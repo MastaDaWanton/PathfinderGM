@@ -1,0 +1,983 @@
+{
+  "schema": 1,
+  "source": "Pathfinder Roleplaying Game Core Rulebook (magic weapons, magic armor, rings, wondrous items; Table: Estimating Magic Item Gold Piece Values) and Advanced Player's Guide p. 287 (corrosive, corrosive burst), read by hand on 2026-10-05 from https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html , https://legacy.aonprd.com/coreRulebook/magicItems/armor.html , https://legacy.aonprd.com/coreRulebook/magicItems/rings.html , https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html , https://legacy.aonprd.com/coreRulebook/magicItems/magicItemCreation.html and https://www.aonprd.com/MagicWeaponsDisplay.aspx . Open Game Content, Open Game License v1.0a (see OGL.txt).",
+  "note": "The property vocabulary every enchanting lane reads (docs/enchanting-contracts.md section 2.2). One entry per book weapon, armour and shield ability, plus the formula-priced wondrous and ring bonuses the book's pricing table names. Every number is the book's, entered by hand; a number that is not the book's is named in the entry's `house` list. `plus` is a bonus equivalent (counts toward the item's total and its capacity), `gp` a flat price outside it, `scaled` a bonus bound at one of `values` and priced bonus squared times `gp_per_square`. `spells` is a list of groups, each group 'any one of these'; each group the binder does not meet is +5 DC, never a refusal (owner, round 1 and round 4 Q4). `requires` restricts the vessel, and the creator clauses are each one more +5 DC. `documents` are effect documents in rules/effectspec.py's vocabulary, applied as printed (`book`); a document naming `choice_key` is filled from the choice stored on the item by effectspec.bind. `not_yet` says, out loud, every clause of the book that nothing executes yet. `aliases` are the old magic-items.json ids, each with the choice it implies, for the migration (lane H). Validated on load by rules/effectspec.properties(); a bad entry stops the load with the fix named.",
+  "properties": [
+    {
+      "id": "flaming", "name": "Flaming", "gear": ["weapon"], "plus": 1, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "rare",
+      "spells": [["flame-blade", "flame-strike", "fireball"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "fire", "lethality": "lethal", "trigger": "hit", "book": true}
+      ],
+      "not_yet": ["The book's flame is lit and put out on command; here it is always lit."],
+      "aliases": {"mi-flaming": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#flaming",
+      "text": "Sheathed in fire: an extra 1d6 fire damage on every hit. The fire does not harm the wielder."
+    },
+    {
+      "id": "frost", "name": "Frost", "gear": ["weapon"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "rare",
+      "spells": [["chill-metal", "ice-storm"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "cold", "lethality": "lethal", "trigger": "hit", "book": true}
+      ],
+      "not_yet": ["The book's cold is called up and dismissed on command; here it is always present."],
+      "aliases": {"mi-frost": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#frost",
+      "text": "Sheathed in icy cold: an extra 1d6 cold damage on every hit."
+    },
+    {
+      "id": "shock", "name": "Shock", "gear": ["weapon"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "rare",
+      "spells": [["call-lightning", "lightning-bolt"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "electricity", "lethality": "lethal", "trigger": "hit", "book": true}
+      ],
+      "not_yet": ["The book's lightning is called up and dismissed on command; here it is always present."],
+      "aliases": {"mi-shock": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#shock",
+      "text": "Sheathed in crackling electricity: an extra 1d6 electricity damage on every hit."
+    },
+    {
+      "id": "corrosive", "name": "Corrosive", "gear": ["weapon"], "plus": 1, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "rare",
+      "spells": [["acid-arrow"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "acid", "lethality": "lethal", "trigger": "hit", "book": true}
+      ],
+      "not_yet": ["The book's acid comes and goes on command; here it is always present."],
+      "aliases": {"mi-corrosive": {}},
+      "source": "https://www.aonprd.com/MagicWeaponsDisplay.aspx?ItemName=Corrosive (Advanced Player's Guide p. 287)",
+      "text": "Slick with acid: an extra 1d6 acid damage on every hit."
+    },
+    {
+      "id": "flaming-burst", "name": "Flaming Burst", "gear": ["weapon"], "plus": 2, "cl": 12,
+      "aura": {"strength": "strong", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["flame-blade", "flame-strike", "fireball"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "fire", "lethality": "lethal", "trigger": "hit", "book": true},
+        {"type": "damage", "dice": "1d10", "damage_type": "fire", "lethality": "lethal", "trigger": "crit", "per_multiplier": true, "book": true}
+      ],
+      "not_yet": ["The book's flame is lit on command (the burst works even when it is out); here the flame is always lit."],
+      "aliases": {"mi-flaming-burst": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#flaming-burst",
+      "text": "Works as a flaming weapon, and bursts with fire on a critical hit: an extra 1d10 fire (2d10 on a x3 weapon, 3d10 on a x4)."
+    },
+    {
+      "id": "icy-burst", "name": "Icy Burst", "gear": ["weapon"], "plus": 2, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["chill-metal", "ice-storm"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "cold", "lethality": "lethal", "trigger": "hit", "book": true},
+        {"type": "damage", "dice": "1d10", "damage_type": "cold", "lethality": "lethal", "trigger": "crit", "per_multiplier": true, "book": true}
+      ],
+      "not_yet": ["The book's cold is called up on command (the burst works even when it is not); here it is always present."],
+      "aliases": {"mi-icy-burst": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#icy-burst",
+      "text": "Works as a frost weapon, and bursts with cold on a critical hit: an extra 1d10 cold (2d10 on a x3 weapon, 3d10 on a x4)."
+    },
+    {
+      "id": "shocking-burst", "name": "Shocking Burst", "gear": ["weapon"], "plus": 2, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["call-lightning", "lightning-bolt"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "electricity", "lethality": "lethal", "trigger": "hit", "book": true},
+        {"type": "damage", "dice": "1d10", "damage_type": "electricity", "lethality": "lethal", "trigger": "crit", "per_multiplier": true, "book": true}
+      ],
+      "not_yet": ["The book's lightning is called up on command (the burst works even when it is not); here it is always present."],
+      "aliases": {"mi-shocking-burst": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#shocking-burst",
+      "text": "Works as a shock weapon, and bursts with lightning on a critical hit: an extra 1d10 electricity (2d10 on a x3 weapon, 3d10 on a x4)."
+    },
+    {
+      "id": "corrosive-burst", "name": "Corrosive Burst", "gear": ["weapon"], "plus": 2, "cl": 12,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["acid-arrow"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d6", "damage_type": "acid", "lethality": "lethal", "trigger": "hit", "book": true},
+        {"type": "damage", "dice": "1d10", "damage_type": "acid", "lethality": "lethal", "trigger": "crit", "per_multiplier": true, "book": true}
+      ],
+      "not_yet": ["The book's acid comes on command (the burst works even when it is off); here it is always present."],
+      "aliases": {"mi-corrosive-burst": {}},
+      "source": "https://www.aonprd.com/MagicWeaponsDisplay.aspx?ItemName=Corrosive%20Burst (Advanced Player's Guide p. 287)",
+      "text": "Works as a corrosive weapon, and bursts with acid on a critical hit: an extra 1d10 acid (2d10 on a x3 weapon, 3d10 on a x4)."
+    },
+    {
+      "id": "keen", "name": "Keen", "gear": ["weapon"], "plus": 1, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["keen-edge"]],
+      "requires": {"melee": true, "damage_types_any": ["piercing", "slashing"]},
+      "documents": [
+        {"type": "crit_range", "multiply": 2, "stacking": "threat-range", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-keen": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#keen",
+      "text": "Doubles the weapon's threat range. Only piercing or slashing melee weapons. Does not stack with anything else that widens a threat range."
+    },
+    {
+      "id": "bane", "name": "Bane", "gear": ["weapon"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["conjuration"]}, "tier": "rare",
+      "spells": [["summon-monster-1"]],
+      "requires": {},
+      "choice": {"key": "foe", "of": "creature_type",
+                 "options": ["aberration", "animal", "construct", "dragon", "fey", "humanoid", "magical-beast", "monstrous-humanoid", "ooze", "outsider", "plant", "undead", "vermin"]},
+      "documents": [
+        {"type": "enhancement_raise", "amount": 2, "choice_key": "foe", "when": {"target": {"choice": "foe"}}, "book": true},
+        {"type": "damage", "dice": "2d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "choice_key": "foe", "when": {"target": {"choice": "foe"}}, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-bane": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#bane",
+      "text": "Against one kind of foe, chosen when it is bound, the weapon's enhancement bonus is 2 better and it deals an extra 2d6 damage. Humanoids and outsiders are chosen by subtype."
+    },
+    {
+      "id": "holy", "name": "Holy", "gear": ["weapon"], "plus": 2, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["holy-smite"]],
+      "requires": {"creator_alignment": "good"},
+      "wielder": {"alignment": "evil", "negative_levels": 1},
+      "documents": [
+        {"type": "strikes_as", "target": "good", "book": true},
+        {"type": "damage", "dice": "2d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "when": {"target": {"alignment": "evil"}}, "book": true}
+      ],
+      "not_yet": [
+        "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be good, and an evil wielder takes no negative level. Both clauses are kept here as data (`requires.creator_alignment`, `wielder`) and nothing checks them.",
+        "The extra 2d6 is `when: target alignment evil`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment (the bestiary field, as Engine._could_be_evil does for smite)."
+      ],
+      "aliases": {"mi-holy": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#holy",
+      "text": "Good-aligned: it passes damage reduction that good passes, and deals an extra 2d6 damage to evil creatures."
+    },
+    {
+      "id": "unholy", "name": "Unholy", "gear": ["weapon"], "plus": 2, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["unholy-blight"]],
+      "requires": {"creator_alignment": "evil"},
+      "wielder": {"alignment": "good", "negative_levels": 1},
+      "documents": [
+        {"type": "strikes_as", "target": "evil", "book": true},
+        {"type": "damage", "dice": "2d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "when": {"target": {"alignment": "good"}}, "book": true}
+      ],
+      "not_yet": [
+        "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be evil, and a good wielder takes no negative level. Both clauses are kept here as data and nothing checks them.",
+        "The extra 2d6 is `when: target alignment good`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment."
+      ],
+      "aliases": {"mi-unholy": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#unholy",
+      "text": "Evil-aligned: it passes damage reduction that evil passes, and deals an extra 2d6 damage to good creatures."
+    },
+    {
+      "id": "axiomatic", "name": "Axiomatic", "gear": ["weapon"], "plus": 2, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["order-s-wrath"]],
+      "requires": {"creator_alignment": "lawful"},
+      "wielder": {"alignment": "chaotic", "negative_levels": 1},
+      "documents": [
+        {"type": "strikes_as", "target": "lawful", "book": true},
+        {"type": "damage", "dice": "2d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "when": {"target": {"alignment": "chaotic"}}, "book": true}
+      ],
+      "not_yet": [
+        "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be lawful, and a chaotic wielder takes no negative level. Both clauses are kept here as data and nothing checks them.",
+        "The extra 2d6 is `when: target alignment chaotic`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment."
+      ],
+      "aliases": {"mi-axiomatic": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#axiomatic",
+      "text": "Lawful-aligned: it passes damage reduction that lawful passes, and deals an extra 2d6 damage to chaotic creatures."
+    },
+    {
+      "id": "anarchic", "name": "Anarchic", "gear": ["weapon"], "plus": 2, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["chaos-hammer"]],
+      "requires": {"creator_alignment": "chaotic"},
+      "wielder": {"alignment": "lawful", "negative_levels": 1},
+      "documents": [
+        {"type": "strikes_as", "target": "chaotic", "book": true},
+        {"type": "damage", "dice": "2d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "when": {"target": {"alignment": "lawful"}}, "book": true}
+      ],
+      "not_yet": [
+        "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be chaotic, and a lawful wielder takes no negative level. Both clauses are kept here as data and nothing checks them.",
+        "The extra 2d6 is `when: target alignment lawful`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment."
+      ],
+      "aliases": {"mi-anarchic": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#anarchic",
+      "text": "Chaotic-aligned: it passes damage reduction that chaotic passes, and deals an extra 2d6 damage to lawful creatures."
+    },
+    {
+      "id": "ghost-touch", "name": "Ghost Touch", "gear": ["weapon"], "plus": 1, "cl": 9,
+      "aura": {"strength": "moderate", "school": ["conjuration"]}, "tier": "exotic",
+      "spells": [["plane-shift"]],
+      "requires": {},
+      "documents": [
+        {"type": "strikes_as", "target": "ghost_touch", "book": true}
+      ],
+      "not_yet": ["An incorporeal creature can pick up and wield a ghost touch weapon; nothing lets an incorporeal creature hold anything yet."],
+      "aliases": {"mi-ghost-touch": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#ghost-touch",
+      "text": "Deals full damage to incorporeal creatures, whatever its enhancement bonus."
+    },
+    {
+      "id": "speed", "name": "Speed", "gear": ["weapon"], "plus": 3, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "legendary",
+      "spells": [["haste"]],
+      "requires": {},
+      "documents": [
+        {"type": "extra_attack", "on": "full_attack", "count": 1, "stacking": "haste", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-speed": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#speed",
+      "text": "On a full attack, one extra attack with this weapon at full base attack bonus. Not with haste."
+    },
+    {
+      "id": "defending", "name": "Defending", "gear": ["weapon"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["abjuration"]}, "tier": "rare",
+      "spells": [["shield", "shield-of-faith"]],
+      "requires": {},
+      "documents": [
+        {"type": "enhancement_to_ac", "max": "enhancement", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-defending": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#defending",
+      "text": "At the start of each turn the wielder may move some or all of the weapon's enhancement bonus to AC, where it stacks with everything else, until their next turn."
+    },
+    {
+      "id": "merciful", "name": "Merciful", "gear": ["weapon"], "plus": 1, "cl": 5,
+      "aura": {"strength": "faint", "school": ["conjuration"]}, "tier": "uncommon",
+      "spells": [["cure-light-wounds"]],
+      "requires": {},
+      "documents": [
+        {"type": "weapon_lethality", "lethality": "nonlethal", "suppressible": true, "book": true},
+        {"type": "damage", "dice": "1d6", "damage_type": "untyped", "lethality": "nonlethal", "trigger": "hit", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-merciful": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#merciful",
+      "text": "An extra 1d6 damage, and all of it non-lethal. On command it can be suppressed, and then it deals lethal damage without the extra die."
+    },
+    {
+      "id": "vicious", "name": "Vicious", "gear": ["weapon"], "plus": 1, "cl": 9,
+      "aura": {"strength": "moderate", "school": ["necromancy"]}, "tier": "uncommon",
+      "spells": [["enervation"]],
+      "requires": {"melee": true},
+      "documents": [
+        {"type": "damage", "dice": "2d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "book": true},
+        {"type": "damage", "dice": "1d6", "damage_type": "untyped", "lethality": "lethal", "trigger": "hit", "recipient": "self", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-vicious": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#vicious",
+      "text": "A flash of disruptive energy on every hit: an extra 2d6 damage to the foe, and 1d6 to the wielder. Melee weapons only."
+    },
+    {
+      "id": "wounding", "name": "Wounding", "gear": ["weapon"], "plus": 2, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "exotic",
+      "spells": [["bleed"]],
+      "requires": {},
+      "documents": [
+        {"type": "bleed", "amount": 1, "stopped_by": "DC 15 Heal check, or any spell that cures hit point damage", "trigger": "hit", "stacks": true, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-wounding": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#wounding",
+      "text": "Each hit adds 1 point of bleed, taken at the start of the creature's turns, and the bleed grows with every hit. A DC 15 Heal check or any healing spell stops it."
+    },
+    {
+      "id": "thundering", "name": "Thundering", "gear": ["weapon"], "plus": 1, "cl": 5,
+      "aura": {"strength": "faint", "school": ["necromancy"]}, "tier": "rare",
+      "spells": [["blindness-deafness"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage", "dice": "1d8", "damage_type": "sonic", "lethality": "lethal", "trigger": "crit", "per_multiplier": true, "book": true},
+        {"type": "save_gate", "target": "fort", "dc": 14, "trigger": "crit", "book": true,
+         "on_failure": [{"type": "apply_condition", "target": "deafened", "duration": {"unit": "permanent"}}]}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-thundering": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#thundering",
+      "text": "A roar of thunder on a critical hit: an extra 1d8 sonic (2d8 on a x3 weapon, 3d8 on a x4), and Fortitude DC 14 or deafened permanently."
+    },
+    {
+      "id": "disruption", "name": "Disruption", "gear": ["weapon"], "plus": 2, "cl": 14,
+      "aura": {"strength": "strong", "school": ["conjuration"]}, "tier": "exotic",
+      "spells": [["heal"]],
+      "requires": {"melee": true, "damage_types_any": ["bludgeoning"]},
+      "documents": [
+        {"type": "save_gate", "target": "will", "dc": 14, "trigger": "hit", "when": {"target": {"type": "undead"}}, "book": true,
+         "on_failure": [{"type": "slay"}]}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#disruption",
+      "text": "Any undead it strikes must make a DC 14 Will save or be destroyed. Bludgeoning melee weapons only."
+    },
+    {
+      "id": "vorpal", "name": "Vorpal", "gear": ["weapon"], "plus": 5, "cl": 18,
+      "aura": {"strength": "strong", "school": ["necromancy", "transmutation"]}, "tier": "legendary",
+      "spells": [["circle-of-death"], ["keen-edge"]],
+      "requires": {"melee": true, "damage_types_any": ["slashing"]},
+      "documents": [
+        {"type": "slay", "natural": 20, "except": ["ooze", "construct", "undead"], "trigger": "crit", "book": true}
+      ],
+      "not_yet": [
+        "The book's exceptions are 'many aberrations and all oozes' (no head) and 'golems and undead creatures other than vampires' (unaffected). Written here as oozes, constructs and undead: a vampire should lose its head and does not, a construct that is not a golem is spared where the book may not spare it, and an aberration with no head is beheaded, because the bestiary records no head."
+      ],
+      "aliases": {"mi-vorpal": {}},
+      "source": "https://www.aonprd.com/MagicWeaponsDisplay.aspx?ItemName=Vorpal",
+      "text": "On a natural 20 confirmed as a critical hit, it severs the foe's head. Slashing melee weapons only."
+    },
+    {
+      "id": "brilliant-energy", "name": "Brilliant Energy", "gear": ["weapon"], "plus": 4, "cl": 16,
+      "aura": {"strength": "strong", "school": ["transmutation"]}, "tier": "legendary",
+      "spells": [["gaseous-form"], ["continual-flame"]],
+      "requires": {"launcher": false},
+      "documents": [
+        {"type": "ignore_armour", "cannot_harm": ["undead", "construct", "object"], "book": true}
+      ],
+      "not_yet": ["It always sheds light as a torch (20-foot radius); nothing reads light from a weapon yet."],
+      "aliases": {"mi-brilliant-energy": {}},
+      "source": "https://www.aonprd.com/MagicWeaponsDisplay.aspx?ItemName=Brilliant%20Energy",
+      "text": "Its edge is light: armour and shield bonuses do not count against it, and it cannot harm undead, constructs or objects. Melee weapons, thrown weapons and ammunition only."
+    },
+    {
+      "id": "dancing", "name": "Dancing", "gear": ["weapon"], "plus": 4, "cl": 15,
+      "aura": {"strength": "strong", "school": ["transmutation"]}, "tier": "legendary",
+      "spells": [["animate-objects"]],
+      "requires": {"melee": true},
+      "documents": [],
+      "reads_tag": "Lane C2 (contracts §4, the last reader): loosed as a standard action, the weapon fights for 4 rounds as a scene actor at the base attack bonus of whoever loosed it, makes no attacks of opportunity, and can be caught back as a free action.",
+      "not_yet": ["Nothing loosens the weapon yet: dancing is lane C2's, built after the other readers. Until then the property is bound, priced and shown, and the weapon does not dance."],
+      "aliases": {"mi-dancing": {}},
+      "source": "https://www.aonprd.com/MagicWeaponsDisplay.aspx?ItemName=Dancing",
+      "text": "Loosed as a standard action, it fights on its own for 4 rounds at the base attack bonus of the one who loosed it. Melee weapons only."
+    },
+    {
+      "id": "spell-storing", "name": "Spell Storing", "gear": ["weapon"], "plus": 1, "cl": 12,
+      "aura": {"strength": "strong", "school": ["evocation"]}, "tier": "rare",
+      "spells": [],
+      "requires": {"creator_caster_level": 12},
+      "documents": [],
+      "reads_tag": "Lane C2: holds one targeted spell of 3rd level or lower with a casting time of one standard action, cast into the creature struck as a free action, through the cast door with origin item:<id>.",
+      "not_yet": ["Nothing stores a spell in a weapon yet: spell storing is lane C2's. Until then the property is bound, priced and shown, and holds nothing."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#spell-storing",
+      "text": "Holds one targeted spell of up to 3rd level, released into a creature the weapon hits."
+    },
+    {
+      "id": "distance", "name": "Distance", "gear": ["weapon"], "plus": 1, "cl": 6,
+      "aura": {"strength": "moderate", "school": ["divination"]}, "tier": "uncommon",
+      "spells": [["clairaudience-clairvoyance"]],
+      "requires": {"ranged": true},
+      "documents": [
+        {"type": "gear_mod", "target": "range_pct", "amount": 100, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#distance",
+      "text": "Doubles the weapon's range increment. Ranged weapons only."
+    },
+    {
+      "id": "returning", "name": "Returning", "gear": ["weapon"], "plus": 1, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "uncommon",
+      "spells": [["telekinesis"]],
+      "requires": {"thrown": true},
+      "documents": [],
+      "reads_tag": "The thrown-weapon path asks has_state('property.returning') of the item: a returning weapon flies back to the thrower just before their next turn (Scene.out_of_hand leaves it in their hand), and catching it is a free action.",
+      "not_yet": ["Nothing reads property.returning yet; a thrown returning weapon lies where it fell until lane C's thrown path asks the tag."],
+      "aliases": {"mi-returning": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#returning",
+      "text": "Thrown, it flies back to the thrower's hand just before their next turn. Thrown weapons only."
+    },
+    {
+      "id": "seeking", "name": "Seeking", "gear": ["weapon"], "plus": 1, "cl": 12,
+      "aura": {"strength": "strong", "school": ["divination"]}, "tier": "rare",
+      "spells": [["true-seeing"]],
+      "requires": {"ranged": true},
+      "documents": [],
+      "reads_tag": "The attack path's concealment roll asks has_state('property.seeking') of the weapon: a seeking weapon's attack ignores the miss chance concealment would give (the wielder still has to aim at the right square).",
+      "not_yet": ["Nothing reads property.seeking yet; the miss chance is still rolled until lane C's concealment roll asks the tag."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#seeking",
+      "text": "Veers to its target: concealment gives no miss chance against it. Ranged weapons only."
+    },
+    {
+      "id": "throwing", "name": "Throwing", "gear": ["weapon"], "plus": 1, "cl": 5,
+      "aura": {"strength": "faint", "school": ["transmutation"]}, "tier": "uncommon",
+      "spells": [["magic-stone"]],
+      "requires": {"melee": true},
+      "documents": [
+        {"type": "gear_mod", "target": "throw_range_ft", "amount": 10, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-throwing": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#throwing",
+      "text": "Can be thrown by anyone proficient with it in melee, with a range increment of 10 feet. Melee weapons only."
+    },
+    {
+      "id": "ki-focus", "name": "Ki Focus", "gear": ["weapon"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [],
+      "requires": {"melee": true, "creator_class": "monk"},
+      "documents": [],
+      "reads_tag": "The monk's ki abilities (content/class-abilities/monk.json: ki strike, stunning fist's charge `weapons`, quivering palm) ask has_state('property.ki-focus') of the weapon in hand and treat it as an unarmed strike.",
+      "not_yet": ["Nothing reads property.ki-focus yet; a monk's stunning fist charge still lists only unarmed strikes until lane C adds the tag to its weapons test."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#ki-focus",
+      "text": "The wielder may channel ki attacks through it as if it were an unarmed strike: ki strike, stunning fist, quivering palm. Melee weapons only."
+    },
+    {
+      "id": "mighty-cleaving", "name": "Mighty Cleaving", "gear": ["weapon"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "rare",
+      "spells": [["divine-power"]],
+      "requires": {"melee": true},
+      "documents": [],
+      "reads_tag": "The Cleave feat's action, when it exists, asks has_state('property.mighty-cleaving') of the weapon and allows one more attack against a foe adjacent to the last and within reach.",
+      "not_yet": ["Cleave has no feat action yet (states-effects-tells ledger: feat actions have no find_ability branch), so mighty cleaving has nothing to extend."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#mighty-cleaving",
+      "text": "With Cleave, one more attack when the first hits, against a foe adjacent to the last and within reach. Melee weapons only."
+    },
+
+    {
+      "id": "fortification-light", "name": "Light Fortification", "gear": ["armour", "shield"], "plus": 1, "cl": 13,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "rare",
+      "spells": [["limited-wish", "miracle"]],
+      "requires": {},
+      "documents": [
+        {"type": "fortification", "percent": 25, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-fortification-light": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#fortification",
+      "text": "A 25% chance that a critical hit or sneak attack against the wearer is rolled as an ordinary hit."
+    },
+    {
+      "id": "fortification-moderate", "name": "Moderate Fortification", "gear": ["armour", "shield"], "plus": 3, "cl": 13,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "exotic",
+      "spells": [["limited-wish", "miracle"]],
+      "requires": {},
+      "documents": [
+        {"type": "fortification", "percent": 50, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-fortification-moderate": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#fortification",
+      "text": "A 50% chance that a critical hit or sneak attack against the wearer is rolled as an ordinary hit."
+    },
+    {
+      "id": "fortification-heavy", "name": "Heavy Fortification", "gear": ["armour", "shield"], "plus": 5, "cl": 13,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "legendary",
+      "spells": [["limited-wish", "miracle"]],
+      "requires": {},
+      "documents": [
+        {"type": "fortification", "percent": 75, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-fortification-heavy": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#fortification",
+      "text": "A 75% chance that a critical hit or sneak attack against the wearer is rolled as an ordinary hit."
+    },
+    {
+      "id": "spell-resistance-13", "name": "Spell Resistance (13)", "gear": ["armour", "shield"], "plus": 2, "cl": 15,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "rare",
+      "spells": [["spell-resistance"]],
+      "requires": {},
+      "documents": [
+        {"type": "spell_resistance", "amount": 13, "book": true}
+      ],
+      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet (effectspec, docs/spells.md 5.1). Lane C builds the check (contracts §4, SR); until then the wearer's SR is shown and does not stop a spell."],
+      "aliases": {"mi-spell-resistance-13": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
+      "text": "Spell resistance 13 while worn."
+    },
+    {
+      "id": "spell-resistance-15", "name": "Spell Resistance (15)", "gear": ["armour", "shield"], "plus": 3, "cl": 15,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "exotic",
+      "spells": [["spell-resistance"]],
+      "requires": {},
+      "documents": [
+        {"type": "spell_resistance", "amount": 15, "book": true}
+      ],
+      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet. Lane C builds the check; until then the wearer's SR is shown and does not stop a spell."],
+      "aliases": {"mi-spell-resistance-15": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
+      "text": "Spell resistance 15 while worn."
+    },
+    {
+      "id": "spell-resistance-17", "name": "Spell Resistance (17)", "gear": ["armour", "shield"], "plus": 4, "cl": 15,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "exotic",
+      "spells": [["spell-resistance"]],
+      "requires": {},
+      "documents": [
+        {"type": "spell_resistance", "amount": 17, "book": true}
+      ],
+      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet. Lane C builds the check; until then the wearer's SR is shown and does not stop a spell."],
+      "aliases": {"mi-spell-resistance-17": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
+      "text": "Spell resistance 17 while worn."
+    },
+    {
+      "id": "spell-resistance-19", "name": "Spell Resistance (19)", "gear": ["armour", "shield"], "plus": 5, "cl": 15,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "legendary",
+      "spells": [["spell-resistance"]],
+      "requires": {},
+      "documents": [
+        {"type": "spell_resistance", "amount": 19, "book": true}
+      ],
+      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet. Lane C builds the check; until then the wearer's SR is shown and does not stop a spell."],
+      "aliases": {"mi-spell-resistance-19": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
+      "text": "Spell resistance 19 while worn."
+    },
+    {
+      "id": "energy-resistance", "name": "Energy Resistance", "gear": ["armour", "shield"], "gp": 18000, "cl": 3,
+      "aura": {"strength": "faint", "school": ["abjuration"]}, "tier": "rare",
+      "spells": [["resist-energy"]],
+      "requires": {},
+      "choice": {"key": "energy", "of": "damage_type", "options": ["acid", "cold", "electricity", "fire", "sonic"]},
+      "documents": [
+        {"type": "resistance", "amount": 10, "choice_key": "energy", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-energy-resistance-fire": {"energy": "fire"}, "mi-energy-resistance-cold": {"energy": "cold"}, "mi-energy-resistance-electricity": {"energy": "electricity"}, "mi-energy-resistance-acid": {"energy": "acid"}, "mi-energy-resistance-sonic": {"energy": "sonic"}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#energy-resistance",
+      "text": "Absorbs the first 10 points of one chosen energy each time the wearer would take it."
+    },
+    {
+      "id": "energy-resistance-improved", "name": "Improved Energy Resistance", "gear": ["armour", "shield"], "gp": 42000, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["abjuration"]}, "tier": "exotic",
+      "spells": [["resist-energy"]],
+      "requires": {},
+      "choice": {"key": "energy", "of": "damage_type", "options": ["acid", "cold", "electricity", "fire", "sonic"]},
+      "documents": [
+        {"type": "resistance", "amount": 20, "choice_key": "energy", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-energy-resistance-fire-improved": {"energy": "fire"}, "mi-energy-resistance-cold-improved": {"energy": "cold"}, "mi-energy-resistance-electricity-improved": {"energy": "electricity"}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#energy-resistance",
+      "text": "Absorbs the first 20 points of one chosen energy each time the wearer would take it."
+    },
+    {
+      "id": "energy-resistance-greater", "name": "Greater Energy Resistance", "gear": ["armour", "shield"], "gp": 66000, "cl": 11,
+      "aura": {"strength": "moderate", "school": ["abjuration"]}, "tier": "legendary",
+      "spells": [["resist-energy"]],
+      "requires": {},
+      "choice": {"key": "energy", "of": "damage_type", "options": ["acid", "cold", "electricity", "fire", "sonic"]},
+      "documents": [
+        {"type": "resistance", "amount": 30, "choice_key": "energy", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-energy-resistance-fire-greater": {"energy": "fire"}, "mi-energy-resistance-cold-greater": {"energy": "cold"}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#energy-resistance",
+      "text": "Absorbs the first 30 points of one chosen energy each time the wearer would take it."
+    },
+    {
+      "id": "invulnerability", "name": "Invulnerability", "gear": ["armour"], "plus": 3, "cl": 18,
+      "aura": {"strength": "strong", "school": ["abjuration", "evocation"]}, "tier": "legendary",
+      "spells": [["stoneskin"], ["wish", "miracle"]],
+      "requires": {},
+      "documents": [
+        {"type": "damage_reduction", "amount": 5, "bypass": "magic", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-invulnerability": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#invulnerability",
+      "text": "Damage reduction 5/magic while worn."
+    },
+    {
+      "id": "shadow", "name": "Shadow", "gear": ["armour"], "gp": 3750, "cl": 5,
+      "aura": {"strength": "faint", "school": ["illusion"]}, "tier": "uncommon",
+      "spells": [["invisibility"], ["silence"]],
+      "requires": {},
+      "documents": [
+        {"type": "skill_mod", "target": "stealth", "amount": 5, "bonus_type": "competence", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-shadow": {}, "mi-silent-moves": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#shadow",
+      "text": "Blurs the wearer and dampens the sound around them: +5 competence on Stealth. Silent moves, the older ability, is this one in Pathfinder."
+    },
+    {
+      "id": "shadow-improved", "name": "Improved Shadow", "gear": ["armour"], "gp": 15000, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["illusion"]}, "tier": "rare",
+      "spells": [["invisibility"], ["silence"]],
+      "requires": {},
+      "documents": [
+        {"type": "skill_mod", "target": "stealth", "amount": 10, "bonus_type": "competence", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-shadow-improved": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#shadow",
+      "text": "+10 competence on Stealth while worn."
+    },
+    {
+      "id": "shadow-greater", "name": "Greater Shadow", "gear": ["armour"], "gp": 33750, "cl": 15,
+      "aura": {"strength": "strong", "school": ["illusion"]}, "tier": "exotic",
+      "spells": [["invisibility"], ["silence"]],
+      "requires": {},
+      "documents": [
+        {"type": "skill_mod", "target": "stealth", "amount": 15, "bonus_type": "competence", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-shadow-greater": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#shadow",
+      "text": "+15 competence on Stealth while worn."
+    },
+    {
+      "id": "slick", "name": "Slick", "gear": ["armour"], "gp": 3750, "cl": 4,
+      "aura": {"strength": "faint", "school": ["conjuration"]}, "tier": "uncommon",
+      "spells": [["grease"]],
+      "requires": {},
+      "documents": [
+        {"type": "skill_mod", "target": "escape artist", "amount": 5, "bonus_type": "competence", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-slick": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#slick",
+      "text": "Slick as oil: +5 competence on Escape Artist."
+    },
+    {
+      "id": "slick-improved", "name": "Improved Slick", "gear": ["armour"], "gp": 15000, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["conjuration"]}, "tier": "rare",
+      "spells": [["grease"]],
+      "requires": {},
+      "documents": [
+        {"type": "skill_mod", "target": "escape artist", "amount": 10, "bonus_type": "competence", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-slick-improved": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#slick",
+      "text": "+10 competence on Escape Artist while worn."
+    },
+    {
+      "id": "slick-greater", "name": "Greater Slick", "gear": ["armour"], "gp": 33750, "cl": 15,
+      "aura": {"strength": "strong", "school": ["conjuration"]}, "tier": "exotic",
+      "spells": [["grease"]],
+      "requires": {},
+      "documents": [
+        {"type": "skill_mod", "target": "escape artist", "amount": 15, "bonus_type": "competence", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-slick-greater": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#slick",
+      "text": "+15 competence on Escape Artist while worn."
+    },
+    {
+      "id": "glamered", "name": "Glamered", "gear": ["armour"], "gp": 2700, "cl": 10,
+      "aura": {"strength": "moderate", "school": ["illusion"]}, "tier": "uncommon",
+      "spells": [["disguise-self"]],
+      "requires": {},
+      "documents": [
+        {"type": "item_power", "tell": "On a word, the armour takes the look of ordinary clothes; only true seeing shows it for what it is.", "uses": "unlimited", "book": true}
+      ],
+      "not_yet": ["Nothing in the app sees through a disguise yet, so only the tell changes."],
+      "aliases": {"mi-glamered": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#glamered",
+      "text": "On command the armour looks like ordinary clothing, until it is commanded back. Only true seeing reveals it."
+    },
+    {
+      "id": "ghost-touch-armour", "name": "Ghost Touch (armour)", "gear": ["armour", "shield"], "plus": 3, "cl": 15,
+      "aura": {"strength": "strong", "school": ["transmutation"]}, "tier": "exotic",
+      "spells": [["etherealness"]],
+      "requires": {},
+      "documents": [],
+      "reads_tag": "The incorporeal attack path asks has_state('property.ghost-touch-armour') of the defender's armour and shield: their enhancement and armour bonuses count against an incorporeal creature's touch attacks; an incorporeal creature can wear it.",
+      "not_yet": ["Nothing reads property.ghost-touch-armour yet; an incorporeal touch still ignores the armour until lane C's incorporeal attack path asks the tag."],
+      "aliases": {"mi-ghost-touch-armour": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#ghost-touch",
+      "text": "Its armour and enhancement bonuses count against incorporeal creatures' touch attacks, and an incorporeal creature can wear it."
+    },
+    {
+      "id": "wild", "name": "Wild", "gear": ["armour", "shield"], "plus": 3, "cl": 9,
+      "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "exotic",
+      "spells": [["baleful-polymorph"]],
+      "requires": {},
+      "documents": [],
+      "reads_tag": "The druid's wild shape asks has_state('property.wild') of the worn armour and shield, and keeps their armour and enhancement bonuses while the wearer is in a wild shape.",
+      "not_yet": ["Nothing reads property.wild yet; wild shape drops the armour bonus as for any suit until lane C's wild shape asks the tag."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#wild",
+      "text": "The wearer keeps its armour and enhancement bonuses in wild shape; the armour is not seen while they are transformed."
+    },
+    {
+      "id": "etherealness", "name": "Etherealness", "gear": ["armour"], "gp": 49000, "cl": 13,
+      "aura": {"strength": "strong", "school": ["transmutation"]}, "tier": "legendary",
+      "spells": [["ethereal-jaunt"]],
+      "requires": {},
+      "documents": [
+        {"type": "item_power", "spell": "ethereal-jaunt", "caster_level": 13, "uses": "per_day", "uses_count": 1, "book": true}
+      ],
+      "not_yet": ["The book's wearer stays ethereal until they choose to return; here it lasts as the spell does at caster level 13."],
+      "aliases": {"mi-etherealness": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#etherealness",
+      "text": "Once a day, on command, the wearer becomes ethereal, as ethereal jaunt."
+    },
+    {
+      "id": "undead-controlling", "name": "Undead Controlling", "gear": ["armour", "shield"], "gp": 49000, "cl": 13,
+      "aura": {"strength": "strong", "school": ["necromancy"]}, "tier": "legendary",
+      "spells": [["control-undead"]],
+      "requires": {},
+      "documents": [
+        {"type": "item_power", "spell": "control-undead", "caster_level": 13, "uses": "per_day", "uses_count": 1, "book": true}
+      ],
+      "not_yet": ["The book's budget is 26 HD of undead a day, which is one control undead at caster level 13 (2 HD per level); the book lets the wearer spend it across several commands, and here it is spent in one."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#undead-controlling",
+      "text": "Controls up to 26 HD of undead a day, as control undead; the control ends at dawn."
+    },
+    {
+      "id": "arrow-catching", "name": "Arrow Catching", "gear": ["shield"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["abjuration"]}, "tier": "rare",
+      "spells": [["entropic-shield"]],
+      "requires": {},
+      "documents": [
+        {"type": "deflect_ranged", "draws_ft": 5, "deflection": 1, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-arrow-catching": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#arrow-catching",
+      "text": "+1 deflection to AC against ranged attacks, and ranged attacks aimed at anyone within 5 feet of the bearer are drawn to the bearer instead."
+    },
+    {
+      "id": "arrow-deflection", "name": "Arrow Deflection", "gear": ["shield"], "plus": 2, "cl": 5,
+      "aura": {"strength": "faint", "school": ["abjuration"]}, "tier": "rare",
+      "spells": [["shield"]],
+      "requires": {},
+      "documents": [
+        {"type": "deflect_ranged", "per": "round", "save": "ref", "dc": 20, "dc_adds_enhancement": true, "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#arrow-deflection",
+      "text": "Once a round, a ranged attack that would hit the bearer is deflected on a DC 20 Reflex save, plus the attacking weapon's enhancement bonus."
+    },
+    {
+      "id": "bashing", "name": "Bashing", "gear": ["shield"], "plus": 1, "cl": 8,
+      "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "uncommon",
+      "spells": [["bull-s-strength"]],
+      "requires": {},
+      "documents": [],
+      "reads_tag": "The shield bash's weapon row asks has_state('property.bashing') of the shield: it deals damage as a weapon two size categories larger and bashes as a +1 weapon (the book: a shield's enhancement never reaches a bash, so this is the only route).",
+      "not_yet": ["Nothing reads property.bashing yet; a bash deals the shield's ordinary damage until lane C's bash row asks the tag."],
+      "aliases": {"mi-bashing": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#bashing",
+      "text": "A shield bash deals damage as a weapon two sizes larger, and the shield bashes as a +1 weapon."
+    },
+    {
+      "id": "blinding", "name": "Blinding", "gear": ["shield"], "plus": 1, "cl": 7,
+      "aura": {"strength": "moderate", "school": ["evocation"]}, "tier": "rare",
+      "spells": [["searing-light"]],
+      "requires": {},
+      "documents": [
+        {"type": "item_power", "uses": "per_day", "uses_count": 2, "area": {"shape": "burst", "ft": 20}, "book": true,
+         "effect": [
+           {"type": "save_gate", "target": "ref", "dc": 14,
+            "on_failure": [{"type": "apply_condition", "target": "blinded", "duration": {"amount": "1d4", "unit": "round"}}]}
+         ]}
+      ],
+      "not_yet": [],
+      "aliases": {"mi-blinding": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#blinding",
+      "text": "Twice a day, on command, a flash of light: everyone within 20 feet but the bearer makes a DC 14 Reflex save or is blinded for 1d4 rounds."
+    },
+    {
+      "id": "animated", "name": "Animated", "gear": ["shield"], "plus": 2, "cl": 12,
+      "aura": {"strength": "strong", "school": ["transmutation"]}, "tier": "legendary",
+      "spells": [["animate-objects"]],
+      "requires": {},
+      "documents": [],
+      "reads_tag": "Hands accounting asks has_state('property.animated') of the shield: on command it floats beside the bearer and protects them as if held, leaving both hands free, with its penalties still applying.",
+      "not_yet": ["Nothing reads property.animated yet; the shield still fills a hand until lane C's hands accounting asks the tag."],
+      "aliases": {"mi-animated": {}},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#animated",
+      "text": "On command it floats beside the bearer and protects them as if held, leaving both hands free."
+    },
+    {
+      "id": "reflecting", "name": "Reflecting", "gear": ["shield"], "plus": 5, "cl": 14,
+      "aura": {"strength": "strong", "school": ["abjuration"]}, "tier": "legendary",
+      "spells": [["spell-turning"]],
+      "requires": {},
+      "documents": [
+        {"type": "item_power", "spell": "spell-turning", "caster_level": 14, "uses": "per_day", "uses_count": 1, "book": true}
+      ],
+      "not_yet": ["Spell turning acts during somebody else's casting, and the engine has no readied-action step to hang it on (effectspec spell_operation); the use is counted and the turning narrated until it does."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#reflecting",
+      "text": "Once a day it turns a spell back on its caster, as spell turning."
+    },
+
+    {
+      "id": "deflection", "name": "Deflection", "gear": ["ring"],
+      "scaled": {"values": [1, 2, 3, 4, 5], "gp_per_square": 2000, "creator_cl_per_bonus": 3,
+                 "tiers": ["uncommon", "uncommon", "rare", "exotic", "legendary"]},
+      "cl": 5, "aura": {"strength": "faint", "school": ["abjuration"]}, "tier": "uncommon",
+      "spells": [["shield-of-faith"]],
+      "requires": {},
+      "documents": [
+        {"type": "combat_mod", "target": "ac", "amount": "bonus", "bonus_type": "deflection", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/rings.html#ring-of-protection",
+      "text": "A deflection bonus to AC, +1 to +5: the ring of protection."
+    },
+    {
+      "id": "natural-armour", "name": "Natural Armour", "gear": ["wondrous"], "slots": ["neck"],
+      "scaled": {"values": [1, 2, 3, 4, 5], "gp_per_square": 2000, "creator_cl_per_bonus": 3,
+                 "tiers": ["uncommon", "uncommon", "rare", "exotic", "legendary"]},
+      "cl": 5, "aura": {"strength": "faint", "school": ["transmutation"]}, "tier": "uncommon",
+      "spells": [["barkskin"]],
+      "requires": {},
+      "documents": [
+        {"type": "combat_mod", "target": "ac", "amount": "bonus", "bonus_type": "natural armour", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#amulet-of-natural-armor",
+      "text": "An enhancement to natural armour, +1 to +5: the amulet of natural armour. Does not stack with barkskin."
+    },
+    {
+      "id": "armour-bonus", "name": "Armour Bonus", "gear": ["wondrous"], "slots": ["wrists"],
+      "scaled": {"values": [1, 2, 3, 4, 5, 6, 7, 8], "gp_per_square": 1000, "creator_cl_per_bonus": 2,
+                 "tiers": ["common", "uncommon", "uncommon", "rare", "rare", "exotic", "exotic", "legendary"]},
+      "cl": 7, "aura": {"strength": "moderate", "school": ["conjuration"]}, "tier": "common",
+      "spells": [["mage-armor"]],
+      "requires": {},
+      "documents": [
+        {"type": "combat_mod", "target": "ac", "amount": "bonus", "bonus_type": "armour", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#bracers-of-armor",
+      "text": "An armour bonus to AC, +1 to +8, as if wearing armour: the bracers of armour."
+    },
+    {
+      "id": "resistance", "name": "Resistance", "gear": ["wondrous"], "slots": ["shoulders"],
+      "scaled": {"values": [1, 2, 3, 4, 5], "gp_per_square": 1000, "creator_cl_per_bonus": 3,
+                 "tiers": ["common", "uncommon", "rare", "exotic", "legendary"]},
+      "cl": 5, "aura": {"strength": "faint", "school": ["abjuration"]}, "tier": "common",
+      "spells": [["resistance"]],
+      "requires": {},
+      "documents": [
+        {"type": "save_mod", "target": "fort", "amount": "bonus", "bonus_type": "resistance", "book": true},
+        {"type": "save_mod", "target": "ref", "amount": "bonus", "bonus_type": "resistance", "book": true},
+        {"type": "save_mod", "target": "will", "amount": "bonus", "bonus_type": "resistance", "book": true}
+      ],
+      "not_yet": [],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#cloak-of-resistance",
+      "text": "A resistance bonus on every saving throw, +1 to +5: the cloak of resistance."
+    },
+    {
+      "id": "ability-strength", "name": "Strength", "gear": ["wondrous"], "slots": ["belt"],
+      "scaled": {"values": [2, 4, 6], "gp_per_square": 1000, "tiers": ["rare", "exotic", "legendary"]},
+      "cl": 8, "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["bull-s-strength"]],
+      "requires": {},
+      "documents": [
+        {"type": "ability_mod", "target": "str", "amount": "bonus", "bonus_type": "enhancement", "book": true}
+      ],
+      "not_yet": ["The book's bonus becomes permanent after 24 hours worn (it then counts for hit points and skill ranks); here it is a standing bonus while worn."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#belt-of-giant-strength",
+      "text": "An enhancement bonus to Strength, +2, +4 or +6: the belt of giant strength."
+    },
+    {
+      "id": "ability-dexterity", "name": "Dexterity", "gear": ["wondrous"], "slots": ["belt"],
+      "scaled": {"values": [2, 4, 6], "gp_per_square": 1000, "tiers": ["rare", "exotic", "legendary"]},
+      "cl": 8, "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["cat-s-grace"]],
+      "requires": {},
+      "documents": [
+        {"type": "ability_mod", "target": "dex", "amount": "bonus", "bonus_type": "enhancement", "book": true}
+      ],
+      "not_yet": ["The book's bonus becomes permanent after 24 hours worn; here it is a standing bonus while worn."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#belt-of-incredible-dexterity",
+      "text": "An enhancement bonus to Dexterity, +2, +4 or +6: the belt of incredible dexterity."
+    },
+    {
+      "id": "ability-constitution", "name": "Constitution", "gear": ["wondrous"], "slots": ["belt"],
+      "scaled": {"values": [2, 4, 6], "gp_per_square": 1000, "tiers": ["rare", "exotic", "legendary"]},
+      "cl": 8, "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["bear-s-endurance"]],
+      "requires": {},
+      "documents": [
+        {"type": "ability_mod", "target": "con", "amount": "bonus", "bonus_type": "enhancement", "book": true}
+      ],
+      "not_yet": ["The book's bonus becomes permanent after 24 hours worn (it then counts for hit points); here it is a standing bonus while worn."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#belt-of-mighty-constitution",
+      "text": "An enhancement bonus to Constitution, +2, +4 or +6: the belt of mighty constitution."
+    },
+    {
+      "id": "ability-intelligence", "name": "Intelligence", "gear": ["wondrous"], "slots": ["headband"],
+      "scaled": {"values": [2, 4, 6], "gp_per_square": 1000, "tiers": ["rare", "exotic", "legendary"]},
+      "cl": 8, "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["fox-s-cunning"]],
+      "requires": {},
+      "documents": [
+        {"type": "ability_mod", "target": "int", "amount": "bonus", "bonus_type": "enhancement", "book": true}
+      ],
+      "not_yet": ["The book's headband also grants skill ranks, chosen when it is made, and its bonus becomes permanent after 24 hours worn; neither is modelled."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#headband-of-vast-intelligence",
+      "text": "An enhancement bonus to Intelligence, +2, +4 or +6: the headband of vast intelligence."
+    },
+    {
+      "id": "ability-wisdom", "name": "Wisdom", "gear": ["wondrous"], "slots": ["headband"],
+      "scaled": {"values": [2, 4, 6], "gp_per_square": 1000, "tiers": ["rare", "exotic", "legendary"]},
+      "cl": 8, "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["owl-s-wisdom"]],
+      "requires": {},
+      "documents": [
+        {"type": "ability_mod", "target": "wis", "amount": "bonus", "bonus_type": "enhancement", "book": true}
+      ],
+      "not_yet": ["The book's bonus becomes permanent after 24 hours worn; here it is a standing bonus while worn."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#headband-of-inspired-wisdom",
+      "text": "An enhancement bonus to Wisdom, +2, +4 or +6: the headband of inspired wisdom."
+    },
+    {
+      "id": "ability-charisma", "name": "Charisma", "gear": ["wondrous"], "slots": ["headband"],
+      "scaled": {"values": [2, 4, 6], "gp_per_square": 1000, "tiers": ["rare", "exotic", "legendary"]},
+      "cl": 8, "aura": {"strength": "moderate", "school": ["transmutation"]}, "tier": "rare",
+      "spells": [["eagle-s-splendor"]],
+      "requires": {},
+      "documents": [
+        {"type": "ability_mod", "target": "cha", "amount": "bonus", "bonus_type": "enhancement", "book": true}
+      ],
+      "not_yet": ["The book's bonus becomes permanent after 24 hours worn; here it is a standing bonus while worn."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/wondrousItems.html#headband-of-alluring-charisma",
+      "text": "An enhancement bonus to Charisma, +2, +4 or +6: the headband of alluring charisma."
+    },
+    {
+      "id": "skill-competence", "name": "Skill Competence", "gear": ["wondrous", "ring"],
+      "scaled": {"values": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "gp_per_square": 100,
+                 "tiers": ["common", "common", "common", "uncommon", "uncommon", "rare", "rare", "exotic", "exotic", "legendary"]},
+      "cl": 5, "aura": {"strength": "faint", "school": ["transmutation"]}, "tier": "common",
+      "spells": [],
+      "requires": {},
+      "choice": {"key": "skill", "of": "skill"},
+      "documents": [
+        {"type": "skill_mod", "amount": "bonus", "bonus_type": "competence", "choice_key": "skill", "book": true}
+      ],
+      "house": ["cl", "values", "spells"],
+      "not_yet": ["The book prices a competence bonus to a skill (bonus squared x 100 gp) and prints no caster level, cap or spell for a free-form one: each printed item names its own. The caster level 5, the cap at +10 and the empty spell list are house numbers, for the owner to rule."],
+      "aliases": {},
+      "source": "https://legacy.aonprd.com/coreRulebook/magicItems/magicItemCreation.html (Table: Estimating Magic Item Gold Piece Values, skill bonus (competence))",
+      "text": "A competence bonus on one chosen skill, +1 to +10."
+    }
+  ]
+}

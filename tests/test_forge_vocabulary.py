@@ -51,15 +51,22 @@ def test_every_dropdown_the_forge_types_use_is_built_from_the_constants():
 def test_the_lists_are_exactly_what_the_contract_names():
     """Lane C writes 112 materials against these ids and lane D's bench reads them. A trait
     renamed here ('hot-short' for 'hot_short') would refuse every material that uses it."""
+    # The enchanting revamp appended to all three (docs/enchanting-contracts.md §2.1, §5):
+    # distance's and throwing's range numbers, what a magic weapon strikes as, and the
+    # circle's working traits. Appended, never renamed: every forge id here is unchanged,
+    # which is what this test protects.
     assert set(es.GEAR_TARGETS) == {"acp", "max_dex", "asf", "weight_pct", "hardness",
-                                    "hp_per_inch", "category", "speed_penalty"}
+                                    "hp_per_inch", "category", "speed_penalty",
+                                    "range_pct", "throw_range_ft"}
     # `ghost_touch` joined in wave 2 (contracts §12 item 5): ghost salt blanching's book
     # clause, which lane C had to stand in a +2 against undead for.
-    assert es.STRIKES_AS == ["cold_iron", "silver", "adamantine", "ghost_touch"]
+    assert es.STRIKES_AS == ["cold_iron", "silver", "adamantine", "ghost_touch",
+                             "magic", "good", "evil", "lawful", "chaotic"]
     assert es.WORKING_TRAITS == [
         "easily_worked", "flawless", "malleable", "pure", "slaggy", "sulfurous",
         "clean_heat", "quench_sensitive", "narrow_window", "forgiving", "reactive",
-        "cleans_slag", "weld_aid", "brittle", "hot_short"]
+        "cleans_slag", "weld_aid", "brittle", "hot_short",
+        "night_only", "eager", "skittish", "heavy", "volatile"]
 
 
 # --- mithral, written as documents --------------------------------------------------------
@@ -123,6 +130,9 @@ def test_the_heavier_side_of_every_gear_target_renders_in_plain_words():
         ("hp_per_inch", 10): "+10 hit points per inch",
         ("category", 1): "Moves as one weight class heavier",
         ("speed_penalty", 5): "5 ft more speed penalty",
+        # The enchanting revamp's two (distance, throwing).
+        ("range_pct", 100): "Doubles the range increment",
+        ("throw_range_ft", 10): "Can be thrown, range increment 10 ft",
     }
     for (target, amount), line in samples.items():
         assert es.render({"type": "gear_mod", "target": target, "amount": amount}) == line

@@ -56,6 +56,14 @@ GEAR_TARGETS: dict[str, dict] = {
     "category": {"name": "Weight class for movement", "better": -1},
     # Feet of speed lost to the armour. Positive is more lost.
     "speed_penalty": {"name": "Speed penalty (feet)", "better": -1},
+    # A weapon's range increment, as a percentage change: the distance property "doubles
+    # the range increment" (CRB, distance), which is +100 here. A percentage rather than
+    # feet because the property is the same on a sling and on a longbow.
+    "range_pct": {"name": "Range increment (percent)", "better": +1},
+    # A thrown range increment in feet, for a melee weapon that has none: the throwing
+    # property gives "a range increment of 10 feet" (CRB, throwing). Added to the weapon
+    # table's own range, which is 0 for a weapon that cannot be thrown.
+    "throw_range_ft": {"name": "Thrown range increment (feet)", "better": +1},
 }
 
 # What a weapon counts as against damage reduction and hardness. A list, and meant to grow:
@@ -67,7 +75,49 @@ GEAR_TARGETS: dict[str, dict] = {
 # attacks made against it with ghost touch weapons" (CRB, ghost touch). Ghost salt
 # blanching gives it as a finish; until it was here lane C's data had to stand in a +2
 # against undead for it, which is a different creature and a different rule.
-STRIKES_AS: list[str] = ["cold_iron", "silver", "adamantine", "ghost_touch"]
+#
+# The enchanting revamp (docs/enchanting-contracts.md §2.1) adds what a magic weapon counts
+# as: `magic` (DR/magic, "any weapon with at least a +1 magical enhancement bonus", Bestiary
+# universal rules) and the four alignments a holy, unholy, axiomatic or anarchic weapon
+# carries, or any weapon at +5 (CRB glossary, damage reduction).
+#
+# The alignments are spelled `lawful` and `chaotic`, not the `law` and `chaos` the contract
+# first wrote, because these are compared as words against the stat block's own bypass
+# (`Reduction.bypassed_by`), and the bestiary prints "DR 10/chaotic" (10 blocks) and
+# "DR 5/lawful" (4), with "cold iron or lawful" on three more; never "chaos" or "law".
+# A trait spelled `chaos` would have bounced an axiomatic blade off every one of them.
+STRIKES_AS: list[str] = ["cold_iron", "silver", "adamantine", "ghost_touch",
+                         "magic", "good", "evil", "lawful", "chaotic"]
+
+# What a weapon's enhancement bonus alone lets it count as against damage reduction (CRB
+# glossary, damage reduction: "Weapons with an enhancement bonus of +3 or greater can ignore
+# some types of damage reduction, regardless of their actual material or alignment"; +1 is
+# DR/magic, Bestiary). Read by the magic layer (lane B), which emits these as `strikes_as`
+# traits so the existing DR door does the work. Adamantine at +4 is for damage reduction
+# only: an enhancement bonus never ignores hardness.
+#
+# The alignment row is all four at once, which is what the glossary says ("+5: alignment-
+# based DR"); a weapon cannot meet DR/good and miss DR/evil at the same plus.
+ENHANCEMENT_STRIKES_AS: tuple[tuple[int, tuple[str, ...]], ...] = (
+    (1, ("magic",)),
+    (3, ("cold_iron", "silver")),
+    (4, ("adamantine",)),
+    (5, ("good", "evil", "lawful", "chaotic")),
+)
+
+
+def strikes_as_for_enhancement(enhancement: int) -> tuple[str, ...]:
+    """The DR traits a weapon of this enhancement bonus carries, by the glossary's rule.
+
+    Bane's +2 against its foe counts here (owner, 2026-10-05, Q8), so the caller passes the
+    enhancement *as raised* for the creature struck (`enhancement_raise`), never the
+    printed one alone.
+    """
+    out: list[str] = []
+    for at_least, traits in ENHANCEMENT_STRIKES_AS:
+        if int(enhancement or 0) >= at_least:
+            out.extend(traits)
+    return tuple(out)
 
 # How a material behaves while it is being worked. Read by the bench only; none of them
 # reaches the finished item (plan §5.5). The first four are Pathfinder Unchained's, the rest
@@ -77,6 +127,11 @@ WORKING_TRAITS: list[str] = [
     "easily_worked", "flawless", "malleable", "pure", "slaggy", "sulfurous", "clean_heat",
     "quench_sensitive", "narrow_window", "forgiving", "reactive", "cleans_slag", "weld_aid",
     "brittle", "hot_short",
+    # The enchanting bench's own (enchanting plan §7.3, added for lane D): ghost residue
+    # binds only at night, a flaming essence is eager to take, a shadow essence skittish in
+    # its seat, a heavy one fades fast, a volatile one bites whoever reads it. `pure` is the
+    # forge's, and means the same at the circle: the check rolled twice, the better kept.
+    "night_only", "eager", "skittish", "heavy", "volatile",
 ]
 
 # Triggers that belong to an *item* rather than to a spell's lifetime: a blade's venom on
@@ -85,15 +140,62 @@ WORKING_TRAITS: list[str] = [
 # excused the duration a spell's `each_round` needs — and why the engine's ward path
 # (`Engine._executes`, which treats any non-`on_cast` trigger as a ward) must not be the
 # thing that runs them. Lane B's riders do (contract §5).
-ITEM_TRIGGERS: tuple[str, ...] = ("hit", "crit", "first_wound_daily", "carried")
+#
+# `wielded` and `worn` (enchanting contracts §2.1) are `carried`'s mechanism for a held or
+# worn item: a standing `ActiveEffect` granted while the item is in the hand or the slot
+# and removed with it, so its contribution evaporates when the item comes off (law 2). A
+# ring's fast healing, a helm's darkvision, the holy blade's negative level on the wrong
+# wielder. Not `carried`, because a sword in a pack heals nobody.
+ITEM_TRIGGERS: tuple[str, ...] = ("hit", "crit", "first_wound_daily", "carried",
+                                  "wielded", "worn")
 
 # Carrying a thing can sicken you, poison you or eat at a score — not swing a sword or
 # grant a sense. The contract names these three and the validator holds to them.
 CARRIED_TYPES: tuple[str, ...] = ("apply_condition", "save_gate", "ability_damage")
 
+# What holding or wearing a thing can grant as a standing effect: the burden's three, and
+# the four a worn magic item has that no other door carries (enchanting plan §8.4) — fast
+# healing ticking from the ring, a sense from the helm, a continuous spell from the boots,
+# an immunity the applicator refuses conditions by, and the negative level a holy blade
+# gives the wrong hand. A plain modifier (+2 deflection) needs no trigger: it is a standing
+# spec on the worn item and `_standing_mods` already reads those.
+WORN_TYPES: tuple[str, ...] = CARRIED_TYPES + (
+    "fast_healing", "sense", "spell_effect", "immunity", "negative_level")
+
 # A standing property of the item has no moment to fire in. "Strikes as silver on a crit"
 # and "-2 armour check penalty every round" are not rules; refused rather than ignored.
-_STANDING_TYPES = ("gear_mod", "strikes_as", "working")
+# The magic item types below join them: keen does not "fire", it is how the blade is.
+_STANDING_TYPES = ("gear_mod", "strikes_as", "working",
+                   "crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
+                   "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality")
+
+# Booleans an effect may carry with no field on the form (the form has no checkbox, and a
+# "yes" typed into a text box would put two spellings of one fact into the data for every
+# reader to handle — `book`'s reason, given where it was first added below).
+#   book            a printed PF1e number: applied as printed, never scaled
+#   house           a house top-up: scaled by binding quality (enchanting plan §6.7)
+#   per_multiplier  a crit rider's dice step with the weapon's multiplier: 1d10 at x2,
+#                   2d10 at x3, 3d10 at x4 (CRB, flaming burst) — count x (multiplier - 1)
+#   stacks          bleed that adds on each hit, as wounding's does ("multiple hits from a
+#                   wounding weapon increase the bleed damage", CRB) where 1e bleed
+#                   ordinarily does not stack
+#   suppressible    merciful's "on command, the weapon suppresses this ability"
+#   dc_adds_enhancement  arrow deflection's DC 20 "+ the enhancement bonus of the weapon"
+_BOOLEAN_KEYS: tuple[str, ...] = ("book", "house", "per_multiplier", "stacks",
+                                  "suppressible", "dc_adds_enhancement")
+
+# The thirteen creature types of 1e (bane's table, CRB), and the things that are not
+# creatures but can be struck — `object`, for brilliant energy's "cannot harm undead,
+# constructs, and objects". Spelled as `states.type_tags` writes the type leaf.
+CREATURE_TYPES: tuple[str, ...] = (
+    "aberration", "animal", "construct", "dragon", "fey", "humanoid", "magical-beast",
+    "monstrous-humanoid", "ooze", "outsider", "plant", "undead", "vermin")
+_STRIKE_TARGETS = CREATURE_TYPES + ("object",)
+
+# Bane's two types that name a subtype: "Humanoids (pick one subtype)", "Outsiders (pick
+# one subtype)" (CRB, bane). The subtype is the world's own and is not listed here (the
+# world owns its races: a goblinoid in one world is a goblin in the next).
+SUBTYPE_REQUIRED: tuple[str, ...] = ("humanoid", "outsider")
 
 
 # --- the vocabularies a dropdown can be filled from ---------------------------------------
@@ -201,7 +303,8 @@ VOCAB: dict[str, list[dict]] = {
         # An item's own moments (`ITEM_TRIGGERS`): the forge's riders and carrier effects.
         ("hit", "When the weapon hits"), ("crit", "When the weapon crits"),
         ("first_wound_daily", "The first wound it deals each day"),
-        ("carried", "While it is carried"))],
+        ("carried", "While it is carried"),
+        ("wielded", "While it is held in hand"), ("worn", "While it is worn"))],
 
     # The forge's three lists, as dropdowns. Built from the constants above so the editor
     # and the validator cannot offer different sets.
@@ -243,6 +346,19 @@ VOCAB: dict[str, list[dict]] = {
     # renders `choice` and has no widget for a boolean. Two entries beat a text box that
     # accepts "true", "y", "Yes" and "1" and means something different for each.
     "yes_no": [{"id": "no", "name": "No"}, {"id": "yes", "name": "Yes"}],
+
+    # --- a magic weapon's and armour's own powers (enchanting contracts §2.1) ----------
+    #
+    # One entry each today, and lists rather than constants so the form offers exactly
+    # what the validator takes. Speed's extra attack comes on a full attack and nowhere
+    # else (CRB, speed: "when making a full-attack action").
+    "attack_kind": [{"id": "full_attack", "name": "A full attack"}],
+    # Defending moves "some or all of the weapon's enhancement bonus" (CRB) to AC, so the
+    # most it can move is the weapon's own enhancement, read from the item when it is used.
+    "ac_transfer_max": [{"id": "enhancement", "name": "The weapon's enhancement bonus"}],
+    "per": [{"id": "round", "name": "Once a round"}],
+    "creature_or_object": [{"id": k, "name": k.replace("-", " ").title()}
+                           for k in _STRIKE_TARGETS],
 }
 
 
@@ -388,6 +504,11 @@ CATEGORIES: list[Category] = [
                       required=False, default="lethal",
                       hint="Non-lethal healing does not touch real hit points."),
             ]),
+            # `per_multiplier` (a boolean, off the form: `_BOOLEAN_KEYS`) makes a crit
+            # rider step with the weapon: flaming burst's 1d10 is 2d10 on a x3 weapon.
+            # `recipient: "self"` is the wielder for an item's rider — vicious's 1d6 —
+            # which is what "The one who has it" already meant; the contract's
+            # `"wielder"` would have been a second spelling of it.
             EffectType("damage", "Damage", "1d6 fire damage", [
                 Field("dice", "How much", "dice"),
                 Field("damage_type", "Type", "choice", vocab="damage_type",
@@ -778,6 +899,177 @@ CATEGORIES: list[Category] = [
                 ]),
         ]),
 
+    # The enchanting revamp's vocabulary (docs/enchanting-contracts.md §2.1, plan §8.1).
+    # Measured on master e028885 before any of it: 14 of 81 essences and 47 of 170
+    # catalogue items were narrative — keen, ghost touch, speed, vorpal, defending,
+    # fortification, brilliant energy, the bursts' crits — because there was no type to
+    # write a threat range, an extra attack or a fortification roll as. Each is a standing
+    # property of the item (`_STANDING_TYPES`): it has no moment to fire in, it is how the
+    # item is while it is held or worn. Their readers are lane C's (contracts §4), in the
+    # attack path and `Actor.ac_modifiers`. Until each lands, `AWAITING_READER` (below
+    # the list) marks it not executable, and what its reader must do is said in
+    # `blocked`, where the builder shows it.
+    Category(
+        "magic_item", "A magic item's own power",
+        "What a magic weapon, suit or shield does because of what is bound into it. These "
+        "belong to the item and work while it is held or worn.",
+        [
+            # Keen. "Doubles the threat range of a weapon ... This benefit doesn't stack
+            # with any other effect that expands the threat range" (CRB, keen). The
+            # contract first wrote this as `not_with: "feat.improved-critical"`, a tag
+            # nothing grants (Improved Critical has no feat document and keen edge is
+            # prose). The book's rule is a stacking rule — doublings do not stack, the
+            # best applies — so it is said as one: every threat-range doubling carries
+            # the same `stacking` group and the reader applies the best of a group once,
+            # 1e's typed-bonus rule (`dice.stack`) applied to a multiplier. When Improved
+            # Critical and keen edge get documents they join the group and need nothing
+            # else.
+            EffectType("crit_range", "Threat range", "Doubles the threat range", [
+                Field("multiply", "Multiply the range by", "int", default=2,
+                      hint="2 for keen: 19-20 becomes 17-20."),
+                Field("stacking", "Does not stack with", "text", required=False,
+                      default="threat-range",
+                      hint="A group name. Two effects in one group do not stack; the "
+                           "best applies. Every threat-range doubling is "
+                           "'threat-range'."),
+            ], blocked="Read by the attack's threat test from the weapon in hand "
+                       "(Engine threat check, contracts §4). Doublings of one group do not "
+                       "stack: 19-20 keen with Improved Critical is 17-20, not 15-20."),
+            # Speed. "When making a full-attack action, the wielder ... may make one extra
+            # attack with it ... not cumulative with similar effects, such as a haste
+            # spell" (CRB, speed). The same stacking group as haste's extra attack.
+            EffectType("extra_attack", "Extra attack", "One extra attack on a full attack", [
+                Field("on", "On", "choice", vocab="attack_kind", default="full_attack"),
+                Field("count", "How many", "int", default=1),
+                Field("stacking", "Does not stack with", "text", required=False,
+                      default="haste",
+                      hint="A group name: haste and a speed weapon are one group, and "
+                           "together they give one extra attack, not two."),
+            ], blocked="Read by the full-attack builder, at full base attack bonus, with "
+                       "this weapon only. One extra attack per stacking group."),
+            # Bane. "Against a designated foe, the weapon's enhancement bonus is +2 better
+            # than its actual bonus" (CRB, bane). Written first as a `combat_mod` +2 of
+            # type enhancement — and through `dice.stack` an enhancement +2 beside the
+            # sword's own +1 enhancement keeps the better ONE: +2 to hit, where the book's
+            # +1 bane sword is +3 (test_enchant_vocabulary measures it). It is not a bonus
+            # beside the enhancement; it raises the enhancement, and that raised number is
+            # also what damage reduction asks (owner, Q8: bane's +2 counts toward the
+            # +3/+4/+5 DR thresholds).
+            EffectType("enhancement_raise", "Raise the enhancement bonus",
+                       "+2 enhancement against the chosen foe", [
+                Field("amount", "Raise by", "int",
+                      hint="Added to the weapon's own enhancement bonus, which then "
+                           "counts for attack, damage and damage reduction."),
+            ], blocked="Read where the weapon's enhancement is read: attack, damage and "
+                       "the damage-reduction thresholds. Usually limited by a `when` to "
+                       "the foe the property was bound against."),
+            # Defending. "Transfer some or all of the weapon's enhancement bonus to his AC
+            # as a bonus that stacks with all others ... chooses how to allocate ... at
+            # the start of his turn" (CRB). The amount moved is a choice made each turn,
+            # so it is a parameter of the attack the engine validates against `max` —
+            # never a number in the document, and never a model's.
+            EffectType("enhancement_to_ac", "Enhancement to AC",
+                       "Move some of the weapon's enhancement bonus to AC", [
+                Field("max", "At most", "choice", vocab="ac_transfer_max",
+                      default="enhancement"),
+            ], blocked="The wielder chooses how much each turn on the combat bar; the "
+                       "engine validates it against the weapon's enhancement, takes it off "
+                       "attack and damage and adds it to AC, untyped (it stacks with all "
+                       "others), until their next turn."),
+            # Fortification. "There is a chance that a critical hit or sneak attack is
+            # negated and damage is instead rolled normally" — 25%, 50%, 75% (CRB).
+            EffectType("fortification", "Fortification",
+                       "25% chance to turn a critical hit or sneak attack", [
+                Field("percent", "Chance %", "int", default=25,
+                      hint="25 light, 50 moderate, 75 heavy."),
+            ], blocked="Rolled by the engine as a d% when a critical hit is confirmed or "
+                       "sneak attack dice are added against the wearer, and shown: on a "
+                       "success the hit is rolled as an ordinary one."),
+            # Brilliant energy. Armour and shield bonuses "do not count against" it, and
+            # "a brilliant energy weapon cannot harm undead, constructs, and objects"
+            # (CRB). The contract wrote the second clause as `except`, read as "the
+            # armour still counts against these" — which would let it cut a skeleton.
+            # The book says it does not harm them at all, so the field says that.
+            EffectType("ignore_armour", "Passes through armour",
+                       "Ignores armour and shield bonuses to AC", [
+                Field("cannot_harm", "Cannot harm", "list", vocab="creature_or_object",
+                      required=False,
+                      hint="Creature types it passes through without effect: undead, "
+                           "construct, object for brilliant energy."),
+            ], blocked="The attack's AC drops the defender's armour and shield bonuses "
+                       "(and their enhancements). Against a type in 'cannot harm' the blow "
+                       "deals nothing, and the tell says why."),
+            # Arrow deflection and arrow catching (CRB shield abilities). Deflection: "once
+            # per round when he would normally be struck by a ranged weapon, he can make a
+            # DC 20 Reflex save ... the DC increases by the enhancement bonus" of the
+            # attacking weapon. Catching: "+1 deflection bonus to AC against ranged weapons
+            # ... ranged weapons fired at targets within 5 feet of the shield's wearer are
+            # diverted to target the shield's bearer". The contract's `auto` reading was
+            # Snatch Arrows, a feat; no shield in the book catches automatically.
+            EffectType("deflect_ranged", "Turns ranged attacks",
+                       "Deflects one ranged attack a round on a DC 20 Reflex save", [
+                Field("per", "How often", "choice", vocab="per", required=False),
+                Field("save", "Save", "choice", vocab="save", required=False,
+                      hint="The save that deflects it: Reflex for arrow deflection."),
+                Field("dc", "DC", "int", required=False),
+                Field("draws_ft", "Draws attacks from within (feet)", "int",
+                      required=False,
+                      hint="Arrow catching: ranged attacks at anyone this close are "
+                           "diverted to the bearer."),
+                Field("deflection", "Deflection bonus against ranged", "int",
+                      required=False),
+            ], blocked="Read by the ranged attack path against the bearer and anyone "
+                       "near them. The save is rolled by the engine and shown."),
+            # Merciful. "All damage it deals is nonlethal damage. On command, the weapon
+            # suppresses this ability" (CRB). The weapon's own lethality, read where
+            # `weapons.lethality_of` reads a sap's.
+            EffectType("weapon_lethality", "Deals non-lethal damage",
+                       "All its damage is non-lethal", [
+                Field("lethality", "Its damage is", "choice", vocab="lethality",
+                      default="nonlethal"),
+            ], blocked="Read by `weapons.lethality_of` as the weapon's own lethality. "
+                       "When `suppressible`, declaring a lethal blow suppresses it, and "
+                       "the property's other riders with it."),
+            # Vorpal ("severs the opponent's head") and disruption ("must succeed on a DC
+            # 14 Will save or be destroyed"): the creature dies, through `Actor.die`, the
+            # one door death is written through. `natural` is vorpal's "upon a roll of
+            # natural 20 (followed by a successful roll to confirm)"; `except` the types it
+            # does nothing to ("such as golems and undead creatures other than vampires",
+            # "all oozes ... have no heads").
+            EffectType("slay", "Slays outright", "Severs the head on a natural 20", [
+                Field("natural", "Only on a natural", "int", required=False,
+                      hint="20 for vorpal. Empty: whenever it fires."),
+                Field("except", "Does nothing to", "list", vocab="creature_or_object",
+                      required=False),
+            ], blocked="The creature dies through the one door death has (`Actor.die`), "
+                       "unless it is of a type it does nothing to or is immune to "
+                       "critical hits. Always with a tell."),
+            # A power the item's bearer uses: the blinding shield's flash, etherealness,
+            # reflecting's spell turning, a ring's command word. The contract wrote its
+            # uses as `{"per": "day", "n": 1}`; every effect already carries `uses` and
+            # `uses_count` (COMMON, below), so a power says `"uses": "per_day",
+            # "uses_count": 2`, and "at will" is `"uses": "unlimited"` — one spelling.
+            # Exactly one of `spell` (a spell id, cast through the cast door at the item's
+            # caster level), `effect` (one document) or `tell` (a power that changes no
+            # number — glamered armour looking like clothes).
+            EffectType("item_power", "A power the bearer uses",
+                       "Twice a day, a blinding flash", [
+                Field("spell", "Casts", "text", required=False,
+                      hint="A spell's id on the Spells bench: ethereal-jaunt."),
+                Field("effect", "Does", "effects", required=False,
+                      hint="One effect, when it is not a spell."),
+                Field("tell", "Says", "text", required=False,
+                      hint="For a power that changes no number: what the narrator is "
+                           "told happened."),
+                Field("caster_level", "Caster level", "int", required=False,
+                      hint="Empty: the item's own."),
+                Field("area", "Area", "area", required=False,
+                      hint="{\"shape\": \"burst\", \"ft\": 20} centred on the bearer."),
+            ], blocked="Used through the `use_item` op, validated by the engine, never "
+                       "written by a model with a number. Uses are counted on the item and "
+                       "come back each day; the bar shows how many are left."),
+        ]),
+
     Category(
         "narrative", "Narrative only",
         "Says what happens without claiming a number. Explicit, so that prose is never "
@@ -790,6 +1082,35 @@ CATEGORIES: list[Category] = [
                        blocked="Recorded and shown to the GM. Nothing is rolled."),
         ]),
 ]
+
+
+# Types the vocabulary can say and the engine does not run yet, each with where its reader
+# will live. The enchanting contract first fixed `engine: True` for every new type; this
+# module's own honesty ratchet (tests/test_effectspec_extensions.py, "no type may be
+# narrative wearing a costume") refuses a type that claims the engine runs it when nothing
+# does — measured on the first full run, ten types claimed and none ran. So they are marked
+# here, in one place: `engine` is False and the builder's warning says what waits. When lane
+# C's reader for one lands, it deletes that line (and lists the type with its site in the
+# ratchet's `already`), and the type is executable from then on.
+AWAITING_READER: dict[str, str] = {
+    "crit_range": "the attack's threat test (Engine, contracts §4)",
+    "extra_attack": "the full-attack builder (contracts §4)",
+    "enhancement_raise": "the weapon scope's enhancement and the DR traits (contracts §4)",
+    "enhancement_to_ac": "Actor.ac_modifiers and a combat-bar param (contracts §4)",
+    "fortification": "the critical-hit and sneak-attack path (contracts §4)",
+    "ignore_armour": "the attack's AC (contracts §4)",
+    "deflect_ranged": "the ranged attack path (contracts §4)",
+    "weapon_lethality": "weapons.lethality_of (contracts §4)",
+    "slay": "the crit path and save gates, through Actor.die (contracts §4)",
+    "item_power": "the use_item op with a power (contracts §4)",
+}
+for _cat in CATEGORIES:
+    for _t in _cat.types:
+        if _t.id in AWAITING_READER:
+            _t.engine = False
+            _t.blocked = (f"Not run yet: its reader, {AWAITING_READER[_t.id]}, is enchanting "
+                          f"lane C's. When it lands — {_t.blocked[:1].lower()}"
+                          f"{_t.blocked[1:]}")
 
 
 def catalogue() -> dict:
@@ -829,6 +1150,11 @@ FORMULA_VARS: dict[str, str] = {
     "str_mod": "The Strength modifier.", "dex_mod": "The Dexterity modifier.",
     "con_mod": "The Constitution modifier.", "int_mod": "The Intelligence modifier.",
     "wis_mod": "The Wisdom modifier.", "cha_mod": "The Charisma modifier.",
+    # A scaled magic property's bonus (`content/rules/magic-properties.json`, `scaled`):
+    # the +3 a ring of protection was bound at. The book prices these by the square of it
+    # (Table: Estimating Magic Item Gold Piece Values) and the effect is the number itself,
+    # so the document says `"amount": "bonus"` and one entry serves +1 to +5.
+    "bonus": "The bonus a scaled magic property was bound at.",
 }
 
 
@@ -1010,12 +1336,32 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
         return [f"{path}: no effect type {type_id!r}. Known: {known}."]
 
     _, etype = found
+    # A document that names a choice (`choice_key`, enchanting contracts §2.1) has its
+    # `target` filled when the property is bound — energy resistance's "fire" is the
+    # player's pick, not the author's — so an empty target is not missing here. The bound
+    # document is validated in full by `property_problems`, option by option.
+    chosen_later = {"target"} if _choice_key(spec) else set()
     for f in etype.fields + COMMON:
         value = spec.get(f.id)
         missing = value is None or (isinstance(value, str) and not value.strip())
         if missing:
-            if f.required:
+            if f.required and f.id not in chosen_later:
                 problems.append(f"{path}: {etype.name} needs {f.label.lower()}.")
+            continue
+        if f.kind == "list":
+            allowed = {o["id"] for o in VOCAB.get(f.vocab, [])}
+            if not isinstance(value, list) or not value:
+                problems.append(
+                    f"{path}: {f.label.lower()} is a list: [\"undead\", \"construct\"].")
+            elif allowed:
+                bad = [v for v in value if str(v) not in allowed]
+                if bad:
+                    problems.append(
+                        f"{path}: {', '.join(map(repr, bad))} in {f.label.lower()} is not "
+                        f"one of: {', '.join(sorted(allowed))}.")
+            continue
+        if f.kind == "area":
+            problems.extend(_area_problems(value, f"{path}: {f.label.lower()}"))
             continue
         if f.kind == "choice" and f.vocab:
             allowed = {o["id"] for o in VOCAB.get(f.vocab, [])}
@@ -1079,6 +1425,12 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
             f"{path}: '{_vocab_name('trigger', trigger)}' works only on "
             f"{', '.join(CARRIED_TYPES)} — carrying a thing can sicken you or eat at a "
             f"score, and that is all. Use a different trigger or one of those types.")
+    elif trigger in ("wielded", "worn") and type_id not in WORN_TYPES:
+        problems.append(
+            f"{path}: '{_vocab_name('trigger', trigger)}' works only on "
+            f"{', '.join(WORN_TYPES)} — the standing effects an item grants while it is "
+            f"held or worn. A plain modifier needs no trigger: a worn item's modifiers "
+            f"are read while it is worn.")
     elif trigger not in ("on_cast", "") and type_id in _STANDING_TYPES:
         problems.append(
             f"{path}: {type_id} is a standing property of the item and has no "
@@ -1087,11 +1439,26 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
     # `book` marks a printed PF1e number: applied from the main piece only, never scaled
     # (plan §6.3). A boolean and nothing else, and it has no field on the form for that
     # reason — the form has no checkbox, and a "yes" typed into a text box would put two
-    # spellings of one fact into the data for every reader to handle.
-    if "book" in spec and not isinstance(spec["book"], bool):
+    # spellings of one fact into the data for every reader to handle. The enchanting
+    # revamp's flags follow the same rule (`_BOOLEAN_KEYS`).
+    for key in _BOOLEAN_KEYS:
+        if key in spec and not isinstance(spec[key], bool):
+            problems.append(
+                f"{path}: {key} must be true or false, not {spec[key]!r}. Write "
+                f"\"{key}\": true, or leave it out.")
+    if spec.get("book") is True and spec.get("house") is True:
         problems.append(
-            f"{path}: book must be true or false, not {spec['book']!r}. Write "
-            f"\"book\": true on a printed rule's number, or leave it out.")
+            f"{path}: a number is the book's or a house top-up, not both. Book numbers are "
+            f"never scaled; house ones are. Keep one.")
+    if spec.get("per_multiplier") and not (type_id == "damage" and trigger == "crit"):
+        problems.append(
+            f"{path}: per_multiplier steps a critical hit's extra dice with the weapon's "
+            f"multiplier, so it belongs on damage with \"trigger\": \"crit\".")
+    if spec.get("stacks") and type_id != "bleed":
+        problems.append(f"{path}: stacks is bleed's (wounding); remove it.")
+
+    problems.extend(_choice_ref_problems(spec, path))
+    problems.extend(_magic_item_problems(spec, type_id, path))
 
     if type_id == "gear_mod":
         problems.extend(_gear_problems(spec, path))
@@ -1137,6 +1504,129 @@ def _gear_problems(spec: dict, path: str) -> list[str]:
         return [f"{path}: spell failure is a percentage; {amount} is past it. Use -100 "
                 f"to +100."]
     return []
+
+
+_AREA_SHAPES = ("cone", "line", "burst")
+
+
+def _area_problems(area, path: str) -> list[str]:
+    """An area in the shape `rules/class_abilities.py` already lays: `{"shape": "burst",
+    "ft": 20}`, with `range_ft` for one laid away from the user. One shape for both, so the
+    blinding shield's flash and a channel's burst go through the same `rules/areas.py`."""
+    if not isinstance(area, dict) or str(area.get("shape") or "") not in _AREA_SHAPES:
+        return [f"{path} is {{\"shape\": \"burst\", \"ft\": 20}} — shape one of "
+                f"{', '.join(_AREA_SHAPES)}."]
+    out = []
+    for key in ("ft", "range_ft"):
+        if key in area:
+            try:
+                if int(area[key]) <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                out.append(f"{path}: {key} is a number of feet above 0.")
+    if "ft" not in area:
+        out.append(f"{path} needs ft, its size in feet.")
+    return out
+
+
+def _choice_key(spec: dict) -> str:
+    return str(spec.get("choice_key") or "").strip()
+
+
+def _choice_refs(when) -> list[str]:
+    """Every `{"choice": key}` inside a `when`'s `target` clause."""
+    if not isinstance(when, dict):
+        return []
+    target = when.get("target")
+    if isinstance(target, dict) and "choice" in target:
+        return [str(target.get("choice") or "")]
+    return []
+
+
+def _choice_ref_problems(spec: dict, path: str) -> list[str]:
+    """`choice_key` and the `when` that references it must agree.
+
+    The note-only bane is the defect this exists for: its +2 and +2d6 sat in a `note`
+    ("against the designated foe", magic-items.json `mi-bane`), so any reader would have
+    applied them to every foe. Now the foe is a choice stored on the item, the document
+    names it (`choice_key`), and its `when` asks for the defender to be of that kind
+    (`{"target": {"choice": "foe"}}`). A `when` that names a choice the document does not
+    carry would never be filled — and an unevaluable clause is dropped, which is bane
+    applying to nobody.
+    """
+    out: list[str] = []
+    key = _choice_key(spec)
+    if "choice_key" in spec and not re.fullmatch(r"[a-z][a-z_]*", key):
+        out.append(f"{path}: choice_key is the name of the property's choice, in lower "
+                   f"case: \"foe\", \"energy\".")
+    for ref in _choice_refs(spec.get("when")):
+        if not key:
+            out.append(f"{path}: its `when` asks for the choice {ref!r} and it carries no "
+                       f"choice_key. Add \"choice_key\": {ref!r}.")
+        elif ref != key:
+            out.append(f"{path}: its `when` asks for the choice {ref!r} and its choice_key "
+                       f"is {key!r}. They must name the same choice.")
+    return out
+
+
+def _magic_item_problems(spec: dict, type_id: str, path: str) -> list[str]:
+    """The limits the enchanting types have that a dropdown and an int cannot say."""
+    def number(key, default=None):
+        try:
+            return int(spec.get(key, default))
+        except (TypeError, ValueError):
+            return None
+
+    out: list[str] = []
+    if type_id == "crit_range":
+        if (number("multiply", 2) or 0) < 2:
+            out.append(f"{path}: a threat range multiplied by less than 2 is not widened. "
+                       f"Keen is 2.")
+    elif type_id == "extra_attack":
+        if (number("count", 1) or 0) < 1:
+            out.append(f"{path}: an extra attack needs a count of at least 1.")
+    elif type_id == "enhancement_raise":
+        if (number("amount") or 0) < 1:
+            out.append(f"{path}: raising an enhancement bonus by less than 1 raises "
+                       f"nothing. Bane is 2.")
+    elif type_id == "fortification":
+        p = number("percent", 25)
+        if p is None or not 1 <= p <= 100:
+            out.append(f"{path}: fortification is a percentage, 1 to 100 (the book's are "
+                       f"25, 50 and 75).")
+    elif type_id == "deflect_ranged":
+        if not spec.get("save") and not spec.get("draws_ft"):
+            out.append(f"{path}: say how it turns an attack — a save (arrow deflection: "
+                       f"\"save\": \"ref\", \"dc\": 20, \"per\": \"round\") or draws_ft "
+                       f"(arrow catching: 5).")
+        if spec.get("save") and not spec.get("dc"):
+            out.append(f"{path}: a deflecting save needs its DC.")
+    elif type_id == "slay":
+        n = number("natural")
+        if "natural" in spec and (n is None or not 1 <= n <= 20):
+            out.append(f"{path}: natural is the face of the d20, 1 to 20 (vorpal: 20).")
+    elif type_id == "item_power":
+        given = [k for k in ("spell", "effect", "tell") if spec.get(k)]
+        if len(given) != 1:
+            out.append(f"{path}: an item power does exactly one of: casts a spell "
+                       f"(\"spell\"), does one effect (\"effect\"), or says what happens "
+                       f"(\"tell\"). It has {', '.join(given) or 'none'}.")
+        if spec.get("effect") and len(spec.get("effect") or []) != 1:
+            out.append(f"{path}: an item power's effect is one document; group several "
+                       f"with a bundle.")
+        if "uses" not in spec:
+            out.append(f"{path}: an item power says how often it can be used — "
+                       f"\"uses\": \"per_day\" with \"uses_count\", or \"unlimited\" for "
+                       f"at will. Left out, it would be at will by accident.")
+        if spec.get("tell") and _TELL_NUMBER.search(str(spec["tell"])):
+            out.append(f"{path}: a power's tell carries no number; a number in prose is a "
+                       f"mechanic nothing applies. Say it with an effect.")
+    return out
+
+
+# A digit in a tell is a mechanic authored into prose (the class abilities' rule, `{name}`
+# and `{target}` and nothing else).
+_TELL_NUMBER = re.compile(r"\d")
 
 
 def is_drawback(spec: dict) -> bool:
@@ -1207,8 +1697,11 @@ def executable(spec: dict) -> bool:
 
 # --- rendering ------------------------------------------------------------------------------
 
-def render(spec: dict) -> str:
+def render(spec: dict, *, against: bool = False) -> str:
     """One authored effect as the line a card shows.
+
+    `against` adds who a `when.target` clause limits it to ("against undead"); the
+    magic property card asks for it (`property_lines`).
 
     Deliberately the same voice as `rules/effects.py` produces from prose, so an item
     whose effects were authored and one whose effects were read out of a description look
@@ -1247,12 +1740,18 @@ def render(spec: dict) -> str:
         kind = spec.get("damage_type", "untyped")
         lethal = "" if spec.get("lethality", "lethal") == "lethal" else " non-lethal"
         body = f"{dice} {kind}{lethal} damage"
+        if spec.get("per_multiplier"):
+            # Flaming burst's line has to say why a x3 axe deals 2d10: the dice step with
+            # the weapon, and the card is where a player looks to find out.
+            body += " per step of the weapon's critical multiplier"
     elif t == "temp_hp":
         body = f"{dice} temporary hit points"
     elif t == "fast_healing":
         body = f"Fast healing {amount}"
     elif t == "bleed":
         body = f"Bleed {amount} per round"
+        if spec.get("stacks"):
+            body += ", more with every hit"
     elif t in ("ability_damage", "ability_drain"):
         word = "drain" if t.endswith("drain") else "damage"
         body = f"{dice} {ABILITY_FULL.get(str(target), str(target))} {word}"
@@ -1359,9 +1858,21 @@ def render(spec: dict) -> str:
         if amount not in (None, ""):
             body += f" ({_signed(amount)})"
         body = body[:1].upper() + body[1:]
+    elif t in _MAGIC_RENDER:
+        body = _MAGIC_RENDER[t](spec)
     else:
         body = str(target or spec.get("note") or etype.name)
         body = body[:1].upper() + body[1:]
+
+    # Against whom, when asked. Bane's +2d6 and holy's +2d6 read exactly like flaming's on
+    # a card without it, and the difference is the whole property. Asked for rather than
+    # always added because the forge's review table (tools/forge_review.py) already
+    # appends its own "(when target type fey)" to the same line, and the owner's reviewed
+    # document would have said it twice.
+    if against:
+        phrase = _against(spec.get("when"))
+        if phrase:
+            body += f" {phrase}"
 
     # Who and when, appended rather than woven in, so the sentence a type already produced
     # is unchanged whenever the two are left at their defaults — which is all 6,476 of the
@@ -1399,7 +1910,7 @@ _TRIGGER_PHRASE = {
     "on_expiry": "when it ends",
     "hit": "on a hit", "crit": "on a critical hit",
     "first_wound_daily": "on the first wound it deals each day",
-    "carried": "while carried",
+    "carried": "while carried", "wielded": "while held", "worn": "while worn",
 }
 
 
@@ -1435,6 +1946,11 @@ def _gear_line(target: str, amount) -> str:
                 f"{'lighter' if n < 0 else 'heavier'}")
     if target == "speed_penalty":
         return f"{size} ft {'less' if n < 0 else 'more'} speed penalty"
+    if target == "range_pct":
+        return ("Doubles the range increment" if n == 100
+                else f"Range increment {size}% {'longer' if n > 0 else 'shorter'}")
+    if target == "throw_range_ft":
+        return f"Can be thrown, range increment {n} ft"
     return f"{n:+d} {target}"
 
 
@@ -1457,6 +1973,110 @@ _WORKING_PHRASE = {
     "weld_aid": "aids a weld: folding and strengthening come easier",
     "brittle": "brittle: it cracks under a hard blow",
     "hot_short": "hot-short: it cracks when worked hot",
+    "night_only": "binds only by night",
+    "eager": "eager: the binding's windows are wider",
+    "skittish": "skittish: it drifts in its seat while it is matched",
+    "heavy": "heavy: its draws fade fast when it is refined",
+    "volatile": "volatile: reading it is dangerous",
+}
+
+
+_ALIGNMENT_WORDS = {"good": "good", "evil": "evil", "lawful": "lawful",
+                    "chaotic": "chaotic"}
+
+
+def _against(when) -> str:
+    """"against undead", "against evil creatures", "against the chosen foe" — or ""."""
+    if not isinstance(when, dict) or not isinstance(when.get("target"), dict):
+        return ""
+    t = when["target"]
+    if t.get("choice"):
+        return f"against the chosen {str(t['choice']).replace('_', ' ')}"
+    bits = []
+    for key in ("type", "subtype"):
+        v = t.get(key)
+        if v:
+            words = v if isinstance(v, (list, tuple)) else [v]
+            bits.append(" or ".join(str(w).replace("-", " ") for w in words))
+    if t.get("alignment"):
+        bits.append(f"{_ALIGNMENT_WORDS.get(str(t['alignment']), t['alignment'])} creatures")
+    return f"against {' '.join(bits)}" if bits else ""
+
+
+def _render_crit_range(spec: dict) -> str:
+    m = spec.get("multiply", 2)
+    return ("Doubles the threat range" if str(m) == "2"
+            else f"Multiplies the threat range by {m}")
+
+
+def _render_extra_attack(spec: dict) -> str:
+    n = int(spec.get("count") or 1)
+    return (f"{'One extra attack' if n == 1 else f'{n} extra attacks'} on a full attack, "
+            f"at full base attack bonus")
+
+
+def _render_deflect(spec: dict) -> str:
+    bits = []
+    if spec.get("save"):
+        save = _vocab_name("save", spec["save"])
+        per = " once a round" if spec.get("per") == "round" else ""
+        plus = " + the attacking weapon's enhancement" if spec.get(
+            "dc_adds_enhancement") else ""
+        bits.append(f"Deflects a ranged attack{per} on a {save} save (DC "
+                    f"{spec.get('dc', '?')}{plus})")
+    if spec.get("draws_ft"):
+        bits.append(f"Draws ranged attacks aimed within {spec['draws_ft']} ft to the "
+                    f"bearer")
+    if spec.get("deflection"):
+        bits.append(f"{_signed(spec['deflection'])} deflection to AC against ranged "
+                    f"attacks")
+    return "; ".join(bits) or "Turns ranged attacks"
+
+
+def _render_slay(spec: dict) -> str:
+    line = "Slays outright"
+    if spec.get("natural"):
+        line += f" on a natural {spec['natural']}"
+    if spec.get("except"):
+        line += " (not " + ", ".join(str(x).replace("-", " ") for x in spec["except"]) + ")"
+    return line
+
+
+def _render_item_power(spec: dict) -> str:
+    if spec.get("spell"):
+        what = f"Casts {str(spec['spell']).replace('-', ' ')}"
+        if spec.get("caster_level"):
+            what += f" (caster level {spec['caster_level']})"
+    elif spec.get("effect"):
+        what = render((spec.get("effect") or [{}])[0])
+    else:
+        what = str(spec.get("tell") or "A power")
+    if isinstance(spec.get("area"), dict):
+        what += f", {spec['area'].get('ft')}-ft {spec['area'].get('shape')}"
+    if spec.get("uses") == "unlimited":
+        what += " (at will)"
+    return what
+
+
+_MAGIC_RENDER = {
+    "crit_range": _render_crit_range,
+    "extra_attack": _render_extra_attack,
+    "enhancement_raise": lambda s: f"Enhancement bonus {_signed(s.get('amount'))}",
+    "enhancement_to_ac": lambda s: "Moves some or all of its enhancement bonus to AC, "
+                                   "chosen each turn",
+    "fortification": lambda s: f"{s.get('percent', 25)}% chance to turn a critical hit "
+                               f"or sneak attack into an ordinary hit",
+    "ignore_armour": lambda s: "Ignores armour and shield bonuses to AC" + (
+        "; cannot harm " + ", ".join(str(x).replace("-", " ")
+                                     for x in s["cannot_harm"])
+        if s.get("cannot_harm") else ""),
+    "deflect_ranged": _render_deflect,
+    "weapon_lethality": lambda s: ("All its damage is non-lethal"
+                                   if s.get("lethality", "nonlethal") == "nonlethal"
+                                   else "All its damage is lethal") + (
+        " (can be suppressed)" if s.get("suppressible") else ""),
+    "slay": _render_slay,
+    "item_power": _render_item_power,
 }
 
 
@@ -1513,3 +2133,656 @@ def _uses(spec: dict) -> str:
     per = {"per_day": "per day", "per_combat": "per combat",
            "per_hour": "per hour"}.get(str(kind), str(kind))
     return f"{n}× {per}" if n else per
+
+
+# --- magic properties: the book's ability table (enchanting contracts §2.2) -----------------
+#
+# `content/rules/magic-properties.json`: one entry per book weapon, armour and shield
+# ability, and the formula-priced ring and wondrous bonuses, each with its price, caster
+# level, spells, restrictions and its bundle of effect documents. Every enchanting lane
+# reads it: the layer (B) prices and builds from it, the engine (C) runs its documents,
+# the essences (D) name its ids in `grants`, the bench (E) checks its requirements.
+#
+# Shipped data only, with no homebrew overlay, so it is cached with `lru_cache` rather
+# than the `_NAME: dict | None = None` declaration the suite isolates between tests
+# (tests/conftest.py `_CACHED`): nothing here is read from under CAMPAIGN_DIR.
+#
+# Validated on load: a bad entry raises `BadProperties` with every problem named, so a
+# mistyped number stops the app in development rather than shipping as a sword that does
+# nothing. Spell ids are checked by `property_problems(..., spell_ids=...)`, which the
+# vocabulary test runs against the real spell list; the loader does not read 5 MB of
+# spells to start.
+
+import functools as _functools  # noqa: E402
+import json as _json  # noqa: E402
+
+PROPERTY_GEAR: tuple[str, ...] = ("weapon", "armour", "shield", "ring", "wondrous")
+TIERS: tuple[str, ...] = ("common", "uncommon", "rare", "exotic", "legendary")
+AURA_STRENGTHS: tuple[str, ...] = ("faint", "moderate", "strong", "overwhelming")
+SCHOOLS: tuple[str, ...] = ("abjuration", "conjuration", "divination", "enchantment",
+                            "evocation", "illusion", "necromancy", "transmutation",
+                            "universal")
+ALIGNMENTS: tuple[str, ...] = ("good", "evil", "lawful", "chaotic")
+
+# What a property's `requires` may say. The first five restrict the vessel and are a
+# refusal (a keen club is not a thing); the creator clauses are the book's "special
+# prerequisites", each one more +5 DC when unmet and never a refusal (owner, round 1 and
+# round 4 Q4). `launcher: false` is brilliant energy's "melee weapons, thrown weapons, and
+# ammunition": anything but the bow or crossbow itself.
+_REQUIRES: dict[str, type] = {
+    "melee": bool, "ranged": bool, "thrown": bool, "launcher": bool,
+    "damage_types_any": list,
+    "creator_alignment": str, "creator_class": str, "creator_caster_level": int,
+}
+
+# What a property's choice can range over, and how the chosen value reaches a document.
+#   creature_type  bane's foe: a type, or `{"subtype": "goblinoid"}` for a humanoid or an
+#                  outsider; written into the document's `when.target` clause, so the
+#                  existing `_when_holds` reads it by tag prefix (law 1).
+#   damage_type    energy resistance's energy: written into the document's `target`.
+#   skill          a competence bonus's skill: written into the document's `target`.
+CHOICE_OF: tuple[str, ...] = ("creature_type", "damage_type", "skill")
+
+# `when.target` keys a property document may use, and the ones `Actor._when_holds` does
+# not read yet. A key it does not read makes the clause unevaluable, and an unevaluable
+# clause is dropped — the term applies to nobody. Every property using one must say so in
+# `not_yet`, and the validator holds it to that.
+_WHEN_TARGET_KEYS = ("type", "subtype", "choice", "alignment")
+WHEN_NOT_READ: dict[str, str] = {
+    "alignment": "a creature's alignment, which Actor._when_holds does not read yet",
+}
+
+_PROPERTY_KEYS = {
+    "id", "name", "gear", "slots", "plus", "gp", "scaled", "cl", "aura", "tier", "spells",
+    "requires", "choice", "documents", "reads_tag", "not_yet", "wielder", "house",
+    "aliases", "source", "text",
+}
+_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+class BadProperties(ValueError):
+    """`content/rules/magic-properties.json` failed validation; every problem is named."""
+
+
+def _properties_path():
+    from pathlib import Path
+
+    from django.conf import settings
+
+    return Path(settings.BASE_DIR) / "content" / "rules" / "magic-properties.json"
+
+
+@_functools.lru_cache(maxsize=1)
+def _property_table() -> tuple[dict, dict]:
+    raw = _json.loads(_properties_path().read_text(encoding="utf-8"))
+    entries = raw.get("properties") if isinstance(raw, dict) else None
+    if not isinstance(entries, list):
+        raise BadProperties("magic-properties.json: \"properties\" must be a list of "
+                            "entries.")
+    problems = all_property_problems(entries)
+    if problems:
+        raise BadProperties("magic-properties.json is not valid:\n  "
+                            + "\n  ".join(problems))
+    table = {e["id"]: e for e in entries}
+    aliases = {old: (e["id"], dict(choice or {}))
+               for e in entries for old, choice in (e.get("aliases") or {}).items()}
+    return table, aliases
+
+
+def properties() -> dict[str, dict]:
+    """Every magic property, by id. Validated on load (`BadProperties`). Read it, never
+    mutate it: the dict is the cache's own (`bind` hands out copies)."""
+    return _property_table()[0]
+
+
+def property(prop_id: str) -> dict | None:            # noqa: A001 — the contract's name
+    """One property by its id, or by an old magic-items.json id (`mi-flaming`); None
+    when there is none. Shadows the builtin inside this module only, which uses no
+    `@property`; the contract (enchanting contracts §2.2) names it this."""
+    key = str(prop_id or "").strip().lower()
+    table, aliases = _property_table()
+    if key in table:
+        return table[key]
+    if key in aliases:
+        return table[aliases[key][0]]
+    return None
+
+
+def from_alias(old_id: str) -> tuple[str, dict] | None:
+    """An old catalogue id as `(property id, the choice it implies)`: `mi-energy-
+    resistance-fire` is `("energy-resistance", {"energy": "fire"})`. For the migration
+    (lane H). `mi-bane` gives an empty choice: the old bane never named its foe, so the
+    migration has to ask."""
+    hit = _property_table()[1].get(str(old_id or "").strip().lower())
+    return (hit[0], dict(hit[1])) if hit else None
+
+
+def property_tag(prop_id: str) -> str:
+    """The standing tag an item carrying this property gives its holder while it is held
+    or worn — `property.returning` — for the readers that ask a rule, not a number
+    (`reads_tag`). Asked by prefix through `has_state`, never matched as a name."""
+    return f"property.{str(prop_id).strip().lower()}"
+
+
+def price_of(prop: dict, bonus: int | None = None) -> dict:
+    """The book's price for one property, in its own shape — never an item's price (that
+    is lane B's, since the squared table needs the whole item). `{"plus": 1}`,
+    `{"gp": 3750}`, or for a scaled one bound at `bonus`, `{"gp": bonus² x
+    gp_per_square}`."""
+    if prop.get("plus") is not None:
+        return {"plus": int(prop["plus"])}
+    if prop.get("gp") is not None:
+        return {"gp": int(prop["gp"])}
+    scaled = prop.get("scaled") or {}
+    if bonus is None or int(bonus) not in scaled.get("values", ()):
+        raise ValueError(f"{prop.get('id')}: a scaled property is priced at one of its "
+                         f"values {scaled.get('values')}, not {bonus!r}.")
+    return {"gp": int(bonus) ** 2 * int(scaled["gp_per_square"])}
+
+
+# --- binding: a property's documents for one item, its choice filled in ----------------------
+
+def choice_problems(prop: dict, choice: dict | None) -> list[str]:
+    """Everything wrong with the choice stored on an item for this property, named.
+
+    `choice` is the record's dict, keyed by the choice's key (contracts §3.1):
+    `{"foe": "undead"}`, `{"foe": {"subtype": "goblinoid"}}`, `{"energy": "fire"}`,
+    `{"skill": "stealth", "bonus": 3}`. A scaled property's bonus rides in the same dict
+    under `bonus`.
+
+    Bane without a foe is refused here. The old catalogue's bane had no foe at all and its
+    numbers sat in a note, so every reader would have applied them to every creature
+    (enchanting plan §1); a property that asks a question is answered before it is bound.
+    """
+    pid = prop.get("id", "?")
+    choice = dict(choice or {})
+    out: list[str] = []
+    spec = prop.get("choice")
+    scaled = prop.get("scaled")
+    allowed_keys = set()
+    if spec:
+        key = spec["key"]
+        allowed_keys.add(key)
+        value = choice.get(key)
+        if value in (None, "", {}):
+            out.append(f"{pid}: choose its {key} — {_choice_hint(spec)} — before it is "
+                       f"bound.")
+        else:
+            out.extend(_choice_value_problems(pid, spec, value))
+    if scaled:
+        allowed_keys.add("bonus")
+        if choice.get("bonus") not in scaled.get("values", ()):
+            out.append(f"{pid}: bind it at one of {scaled.get('values')} (\"bonus\").")
+    extra = set(choice) - allowed_keys
+    if extra:
+        out.append(f"{pid}: {', '.join(sorted(extra))} is not a choice this property "
+                   f"asks. It asks: {', '.join(sorted(allowed_keys)) or 'nothing'}.")
+    return out
+
+
+def _choice_hint(spec: dict) -> str:
+    if spec.get("options"):
+        return "one of " + ", ".join(spec["options"])
+    return "a skill" if spec["of"] == "skill" else spec["of"].replace("_", " ")
+
+
+def _choice_value_problems(pid: str, spec: dict, value) -> list[str]:
+    key, of = spec["key"], spec["of"]
+    options = spec.get("options")
+    if of == "creature_type":
+        if isinstance(value, dict):
+            if set(value) - {"type", "subtype"} or not str(value.get("subtype") or "").strip():
+                return [f"{pid}: a {key} by subtype is {{\"subtype\": \"goblinoid\"}}, "
+                        f"with its type if you like ({{\"type\": \"humanoid\", ...}})."]
+            if value.get("type") and value["type"] not in SUBTYPE_REQUIRED:
+                return [f"{pid}: only {' and '.join(SUBTYPE_REQUIRED)} are chosen by "
+                        f"subtype; {value['type']} is chosen by its type alone."]
+            return []
+        if value in SUBTYPE_REQUIRED:
+            return [f"{pid}: {value} is chosen by subtype (the book: 'pick one subtype'): "
+                    f"{{\"subtype\": \"goblinoid\"}}."]
+        if options and value not in options:
+            return [f"{pid}: {value!r} is not a {key}. One of: {', '.join(options)}, or a "
+                    f"humanoid or outsider subtype."]
+        return []
+    if of == "skill":
+        if value not in SKILLS:
+            return [f"{pid}: {value!r} is not a skill. One of: {', '.join(sorted(SKILLS))}."]
+        return []
+    if options and value not in options:
+        return [f"{pid}: {value!r} is not a {key}. One of: {', '.join(options)}."]
+    return []
+
+
+def bind(prop: dict | str, choice: dict | None = None) -> list[dict]:
+    """A property's documents for one item: the choice filled in, the bonus worked out,
+    each stamped `source: property:<id>`. What lane B's layer emits and lane C reads — no
+    document leaves here naming a choice, so `_when_holds` never meets one.
+
+    Bane bound against undead carries `when: {"target": {"type": "undead"}}`, exactly the
+    clause cold iron's +2 against fey already uses, so the existing reader decides it. A
+    deep copy every time: the table is the cache's own, and a reader that mutated a
+    document would change every item that carries the property.
+    """
+    import copy
+
+    if isinstance(prop, str):
+        found = property(prop)
+        if found is None:
+            raise KeyError(f"no magic property {prop!r}")
+        prop = found
+    problems = choice_problems(prop, choice)
+    if problems:
+        raise ValueError("; ".join(problems))
+    choice = dict(choice or {})
+    spec = prop.get("choice")
+    out = []
+    for doc in prop.get("documents") or []:
+        d = copy.deepcopy(doc)
+        key = d.pop("choice_key", None)
+        if key and spec:
+            _fill_choice(d, spec, choice[key])
+        if prop.get("scaled"):
+            _fill_bonus(d, int(choice["bonus"]))
+        d["source"] = f"property:{prop['id']}"
+        out.append(d)
+    return out
+
+
+def _fill_choice(doc: dict, spec: dict, value) -> None:
+    if spec["of"] != "creature_type":
+        doc["target"] = value
+        return
+    if isinstance(value, dict):
+        # A subtype answers alone: `subtype.goblinoid` is the tag the defender carries,
+        # and adding `type.humanoid` beside it asks the same question twice.
+        clause = {"subtype": value["subtype"]}
+    else:
+        clause = {"type": value}
+    when = doc.get("when") or {}
+    target = {k: v for k, v in dict(when.get("target") or {}).items() if k != "choice"}
+    target.update(clause)
+    doc["when"] = {**when, "target": target}
+
+
+def _fill_bonus(doc: dict, bonus: int) -> None:
+    """Every `bonus` formula in the document, worked out: the layer emits numbers."""
+    v = doc.get("amount")
+    if isinstance(v, str) and "bonus" in _safe_names(v):
+        doc["amount"] = evaluate(v, {"bonus": bonus})
+    for nested in _walk_docs(doc):
+        if nested is not doc:
+            _fill_bonus(nested, bonus)
+
+
+def property_lines(prop: dict | str, choice: dict | None = None) -> list[str]:
+    """The card lines for a property as bound on one item — "2d6 untyped damage against
+    undead, on a hit". Unbound (no choice), a choosing property reads "against the chosen
+    foe"; the documents are never sent, only these words."""
+    if isinstance(prop, str):
+        found = property(prop)
+        if found is None:
+            raise KeyError(f"no magic property {prop!r}")
+        prop = found
+    if choice_problems(prop, choice):
+        docs = prop.get("documents") or []
+    else:
+        docs = bind(prop, choice)
+    return [render(d, against=True) for d in docs]
+
+
+def sample_choices(prop: dict) -> list[dict]:
+    """One complete choice per option (and per scaled value): what the validator binds
+    to prove every way the property can be bound gives valid documents."""
+    spec, scaled = prop.get("choice"), prop.get("scaled")
+    picks: list[dict] = [{}]
+    if spec:
+        if spec["of"] == "creature_type":
+            values: list = [o for o in spec.get("options") or CREATURE_TYPES
+                            if o not in SUBTYPE_REQUIRED] + [{"subtype": "goblinoid"}]
+        elif spec["of"] == "skill":
+            values = sorted(SKILLS)
+        else:
+            values = list(spec.get("options") or [])
+        picks = [{spec["key"]: v} for v in values]
+    if scaled:
+        picks = [{**p, "bonus": b} for p in picks for b in scaled.get("values", ())]
+    return picks
+
+
+# --- validating the table ---------------------------------------------------------------------
+
+def all_property_problems(entries: list, spell_ids=None) -> list[str]:
+    """Every problem in the whole table: each entry's, and those between entries — a
+    repeated id, an alias claimed twice, an alias that is also a property's id."""
+    out: list[str] = []
+    seen: set[str] = set()
+    alias_owner: dict[str, str] = {}
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            out.append(f"entry {i + 1}: is not an object.")
+            continue
+        out.extend(property_problems(e, spell_ids=spell_ids))
+        pid = str(e.get("id") or "")
+        if pid in seen:
+            out.append(f"{pid}: the id is used twice. Ids are how items name a property.")
+        seen.add(pid)
+        for old in e.get("aliases") or {}:
+            if old in alias_owner:
+                out.append(f"{pid}: the alias {old} already belongs to {alias_owner[old]}.")
+            alias_owner[old] = pid
+    for old, owner in alias_owner.items():
+        if old in seen:
+            out.append(f"{owner}: the alias {old} is also a property's id; an old save "
+                       f"naming it would be read two ways.")
+    return out
+
+
+def property_problems(e: dict, spell_ids=None) -> list[str]:
+    """Everything wrong with one entry, named with the fix — the classbuilder's style.
+
+    `spell_ids`, when given, is the set of real spell ids. Every spell a property names
+    must be one, or the binder's "do I know this spell?" asks after a spell nobody can
+    ever know, and the +5 DC is permanent.
+    """
+    pid = str(e.get("id") or "?")
+    at = pid
+    out: list[str] = []
+    say = out.append
+
+    unknown = set(e) - _PROPERTY_KEYS
+    if unknown:
+        say(f"{at}: {', '.join(sorted(unknown))} is not a property field. Known: "
+            f"{', '.join(sorted(_PROPERTY_KEYS))}.")
+    if not _SLUG.match(pid):
+        say(f"{at}: the id is lower-case words joined by hyphens: \"flaming-burst\".")
+    if not str(e.get("name") or "").strip():
+        say(f"{at}: needs a name, as the card shows it.")
+    gear = e.get("gear")
+    if not isinstance(gear, list) or not gear or set(gear) - set(PROPERTY_GEAR):
+        say(f"{at}: gear is a list of {', '.join(PROPERTY_GEAR)}.")
+        gear = []
+    slots = e.get("slots")
+    if slots is not None:
+        from .tables import SLOTS
+
+        if not isinstance(slots, list) or not slots or set(slots) - set(SLOTS):
+            say(f"{at}: slots is a list of body slots: {', '.join(SLOTS)}.")
+
+    # The price: exactly one of the book's three shapes.
+    prices = [k for k in ("plus", "gp", "scaled") if e.get(k) is not None]
+    if len(prices) != 1:
+        say(f"{at}: give exactly one price — \"plus\" (a bonus equivalent, +1 to +5), "
+            f"\"gp\" (a flat price outside the +10) or \"scaled\" (a bonus priced by its "
+            f"square). It has {', '.join(prices) or 'none'}.")
+    plus = e.get("plus")
+    if plus is not None and (not isinstance(plus, int) or isinstance(plus, bool)
+                             or not 1 <= plus <= 5):
+        say(f"{at}: plus is the book's bonus equivalent, a whole number 1 to 5.")
+    if e.get("gp") is not None and (not isinstance(e["gp"], int) or e["gp"] <= 0):
+        say(f"{at}: gp is the book's flat price in gold, a whole number above 0.")
+    scaled = e.get("scaled")
+    if scaled is not None:
+        out.extend(_scaled_problems(at, scaled))
+        if {"weapon", "armour", "shield"} & set(gear):
+            say(f"{at}: arms and armour abilities are priced as a bonus equivalent or in "
+                f"gold; \"scaled\" is the ring and wondrous table's.")
+
+    cl = e.get("cl")
+    if not isinstance(cl, int) or isinstance(cl, bool) or not 1 <= cl <= 20:
+        say(f"{at}: cl is the book's caster level, 1 to 20.")
+    aura = e.get("aura")
+    if (not isinstance(aura, dict) or aura.get("strength") not in AURA_STRENGTHS
+            or not isinstance(aura.get("school"), list) or not aura["school"]
+            or set(aura["school"]) - set(SCHOOLS)):
+        say(f"{at}: aura is {{\"strength\": one of {', '.join(AURA_STRENGTHS)}, "
+            f"\"school\": [one or more of {', '.join(SCHOOLS)}]}}.")
+    if e.get("tier") not in TIERS:
+        say(f"{at}: tier is one of {', '.join(TIERS)}.")
+
+    spells = e.get("spells")
+    if not isinstance(spells, list) or any(
+            not isinstance(g, list) or not g
+            or not all(isinstance(s, str) and s for s in g) for g in spells):
+        say(f"{at}: spells is a list of groups, each a list of spell ids any one of which "
+            f"meets it: [[\"fireball\", \"flame-blade\", \"flame-strike\"]].")
+    elif spell_ids is not None:
+        missing = sorted({s for g in spells for s in g} - set(spell_ids))
+        if missing:
+            say(f"{at}: {', '.join(missing)} is not a spell id in content/spells. Use the "
+                f"Spells bench's id (summon-monster-1, not summon-monster-i).")
+
+    out.extend(_requires_problems(at, e.get("requires")))
+    if e.get("wielder") is not None:
+        w = e["wielder"]
+        if (not isinstance(w, dict) or w.get("alignment") not in ALIGNMENTS
+                or not isinstance(w.get("negative_levels"), int)):
+            say(f"{at}: wielder is {{\"alignment\": the wrong hand's alignment, "
+                f"\"negative_levels\": 1}}.")
+    out.extend(_choice_spec_problems(at, e.get("choice")))
+
+    not_yet = e.get("not_yet")
+    if not isinstance(not_yet, list) or not all(isinstance(x, str) and x.strip()
+                                                for x in not_yet):
+        say(f"{at}: not_yet is a list of sentences (empty when nothing waits).")
+        not_yet = []
+    waits = " ".join(not_yet).lower()
+    docs = e.get("documents")
+    if not isinstance(docs, list):
+        say(f"{at}: documents is a list of effect documents.")
+        docs = []
+    if not docs:
+        if not str(e.get("reads_tag") or "").strip() or not not_yet:
+            say(f"{at}: has no documents, so its whole effect is a rule a reader asks of "
+                f"its tag. Say which reader in \"reads_tag\" and what waits in "
+                f"\"not_yet\": a property that does nothing must say so.")
+    elif e.get("reads_tag"):
+        say(f"{at}: reads_tag is for a property with no documents; this one has them.")
+
+    spec = e.get("choice") if isinstance(e.get("choice"), dict) else {}
+    choice_key = spec.get("key")
+    used_choice = False
+    for n, doc in enumerate(docs):
+        where = f"{at} > document {n + 1}"
+        if not isinstance(doc, dict):
+            say(f"{where}: is not an object.")
+            continue
+        for nested in _walk_docs(doc):
+            if nested.get("type") == "narrative":
+                say(f"{where}: is narrative. Every book property works (owner, round 2): "
+                    f"write it as a typed effect, or as a reads_tag rule with a not_yet.")
+        out.extend(validate(doc, where))
+        if doc.get("book") is not True:
+            say(f"{where}: a printed number is marked \"book\": true, never scaled by "
+                f"binding quality.")
+        key = _choice_key(doc)
+        if key:
+            used_choice = True
+            if key != choice_key:
+                say(f"{where}: choice_key {key!r} is not this property's choice "
+                    f"({choice_key or 'it has none'}).")
+        if doc.get("when") is not None:
+            out.extend(_when_problems(where, doc["when"], waits))
+        if "bonus" in _safe_names(doc.get("amount")) and not scaled:
+            say(f"{where}: its amount names bonus and the property is not scaled.")
+    if choice_key and not used_choice:
+        say(f"{at}: asks for a {choice_key} and no document uses it. A choice nothing "
+            f"reads is a question with no consequence.")
+    if scaled and not any("bonus" in _safe_names(d.get("amount"))
+                          for d in docs if isinstance(d, dict)):
+        say(f"{at}: is scaled and no document's amount is \"bonus\".")
+
+    # Every way it can be bound must give documents that validate in full.
+    if not out and docs:
+        for pick in sample_choices(e):
+            try:
+                bound = bind(e, pick)
+            except ValueError as exc:
+                say(f"{at}: cannot be bound with {pick}: {exc}")
+                break
+            problems = [p for n, d in enumerate(bound)
+                        for p in validate(d, f"{at} bound {pick} > document {n + 1}")]
+            if problems:
+                out.extend(problems)
+                break
+
+    if (e.get("requires") or {}).get("creator_alignment") or e.get("wielder"):
+        if "alignment" not in waits:
+            say(f"{at}: carries an alignment clause, and alignment is not tracked (owner, "
+                f"round 4 Q7). Say in not_yet that nothing checks it.")
+    house = e.get("house")
+    if house is not None and (not isinstance(house, list)
+                              or set(house) - {"cl", "values", "spells", "tier"}):
+        say(f"{at}: house lists which of its numbers are not the book's: cl, values, "
+            f"spells.")
+    if house and not any(w in waits for w in ("house",)):
+        say(f"{at}: names house numbers; say in not_yet why the book gives none.")
+
+    aliases = e.get("aliases")
+    if not isinstance(aliases, dict):
+        say(f"{at}: aliases is {{old magic-items.json id: the choice it implies}}, {{}} "
+            f"when there are none.")
+    else:
+        for old, choice in aliases.items():
+            if not str(old).startswith("mi-"):
+                say(f"{at}: alias {old} is not an old catalogue id (mi-...).")
+            if not isinstance(choice, dict):
+                say(f"{at}: alias {old} maps to a choice dict ({{}} for none).")
+            elif choice:
+                # An alias may leave the choice open (the old bane named no foe); what it
+                # does name must be right.
+                bad = [p for p in choice_problems(e, choice)
+                       if "choose its" not in p and "bind it at" not in p]
+                out.extend(f"{at}: alias {old}: {p}" for p in bad)
+    if not str(e.get("source") or "").startswith("https://"):
+        say(f"{at}: source is the page the numbers were read from (https://...), so the "
+            f"next reader can check them.")
+    if not str(e.get("text") or "").strip():
+        say(f"{at}: needs a text, the line the card shows.")
+    return out
+
+
+def _safe_names(value) -> set[str]:
+    if not isinstance(value, str):
+        return set()
+    try:
+        return _formula_names(value)
+    except BadFormula:
+        return set()
+
+
+def _walk_docs(doc: dict):
+    yield doc
+    for key in ("on_failure", "on_success", "effect", "effects", "options", "on_enter"):
+        for nested in doc.get(key) or ():
+            if isinstance(nested, dict):
+                yield from _walk_docs(nested)
+
+
+def _scaled_problems(at: str, scaled) -> list[str]:
+    if not isinstance(scaled, dict):
+        return [f"{at}: scaled is {{\"values\": [1, 2, 3, 4, 5], \"gp_per_square\": "
+                f"2000}}."]
+    out = []
+    values = scaled.get("values")
+    if (not isinstance(values, list) or not values
+            or not all(isinstance(v, int) and not isinstance(v, bool) and v > 0
+                       for v in values)
+            or values != sorted(set(values))):
+        out.append(f"{at}: scaled.values is the bonuses it can be bound at, rising: "
+                   f"[1, 2, 3, 4, 5].")
+        values = []
+    if not isinstance(scaled.get("gp_per_square"), int) or scaled["gp_per_square"] <= 0:
+        out.append(f"{at}: scaled.gp_per_square is the book's multiplier (deflection 2000, "
+                   f"resistance 1000, competence 100).")
+    per = scaled.get("creator_cl_per_bonus")
+    if per is not None and (not isinstance(per, int) or per <= 0):
+        out.append(f"{at}: scaled.creator_cl_per_bonus is the book's 'at least N times "
+                   f"the bonus'.")
+    tiers = scaled.get("tiers")
+    if tiers is not None and (not isinstance(tiers, list) or len(tiers) != len(values)
+                              or set(tiers) - set(TIERS)):
+        out.append(f"{at}: scaled.tiers gives a tier for each value, in order.")
+    unknown = set(scaled) - {"values", "gp_per_square", "creator_cl_per_bonus", "tiers"}
+    if unknown:
+        out.append(f"{at}: scaled has no field {', '.join(sorted(unknown))}.")
+    return out
+
+
+def _requires_problems(at: str, req) -> list[str]:
+    if not isinstance(req, dict):
+        return [f"{at}: requires is an object ({{}} when it has none)."]
+    from .tables import PHYSICAL_DAMAGE
+
+    out = []
+    for key, value in req.items():
+        want = _REQUIRES.get(key)
+        if want is None:
+            out.append(f"{at}: requires has no clause {key!r}. Known: "
+                       f"{', '.join(_REQUIRES)}.")
+        elif want is int and (not isinstance(value, int) or isinstance(value, bool)):
+            out.append(f"{at}: requires.{key} is a whole number.")
+        elif want is not int and not isinstance(value, want):
+            out.append(f"{at}: requires.{key} is a {want.__name__}.")
+    dt = req.get("damage_types_any")
+    if isinstance(dt, list) and (not dt or set(dt) - set(PHYSICAL_DAMAGE)):
+        out.append(f"{at}: requires.damage_types_any names weapon damage types: "
+                   f"{', '.join(PHYSICAL_DAMAGE)}.")
+    if "creator_alignment" in req and req["creator_alignment"] not in ALIGNMENTS:
+        out.append(f"{at}: requires.creator_alignment is one of {', '.join(ALIGNMENTS)}.")
+    if req.get("melee") and req.get("ranged"):
+        out.append(f"{at}: requires melee and ranged at once; no weapon is both.")
+    return out
+
+
+def _choice_spec_problems(at: str, spec) -> list[str]:
+    if spec is None:
+        return []
+    if (not isinstance(spec, dict)
+            or not re.fullmatch(r"[a-z][a-z_]*", str(spec.get("key") or ""))
+            or spec.get("of") not in CHOICE_OF):
+        return [f"{at}: choice is {{\"key\": \"foe\", \"of\": one of "
+                f"{', '.join(CHOICE_OF)}, \"options\": [...]}}."]
+    if spec["key"] == "bonus":
+        return [f"{at}: \"bonus\" is the scaled value's key; name the choice something "
+                f"else."]
+    unknown = set(spec) - {"key", "of", "options"}
+    if unknown:
+        return [f"{at}: choice has no field {', '.join(sorted(unknown))}."]
+    options = spec.get("options")
+    if spec["of"] in ("creature_type", "damage_type") and not options:
+        return [f"{at}: a {spec['of'].replace('_', ' ')} choice lists its options."]
+    if options is not None:
+        vocab = (set(CREATURE_TYPES) if spec["of"] == "creature_type"
+                 else {o["id"] for o in VOCAB["damage_type"]}
+                 if spec["of"] == "damage_type" else set(SKILLS))
+        bad = [o for o in options if o not in vocab]
+        if bad:
+            return [f"{at}: {', '.join(map(str, bad))} cannot be a "
+                    f"{spec['of'].replace('_', ' ')}."]
+    return []
+
+
+def _when_problems(where: str, when, waits: str) -> list[str]:
+    if (not isinstance(when, dict) or set(when) - {"target"}
+            or not isinstance(when.get("target"), dict) or not when["target"]):
+        return [f"{where}: a property's when is {{\"target\": {{...}}}}: the creature "
+                f"struck, by type, subtype, alignment or the property's choice."]
+    out = []
+    target = when["target"]
+    unknown = set(target) - set(_WHEN_TARGET_KEYS)
+    if unknown:
+        out.append(f"{where}: when.target has no key {', '.join(sorted(unknown))}. Known: "
+                   f"{', '.join(_WHEN_TARGET_KEYS)}.")
+    if "type" in target:
+        types = target["type"] if isinstance(target["type"], list) else [target["type"]]
+        bad = [t for t in types if t not in CREATURE_TYPES]
+        if bad:
+            out.append(f"{where}: {', '.join(map(str, bad))} is not a creature type.")
+    if "alignment" in target and target["alignment"] not in ALIGNMENTS:
+        out.append(f"{where}: when.target.alignment is one of {', '.join(ALIGNMENTS)}.")
+    for key, why in WHEN_NOT_READ.items():
+        if key in target and key not in waits:
+            out.append(f"{where}: asks {why}, so the term applies to nobody. Say so in "
+                       f"not_yet (mention {key}).")
+    return out
