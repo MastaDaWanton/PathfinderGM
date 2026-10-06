@@ -411,7 +411,7 @@ def build(record: dict) -> dict:
                       f"folded:{slot}")
 
     specs.extend(extras)
-    return {
+    out = {
         "id": item_id, "name": str(rec.get("name") or item_id), "kind": gear,
         "base": str(rec.get("base") or rec.get(gear) or ""),
         "specs": specs, "book": book,
@@ -421,6 +421,29 @@ def build(record: dict) -> dict:
         "multipliers": {"quality": round(q_mult, 4), "negative_cut": round(cut, 4)},
         "problems": problems,
     }
+    # The enchanter's layer (enchanting contracts §3.2), merged into the lists every
+    # reader already reads — specs into the funnel, the DR traits into `strikes_as` — so
+    # a +1 sword needs no second door. The whole layer rides under "magic" for the readers
+    # that need more (bane's raise, powers, wielded and worn effects, riders). A record
+    # with no layer gets no key and builds exactly as it did (tests/test_magic_layer.py
+    # pins the equality).
+    #
+    # Riders are NOT merged into `riders`, though §3.2 first said so. Measured 2026-10-05:
+    # `Engine._item_riders` turns a rider into a damage intent through
+    # `consumables._spec_to_intents`, which never asks the rider's `when`, so a merged bane
+    # rider put its +2d6 on every foe — the exact defect bane's `when` exists to close —
+    # and its tell named "the property:bane". Lane C reads `build["magic"]["riders"]`
+    # (contracts §4) with the `when` asked. Specs are safe to merge: `_standing_mods` asks
+    # every spec's `when` (`_when_holds`).
+    from . import magic_layer
+
+    if magic_layer.has_layer(rec):
+        lay = magic_layer.layer(rec)
+        out["magic"] = lay
+        out["specs"] = specs + [dict(s) for s in lay["specs"]]
+        out["strikes_as"] = sorted(set(out["strikes_as"]) | set(lay["strikes_as"]))
+        out["problems"] = problems + [f"magic: {p}" for p in lay["problems"]]
+    return out
 
 
 def preview(pieces: dict, *, gear: str, base: str, quality_index: int, level: int,
@@ -465,8 +488,81 @@ def record_of(thing) -> dict | None:
             rebuilt = blacksmith.record(thing)
         except Exception:  # noqa: BLE001 - a shelf entry that is not a forge item
             return None
-        return rebuilt if is_forged(rebuilt) else None
+        if not is_forged(rebuilt):
+            return None
+        # A forge item kept as a plain Stock keeps its magic layer on the Stock's own
+        # `magic` field (lane G's, contracts §8.1), since its record is rebuilt from tags
+        # that know nothing of magic. Without this the layer would be on the shelf and in
+        # no build: the old enchanter's dropped-build defect, by a different road.
+        magic = getattr(thing, "magic", None)
+        if isinstance(magic, dict) and magic:
+            import copy as _copy
+
+            rebuilt["magic"] = _copy.deepcopy(magic)
+        return rebuilt
     return None
+
+
+def record_for_base(base: str, *, gear: str, quality_index: int = 3,
+                    pieces: dict | None = None, item_id: str | None = None,
+                    name: str | None = None) -> dict:
+    """A contracts §4 record for an item nobody forged — bought, looted, a stat block's
+    sword — so it can carry a magic layer (enchanting plan §6.2: "a record is made for it
+    on first touch") and answer the material tag.
+
+    Its pieces are the base's defaults from `content/rules/base-pieces.json`, marked
+    `plain` as the forge migration marks the pieces nobody chose (`blacksmith.
+    MIGRATED_PLAIN`): named, so the card and the material tag can say what it is made of,
+    and never summed, because a bought longsword is the book's longsword and the forge's
+    house numbers are for metal somebody worked. Pieces the caller names (a bought cold
+    iron blade: `{"head": "cold-iron"}`) replace those defaults and are not plain.
+
+    Refuses (ValueError) a base the tables do not know or a gear it is not.
+    """
+    from . import armour as armour_mod
+    from . import item_tags
+    from .worldclass import quality_name
+
+    gear = str(gear or "").strip().lower()
+    if gear not in PIECES:
+        raise ValueError(f"gear must be one of {', '.join(PIECES)}, not {gear!r}.")
+    if gear == "weapon":
+        key = item_tags.weapon_key(base)
+        printed = key
+        if key:
+            from . import weapons as weapons_mod
+
+            printed = str(weapons_mod.get(key).get("name") or key)
+    else:
+        kind, key = armour_mod.key_for(base)
+        if kind != gear:
+            key = ""
+        printed = str(armour_mod.row(gear, key).get("name") or key) if key else ""
+    defaults = item_tags.default_pieces(key, gear) if key else None
+    if not key or defaults is None:
+        raise ValueError(f"No {gear} called {base!r} in the tables.")
+    made = {slot: {"material": mid, "passes": 0, "plain": True}
+            for slot, mid in defaults.items()}
+    for slot, spec in (pieces or {}).items():
+        mid = spec if isinstance(spec, str) else (spec or {}).get("material")
+        if mid:
+            made[slot] = {"material": str(mid).strip().lower(),
+                          "passes": int((spec or {}).get("passes", 0) or 0)
+                          if isinstance(spec, dict) else 0}
+    q = int(quality_index)
+    label = name or f"{quality_name(q)} {printed}"
+    rid = item_id or "-".join("".join(ch if ch.isalnum() else " " for ch in label.lower())
+                              .split())
+    return {
+        "id": rid, "name": label,
+        "kind": "crafted", "craft": "bought", "count": 1,
+        "gear": gear, "base": key,
+        "slot": {"weapon": "hands", "shield": "shield"}.get(gear, "armor"),
+        "quality": quality_name(q).lower(), "quality_index": q,
+        "masterwork": q >= MASTERWORK_AT,
+        "pieces": made, "quench": None, "finish": [], "flaws": [],
+        "smith": {"level": 1, "perks": {}},
+    }
 
 
 _ROLL_EXCLUDED = frozenset({"gear_mod", "strikes_as", "working", "narrative"})
@@ -617,7 +713,8 @@ def material_carried_effects(material_id: str) -> list[dict]:
     return out
 
 
-__all__ = ["build", "preview", "material", "is_forged", "record_of", "roll_specs",
+__all__ = ["build", "preview", "material", "is_forged", "record_of", "record_for_base",
+           "roll_specs",
            "standing_specs", "armour_row", "weapon_row", "ForgedStock", "stock_item",
            "material_carried_effects", "quality_multiplier", "negative_cut", "PIECES",
            "MAIN_PIECE", "GEAR_TARGETS", "TRIGGERS", "FLAWS"]

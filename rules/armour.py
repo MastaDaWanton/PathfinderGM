@@ -194,25 +194,45 @@ def worn_rows(actor) -> tuple[dict, dict]:
     return a, s
 
 
-# The suits and shields made of iron or steel (CRB Table 6-6). The table carries no
-# material column, so it is named once here: the smith's own list (`blacksmith.
-# FORGED_ARMOUR`, the metal suits of the table) plus studded leather's rivets, and the
-# steel shields and the buckler. Leather, padded and hide, and the wooden shields, are not.
-METAL_ARMOUR = frozenset({"studded leather", "chain shirt", "scale mail", "breastplate",
-                          "chainmail", "splint mail", "banded mail", "half-plate",
-                          "full plate"})
-METAL_SHIELDS = frozenset({"buckler", "light shield", "heavy shield"})
+def worn_things(actor) -> list:
+    """What this creature has on its body and arm, as things `item_tags` can read: the
+    forged record when the suit (or shield) is one, else the crafted record in the slot
+    whose base is the suit being worn (a tanner's studded leather, which knows its own
+    studs), else the table key. Nothing for "none"."""
+    out: list = []
+    for kind, slot, record_of in (("armour", "armor", "armour_record"),
+                                  ("shield", "shield", "shield_record")):
+        key = str(getattr(actor, kind, "none") or "none")
+        if key == "none":
+            continue
+        rec = getattr(actor, record_of)() if hasattr(actor, record_of) else None
+        if rec is None:
+            for name in (getattr(actor, "slots", {}) or {}).get(slot) or ():
+                cand = (getattr(actor, "worn", {}) or {}).get(str(name or "").strip().lower())
+                if isinstance(cand, dict) and key_for(str(cand.get("armour") or ""))[1] == key:
+                    rec = cand
+                    break
+        out.append(rec if rec is not None else key)
+    return out
 
 
 def wears_metal(actor) -> bool:
     """Whether this creature has metal armour or a metal shield on — what inubrix's house
-    clause (`when: {"target": {"armour_metal": true}}`) asks of a defender. A stat block
-    with a printed AC wears what its note says, which this cannot read, so it answers no:
-    a clause nothing can evaluate is dropped, never applied."""
+    clause (`when: {"target": {"armour_metal": true}}`) asks of a defender, and what the
+    druid's rule and shocking grasp will ask. A stat block with a printed AC wears what its
+    note says, which this cannot read, so it answers no: a clause nothing can evaluate is
+    dropped, never applied.
+
+    Asked of the material tag (`item_tags`, enchanting plan §16), never of a name. It was
+    two name lists here, `METAL_ARMOUR` and `METAL_SHIELDS`, which made a forged shield
+    metal by its base's name whatever it was made of, and a forged noqual breastplate
+    metal only because "breastplate" was on the list."""
     if getattr(actor, "flat_ac", None) is not None:
         return False
-    return (str(getattr(actor, "armour", "none") or "none") in METAL_ARMOUR
-            or str(getattr(actor, "shield", "none") or "none") in METAL_SHIELDS)
+    from . import item_tags
+    from .states import METAL
+
+    return any(item_tags.has_material(t, METAL) for t in worn_things(actor))
 
 
 def attack_penalties(actor) -> list[tuple[int, str]]:
@@ -283,4 +303,4 @@ def spell_failure(actor, spell) -> tuple[int, str]:
 
 __all__ = ["key_for", "row", "change_cost", "proficiency_tags", "is_armour_token",
            "proficient_with", "attack_penalties", "is_arcane", "spell_failure",
-           "ARCANE_LISTS", "worn_rows", "wears_metal", "METAL_ARMOUR", "METAL_SHIELDS"]
+           "ARCANE_LISTS", "worn_rows", "wears_metal", "worn_things"]

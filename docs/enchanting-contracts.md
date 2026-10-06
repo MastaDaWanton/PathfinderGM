@@ -264,6 +264,65 @@ item_tags.main_material(thing) -> str | None
 suit and shield; `METAL_ARMOUR` and `METAL_SHIELDS` are deleted, and the inubrix clause test
 keeps passing.
 
+### 3.4 As built (lane B, 2026-10-05)
+
+Where this differs from §3.1-3.3 the reason is in the module docstring; in brief:
+
+- **Capacity is the owner's round 4 ruling**, not §3.2's maths: `capacity(record, *,
+  binder_level=None, binder_perks=None)` (a **new `binder_level` argument**; both default to
+  the record's last `binding`) returns `{"bonus", "used", "left", "cap": None, "level",
+  "from_level", "from_quality", "from_perks", "masterwork", "why"}` with bonus =
+  floor(level / 2) + max(0, quality_index − 3) + Capacity perks, **no ceiling**. Arms and armour
+  below Superior hold 0 ("not masterwork"). The plan's power-count column for rings and
+  wondrous items is gone: **one budget for every vessel**, a wondrous power counting as the plus
+  a weapon would carry at its price, ceil(sqrt(gp ÷ 2,000)) (a reading; the book has no bonus
+  equivalent for wondrous items).
+- **Kept from the book:** +5 the highest enhancement, and a special ability on arms or armour
+  needs at least +1 enhancement. Gold-priced abilities (`flat`) are outside capacity.
+- `plan(record, adds, *, binder, hurry=False, helps=())`: `adds["enhancement"]` is the number of
+  steps to **add** (+1 → +2 is 1). `binder` also takes `classes` (ki focus's monk). `helps` are
+  the bench's own DC terms (affinity, catalyst), added as given. The result also carries `dc`
+  (the sum), `notes` (waived alignment clauses), `gear`, `creator_level`, `aura`;
+  `price` also carries `item_market_gp` and `was_gp`; `needs.enhancement` is `{"from", "to"}`
+  or None and `needs.powers` the recipe ids.
+- Surcharges: noqual's from its document (`enchant_surcharge_gp`, any piece); cold iron's
+  2,000 gp from the book as `magic_layer.WEAPON_MAIN_SURCHARGE_GP` (weapon, main piece) because
+  the cold iron document carries no `enchant_surcharge_gp` — a material's own field wins when
+  it has one. Both only when the record has no layer yet.
+- `write(record, adds, *, binding, curse=None, day=None)`: raises ValueError for an unknown
+  property or recipe or an unanswered choice; stores `{"id", "essence", "choice"}` per entry,
+  files a gold-priced property under `flat` whichever list it came in; adds `worked_day`.
+- `layer(record, *, believed=False)` returns `specs, riders, wielded, worn, strikes_as, raises,
+  powers, tags, enhancement, aura, schools, caster_level, total_bonus, price_gp, capacity,
+  known, problems, gear, schema`. Weapon +N: `combat_mod` attack and damage, `bonus_type:
+  enhancement`; armour/shield +N: `combat_mod` ac, `bonus_type: armour` (folded by
+  `armour_row`). `raises` are bane's `enhancement_raise` documents; lane C asks
+  `raised_enhancement(lay, holds)` / `strikes_as_against(lay, holds)` with `holds = lambda
+  when: _when_holds(when, ctx)`. `powers` rows: `{"key", "source", "spec", "uses",
+  "uses_count", "used"}`. `tags`: `property.<id>` for every bound property. A curse is applied
+  through `curses.documents(curse, layer) -> {"suppress": bool, "replace": {list: [...]},
+  "add": {list: [...]}, "enhancement": int}` when rules/curses.py exists (lane F); the curse's
+  id never appears in the output.
+- **Riders are NOT merged into `build["riders"]`**; they stay in `build["magic"]["riders"]`,
+  which is what §4 says lane C reads. Measured: `Engine._item_riders` turns a rider into a
+  damage intent through `consumables._spec_to_intents`, which never asks the rider's `when`,
+  so a merged bane rider would have put +2d6 on every foe (the very note-only defect bane's
+  `when` exists to close), and its tell would have read "The property:bane in ...". Specs and
+  `strikes_as` ARE merged: `_standing_mods` asks every spec's `when`.
+- `magic_layer.record_specs(record)`: a NON-forged record's flat specs plus its layer's, for
+  lane C's `_record_specs` (rings and cloaks have no forge build).
+- `forge_items.record_for_base(base, *, gear, quality_index=3, pieces=None, item_id=None,
+  name=None)`: default pieces marked `plain` (named, not summed); `craft: "bought"`; pass
+  `item_id` for a unique id. `forge_items.record_of` carries a plain forge `Stock`'s
+  `Stock.magic` into the rebuilt record.
+- Tags: `item_tags.material_tags / has_material / main_material` as §3.3, plus
+  `materials_in`, `substance_of`, `root_material`, `default_pieces`; tag text
+  `material.<substance>.<root id>` (`material.wood.ash`, `material.metal.cold-iron`),
+  `material.<substance>`, `material.main.<root id>`, written only by
+  `states.material_tag` / `main_material_tag`. Substances (`states.SUBSTANCES`): metal, wood,
+  leather, bone, horn, cloth, cord, stone, glass. A finish (alchemical silver) adds no
+  substance. `armour.worn_things(actor)` is the suit and shield as tag-readable things.
+
 ---
 
 ## 4. What lane C's readers promise

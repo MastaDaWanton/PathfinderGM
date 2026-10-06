@@ -174,6 +174,50 @@ WITHHELD = "heal.withheld"
 # new literal.
 BYSTANDER_KEY = "bystander"
 
+# What an ITEM is made of (enchanting plan §16, contracts §3.3; the cross-craft ruling
+# "there are spells that affect metal", leatherworking Q7.3). Tags of a thing, not of a
+# person: `rules/item_tags.py` derives them from the item's pieces and asks them through
+# `matches`, never `==`, so "is it metal?" is one prefix question whatever the metal is.
+#
+#   material.<substance>.<material>   every piece: material.metal.cold-iron,
+#                                     material.wood.ash, material.leather.wolf-pelt
+#   material.<substance>              the family alone, asked by prefix: material.metal
+#   material.main.<material>          the most prevalent material (the book's "only the
+#                                     most prevalent", the main piece: head or body),
+#                                     which the cold iron surcharge asks
+#
+# Before this, metal was a name list (`armour.METAL_ARMOUR`, `METAL_SHIELDS`): a forged
+# mithral-on-darkwood shield was metal by its name and a forged noqual breastplate only
+# because "breastplate" was on the list. The substance is read off the material's own
+# `kind` (metal, alloy, hide...), so a world's own metals answer the same question
+# (World Bible exports `kind`; docs/enchanting-revamp-plan.md §20). Foundry's PF1 system
+# models the same split (its material registry gives each material a `baseMaterial`,
+# steel or wood, and keeps surface treatments as `addon` materials beside it), which is
+# why a finish such as alchemical silvering adds no substance tag here.
+MATERIAL = "material"
+MATERIAL_MAIN = "material.main"
+METAL = "material.metal"
+# The substances a piece can be. Fixed so a reader can name a family without guessing
+# its spelling; `item_tags` refuses (by test) a substance not on the list.
+SUBSTANCES: tuple[str, ...] = ("metal", "wood", "leather", "bone", "horn", "cloth", "cord",
+                               "stone", "glass")
+
+
+def material_leaf(material_id) -> str:
+    """A material id made safe as a tag leaf: lowered, and anything but a letter, digit
+    or hyphen folded to a hyphen — a dot would read as a level of family (`town_tag`'s
+    rule, for the same reason)."""
+    return town_tag(material_id)
+
+
+def material_tag(substance: str, material_id) -> str:
+    """`material.<substance>.<material>` — the one writer of the tag text."""
+    return f"{MATERIAL}.{substance}.{material_leaf(material_id)}"
+
+
+def main_material_tag(material_id) -> str:
+    return f"{MATERIAL_MAIN}.{material_leaf(material_id)}"
+
 TAGS: dict[str, tuple[str, ...]] = {
     # Not under `state.*`: a bystander is stopped from nothing and impaired in
     # nothing, and no `recovery.*` — a night's sleep does not make a merchant a
