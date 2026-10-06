@@ -4332,10 +4332,14 @@ class Actor:
         # roll for the rest of the campaign.
         self.clear_states("recovery.rest")
         # A night's sleep is what fatigue is for. Exhaustion becomes fatigue instead.
+        # Except the fatigue thirst and hunger leave: "Characters who have taken nonlethal
+        # damage from lack of food or water are fatigued" (CRB p.444) for as long as that
+        # damage is held, and the owner ruled it stays until they drink or eat (2026-10-05).
+        # A night's sleep cleared it while the thirst damage it came with still stood.
         if self.has_condition("exhausted"):
             self.remove_condition("exhausted")
             self.add_condition("fatigued", source="slept off exhaustion")
-        elif self.has_condition("fatigued"):
+        elif self.has_condition("fatigued") and not self.withheld_nonlethal():
             self.remove_condition("fatigued")
 
         # "Ability damage returns at a rate of 1 point per day, or 2 points per day of

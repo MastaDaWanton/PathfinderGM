@@ -745,14 +745,28 @@ def eat(actor) -> int:
     released to heal by the ordinary clock. Returns the points released."""
     actor.fed_minutes = 0
     actor.hunger_checks = 0
-    return actor.release_nonlethal("hunger")
+    return _met(actor, "hunger")
 
 
 def drink(actor) -> int:
     """Water: as `eat`, for thirst."""
     actor.watered_minutes = 0
     actor.thirst_checks = 0
-    return actor.release_nonlethal("thirst")
+    return _met(actor, "thirst")
+
+
+def _met(actor, need: str) -> int:
+    """Release what `need` held, and lift the fatigue thirst and hunger leave once nothing
+    holds any more (owner, 2026-10-05: "keep fatigue until you drink"; a night's sleep
+    leaves it — `Actor.rest`). Fatigue from going without sleep is not this need's, and
+    a fatigue thirst left stays while hunger still holds damage too."""
+    released = actor.release_nonlethal(need)
+    if not actor.withheld_nonlethal():
+        mine = [c for c in actor.conditions
+                if c.key == "fatigued" and c.source in ("thirst", "hunger")]
+        if mine:
+            actor.remove_condition("fatigued")
+    return released
 
 
 def released_said(actor, need: str, points: int) -> str:

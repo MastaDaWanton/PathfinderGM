@@ -370,3 +370,25 @@ def test_the_rest_op_and_the_collapse_share_one_door():
         assert "sleep_through" in made, (path, name)
         assert not made & {"refresh_pools", "ensure_prepared", "level_up", "rest"}, \
             (path, name, made & {"refresh_pools", "ensure_prepared", "level_up", "rest"})
+
+
+def test_thirst_fatigue_stays_through_the_night_and_goes_with_the_drink():
+    """Owner, 2026-10-05: "keep fatigue until you drink". As first built, a night's sleep
+    cleared the fatigue thirst left while the thirst damage it came with was still held —
+    the book's "characters who have taken nonlethal damage from lack of food or water are
+    fatigued" broken by an ordinary rest. Fatigue from going without sleep still sleeps
+    off; a thirst fatigue stays while hunger holds damage too, and goes with the last."""
+    pc = _parched(_pc(), 3)
+    pc.add_condition("fatigued", source="thirst")
+    pc.rest("night")
+    assert pc.has_condition("fatigued"), "the night left the thirst damage, so the fatigue"
+    _parched(pc, 2, need="hunger")
+    survival.drink(pc)
+    assert pc.has_condition("fatigued"), "hunger still holds damage"
+    survival.eat(pc)
+    assert not pc.has_condition("fatigued")
+
+    tired = _pc()
+    tired.add_condition("fatigued", source="going without sleep")
+    tired.rest("night")
+    assert not tired.has_condition("fatigued")
