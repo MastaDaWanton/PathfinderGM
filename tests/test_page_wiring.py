@@ -49,7 +49,9 @@ WIRING = {
         "batch",                                        # the batch count
         "stationTip", "method_help",                    # the station tooltips
         "adoptGlyphs",                                  # per-craft icons
-        "renderModes",                                  # the secondary rulebook tab
+        # The secondary rulebook row (renderModes) retired with enchanting's move to the
+        # circle at the table (lane U1, 2026-10-06); its tab is the card that opens it.
+        "renderEnchantMoved", "/play/#enchant",
     ],
     "/": [
         "/api/worlds/import", "#worldfile",             # the import button

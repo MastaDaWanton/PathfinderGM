@@ -1,0 +1,165 @@
+/* The enchanting circle (docs/enchanting-ui-plan.md), over the play table, after bench.css
+   and forge.css.
+
+   THE SAME BENCH, LAID OUT FOR THE CIRCLE. The layer carries both classes, `bench enchant`,
+   so every rule of bench.css (the layer at z 35, the leather strip and footer, the tooled
+   panels, the method strip, the shelf rows, the paper tag and its ladder, the confirms, the
+   reduced-motion block, the 1180px and 768px collapses with their 16px gutters) is the
+   circle's too, and this sheet holds only what is the circle's own: the working column
+   (UI plan §5.2, 360px for the seats and the cost line), the failure lines under the
+   stage, the phase of the day with Wait for it, the seats and their choices, and the holds
+   pips. The essence swatch is the forge's `.fr-swatch` (forge.css), one rule for both.
+
+   NO NEW COLOUR, FONT OR TEXTURE (UI plan §4). Every value is a theme-v2.css token or the
+   bench's semantic layer over them. The one exception is content, not chrome: an essence's
+   own colour (`--sw`, set per row from lane D's documents), exactly as heat and metal
+   colour live only in the forge's scene. The curse warning is --alarm in a rule beside the
+   words, never a red panel (UI plan §4).
+
+   LAYERS. Only the bench's own: 1 to 9 inside the layer's stacking context. MOTION.
+   Transform and opacity only, 200ms at most; the reduced-motion block in bench.css reaches
+   every element here. */
+
+.enchant {
+  --bench-satchel-w: 280px;
+  --bench-tag-w: 360px;
+}
+.enchant .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(600px, 1fr) var(--bench-tag-w); }
+
+/* Locked methods keep their reason under the name, as the forge's strip does. */
+.enchant .bm.is-locked {
+  display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  column-gap: 7px; row-gap: 1px; align-content: center; justify-items: start;
+}
+.enchant .bm.is-locked .bicon { grid-row: 1 / span 2; align-self: center; }
+.enchant .bm.is-locked .bm-lock { font-size: 12px; line-height: 1.1; }
+.enchant .bm.is-locked .bm-name { line-height: 1; }
+.enchant .bicon-l.is-two { font-size: calc(var(--bi) * .42); letter-spacing: -.02em; }
+
+/* --- the shelf (UI plan §6.2) --------------------------------------------------------------- */
+.enchant .es .bt-name { white-space: normal; overflow: visible; }
+.es-sub { color: var(--bench-quiet); }
+.enchant .bt-badge.is-warn { color: var(--bench-ink); border-color: var(--bench-warn); }
+
+/* --- the stage (UI plan §6.3, §5.2) ------------------------------------------------------- */
+.enchant .bench-stage { grid-template-rows: minmax(0, 1fr) auto auto auto auto auto; }
+.enchant .bench-info { display: grid; gap: 2px; max-width: 64ch; }
+/* The two failure lines, before the roll and in words: the small miss quiet, the big one
+   (the hidden curse) marked by a rule of --alarm beside it, a shape as well as a colour. */
+.en-lines { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; max-width: 64ch;
+            font-size: 15px; color: var(--bench-quiet); }
+.en-lines[hidden] { display: none; }
+.en-lines li { padding-left: 13px; }
+.en-lines .is-warn { color: var(--bench-ink); border-left: 3px solid var(--bench-warn); padding-left: 10px; }
+/* The phase of the day the lead essence favours (owner round 4 point 10): its words and
+   Wait for it. The mark is a ring when the phase is not now and a filled disc inside it,
+   so the state is a shape, not a colour alone. */
+.en-hour { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+           margin-top: 10px; max-width: 64ch; font-size: 15px; }
+.en-hour[hidden] { display: none; }
+.eh-mark { flex: none; width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--bench-accent); }
+.eh-words { display: grid; gap: 1px; text-align: left; }
+.eh-in { color: var(--bench-accent); }
+.eh-out { color: var(--bench-ink); }
+.eh-why { color: var(--bench-quiet); font-size: 13px; }
+.en-hour:has(.eh-in) .eh-mark { background: var(--bench-accent); }
+
+/* The minigame strip rises from the stage's foot (UI plan §6.4), as #bench-game does. */
+#enchant-game {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4;
+  transform: translateY(calc(100% + 12px)); opacity: 0;
+  transition: transform .2s ease-out, opacity .2s ease-out;
+}
+#enchant-game.is-up { transform: none; opacity: 1; }
+#enchant-game[hidden] { display: none; }
+
+/* --- the working (UI plan §6.5) ------------------------------------------------------------- */
+.enchant .bench-tagcol-in { gap: 16px; }
+.ew-take, .ew-sums { display: grid; gap: 6px; }
+.ew-take:empty, .ew-sums:empty { display: none; }
+.ew-h { margin: 6px 0 2px; color: var(--bench-quiet); font: 400 13px/1.4 var(--body); }
+.ew-h:first-child { margin-top: 0; }
+.ew-slot { position: relative; border-radius: var(--bench-radius); }
+/* Filled: the thing on leather, its label in small caps on the left. Empty: a dashed rim, a
+   shape as well as a colour, saying what goes there. */
+.ew-slot.is-full, .ew-seat.is-full {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) 30px; align-items: center; gap: 8px;
+  min-height: 52px; padding: 6px 4px 6px 10px;
+  border: 1px solid #3b3022; border-radius: var(--bench-radius);
+  background: linear-gradient(#2a2118, #18130e); box-shadow: var(--bevel), var(--sh-1);
+}
+.ew-label { color: var(--bench-accent); font: 400 15px/1.1 var(--display); letter-spacing: .05em; font-variant: small-caps;
+            text-shadow: var(--engraved); }
+.ew-piece { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ew-piece .fr-swatch { margin-left: -4px; }
+.ew-name { display: grid; min-width: 0; font-size: 15px; line-height: 1.25; color: var(--bench-ink); }
+.ew-name small, .ew-sign { color: var(--bench-quiet); font-size: 12px; line-height: 1.3; }
+.enchant .ew-x { width: 28px; height: 28px; display: grid; place-items: center; color: var(--bench-quiet); font-size: 17px; }
+.enchant .ew-x:hover { color: var(--bench-ink); }
+.enchant .ew-slot-b {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; width: 100%;
+  min-height: 52px; padding: 6px 10px; text-align: left; border: 1px dashed var(--edge); border-radius: var(--bench-radius);
+}
+.enchant .ew-slot-b:hover { border-color: var(--gold-dim); }
+.ew-slot.is-still { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px;
+                    min-height: 44px; padding: 6px 10px; border: 1px dashed var(--edge); }
+.ew-hint { color: var(--bench-quiet); font-size: 13px; line-height: 1.3; }
+.ew-slot.is-optional .ew-label { color: var(--bench-quiet); }
+.ew-slot.is-hinted .ew-slot-b { border-style: solid; border-color: var(--bench-accent); }
+.ew-seats { display: grid; gap: 6px; }
+/* A seat's choice sits under its row, label above the field (the skill's form rule). */
+.ew-choice { grid-column: 1 / -1; display: grid; gap: 4px; padding: 2px 6px 4px 0; }
+.ew-choice > span { color: var(--bench-quiet); font-size: 13px; }
+.enchant .ew-select { width: 100%; min-height: 34px; padding: 5px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink); }
+.enchant .ew-select option { background: var(--panel); color: var(--bench-ink); }
+.ew-check { display: inline-flex; align-items: flex-start; gap: 8px; margin-top: 4px; color: var(--bench-ink); font-size: 15px; cursor: pointer; }
+.ew-check input { width: 16px; height: 16px; margin-top: 3px; accent-color: var(--gold); }
+.ew-check small { display: block; color: var(--bench-quiet); font-size: 13px; }
+.ew-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ew-part { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 0 4px 8px; }
+.ew-n { min-width: 28px; text-align: center; font-variant-numeric: lining-nums tabular-nums; }
+.enchant .ew-part .tb-step { display: inline-flex; align-items: center; gap: 3px; }
+.enchant .ew-part .tb-step .v2-btn { min-width: 32px; justify-content: center; }
+.ew-card { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 15px; }
+.ew-card .is-quiet, .ew-quiet { color: var(--bench-quiet); font-size: 13px; margin: 2px 0 0; }
+.ew-card-sum { margin: 4px 0 0; }
+.ew-flawed { margin: 4px 0 0; color: var(--bench-ink); border-left: 3px solid var(--bench-warn); padding-left: 10px; }
+
+/* Holds: pips, never a filled track (UI plan §6.5). A pip inside the vessel's capacity has a
+   gilt rim; one the working takes is filled; one past the capacity is a hairline. Ten to a
+   row, and they wrap when an Enchanter's capacity passes ten (owner round 4: no ceiling). */
+.ew-pips { display: grid; grid-template-columns: repeat(10, 14px); gap: 5px; margin: 2px 0 4px; }
+.ew-pip { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--edge); }
+.ew-pip.is-inside { box-shadow: inset 0 0 0 1.5px var(--gold-dim); }
+.ew-pip.is-filled { background: var(--brass-grain), var(--gilt); background-size: 60px auto, auto;
+                    background-blend-mode: soft-light, normal; box-shadow: inset 0 0 0 1px var(--gold); }
+.ew-pip.is-filled.is-outside { box-shadow: inset 0 0 0 2px var(--bench-warn); }
+.ew-words { margin: 0; display: grid; gap: 1px; font-size: 15px; }
+.ew-words b { font-weight: 400; color: var(--bench-accent); font-variant-numeric: lining-nums tabular-nums; }
+.ew-words span { color: var(--bench-quiet); font-size: 13px; }
+.ew-costs p, .ew-holds p { margin: 0; }
+.ew-terms { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--bench-quiet); }
+.ew-terms li { display: flex; justify-content: space-between; gap: 10px; }
+.ew-terms b { font-weight: 400; color: var(--bench-ink); font-variant-numeric: lining-nums tabular-nums; }
+.ew-notes { list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--bench-quiet); }
+.ew-problems { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
+.ew-problems li { color: var(--bench-ink); border-left: 2px solid var(--edge); padding-left: 10px; }
+
+/* --- other sizes (UI plan §5.3) --------------------------------------------------------------- */
+/* 1280 to 1439: the shelf to 240px and the working to 320px, as the plan says; the strip
+   goes to icons by bench.css's own rule for this band. */
+@media (max-width: 1439px) and (min-width: 1180px) {
+  .enchant { --bench-satchel-w: 240px; --bench-tag-w: 320px; --bench-gap: 28px; }
+  .enchant .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(520px, 1fr) var(--bench-tag-w); }
+  .enchant .bm.is-locked { display: inline-flex; }
+  .ew-slot.is-full, .ew-seat.is-full, .enchant .ew-slot-b { grid-template-columns: 74px minmax(0, 1fr) auto; }
+  .ew-label { font-size: 13px; letter-spacing: .03em; }
+}
+@media (max-width: 1179px) {
+  .enchant .bench-frame { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .ew-slot.is-full, .ew-seat.is-full, .enchant .ew-slot-b { grid-template-columns: 68px minmax(0, 1fr) auto; }
+  .ew-pips { grid-template-columns: repeat(10, 12px); gap: 4px; }
+  .ew-pip { width: 12px; height: 12px; }
+}

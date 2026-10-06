@@ -58,14 +58,6 @@
   }
   .back:hover { color: var(--accent); border-bottom-color: var(--gold-dim); }
   nav { display: flex; gap: 2px; align-self: flex-end; flex-wrap: wrap; }
-  /* A craft may be practised by more than one rulebook. The second row is quieter
-     than the craft tabs on purpose: it is the same world class at the same level. */
-  #modes { display: flex; gap: 6px; padding: 4px 18px 0; }
-  #modes .mode { padding: 3px 10px; cursor: pointer; border-radius: 2px;
-                 border: 1px solid rgba(150,120,60,.3); background: transparent;
-                 color: var(--dim); font: 400 12px/1.2 Palatino, serif; }
-  #modes .mode.on { color: #ffe7b4; border-color: var(--gold);
-                    background: linear-gradient(rgba(60,48,26,.5), rgba(32,25,14,.5)); }
   .tab {
     background: linear-gradient(#171209, #100d08); color: var(--dim); cursor: pointer;
     border: 1px solid var(--edge); border-bottom: none; padding: 10px 18px 9px;
@@ -528,9 +520,6 @@
 <header>
   <h1>Crafting</h1>
   <nav id="tabs"></nav>
-  <!-- A craft practised by more than one rulebook. Enchanting is the first: its own
-       essence-and-focus system, and Pathfinder's +1 ladder beside it. -->
-  <nav id="modes" hidden></nav>
   <a class="back" href="/play/">← back to the table</a>
   <a class="back" href="/" style="margin-left:0">worlds &amp; characters</a>
 </header>
@@ -596,7 +585,6 @@ let REFUSED = {};
 // accept, rather than being counted twice in two places that can disagree.
 let BATCH_MAX = 0;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
-let MODE = "";                 // a secondary rulebook for this craft, if one is picked
 let SHAPE = "";                // what is being made, for the crafts that shape things
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
@@ -661,30 +649,14 @@ function tabs() {
     return `<button class="tab ${d.id === CRAFT ? "on" : ""}" data-craft="${d.id}">
       ${esc(d.name)}<small>${sub}</small></button>`;
   }).join("");
-  renderModes();
 }
 
-// A craft may work by more than one rulebook. Enchanting is the first: the essence and
-// focus system it was built with, and Pathfinder's own +1 ladder beside it. Drawn as a
-// second row rather than more top-level tabs, because they are the same world class at
-// the same level — one trade, two ways of practising it.
-function renderModes() {
-  const row = $("#modes");
-  if (!row) return;
-  const t = STATE.tracks[CRAFT] || {};
-  const modes = t.modes || [];
-  if (!modes.length) { row.innerHTML = ""; row.hidden = true; return; }
-  row.hidden = false;
-  const own = `<button class="mode ${MODE ? "" : "on"}" data-mode=""
-    title="${esc(t.summary || "This craft's own system.")}">${esc(t.name || CRAFT)}</button>`;
-  row.innerHTML = own + modes.map(m =>
-    `<button class="mode ${MODE === m.id ? "on" : ""}" data-mode="${esc(m.id)}"
-      title="${esc(m.blurb || "")}">${esc(m.name)}</button>`).join("");
-}
-
-async function selectCraft(id, mode) {
+// The Enchanting tab's second row of modes ("the circle" and "By the book", two crafts on
+// one track) is retired (docs/enchanting-ui-plan.md §2 and §15 U7, lane U1, 2026-10-06):
+// enchanting is one craft at the circle over the table now, and its tab here is the card
+// that opens it. No other craft ever had a mode, so the row and its variable went with it.
+async function selectCraft(id) {
   CRAFT = id;
-  MODE = mode || "";
   CHOSEN = []; USING = {}; CHAIN = []; PREVIEW = null;
   $("#err").textContent = "";
   tabs();
@@ -693,12 +665,15 @@ async function selectCraft(id, mode) {
   // The other four crafts keep this bench exactly as it was until each is revamped.
   // Blacksmithing moved the same way on 2026-10-04 (docs/blacksmithing-ui-plan.md §15,
   // lane U7): its tab is the card that opens the forge over the table. The class keeps
-  // its first name; it now means "this tab is a door, not a bench".
-  const moved = CRAFT === "herbalism" || CRAFT === "blacksmithing";
+  // its first name; it now means "this tab is a door, not a bench". Enchanting moved on
+  // 2026-10-06 (docs/enchanting-ui-plan.md §15, lane U1): the circle over the table, one
+  // step at a time; the old chain could no longer bind anything (rules/benches.MOVED).
+  const moved = CRAFT === "herbalism" || CRAFT === "blacksmithing" || CRAFT === "enchanting";
   document.body.classList.toggle("herb-moved", moved);
   const seq = ++CRAFT_SEQ;
   if (CRAFT === "herbalism") { renderHerbalismMoved(); return; }
   if (CRAFT === "blacksmithing") { renderForgeMoved(); return; }
+  if (CRAFT === "enchanting") { renderEnchantMoved(); return; }
   const track = STATE.tracks[CRAFT] || {};
   if (!track.available) { renderLocked(); return; }
   // The tab's own panel at once, before the two requests below (measured on the audit,
@@ -706,8 +681,7 @@ async function selectCraft(id, mode) {
   // about two seconds, because #main kept the last tab's card while the shelf loaded).
   renderLoading();
   const [r, ft] = await Promise.all([
-    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}${
-      MODE ? `&mode=${encodeURIComponent(MODE)}` : ""}`),
+    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`),
     fetch(`/api/forage/table?craft=${encodeURIComponent(CRAFT)}`),
   ]);
   const d = await r.json();
@@ -763,6 +737,23 @@ function renderForgeMoved() {
           A field kit works anywhere; a smithy opens the furnace, the crucible and rare
           metal. The time each step takes passes in the scene.</p>
         <a class="act moved-go" href="/play/#forge">Open the forge</a>
+      </div>
+    </section>`;
+  $("#craft").disabled = true; $("#save").disabled = true;
+  $("#mastery").innerHTML = "";
+}
+
+// The card that stands where the old enchanting chain was (lane U1). Its one button
+// returns to the table with the circle open (`/play/#enchant`, which 45-enchant-shell.js
+// opens on load).
+function renderEnchantMoved() {
+  $("#main").innerHTML = `<section class="panel moved-card" aria-labelledby="moved-title">
+      <h2 id="moved-title">The circle is at the table now</h2>
+      <div class="inner">
+        <p>Your shelf of vessels and essences, the circle and the working open over the
+          table, where you stand. Prepare a vessel, attune its essences and bind them, one
+          step at a time; a binding waits In progress until its days have passed.</p>
+        <a class="act moved-go" href="/play/#enchant">Open the circle</a>
       </div>
     </section>`;
   $("#craft").disabled = true; $("#save").disabled = true;
@@ -1116,7 +1107,7 @@ async function refresh() {
   let answer = null;
   try {
     answer = await post("/api/craft/preview",
-      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, materials: CHOSEN,
+      { craft: CRAFT, ingredients: CHOSEN, materials: CHOSEN,
         base: SHAPE, item: SHAPE, product: SHAPE, pattern: SHAPE, methods: CHAIN, stock: USING });
   } catch (e) { $("#err").textContent = e.message; }
   REFUSED = (answer && answer.refused) || {};
@@ -1195,8 +1186,6 @@ document.addEventListener("input", e => {
 
 document.addEventListener("click", async e => {
   const tab = e.target.closest("[data-craft]");
-  const modeBtn = e.target.closest("[data-mode]");
-  if (modeBtn) { await selectCraft(CRAFT, modeBtn.dataset.mode); return; }
   if (tab) { await selectCraft(tab.dataset.craft); return; }
 
   const jar = e.target.closest("[data-ing]");
@@ -1287,7 +1276,7 @@ $("#craft").addEventListener("click", async () => {
   try {
     const asked = Math.max(1, Math.floor(Number($("#batch")?.value) || 1));
     const d = await post("/api/craft/do",
-      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, materials: CHOSEN,
+      { craft: CRAFT, ingredients: CHOSEN, materials: CHOSEN,
         base: SHAPE, item: SHAPE, product: SHAPE, pattern: SHAPE, methods: CHAIN, stock: USING,
         name: PREVIEW?.name, batch: asked });
     STATE.tracks[CRAFT] = d.track;
@@ -1373,8 +1362,7 @@ document.addEventListener("change", async e => {
 
 async function reloadShelf() {
   const [r, ft] = await Promise.all([
-    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}${
-      MODE ? `&mode=${encodeURIComponent(MODE)}` : ""}`),
+    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`),
     fetch(`/api/forage/table?craft=${encodeURIComponent(CRAFT)}`),
   ]);
   const d = await r.json();
