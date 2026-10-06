@@ -430,3 +430,14 @@ def test_the_item_card_shows_only_what_is_known():
     knowledge.identify(pc(), rec, 40, day=2)
     assert knowledge.item_card(rec)["curse"] == curses.describe(curse)
     assert knowledge.item_card(forged()) == {"magic": False}
+
+
+def test_the_enchanting_manuals_are_on_a_counter():
+    """Lane F built six enchanting manuals and no counter sold them — the 0.2.4 defect
+    again (manuals in the data, none on any shelf), because a stall could list GEAR but not
+    a whole table. The curio stall now carries the table, so every market sells them."""
+    from rules import goods, market
+
+    manuals = {g.name for g in goods.table_goods("enchanting-manuals")}
+    on_shelf = {g.name for g in market.staples_of("market:stall-curios")}
+    assert manuals and manuals <= on_shelf

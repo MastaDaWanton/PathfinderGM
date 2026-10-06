@@ -559,6 +559,13 @@ def staples_of(kind: str) -> list:
         shop = next((s for s in _shops() if s.get("id") == ids[0]), {})
         for table in shop.get("tables") or ():
             out.extend(goods_mod.table_goods(str(table)))
+    elif sort == "stall":
+        # A stall sells a whole table too (the curio stall's enchanting manuals): lane F
+        # built six manuals and no counter carried them, the 0.2.4 defect again — the
+        # herbal and smithing manuals had shops, and stalls could only list GEAR.
+        for line in ids:
+            for table in _line(line).get("tables") or ():
+                out.extend(goods_mod.table_goods(str(table)))
     out.extend(consumable_goods(consumables_at(kind)))
     return out
 

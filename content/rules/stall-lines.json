@@ -120,6 +120,7 @@
     {"id": "curios", "noun": "curio", "says": "odds and ends, and what the crafts sell",
      "gear": ["ink and paper", "signal whistle", "mirror", "holy symbol",
               "spell component pouch", "healer's kit", "thieves' tools", "manacles"],
+     "tables": ["enchanting-manuals"],
      "draw": ["blacksmith", "leatherworker", "enchanter"], "catch_all": true,
      "consumables": ["blacksmith", "leatherworker", "enchanter"]}
   ],
