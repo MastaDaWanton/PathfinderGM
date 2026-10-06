@@ -159,6 +159,19 @@ def demonstrations_path() -> Path:
     return Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "style" / "intimate.txt"
 
 
+def shipped_path() -> Path:
+    """`content/style/intimate.txt` in the install: the passages the app ships, used
+    when the table's own file (`demonstrations_path`) holds none.
+
+    The owner, 2026-10-06: with only an empty header on a fresh install, "the intimate
+    scenes will not be very good" — the measured reason this module exists is that
+    demonstration outweighs instruction, and a table with no passages gets instruction
+    alone. Read through `settings.BASE_DIR`, the bundle root the content folders already
+    use (frozen: `_MEIPASS`), never `__file__`. The table's own passages always win; a
+    shipped passage is never copied into the table's file."""
+    return Path(settings.BASE_DIR) / "content" / "style" / "intimate.txt"
+
+
 def ensure_file() -> Path:
     """The file, created holding only the header when it is missing — and only then.
     The owner may write it before any build reads it: an existing file is never
@@ -201,6 +214,8 @@ class Demonstrations:
     examples: list[dict] = field(default_factory=list)
     chars: int = 0
     on_file: int = 0
+    # "yours" (the data folder's file), "shipped" (the install's), or "" for none.
+    source: str = ""
     skipped: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -296,6 +311,15 @@ def read_demonstrations(beat: int = 0) -> Demonstrations:
         out.skipped.append(f"unreadable: {exc}")
         return out
     passages, out.skipped = parse(raw)
+    out.source = "yours" if passages else ""
+    if not passages:
+        try:
+            shipped, dropped = parse(shipped_path().read_text(encoding="utf-8",
+                                                               errors="replace"))
+        except OSError:
+            shipped, dropped = [], []
+        if shipped:
+            passages, out.skipped, out.source = shipped, dropped, "shipped"
     out.on_file = len(passages)
     out.warnings = warnings_for(passages)
     chosen, left = select(passages, beat)

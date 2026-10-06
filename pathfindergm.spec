@@ -50,6 +50,7 @@ CONTENT_DIRS = [
     "class-features",  # classes' passive numbers as documents (rules/classfeatures.py)
     "class-options",  # bloodlines, schools, rage powers… (rules/classes.py catalogues)
     "class-abilities",  # the core classes' active abilities (rules/class_abilities.py)
+    "style",       # the intimate-scene passages the app ships (gm/intimate.shipped_path)
     "bloodlines",  # what a sorcerer's bloodline powers do (rules/grantedpowers.py)
     "schools",     # a wizard's school powers and arcane bond (rules/grantedpowers.py)
 ]

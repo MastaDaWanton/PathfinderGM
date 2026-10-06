@@ -1,0 +1,9 @@
+# Intimate scenes: the passages that ship with the app
+#
+# Used only when the table's own file (homebrew/style/intimate.txt in the data folder)
+# holds no passages of its own; a table's own passages always win, and nothing here is
+# ever copied into that file. Same format as the table's file: separate passages with a
+# numbered line ("1.)") or a line of three or more dashes, start each with "> " and the
+# player's line it answers, no names, adults only. A passage that names a child is never
+# shown. Used only with the house rule set to Explicit, on a beat detected as an
+# intimate scene between adults.
