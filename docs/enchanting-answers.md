@@ -47,3 +47,10 @@ took, **the answer wins** and the plan section named must be built to it.
 | 8. Bane and DR (§9) | **Yes**: bane's +2 against its foe counts toward the +3/+4/+5 DR thresholds. (As taken.) |
 | 9. Numbers | **Use the proposed numbers, tune in play**: 1 mote = 100 gp; cold iron +2,000 gp = 20 motes; affinity −1 DC, max −2; favourable-time windows ×1.5; residue a quarter; attuned vessels hold a day; perk sizes as proposed. |
 | 10. Planetary hours (§17) | **Not Earth's planets: "this is not earth", and named planets would not be world-agnostic.** Replaced by **phases of the day only**: dawn, morning, noon, dusk, night and midnight each favour some essence families (e.g. fire at noon, the dead at midnight, frost before dawn). Needs nothing from the world. `rules/sky.py` becomes day phases from the game clock; each essence family names its phase (`phase`, not `planet`) in data; the bench says "Noon, 42 minutes left" / "Midnight in 3 hours 10 minutes" with **Wait for it**. |
+
+## Round 5: lane G's calls (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Day phases | **Add "afternoon"** (13:00–17:00), so no hour is called noon that the narrator's hour check would flag. Seven phases: dawn, morning, noon, afternoon, dusk, night, midnight. |
+| Stopping a steep | **No: a steep must finish.** It is collected when ready; there is no Stop for jars. |
