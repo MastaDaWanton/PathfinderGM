@@ -71,6 +71,13 @@ refuses the trade panel) without the watcher ever touching a number.
 
 ## The mind had no gate (2026-09-09)
 
+*Widened 2026-10-05 (docs/means-gate.md): the declaration door below leaked by its gaps
+("I make the smith forget he saw me" matched no pattern) and by standing down for the
+plan's own guessed cast. Every deed the reader returns now carries a `means` enum, and
+code holds a `power` or `beyond` deed against the sheet (`gm/means.py`) — whatever the
+deed is, not only minds. The regex door stays beside it: alone the reader-based gate
+reaches 30/32 on this section's corpus, together 32/32.*
+
 Reported from the table: "I was able to break the game and use psychic powers to
 manipulate the people and story in ways that should not be possible."
 
