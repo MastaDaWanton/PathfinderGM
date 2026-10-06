@@ -33,7 +33,11 @@
     chalk: { color: [0.86, 0.84, 0.78], spec: 0.05, shin: 6, pattern: 3, patScale: 9 },
     // A little light of its own: wax is translucent and glows under its flame. Lit only from the
     // circle's centre, the candles nearest the camera read as black stubs in the first capture.
-    wax: { color: [0.82, 0.74, 0.58], spec: 0.35, shin: 22, pattern: 3, patScale: 3, emit: [0.1, 0.07, 0.035] },
+    // At night (the final pass, 2026-10-06, 8:51pm on day 17) 0.1 still left the front candle a
+    // black stub: its camera side read rgb(50,43,41) at 1280x720 beside cream candles behind
+    // it. Three times the glow keeps it wax-coloured with only its own flame on that side:
+    // rgb(115,90,69) at the same spot and hour.
+    wax: { color: [0.82, 0.74, 0.58], spec: 0.35, shin: 22, pattern: 3, patScale: 3, emit: [0.3, 0.21, 0.105] },
     wick: { color: [0.06, 0.05, 0.045], spec: 0.05, shin: 6 },
     ink: { color: [0.05, 0.045, 0.07], spec: 1.2, shin: 70 },
     salt: { color: [0.9, 0.89, 0.86], spec: 0.5, shin: 30, pattern: 3, patScale: 12 },

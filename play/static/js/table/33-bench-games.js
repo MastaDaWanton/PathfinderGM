@@ -1043,10 +1043,14 @@
       // game with several (Dry's bundles). Without it the stage guessed from the last state
       // it was sent, and that state is a frame behind the press: the hit showed on the
       // bundle turned before. Added 2026-10-02; a stage that ignores it still works.
-      hit: function (strength, x, y, kind, index) {
+      // `cue` (optional) names a SOUNDS key that plays in place of `hit` for this one
+      // press: Prepare lays chalk, salt, ink and a bell, and every piece rang as chalk
+      // (the final pass, 2026-10-06: `enchant.salt`, `.ink` and `.bell` were defined and
+      // never called). An unknown cue falls back to `hit`.
+      hit: function (strength, x, y, kind, index, cue) {
         var s = clamp(strength == null ? 1 : strength, 0, 1);
         r.hits++;
-        var hs = r.def.SOUNDS && r.def.SOUNDS.hit;
+        var hs = r.def.SOUNDS && ((cue && r.def.SOUNDS[cue]) || r.def.SOUNDS.hit);
         sound(hs || "bench.hit." + r.def.id, Object.assign({}, voice, { volume: 0.5 + 0.5 * s }));
         if (r.stage && typeof r.stage.hit === "function") {
           try { if (typeof index === "number") r.stage.hit(s, index); else r.stage.hit(s); }

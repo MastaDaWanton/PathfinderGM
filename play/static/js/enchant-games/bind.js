@@ -43,7 +43,7 @@
     HOLDS: [],
     HOLDS_STEADY: [],
     HOUR: true,
-    SOUNDS: { hit: "enchant.bind.hit", miss: "enchant.bind.miss" },
+    SOUNDS: { hit: "enchant.bind.hit", miss: "enchant.miss" },
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C;
       var crests = Math.round(k.clamp(+ctx.tuning.crests || Math.round(4 + 2 * ctx.difficulty), 4, 6));
@@ -97,9 +97,18 @@
         },
         state: function () {
           var i = Math.min(crestAt(t), crests - 1), tb = t - i * period;
+          // `window` and `pour` are what the circle (47-enchant-stage.js) draws: the crest's
+          // arc as a fraction of the turn (the band below spans the same +-hw/period of it)
+          // and how much of the binding has gone into the work. Before the final pass the
+          // stage read both and the game sent neither, so the stage's window sat at its
+          // default 0.12 whatever the day phase widened it to.
+          var poured = 0;
+          res.forEach(function (q) { if (typeof q === "number") poured += q; });
           return { crest: i, crests: crests, light: k.clamp(tb / tm, 0, 1), beat: counted(tb),
             open: Math.abs(tb - tm) <= hw && res[i] === null, offset_s: tb - tm, struck: res[i] !== null,
-            widen: widen, window_s: hw * 2, phase: H ? H.phase : null, inside: !!(H && H.inside) };
+            widen: widen, window_s: hw * 2, window: k.clamp(2 * hw / period, 0, 1),
+            pour: k.clamp(poured / crests, 0, 1),
+            phase: H ? H.phase : null, inside: !!(H && H.inside) };
         },
         score: function () { var s = 0; res.forEach(function (q) { if (typeof q === "number") s += q; }); return s / crests; },
         done: function () { return resolved() >= crests; },

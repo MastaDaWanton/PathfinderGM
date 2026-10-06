@@ -1975,7 +1975,9 @@ const eqSlotLabel = (s, key) => (key === "hand" ? "hand"
 function eqFacts(s, r) {
   if (r.kind === "weapon") {
     const a = (s.offense.attacks || []).find(x => x.key === r.key);
-    if (!a) return esc(EQ_INERT);
+    // A forged weapon not in hand has no attack line yet: its row carries its own facts
+    // (views._forged_weapon_line), which are said rather than "for show".
+    if (!a) return esc(r.line || EQ_INERT);
     const bits = [`${a.damage_dice}${a.damage.total ? sign(a.damage.total) : ""} ${a.type_text || a.type}`,
                   a.crit, `${(a.swings && a.swings.length ? a.swings : [a.attack.total]).map(sign).join("/")} to hit`];
     if (a.range_ft) bits.push(`range ${a.range_ft} ft`);

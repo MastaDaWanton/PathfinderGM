@@ -485,7 +485,8 @@ On the app-wide buses, a new **enchant** bus (three files: `BUSES` and `BUS_PREF
 - `enchant.chalk` (a dry scrape per sigil), `enchant.salt`, `enchant.ink`, `enchant.bell` (the
   test step);
 - `enchant.seat` with **pitch by planet** (Saturn lowest, the Moon highest), `enchant.unseat`;
-- `enchant.bind.hit` (a struck bell), `enchant.bind.miss` (a muffled one);
+- `enchant.bind.hit` (a struck bell), `enchant.bind.miss` (a muffled one); `enchant.miss`, the
+  same muffled bowl under the name every circle game's miss rings (final pass, 2026-10-06);
 - `enchant.draw`, `enchant.unpick`;
 - `enchant.tier.up`, `enchant.flawless`, `enchant.flawed` (a bell slightly off its note), `enchant.fail`,
   `enchant.land`, `enchant.read`, `enchant.identify`;

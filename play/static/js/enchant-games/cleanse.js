@@ -32,7 +32,7 @@
     KEYS: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "Enter"],
     HOLDS: [],
     HOLDS_STEADY: [],
-    SOUNDS: { hit: "enchant.unpick", miss: "enchant.bind.miss" },
+    SOUNDS: { hit: "enchant.unpick", miss: "enchant.miss" },
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C, steady = ctx.steady;
       var seq = (ctx.seq || []).map(function (s) { return String(s || "").toLowerCase(); })
@@ -130,7 +130,10 @@
         state: function () {
           return { step: Math.min(step, n - 1), steps: n, focus: focus, refused: refused,
             marks: marks.map(function (m) { var p = posOf(m); return { kind: m.kind, curse: m.curse, turn: m.turn, slot: m.slot, gone: m.gone, x: p.x, y: p.y }; }),
-            slots: slots, unpicked: res.map(function (q) { return q; }) };
+            slots: slots, unpicked: res.map(function (q) { return q; }),
+            // For the circle (47), as Unbind sends them: the curse's sequence and how many of
+            // its sigils have come out, timed-out ones included.
+            seq: seq.slice(), picked: step };
         },
         score: function () { var sum = 0; res.forEach(function (q) { if (typeof q === "number") sum += q; }); return sum / n; },
         done: function () { return step >= n; },

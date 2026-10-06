@@ -485,9 +485,10 @@ def test_dry_names_the_bundle_it_hits(node_run):
 def test_the_frame_forwards_the_index_and_keeps_the_old_call():
     """The frame passes a game's index to `stage.hit(s, index)` / `stage.miss(index)`, and when
     a game sends none it makes the old one-argument call, so a stage or fake built against the
-    first contract sees exactly what it always did."""
+    first contract sees exactly what it always did. (The enchanting final pass added a sixth,
+    optional `cue`: a SOUNDS key that rings for that one hit, Prepare's salt, ink and bell.)"""
     code = _code(_read(FRAME))
-    assert "hit: function (strength, x, y, kind, index)" in code
+    assert "hit: function (strength, x, y, kind, index, cue)" in code
     assert 'if (typeof index === "number") r.stage.hit(s, index); else r.stage.hit(s);' in code
     assert "miss: function (index)" in code
     assert 'if (typeof index === "number") r.stage.miss(index); else r.stage.miss();' in code

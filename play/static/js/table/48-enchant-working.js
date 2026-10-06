@@ -195,7 +195,7 @@
       html += '<div class="ew-seat is-full" data-seat-row="' + esc(s.seat) + '">' +
         '<span class="ew-label">' + esc(s.name || words(s.seat)) + '</span>' +
         '<span class="ew-piece"><i class="fr-swatch" style="--sw:' + esc(color) + '" aria-hidden="true"></i>' +
-          '<span class="ew-name">' + esc(name) + (s.grants ? '<small>' + esc(s.grants) + (s.motes != null ? ", " + esc(s.motes) + " motes" : "") + '</small>' : "") +
+          '<span class="ew-name">' + esc(name) + (s.grants ? '<small>' + esc(s.grants) + (s.motes != null ? ", " + esc(s.motes) + (Number(s.motes) === 1 ? " mote" : " motes") : "") + '</small>' : "") +
           sign + '</span></span>' +
         (m === "attune" ? '<button type="button" class="ew-x" data-unput="seat" data-key="' + esc(s.seat) +
           '" data-seat="' + esc(s.seat) + '" aria-label="Lift ' + esc(name) + ' off the ' + esc(String(s.name || s.seat).toLowerCase()) + '">×</button>' : "") +
@@ -242,7 +242,11 @@
     var lis = out.filter(function (x) { return x.indexOf("<li") === 0; });
     var html = out.filter(function (x) { return x.indexOf("<li") !== 0; }).join("") +
       (lis.length ? '<ul class="ew-card">' + lis.join("") + '</ul>' : "");
-    if (card.flawed) html += '<p class="ew-flawed">Flawed' + (card.curse ? ": " + esc(card.curse) : "") + '</p>';
+    // `curse` is "none" once the item is known to carry none (49's card says so in words);
+    // drawn raw it was a red-barred "none" under the converted bane sword's lines (the
+    // final pass, 2026-10-06).
+    if (card.curse === "none") html += '<p class="ew-quiet">No curse: it is what it was made to be.</p>';
+    else if (card.flawed) html += '<p class="ew-flawed">Flawed' + (card.curse ? ": " + esc(card.curse) : "") + '</p>';
     else if (card.curse) html += '<p class="ew-flawed">' + esc(card.curse) + '</p>';
     if (card.curse_question) html += '<p class="ew-quiet">' + esc(cap(card.curse_question)) + '</p>';
     if (card.aura || card.caster_level) {

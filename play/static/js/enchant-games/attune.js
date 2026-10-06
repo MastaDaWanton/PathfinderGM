@@ -49,7 +49,7 @@
     KEYS: ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", "Space", "Backspace"],
     HOLDS: [],
     HOLDS_STEADY: [],
-    SOUNDS: { hit: "enchant.seat", miss: "enchant.bind.miss", lift: "enchant.unseat" },
+    SOUNDS: { hit: "enchant.seat", miss: "enchant.miss", lift: "enchant.unseat" },
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C, steady = ctx.steady;
       var rows = (ctx.seats && ctx.seats.length ? ctx.seats : DEMO).map(function (r, i) {

@@ -1236,6 +1236,43 @@ def _use_targets(pc) -> list[dict]:
     return out
 
 
+def _forged_weapon_line(rec: dict) -> list[str]:
+    """A forged weapon's facts for its Equipment row: the base weapon's dice, type and crit,
+    then each of the forge's own numbers by the piece it comes from ("+4 damage, forged iron
+    head") and masterwork's +1 to hit. Every number is the engine's (`forge_items.build`);
+    nothing here adds one."""
+    from rules import forge_items as fi
+    from rules import weapons as weapons_mod
+
+    out = []
+    base = str(rec.get("base") or "")
+    if weapons_mod.has(base):
+        w = weapons_mod.get(base)
+        lo = int(w.get("crit_range") or 20)
+        crit = (f"{lo}-20" if lo < 20 else "20") + f"/x{int(w.get('crit_mult') or 2)}"
+        out.append(f"{w.get('damage')} {w.get('type_text') or w.get('type')}, {crit}")
+    try:
+        b = fi.build(rec)
+    except Exception:  # noqa: BLE001 - a record the build refuses still has its base line
+        return out
+    words = {"damage": "damage", "attack": "to hit", "cmd": "CMD", "ac": "AC"}
+    # The forge's numbers only: a magic layer's (`book`) are the item card's to say, and
+    # masterwork's +1 is an enhancement bonus a magic +1 or better replaces (they do not
+    # stack, CRB; the engine keeps one). Listed together they read "+1 to hit (masterwork);
+    # +1 to hit (enhancement)" on the collected +1 flaming sword (the final pass).
+    magic_plus = int(((b.get("magic") or {}).get("enhancement")) or 0)
+    for s in fi.roll_specs(b):
+        if s.get("type") != "combat_mod" or not s.get("amount") or s.get("when"):
+            continue
+        if s.get("book") or (s.get("origin") == "rule:masterwork" and magic_plus):
+            continue
+        amt = int(s["amount"])
+        what = words.get(str(s.get("target")), str(s.get("target") or "").replace("_", " "))
+        why = s.get("label") or s.get("source") or ""
+        out.append(f"{amt:+d} {what}" + (f" ({why})" if why else ""))
+    return out
+
+
 def _carried(pc) -> list[dict]:
     """Everything the character carries, one row a thing, for the Equipment tab.
 
@@ -1266,6 +1303,7 @@ def _carried(pc) -> list[dict]:
     from rules import forge_items as forge_items_mod
     from rules import gear as gear_mod
     from rules import goods, magicitem, weapons as weapons_mod
+    from rules import inprogress as inprogress_mod
     from rules import magic_layer as magic_layer_mod
     from rules.sheet import _stock_row
     from rules.tables import ARMOUR, SHIELDS, SLOTS
@@ -1319,6 +1357,12 @@ def _carried(pc) -> list[dict]:
     in_fight = any(getattr(c, "scene", None) is not None and c.scene.pc() is pc
                    and c.scene.in_encounter
                    for c in list(getattr(campaign_mod, "_LIVE", {}).values()))
+    # The world minute, from the same campaigns, for In progress (rules/inprogress.py): a
+    # thing still being worked is not offered Wield or Wear. None for a roster preview,
+    # whose rows ask the stored state instead.
+    now = next((int(getattr(c.scene, "clock_minutes", 0) or 0)
+                for c in list(getattr(campaign_mod, "_LIVE", {}).values())
+                if getattr(c, "scene", None) is not None and c.scene.pc() is pc), None)
     for key, n in counts.items():
         name = weapons_mod.get(key)["name"] if weapons_mod.has(key) else key
         seen.add(key)
@@ -1525,6 +1569,15 @@ def _carried(pc) -> list[dict]:
         # What a bought bedroll or tent does, from its gear row (content/rules/gear.json):
         # a counter's goods land here as jars with no specs, and every one of the owner's
         # nine read "for show, no effect in play" until 2026-10-01.
+        # A forged weapon says what it is in the hand: its dice, crit and the forge's own
+        # numbers, named by piece (`forge_items` labels them). Without this the row read "for
+        # show, no effect in play, goes at the hands": the attacks list the tab reads holds
+        # only the weapon in hand, and "hands" is the gloves' slot (the final pass,
+        # 2026-10-06, on the Superior longsword waiting to be wielded).
+        # Its magic is the item card's (18-tab-equipment draws it under the row), so the
+        # card's lines are not said a second time in this one.
+        if held_weapon:
+            effects = _forged_weapon_line(forged)
         _, row = gear_mod.row_for(s.base)
         if row and not effects:
             effects = [str(row.get("does") or "")]
@@ -1535,19 +1588,36 @@ def _carried(pc) -> list[dict]:
             # it, so they came up with a Drink button.
             acts = [a for a in acts if a["label"] not in ("Drink", "Throw", "Coat")]
         acts += _gear_acts(row, d["id"])
+        note = slot_full(slot) if slot and not on and not held_weapon and not any(
+            a["label"] == "Wear" for a in acts) else _gear_note(row)
+        # Work In progress (rules/inprogress.py) is nobody's to wield, wear or use until it
+        # is collected: the engine's doors ask `inprogress.held_back` and refuse, so the row
+        # offered a Wield that could only fail. Seen in the final pass, 2026-10-06: the
+        # longsword on the circle, two days from bound, read "Wield" on the Equipment tab
+        # and the press answered "is still binding". The act goes; the reason is the note.
+        busy = inprogress_mod.held_back(s, now)
+        if busy:
+            acts = []
+            note = f"The {d['name']} is {busy}."
         rows.append({
             "id": f"stock:{d['id']}", "key": d["id"], "name": d["name"],
             "count": int(d.get("count") or 0), "unit": goods.unit_for(d["name"]),
-            "kind": "wearable" if slot else "consumable" if d.get("how") or any(
+            # A forged weapon is a weapon, held in the hand (the slot filter's "hand"), not
+            # a wearable at the gloves' slot its record's "hands" would name.
+            "kind": "weapon" if held_weapon else "wearable" if slot else
+                    "consumable" if d.get("how") or any(
                 d.get(f"{h}able") for h in ("drink", "throw", "coat")) else "gear",
-            "shelf": "magic" if item and _shelf_of(s) == "gear" else _shelf_of(s),
-            "fits": slot, "state": "worn" if on else "",
+            "shelf": "weapons" if held_weapon else
+                     "magic" if item and _shelf_of(s) == "gear" else _shelf_of(s),
+            "fits": "hand" if held_weapon else slot,
+            "state": "in hand" if held_weapon and any(a["label"] == "Put away" for a in acts)
+                     else "worn" if on else "",
             "line": "; ".join(effects),
             "known": bool(effects) or bool(s.specs) or bool(item) or bool(row) or layered,
             "poisons": bool(d.get("poisons")),
             "acts": acts,
-            "note": slot_full(slot) if slot and not on and not held_weapon and not any(
-                a["label"] == "Wear" for a in acts) else _gear_note(row),
+            "note": note,
+            "in_progress": bool(busy),
         })
 
     # A name written in a slot that is none of the above: worn, and recorded.

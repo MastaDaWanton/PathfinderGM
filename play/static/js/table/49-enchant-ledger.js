@@ -186,7 +186,7 @@
     }).join("") + '</ul>' : "";
     var sub = [r.tier, r.vessel ? "on a " + r.vessel : "",
                r.caster_level != null ? "caster level " + r.caster_level : "",
-               r.motes != null ? r.motes + " motes" : ""].filter(Boolean).join(", ");
+               r.motes != null ? String(r.motes) + (Number(r.motes) === 1 ? " mote" : " motes") : ""].filter(Boolean).join(", ");
     var load = o && o.load ? '<button type="button" class="v2-btn is-small" data-el-load="' + esc(r.id) + '"' +
       (r.can_make ? "" : ' disabled aria-describedby="el-rc-why-' + esc(r.id) + '"') + '>Load</button>' : "";
     return '<li class="el-recipe"><div class="el-rc-head"><b>' + esc(r.name) + '</b>' + load + '</div>' +

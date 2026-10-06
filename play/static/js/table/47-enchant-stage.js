@@ -1088,9 +1088,30 @@
         g.state = st;
         S.gameLast = now();
         if (Array.isArray(st.seq)) g.seq = st.seq;
-        if (method === "prepare" && st.placed !== undefined && num(st.placed, g.placed) !== g.placed) placeTo(num(st.placed, 0));
+        // Prepare's game sends `placed` as one entry a step (a score, or null while the step
+        // is still to lay), not a count: `num([..])` was NaN, so the circle drew only on the
+        // hits and a step lost to the clock never drew its part (the final pass, 2026-10-06).
+        // A count is still taken as it was written.
+        if (method === "prepare" && st.placed !== undefined) {
+          var laid = Array.isArray(st.placed)
+            ? st.placed.filter(function (q) { return q !== null && q !== undefined; }).length
+            : num(st.placed, g.placed);
+          if (laid !== g.placed) placeTo(laid);
+        }
+        // Attune's game says `lit` for a seat holding its phial; `matched` is the first
+        // shape this stage was written to. Either lights the mark, and a phial lifted off
+        // (Backspace) puts it out again, which hits alone could never do.
         if (method === "attune" && Array.isArray(st.seats)) {
-          st.seats.forEach(function (s, i) { if (s && s.matched !== undefined) S.sp.set("seat" + i, s.matched ? 1 : 0, 6); });
+          st.seats.forEach(function (s, i) {
+            if (!s) return;
+            var on = s.matched !== undefined ? s.matched : s.lit;
+            if (on !== undefined) S.sp.set("seat" + i, on ? 1 : 0, 6);
+            // The game deals the phials shuffled, and any phial whose sign a seat answers may
+            // sit there: the mark lights in the colour of the phial actually set on it, not
+            // the working's (seen live: Flaming set on the Point lit it Arcane's violet).
+            var sn = S.set && S.set.seatNodes[i];
+            if (sn && sn.seat && s.color) sn.col = parseColor(s.color, sn.col);
+          });
         }
         if (method === "bind" && st.pour !== undefined) S.pour = clamp01(st.pour);
         if ((method === "unbind" || method === "cleanse") && st.picked !== undefined) {
@@ -1193,6 +1214,10 @@
         // round the ring and into the work, the sigils flash and cool to a faint scored line.
         var col = E.fx.bright(leadColor() || CANDLE);
         S.flareCol = col;
+        // The work wrapped and set In progress: the same sound the flat stand-in plays for
+        // a binding (45's flourish). This branch had none, so on a WebGL stage the moment
+        // the plan spends its boldness on was the one silent result (the final pass).
+        sound("enchant.land", ph);
         tween(quiet ? 300 : 900, function (q) {
           if (!quiet) {
             var a = Math.PI / 2 + TAU * q, R = E.circle.R.OUTER;
@@ -1435,7 +1460,11 @@
       var same = !!(was && is && was === is);
       S.vesselKey = key;
       S.vesselGone = false;
-      if (!same && S.flawed) {
+      // Relit for the NEXT vessel, not when the flawed one leaves: the finish clears the
+      // working (null) in the same tick as the flourish, and the guttered candle was relit
+      // before a single frame showed it (the final pass, 2026-10-06, `_debug().candles`
+      // all 1 half a second after a FLAWED Bind).
+      if (!same && S.flawed && is) {
         S.flawed = false;
         S.set.candles.forEach(function (cd) { cd.out = false; });
       }

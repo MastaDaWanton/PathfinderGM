@@ -2312,7 +2312,10 @@ def choice_problems(prop: dict, choice: dict | None) -> list[str]:
         allowed_keys.add(key)
         value = choice.get(key)
         if value in (None, "", {}):
-            out.append(f"{pid}: choose its {key} — {_choice_hint(spec)} — before it is "
+            # Plain words, no dashes (the final pass, 2026-10-06: this line reached the
+            # bench's problems list as "choose its foe — one of aberration, ... — before
+            # it is bound"). "choose its" stays: the alias check below keys on it.
+            out.append(f"{pid}: choose its {key} ({_choice_hint(spec)}) before it is "
                        f"bound.")
         else:
             out.extend(_choice_value_problems(pid, spec, value))

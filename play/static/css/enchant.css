@@ -162,6 +162,17 @@
 .eq-why { color: var(--bench-ink); font-size: 13px; }
 .eq-done, .eq-note { margin: 6px 0 0; color: var(--bench-quiet); font-size: 13px; }
 
+/* The footer never sets the layer's width. Measured in the final pass (2026-10-06) at
+   1280x720: the footer's one nowrap row (the clock, "Anywhere quiet: a circle on the
+   ground", the Enchanter line, the perks, Recipes, Ledger, In progress, Steady mode) was
+   1373px of min-content in a 1280px window, so the layer's one grid column grew to 1373 and
+   the working column and Steady mode ran 93px off the right edge. The column is held to the
+   window, and the place, the longest words, gives way first with an ellipsis (the words
+   are all still in the element, for a screen reader and for a wider window). */
+.enchant { grid-template-columns: minmax(0, 1fr); }
+.enchant .bf-place { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.enchant .bf-track { min-width: 0; flex: 0 1 auto; }
+
 /* --- other sizes (UI plan §5.3) --------------------------------------------------------------- */
 /* 1280 to 1439: the shelf to 240px and the working to 320px, as the plan says; the strip
    goes to icons by bench.css's own rule for this band. */

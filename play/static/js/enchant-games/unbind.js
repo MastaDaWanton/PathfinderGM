@@ -31,7 +31,7 @@
     KEYS: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "Enter"],
     HOLDS: [],
     HOLDS_STEADY: [],
-    SOUNDS: { hit: "enchant.unpick", miss: "enchant.bind.miss" },
+    SOUNDS: { hit: "enchant.unpick", miss: "enchant.miss" },
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C, steady = ctx.steady;
       var seq = (ctx.seq || []).map(function (s) { return String(s || "").toLowerCase(); })
@@ -130,7 +130,11 @@
         state: function () {
           return { step: Math.min(step, n - 1), steps: n, next: step < n ? n - step : 0, focus: focus,
             marks: marks.map(function (m) { var p = posOf(m); return { kind: m.kind, cut: m.cut, slot: m.slot, gone: m.gone, quarter: m.turn < 0, x: p.x, y: p.y }; }),
-            slots: slots, unpicked: res.map(function (q) { return q; }) };
+            slots: slots, unpicked: res.map(function (q) { return q; }),
+            // For the circle (47): the sequence, so it shows as many of the item's sigils as
+            // there are, and how many have come out (a timed-out sigil too, which no hit
+            // reports). Without them it always showed three and faded only the pressed ones.
+            seq: seq.slice(), picked: step };
         },
         score: function () { var sum = 0; res.forEach(function (q) { if (typeof q === "number") sum += q; }); return sum / n; },
         done: function () { return step >= n; },
