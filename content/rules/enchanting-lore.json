@@ -1,0 +1,60 @@
+{
+  "_about": [
+    "How a character learns what an essence does, what an item is, and what was bound into",
+    "it (docs/enchanting-revamp-plan.md §12-13; contracts §7). Read by rules/knowledge.py",
+    "beside herb-lore.json and smithing-lore.json, whose shape this mirrors so one module",
+    "answers all three crafts. Words, prices, times and DCs only; no model authors a number.",
+    "",
+    "Book numbers: identify is DC 15 + the item's caster level, once per item per day, and",
+    "beating it by 10 finds a curse (CRB Spellcraft and Cursed Items). Everything else is",
+    "the herbalist's and the smith's rows (study by rarity, a teacher's hour, a library's",
+    "common knowledge) or the owner's round 4 numbers (a quarter of the motes back on",
+    "Unbind). Nothing here is a new house number."
+  ],
+  "read": {
+    "minutes": 10,
+    "_pinch": "Plan §10: a Read spends a pinch, a tenth of a phial.",
+    "pinch": 0.1,
+    "_dc": "As study: 10 + 5 per rarity band (plan §10, 'Read and Identify as §12'; §12 sets none, so the herbalist's study DC is the nearest rule).",
+    "_danger": "Plan §7.3: 'volatile (Read is dangerous: reading it applies its house drawback for an hour, the forge's reactive-assay shape)'. The essence's OWN first house drawback, never a hazard invented for the bench; a volatile essence with no house drawback is safe to read. Applied whatever the roll says (rules/knowledge.py `apply_danger`).",
+    "danger_duration": {"amount": 1, "unit": "hour"}
+  },
+  "study": {
+    "minutes": 10,
+    "dc_base": 10,
+    "dc_per_band": 5,
+    "reveal_per_margin": 5
+  },
+  "identify": {
+    "_dc": "CRB Spellcraft: 'Identify the properties of a magic item using detect magic: DC 15 + item's caster level', 3 rounds, once per item per day ('additional attempts reveal the same results'). CRB Cursed Items: the curse is found only when the check exceeds the DC by 10 or more.",
+    "dc_base": 15,
+    "rounds": 3,
+    "curse_margin": 10
+  },
+  "unbind": {
+    "_residue": "Owner round 4 Q6/Q9: the layer goes, the smith's item stays, a quarter of the layer's motes come back as residue, rounded down (no mote is paid back that was not in the item).",
+    "residue_fraction": 0.25,
+    "residue": "arcane-residue"
+  },
+  "teacher": {
+    "price_cp": 20,
+    "minutes": 10,
+    "_works": "No occupation in content/people/occupations.json is an enchanter; the words name the trade.",
+    "works": [],
+    "words": ["enchanter", "enchantress", "wizard", "sorcerer", "sorceress", "mage", "magus",
+              "arcanist", "witch", "warlock", "loremaster", "runesmith", "runecarver"],
+    "teaches": {"indifferent": 1, "friendly": 2, "helpful": 2}
+  },
+  "library": {
+    "price_cp": 50,
+    "minutes": 60,
+    "words": ["library", "scriptorium", "archive", "archives", "college", "academy"],
+    "_common": "What the world writes down about an essence: its plain facts (what it binds, where it sits, what suits it) for common and uncommon ones. A rare essence's secrets and every drawback stay unwritten, as for herbs and metals.",
+    "tiers": ["common", "uncommon"],
+    "reveals": ["benefit", "neutral"]
+  },
+  "manual": {
+    "mastery": 5
+  },
+  "_working_words": "None here: the circle's working traits (eager, volatile...) are rendered by the effect vocabulary itself (rules/effectspec.py, lane A), so a second copy of their words would drift."
+}

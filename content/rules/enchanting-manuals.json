@@ -1,0 +1,127 @@
+{
+  "_about": [
+    "Enchanting manuals (docs/enchanting-revamp-plan.md §12.3; contracts §7): books that",
+    "teach what essences do, how catalogue items are made, and which properties exist —",
+    "the herbal and smithing manuals' counterpart (content/rules/herbal-manuals.json,",
+    "smithing-manuals.json). Read by rules/knowledge.py (`manual_keys`); sold through",
+    "rules/goods.py `table_goods('enchanting-manuals')`.",
+    "",
+    "Original writing for Pathfinder GM (2026-10-05). Prices are PROPOSED, in the other",
+    "manuals' range (6 to 15 gp) and dearer as the knowledge is rarer, as the deep-metals",
+    "book is: the owner tunes them in play.",
+    "",
+    "`teaches` rows name one of: an `essence` by material id, with which of its traits the",
+    "book holds (\"all\", \"benefits\", \"drawbacks\", \"working\", or a list of trait keys:",
+    "\"grants\", \"house:0\", \"phase\", \"polarity\", \"affinity\", \"working:eager\"); a",
+    "`recipe` by catalogue id (the making of a wondrous item or ring); or a `property` by",
+    "the id in content/rules/magic-properties.json (or \"enhancement\"), the type Unbind",
+    "would teach. An id nothing holds is skipped, never invented."
+  ],
+  "manuals": [
+    {
+      "id": "a-primer-of-motes",
+      "name": "A Primer of Motes",
+      "price_gp": 8,
+      "hours": 4,
+      "about": "An apprentice's first book: the small essences skimmed off forges, storms and springs, and where each one likes to sit.",
+      "teaches": [
+        {"essence": "fire-mote", "keys": "all"},
+        {"essence": "frost-mote", "keys": "all"},
+        {"essence": "spark-mote", "keys": "all"},
+        {"essence": "stone-mote", "keys": "all"},
+        {"essence": "gale-mote", "keys": "all"},
+        {"essence": "tide-mote", "keys": "all"},
+        {"essence": "glow-mote", "keys": "all"},
+        {"essence": "hearth-ember", "keys": "all"}
+      ]
+    },
+    {
+      "id": "the-arcanists-ladder",
+      "name": "The Arcanist's Ladder",
+      "price_gp": 12,
+      "hours": 6,
+      "about": "Rung by rung, the plain enhancement of blade and plate, and the essences that carry each step.",
+      "teaches": [
+        {"property": "enhancement"},
+        {"essence": "arcane-essence-i", "keys": "benefits"},
+        {"essence": "arcane-essence-ii", "keys": "benefits"},
+        {"essence": "arcane-essence-iii", "keys": "benefits"},
+        {"essence": "warding-essence-i", "keys": "benefits"},
+        {"essence": "warding-essence-ii", "keys": "benefits"},
+        {"essence": "warding-essence-iii", "keys": "benefits"}
+      ]
+    },
+    {
+      "id": "edges-and-embers",
+      "name": "Edges and Embers",
+      "price_gp": 15,
+      "hours": 6,
+      "about": "A weapon-binder's notebook: what each common edge-magic does in a fight, and the phials that hold it.",
+      "teaches": [
+        {"property": "flaming"},
+        {"property": "frost"},
+        {"property": "shock"},
+        {"property": "corrosive"},
+        {"property": "thundering"},
+        {"property": "keen"},
+        {"property": "merciful"},
+        {"essence": "flaming-essence", "keys": "benefits"},
+        {"essence": "frost-essence", "keys": "benefits"},
+        {"essence": "shock-essence", "keys": "benefits"},
+        {"essence": "keen-essence", "keys": "benefits"},
+        {"essence": "merciful-essence", "keys": "benefits"}
+      ]
+    },
+    {
+      "id": "wards-and-walls",
+      "name": "Wards and Walls",
+      "price_gp": 15,
+      "hours": 6,
+      "about": "Armour magic for the cautious: what turns a blade, what turns a flame, and what hides the wearer.",
+      "teaches": [
+        {"property": "fortification-light"},
+        {"property": "energy-resistance"},
+        {"property": "shadow"},
+        {"property": "slick"},
+        {"essence": "fortification-light-essence", "keys": "benefits"},
+        {"essence": "resist-fire-essence", "keys": "benefits"},
+        {"essence": "resist-cold-essence", "keys": "benefits"},
+        {"essence": "shadow-essence", "keys": "benefits"},
+        {"essence": "slick-essence", "keys": "benefits"}
+      ]
+    },
+    {
+      "id": "the-ringmakers-book",
+      "name": "The Ringmaker's Book",
+      "price_gp": 20,
+      "hours": 8,
+      "about": "How the small protective trinkets are made: bands that turn blows, cloaks that turn spells, amulets that toughen the skin.",
+      "teaches": [
+        {"property": "deflection"},
+        {"property": "resistance"},
+        {"property": "natural-armour"},
+        {"recipe": "mi-ring-protection-1"},
+        {"recipe": "mi-ring-protection-2"},
+        {"recipe": "mi-cloak-resistance-1"},
+        {"recipe": "mi-cloak-resistance-2"},
+        {"recipe": "mi-amulet-natural-armor-1"}
+      ]
+    },
+    {
+      "id": "on-dangerous-phials",
+      "name": "On Dangerous Phials",
+      "price_gp": 12,
+      "hours": 4,
+      "about": "A careful binder's warnings: which essences bite the hand that reads them, and how.",
+      "teaches": [
+        {"essence": "vicious-essence", "keys": "drawbacks"},
+        {"essence": "corrosive-essence", "keys": "drawbacks"},
+        {"essence": "unholy-essence", "keys": "drawbacks"},
+        {"essence": "green-dragon-ichor", "keys": "drawbacks"},
+        {"essence": "black-dragon-ichor", "keys": "drawbacks"},
+        {"essence": "fiend-ash", "keys": "drawbacks"},
+        {"essence": "lich-dust", "keys": "drawbacks"}
+      ]
+    }
+  ]
+}

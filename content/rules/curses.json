@@ -1,0 +1,986 @@
+{
+ "_about": [
+  "The book's cursed-item table (CRB, Cursed Items) made executable for enchanting's",
+  "flawed bindings (docs/enchanting-revamp-plan.md §11; the owner's rounds 1 and 4 in",
+  "docs/enchanting-answers.md). Read by rules/curses.py, validated on load.",
+  "",
+  "The top table is the book's own d%, unchanged. The sub-tables keep the book's rows",
+  "the owner did not drop and the engine can ask about, and re-scale the d% over",
+  "them: each kept row's width is its book width (an even split where the book prints",
+  "a list with no die), spread over 1-100 by the largest-remainder rule, which",
+  "tests/test_curses.py re-derives from `book_d100`. `dropped` lists every book row",
+  "that is not here and why.",
+  "",
+  "Numbers are the book's: the save DC 10 + the item's caster level (written",
+  "\"10 + cl\", filled from the curse record), 1 point of ability damage, 1d4 rounds",
+  "stunned, one or two negative levels, -2 for blurred sight and the -2 cursed item,",
+  "5% unreliable, and remove curse's DC 10 + caster level. The split between",
+  "unreliable and dependent is the one house number (the book gives no die for which",
+  "intermittent variety): an even split."
+ ],
+ "source": "https://legacy.aonprd.com/coreRulebook/magicItems/cursedItems.html",
+ "identify_margin": 10,
+ "lift_dc_base": 10,
+ "specific_penalty": -2,
+ "rows": [
+  {
+   "id": "delusion",
+   "name": "Delusion",
+   "d100": [
+    1,
+    15
+   ],
+   "words": "Delusion: it has no magic but the power to deceive. What it seems to do, it does not do."
+  },
+  {
+   "id": "opposite",
+   "name": "Opposite effect or target",
+   "d100": [
+    16,
+    35
+   ],
+   "words": "Opposite effect: every bonus it was meant to give is a penalty, and what it was meant to do to a foe it does to its bearer."
+  },
+  {
+   "id": "intermittent",
+   "name": "Intermittent functioning",
+   "d100": [
+    36,
+    45
+   ],
+   "table": "intermittent"
+  },
+  {
+   "id": "requirement",
+   "name": "Requirement",
+   "d100": [
+    46,
+    60
+   ],
+   "table": "requirement"
+  },
+  {
+   "id": "drawback",
+   "name": "Drawback",
+   "d100": [
+    61,
+    75
+   ],
+   "table": "drawback"
+  },
+  {
+   "id": "different",
+   "name": "Completely different effect",
+   "d100": [
+    76,
+    90
+   ],
+   "words": "Completely different effect: its magic works, and it is not the magic that was meant."
+  },
+  {
+   "id": "specific",
+   "name": "A specific cursed item",
+   "d100": [
+    91,
+    100
+   ],
+   "words": "A cursed item: a -2 where the bonus should be, and it will not leave its bearer's hand until the curse is lifted."
+  }
+ ],
+ "tables": {
+  "intermittent": [
+   {
+    "id": "unreliable",
+    "name": "Unreliable",
+    "book_d100": null,
+    "chance_pct": 5,
+    "words": "Unreliable: each time it is used there is a 5% chance its magic gutters and does nothing.",
+    "note": "The book's uncontrolled variety is folded in here (plan §11.2): an item that activates itself means nothing for a blade or a ring with a standing bonus.",
+    "d100": [
+     1,
+     50
+    ]
+   },
+   {
+    "id": "dependent",
+    "name": "Dependent",
+    "book_d100": null,
+    "table": "dependent",
+    "words": "Dependent: it works only {situation}.",
+    "d100": [
+     51,
+     100
+    ]
+   }
+  ],
+  "dependent": [
+   {
+    "id": "daylight",
+    "name": "During the day",
+    "book_d100": [
+     6,
+     10
+    ],
+    "when": {
+     "daylight": true
+    },
+    "situation": "by day",
+    "d100": [
+     1,
+     11
+    ]
+   },
+   {
+    "id": "night",
+    "name": "During the night",
+    "book_d100": [
+     11,
+     15
+    ],
+    "when": {
+     "daylight": false
+    },
+    "situation": "by night",
+    "d100": [
+     12,
+     22
+    ]
+   },
+   {
+    "id": "underground",
+    "name": "Underground",
+    "book_d100": [
+     38,
+     45
+    ],
+    "when": {
+     "underground": true
+    },
+    "situation": "underground",
+    "d100": [
+     23,
+     39
+    ]
+   },
+   {
+    "id": "aboveground",
+    "name": "Aboveground",
+    "book_d100": [
+     46,
+     55
+    ],
+    "when": {
+     "underground": false
+    },
+    "situation": "above ground",
+    "d100": [
+     40,
+     61
+    ]
+   },
+   {
+    "id": "near-creature",
+    "name": "Within 10 feet of a creature type",
+    "book_d100": [
+     56,
+     60
+    ],
+    "when": {
+     "near": {
+      "type": "{creature_type}"
+     }
+    },
+    "situation": "within 10 feet of {creature_type_words}",
+    "rolls": "creature_type",
+    "d100": [
+     62,
+     72
+    ]
+   },
+   {
+    "id": "nonspellcaster",
+    "name": "In the hands of a nonspellcaster",
+    "book_d100": [
+     81,
+     85
+    ],
+    "when": {
+     "wielder_casts": false
+    },
+    "situation": "in the hands of someone who casts no spells",
+    "d100": [
+     73,
+     83
+    ]
+   },
+   {
+    "id": "spellcaster",
+    "name": "In the hands of a spellcaster",
+    "book_d100": [
+     86,
+     90
+    ],
+    "when": {
+     "wielder_casts": true
+    },
+    "situation": "in the hands of a spellcaster",
+    "d100": [
+     84,
+     94
+    ]
+   },
+   {
+    "id": "phase",
+    "name": "In one phase of the day",
+    "book_d100": [
+     97,
+     99
+    ],
+    "when": {
+     "day_phase": "{phase}"
+    },
+    "situation": "at {phase}",
+    "rolls": "phase",
+    "reworded": "The book's 'on holy days or during particular astrological events'. The owner's round 4 point 10: no planets, phases of the day only, so the row asks nothing of the world.",
+    "d100": [
+     95,
+     100
+    ]
+   }
+  ],
+  "requirement": [
+   {
+    "id": "eat-double",
+    "name": "Eats twice as much",
+    "book_d100": null,
+    "fact": "ate_double",
+    "words": "Requirement: its bearer must eat twice what a body needs each day, or its magic sleeps.",
+    "d100": [
+     1,
+     17
+    ]
+   },
+   {
+    "id": "sleep-double",
+    "name": "Sleeps twice as long",
+    "book_d100": null,
+    "fact": "slept_double",
+    "words": "Requirement: its bearer must sleep twice as long each day, or its magic sleeps.",
+    "d100": [
+     18,
+     34
+    ]
+   },
+   {
+    "id": "daily-use",
+    "name": "Used every day",
+    "book_d100": null,
+    "fact": "used",
+    "words": "Requirement: it must be used every day, or it stops working for whoever holds it.",
+    "d100": [
+     35,
+     51
+    ]
+   },
+   {
+    "id": "draw-blood",
+    "name": "Draws blood every day",
+    "book_d100": null,
+    "fact": "drew_blood",
+    "gear": [
+     "weapon"
+    ],
+    "words": "Requirement: it must draw blood every day, or its magic sleeps.",
+    "reworded": "The book's 'must draw blood when drawn, and cannot be sheathed until it has'; the plan's daily reading (§11.2), since no op sheathes a blade.",
+    "d100": [
+     52,
+     68
+    ]
+   },
+   {
+    "id": "daily-kill",
+    "name": "A kill every day",
+    "book_d100": null,
+    "fact": "killed",
+    "words": "Requirement: it must have a living creature killed by its bearer every day, or its magic sleeps.",
+    "d100": [
+     69,
+     84
+    ]
+   },
+   {
+    "id": "no-other-magic",
+    "name": "No other magic",
+    "book_d100": null,
+    "fact": "other_magic",
+    "met_when": false,
+    "words": "Requirement: its bearer may carry no other magic item, or its magic sleeps.",
+    "d100": [
+     85,
+     100
+    ]
+   }
+  ],
+  "drawback": [
+   {
+    "id": "hair-grows",
+    "name": "Hair grows",
+    "book_d100": [
+     1,
+     4
+    ],
+    "noticed": true,
+    "words": "Drawback: its bearer's hair grows an inch every hour.",
+    "d100": [
+     1,
+     5
+    ]
+   },
+   {
+    "id": "height",
+    "name": "Shrinks or grows",
+    "book_d100": [
+     5,
+     9
+    ],
+    "noticed": true,
+    "rolls": "taller",
+    "words": "Drawback: its bearer {taller_words} six inches, once.",
+    "d100": [
+     6,
+     11
+    ]
+   },
+   {
+    "id": "colder",
+    "name": "Colder air",
+    "book_d100": [
+     10,
+     13
+    ],
+    "noticed": true,
+    "words": "Drawback: the air around it is always cooler, as though it drank the warmth.",
+    "d100": [
+     12,
+     16
+    ]
+   },
+   {
+    "id": "warmer",
+    "name": "Warmer air",
+    "book_d100": [
+     14,
+     17
+    ],
+    "noticed": true,
+    "words": "Drawback: the air around it is always warmer, close and stale.",
+    "d100": [
+     17,
+     21
+    ]
+   },
+   {
+    "id": "hair-colour",
+    "name": "Hair colour",
+    "book_d100": [
+     18,
+     21
+    ],
+    "noticed": true,
+    "words": "Drawback: its bearer's hair has changed colour.",
+    "d100": [
+     22,
+     26
+    ]
+   },
+   {
+    "id": "skin-colour",
+    "name": "Skin colour",
+    "book_d100": [
+     22,
+     25
+    ],
+    "noticed": true,
+    "words": "Drawback: its bearer's skin has changed colour.",
+    "d100": [
+     27,
+     31
+    ]
+   },
+   {
+    "id": "mark",
+    "name": "A mark",
+    "book_d100": [
+     26,
+     29
+    ],
+    "noticed": true,
+    "words": "Drawback: its bearer carries a mark anyone can see: a sign on the skin, a faint glow.",
+    "d100": [
+     32,
+     35
+    ]
+   },
+   {
+    "id": "sound",
+    "name": "A sound",
+    "book_d100": [
+     36,
+     39
+    ],
+    "noticed": true,
+    "words": "Drawback: it never stops making a faint, disturbing sound.",
+    "d100": [
+     36,
+     39
+    ]
+   },
+   {
+    "id": "ridiculous",
+    "name": "Ridiculous",
+    "book_d100": [
+     40,
+     40
+    ],
+    "noticed": true,
+    "words": "Drawback: it looks ridiculous, garish and wrongly shaped.",
+    "d100": [
+     40,
+     40
+    ]
+   },
+   {
+    "id": "possessive",
+    "name": "Possessive",
+    "book_d100": [
+     41,
+     45
+    ],
+    "noticed": true,
+    "words": "Drawback: its bearer grows selfishly possessive of it.",
+    "d100": [
+     41,
+     46
+    ]
+   },
+   {
+    "id": "paranoid",
+    "name": "Paranoid",
+    "book_d100": [
+     46,
+     49
+    ],
+    "noticed": true,
+    "words": "Drawback: its bearer frets that it will be lost or harmed.",
+    "d100": [
+     47,
+     50
+    ]
+   },
+   {
+    "id": "stunned",
+    "name": "Stunned",
+    "book_d100": [
+     55,
+     57
+    ],
+    "documents": [
+     {
+      "type": "apply_condition",
+      "target": "stunned",
+      "duration": {
+       "amount": "1d4",
+       "unit": "round"
+      },
+      "periodic": "day",
+      "book": true
+     }
+    ],
+    "words": "Drawback: once a day, at no hour it chooses, it stuns its bearer for 1d4 rounds.",
+    "d100": [
+     51,
+     53
+    ]
+   },
+   {
+    "id": "blurred",
+    "name": "Blurred vision",
+    "book_d100": [
+     58,
+     60
+    ],
+    "documents": [
+     {
+      "type": "combat_mod",
+      "target": "attack",
+      "amount": -2,
+      "bonus_type": "untyped",
+      "book": true
+     },
+     {
+      "type": "save_mod",
+      "target": "fort",
+      "amount": -2,
+      "bonus_type": "untyped",
+      "book": true
+     },
+     {
+      "type": "save_mod",
+      "target": "ref",
+      "amount": -2,
+      "bonus_type": "untyped",
+      "book": true
+     },
+     {
+      "type": "save_mod",
+      "target": "will",
+      "amount": -2,
+      "bonus_type": "untyped",
+      "book": true
+     },
+     {
+      "type": "skill_mod",
+      "target": "perception",
+      "amount": -2,
+      "bonus_type": "untyped",
+      "book": true
+     }
+    ],
+    "words": "Drawback: its bearer's sight blurs: -2 on attacks, saves and Perception.",
+    "d100": [
+     54,
+     56
+    ]
+   },
+   {
+    "id": "negative-level",
+    "name": "A negative level",
+    "book_d100": [
+     61,
+     64
+    ],
+    "documents": [
+     {
+      "type": "negative_level",
+      "amount": 1,
+      "book": true
+     }
+    ],
+    "words": "Drawback: its bearer carries a negative level while it is held or worn.",
+    "d100": [
+     57,
+     60
+    ]
+   },
+   {
+    "id": "two-negative-levels",
+    "name": "Two negative levels",
+    "book_d100": [
+     65,
+     65
+    ],
+    "documents": [
+     {
+      "type": "negative_level",
+      "amount": 2,
+      "book": true
+     }
+    ],
+    "words": "Drawback: its bearer carries two negative levels while it is held or worn.",
+    "d100": [
+     61,
+     61
+    ]
+   },
+   {
+    "id": "will-int",
+    "name": "Will or Intelligence",
+    "book_d100": [
+     66,
+     70
+    ],
+    "documents": [
+     {
+      "type": "save_gate",
+      "target": "will",
+      "dc": "10 + cl",
+      "periodic": "day",
+      "book": true,
+      "on_failure": [
+       {
+        "type": "ability_damage",
+        "target": "int",
+        "dice": "1",
+        "book": true
+       }
+      ]
+     }
+    ],
+    "words": "Drawback: each day its bearer makes a Will save (DC {dc}) or loses a point of Intelligence.",
+    "d100": [
+     62,
+     67
+    ]
+   },
+   {
+    "id": "will-wis",
+    "name": "Will or Wisdom",
+    "book_d100": [
+     71,
+     75
+    ],
+    "documents": [
+     {
+      "type": "save_gate",
+      "target": "will",
+      "dc": "10 + cl",
+      "periodic": "day",
+      "book": true,
+      "on_failure": [
+       {
+        "type": "ability_damage",
+        "target": "wis",
+        "dice": "1",
+        "book": true
+       }
+      ]
+     }
+    ],
+    "words": "Drawback: each day its bearer makes a Will save (DC {dc}) or loses a point of Wisdom.",
+    "d100": [
+     68,
+     73
+    ]
+   },
+   {
+    "id": "will-cha",
+    "name": "Will or Charisma",
+    "book_d100": [
+     76,
+     80
+    ],
+    "documents": [
+     {
+      "type": "save_gate",
+      "target": "will",
+      "dc": "10 + cl",
+      "periodic": "day",
+      "book": true,
+      "on_failure": [
+       {
+        "type": "ability_damage",
+        "target": "cha",
+        "dice": "1",
+        "book": true
+       }
+      ]
+     }
+    ],
+    "words": "Drawback: each day its bearer makes a Will save (DC {dc}) or loses a point of Charisma.",
+    "d100": [
+     74,
+     79
+    ]
+   },
+   {
+    "id": "fort-con",
+    "name": "Fortitude or Constitution",
+    "book_d100": [
+     81,
+     85
+    ],
+    "documents": [
+     {
+      "type": "save_gate",
+      "target": "fort",
+      "dc": "10 + cl",
+      "periodic": "day",
+      "book": true,
+      "on_failure": [
+       {
+        "type": "ability_damage",
+        "target": "con",
+        "dice": "1",
+        "book": true
+       }
+      ]
+     }
+    ],
+    "words": "Drawback: each day its bearer makes a Fortitude save (DC {dc}) or loses a point of Constitution.",
+    "d100": [
+     80,
+     85
+    ]
+   },
+   {
+    "id": "fort-str",
+    "name": "Fortitude or Strength",
+    "book_d100": [
+     86,
+     90
+    ],
+    "documents": [
+     {
+      "type": "save_gate",
+      "target": "fort",
+      "dc": "10 + cl",
+      "periodic": "day",
+      "book": true,
+      "on_failure": [
+       {
+        "type": "ability_damage",
+        "target": "str",
+        "dice": "1",
+        "book": true
+       }
+      ]
+     }
+    ],
+    "words": "Drawback: each day its bearer makes a Fortitude save (DC {dc}) or loses a point of Strength.",
+    "d100": [
+     86,
+     91
+    ]
+   },
+   {
+    "id": "fort-dex",
+    "name": "Fortitude or Dexterity",
+    "book_d100": [
+     91,
+     95
+    ],
+    "documents": [
+     {
+      "type": "save_gate",
+      "target": "fort",
+      "dc": "10 + cl",
+      "periodic": "day",
+      "book": true,
+      "on_failure": [
+       {
+        "type": "ability_damage",
+        "target": "dex",
+        "dice": "1",
+        "book": true
+       }
+      ]
+     }
+    ],
+    "words": "Drawback: each day its bearer makes a Fortitude save (DC {dc}) or loses a point of Dexterity.",
+    "d100": [
+     92,
+     97
+    ]
+   },
+   {
+    "id": "no-arcane",
+    "name": "No arcane spells",
+    "book_d100": [
+     97,
+     97
+    ],
+    "bars": "curse.bars-casting.arcane",
+    "words": "Drawback: while it is held or worn its bearer cannot cast arcane spells.",
+    "d100": [
+     98,
+     98
+    ]
+   },
+   {
+    "id": "no-divine",
+    "name": "No divine spells",
+    "book_d100": [
+     98,
+     98
+    ],
+    "bars": "curse.bars-casting.divine",
+    "words": "Drawback: while it is held or worn its bearer cannot cast divine spells.",
+    "d100": [
+     99,
+     99
+    ]
+   },
+   {
+    "id": "no-spells",
+    "name": "No spells",
+    "book_d100": [
+     99,
+     99
+    ],
+    "bars": "curse.bars-casting",
+    "words": "Drawback: while it is held or worn its bearer cannot cast any spell.",
+    "d100": [
+     100,
+     100
+    ]
+   }
+  ]
+ },
+ "dropped": [
+  {
+   "table": "drawback",
+   "book_d100": [
+    30,
+    32
+   ],
+   "name": "Gender changes",
+   "why": "Owner, round 4 point 3: dropped."
+  },
+  {
+   "table": "drawback",
+   "book_d100": [
+    33,
+    34
+   ],
+   "name": "Race or kind changes",
+   "why": "Owner, round 4 point 3: dropped."
+  },
+  {
+   "table": "drawback",
+   "book_d100": [
+    35,
+    35
+   ],
+   "name": "An incurable disease",
+   "why": "Owner, round 4 point 3: dropped."
+  },
+  {
+   "table": "drawback",
+   "book_d100": [
+    50,
+    51
+   ],
+   "name": "Alignment changes",
+   "why": "Owner, round 4 point 3: dropped (and no alignment is tracked, Q7)."
+  },
+  {
+   "table": "drawback",
+   "book_d100": [
+    52,
+    54
+   ],
+   "name": "Must attack the nearest creature",
+   "why": "Owner, round 4 point 3: the compulsion to attack is dropped."
+  },
+  {
+   "table": "drawback",
+   "book_d100": [
+    96,
+    96
+   ],
+   "name": "Polymorphed",
+   "why": "Owner, round 4 point 3: dropped."
+  },
+  {
+   "table": "drawback",
+   "book_d100": [
+    100,
+    100
+   ],
+   "name": "Choose or invent a drawback",
+   "why": "GM fiat with no rule row is refused (docs/states-effects-tells.md); the row is spread over the rest."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    1,
+    5
+   ],
+   "name": "Above or below freezing",
+   "why": "No temperature is modelled, so the condition could never be asked."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    16,
+    25
+   ],
+   "name": "In or out of direct sunlight",
+   "why": "No light or shelter is modelled; day and night are kept."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    26,
+    37
+   ],
+   "name": "Underwater or out of water",
+   "why": "No water is modelled."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    61,
+    64
+   ],
+   "name": "Near a race or kind",
+   "why": "The world owns its peoples (they are not the rulebook's races); the creature type row covers kinds."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    65,
+    80
+   ],
+   "name": "Near an arcane or divine caster",
+   "why": "Nothing reads a creature's casting tradition."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    91,
+    95
+   ],
+   "name": "In the hands of an alignment",
+   "why": "No alignment is tracked (owner, round 4 Q7): waived, not reworded, because the row has no meaning without it."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    96,
+    96
+   ],
+   "name": "In the hands of a gender",
+   "why": "The owner dropped the gender rows (round 4 point 3); the same reason holds."
+  },
+  {
+   "table": "dependent",
+   "book_d100": [
+    100,
+    100
+   ],
+   "name": "More than 100 miles from a site",
+   "why": "Nothing measures distance to a named site."
+  },
+  {
+   "table": "requirement",
+   "name": "Completes a quest",
+   "why": "No quest has an ending the engine can read."
+  },
+  {
+   "table": "requirement",
+   "name": "Destroys 100 gp of valuables daily, or 2,000 gp of magic weekly",
+   "why": "No op destroys valuables."
+  },
+  {
+   "table": "requirement",
+   "name": "Swears fealty, worships a deity, takes a name, adds a class",
+   "why": "None of these is recorded anywhere a reader could ask."
+  },
+  {
+   "table": "requirement",
+   "name": "Keeps ranks in a skill",
+   "why": "The book prints no number of ranks; inventing one is a house number with no source."
+  },
+  {
+   "table": "requirement",
+   "name": "Sacrifices 2 Constitution once",
+   "why": "No first-use hook exists to take it at."
+  },
+  {
+   "table": "requirement",
+   "name": "Daily holy water, monthly lava, a daily spell cast on it",
+   "why": "No op anoints, immerses or casts on an item."
+  }
+ ]
+}
