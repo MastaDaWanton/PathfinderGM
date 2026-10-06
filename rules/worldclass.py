@@ -562,8 +562,12 @@ def migrate_enchanter(progress: Progress) -> bool:
     The Herbalist's and the Blacksmith's conversion: the unlocks stop at 3 and the bank is
     counted from the level, so an old Enchanter 4 holds one pick-pair and an old 5 two,
     waiting at the circle. Banked mastery is untouched; an old `legendary-binding` in
-    `milestones` is inert. Old recipes and enchanted items are lane H's (the plan's §19,
-    wave 2), read through `rules/enchanter.py`; this only stamps the progress.
+    `milestones` is inert. This only stamps the progress: old enchanted ITEMS are converted
+    record by record on load (`enchanter.migrate_old_record`, called from `sheet._migrated`
+    for the pack and the worn copies; lane H), and old chain recipes need nothing here —
+    the track's `old_methods` maps their methods, and no save measured on 2026-10-06 holds
+    one. An old Enchanter 5 measured on the live bench: level 5 kept, 4 picks banked, the
+    perk picker's to show on the first visit (tests/test_enchant_migration.py).
 
     Idempotent by the stamp, so running it on every load is safe.
     """

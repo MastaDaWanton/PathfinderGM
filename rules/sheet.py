@@ -6149,13 +6149,24 @@ def _migrated(d):
     read by none of the forge's readers (no material, no strikes, no build)."""
     if not isinstance(d, dict):
         return d
-    from . import blacksmith
+    from . import blacksmith, enchanter
 
-    try:
-        new = blacksmith.migrate_old_record(d)
-    except Exception:  # noqa: BLE001 — a record the migration cannot read stays as it was
-        return d
-    return new if new is not None else d
+    # Each migration answers None for a record that is not its own, and the two never
+    # claim the same one (`craft` "blacksmith" or "enchanter"). The enchanter's is the
+    # enchanting plan §19 ("convert"): an old enchanted item re-derived onto the magic
+    # layer, the old record kept beside it in `magic.migrated` for one version. Measured
+    # 2026-10-06 (lane H) on the 268 items the pre-revamp code makes: every one loaded as
+    # a plain shelf entry the new bench offered as an UNENCHANTED vessel, its +N and
+    # properties flat specs no layer reader saw — a +1 flaming sword could be "enchanted"
+    # again from scratch, and its fire (a note, "on a hit", with no trigger) never fired.
+    for migrate in (blacksmith.migrate_old_record, enchanter.migrate_old_record):
+        try:
+            new = migrate(d)
+        except Exception:  # noqa: BLE001 — a record the migration cannot read stays as it was
+            new = None
+        if new is not None:
+            return new
+    return d
 
 
 def _progress_dict(p) -> dict:

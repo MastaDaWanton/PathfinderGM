@@ -782,13 +782,20 @@ def item_card(record: dict) -> dict:
     mine = _own_card(record)
     fn = _lane_fn("knowledge", "item_card")
     if fn is None:
-        return mine
-    card = dict(fn(record) or {})
-    if card.get("identified"):
-        card["house"] = mine.get("house", [])
-        card["uses"] = mine.get("powers", [])
+        card = mine
     else:
-        card.setdefault("summary", mine.get("summary"))
+        card = dict(fn(record) or {})
+        if card.get("identified"):
+            card["house"] = mine.get("house", [])
+            card["uses"] = mine.get("powers", [])
+        else:
+            card.setdefault("summary", mine.get("summary"))
+    # An item converted from an old save that never named a choice (bane's foe) asks it
+    # here, on its own card, for as long as it is unanswered (plan §19, lane H): the
+    # one-time notice can be dismissed, the question cannot be lost.
+    asks = pending_of(record)
+    if asks:
+        card["questions"] = asks
     return card
 
 
@@ -2463,6 +2470,567 @@ def unbind_learn(actor, record: dict, *, now: int) -> dict:
 
 
 # =============================================================================================
+# Old saves: enchanted items from before the revamp (plan §19; contracts §12, lane H)
+# =============================================================================================
+#
+# The owner's ruling (round 3): "Convert. ... old enchanted items keep their +N and specs,
+# re-derived onto the new layer where possible, the old record kept beside them for one
+# version." An item from the old circle or the old "By the book" tab is a shelf entry with
+# `craft: "enchanter"`, a flat `specs` list, an `enhancement` number, `properties` as display
+# NAMES and `from_materials` naming what it was made from (catalogue `mi-*` ids, or essence
+# ids beside the focus and vessel). Nothing on it says what a property's choice was, and its
+# numbers were written once and never re-read, so a corrected document corrected nothing.
+#
+# Prior art read before this was designed (CLAUDE.md, "search first"):
+# - Factorio's migrations (https://lua-api.factorio.com/latest/Migrations.html): a rename
+#   table first (lane A's `aliases`, `effectspec.from_alias`), then code that adjusts state
+#   (`migrate_old_record`), each remembered by name so it never runs twice (`MIGRATION_STAMP`
+#   on the layer; idempotent because a record with a layer is not an old record).
+# - Path of Exile's "legacy" items (forum thread 3229344, "Items updated to new mod values
+#   which retain old mod values"): items that WORK by the new numbers while still SHOWING the
+#   old ones were the complaint. So the converted record's own `effects` prose is rewritten
+#   to what still rides flat on it, and every other line on the card is the layer's, read
+#   live; the old numbers survive only in `magic.migrated.from`, for undo.
+# - The quarantine pattern (a farm-game engine's issue #52, "drop or quarantine missing
+#   IDs"): what nothing maps is neither dropped nor guessed. It stays on the record as the
+#   flat spec it was, read exactly as before (`magic_layer.record_specs`), and is named in
+#   the conversion's notes. The plan's `legacy_specs` field would have needed a new reader in
+#   lane B's and lane C's files; keeping them in `specs` is "read as today" with none.
+#
+# **Never guess a choice.** A choice the old record cannot prove is asked of the player. Bane
+# is the case lane A named: `mi-bane` maps to bane with no foe, because the old bane never
+# named one. Where the old numbers DO settle a choice (an old Knack Essence's +N on one skill
+# is skill competence on that skill at +N) it is read, not guessed: every way the property
+# can be bound is tried and the old specs must pick out exactly one. A tie is a question.
+# An unanswered property waits on the layer under `pending` — the layer builder skips it, so
+# it does nothing until answered (an old bane's +2d6 on EVERY foe was the note-only defect
+# bane's `when` exists to close; carrying it on would keep the bug) — and the item card asks
+# (`item_card`'s `question`), as does the one-time notice (`conversions`).
+
+MIGRATION_STAMP = "enchanting-19"
+# The vessel's quality index: an old enchanted item was masterwork by the old rule (both
+# old modes demanded or granted it), and the forge's Superior is masterwork (forge §4.4).
+_MIGRATED_QUALITY = 3
+
+
+def is_old_enchanted(d) -> bool:
+    """An enchanted item from before the revamp: a shelf or worn record of the old circle
+    or the old "By the book" tab, with a +N, named properties or flat specs and no layer.
+
+    Not one: anything with a `magic` layer or a forge record (`pieces`), anything in
+    progress, the new bench's phials (`enchant.*` tags) and blanks (no numbers at all)."""
+    if not isinstance(d, dict) or str(d.get("craft") or "") != TRACK_ID:
+        return False
+    if isinstance(d.get("pieces"), dict) or d.get("work"):
+        return False
+    if isinstance(d.get("magic"), dict) and d["magic"]:
+        return False
+    if any(str(p).startswith(PHIAL_TAG) for p in d.get("properties") or ()):
+        return False
+    try:
+        enh = int(d.get("enhancement") or 0)
+    except (TypeError, ValueError):
+        enh = 0
+    return bool(enh or d.get("properties") or d.get("specs"))
+
+
+def _old_source_names() -> dict[str, str]:
+    """{id: display name} for everything an old item's specs could say they came `from`:
+    the old catalogue (retired rows included: `magicitem.catalogue` keeps them) and every
+    shelf material, old library and lane D's essences both. These are TODAY's names, and
+    three catalogue rows were renamed by lane D's book check (Gauntlets of Rust is now
+    Gauntlet of Rust, Belt of Mighty Hurling is the Lesser one, Ring of Mindshielding is
+    Ring of Mind Shielding): measured on the old corpus, their specs stayed flat beside the
+    power they had become, so the item did its thing twice. `_labels` adds the name the old
+    record itself wrote."""
+    names: dict[str, str] = {}
+    try:
+        from . import magicitem
+
+        names.update({k: v.name for k, v in magicitem.catalogue().items()})
+    except Exception:  # noqa: BLE001 - a broken homebrew catalogue still migrates the rest
+        pass
+    try:
+        names.update({k: m.name for k, m in materials().items()})
+    except Exception:  # noqa: BLE001
+        pass
+    names.update({k: str(d.get("name") or k) for k, d in _essence_docs().items()})
+    return names
+
+
+def _norm(text) -> str:
+    return " ".join(str(text or "").split()).strip().lower()
+
+
+def _sig(doc: dict) -> tuple:
+    """What a document does, as a comparable fact: type, target, number, energy. An old
+    flat spec and a bound document agree on this when they are the same effect."""
+    amount = doc.get("amount", doc.get("dice", doc.get("percent")))
+    return (str(doc.get("type") or ""), _norm(doc.get("target")), _norm(amount),
+            _norm(doc.get("damage_type")))
+
+
+def _infer_choice(prop: dict, partial: dict, old_specs: list[dict]) -> dict:
+    """The choice the old numbers prove, or `partial` unchanged.
+
+    Every complete way the property can be bound (`effectspec.sample_choices`, with what
+    is already known kept) is bound and compared with what the old item actually did. Only
+    a single best match is taken; a tie, or nothing in common, leaves the choice open for
+    the player. Bane ties across every creature type (its old numbers never named a foe), so
+    bane is always asked."""
+    if not effectspec.choice_problems(prop, partial):
+        return partial
+    old = {_sig(s) for s in old_specs}
+    if not old:
+        return partial
+    scored: list[tuple[int, dict]] = []
+    for pick in effectspec.sample_choices(prop):
+        merged = {**pick, **{k: v for k, v in partial.items() if v not in (None, "", {})}}
+        if effectspec.choice_problems(prop, merged) or any(merged == c for _, c in scored):
+            continue
+        try:
+            docs = effectspec.bind(prop, merged)
+        except (ValueError, KeyError):
+            continue
+        scored.append((len({_sig(d) for d in docs} & old), merged))
+    if not scored:
+        return partial
+    best = max(n for n, _ in scored)
+    winners = [c for n, c in scored if n == best]
+    return winners[0] if best and len(winners) == 1 else partial
+
+
+def _missing(prop: dict, choice: dict) -> list[str]:
+    """Which parts of a choice the player still has to give: the property's own key
+    (`foe`, `skill`, `energy`) and, for a scaled one, `bonus`."""
+    out = []
+    spec = prop.get("choice") or {}
+    if spec and choice.get(spec.get("key")) in (None, "", {}):
+        out.append(str(spec["key"]))
+    scaled = prop.get("scaled") or {}
+    if scaled and choice.get("bonus") not in scaled.get("values", ()):
+        out.append("bonus")
+    return out
+
+
+def _sources_of(d: dict, names: dict[str, str]) -> list[str]:
+    """What the old item was made from, as ids: its `from_materials`, or for a record that
+    predates that field, its property names read back to ids."""
+    got = [str(x).strip().lower() for x in d.get("from_materials") or () if x]
+    if got:
+        return list(dict.fromkeys(got))
+    by_name = {_norm(n): k for k, n in sorted(names.items())}
+    return list(dict.fromkeys(by_name[_norm(n)] for n in d.get("properties") or ()
+                              if _norm(n) in by_name))
+
+
+def _labels(d: dict, sources: list[str], names: dict[str, str]) -> dict[str, set[str]]:
+    """Every name an old item's specs may give each source in `from`: today's name, and the
+    name the old record wrote itself. Both old benches wrote `properties` as the names of
+    exactly the things specs came from, in `from_materials` order — every catalogue entry
+    (the book tab), every essence (the circle; its focus, vessel and inks made no specs) —
+    so the two lists pair up by position when their lengths agree."""
+    out = {mid: {_norm(names.get(mid, mid))} for mid in sources}
+    try:
+        shelf = materials()
+    except Exception:  # noqa: BLE001
+        shelf = {}
+    makers = [mid for mid in sources if mid.startswith("mi-")
+              or getattr(shelf.get(mid), "kind", "") == "essence"
+              or mid in _essence_docs()]
+    said = [_norm(n) for n in d.get("properties") or ()]
+    if len(makers) == len(said):
+        for mid, label in zip(makers, said):
+            out[mid].add(label)
+    return out
+
+
+def migrate_old_record(d) -> dict | None:
+    """An old enchanted item re-derived onto the magic layer, or None when `d` is not one
+    (plan §19, the owner's "convert").
+
+    - The +N becomes `magic.enhancement` (arms and armour; the book's +5 kept).
+    - Each catalogue property (`mi-*`) becomes its property by lane A's alias, with the
+      choice the alias implies; each essence its grant (lane D's `grants`); each catalogue
+      wondrous item a recipe power, retired rows included (they still resolve through the
+      old catalogue in `magic_layer.recipe`, so an item built on one keeps working and is
+      never offered again). Essences that now grant an enhancement are the +N already.
+    - A choice the old record cannot prove waits in `magic.pending`, asked, never guessed.
+    - Specs from anything nothing maps (a mote that grants nothing now) stay flat, read as
+      before.
+    - Arms and armour become a forged record of their base (`forge_items.record_for_base`,
+      default pieces marked plain, Superior), so the armour row folds the +N into the suit
+      and the material tag answers. Rings and wondrous items keep their shelf shape with the
+      layer on `magic`. An item whose base the tables do not know keeps its shelf shape too.
+    - The binding is stamped at the Enchanter level that holds what the item carries
+      (capacity floor(level / 2), owner round 4): it was made, so it held it.
+
+    **The old record is kept beside the new, for one version**, in `magic.migrated.from`
+    (`undo_migration`); remove it in the release after the one that ships this. The keys
+    the readers find it by — id, name, the shelf key — do not change.
+    """
+    if not is_old_enchanted(d):
+        return None
+    from . import armour as armour_mod
+    from . import forge_items, magic_layer
+
+    old = copy.deepcopy(d)
+    names = _old_source_names()
+    essences = _essence_docs()
+    specs = [dict(s) for s in d.get("specs") or () if isinstance(s, dict)]
+    try:
+        enh = max(0, min(magic_layer.MAX_ENHANCEMENT, int(d.get("enhancement") or 0)))
+    except (TypeError, ValueError):
+        enh = 0
+    name = str(d.get("name") or d.get("base") or "Enchanted item")
+
+    gear, base = "", ""
+    if d.get("weapon"):
+        gear, base = "weapon", str(d["weapon"])
+    elif d.get("armour"):
+        kind, _ = armour_mod.key_for(str(d["armour"]))
+        gear, base = (kind or "armour"), str(d["armour"])
+    arms = gear in magic_layer.ARMS
+
+    covered: set[str] = set()
+    # Where the +N's own specs say they came from: "+1" (the book tab) or an arcane or
+    # warding essence's name (the circle). Covered only when the +N moves onto the layer.
+    plus_labels: set[str] = {_norm(f"+{n}") for n in range(1, magic_layer.MAX_ENHANCEMENT + 1)}
+    props: list[dict] = []
+    flat: list[dict] = []
+    powers: list[dict] = []
+    pending: list[dict] = []
+    changes: list[str] = []
+
+    def from_of(s: dict) -> str:
+        return _norm(s.get("from"))
+
+    sources = _sources_of(d, names)
+    labels = _labels(d, sources, names)
+    for mid in sources:
+        label = names.get(mid, mid)
+        mine = [s for s in specs if from_of(s) in labels[mid]]
+        essence = None
+        alias = effectspec.from_alias(mid)
+        if alias:
+            pid, choice = alias[0], dict(alias[1] or {})
+        elif mid in essences:
+            grants = essences[mid].get("grants") or {}
+            if "enhancement" in grants:
+                plus_labels |= labels[mid]       # the +N, read off `enhancement` above
+                continue
+            if grants.get("power"):
+                powers.append({"recipe": str(grants["power"]), "essence": mid})
+                covered |= labels[mid]
+                changes.append(f"{label}: now {_recipe_name(grants['power'])}.")
+                continue
+            if not grants.get("property"):
+                continue                         # grants nothing now: its specs stay flat
+            pid, essence = str(grants["property"]), mid
+            choice = dict(grants.get("choice") or {})
+            if grants.get("bonus") is not None:
+                choice["bonus"] = int(grants["bonus"])
+        elif magic_layer.recipe(mid) is not None:
+            powers.append({"recipe": mid, "essence": None})
+            covered |= labels[mid]
+            continue
+        else:
+            continue                             # a vessel, focus, ink: no specs of its own
+        prop = effectspec.property(pid)
+        if prop is None:
+            continue
+        choice = _infer_choice(prop, choice, mine)
+        covered |= labels[mid]
+        entry = {"id": prop["id"], "essence": essence, "choice": choice or None}
+        if any(e["id"] == entry["id"] and (e.get("choice") or None) == entry["choice"]
+               for e in props + flat + pending):
+            continue
+        ask = _missing(prop, choice)
+        if ask:
+            pending.append({**entry, "asks": ask})
+            changes.append(f"{prop['name']}: waits for you to choose its {_say_list(ask)}; "
+                           f"until then it does nothing.")
+            continue
+        (flat if prop.get("gp") is not None else props).append(entry)
+        before = [effectspec.render(s) for s in mine]
+        # A property that is a rule rather than a number (returning, bashing) has no line
+        # of its own; its card text says what it does.
+        after = effectspec.property_lines(prop, choice) or [str(prop.get("text") or "")]
+        # Compared as facts, with the trigger, not as rendered words: "Resist fire 10
+        # (permanent)" and "Resist fire 10" are the same effect, while the old flaming's
+        # "1d6 fire damage" (a note no reader fired) and the new "1d6 fire damage, on a
+        # hit" are not, and the player should be told the fire lands now.
+        was = {_sig(s) + (str(s.get("trigger") or ""),) for s in mine}
+        now = {_sig(x) + (str(x.get("trigger") or ""),) for x in effectspec.bind(prop, choice)}
+        if before and was != now:
+            changes.append(f"{prop['name']}: was {'; '.join(b.rstrip('.') for b in before)}"
+                           f"; now {'; '.join(a.rstrip('.') for a in after)}.")
+
+    # Arms and armour become a forged record of their base, which the armour row and the
+    # material tag read. A forged build reads its pieces and its layer, never a flat
+    # `specs` list, so an item with something left flat keeps its shelf shape, where
+    # `magic_layer.record_specs` reads both. Measured on the old corpus (268 items the old
+    # code makes, tests/test_enchant_migration.py): only 19 bound with an essence that
+    # grants nothing now (a mote, or an alchemist's essence the old shelf also read) leave
+    # anything flat.
+    rid = str(d.get("id") or "").split("#", 1)[0] or _slug(name)
+    rec = None
+    if arms:
+        try:
+            rec = forge_items.record_for_base(base, gear=gear,
+                                              quality_index=_MIGRATED_QUALITY,
+                                              item_id=rid, name=name)
+        except ValueError:
+            rec = None
+    flat_left = [s for s in specs if from_of(s) not in covered | plus_labels]
+    forge = rec is not None and not flat_left
+    # The +N moves onto the layer on a forged item and on a weapon (whose shelf record the
+    # attack path reads with its layer, `Actor._crafted_weapon`). Not on a shelf-kept suit:
+    # the layer's +N is an ARMOUR bonus that only the forged armour row folds into the
+    # suit's, and read loose it would be one more armour bonus the suit's own beats — so a
+    # suit that stays on the shelf keeps its +N flat, as it was. Nor on a ring: the book
+    # gives rings no enhancement.
+    if enh and (forge or gear == "weapon"):
+        covered |= plus_labels
+    else:
+        enh = 0
+    legacy = [s for s in specs if from_of(s) not in covered]
+    if legacy:
+        changes.append("Kept as it was (nothing in the new enchanting reads it): "
+                       + "; ".join(effectspec.render(s) for s in legacy) + ".")
+
+    magic: dict = {
+        "schema": magic_layer.SCHEMA, "enhancement": enh, "properties": props,
+        "flat": flat, "powers": powers,
+        "binding": {"quality_index": _MIGRATED_QUALITY, "level": 1, "perks": {},
+                    "migrated": True},
+        # Made or bought before curses existed, and known to whoever has it: nothing to
+        # identify, and no curse question to leave open on the card.
+        "curse": None, "known": {"intent": True, "curse": True, "how": "migrated"},
+        "uses": {}, "made_day": None,
+        "migrated": {"stamp": MIGRATION_STAMP, "from": old, "changes": changes,
+                     "seen": False},
+    }
+    if pending:
+        magic["pending"] = pending
+    used = magic_layer.used(magic_layer.magic_of({"magic": magic}), gear or "wondrous")
+    magic["binding"]["level"] = max(1, magic_layer.CAPACITY_LEVELS_PER_BONUS * used)
+
+    if forge:
+        rec["craft"] = TRACK_ID
+        rec["count"] = int(d.get("count", 1) or 1)
+        rec["magic"] = magic
+        return rec
+    out = copy.deepcopy(d)
+    out["magic"] = magic
+    out["specs"] = legacy
+    out["effects"] = [effectspec.render(s) for s in legacy]
+    # The shelf entry's own `enhancement` and `properties` were display fields nothing
+    # computes from; the layer says them now. A ring's +N is not the layer's (above), so
+    # its number stays where its flat spec still reads it.
+    out["enhancement"] = int(out.get("enhancement") or 0) if not enh else 0
+    out["properties"] = []
+    return out
+
+
+def _recipe_name(recipe_id) -> str:
+    from . import magic_layer
+
+    r = magic_layer.recipe(str(recipe_id or "")) or {}
+    return str(r.get("name") or recipe_id)
+
+
+def _slug(name: str) -> str:
+    out = "".join(c if c.isalnum() else "-" for c in str(name).lower()).strip("-")
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out
+
+
+def undo_migration(record) -> dict | None:
+    """The old record a converted one was made from, while it is still kept."""
+    from . import magic_layer
+
+    got = (magic_layer.magic_of(record).get("migrated") or {}).get("from")
+    return copy.deepcopy(got) if isinstance(got, dict) else None
+
+
+def pending_of(record) -> list[dict]:
+    """The questions a converted item is waiting on, as the page asks them: {"property",
+    "name", "asks", "options", "words"}. `options` are the engine's (lane A's choice lists),
+    so the page offers and never invents; a humanoid or outsider foe also needs a subtype,
+    which is the world's own and typed by the player."""
+    from . import magic_layer
+
+    out = []
+    for p in magic_layer.magic_of(record).get("pending") or ():
+        prop = effectspec.property(str(p.get("id") or ""))
+        if prop is None:
+            continue
+        spec = _choices_for(prop) or {}
+        asks = list(p.get("asks") or ())
+        q = {"property": prop["id"], "name": prop["name"], "asks": asks,
+             "options": spec.get("options") or [], "of": spec.get("of"),
+             "key": spec.get("key")}
+        if "bonus" in asks:
+            q["bonus_values"] = list((prop.get("scaled") or {}).get("values") or ())
+        what = "foe" if spec.get("of") == "creature_type" else (spec.get("key") or "bonus")
+        q["words"] = (f"{prop['name']} on {record.get('name') or 'this item'} never named "
+                      f"its {what}. Choose it and it starts working.")
+        out.append(q)
+    return out
+
+
+def answer_pending(record, property_id: str, answer: dict) -> dict:
+    """A new record with one pending property answered and bound (pure). `answer` is the
+    choice's own keys (`{"foe": "undead"}`, `{"foe": {"subtype": "goblinoid"}}`,
+    `{"skill": "stealth", "bonus": 2}`). Raises ValueError with the engine's sentence for a
+    choice the property would not bind, so a bad answer leaves the question open."""
+    from . import magic_layer
+
+    rec = copy.deepcopy(dict(record or {}))
+    m = rec.get("magic") if isinstance(rec.get("magic"), dict) else {}
+    waiting = list(m.get("pending") or ())
+    pid = str(property_id or "").strip().lower()
+    hit = next((p for p in waiting if str(p.get("id")) == pid), None)
+    if hit is None:
+        raise ValueError(f"{rec.get('name') or 'This item'} is not waiting on {pid!r}.")
+    prop = effectspec.property(pid)
+    if prop is None:
+        raise ValueError(f"There is no magic property {pid!r}.")
+    choice = {k: v for k, v in dict(hit.get("choice") or {}).items() if v not in (None, "", {})}
+    for k, v in dict(answer or {}).items():
+        if isinstance(v, str):
+            v = v.strip().lower()
+        if k == "bonus":
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                pass
+        choice[str(k)] = v
+    problems = effectspec.choice_problems(prop, choice)
+    if problems:
+        raise ValueError("; ".join(problems))
+    entry = {"id": prop["id"], "essence": hit.get("essence"), "choice": choice}
+    key = "flat" if prop.get("gp") is not None else "properties"
+    m[key] = list(m.get(key) or ()) + [entry]
+    m["pending"] = [p for p in waiting if p is not hit]
+    if not m["pending"]:
+        m.pop("pending")
+    note = m.get("migrated")
+    if isinstance(note, dict):
+        line = f"{prop['name']}: you named it — {'; '.join(effectspec.property_lines(prop, choice))}."
+        note["changes"] = [c for c in note.get("changes") or ()
+                           if not str(c).startswith(f"{prop['name']}: waits")] + [line]
+    # The binding still holds what the item now carries (it was made with this property).
+    used = magic_layer.used(magic_layer.magic_of({"magic": m}),
+                            magic_layer.vessel_kind(rec))
+    binding = m.setdefault("binding", {})
+    binding["level"] = max(int(binding.get("level", 1) or 1),
+                           magic_layer.CAPACITY_LEVELS_PER_BONUS * used)
+    rec["magic"] = m
+    return rec
+
+
+def _converted_things(actor):
+    """(where, key, record getter, record setter) for everything the actor carries or wears
+    that was converted: the pack's entries and the worn copies `wear` keeps."""
+    from . import forge_items
+
+    for sid, st in (getattr(actor, "stock", {}) or {}).items():
+        rec = forge_items.record_of(st)
+        if rec is not None:
+            yield f"stock:{sid}", rec, (lambda new, st=st: _put_record(st, new))
+            continue
+        magic = getattr(st, "magic", None)
+        if isinstance(magic, dict) and magic.get("migrated"):
+            yield f"stock:{sid}", st.as_dict(), (lambda new, st=st: setattr(
+                st, "magic", copy.deepcopy(new.get("magic"))))
+    for wk, rec in (getattr(actor, "worn", {}) or {}).items():
+        if isinstance(rec, dict):
+            yield f"worn:{wk}", rec, (lambda new, wk=wk: actor.worn.__setitem__(wk, new))
+
+
+def _put_record(st, new: dict) -> None:
+    rec = getattr(st, "record", None)
+    if isinstance(rec, dict) and "pieces" in rec:
+        rec.clear()
+        rec.update(copy.deepcopy(new))
+    else:
+        st.magic = copy.deepcopy(new.get("magic"))
+
+
+def _same_item(a: dict, b: dict) -> bool:
+    return bool({_norm(a.get("id")), _norm(a.get("name"))} - {""}
+                & {_norm(b.get("id")), _norm(b.get("name"))})
+
+
+def conversions(actor) -> list[dict]:
+    """The one-time notice on the first load after the revamp (owner round 3): every carried
+    or worn item the migration converted and the player has not yet been shown, with what
+    changed, and every question still open. Read by the bench state; a worn copy and its
+    pack entry are one item and listed once. [] for a save with nothing converted."""
+    from . import magic_layer
+
+    out: list[dict] = []
+    seen: list[dict] = []
+    for key, rec, _ in _converted_things(actor):
+        m = magic_layer.magic_of(rec)
+        note = m.get("migrated")
+        if not isinstance(note, dict) or any(_same_item(rec, s) for s in seen):
+            continue
+        questions = pending_of(rec)
+        if note.get("seen") and not questions:
+            continue
+        seen.append(rec)
+        out.append({"key": key, "name": str(rec.get("name") or ""),
+                    "changes": list(note.get("changes") or ()), "questions": questions,
+                    "seen": bool(note.get("seen"))})
+    return out
+
+
+def _each_copy(actor, key: str, change) -> int:
+    """Apply `change(record) -> record` to the item `key` names and to every other copy of
+    the same item (the pack entry and its worn copy). Returns how many were changed."""
+    things = list(_converted_things(actor))
+    target = next((rec for k, rec, _ in things if k == key), None)
+    if target is None:
+        raise ValueError("You are not carrying that.")
+    n = 0
+    for _, rec, put in things:
+        if rec is target or _same_item(rec, target):
+            put(change(copy.deepcopy(rec)))
+            n += 1
+    return n
+
+
+def answer_question(actor, key: str, property_id: str, answer: dict) -> dict:
+    """Answer one converted item's open question, on the pack entry and its worn copy alike.
+    Returns `{"ok": True, "lines": [...]}` (the property's card lines as now bound) or
+    raises ValueError with the sentence to show."""
+    _each_copy(actor, key, lambda rec: answer_pending(rec, property_id, answer))
+    prop = effectspec.property(property_id) or {}
+    rec = next(rec for k, rec, _ in _converted_things(actor) if k == key)
+    from . import magic_layer
+
+    entry = next((e for e in magic_layer.magic_of(rec)["properties"]
+                  + magic_layer.magic_of(rec)["flat"] if e.get("id") == prop.get("id")), {})
+    return {"ok": True, "lines": effectspec.property_lines(prop, entry.get("choice"))
+            if prop else []}
+
+
+def conversion_seen(actor, key: str) -> None:
+    """The notice is shown once: mark it seen (the open questions stay on the item card)."""
+    def mark(rec):
+        m = rec.get("magic") if isinstance(rec.get("magic"), dict) else None
+        if m and isinstance(m.get("migrated"), dict):
+            m["migrated"]["seen"] = True
+        return rec
+
+    _each_copy(actor, key, mark)
+
+
+# =============================================================================================
 # The old shelf library: the /craft/ page's catalogue and the acquisition hub
 # =============================================================================================
 
@@ -2721,7 +3289,9 @@ def obtainable(obtain_kind: str, *, biome: str | None = None,
 
 _register()
 
-__all__ = ["ACQUISITION", "BLANKS", "Chain", "CraftError", "KIND_GLYPH", "Material",
+__all__ = ["ACQUISITION", "BLANKS", "Chain", "CraftError", "KIND_GLYPH", "MIGRATION_STAMP",
+           "Material", "answer_pending", "answer_question", "conversion_seen", "conversions",
+           "is_old_enchanted", "migrate_old_record", "pending_of", "undo_migration",
            "Phial", "StepPlan", "TRACK_ID", "Vessel", "bench_rules", "bound_name",
            "chain_from_body", "check_bonus", "check_terms", "circle_items", "finish",
            "from_dict", "get", "identify_item", "item_card", "materials", "methods_view",

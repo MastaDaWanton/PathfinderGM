@@ -215,23 +215,59 @@ never given the shipped metal's numbers by guess.
 | `play.materials[].quench_mark` | Absent | Quenchants only: one small effect |
 | `play.materials[].forms`, `feeds`, `finishes`, `not_on`, `book`, `assay_danger` | Absent | As `campaign-format.md` describes; all default sensibly, and `book` stays `false` for a world's own metal |
 
-### A world's essences (added 2026-10-05, enchanting lane D)
+### What an enchanter needs from a world (enchanting revamp, lanes B, D and H)
 
-The enchanter binds essences, and a world's own creatures and places are where the found
-ones come from. A world essence is a `play.materials[]` row with `kind` `essence`, shaped
-as `campaign-format.md` ("A world's essences") describes and checked by the same validator
-as the shipped shelf. The owner's rulings that bind it: **phases of the day, never
-planets** ("this is not earth"), so an essence's family favours `dawn`, `morning`, `noon`,
-`afternoon`, `dusk`, `night` or `midnight` and nothing asks the world for a sky; and **its
-tier is its price band**, computed from its motes, never chosen.
+Collected in one place 2026-10-06 (lane H) from what lanes B (the layer and the material
+tag) and D (the essences) asked on 2026-10-05, under the standing instruction that fixes
+are world-agnostic. The enchanter puts a **layer** on an item someone else made, paid for in
+**essences**, and asks of what the item is made of. A world gives all three their names and
+their places; the numbers stay the app's.
+
+The owner's rulings that bind every row: **phases of the day, never planets** ("this is not
+earth"), so an essence's family favours `dawn`, `morning`, `noon`, `afternoon`, `dusk`,
+`night` or `midnight` and **nothing asks the world for a sky**; **an essence's tier is its
+price band**, computed from its motes, never chosen; and **what magic does is the book's**
+(every property is a row of the app's table, `content/rules/magic-properties.json`), so a
+world names which properties its essences and items carry and never invents one.
+
+**What it is made of** (lane B: the material tag, `rules/item_tags.py`). One question,
+"is it metal, and which metal", serves heat metal, the druid's rule and the enchanter's
+surcharges, and it is answered from data, never a name.
 
 | Field | Now | Best shape |
 |---|---|---|
-| `play.materials[]` rows of `kind` `essence` | Absent: every enchanter binds the shipped 92 | One row per essence the world names, `text` in its own words; `from_creature` (the world's creature) or `biomes` (the fourteen terrain words) for where it is found |
-| `.grants` | Absent | A property id from the app's table, an enhancement step, or nothing (a mote supply). Never a new property: what an essence *does* is the book's |
+| `play.materials[].kind` | Absent (the whole of `play.materials[]` is proposed) | The substance for anything a piece can be made of: `metal` or `alloy` (both metal), `hide` or `leather`, `thread` (cord), `wood`, `bone`, `horn`, `cloth`, `stone`, `glass`. A world's "blue iron of the eastern hills" with `kind: "metal"` is metal to every spell that asks. The forge's other kinds (`fuel`, `flux`, `quenchant`, `fitting`, `treatment`) say what it does at the bench, not what it is |
+| `play.materials[].material` on a fitting | Absent | **Required on a fitting** (and any form): the root material it is made of, `"material": "brass"`. A fitting's kind is only "fitting", so this link is the one way the tag learns that "the guild's riveted grips" are brass and metal. Without it the fitting is made of nothing the tag can name, and nothing is guessed |
+| `play.materials[].enchant_surcharge_gp` | Absent | Only for a metal that should resist magic, as the book's cold iron (+2,000 gp the first time a weapon of it is enchanted) and noqual (+5,000) do: the extra gold, which the app turns into motes. Absent is no surcharge |
+
+**Essences** (lane D: `materials.essences()`, checked by `materials.essence_problems`). The
+enchanter binds essences, and a world's own creatures and places are where the found ones
+come from. A world essence is a `play.materials[]` row with `kind` `essence`, shaped as
+`campaign-format.md` ("A world's essences") describes.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.materials[]` rows of `kind` `essence` | Absent: every enchanter binds the shipped 93 | One row per essence the world names, `text` in its own words; `from_creature` (the world's creature) or `biomes` (the fourteen terrain words) for where it is found. **Ids are forever**: a bound item names its essence by id and reads its top-ups live from it |
+| `.grants` | Absent | A property id from the app's table (with its `choice` when it asks one, `{"energy": "fire"}`, and a `bonus` for a scaled one), an enhancement step 1 to 5, or nothing (a mote supply). Never a new property |
 | `.motes`, `.tier`, `.price_gp` | Absent | Computed by the app's rules (`materials.grant_motes`, `essence_tier`): World Bible may run them before export or leave `tier` and `price_gp` out for the app to refuse with the fix named; never a guessed number |
-| `.family`, `.phase` | Absent | A shipped family, or the world's own with its own `phase` |
-| `.house`, `.working`, `.affinity`, `.color` | Absent | As the shipped rows: at least one small typed top-up inside the tier's ceiling |
+| `.family`, `.phase` | Absent | A shipped family (`fire`, `cold`, `holy`, `shadow`...), whose phase is taken from the app; or the world's own family, which **must** name its own `phase` |
+| `.polarity` | Absent | Where it wants to sit: `weapon`, `armour`, `ward` (rings, cloaks, belts) or `any` |
+| `.house` | Absent | The essence's own small flavour on top of the book: at least one typed top-up, each `"house": true`, inside the tier's ceiling (common and uncommon ±1, rare and exotic ±2, legendary ±3), drawbacks included. Never `narrative`, never one of the magic-item types still waiting on a reader. Scaled at bind time by the binding's quality, read live |
+| `.working`, `.affinity`, `.color` | Absent | As the shipped rows: circle traits (`night_only`, `eager`, `skittish`, `heavy`, `volatile`, `pure`), the material ids that suit it, the glow on the stage |
+| creature harvest tags | Absent | The leatherworker's harvest tags extended to essences (`harvest.essence.fire` on a world's fire creature), so a slain creature yields its family's essence by the same reader. No reader yet |
+
+**A world's own named magic items** (lane H). An heirloom blade, the ring every reeve
+wears: `play.magic_items[]` in `campaign-format.md`, shaped as the app stores an enchanted
+item — a table `base`, optional `pieces` from the world's materials, and a `magic` block of
+**ids and choices only** (enhancement, properties by id, recipe powers, an optional curse),
+with `owner_id` or `where_id`. No reader yet.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.magic_items[]` | Absent: a world's named magic items exist only in prose | One row per item the world names, its `text` the world's own sentence; never a number |
+| `.magic.properties[].choice` | Absent | **Every choice named**: bane's foe (a creature type, or the world's own subtype as `{"subtype": ...}`), resistance's energy, skill competence's skill and bonus. Learned 2026-10-06 converting old saves: the old catalogue's bane never named its foe, every reader applied it to every creature, and the conversion now has to stop and ask the player. An export can simply say |
+| `.magic.curse` | Absent | A row of the book's curse table (`content/rules/curses.json`, the owner's dropped rows excluded), hidden until identified. Optional |
+| knowledge chain | Absent | The item's history as questions a player can learn by study (plan §12.3, Earthdawn's thread items). Not designed yet; nothing should be exported for it before the app says how |
 
 ### What a trade keeps on its counter
 
