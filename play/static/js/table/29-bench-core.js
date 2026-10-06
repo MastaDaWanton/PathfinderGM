@@ -632,6 +632,10 @@
         (f.place ? '<span class="bf-place">' + esc(f.place) + '</span>' : "") +
         '<span class="bf-track" role="group" aria-label="' + esc(f.trackLabel || "") + '">' + prog + '</span>' + picks +
         '<span class="bf-gap"></span>' + (f.buttons || "") +
+        // In progress, in every bench's footer and drawn by its own file (37-works.js), so
+        // each bench has it without naming it and its count is the one the table's door
+        // shows (enchanting UI plan §6.10). Absent when 37 is not on the page.
+        (window.Works && typeof Works.footButton === "function" ? Works.footButton() : "") +
         '<button type="button" class="bf-btn bf-steady" role="switch" aria-checked="' + steady +
         '" data-bench-steady>Steady mode<span class="bf-switch" aria-hidden="true"></span></button>';
     };

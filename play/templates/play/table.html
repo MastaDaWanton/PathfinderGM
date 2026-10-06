@@ -3174,6 +3174,9 @@
      U3's, named only once it is in the build, by the same "?v=" test. -->
 <link rel="stylesheet" href="{% asset 'css/forge.css' %}">
 {% asset 'css/forge-games.css' as forge_games_css %}{% if '?v=' in forge_games_css %}<link rel="stylesheet" href="{% asset 'css/forge-games.css' %}">{% endif %}
+<!-- In progress (37-works.js), after bench.css: its rows reuse the bench's icons and
+     skeleton bars, and inside a bench it sits in the bench's own popover host. -->
+<link rel="stylesheet" href="{% asset 'css/works.css' %}">
 <script src="{% static 'js/dice3d.js' %}"></script>
 <!-- App-wide preferences and sound (Lane G), early and after the dice, so every later
      script can read them. Guarded the same way as bench-games.css above. -->
@@ -3904,6 +3907,10 @@ one printed itself at the foot of the table (seen live, 2026-10-02).{% endcommen
 <script src="{% asset 'js/table/34-bench-tag.js' %}"></script>
 <script src="{% asset 'js/table/35-bench-herbarium.js' %}"></script>
 <script src="{% asset 'js/table/36-bench-perks.js' %}"></script>
+{% comment %}In progress (enchanting lane U4, contracts §13): every craft's unfinished work,
+the left column's door, every bench footer's button and each shelf's group. After the herb
+bench, before the forge; both benches look it up when they draw.{% endcomment %}
+<script src="{% asset 'js/table/37-works.js' %}"></script>
 <!-- The forge (docs/blacksmithing-contracts.md §10): its icon art with the content stamp,
      a registry of its own beside BENCH_ICON_URLS (whose 46 herb names bench-icons.js pins);
      lane U4's stage parts and adapter; then 40 to 44 in number order. 42 (lane U4) is an

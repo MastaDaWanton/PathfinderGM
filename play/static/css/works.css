@@ -1,0 +1,125 @@
+/* In progress (37-works.js; enchanting UI plan §6.10): every craft's unfinished work.
+
+   A REDESIGN THAT KEEPS THE LOOK (the owner's standing instruction for UI work). No new
+   colour, font or texture: every value is a theme-v2.css token, and the surfaces are the
+   ones the benches already use. The panel is the benches' framed card (v2-framed
+   v2-card-leather, the confirm's and the herbarium card's); its buttons are v2-btn; the
+   count on a door is the theme's gilt `v2-count`; a row reuses the bench's icon disc and
+   skeleton bars. Gold is the one accent and it marks only what can be done now: a Collect
+   at hand, and the count of what is ready.
+
+   THE LAYERS. Over the table the panel stands at 34: over the table's popovers (30), under
+   the bench layers (35), the deathveil (40) and the dice mat (60). Inside a bench it is in
+   the bench's own popover host and orders only within it (6 to 9, as the bench's cards).
+
+   MOTION. A door that gains a ready count glints once (600ms, opacity of a pseudo-element);
+   a refused Collect nudges its reason (200ms). Nothing loops and nothing ticks: the
+   countdowns change when the game clock does. Under reduced motion, or the bench's Short
+   flourishes, neither runs and the gilt count alone says it. */
+
+.works {
+  position: fixed; z-index: 34; left: 16px; top: 72px;
+  width: 380px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px);
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 22px 22px 16px; border-radius: 3px;
+  color: var(--ink); font: 16px/1.5 var(--body);
+  box-shadow: var(--sh-3), var(--ring-cast);
+}
+.works[hidden] { display: none; }
+.works *, .works *::before, .works *::after { box-sizing: border-box; }
+/* The framed card's ring is drawn over the surface (z 2); what is in it stands at 1. */
+.works > :not(.v2-rim) { position: relative; z-index: 1; }
+.works :focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+
+/* Inside a bench: on the right, above the footer, where the footer's button is. */
+.works.is-in-bench {
+  position: absolute; z-index: 8; left: auto; top: auto; right: 28px; bottom: 66px;
+  max-height: calc(100% - 144px);
+}
+
+.wk-head { display: flex; align-items: center; gap: 12px; }
+.wk-title {
+  margin: 0; flex: 1; color: var(--gold); font: 400 21px/1.2 var(--display);
+  letter-spacing: .05em; font-variant: small-caps; text-shadow: var(--engraved);
+}
+/* The list scrolls inside; the framed card itself never does, or its clasps are cut. */
+.wk-body { min-height: 0; overflow-y: auto; margin: 0 -10px; padding: 0 10px 4px;
+           scrollbar-color: var(--gold-dim) transparent; scrollbar-width: thin; }
+.wk-part + .wk-part { margin-top: 14px; }
+.wk-ph, .wk-group .bs-gh { margin: 0 0 4px; color: var(--dim); font: 400 13px/1.4 var(--body); }
+.wk-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.wk-state { padding: 8px 2px 4px; }
+.wk-state p { margin: 0 0 10px; }
+.wk-detail { color: var(--dim); font-size: 13px; }
+.wk-said { margin: 0; min-height: 0; color: var(--ink); font-size: 14px; }
+.wk-said:empty { display: none; }
+
+/* A row: icon, the name with what is done and where, the dial with the countdown on the
+   right; the action under the words. Separated by space, not rules (a list of a few). */
+.wk-row {
+  position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto;
+  column-gap: 10px; row-gap: 6px; align-items: start;
+  padding: 8px 8px 8px 6px; border-radius: 3px;
+}
+.wk-row.is-ready { background: rgba(255, 225, 170, .04); box-shadow: inset 2px 0 0 var(--gold-dim); }
+.wk-icon { display: grid; place-items: center; padding-top: 2px; }
+.wk-main { display: grid; gap: 1px; min-width: 0; }
+.wk-name { font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+.wk-where { font-size: 13px; line-height: 1.3; color: var(--dim); }
+.wk-time { padding-top: 2px; }
+.wk-left { margin-top: 3px; font-size: 14px; line-height: 1.3; color: var(--ink);
+           font-variant-numeric: lining-nums tabular-nums; }
+.wk-row.is-ready .wk-left { color: var(--gold); }
+.wk-when { font-size: 12px; line-height: 1.3; color: var(--dim); }
+
+/* The arc dial: a hairline groove and the brass arc of the time gone (no filled track). */
+.wk-dial { width: 26px; height: 26px; display: block; }
+.wk-dial circle { fill: none; }
+.wk-dial-rim { stroke: var(--edge); stroke-width: 1.5; }
+.wk-dial-arc { stroke: var(--gold-dim); stroke-width: 3; stroke-linecap: round; }
+.wk-row.is-ready .wk-dial-arc { stroke: var(--gold); }
+
+.wk-acts { grid-column: 2 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wk-why { font-size: 13px; line-height: 1.3; color: var(--ink); }
+.wk-why.is-nudged { animation: wk-nudge .2s ease-out; }
+.wk-confirm { grid-column: 2 / -1; display: grid; gap: 8px; }
+.wk-q { margin: 0; font-size: 14px; border-left: 3px solid var(--alarm); padding-left: 10px; }
+.wk-q span { color: var(--dim); }
+.works .wk-danger, .wk-group .wk-danger { border-color: var(--alarm); }
+.wk-row [aria-busy="true"] { opacity: .6; }
+.wk-row.is-skel { grid-template-columns: 34px minmax(0, 1fr); }
+
+/* On a shelf (the satchel's 300px column): the same row, a little tighter. */
+.wk-group .wk-row { padding: 6px; }
+
+/* --- the count on the door and the footer button ---------------------------------------- */
+.wk-door { position: relative; }
+.wk-count { display: inline-flex; align-items: center; }
+.wk-count:empty { display: none; }
+.wk-count .wk-working { color: var(--dim); font: 400 13px/1 var(--body); letter-spacing: 0;
+                        font-variant: normal; text-shadow: none; }
+.wk-count .v2-count { font-variant: normal; letter-spacing: 0; text-shadow: none; }
+.wk-foot .wk-count .v2-count { font-size: 12px; }
+/* One glint when something becomes ready: the gilt edge lit, once. */
+[data-works-open]::after {
+  content: ""; position: absolute; inset: -1px; border-radius: 3px; pointer-events: none; opacity: 0;
+  box-shadow: inset 0 0 0 1px var(--gold), 0 0 16px rgba(var(--ember), .35);
+}
+[data-works-open].wk-new::after { animation: wk-glint .6s ease-out; }
+.bench .wk-foot { position: relative; }
+
+@keyframes wk-glint { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes wk-nudge { 0% { transform: translateX(0); } 40% { transform: translateX(3px); } 100% { transform: translateX(0); } }
+
+/* A phone: the width of the screen, 8px from its edges, wherever it was opened. */
+@media (max-width: 760px) {
+  .works, .works.is-in-bench {
+    position: fixed; left: 8px; right: 8px; top: 8px; bottom: auto;
+    width: auto; max-width: none; max-height: calc(100dvh - 16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-works-open].wk-new::after, .wk-why.is-nudged { animation: none; }
+}
+.bench.bench-still [data-works-open].wk-new::after, .bench.bench-still .wk-why.is-nudged { animation: none; }

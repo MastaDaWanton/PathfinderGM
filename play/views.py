@@ -685,7 +685,20 @@ def _state(c) -> dict:
         "spellcasting": _spellcasting_state(pc),
         # The start this campaign opened with (C): its id, kind and hand-off.
         "start": _start_state(c.scene),
+        # In progress (docs/enchanting-contracts.md §8.2): the door's count, `{ready,
+        # working, next}`, so the table's In progress door says "1 ready" the moment a
+        # turn's state lands, without a fetch of its own. The rows themselves are
+        # `GET api/works`, asked only while the panel or a bench's group is on screen.
+        "works": _works_summary(c, pc),
     }
+
+
+def _works_summary(c, pc) -> dict | None:
+    if pc is None:
+        return None
+    from rules import inprogress
+
+    return inprogress.summary(pc, int(c.scene.clock_minutes or 0))
 
 
 _TELL_NUMBERS = re.compile(r"\s*\((?=[^)]*\d)[^()]*(?:\([^()]*\)[^()]*)*\)")

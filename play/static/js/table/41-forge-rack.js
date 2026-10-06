@@ -150,11 +150,17 @@
       });
     }
     if (!html) html = '<div class="bs-state"><p>Nothing on your rack matches "' + esc(find) + '".</p></div>';
+    // The shared In progress group (37-works.js), the smith's rows only, at the foot. No
+    // forge work goes into progress yet (every step finishes on the anvil), so it draws
+    // nothing today; it is here so the first smithing work that takes days (a long cure, a
+    // commission left at a smithy) has its countdown and Collect without touching the rack.
+    html += '<div class="wk-host" id="forge-works"></div>';
     var had = document.activeElement && list.contains(document.activeElement) ? document.activeElement : null;
     var hadKey = had ? (had.dataset.add || had.dataset.for) : null;
     var hadInfo = had && had.classList.contains("bt-info");
     var scroll = list.scrollTop;
     list.innerHTML = html;
+    works();
     list.scrollTop = scroll;
     rove();
     if (F.landed && Date.now() < F.landed.until) {
@@ -167,6 +173,18 @@
     }
   }
   F.drawRack = draw;
+
+  // The group, drawn from the rows the section last sent and asked again when the forge's
+  // clock has turned (every step passes time), so a countdown here moves on game time.
+  function works() {
+    var W = window.Works, host = document.getElementById("forge-works");
+    if (!W || !host) return;
+    W.group(host, "blacksmith");
+    var clock = F.state && F.state.clock;
+    W.sync("forge|" + (clock && clock.minute != null ? clock.minute : ""));
+  }
+  document.addEventListener("works:collected", function () { if (F.open) F.refresh(); });
+  document.addEventListener("works:stopped", function () { if (F.open) F.refresh(); });
 
   // One Tab stop for the whole list (a roving tabindex), as the satchel: ↑ and ↓ walk it.
   var roveKey = null;

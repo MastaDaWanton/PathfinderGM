@@ -22,14 +22,20 @@
 
   // The groups, in the order a herbalist works (UI plan §6.2), headed in plain sentence
   // case: no uppercase tracked labels.
+  // A jar put up to steep is not on this list: it is In progress until it is collected
+  // (the owner's ruling, rules/inprogress.py), and sits in the shared In progress group at
+  // the foot (37-works.js, `Works.group`), with the section's own countdown and Collect.
+  // Until 2026-10-05 it was this file's own "Steeping" group, with a countdown worked out
+  // here from `ready_at` and no Collect at all: a finished jar said "ready now" and could
+  // be neither used nor taken out (lane G's report; no Collect button anywhere).
   var GROUPS = ["Fresh herbs", "Dried", "Powders", "Oils", "Bases", "Liquids", "Monster parts",
-                "Crafted", "Steeping"];
+                "Crafted"];
   var BEAST = { gland: 1, organ: 1, bone: 1, horn: 1, feather: 1, scale: 1, eye: 1, shell: 1 };
   var SHOWS = [["fits", "What fits"], ["all", "Everything I carry"], ["crafted", "Crafted"]];
   var show = "fits", find = "";
 
+  function held(it) { return it.ready_at != null; }
   function groupOf(it) {
-    if (it.ready_at != null) return "Steeping";
     if (it.form === "infused-oil" || it.part === "oil") return "Oils";
     if (it.form === "salve-base" || it.part === "wax") return "Bases";
     if (it.crafted) return "Crafted";
@@ -65,20 +71,15 @@
     var dim = !!why;
     var badges = [];
     if (it.state && it.state !== "raw") badges.push(it.state);
-    if (it.crafted && it.form && it.ready_at == null) badges.push(it.form.replace("-", " "));
+    if (it.crafted && it.form) badges.push(it.form.replace("-", " "));
     if (it.quality_name) badges.push(it.quality_name);
     var lines = [];
-    var g = B.state && B.state.ground;
-    if (it.ready_at != null) {
-      var wait = g && typeof g.minute === "number" ? it.ready_at - g.minute : null;
-      lines.push('<span class="bt-time">' + (wait != null && wait <= 0 ? "ready now" :
-        "ready in " + esc(B.span(wait == null ? 0 : wait))) + '</span>');
-    } else if (it.spoils_in != null && it.spoils_in <= 1440) {
+    if (it.spoils_in != null && it.spoils_in <= 1440) {
       lines.push('<span class="bt-time is-soon">spoils in ' + esc(B.span(it.spoils_in)) + '</span>');
     }
     if (dim) lines.push('<span class="bt-why" id="bt-why-' + esc(it.key) + '">' + esc(why) + '</span>');
     var herb = it.ingredient_id && !it.crafted;
-    var glyph = it.ready_at != null ? "steeping" : (it.form || it.part || it.kind || "leaf");
+    var glyph = it.form || it.part || it.kind || "leaf";
     var icon = window.BenchIcons ? BenchIcons.html(glyph,
                                                     { size: 30, tier: it.tier, label: it.name }) : "";
     var unknown = it.unknown > 0;
@@ -123,7 +124,9 @@
         '<button type="button" class="v2-btn is-small" data-bench-forage>Forage here</button></div>';
       return;
     }
-    var shown = all.filter(function (it) { return !find || it.name.toLowerCase().indexOf(find) >= 0; });
+    // In progress is not the satchel's: those jars are drawn by the shared group below.
+    var free = all.filter(function (it) { return !held(it); });
+    var shown = free.filter(function (it) { return !find || it.name.toLowerCase().indexOf(find) >= 0; });
     var why = function (it) { return B.why(it.key); };
     var html = "";
     var byGroup = function (items, whyOf) {
@@ -134,28 +137,28 @@
       return out;
     };
     if (show === "crafted") {
-      html = byGroup(shown.filter(function (it) { return it.crafted || it.ready_at != null; }), why);
-      if (!html) html = '<div class="bs-state"><p>Nothing crafted yet.</p></div>';
+      html = byGroup(shown.filter(function (it) { return it.crafted; }), why);
+      if (!html && !find) html = '<div class="bs-state"><p>Nothing crafted yet.</p></div>';
     } else if (show === "all") {
       html = byGroup(shown, why);
     } else {
       // What fits first, by kind; then everything that cannot go on the tool now, each
-      // with its reason; then the jars still steeping.
-      var steeping = shown.filter(function (it) { return it.ready_at != null; });
-      var rest = shown.filter(function (it) { return it.ready_at == null; });
-      var fits = rest.filter(function (it) { return !why(it); });
-      var not = rest.filter(function (it) { return !!why(it); });
+      // with its reason; then (below) what is in progress.
+      var fits = shown.filter(function (it) { return !why(it); });
+      var not = shown.filter(function (it) { return !!why(it); });
       var m = B.pot.method;
-      if (!fits.length && m) {
+      if (!fits.length && m && free.length) {
         html += '<div class="bs-state"><p>Nothing you carry can be ' + esc(B.DONE[m]) + '.</p>' +
           '<div class="bs-acts"><button type="button" class="v2-btn is-small" data-bench-forage>Forage here</button>' +
           '<button type="button" class="v2-btn is-small is-quiet" data-bench-everything>Everything I carry</button></div></div>';
       }
       html += byGroup(fits, why);
       html += group("Can't use now", not, why);
-      html += group("Steeping", steeping, why);
     }
-    if (!html) html = '<div class="bs-state"><p>Nothing in your satchel matches "' + esc(find) + '".</p></div>';
+    if (!html && find) html = '<div class="bs-state"><p>Nothing in your satchel matches "' + esc(find) + '".</p></div>';
+    else if (!html && !free.length) html = '<div class="bs-state"><p>Everything you carry is in progress.</p></div>';
+    // The shared In progress group (37-works.js), this craft's rows only, at the foot.
+    html += '<div class="wk-host" id="bench-works"></div>';
     // Keep the keyboard where it was: a redraw replaces the rows, so the focused row is
     // found again by its key.
     var had = document.activeElement && list.contains(document.activeElement) ? document.activeElement : null;
@@ -163,6 +166,7 @@
     var hadInfo = had && had.classList.contains("bt-info");
     var scroll = list.scrollTop;
     list.innerHTML = html;
+    works(all);
     list.scrollTop = scroll;
     rove();
     if (B.landed && Date.now() < B.landed.until) {
@@ -175,6 +179,37 @@
     }
   }
   function cssEsc(s) { return window.CSS && CSS.escape ? CSS.escape(s) : String(s); }
+
+  // The group is drawn from the rows the section last sent, and asked again when the clock
+  // has turned or what is in progress has changed (a jar put up, one collected): every step
+  // at the bench passes time, so the countdown moves with each one, on game time.
+  function works(all) {
+    var W = window.Works, host = document.getElementById("bench-works");
+    if (!W || !host) return;
+    W.group(host, "herbalist");
+    var clock = B.state && B.state.clock;
+    var keys = all.filter(held).map(function (it) { return it.key + ":" + (it.work_state || ""); }).join(",");
+    W.sync("bench|" + (clock && clock.minute != null ? clock.minute : "") + "|" + keys);
+  }
+  // A jar collected from the group comes back onto the shelf as the tincture it always was:
+  // the satchel is read again and the row it landed on pulses, as a finished step's does.
+  document.addEventListener("works:collected", function (e) {
+    if (!B.open) return;
+    var made = e.detail && e.detail.product;
+    Promise.resolve(B.refresh()).then(function () {
+      if (!made || !made.key) return;
+      B.landed = { key: made.key, until: Date.now() + 1400 };
+      draw();
+      var tile = list.querySelector('.bt[data-key="' + cssEsc(made.key) + '"]');
+      if (tile && tile.scrollIntoView) tile.scrollIntoView({ block: "nearest" });
+      // The Collect pressed has gone with its row; the keyboard goes where the jar went,
+      // not to <body>.
+      var add = tile && tile.querySelector(".bt-add");
+      var at = document.activeElement;
+      if (add && (!at || at === document.body || !document.contains(at))) add.focus();
+    });
+  });
+  document.addEventListener("works:stopped", function () { if (B.open) B.refresh(); });
 
   // One Tab stop for the whole list (a roving tabindex): the row last visited, else the
   // first, and its "?". ↑ and ↓ walk the rows. Without it every row was two Tab stops: 26
