@@ -269,6 +269,12 @@ STEP_MP = 1                 # each successful step, +1 per rarity band above com
 QUALITY_MP = {3: 1, 4: 2}   # Superior +1; Flawless *or higher* +2 (index 4 and up)
 FIRST_MP = 3                # a first: a property learned, a product type, a new herb
 MANUAL_MP = 5               # an unread herbalism manual, once per manual
+# Studying a material (an assay, a read, a teacher's lesson): 1 for each property it
+# turns up, 0 when it finds nothing. Owner, 2026-10-06: "studying materials should give
+# you 1 point and 0 if you dont find anything. I had made almost nothing and was level 5
+# blacksmithing", then "1 for each property it finds is okay" — each revealed property
+# had paid FIRST_MP (3), so one assay that turned up three properties paid 9.
+STUDY_MP = 1
 
 # The stamp `migrate_herbalist` writes. 0 is every save from before the revamp.
 HERBALISM_SCHEMA = 2

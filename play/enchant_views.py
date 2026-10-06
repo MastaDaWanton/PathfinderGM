@@ -569,9 +569,11 @@ def enchant_read(request):
     for k in got.get("revealed") or []:
         words = en.trait_words(doc, k)
         found.append({"key": k, "text": words})
+    for f in found:
+        # A point for each trait the read turned up (`worldclass.STUDY_MP`).
         lines += list(worldclass.award_bonus(worldclass.get(TRACK_ID), progress,
-                                             why=f"learned: {ph.name}, {words}",
-                                             mp=worldclass.FIRST_MP).get("reasons") or [])
+                                             why=f"studied {ph.name}: {f['text']}",
+                                             mp=worldclass.STUDY_MP).get("reasons") or [])
     danger = got.get("danger")
     applied = en.apply_read_danger(engine, pc, ph.id, danger)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
