@@ -1142,6 +1142,25 @@ def sheet(request):
     return JsonResponse(_sheet_payload(pc))
 
 
+def _in_the_moment():
+    """The scene's moment for whatever the page reads (`sheet.situated`): a curse that
+    holds only by night, or only underground, reads the clock and the place from it.
+    Without one the facts are unknown and the curse fails closed, so the Sheet and
+    Equipment tabs showed a night-only blade without its magic even at midnight while
+    the same blade struck with it (lane C2, 2026-10-06)."""
+    from rules.sheet import situated
+
+    return situated(campaign_mod.current().scene)
+
+
+def _sheet_now(pc) -> dict:
+    """`full_sheet`, read in the scene's moment (`_in_the_moment`)."""
+    from rules.sheet import full_sheet
+
+    with _in_the_moment():
+        return full_sheet(pc)
+
+
 def _sheet_payload(pc) -> dict:
     """`full_sheet`, plus the Equipment tab's one list of everything carried.
 
@@ -1150,10 +1169,10 @@ def _sheet_payload(pc) -> dict:
     list: `/api/use` returning the bare `full_sheet` would have emptied the page the
     moment a jar was drunk from it."""
     from rules import gear as gear_mod
-    from rules.sheet import full_sheet
 
-    out = full_sheet(pc)
-    out["equipment"]["carried"] = _carried(pc)
+    out = _sheet_now(pc)
+    with _in_the_moment():
+        out["equipment"]["carried"] = _carried(pc)
     # What is carried against what can be (CRB Table 7-4), with the backpack's +1 Str
     # (content/rules/gear.json). Shown, not enforced: encumbrance is the owner's later
     # batch (E9), and the Equipment tab says so in words.
@@ -1871,7 +1890,6 @@ def level_take_feats(request):
     bonus-feat list — every reason refused at once and nothing written unless all pass.
     """
     from rules import leveling
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -1892,7 +1910,7 @@ def level_take_feats(request):
     if c.character_id:
         roster.record(c.character_id, pc)
     c.save()
-    return JsonResponse({**full_sheet(pc), "taken": added})
+    return JsonResponse({**_sheet_now(pc), "taken": added})
 
 
 @require_POST
@@ -1903,7 +1921,6 @@ def level_take_points(request):
     earned. Both of a house rule's points may land on one score.
     """
     from rules import leveling
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -1923,7 +1940,7 @@ def level_take_points(request):
     if c.character_id:
         roster.record(c.character_id, pc)
     c.save()
-    return JsonResponse({**full_sheet(pc), "raised": changes})
+    return JsonResponse({**_sheet_now(pc), "raised": changes})
 
 
 def _level_write(c, pc, said: str):
@@ -1944,7 +1961,6 @@ def level_take_skills(request):
     the ranks held (`leveling.skill_ranks`); no skill above the character's level.
     """
     from rules import leveling
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -1957,7 +1973,7 @@ def level_take_skills(request):
                             status=400)
     _level_write(c, pc, f"{pc.name} trains: " + ", ".join(
         f"{k.title()} to {v} rank{'s' if v != 1 else ''}" for k, v in placed.items()) + ".")
-    return JsonResponse({**full_sheet(pc), "placed": placed})
+    return JsonResponse({**_sheet_now(pc), "placed": placed})
 
 
 @require_GET
@@ -1983,7 +1999,6 @@ def level_take_choice(request):
     (`classes.take_choice`). A companion chosen here arrives at once.
     """
     from rules import animal_companion, classes as classes_mod
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -2002,7 +2017,7 @@ def level_take_choice(request):
         said += f" {came.name} joins {pc.name}."
     pc.rebuild_pools()
     _level_write(c, pc, said)
-    return JsonResponse({**full_sheet(pc), "taken": taken})
+    return JsonResponse({**_sheet_now(pc), "taken": taken})
 
 
 @require_POST
@@ -2010,7 +2025,6 @@ def level_take_path(request):
     """Follow Blood Bending's second path once its track opens: `{"path": "..."}`
     (audit D8 — nothing offered Path B after the forge)."""
     from rules import leveling
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -2022,7 +2036,7 @@ def level_take_path(request):
                             status=400)
     pc.rebuild_pools()
     _level_write(c, pc, f"{pc.name} follows a second path: {path} (Path B).")
-    return JsonResponse({**full_sheet(pc), "path": path})
+    return JsonResponse({**_sheet_now(pc), "path": path})
 
 
 @require_GET
@@ -2075,7 +2089,6 @@ def prepare_spells(request):
     and fail only when they reached for it in a fight.
     """
     from rules import casting, spells as spells_mod
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -2112,7 +2125,7 @@ def prepare_spells(request):
         else:
             casting.unprepare(pc, key, count)
         c.save()
-        return JsonResponse(full_sheet(pc))
+        return JsonResponse(_sheet_now(pc))
 
     level = casting.spell_level_for(pc, spell)
     if action in ("prepare", "learn"):
@@ -2178,7 +2191,7 @@ def prepare_spells(request):
         casting.remember_loadout(pc)
 
     c.save()
-    return JsonResponse(full_sheet(pc))
+    return JsonResponse(_sheet_now(pc))
 
 
 @require_GET
@@ -2213,7 +2226,6 @@ def learn_spells(request):
     named, and nothing written unless all of them pass.
     """
     from rules import casting
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -2237,7 +2249,7 @@ def learn_spells(request):
     if c.character_id:
         roster.record(c.character_id, pc)
     c.save()
-    return JsonResponse({**full_sheet(pc), "learned": added})
+    return JsonResponse({**_sheet_now(pc), "learned": added})
 
 
 def swap_spell(request):
@@ -2250,7 +2262,6 @@ def swap_spell(request):
     and nothing is written unless every check passes.
     """
     from rules import casting, spells as spells_mod
-    from rules.sheet import full_sheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -2284,7 +2295,7 @@ def swap_spell(request):
     if c.character_id:
         roster.record(c.character_id, pc)
     c.save()
-    return JsonResponse(full_sheet(pc))
+    return JsonResponse(_sheet_now(pc))
 
 
 # What the Continue button sends. Written as an instruction to the GM rather than as

@@ -635,3 +635,24 @@ def test_a_build_is_kept_for_the_batch_and_rebuilt_when_the_record_changes():
         rec["magic"]["uses"] = {"x": 1}
         assert built(rec) is not a
     assert built(rec) is not built(rec)                     # no moment, nothing kept
+
+
+def test_the_sheet_the_page_reads_knows_the_hour(monkeypatch):
+    """Lane C2's ask: the Sheet and Equipment tabs built `full_sheet(pc)` outside any
+    moment, so every situation fact read there was unknown and a night-only blade's
+    curse failed closed even at midnight, while the same blade struck with its magic.
+    Every sheet the page gets is now built inside the scene's moment."""
+    from types import SimpleNamespace
+
+    from play import views
+    from rules import sheet as sheet_mod
+
+    s, e, pc = _armed_with(_cursed("nightblade", NIGHT))
+    s.clock_minutes = 23 * 60 + 30
+    monkeypatch.setattr(views.campaign_mod, "current", lambda: SimpleNamespace(scene=s))
+    seen = []
+    monkeypatch.setattr(sheet_mod, "full_sheet",
+                        lambda actor: seen.append(sheet_mod._MOMENT.get()) or {})
+    views._sheet_now(pc)
+    assert seen and seen[0] is not None and seen[0].scene is s
+    assert Situation(pc, seen[0].scene).fact("day_phase") == "midnight"
