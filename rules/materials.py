@@ -181,7 +181,35 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "from_creatures": [str(c).lower() for c in _list(raw.get("from_creatures"))],
         "weight_factor": float(raw.get("weight_factor", 1.0) or 1.0),
         "effects": [dict(e) for e in _list(raw.get("effects")) if isinstance(e, dict)],
+        # The enchanter's fields (enchanting contracts §5), defaulted on every entry so a
+        # reader never has to ask which shelf a document came from. Read by the essence
+        # door below; meaningless (and empty) on a metal.
+        "grants": dict(raw["grants"]) if isinstance(raw.get("grants"), dict) else None,
+        "motes": _int(raw.get("motes")),
+        "family": str(raw.get("family") or ""),
+        "phase": str(raw.get("phase") or "").strip().lower(),
+        "polarity": str(raw.get("polarity") or ""),
+        "affinity": [str(a).strip().lower() for a in _list(raw.get("affinity"))],
+        "house": [dict(e) for e in _list(raw.get("house")) if isinstance(e, dict)],
+        "color": str(raw.get("color") or ""),
+        # A shelf entry kept loadable (old saves name it) but never offered: the vessel
+        # entries, now that a vessel is a real record (enchanting plan §7.3).
+        "retired": bool(raw.get("retired", False)),
+        # The pre-revamp enchanter's fields, passed through for `rules/enchanter.py` until
+        # lane E's bench moves to the fields above.
+        "prefers": str(raw.get("prefers") or ""),
+        "plus": _int(raw.get("plus")),
+        "adjective": str(raw.get("adjective") or ""),
+        "binds_at": str(raw.get("binds_at") or ""),
+        "drawbacks": [dict(e) for e in _list(raw.get("drawbacks")) if isinstance(e, dict)],
     }
+
+
+def _int(value) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 # The cache is keyed on *which* homebrew it read and what that homebrew looked like, so it
@@ -226,6 +254,14 @@ def _load() -> dict[str, dict]:
                 raw[key] = merged
                 stems.setdefault(key, "")
     docs = {k: normalise({**v, "id": k}, stems.get(k, "")) for k, v in raw.items()}
+    # An essence's phase is its family's (the owner's ruling: "each essence family names
+    # its phase"), so it is filled from the family table here and never needs writing
+    # twice. An essence of a family the table does not know keeps its own, which is how a
+    # world's own essence (World Bible) names a phase for a family nobody shipped.
+    fams = _families_raw()
+    for doc in docs.values():
+        if doc["kind"] == "essence" and not doc["phase"]:
+            doc["phase"] = str((fams.get(doc["family"]) or {}).get("phase") or "")
     # Each parent lists the shelves it appears on: "ore:mithral-ore",
     # "catalyst:mithral-dust", "fitting:mithral-fittings". Computed, never stored.
     for mid, doc in docs.items():
@@ -379,7 +415,11 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
     """
     if "pieces" not in doc or not isinstance(doc.get("pieces"), dict) \
             or "catalogue" not in doc:
-        doc = normalise(doc, doc.get("catalogue", FORGE_CATALOGUE))
+        default = ENCHANT_CATALOGUE if doc.get("kind") == "essence" else FORGE_CATALOGUE
+        doc = normalise(doc, doc.get("catalogue", default))
+        if doc["kind"] == "essence" and not doc["phase"]:
+            doc["phase"] = str((_families_raw().get(doc["family"]) or {}).get("phase")
+                               or "")
     mid = doc.get("id") or "?"
     out: list[str] = []
     known = shelf
@@ -402,6 +442,9 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
         if known is not None and doc["material"] not in known:
             say(f"names {doc['material']!r} as its material, and no material has that id. "
                 f"Point it at a real parent or remove the field.")
+    if doc.get("kind") == "essence" and not is_forge(doc):
+        out.extend(essence_problems(doc, shelf=known))
+        return out
     if not is_forge(doc):
         return out
 
@@ -591,4 +634,655 @@ def _effect_problems(spec: dict, path: str) -> list[str]:
             out.append(f"{path}: {t} is not executable by the engine. Use a type it can "
                        f"run (combat_mod, gear_mod, strikes_as, resistance...).")
     out.extend(effectspec.validate(spec, path))
+    return out
+
+
+# =============================================================================================
+# The enchanter's shelf: essences, their families, and the catalogue's recipes
+# (docs/enchanting-contracts.md §5, enchanting plan §7; enchanting lane D, 2026-10-05).
+# =============================================================================================
+#
+# **Essences are the cost** (the owner, round 1), so an essence document says two things the
+# old shelf never did: *what* it binds (`grants`, a property in lane A's table or a step of
+# enhancement) and *how much* (`motes`, potency). ESO's split of a glyph into an essence
+# rune and a potency rune is the prior art (enchanting plan §6.5); one mote is 100 gp of the
+# book's making cost (the owner, round 4 point 9).
+#
+# Measured before this pass, over the 81 essences: 14 carried `narrative` prose nothing could
+# execute, none said which book property it bound, every bought price was authored by eye
+# (flaming 1,800 gp against the 3,000 gp the book charges to make the +1 it adds over a +1
+# sword), and no family named the time of day it favours.
+
+ENCHANT_CATALOGUE = "enchanter-materials"
+RECIPE_CATALOGUE = "magic-items"
+
+# Where an essence wants to sit (plan §7.2): the old `prefers`, now a matching-seat rule at
+# Attune instead of a +5 DC. `ward` is rings, cloaks, belts and the other worn wards.
+POLARITIES = ("weapon", "armour", "ward", "any")
+
+# The working traits the circle reads. effectspec.WORKING_TRAITS holds the forge's too; an
+# essence that said `slaggy` would load and mean nothing at the bench.
+ENCHANT_TRAITS = ("night_only", "eager", "skittish", "heavy", "volatile", "pure")
+
+# The ceiling on one house top-up, by tier (plan §7.2, proposed; the owner's "use the
+# proposed numbers", round 4 point 9). Smaller than the forge's ±2 base because a layer's
+# top-ups stack on the smith's own piece modifiers.
+HOUSE_CEILING = {"common": 1, "uncommon": 1, "rare": 2, "exotic": 2, "legendary": 3}
+
+# One mote is 100 gp of the book's making cost (owner, round 4 point 9). The making cost is
+# half the market price (CRB, magic item creation), so a mote carries 200 gp of market value.
+MOTE_GP = 100
+MARKET_PER_MOTE = 2 * MOTE_GP
+
+# **Rarity is a price band** (the owner, 2026-10-05, for the magic-item catalogue): under
+# 1,000 gp common, under 5,000 uncommon, under 20,000 rare, under 50,000 exotic, legendary
+# above. Before it the catalogue's tiers were authored by eye and 35 of the 112 wondrous
+# items sat outside the band of their own price (Ring of Climbing at 2,500 gp "common"
+# beside a 1,000 gp Cloak of Resistance +1; Cloak of Resistance +5 at 25,000 gp
+# "legendary" above a 32,000 gp Ring of Protection +4 "exotic").
+#
+# The same bands tier an **essence**, read on the market value its motes carry (motes × 200
+# gp). The price rule forces this rather than taste: `pricing.material_price_problems`
+# refuses a rarer essence cheaper than a commoner one, and a bought essence costs its motes
+# × 100 by the owner's ruling, so any tiering that is not a rising function of motes fails
+# somewhere. Measured on the first draft, which kept lane A's property tiers: the exotic
+# ghost touch essence (30 motes, 3,000 gp) came in under the rare Arcane Essence III (90
+# motes, 9,000 gp). With one band table a +1 flaming sword's essence sits in the band of
+# the 6,000 gp of market value it adds — rare, where lane A put flaming too.
+PRICE_BANDS: tuple[tuple[int, str], ...] = (
+    (1000, "common"), (5000, "uncommon"), (20000, "rare"), (50000, "exotic"))
+
+
+def tier_for_price(gp) -> str:
+    """The rarity band of a market price in gold (the owner's re-tier of 2026-10-05)."""
+    try:
+        value = float(gp or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+    for under, tier in PRICE_BANDS:
+        if value < under:
+            return tier
+    return "legendary"
+
+
+def essence_tier(motes) -> str:
+    """An essence's band: the market value its motes carry, on the magic items' bands."""
+    return tier_for_price(_int(motes) * MARKET_PER_MOTE)
+
+
+class BadEssences(ValueError):
+    """The shipped essence shelf does not validate. Raised on load with every problem and
+    its fix named, as `effectspec.BadProperties` is for lane A's table."""
+
+
+class BadRecipes(ValueError):
+    """The shipped recipe catalogue does not validate (the same shape as `BadEssences`)."""
+
+
+def _families_from(path: Path) -> dict[str, dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    fams = data.get("families") if isinstance(data, dict) else None
+    if not isinstance(fams, dict):
+        return {}
+    return {str(k).strip().lower(): dict(v) for k, v in fams.items() if isinstance(v, dict)}
+
+
+def _families_raw() -> dict[str, dict]:
+    """Every essence family: the shipped table, then homebrew merged field by field."""
+    out = _families_from(_content_dir() / f"{ENCHANT_CATALOGUE}.json")
+    home = _homebrew_dir()
+    if home.is_dir():
+        for path in sorted(home.glob("*.json")):
+            for key, fam in _families_from(path).items():
+                merged = dict(out.get(key, {}))
+                merged.update(fam)
+                out[key] = merged
+    return out
+
+
+def families() -> dict[str, dict]:
+    """The family table, `{family: {"phase", "why", "affinity", "color", "working"}}`.
+
+    Each family names the phase of the day it favours: the owner's ruling (round 4 point
+    10) is phases of the day, never a planet, so it asks nothing of the world."""
+    return copy.deepcopy(_families_raw())
+
+
+def family_problems(fams: dict[str, dict], *, shelf: dict[str, dict] | None = None
+                    ) -> list[str]:
+    """Everything wrong with the family table, each with the fix named."""
+    from . import sky
+
+    out: list[str] = []
+    for name, fam in fams.items():
+        phase = str(fam.get("phase") or "").strip().lower()
+        if phase not in sky.PHASES:
+            out.append(f"family {name}: phase {fam.get('phase')!r} is not a phase of the "
+                       f"day. One of: {', '.join(sky.PHASES)} (rules/sky.py).")
+        if not str(fam.get("why") or "").strip():
+            out.append(f"family {name}: gives no reason for its phase. Say the folklore in "
+                       f"\"why\" so the owner can review it.")
+        if not _is_colour(str(fam.get("color") or "")):
+            out.append(f"family {name}: color {fam.get('color')!r} is not #rrggbb.")
+        for t in fam.get("working") or []:
+            if t not in ENCHANT_TRAITS:
+                out.append(f"family {name}: working trait {t!r} is not the circle's. One "
+                           f"of: {', '.join(ENCHANT_TRAITS)}.")
+        if shelf is not None:
+            for mid in fam.get("affinity") or []:
+                if mid not in shelf:
+                    out.append(f"family {name}: affinity {mid!r} is no material. Name a "
+                               f"real material id (a metal, a hide, a focus).")
+    return out
+
+
+def _is_colour(value: str) -> bool:
+    # Not `all(...)`: this module's own `all()` (the contract's name) shadows the builtin.
+    return (len(value) == 7 and value.startswith("#")
+            and set(value[1:]) <= set("0123456789abcdefABCDEF"))
+
+
+_ESSENCES: dict[tuple, dict[str, dict]] = {}
+
+
+def essences() -> dict[str, dict]:
+    """Every essence on the shelf by id, as normalised documents validated on load.
+
+    A problem in a **shipped** essence raises `BadEssences` (shipped content is fixed, and
+    a test pins it clean); a broken homebrew essence is left off the shelf rather than
+    taking the bench down with it."""
+    key = _key()
+    if key not in _ESSENCES:
+        _ESSENCES.clear()
+        shelf = _cache()
+        fams = _families_raw()
+        problems = [f"{ENCHANT_CATALOGUE}.json: {p}"
+                    for p in family_problems(fams, shelf=shelf)]
+        out: dict[str, dict] = {}
+        for mid, doc in shelf.items():
+            if doc["kind"] != "essence":
+                continue
+            found = essence_problems(doc, shelf=shelf, fams=fams)
+            if found and doc["catalogue"] == ENCHANT_CATALOGUE:
+                problems.extend(found)
+            elif not found:
+                out[mid] = doc
+        if problems:
+            raise BadEssences("the essence shelf is not valid:\n  " + "\n  ".join(problems))
+        _ESSENCES[key] = out
+    return {k: copy.deepcopy(v) for k, v in _ESSENCES[key].items()}
+
+
+# --- what a grant costs ---------------------------------------------------------------------
+
+def _ceil_div(a: float, b: float) -> int:
+    q = int(a // b)
+    return q + (1 if a - q * b > 1e-9 else 0)
+
+
+def grant_motes(grants: dict | None, polarity: str = "") -> int:
+    """The book's making cost of what an essence grants, in motes, on the cheapest item
+    that can carry it. One rule, so the gold route is the book's price exactly:
+
+    - `{"enhancement": n}`: a +n weapon is n² × 2,000 gp and armour n² × 1,000 (CRB); the
+      making cost is half, so 10n² motes for a weapon essence and 5n² for an armour one.
+    - a property priced in `plus`: the market value it adds on top of the +1 enhancement
+      every special ability needs under it (CRB: "must have at least a +1 enhancement
+      bonus"), halved. Flaming on a +1 sword is (2² − 1²) × 2,000 = 6,000 gp market and
+      3,000 to make: 30 motes, and with Arcane Essence I's 10 that is the 40 a +1 flaming
+      sword costs.
+    - a property priced in `gp` (shadow, energy resistance): half its gold, rounded up.
+    - a scaled one (deflection, resistance...): bonus² × its price per square, halved, at
+      the grant's `bonus`, or the smallest value the book prints.
+    - `{"power": recipe}`: the recipe's own making cost.
+    """
+    if not grants:
+        return 0
+    if "enhancement" in grants:
+        n = _int(grants.get("enhancement"))
+        per = 1000 if polarity == "armour" else 2000
+        return _ceil_div(n * n * per / 2, MOTE_GP)
+    if grants.get("property"):
+        prop = effectspec.properties().get(str(grants["property"]))
+        if not prop:
+            return 0
+        if prop.get("plus") is not None:
+            p = int(prop["plus"])
+            per = 2000 if "weapon" in (prop.get("gear") or ()) else 1000
+            return _ceil_div(((1 + p) ** 2 - 1) * per / 2, MOTE_GP)
+        if prop.get("gp") is not None:
+            return _ceil_div(int(prop["gp"]) / 2, MOTE_GP)
+        scaled = prop.get("scaled") or {}
+        values = list(scaled.get("values") or [1])
+        bonus = _int(grants.get("bonus")) or int(values[0])
+        return _ceil_div(bonus * bonus * int(scaled.get("gp_per_square") or 0) / 2, MOTE_GP)
+    if grants.get("power"):
+        row = _recipe_rows().get(str(grants["power"]))
+        if not row:
+            return 0
+        return _ceil_div(float(row.get("price_gp") or 0) / 2, MOTE_GP)
+    return 0
+
+
+def grant_problems(grants: dict | None, polarity: str = "") -> list[str]:
+    """What is wrong with one `grants` field; [] when it resolves."""
+    if grants is None:
+        return []
+    keys = [k for k in ("property", "enhancement", "power") if k in grants]
+    if len(keys) != 1:
+        return [f"grants names {', '.join(keys) or 'nothing'}; it names exactly one of "
+                f"property, enhancement or power (contracts §5)."]
+    out: list[str] = []
+    extra = set(grants) - {"property", "enhancement", "power", "choice", "bonus"}
+    if extra:
+        out.append(f"grants carries {', '.join(sorted(extra))}, which no reader knows. Use "
+                   f"property (with an optional choice or bonus), enhancement or power.")
+    if keys == ["enhancement"]:
+        if not 1 <= _int(grants.get("enhancement")) <= 5:
+            out.append(f"grants enhancement {grants.get('enhancement')!r}; a step is +1 to "
+                       f"+5 (the book's enhancement ladder).")
+        if polarity not in ("weapon", "armour"):
+            out.append(f"grants enhancement with polarity {polarity!r}; an enhancement step "
+                       f"is a weapon's or an armour's (its price differs), so say which.")
+    elif keys == ["property"]:
+        pid = str(grants["property"])
+        prop = effectspec.properties().get(pid)
+        if prop is None:
+            alias = effectspec.from_alias(pid)
+            hint = f" It is the old id of {alias[0]!r}: name that." if alias else ""
+            return out + [f"grants property {pid!r}, which is not in "
+                          f"content/rules/magic-properties.json.{hint}"]
+        if grants.get("choice") is not None:
+            if not prop.get("choice"):
+                out.append(f"grants {pid} with a choice, and {pid} takes none. Remove it.")
+            else:
+                out.extend(f"grants {pid}: {p}" for p in effectspec.choice_problems(
+                    prop, dict(grants.get("choice") or {})))
+        if grants.get("bonus") is not None:
+            values = (prop.get("scaled") or {}).get("values") or []
+            if _int(grants["bonus"]) not in values:
+                out.append(f"grants {pid} at bonus {grants['bonus']!r}; the book prints "
+                           f"{values or 'no bonus for it'}.")
+    elif str(grants["power"]) not in _recipe_rows():
+        out.append(f"grants power {grants['power']!r}, and no recipe has that id.")
+    return out
+
+
+# --- the essence document ---------------------------------------------------------------------
+
+def essence_traits(doc: dict) -> list[str]:
+    """The things there are to discover about an essence (plan §7.2): what it grants, each
+    house top-up, its phase, its polarity, its affinity and each working trait. Keys in the
+    order a Read reveals them."""
+    out: list[str] = []
+    if doc.get("grants"):
+        out.append("grants")
+    out.extend(f"house:{i}" for i, _ in enumerate(doc.get("house") or []))
+    if doc.get("phase"):
+        out.append("phase")
+    if doc.get("polarity"):
+        out.append("polarity")
+    if doc.get("affinity"):
+        out.append("affinity")
+    out.extend(f"working:{w.get('trait')}" for w in doc.get("working") or [])
+    return out
+
+
+def _house_points(spec: dict) -> float | None:
+    """`points` for a house top-up, and a flat damage rider's size: a fire mote's "+1 fire
+    on a hit" is one point. Dice are refused before this is asked."""
+    if spec.get("type") == "damage":
+        try:
+            return float(int(str(spec.get("dice")).strip()))
+        except (TypeError, ValueError):
+            return None
+    return points(spec)
+
+
+def essence_problems(doc: dict, *, shelf: dict[str, dict] | None = None,
+                     fams: dict[str, dict] | None = None) -> list[str]:
+    """Everything wrong with one essence document, each with the fix named: at least three
+    traits, no narrative, a grant that resolves, price = motes × 100, top-ups inside the
+    ceilings (contracts §5), and a phase of the day (the owner's ruling)."""
+    from . import sky
+
+    mid = doc.get("id") or "?"
+    out: list[str] = []
+
+    def say(msg: str) -> None:
+        out.append(f"{mid}: {msg}")
+
+    fams = _families_raw() if fams is None else fams
+    tier = doc.get("tier")
+    polarity = doc.get("polarity") or ""
+    grants = doc.get("grants")
+
+    # What it grants, and what that costs.
+    for p in grant_problems(grants, polarity):
+        say(p)
+    motes = _int(doc.get("motes"))
+    need = grant_motes(grants, polarity) if not out else 0
+    bought = str(doc.get("obtain") or "") == "bought"
+    if motes < 1:
+        say("has no motes. Every essence carries potency: give it \"motes\" (1 mote = "
+            "100 gp of the book's making cost).")
+    elif motes < need:
+        say(f"carries {motes} motes, under the {need} its grant costs to make. Raise "
+            f"\"motes\" to at least {need}.")
+    elif bought and grants and need and motes != need:
+        say(f"is bought and carries {motes} motes against the {need} its grant costs; a "
+            f"bought essence carries exactly its grant's making cost, so buying it is the "
+            f"book's price. Set \"motes\" to {need}.")
+    if motes >= 1 and tier != essence_tier(motes):
+        say(f"is {tier} with {motes} motes ({motes * MARKET_PER_MOTE:,} gp of market "
+            f"value), and that is the {essence_tier(motes)} band (materials.PRICE_BANDS). "
+            f"Set \"tier\" to {essence_tier(motes)!r}.")
+    price = doc.get("price_gp")
+    if bought:
+        try:
+            priced = float(price) if price not in (None, "") else None
+        except (TypeError, ValueError):
+            priced = None
+        if priced != motes * MOTE_GP:
+            say(f"is bought at {price!r} gp; a bought essence costs its motes × {MOTE_GP} "
+                f"(the owner's ruling). Set \"price_gp\" to {motes * MOTE_GP}.")
+    elif price not in (None, "", 0):
+        say(f"is {doc.get('obtain') or 'not bought'} and carries a price; no shop sells "
+            f"it, which an absent price says. Remove \"price_gp\" or make it bought.")
+
+    # Family and phase: the owner's ruling, checked on load.
+    family = doc.get("family") or ""
+    if not family:
+        say("has no family. Name the family it belongs to (fire, holy, shadow...).")
+    fam = fams.get(family)
+    phase = str(doc.get("phase") or "").strip().lower()
+    if phase not in sky.PHASES:
+        where = (f"its family {family!r} is not in the families table" if fam is None
+                 else f"its family {family!r} names {fam.get('phase')!r}")
+        say(f"has phase {doc.get('phase')!r} ({where}). A phase is one of "
+            f"{', '.join(sky.PHASES)}: give the family a \"phase\" in the families table, "
+            f"or the essence its own.")
+    elif fam is not None and str(fam.get("phase") or "").lower() not in ("", phase):
+        say(f"says phase {phase!r} but its family {family!r} favours {fam.get('phase')!r}. "
+            f"A family has one phase: drop the essence's own.")
+
+    if polarity not in POLARITIES:
+        say(f"polarity {polarity!r} is not one of {', '.join(POLARITIES)}.")
+    if shelf is not None:
+        for a in doc.get("affinity") or []:
+            if a not in shelf:
+                say(f"affinity {a!r} is no material on the shelf. Name a real id.")
+
+    # House top-ups: small, typed, executable, scaled by binding quality.
+    house = doc.get("house") or []
+    if not house:
+        say("has no house top-up. Every essence carries at least one small typed effect "
+            "(plan §7.2): a resistance, a skill or save modifier, a flat rider.")
+    ceiling = HOUSE_CEILING.get(tier, 1)
+    for i, spec in enumerate(house):
+        here = f"house {i + 1} ({spec.get('type')} {spec.get('target', '')})".replace(" )", ")")
+        for nested in _walk(spec):
+            t = str(nested.get("type") or "")
+            if t == "narrative":
+                say(f"{here} is narrative prose; a top-up is a typed effect. Move the words "
+                    f"to \"text\".")
+            elif t in effectspec.AWAITING_READER:
+                say(f"{here} is a {t}, which waits on lane C's reader "
+                    f"({effectspec.AWAITING_READER[t]}); an essence names book properties "
+                    f"through \"grants\", never these documents.")
+            elif effectspec.find(t) is not None and not effectspec.executable(nested):
+                say(f"{here}: {t} is not executable by the engine. Use one it runs "
+                    f"(resistance, save_mod, skill_mod, combat_mod, a flat damage rider).")
+        if not spec.get("house"):
+            say(f"{here} is not marked \"house\": true. Every top-up is a house number "
+                f"that binding quality scales: mark it.")
+        if spec.get("book"):
+            say(f"{here} is marked \"book\"; a book number is the property's, reached "
+                f"through \"grants\". Remove the mark.")
+        if spec.get("type") == "damage" and not str(spec.get("dice", "")).strip().isdigit():
+            say(f"{here} rolls dice {spec.get('dice')!r}; a house rider is a flat number "
+                f"(dice are the book's, through \"grants\").")
+        pts = _house_points(spec)
+        if pts is not None and pts > ceiling:
+            say(f"{here} is {pts:g} points; a {tier} top-up is at most ±{ceiling} "
+                f"(materials.HOUSE_CEILING). Bring it inside the ceiling.")
+        out.extend(effectspec.validate(spec, f"{mid} {here}"))
+
+    # Working traits: the circle's own.
+    for i, spec in enumerate(doc.get("working") or []):
+        if spec.get("type") != "working":
+            say(f"working entry {i + 1} is a {spec.get('type')!r}, not a working trait.")
+            continue
+        if spec.get("trait") not in ENCHANT_TRAITS:
+            say(f"working trait {spec.get('trait')!r} is not the circle's. One of: "
+                f"{', '.join(ENCHANT_TRAITS)}.")
+        out.extend(effectspec.validate(spec, f"{mid} working {i + 1}"))
+    traits = {w.get("trait") for w in doc.get("working") or []}
+    if "volatile" in traits and not any(is_negative(e) for e in house):
+        say("is volatile and has no drawback among its top-ups; volatile means reading it "
+            "applies its drawback (plan §7.3). Add a negative top-up or drop the trait.")
+    if not _is_colour(str(doc.get("color") or "")):
+        say(f"color {doc.get('color')!r} is not #rrggbb; the stage's glow reads it.")
+
+    n = len(essence_traits(doc))
+    if n < 3:
+        say(f"has {n} discoverable trait(s); an essence needs at least 3 (grant, top-ups, "
+            f"phase, polarity, affinity, working traits).")
+    return out
+
+
+# --- recipes: the catalogue's wondrous items --------------------------------------------------
+#
+# The owner: "a catalogue item is a known recipe of essences and a vessel" (round 3). The 112
+# wondrous rows of magic-items.json are the recipes; the 58 weapon and armour rows are lane
+# A's property table now (its `aliases`). The old fields (`spell`, `effects`, `slot`) stay
+# for `rules/magicitem.py` until lane E's bench reads these.
+
+RECIPE_VESSELS = ("slotless", "rod")
+
+
+def _recipe_paths() -> list[Path]:
+    from django.conf import settings
+
+    paths = [_content_dir() / f"{RECIPE_CATALOGUE}.json"]
+    home = Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "magic-items"
+    if home.is_dir():
+        paths.extend(sorted(home.glob("*.json")))
+    return paths
+
+
+def _recipe_rows() -> dict[str, dict]:
+    """The raw wondrous rows, shipped then homebrew merged field by field."""
+    out: dict[str, dict] = {}
+    for i, path in enumerate(_recipe_paths()):
+        for row in _read(path):
+            key = str(row["id"]).strip().lower()
+            merged = dict(out.get(key, {}))
+            merged.update(row)
+            if i:
+                merged.setdefault("_homebrew", True)
+            out[key] = merged
+    return {k: v for k, v in out.items() if v.get("kind") == "wondrous"}
+
+
+def normalise_recipe(raw: dict) -> dict:
+    """One wondrous row as a recipe document (plan §7.4), every field defaulted."""
+    spells = raw.get("spells")
+    if not isinstance(spells, list):
+        spells = [[raw["spell"]]] if raw.get("spell") else []
+    price = raw.get("price_gp") or 0
+    cost = raw.get("cost_gp")
+    if cost in (None, ""):
+        cost = float(price) / 2
+    return {
+        "id": str(raw.get("id") or "").strip().lower(),
+        "name": str(raw.get("name") or raw.get("id") or ""),
+        "vessel": str(raw.get("vessel") or raw.get("slot") or "slotless"),
+        "book": [dict(e) for e in _list(raw.get("book")) if isinstance(e, dict)],
+        "spells": [[str(s) for s in g] for g in spells if isinstance(g, list)],
+        "caster_level": _int(raw.get("caster_level")),
+        "creator_level": _int(raw.get("creator_level")) or None,
+        "creator": [str(c) for c in _list(raw.get("creator"))],
+        "price_gp": price,
+        "cost_gp": cost,
+        "motes": _ceil_div(float(cost or 0), MOTE_GP),
+        "essences": [dict(e) for e in _list(raw.get("essences")) if isinstance(e, dict)],
+        "tier": str(raw.get("tier") or "common"),
+        "source": str(raw.get("source") or ""),
+        "not_yet": [str(n) for n in _list(raw.get("not_yet"))],
+        "retired": bool(raw.get("retired", False)),
+        "why_retired": str(raw.get("why_retired") or ""),
+        "text": str(raw.get("text") or ""),
+        "homebrew": bool(raw.get("_homebrew", False)),
+    }
+
+
+_RECIPES: dict[tuple, dict[str, dict]] = {}
+
+
+def _recipe_key() -> tuple:
+    sig = []
+    for path in _recipe_paths():
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        sig.append((str(path), st.st_mtime_ns, st.st_size))
+    return (_key(), tuple(sig))
+
+
+def recipes() -> dict[str, dict]:
+    """Every recipe a binder can know, by id: the wondrous items, retired rows left out.
+    Validated on load like `essences()`: a shipped problem raises `BadRecipes`, a broken
+    homebrew row is left out."""
+    key = _recipe_key()
+    if key not in _RECIPES:
+        _RECIPES.clear()
+        shelf = essences()
+        rows = _recipe_rows()
+        problems = [f"{RECIPE_CATALOGUE}.json: {p}" for p in magic_item_tier_problems(
+            [r for r in rows.values() if not r.get("_homebrew")])]
+        out: dict[str, dict] = {}
+        for rid, raw in rows.items():
+            doc = normalise_recipe(raw)
+            if doc["retired"]:
+                continue
+            found = recipe_problems(doc, essences=shelf)
+            if found and not doc["homebrew"]:
+                problems.extend(found)
+            elif not found:
+                out[rid] = doc
+        if problems:
+            raise BadRecipes("the recipe catalogue is not valid:\n  " + "\n  ".join(problems))
+        _RECIPES[key] = out
+    return {k: copy.deepcopy(v) for k, v in _RECIPES[key].items()}
+
+
+def recipe(recipe_id: str) -> dict | None:
+    return recipes().get(str(recipe_id or "").strip().lower())
+
+
+def magic_item_tier_problems(rows) -> list[str]:
+    """Every priced wondrous row whose tier is not its price band (the owner's re-tier of
+    2026-10-05), each with the fix named; [] when sound. A check, not a derivation, so the
+    tier stays a written fact `rules/magicitem.py` reads as it is."""
+    out: list[str] = []
+    for row in rows or ():
+        if not isinstance(row, dict) or row.get("kind") != "wondrous":
+            continue
+        try:
+            price = float(row.get("price_gp") or 0)
+        except (TypeError, ValueError):
+            continue
+        if price <= 0:
+            continue
+        band = tier_for_price(price)
+        if row.get("tier") != band:
+            out.append(f"{row.get('id')}: {row.get('name')} is {row.get('tier')} at "
+                       f"{price:,.0f} gp, and that price is {band} (under 1,000 gp common, "
+                       f"5,000 uncommon, 20,000 rare, 50,000 exotic, then legendary). Set "
+                       f"\"tier\" to {band!r}.")
+    return out
+
+
+def recipe_problems(doc: dict, *, essences: dict[str, dict] | None = None,
+                    spell_ids=None) -> list[str]:
+    """Everything wrong with one recipe, each with the fix named."""
+    from .tables import SLOTS
+
+    if "book" not in doc or "vessel" not in doc:
+        doc = normalise_recipe(doc)
+    rid = doc.get("id") or "?"
+    out: list[str] = []
+
+    def say(msg: str) -> None:
+        out.append(f"{rid}: {msg}")
+
+    shelf = essences if essences is not None else {}
+    price = float(doc.get("price_gp") or 0)
+    if price <= 0:
+        say("has no price. Give it the book's price_gp.")
+    elif doc.get("tier") != tier_for_price(price):
+        say(f"is {doc.get('tier')} at {price:,.0f} gp; set \"tier\" to "
+            f"{tier_for_price(price)!r} (the price bands).")
+    if not 1 <= _int(doc.get("caster_level")) <= 20:
+        say(f"caster level {doc.get('caster_level')!r} is not the book's 1st to 20th.")
+    if doc.get("vessel") not in SLOTS and doc.get("vessel") not in RECIPE_VESSELS:
+        say(f"vessel {doc.get('vessel')!r} is no slot. One of the sheet's slots "
+            f"(rules/tables.SLOTS) or {', '.join(RECIPE_VESSELS)}.")
+    if not str(doc.get("source") or "").startswith("https://legacy.aonprd.com/"):
+        say("cites no source. Name the AoN page its numbers were read from.")
+
+    book = doc.get("book") or []
+    if not book:
+        say("has no book effects. Write what the item does as effect documents.")
+    for i, spec in enumerate(book):
+        for nested in _walk(spec):
+            if str(nested.get("type") or "") == "narrative":
+                say(f"book effect {i + 1} is narrative prose; write it as a typed effect "
+                    f"(an item_power with a tell, if it changes no number) and put the "
+                    f"clause nothing runs in \"not_yet\".")
+        out.extend(effectspec.validate(spec, f"{rid} book {i + 1}"))
+
+    if spell_ids is None:
+        try:
+            from . import spells as _spells
+
+            spell_ids = set(_spells.all_spells())
+        except Exception:
+            spell_ids = None
+    for g in doc.get("spells") or []:
+        if not g:
+            say("has an empty spell group. Remove it.")
+        for sid in g:
+            if spell_ids is not None and sid not in spell_ids:
+                say(f"spell {sid!r} is not in the spell corpus. Use the Spells bench's id.")
+
+    needs = doc.get("essences") or []
+    if not needs:
+        say("names no essences. A recipe is essences and a vessel: say which.")
+    granted = {str((e.get("grants") or {}).get("property") or "") for e in shelf.values()}
+    steps = any("enhancement" in (e.get("grants") or {}) for e in shelf.values())
+    fams_here = {e.get("family") for e in shelf.values()}
+    for need in needs:
+        if _int(need.get("count") or 1) < 1:
+            say(f"needs {need.get('count')!r} of an essence; a count is 1 or more.")
+        if need.get("grants"):
+            g = str(need["grants"])
+            if g == "enhancement":
+                if shelf and not steps:
+                    say("needs an enhancement essence and none is on the shelf.")
+            elif g not in effectspec.properties():
+                say(f"needs grants {g!r}, which is not a property id.")
+            elif shelf and g not in granted:
+                say(f"needs an essence granting {g!r} and none on the shelf grants it. Add "
+                    f"one, or name a family instead.")
+        elif need.get("family"):
+            if shelf and need["family"] not in fams_here:
+                say(f"needs a {need['family']!r} essence and no essence is of that family.")
+        else:
+            say(f"essence need {need!r} names neither grants nor family.")
     return out

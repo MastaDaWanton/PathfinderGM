@@ -410,6 +410,31 @@ things to discover. A row that fails is reported, not guessed at.
 | `assay_danger` | reactive metals only: what handling a sliver does to the assayer when its harm is not a carried effect. One type today, `suppress_magic` (noqual's, a house rule), with a `duration` and `"house": true` or `"book": true` | `null`: an assay is safe |
 | `price_gp`, `biomes`, `obtain` | what it costs at a market, where it is found, how (`mined`, `bought`, `harvested`). **Required on a common `fuel`, `flux` or `quenchant`**: those are staples on every counter that sells the smith's supplies (`content/rules/stall-lines.json` `consumables`, 2026-10-05), and an unpriced one would be on none. **Held to the price rule** (`rules/pricing.py`, `material_price_problems`, 2026-10-05): at least the rung's floor (common 1, uncommon 5, rare 25, exotic 125, legendary 625 gp), ×5 for an `essence`, `catalyst`, `ink`, `chalk`, `focus` or a row with `neutralizer`, × how far its `plus`, `capacity`, `neutralizer` or `dc_mod` runs above its rung; never cheaper than a commoner row of its kind in its file, and a stronger row costs strictly more than a weaker one. 1 cp is the "free" token, allowed only on a plain common row (water). Absent stays absent: an unpriced row is simply not sold | none, `[]`, `""` |
 
+### A world's essences (proposed, 2026-10-05: the enchanting revamp, lane D)
+
+A `play.materials[]` row with `kind` `essence` is a thing an enchanter binds, read through
+the same door (`materials.essences()`) and held to the same fences as the shipped shelf
+(`materials.essence_problems`, every refusal with its fix named). Nothing in it is
+world-specific except the words: the numbers are the app's rules.
+
+| Field | Meaning | Default |
+|---|---|---|
+| `grants` | what it binds: `{"property": id}` from `content/rules/magic-properties.json` (with an optional `choice`, `{"energy": "fire"}`, or `bonus` for a scaled one), `{"enhancement": n}` (1 to 5), or absent for an essence that is only potency | absent: a mote supply |
+| `motes` | potency, the cost unit: 1 mote = 100 gp of the book's making cost. At least what its grant costs to make (`materials.grant_motes`); a sold essence exactly that | required |
+| `tier` | **not free**: the band of the market value its motes carry (motes × 200 gp: under 1,000 common, 5,000 uncommon, 20,000 rare, 50,000 exotic, then legendary). World Bible computes it, never chooses it | required |
+| `price_gp` | motes × 100 when `obtain` is `bought`; absent otherwise (a found essence is not sold) | absent |
+| `family` | the family it belongs to: one of the shipped families (`fire`, `cold`, `holy`, `shadow`... the `families` table in `enchanter-materials.json`) or the world's own | required |
+| `phase` | the phase of the day its family favours, one of `dawn`, `morning`, `noon`, `afternoon`, `dusk`, `night`, `midnight` (`rules/sky.py`). Never a planet: a world need have none. Taken from the family when the family is a shipped one; **required for a family of the world's own** | the family's |
+| `polarity` | where it wants to sit: `weapon`, `armour`, `ward` (rings, cloaks, belts), `any` | required |
+| `affinity` | material ids (the world's or the shipped) that suit it | `[]` |
+| `house` | at least one small typed top-up, each `"house": true`, inside the tier's ceiling (common and uncommon ±1, rare and exotic ±2, legendary ±3); never `narrative`, never one of the magic-item types still waiting on a reader | required |
+| `working` | the circle's traits: `night_only`, `eager`, `skittish`, `heavy`, `volatile` (needs a drawback in `house`), `pure` | `[]` |
+| `color` | `#rrggbb`, the glow on the binding stage | required |
+
+A world's essence harvested from its own creature names the creature in `from_creature`,
+in the world's words, and the harvest tag reader is the leatherworker's (`harvest.essence.*`,
+not yet built).
+
 **Who sells a craft's supplies** (proposed, no reader yet). A `play.places[]` row may carry
 `"supplies": ["blacksmith"]` — the crafts whose consumables (fuel, flux, quench; solvents,
 salts, vials; bark, oil, wax, thread; ink, chalk, seal) its keeper always has, from
