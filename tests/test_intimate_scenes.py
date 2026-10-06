@@ -694,3 +694,44 @@ def test_the_narrator_may_speak_for_the_player_on_an_intimate_beat(live, monkeyp
     r, seen = _say(monkeypatch, PC_SPEECH, "I pay for the room")
     assert "exempt" not in _prose_row(cm)["intimate"]
     assert seen[0][0]["content"].startswith(prompts.BRIEFING[:200])
+
+
+# --- the passages the app ships -------------------------------------------------------------
+
+
+def test_the_shipped_passages_stand_in_when_the_tables_file_has_none(data, monkeypatch, tmp_path):
+    """The owner, 2026-10-06: a fresh install held only the header, so an explicit table
+    got the briefing with no demonstrations — "the intimate scenes will not be very
+    good". The install now ships passages, used only when the table's own file holds
+    none."""
+    shipped = tmp_path / "shipped.txt"
+    shipped.write_text("> I go on\nDEMO-SHIPPED-ONE: a placeholder line.\n", encoding="utf-8")
+    monkeypatch.setattr(intimate, "shipped_path", lambda: shipped)
+    d = intimate.read_demonstrations()
+    assert d.source == "shipped" and d.on_file == 1
+    assert d.examples[0]["reply"]["narration"].startswith("DEMO-SHIPPED-ONE")
+    # The table's own file is never written with them.
+    assert "DEMO-SHIPPED" not in intimate.demonstrations_path().read_text(encoding="utf-8")
+
+
+def test_the_tables_own_passages_always_win(data, monkeypatch, tmp_path):
+    shipped = tmp_path / "shipped.txt"
+    shipped.write_text("DEMO-SHIPPED-ONE: a placeholder line.\n", encoding="utf-8")
+    monkeypatch.setattr(intimate, "shipped_path", lambda: shipped)
+    path = intimate.demonstrations_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("DEMO-PASSAGE-ONE: a placeholder line.\n", encoding="utf-8")
+    d = intimate.read_demonstrations()
+    assert d.source == "yours" and d.examples[0]["reply"]["narration"].startswith("DEMO-PASSAGE-ONE")
+
+
+def test_the_shipped_file_is_in_the_bundle_and_never_on_file():
+    """Read through the bundle root (frozen: _MEIPASS), never `__file__`, and the content
+    folder is in the spec's CONTENT_DIRS so the .exe carries it."""
+    from django.conf import settings
+
+    assert intimate.shipped_path() == (
+        Path(settings.BASE_DIR) / "content" / "style" / "intimate.txt")
+    assert intimate.shipped_path().exists()
+    spec = (Path(settings.BASE_DIR) / "pathfindergm.spec").read_text(encoding="utf-8")
+    assert '"style"' in spec
