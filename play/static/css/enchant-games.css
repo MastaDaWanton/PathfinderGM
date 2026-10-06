@@ -1,0 +1,42 @@
+/* The enchanter's minigames in the bench strip (play/static/js/enchant-games/, the day-phase
+   parts of play/static/js/table/33-bench-games.js), enchanting UI plan §6.4 and §9.
+
+   Loaded after bench-games.css and only adds to it, as forge-games.css does: the strip keeps
+   the herb bench's shape (meter left, hint centre, band right, time thread on top). Tokens
+   only (tests/test_enchant_games.py refuses a raw colour); an essence's own colour is content
+   and appears only as the swatch the game draws on its canvas, never in the chrome.
+
+   What an enchant game with an hour adds to the hint column: the server's day-phase words
+   ("Noon, 42 minutes left. In its hour: windows x1.5") above the hint. The band itself is drawn
+   on the canvas across the meter's foot. Inside the essence's phase the words take the ink and
+   a gold rule beside them; the words say it, the rule and the brighter ink only help them be
+   seen (never colour alone). */
+
+.bench-game.has-hour .bench-game__hint { gap: 6px; }
+
+.bench-game__hour {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--dim);
+  /* Two lines at most: the phase and its minutes, then whether the windows are wider. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bench-game.is-in-hour .bench-game__hour {
+  color: var(--ink);
+  border-left: 2px solid var(--gold);
+  padding-left: 6px;
+  text-align: left;
+}
+
+/* The order and matching games speak their next step in the hint, so it reads a step brighter
+   than a timing game's fixed instruction. */
+.bench-game--enchant .bench-game__hint-text { color: var(--ink); }
+
+@container (max-width: 640px) {
+  .bench-game__hour { font-size: 11px; }
+}
