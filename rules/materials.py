@@ -942,6 +942,14 @@ def _house_points(spec: dict) -> float | None:
     return points(spec)
 
 
+# The kinds of document a house top-up may be: the small typed numbers plan §7.2 names
+# (a resistance, a skill or save modifier, a combat modifier, a flat rider) and fast
+# healing, which one shipped essence carries. Everything else is a book property's own
+# shape and comes through "grants".
+HOUSE_TYPES = frozenset({"resistance", "save_mod", "skill_mod", "combat_mod", "damage",
+                         "fast_healing"})
+
+
 def essence_problems(doc: dict, *, shelf: dict[str, dict] | None = None,
                      fams: dict[str, dict] | None = None) -> list[str]:
     """Everything wrong with one essence document, each with the fix named: at least three
@@ -1033,6 +1041,13 @@ def essence_problems(doc: dict, *, shelf: dict[str, dict] | None = None,
                 say(f"{here} is a {t}, which waits on lane C's reader "
                     f"({effectspec.AWAITING_READER[t]}); an essence names book properties "
                     f"through \"grants\", never these documents.")
+            elif nested is spec and t not in HOUSE_TYPES:
+                # A top-up is a small house number; a book property's own document (keen's
+                # crit_range, speed's extra_attack) is reached through "grants". This was
+                # refused only while those types waited on lane C's readers; once the
+                # readers landed (2026-10-05) a keen top-up on a flaming essence passed.
+                say(f"{here} is a {t}; a top-up is one of {', '.join(sorted(HOUSE_TYPES))}. "
+                    f"A book property is named through \"grants\".")
             elif effectspec.find(t) is not None and not effectspec.executable(nested):
                 say(f"{here}: {t} is not executable by the engine. Use one it runs "
                     f"(resistance, save_mod, skill_mod, combat_mod, a flat damage rider).")

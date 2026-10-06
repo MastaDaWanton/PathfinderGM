@@ -349,4 +349,4 @@ Not on the Core Rulebook's rings, wondrous items or rods pages, Ultimate Equipme
 
 ## What the recipes still cannot run
 
-102 recipes, none narrative. Book documents of a type the engine does not run yet, by type: item_power 37, sense 4, speed 1, spell_effect 3, spell_resistance 2. 67 recipes say in `not_yet` what of the book they leave out.
+102 recipes, none narrative. Book documents of a type the engine does not run yet, by type: sense 4, speed 1, spell_effect 3. 67 recipes say in `not_yet` what of the book they leave out.

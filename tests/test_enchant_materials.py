@@ -163,11 +163,14 @@ def test_a_house_top_up_over_the_ceiling_is_refused():
 
 
 def test_a_book_type_inside_a_top_up_is_refused():
-    """Lane A's note: the ten new magic-item types wait on lane C's readers, so an essence
-    names properties through `grants` and never carries those documents itself."""
+    """An essence names book properties through `grants` and never carries their documents
+    as a top-up. First held by "waits on lane C's reader"; when lane C's readers landed
+    (2026-10-05) that refusal fell away and a keen crit_range top-up on a flaming essence
+    passed the check. Top-ups are now an allow-list of small typed numbers."""
     doc = _flaming()
     doc["house"].append({"type": "crit_range", "multiply": 2, "house": True})
-    assert any("waits on lane C" in p for p in materials.essence_problems(doc))
+    assert any("is a crit_range; a top-up is one of" in p
+               for p in materials.essence_problems(doc))
 
 
 def test_narrative_and_dice_are_refused_in_a_top_up():
