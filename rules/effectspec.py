@@ -652,14 +652,16 @@ CATEGORIES: list[Category] = [
                            "enemies still target it normally and still miss half the "
                            "time."),
             ]),
+            # Executable since enchanting lane C (2026-10-05): `_op_cast` rolls the
+            # caster level check against a target's SR (`Engine._resists`), and a rating
+            # comes from a stat block, a worn item (`Actor.worn_specs_of`) or a spell's
+            # grant (`Engine._grant_sr`). It was `engine: False` with the note "no creature
+            # carries a rating for it to check against, and half a check would be worse
+            # than none" — both halves now exist.
             EffectType("spell_resistance", "Spell resistance", "SR 12 + caster level", [
                 Field("amount", "Rating", "signed_formula",
                       hint="A number, or a formula: 12 + caster_level."),
-            ], engine=False,
-                blocked="Recorded on the sheet and shown to the GM. `_op_cast` rolls no "
-                        "check to overcome spell resistance — no creature in the app "
-                        "carries a rating for it to check against, and half a check "
-                        "would be worse than none. docs/spells.md §5.1."),
+            ]),
         ]),
 
     Category(
@@ -1092,18 +1094,23 @@ CATEGORIES: list[Category] = [
 # here, in one place: `engine` is False and the builder's warning says what waits. When lane
 # C's reader for one lands, it deletes that line (and lists the type with its site in the
 # ratchet's `already`), and the type is executable from then on.
-AWAITING_READER: dict[str, str] = {
-    "crit_range": "the attack's threat test (Engine, contracts §4)",
-    "extra_attack": "the full-attack builder (contracts §4)",
-    "enhancement_raise": "the weapon scope's enhancement and the DR traits (contracts §4)",
-    "enhancement_to_ac": "Actor.ac_modifiers and a combat-bar param (contracts §4)",
-    "fortification": "the critical-hit and sneak-attack path (contracts §4)",
-    "ignore_armour": "the attack's AC (contracts §4)",
-    "deflect_ranged": "the ranged attack path (contracts §4)",
-    "weapon_lethality": "weapons.lethality_of (contracts §4)",
-    "slay": "the crit path and save gates, through Actor.die (contracts §4)",
-    "item_power": "the use_item op with a power (contracts §4)",
-}
+#
+# Emptied by enchanting lane C (2026-10-05). Where each reader landed:
+#   crit_range         sheet._with_layer (the weapon row's threat range, read by the
+#                      attack's threat test and the sheet's weapon line)
+#   extra_attack       Actor.attack_sequence (one more swing at full BAB on a full attack)
+#   enhancement_raise  sheet._raised_specs (attack and damage) and
+#                      magic_layer.strikes_as_against in Engine._op_attack (DR traits)
+#   enhancement_to_ac  Engine._defend_with, the attack's `defending` param
+#   fortification      Engine._fortify (crit and sneak attack), Actor.fortification
+#   ignore_armour      Engine._op_attack's AC, Engine._harmless_blow (cannot harm)
+#   deflect_ranged     Actor.ac_modifiers (arrow catching's +1), Engine._catcher,
+#                      Engine._deflect (arrow deflection's Reflex save)
+#   weapon_lethality   sheet._with_layer (the row's `nonlethal`, read by
+#                      weapons.lethality_of; suppressed by a declared lethal blow)
+#   slay               Engine._slay (vorpal on a natural 20 crit; disruption's gate)
+#   item_power         Engine._use_power, the use_item op's `power`
+AWAITING_READER: dict[str, str] = {}
 for _cat in CATEGORIES:
     for _t in _cat.types:
         if _t.id in AWAITING_READER:
@@ -2188,9 +2195,9 @@ CHOICE_OF: tuple[str, ...] = ("creature_type", "damage_type", "skill")
 # clause is dropped — the term applies to nobody. Every property using one must say so in
 # `not_yet`, and the validator holds it to that.
 _WHEN_TARGET_KEYS = ("type", "subtype", "choice", "alignment")
-WHEN_NOT_READ: dict[str, str] = {
-    "alignment": "a creature's alignment, which Actor._when_holds does not read yet",
-}
+# `alignment` left this list with enchanting lane C (2026-10-05): `_when_holds` reads it,
+# and by the owner's round 6 ruling answers yes for every target until alignment exists.
+WHEN_NOT_READ: dict[str, str] = {}
 
 _PROPERTY_KEYS = {
     "id", "name", "gear", "slots", "plus", "gp", "scaled", "cl", "aura", "tier", "spells",

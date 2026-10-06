@@ -814,10 +814,18 @@ class Actor:
             row = dict(row, damage=weapons_mod.first_end_damage(row["damage"]),
                        damage_text=str(row["damage"]))
         if forge_items.is_forged(rec):
-            return forge_items.weapon_row(row, forge_items.build(rec), rec)
+            b = forge_items.build(rec)
+            return _with_layer(forge_items.weapon_row(row, b, rec), b.get("magic"))
         row.update({"name": str(rec.get("name") or row.get("name")),
                     "crafted_record": rec, "crafted_base": str(row.get("id") or base_key),
                     "masterwork": bool(rec.get("masterwork"))})
+        from . import magic_layer
+
+        if magic_layer.has_layer(rec):
+            lay = magic_layer.layer(rec)
+            row["strikes_as"] = sorted(set(row.get("strikes_as") or ())
+                                       | set(lay["strikes_as"]))
+            return _with_layer(row, lay)
         return row
 
     def armour_record(self) -> dict | None:
@@ -899,6 +907,137 @@ class Actor:
         return [s for s in forge_items.roll_specs(forge_items.build(rec))
                 if str(s.get("type") or "") == kind]
 
+    def wielded_record(self) -> dict | None:
+        """The crafted weapon record in hand, or None."""
+        rec = self.crafted_record(str(self.equipped or "")) if self.equipped else None
+        return rec if _is_weapon_record(rec) else None
+
+    def worn_specs_of(self, kind: str, ctx: dict | None = None, ask_when: bool = True,
+                      walk: list | None = None) -> list[tuple[dict, str, str]]:
+        """Every document of one type that what this creature wears gives it, as
+        (spec, the thing's name, origin `item:<id>`).
+
+        The worn readers' one walk (enchanting contracts §4, "worn readers for every worn
+        record and catalogue slot item"). Before 2026-10-05 `resistance` and
+        `damage_reduction` asked the forged SUIT alone (`_armour_build_specs`): a shield
+        of energy resistance, a ring of it from the catalogue and a cloak bound at the
+        enchanter's bench were worn and did nothing. Walked here, once, for every reader:
+
+        - the worn suit and shield, through their build (the layer merged in) and the
+          layer's `worn` documents;
+        - every other worn record — a ring, a cloak — through `magic_layer.record_specs`
+          and its layer's `worn` documents (a record with no build);
+        - every catalogue item named in a slot, within the slot's rules limit (the third
+          ring is worn, not working — `_standing_mods`' rule);
+        - the weapon in hand's `wielded` documents (holy's wielder clause, when it is
+          built: a sword's own numbers stay on its own swing, `_standing_mods`).
+
+        Read live: take the thing off and its documents are gone from the next read.
+        `walk` is a walk already taken (`_worn_walk`) by a caller asking several types.
+        """
+        out: list[tuple[dict, str, str]] = []
+        for s, name, origin, _ in (self._worn_walk() if walk is None else walk):
+            if str(s.get("type") or "") != kind:
+                continue
+            # A `when` is asked of the context the reader gave; a reader with none
+            # (resistance, SR, fortification) drops a conditional document, the rule
+            # for every clause nothing can evaluate — never applies it.
+            if ask_when and s.get("when") and not _when_holds(s.get("when"), ctx):
+                continue
+            out.append((s, name, origin))
+        return out
+
+    def _worn_walk(self) -> list[tuple[dict, str, str, bool]]:
+        """Everything worn and wielded gives, built ONCE per thing, as (doc, name,
+        origin, bearer). `bearer` marks the layers' `worn` documents (suit, shield, every
+        worn record) and the weapon in hand's `wielded` ones — what a layer, or a curse
+        on it, lays on the person rather than on the blow (lane F's blurred sight), which
+        `_standing_mods` reads on every roll.
+
+        One walk, each item built once: measured 2026-10-05, a PC in a layered suit with a
+        layered sword spent 1.9 ms in each `has_state` (180 µs bare) while the readers
+        walked the gear separately and rebuilt each layer several times over."""
+        from . import forge_items, magic_layer
+        from . import magicitem
+
+        out: list[tuple[dict, str, str, bool]] = []
+
+        def take(specs, name: str, origin: str, bearer: bool = False) -> None:
+            out.extend((s, name, str(s.get("origin") or origin), bearer)
+                       for s in specs or () if isinstance(s, dict))
+
+        for rec in (self.armour_record(), self.shield_record()):
+            if rec is None:
+                continue
+            b = forge_items.build(rec)
+            name = str(rec.get("name") or b.get("name") or "armour")
+            origin = f"item:{b.get('id')}"
+            take(forge_items.roll_specs(b), name, origin)
+            take((b.get("magic") or {}).get("worn"), name, origin, True)
+        crafted = set(self.worn)
+        for rec in self.worn_items():
+            if _is_weapon_record(rec) or forge_items.is_forged(rec):
+                continue
+            name = str(rec.get("name") or "worn gear")
+            origin = f"item:{rec.get('id') or name}"
+            take(rec.get("specs"), name, origin)
+            if rec.get("magic") and magic_layer.has_layer(rec):
+                lay = magic_layer.layer(rec)
+                take(lay["specs"], name, origin)
+                take(lay["worn"], name, origin, True)
+        for slot_key, items in self.slots.items():
+            limit = SLOT_RULES_LIMIT.get(slot_key, 1)
+            for i, item in enumerate(items):
+                if not item or i >= limit or str(item).strip().lower() in crafted:
+                    continue
+                take(magicitem.worn_specs(str(item)), str(item), f"item:{item}")
+        held = self.wielded_record()
+        if held is not None and held.get("magic"):
+            lay = layer_of(held) or {}
+            take(lay.get("wielded"), str(held.get("name") or "the weapon"),
+                 f"item:{held.get('id') or held.get('name')}", True)
+        return out
+
+    def _layer_trigger_docs(self) -> list[tuple[dict, str, str]]:
+        """The layers' `worn` and `wielded` documents (see `_worn_walk`)."""
+        return [(d, name, origin) for d, name, origin, bearer in self._worn_walk()
+                if bearer]
+
+    def spell_resistance_rating(self) -> tuple[int, str]:
+        """(SR, whose) — the best of a stat block's printed SR and what is worn (armour
+        of spell resistance, CRB: "grants the wearer spell resistance"). SR does not
+        stack: the highest applies (CRB, Spell Resistance: "only the highest SR
+        applies"). (0, "") for none."""
+        best, why = 0, ""
+        doc = self._creature_doc() or {}
+        try:
+            printed = int(doc.get("sr") or 0)
+        except (TypeError, ValueError):
+            printed = 0
+        if printed > best:
+            best, why = printed, "its own"
+        for e in self.effects:
+            if e.kind == "spell_resistance" and int(e.amount or 0) > best:
+                best, why = int(e.amount), e.source or e.name
+        for spec, name, _ in self.worn_specs_of("spell_resistance"):
+            try:
+                n = int(spec.get("amount") or 0)
+            except (TypeError, ValueError):
+                continue                        # "12 + caster_level" is a spell's, unbound
+            if n > best:
+                best, why = n, f"the {name}"
+        return best, why
+
+    def fortification(self) -> tuple[int, str]:
+        """(percent, whose) — the best worn fortification (CRB: light 25%, moderate 50%,
+        heavy 75%). Two suits' chances do not add; the wearer has one body to guard."""
+        best, why = 0, ""
+        for spec, name, _ in self.worn_specs_of("fortification"):
+            n = int(spec.get("percent", 0) or 0)
+            if n > best:
+                best, why = n, name
+        return best, why
+
     # --- what the pack itself does (plan §12.5) ---------------------------------------
 
     def carried_effects(self) -> dict[str, tuple[dict, str, str]]:
@@ -926,6 +1065,62 @@ class Actor:
                                               str(getattr(item, "base", "") or mid))
         return out
 
+    def item_records(self, item_id: str = "") -> list:
+        """Every stored copy of a magic item's layer holder: the worn copies (`wear`
+        keeps one) and the pack's record or Stock (a forge item kept as a plain Stock
+        holds its layer on `Stock.magic`). Each is a dict whose `magic` is the layer —
+        the one field a use count is written to, on every copy, so the card, the bench
+        and the fight read the same number after a save and a load."""
+        from . import forge_items
+
+        want = str(item_id or "").strip().lower()
+        out: list = []
+        for rec in self.worn.values():
+            if isinstance(rec, dict) and isinstance(rec.get("magic"), dict):
+                if not want or want in {str(rec.get(k) or "").strip().lower()
+                                        for k in ("id", "name")}:
+                    out.append(rec)
+        for sid, item in self.stock.items():
+            rec = getattr(item, "record", None)
+            holder = rec if isinstance(rec, dict) and isinstance(rec.get("magic"), dict) \
+                else None
+            if holder is None and isinstance(getattr(item, "magic", None), dict):
+                holder = {"magic": item.magic}
+                built = forge_items.record_of(item) or {}
+                holder["id"], holder["name"] = built.get("id") or sid, built.get("name")
+            if holder is None:
+                continue
+            if not want or want in {str(sid).lower()} | {
+                    str(holder.get(k) or "").strip().lower() for k in ("id", "name")}:
+                out.append(holder)
+        return out
+
+    def reset_item_uses(self) -> None:
+        """Every magic item's per-day use counts back to nothing (a new day)."""
+        for holder in self.item_records():
+            m = holder.get("magic")
+            if isinstance(m, dict) and m.get("uses"):
+                m["uses"] = {}
+
+    def worn_effects(self) -> dict[str, tuple[dict, str, str]]:
+        """What worn things grant as standing effects, by a stable key — today fast
+        healing (a ring of regeneration's kin), which needs the round clock and so cannot
+        be a live read the way a modifier is. Keyed `worn:<origin>#<type>#<n>` so the same
+        item worn twice is one effect and taking it off is that effect gone
+        (`sync_carried`, the carried mechanism the plan named for `worn`, §8.1)."""
+        out: dict[str, tuple[dict, str, str]] = {}
+        for kind in ("fast_healing",):
+            for n, (spec, name, origin) in enumerate(self.worn_specs_of(kind)):
+                out[f"worn:{origin}#{kind}#{n}"] = (spec, origin, name)
+        # A daily price for wearing or wielding it — a curse's save each day (lane F,
+        # `periodic: "day"`): the carried mechanism's day effect, run by the one
+        # periodic executor (`run_periodic("day")`).
+        for kind in ("save_gate", "ability_damage"):
+            for n, (spec, name, origin) in enumerate(self.worn_specs_of(kind)):
+                if str(spec.get("periodic") or "").lower() == "day":
+                    out[f"worn:{origin}#{kind}#{n}"] = (spec, origin, name)
+        return out
+
     def sync_carried(self, dice=None) -> list[dict]:
         """Grant what the pack grants, take back what left it — through the one applicator.
 
@@ -937,12 +1132,31 @@ class Actor:
         """
         out: list[dict] = []
         want = self.carried_effects()
+        want.update(self.worn_effects())
         have = {str(e.payload.get("carried_key")): e for e in self.effects
                 if isinstance(e.payload, dict) and e.payload.get("carried_key")}
         for key, (eff, source, item_name) in want.items():
             if key in have:
                 continue
             kind = str(eff.get("type") or "")
+            if kind == "fast_healing" and key.startswith("worn:"):
+                # A worn item's fast healing (enchanting contracts §4, plan §8.4): a
+                # standing effect whose per-round heal the one periodic executor runs
+                # (`run_periodic`), granted with the item and removed with it.
+                try:
+                    amount = int(eff.get("amount") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if amount <= 0:
+                    continue
+                self.apply_effect(ActiveEffect(
+                    name=f"fast healing {amount} ({item_name})", kind="worn", key=key,
+                    source=source, origin=source,
+                    payload={"carried_key": key, "carried_from": item_name, "worn": True},
+                    periodic=[{"per": "round", "heal": amount}]))
+                out.append({"kind": "worn", "ref": self.ref, "what": item_name,
+                            "grants": f"fast healing {amount}"})
+                continue
             if kind == "apply_condition":
                 cond = str(eff.get("target") or eff.get("condition") or "").strip().lower()
                 if not cond:
@@ -960,21 +1174,27 @@ class Actor:
                 # A daily price for carrying it (viridium's leprosy save unless kept in a
                 # lead-lined scabbard): a standing effect whose per-day work the periodic
                 # executor runs (`run_periodic`).
+                worn = key.startswith("worn:")
                 self.apply_effect(ActiveEffect(
-                    name=f"carrying the {item_name}", kind="carried", key=key,
+                    name=f"{'wearing' if worn else 'carrying'} the {item_name}",
+                    kind="worn" if worn else "carried", key=key,
                     source=source, origin=source,
-                    payload={"carried_key": key, "carried_from": item_name},
-                    periodic=[{"per": "day", "effect": {k: v for k, v in eff.items()
-                                                        if k not in ("trigger", "origin",
-                                                                     "source", "book")}}]))
-                out.append({"kind": "carried", "ref": self.ref, "what": item_name})
+                    payload={"carried_key": key, "carried_from": item_name,
+                             **({"worn": True} if worn else {})},
+                    periodic=[{"per": "day", "effect": {
+                        k: v for k, v in eff.items()
+                        if k not in ("trigger", "origin", "source", "book", "periodic")}}]))
+                out.append({"kind": "worn", "ref": self.ref, "what": item_name,
+                            "grants": "a toll each day"} if worn else
+                           {"kind": "carried", "ref": self.ref, "what": item_name})
         for key, e in have.items():
             if key in want:
                 continue
             self.remove_effects(match=lambda x, e=e: x is e)
+            how = "worn" if e.payload.get("worn") else "carried"
             out.append({"kind": "effect_ended", "ref": self.ref,
                         "what": f"{e.name} (the {e.payload.get('carried_from') or 'item'} "
-                                f"is no longer carried)"})
+                                f"is no longer {how})"})
             rounds = _rounds_of(e.payload.get("linger"), dice)
             if rounds and e.kind == "condition":
                 self.apply_effect(ActiveEffect(
@@ -1009,6 +1229,11 @@ class Actor:
         times = max(0, int(times or 0))
         if not times:
             return out
+        if per == "day":
+            # A magic item's daily powers come back with the day (enchanting contracts
+            # §4: "`run_periodic("day")` resets the counts") — the clock's own day
+            # boundary, so there is no second ticker for item uses.
+            self.reset_item_uses()
         for e in list(self.effects):
             for p in list(e.periodic or ()):
                 if str(p.get("per") or "round").lower() != per or "spend_pool" in p:
@@ -1136,9 +1361,12 @@ class Actor:
                     continue
                 if not _when_holds(spec.get("when"), ctx):
                     continue
-                amount = int(spec.get("amount", 0) or 0)
+                try:
+                    amount = int(spec.get("amount", 0) or 0)
+                except (TypeError, ValueError):
+                    continue                    # an unbound formula is no number yet
                 if amount:
-                    out.append(Modifier(amount, name,
+                    out.append(Modifier(amount, str(spec.get("label") or name),
                                         _bonus_type(spec.get("bonus_type"))))
 
         crafted = {k for k in self.worn}
@@ -1152,12 +1380,16 @@ class Actor:
                     read(forge_items.standing_specs(forge_items.build(rec)),
                          str(rec.get("name") or "worn gear"))
                 continue
-            read(rec.get("specs"), str(rec.get("name") or "worn gear"))
+            # An unforged record — a ring, a cloak, an old enchanter's piece — with its
+            # magic layer (`magic_layer.record_specs`): read only its flat `specs` until
+            # 2026-10-05, so a ring of protection bound at the enchanter's bench would
+            # have been worn and inert.
+            read(_record_specs(rec), str(rec.get("name") or "worn gear"))
         held = str(((ctx or {}).get("weapon") or {}).get("record") or "")
         if held:
             rec = self.crafted_record(held)
             if rec is not None and _is_weapon_record(rec):
-                read(_record_specs(rec), str(rec.get("name") or held))
+                read(_raised_specs(rec, ctx), str(rec.get("name") or held))
         from . import magicitem
 
         for slot_key, items in self.slots.items():
@@ -1168,6 +1400,11 @@ class Actor:
                 if str(item).strip().lower() in crafted:
                     continue                    # already read as a crafted record
                 read(magicitem.worn_specs(str(item)), str(item))
+        # What the layers lay on the BEARER (`worn`, `wielded` documents): read on every
+        # roll, the weapon's included — a cursed blade's penalty to its wielder's saves
+        # is the wielder's, not the swing's (lane F's blurred sight).
+        for doc, name, _ in self._layer_trigger_docs():
+            read([doc], name)
         return out
 
     # --- the effect engine ---------------------------------------------------------
@@ -1241,7 +1478,18 @@ class Actor:
         the stored half, and the only one `to_dict` writes, so a level lost is an
         immunity lost. Measured 2026-10-05: a level-20 paladin and monk had none.
         """
+        return self._immunities()
+
+    def _immunities(self, walk: list | None = None) -> list[str]:
         own = self.innate_immunities
+        # And what is worn (a periapt of health's disease, a layered amulet's), read live
+        # through the worn walk: the condition op's immunity check (`states.
+        # immunity_blocks`) and `immune_to` both ask this list, so a worn immunity
+        # refuses at the one door conditions come through, with its tell, and stops
+        # when the thing comes off (enchanting contracts §4).
+        worn = [str(s.get("target") or "")
+                for s, _, _ in self.worn_specs_of("immunity", walk=walk)]
+        own = own + [w for w in worn if w and w not in own]
         if not self.char_class:
             return own
         from . import classfeatures
@@ -2504,9 +2752,16 @@ class Actor:
             from . import statblock_attacks
 
             return statblock_attacks.swings({"bonuses": printed["bonuses"], "count": 1})
+        # Speed (CRB): "when making a full-attack action, the wielder of a speed weapon may
+        # make one extra attack with it. The attack uses the wielder's full base attack
+        # bonus" — so the extra is one more swing at iteration 0, never a sixth
+        # iterative. `extra_attacks` is the row's count per stacking group, the best of
+        # each group once (`_with_layer`), so a speed weapon under haste gets one extra,
+        # not two, the day haste has a document in the group.
+        extra = [0] * int(self.weapon(weapon_key).get("extra_attacks", 0) or 0)
         if self.flat_attack is not None:
-            return [0]
-        return list(range(len(iterative_attacks(self.bab))))
+            return [0] + extra
+        return list(range(len(iterative_attacks(self.bab)))) + extra
 
     def attack_plan(self, weapon_key: str | None = None,
                     full_attack: bool = False) -> list[tuple[str, int]]:
@@ -2619,6 +2874,14 @@ class Actor:
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
+        if against == "ranged":
+            # Arrow catching (CRB shield ability): "a +1 deflection bonus to AC against
+            # ranged weapons". Typed, so a ring of protection's deflection and this take
+            # the better, as 1e's stacking says.
+            for spec, name, _ in self.worn_specs_of("deflect_ranged"):
+                n = int(spec.get("deflection", 0) or 0)
+                if n:
+                    mods.append(Modifier(n, f"{name} (against ranged)", "deflection"))
         # The scoped terms, asked of THIS attacker and this kind of attack: a smite's
         # deflection against the smitten, a dodge "against melee attacks". Only an
         # effect's own scoped modifiers are added here — the unscoped ones arrived on the
@@ -2985,10 +3248,11 @@ class Actor:
             m = _re.match(r"^resist\.([a-z-]+)\.(\d+)$", str(tag))
             if m and normalise_damage_type(m.group(1)) == want:
                 tagged = max(tagged, int(m.group(2)))
-        # The worn forged suit's build (a fire-forged steel's resistance 2, a quench mark's
-        # glacier-melt cold 1), live-read like everything worn. The better one applies.
+        # What is worn (`worn_specs_of`): the forged suit's build (a fire-forged steel's
+        # resistance 2), a shield or suit of energy resistance, a catalogue ring, a
+        # cloak's layer — live-read like everything worn. The better one applies.
         forged = max((int(s.get("amount", 0) or 0)
-                      for s in self._armour_build_specs("resistance")
+                      for s, _, _ in self.worn_specs_of("resistance")
                       if normalise_damage_type(str(s.get("target") or "")) == want),
                      default=0)
         return max(printed, tagged, forged)
@@ -3038,9 +3302,9 @@ class Actor:
         # level-20 barbarian and paladin both had `dr=[]`.
         for r in self.class_reductions():
             pool.append(r)
-        # The worn forged suit's build: adamantine armour's book DR, read live from the
-        # suit while it is worn (contract §5), so taking it off takes the DR with it.
-        suit = self.armour_record()
+        # What is worn (`worn_specs_of`): adamantine armour's book DR, invulnerability's
+        # 5/magic, a catalogue item's — read live while worn (contract §5), so taking it
+        # off takes the DR with it.
         # A suit's DR may be conditional on who struck (elysian bronze: "against magical
         # beasts and monstrous humanoids"). The blow names its maker in its traits as
         # `attacker:<tag>` (`Engine` adds them on a weapon hit), and the clause is asked
@@ -3049,12 +3313,12 @@ class Actor:
         blow = {"attacker_tags": frozenset(
             str(t)[len(ATTACKER_TRAIT):] for t in traits or ()
             if str(t).startswith(ATTACKER_TRAIT))}
-        for s in self._armour_build_specs("damage_reduction"):
+        for s, worn_name, _ in self.worn_specs_of("damage_reduction", ask_when=False):
             if not _when_holds(s.get("when"), blow):
                 continue
             if int(s.get("amount", 0) or 0) > 0 and wants(s):
                 pool.append(Reduction(int(s["amount"]), str(s.get("bypass") or ""),
-                                      str((suit or {}).get("name") or "armour")))
+                                      worn_name))
         for e in self.effects:
             if e.kind == "damage_reduction":
                 d = dict(e.payload or {})
@@ -3713,15 +3977,39 @@ class Actor:
         from . import states as _states
 
         doc = self._creature_doc() or {}
+        walk = self._worn_walk()                 # one walk for both readers below
         out.extend(_states.type_tags(doc.get("creature_type"), doc.get("subtype"),
-                                     self.immunities))
+                                     self._immunities(walk)))
         # What carried gear grants (content/rules/gear.json, 2026-10-01): a bedroll is
         # `gear.bedding`, a tent `gear.shelter`. Live-read from the pack like a feat
         # from the feat list, so the bedroll sold is the bedding gone.
         from . import gear as _gear
 
         out.extend(_gear.tags(self))
+        # What is worn and wielded gives (enchanting contracts §4): a sense while worn —
+        # goggles of night's `sense.darkvision` — and every bound property's
+        # `property.<id>` tag on the suit, the shield and the weapon in hand, which a
+        # `reads_tag` reader asks (ghost touch armour, seeking, wild) by prefix (law 1),
+        # never by a name. Live-read: off comes the cloak, gone is the sight.
+        out.extend(self._worn_tags(walk))
         return tuple(out)
+
+    def _worn_tags(self, walk: list | None = None) -> list[str]:
+        out: list[str] = []
+        for spec, _, _ in self.worn_specs_of("sense", walk=walk):
+            sense = str(spec.get("target") or "").strip().lower().replace(" ", "-")
+            if sense:
+                out.append(f"sense.{sense}")
+        for rec in (self.armour_record(), self.shield_record(), self.wielded_record()):
+            # The record's own ids, read without `magic_layer.magic_of` (which deep-
+            # copies the layer, and this runs inside every `has_state`).
+            m = (rec or {}).get("magic")
+            if not isinstance(m, dict):
+                continue
+            out.extend(effectspec_property_tag(e.get("id"))
+                       for e in (m.get("properties") or []) + (m.get("flat") or [])
+                       if isinstance(e, dict) and e.get("id"))
+        return out
 
     def death_floor(self) -> int:
         """The hit point total at which this body is dead (or destroyed).
@@ -5171,12 +5459,144 @@ def _is_weapon_record(rec) -> bool:
 
 
 def _record_specs(rec: dict) -> list[dict]:
-    """What a crafted record adds to a roll: a forged one's build, an old one's flat specs."""
-    from . import forge_items
+    """What a crafted record adds to a roll: a forged one's build (its magic layer merged
+    in by `forge_items.build`), an unforged one's flat specs and its layer
+    (`magic_layer.record_specs`, enchanting contracts §3.4: a ring has no build)."""
+    from . import forge_items, magic_layer
 
     if forge_items.is_forged(rec):
         return forge_items.standing_specs(forge_items.build(rec))
-    return [dict(s) for s in rec.get("specs") or () if isinstance(s, dict)]
+    return magic_layer.record_specs(rec)
+
+
+def effectspec_property_tag(pid) -> str:
+    """`property.<id>` for a bound property, by its canonical id (an old `mi-*` alias
+    answers as the property it became)."""
+    from . import effectspec
+
+    prop = effectspec.property(str(pid))
+    return effectspec.property_tag(prop["id"] if prop else str(pid))
+
+
+def _raised_specs(rec: dict, ctx: dict | None) -> list[dict]:
+    """A weapon record's specs for THIS swing, with bane's raise applied.
+
+    Bane (CRB): "against a designated foe, the weapon's enhancement bonus is +2 better
+    than its actual bonus". Lane A measured why it cannot ride as a second enhancement
+    term: `dice.stack` keeps the better of two enhancement bonuses, so a +1 bane sword
+    with a "+2 enhancement" beside its +1 hit at +2 against its foe, not the book's +3.
+    So the raise is applied to the enhancement term itself — +1 becomes +3 against the
+    foe, named "(bane +2)" in the dice popup — and against anybody else the term is the
+    sword's own +1. The foe is the `when` lane A's `bind` wrote, asked of this roll's
+    defender (`_when_holds`); a roll with no defender (the sheet's line) has no foe.
+    """
+    from . import magic_layer
+
+    specs = _record_specs(rec)
+    lay = layer_of(rec)
+    if not lay or not lay.get("raises"):
+        return specs
+    own = int(lay.get("enhancement") or 0)
+    raised = magic_layer.raised_enhancement(lay, lambda when: _when_holds(when, ctx))
+    if raised == own:
+        return specs
+    why = ", ".join(sorted({str(d.get("source") or "").split(":")[-1]
+                            for d in lay["raises"] if _when_holds(d.get("when"), ctx)}))
+    label = f"{rec.get('name') or 'the weapon'} ({why or 'raised'} +{raised - own})"
+    out, done = [], set()
+    for s in specs:
+        if (s.get("type") == "combat_mod" and s.get("source") == "enhancement"
+                and str(s.get("target")) in ("attack", "damage")):
+            s = dict(s, amount=raised, label=label)
+            done.add(str(s["target"]))
+        out.append(s)
+    for target in ("attack", "damage"):
+        if target not in done:
+            out.append({"type": "combat_mod", "target": target, "amount": raised,
+                        "bonus_type": "enhancement", "source": "enhancement",
+                        "label": label})
+    return out
+
+
+def layer_of(rec) -> dict | None:
+    """The computed magic layer of a record (`magic_layer.layer`), or None. A forged
+    record's comes through its build, so a reader never computes it twice by two roads."""
+    from . import forge_items, magic_layer
+
+    if not isinstance(rec, dict) or not magic_layer.has_layer(rec):
+        return None
+    if forge_items.is_forged(rec):
+        return forge_items.build(rec).get("magic")
+    return magic_layer.layer(rec)
+
+
+# The book's threat-range rule, said once (CRB, keen: "Doubles the threat range of a
+# weapon ... This benefit doesn't stack with any other effect that expands the threat
+# range of a weapon (such as the keen edge spell or the Improved Critical feat)"). A
+# doubling is of the range's SIZE — 19-20 (two faces) becomes 17-20 (four), 18-20 becomes
+# 15-20 — the CRB's Improved Critical example, which this arithmetic reproduces.
+def doubled_threat(crit_range: int, multiply: int) -> int:
+    faces = 21 - int(crit_range or 20)
+    return max(1, 21 - faces * max(1, int(multiply or 1)))
+
+
+def _with_layer(row: dict, lay: dict | None) -> dict:
+    """The weapons-table row as the enchanter's layer changes it (enchanting contracts
+    §4): the threat range (keen), the weapon's own lethality (merciful), the extra attack
+    (speed), and the layer itself under `magic` for the attack path's readers (riders,
+    bane's raise, ghost touch, brilliant energy). Each is a fact of the WEAPON, which is
+    why it is set on the row the sheet and the engine both read, and why the sheet's
+    weapon line shows 17-20 for a keen scimitar without a second reader.
+
+    Threat-range doublings of one `stacking` group do not stack — the best applies once
+    (the type's docstring, effectspec `crit_range`); two different groups would compound,
+    and no second group exists in the book.
+    """
+    if not lay:
+        return row
+    row = dict(row)
+    row["magic"] = lay
+    best: dict[str, int] = {}
+    extra: dict[str, int] = {}
+    for spec in lay.get("specs") or ():
+        kind = str(spec.get("type") or "")
+        if kind == "crit_range":
+            group = str(spec.get("stacking") or "threat-range")
+            best[group] = max(best.get(group, 1), int(spec.get("multiply", 2) or 2))
+        elif kind == "extra_attack" and str(spec.get("on") or "full_attack") == "full_attack":
+            group = str(spec.get("stacking") or "haste")
+            extra[group] = max(extra.get(group, 0), int(spec.get("count", 1) or 1))
+        elif kind == "gear_mod" and spec.get("target") == "throw_range_ft":
+            # Throwing (CRB): "allows a weapon designed for melee to be thrown as a
+            # ranged weapon" with a 10-foot range increment — the row's `range_ft`, which
+            # the reach check reads for a thrown blow (`position.out_of_reach`).
+            if not int(row.get("range_ft") or 0):
+                row["range_ft"] = int(spec.get("amount", 10) or 10)
+        elif kind == "gear_mod" and spec.get("target") == "range_pct":
+            # Distance (CRB): "doubles the range increment". The row's `range_ft`, so the
+            # sheet shows it; no range-increment penalty is rolled by the engine yet.
+            if int(row.get("range_ft") or 0):
+                row["range_ft"] = int(row["range_ft"]) * (100 + int(spec.get("amount", 0)
+                                                                     or 0)) // 100
+        elif kind == "weapon_lethality" and spec.get("lethality") == "nonlethal":
+            # Merciful (CRB): "all damage it deals is nonlethal damage. On command, the
+            # weapon suppresses this ability until commanded to resume it." Read where a
+            # sap's is read (`weapons.lethality_of`, the `nonlethal` flag), and the
+            # command is the declared lethality: `either`, so striking to kill costs no
+            # -4 (`lethality_swap`) — the weapon is told, not fought.
+            row["nonlethal"] = True
+            if spec.get("suppressible"):
+                row["lethality"] = "either"
+                row["suppressible"] = str(spec.get("source") or "")
+    if best:
+        row["crit_range_printed"] = int(row.get("crit_range", 20) or 20)
+        cr = row["crit_range_printed"]
+        for m in best.values():
+            cr = doubled_threat(cr, m)
+        row["crit_range"] = cr
+    if extra:
+        row["extra_attacks"] = sum(extra.values())
+    return row
 
 
 # Rounds in each unit a duration may be written in (ten rounds a minute, CRB p.178).
@@ -5331,6 +5751,16 @@ def _when_holds(when, ctx: dict | None) -> bool:
 
                     if bool(value) != armour_mod.wears_metal(defender):
                         return False
+                    continue
+                if field_name == "alignment":
+                    # Holy's 2d6 "against evil", unholy's against good, axiomatic's and
+                    # anarchic's (CRB). The owner's ruling (round 6, 2026-10-05,
+                    # docs/enchanting-answers.md): the app tracks no alignment yet, so the
+                    # clause holds against ANY foe, as smite does, until alignment exists —
+                    # and the property's own text says it will narrow then. Answered yes
+                    # here, at the one reader, rather than by deleting the clause from the
+                    # documents: when alignment lands this branch is the only line that
+                    # changes, and every holy sword narrows with it.
                     continue
                 if field_name not in ("type", "subtype"):
                     return False

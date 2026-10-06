@@ -152,11 +152,11 @@
       ],
       "not_yet": [
         "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be good, and an evil wielder takes no negative level. Both clauses are kept here as data (`requires.creator_alignment`, `wielder`) and nothing checks them.",
-        "The extra 2d6 is `when: target alignment evil`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment (the bestiary field, as Engine._could_be_evil does for smite)."
+        "The extra 2d6 is `when: target alignment evil`. The app tracks no alignment yet (owner, round 6, 2026-10-05), so Actor._when_holds answers yes for every target and the 2d6 lands on any foe, as smite does; it narrows to evil creatures once alignment is added."
       ],
       "aliases": {"mi-holy": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#holy",
-      "text": "Good-aligned: it passes damage reduction that good passes, and deals an extra 2d6 damage to evil creatures."
+      "text": "Good-aligned: it passes damage reduction that good passes, and deals an extra 2d6 damage to evil creatures — for now to any foe, since no alignment is tracked yet; it narrows to evil creatures once alignment is added."
     },
     {
       "id": "unholy", "name": "Unholy", "gear": ["weapon"], "plus": 2, "cl": 7,
@@ -170,11 +170,11 @@
       ],
       "not_yet": [
         "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be evil, and a good wielder takes no negative level. Both clauses are kept here as data and nothing checks them.",
-        "The extra 2d6 is `when: target alignment good`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment."
+        "The extra 2d6 is `when: target alignment good`. The app tracks no alignment yet (owner, round 6, 2026-10-05), so Actor._when_holds answers yes for every target and the 2d6 lands on any foe, as smite does; it narrows to good creatures once alignment is added."
       ],
       "aliases": {"mi-unholy": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#unholy",
-      "text": "Evil-aligned: it passes damage reduction that evil passes, and deals an extra 2d6 damage to good creatures."
+      "text": "Evil-aligned: it passes damage reduction that evil passes, and deals an extra 2d6 damage to good creatures — for now to any foe, since no alignment is tracked yet; it narrows to good creatures once alignment is added."
     },
     {
       "id": "axiomatic", "name": "Axiomatic", "gear": ["weapon"], "plus": 2, "cl": 7,
@@ -188,11 +188,11 @@
       ],
       "not_yet": [
         "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be lawful, and a chaotic wielder takes no negative level. Both clauses are kept here as data and nothing checks them.",
-        "The extra 2d6 is `when: target alignment chaotic`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment."
+        "The extra 2d6 is `when: target alignment chaotic`. The app tracks no alignment yet (owner, round 6, 2026-10-05), so Actor._when_holds answers yes for every target and the 2d6 lands on any foe, as smite does; it narrows to chaotic creatures once alignment is added."
       ],
       "aliases": {"mi-axiomatic": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#axiomatic",
-      "text": "Lawful-aligned: it passes damage reduction that lawful passes, and deals an extra 2d6 damage to chaotic creatures."
+      "text": "Lawful-aligned: it passes damage reduction that lawful passes, and deals an extra 2d6 damage to chaotic creatures — for now to any foe, since no alignment is tracked yet; it narrows to chaotic creatures once alignment is added."
     },
     {
       "id": "anarchic", "name": "Anarchic", "gear": ["weapon"], "plus": 2, "cl": 7,
@@ -206,11 +206,11 @@
       ],
       "not_yet": [
         "Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): the creator need not be chaotic, and a lawful wielder takes no negative level. Both clauses are kept here as data and nothing checks them.",
-        "The extra 2d6 is `when: target alignment lawful`, and Actor._when_holds reads no `alignment` key yet, so it fires against nobody until lane C reads a creature's printed alignment."
+        "The extra 2d6 is `when: target alignment lawful`. The app tracks no alignment yet (owner, round 6, 2026-10-05), so Actor._when_holds answers yes for every target and the 2d6 lands on any foe, as smite does; it narrows to lawful creatures once alignment is added."
       ],
       "aliases": {"mi-anarchic": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#anarchic",
-      "text": "Chaotic-aligned: it passes damage reduction that chaotic passes, and deals an extra 2d6 damage to lawful creatures."
+      "text": "Chaotic-aligned: it passes damage reduction that chaotic passes, and deals an extra 2d6 damage to lawful creatures — for now to any foe, since no alignment is tracked yet; it narrows to lawful creatures once alignment is added."
     },
     {
       "id": "ghost-touch", "name": "Ghost Touch", "gear": ["weapon"], "plus": 1, "cl": 9,
@@ -405,7 +405,7 @@
       "requires": {"ranged": true},
       "documents": [],
       "reads_tag": "The attack path's concealment roll asks has_state('property.seeking') of the weapon: a seeking weapon's attack ignores the miss chance concealment would give (the wielder still has to aim at the right square).",
-      "not_yet": ["Nothing reads property.seeking yet; the miss chance is still rolled until lane C's concealment roll asks the tag."],
+      "not_yet": ["Read since lane C (2026-10-05): the concealment roll asks the tag and rolls no miss chance. Total cover is not concealment and still blocks the shot."],
       "aliases": {},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#seeking",
       "text": "Veers to its target: concealment gives no miss chance against it. Ranged weapons only."
@@ -495,7 +495,7 @@
       "documents": [
         {"type": "spell_resistance", "amount": 13, "book": true}
       ],
-      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet (effectspec, docs/spells.md 5.1). Lane C builds the check (contracts §4, SR); until then the wearer's SR is shown and does not stop a spell."],
+      "not_yet": [],
       "aliases": {"mi-spell-resistance-13": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
       "text": "Spell resistance 13 while worn."
@@ -508,7 +508,7 @@
       "documents": [
         {"type": "spell_resistance", "amount": 15, "book": true}
       ],
-      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet. Lane C builds the check; until then the wearer's SR is shown and does not stop a spell."],
+      "not_yet": [],
       "aliases": {"mi-spell-resistance-15": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
       "text": "Spell resistance 15 while worn."
@@ -521,7 +521,7 @@
       "documents": [
         {"type": "spell_resistance", "amount": 17, "book": true}
       ],
-      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet. Lane C builds the check; until then the wearer's SR is shown and does not stop a spell."],
+      "not_yet": [],
       "aliases": {"mi-spell-resistance-17": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
       "text": "Spell resistance 17 while worn."
@@ -534,7 +534,7 @@
       "documents": [
         {"type": "spell_resistance", "amount": 19, "book": true}
       ],
-      "not_yet": ["spell_resistance is recorded and not executable: the cast path rolls no caster level check against spell resistance yet. Lane C builds the check; until then the wearer's SR is shown and does not stop a spell."],
+      "not_yet": [],
       "aliases": {"mi-spell-resistance-19": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#spell-resistance",
       "text": "Spell resistance 19 while worn."
@@ -692,7 +692,7 @@
       "requires": {},
       "documents": [],
       "reads_tag": "The incorporeal attack path asks has_state('property.ghost-touch-armour') of the defender's armour and shield: their enhancement and armour bonuses count against an incorporeal creature's touch attacks; an incorporeal creature can wear it.",
-      "not_yet": ["Nothing reads property.ghost-touch-armour yet; an incorporeal touch still ignores the armour until lane C's incorporeal attack path asks the tag."],
+      "not_yet": ["Its first clause is read since lane C (2026-10-05): an incorporeal creature's touch attack meets the armour and shield bonuses. The second — an incorporeal creature can wear it — has no reader: nothing lets an incorporeal body put armour on."],
       "aliases": {"mi-ghost-touch-armour": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#ghost-touch",
       "text": "Its armour and enhancement bonuses count against incorporeal creatures' touch attacks, and an incorporeal creature can wear it."
