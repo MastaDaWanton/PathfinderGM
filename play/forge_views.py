@@ -1092,9 +1092,11 @@ def forge_assay(request):
     for k in revealed:
         text = str((rows.get(k) or {}).get("text") or "")
         found.append({"key": k, "text": text, "row": rows.get(k)})
-        res = worldclass.award_bonus(track, progress, mp=worldclass.FIRST_MP,
-                                     why=f"learned: {m.name}, {text}" if text
-                                     else f"learned: {m.name}")
+    for f in found:
+        # A point for each property the study turned up (`worldclass.STUDY_MP`).
+        res = worldclass.award_bonus(track, progress, mp=worldclass.STUDY_MP,
+                                     why=f"studied {m.name}: {f['text']}" if f["text"]
+                                     else f"studied {m.name}")
         lines.extend(res.get("reasons") or [])
         levelled.extend(res.get("levelled") or [])
     # The danger of a reactive metal, applied for real (contracts §6): lane E's assay
@@ -1306,9 +1308,10 @@ def forge_ask(request):
     lines: list[dict] = []
     levelled: list[int] = []
     for f in revealed:
-        res = worldclass.award_bonus(track, progress, mp=worldclass.FIRST_MP,
-                                     why=f"learned: {m.name}, {f['text']}" if f["text"]
-                                     else f"learned: {m.name}")
+        # A lesson is a study: a point for each property taught (`worldclass.STUDY_MP`).
+        res = worldclass.award_bonus(track, progress, mp=worldclass.STUDY_MP,
+                                     why=f"studied {m.name}: {f['text']}" if f["text"]
+                                     else f"studied {m.name}")
         lines.extend(res.get("reasons") or [])
         levelled.extend(res.get("levelled") or [])
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
