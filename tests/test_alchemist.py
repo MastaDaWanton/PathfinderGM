@@ -598,23 +598,9 @@ def test_gathered_and_mined_materials_name_real_biomes(shipped):
                 assert b in BIOMES, f"{m['id']}: {b!r} is not a biome"
 
 
-def test_no_material_id_is_claimed_by_two_crafts():
-    """One shelf, four catalogues, and `load_dir` merges by id in filename order — so a
-    duplicate id means the alphabetically-later craft silently wins.
-
-    Measured when this was written: my `blessed-water` (uncommon solvent) was shadowed
-    by the blacksmith's `blessed-water` (rare quenchant), which moved four potions up a
-    tier and removed the reaction medium from three chains, with nothing anywhere
-    reporting a problem. Mine were renamed to `font-water` and `standing-oak-bark`. The
-    test is shelf-wide rather than mine-only because the next collision will not be
-    mine either.
-    """
-    seen: dict[str, list[str]] = {}
-    for path in Path("content/materials").glob("*-materials.json"):
-        for m in json.loads(path.read_text(encoding="utf-8"))["materials"]:
-            seen.setdefault(m["id"], []).append(path.stem)
-    clashes = {k: v for k, v in seen.items() if len(v) > 1}
-    assert not clashes, f"ids claimed by two crafts: {clashes}"
+# The shelf-wide id test lived here until 2026-10-06 and moved to tests/test_alchemy_shelf.py,
+# widened from "catalogue against catalogue" to "every material id against every ingredient
+# id" after `basilisk-eye` was found claimed by a herb and a gland at once (alchemy plan §5.7).
 
 
 def test_a_sibling_crafts_shelf_entry_is_read_rather_than_crashing():

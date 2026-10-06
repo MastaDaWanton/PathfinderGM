@@ -176,10 +176,15 @@ def test_an_ingredient_that_is_only_dangerous_to_handle_is_named():
     """30 of the corpus's ingredients are marked risky and extract no harmful mechanic at
     all, because the danger is in the harvesting. The warning stays — but it says which
     ingredient it is about, instead of the one sentence that used to be the whole panel
-    however many poisons were in the pot."""
+    however many poisons were in the pot.
+
+    The example was Basilisk Eye until 2026-10-06, when the alchemist's basilisk-eye gland
+    was merged into it (alchemy plan §5.7) and it gained a harmful `external` trait, so it
+    is no longer only dangerous to handle; Cockatrice Beak still is."""
     r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["basilisk-eye"]))
-    assert any("Untreated hazardous components: Basilisk Eye." in d for d in r.drawbacks)
+                         Chain("herbalist", ["grind"], ["cockatrice-beak"]))
+    assert any("Untreated hazardous components: Cockatrice Beak." in d
+               for d in r.drawbacks)
 
 
 def test_a_crafting_dc_restated_in_the_prose_does_not_become_a_poison():

@@ -12,17 +12,24 @@ CLAUDE.md's "when you fix a rule, grep for every copy of it" warns about, and th
 would have drifted the first time anyone corrected how a drawback is told.
 
 **A document** is either an `Ingredient` (its effect lines are `pairs`) or a normalised
-material document (contract §3: a dict with `weapon`, `armour`, `working` and
-`quench_mark`). A string is resolved as a material first, through lane C's
-`rules/materials.py` (the one door to every craft material), then as an ingredient. The
-two id spaces are disjoint (`tests/test_alchemist.py` pins it), so the order only decides
-which loader is asked first.
+material document (contract §3: a dict with `product`, `weapon`, `armour`, `working`,
+`quench_mark`, `mishap` and `toxic`). A string is resolved as a material first, through
+`rules/materials.py` (the one door to every craft material), then as an ingredient.
+Every material id in every catalogue and every ingredient id in the herb corpus are
+disjoint — tests/test_alchemy_shelf.py pins it — so the order only decides which loader
+is asked first. (Until 2026-10-06 this said tests/test_alchemist.py pinned it; that test
+compared the material catalogues only with each other, and `basilisk-eye` was a herb
+and an alchemist's gland at once, the herb's own id resolving to the gland. Merged into
+the herb: alchemy plan §5.7.)
 
 **A property is one positional key.** An ingredient's are "p0", "p1"... as they always
-were. A material's are one per effect, by list: "w0".. for `weapon`, "a0".. for `armour`,
-"t0".. for `working` traits, and "q0" for the quench mark. Positional on purpose, for the
-reason herbs gave: a key that is a slug of the text breaks the moment an author fixes a
-typo in it.
+were. A material's are one per effect, by list: "p0".. for `product` (what it puts in a
+bottle — the same letter as a herb's, because a hybrid herb's effects ARE its product,
+and tasting it and assaying it must teach one set of keys), "w0".. for `weapon`, "a0"..
+for `armour`, "t0".. for `working` traits, "q0" for the quench mark, "m0" for the
+alchemist's mishap and "x0" for the toxic-to-handle document. Positional on purpose, for
+the reason herbs gave: a key that is a slug of the text breaks the moment an author
+fixes a typo in it.
 
 **One store.** `Actor.herb_known`, keyed by herb id or material id (contract §6: no new
 Actor field this wave; a rename is a later migration). A material is stored under its
@@ -58,12 +65,28 @@ BENEFIT, DRAWBACK, NEUTRAL = "benefit", "drawback", "neutral"
 _HARM_TYPES = frozenset({"vulnerability", "ability_drain", "bleed"})
 
 HERBALIST, BLACKSMITH, ENCHANTER = "herbalist", "blacksmith", "enchanter"
+ALCHEMIST = "alchemist"
 
 # A material's lists, in the order their properties are keyed and shown, with the prefix
-# each key carries. Herbs' "p" sorts first, so an ingredient's key order is untouched.
-MATERIAL_LISTS = (("weapon", "w"), ("armour", "a"), ("working", "t"), ("quench_mark", "q"))
-_PREFIX_ORDER = {"p": 0, **{p: i + 1 for i, (_, p) in enumerate(MATERIAL_LISTS)}}
+# each key carries. "p" sorts first, so an ingredient's key order is untouched.
+#
+# The alchemist's four (alchemy contracts §4): `product`, `mishap` and `toxic` joined the
+# forge's lists. Measured before they did: `property_keys` was 0 for all 139 alchemist
+# materials, because this tuple knew only the forge's fields, so nothing about a reagent
+# could ever be learned, taught or shown.
+MATERIAL_LISTS = (("product", "p"), ("weapon", "w"), ("armour", "a"), ("working", "t"),
+                  ("quench_mark", "q"), ("mishap", "m"), ("toxic", "x"))
+# The lists that hold one document rather than a list of them.
+_SINGLE_LISTS = frozenset({"quench_mark", "mishap", "toxic"})
+_PREFIX_ORDER = {p: i for i, (_, p) in enumerate(MATERIAL_LISTS)}
 GROUP_OF_PREFIX = {p: g for g, p in MATERIAL_LISTS}
+# Routes on which a product trait lands on whoever the product is used AGAINST (alchemy
+# contracts §2.1): a flask's fire on the struck foe, a cloud's on those inside it. Harm
+# delivered there is the product's point, a benefit to its maker; the same harm by
+# `carried` or `ingest` is a cost to whoever holds or drinks it. `external` is left out on
+# purpose: it is the herb corpus's word, and reclassifying its 49 effects would move what
+# a taste of every hybrid herb teaches.
+_FOE_ROUTES = frozenset({"struck", "area"})
 
 # `gear_mod` targets where a LOWER number is the better item (contract §2): less spell
 # failure, less weight, a lighter category, a smaller speed penalty. Every other target
@@ -79,7 +102,13 @@ _BAD_TRAITS = frozenset({"slaggy", "sulfurous", "quench_sensitive", "narrow_wind
                          # The circle's (enchanting plan §7.3): a phial that binds only
                          # by night, drifts in its seat, fades as it is refined, or is
                          # dangerous to read. `eager` and `pure` help.
-                         "night_only", "skittish", "heavy", "volatile"})
+                         "night_only", "skittish", "heavy", "volatile",
+                         # The alchemist's (alchemy plan §5.5): refused at Calcine, a
+                         # narrower Dissolve band, a grade lost a day unsealed, refused
+                         # in a metal vessel, and harm to whoever works it. `volatile` is
+                         # the circle's word too, and means a mishap here.
+                         "combustible", "slow_to_dissolve", "light_sensitive",
+                         "corrosive", "toxic_to_handle"})
 
 # An essence's discoverable traits (enchanting plan §7.2; lane D's
 # `materials.essence_traits`): what it binds, each house top-up, its phase, its polarity,
@@ -103,9 +132,15 @@ _FOE_TRIGGERS = frozenset({"hit", "crit", "first_wound_daily"})
 # CAMPAIGN_DIR can change what these files say mid-run.
 
 _LORE_FILES = {HERBALIST: "herb-lore.json", BLACKSMITH: "smithing-lore.json",
-               ENCHANTER: "enchanting-lore.json"}
+               ENCHANTER: "enchanting-lore.json", ALCHEMIST: "alchemy-lore.json"}
 _MANUAL_FILES = {HERBALIST: "herbal-manuals.json", BLACKSMITH: "smithing-manuals.json",
-                 ENCHANTER: "enchanting-manuals.json"}
+                 ENCHANTER: "enchanting-manuals.json", ALCHEMIST: "alchemy-manuals.json"}
+# The alchemist's rule rows are not all written yet (alchemy contracts §1: the manuals
+# are lane H's file; no lane owns an alchemy-lore.json in wave 1). Until a file is
+# shipped, its craft reads the herbalist's rows — the plan's own fallback for reagents
+# (alchemy plan §13.3: "the herbalism `teaches` route", "Libraries: the herbalism route,
+# reused") — and has no manuals, rather than crashing every card that asks.
+_LORE_FALLBACK = {ALCHEMIST: HERBALIST}
 
 
 def _content(name: str) -> dict:
@@ -115,28 +150,49 @@ def _content(name: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-@functools.lru_cache(maxsize=4)
+def _has_content(name: str) -> bool:
+    from django.conf import settings
+
+    return (Path(settings.BASE_DIR) / "content" / "rules" / name).is_file()
+
+
+@functools.lru_cache(maxsize=8)
 def _rule_file(name: str) -> dict:
     return _content(name)
 
 
 def craft_of(doc_or_craft) -> str:
     """Which craft's rule rows answer for a document: an essence's are the enchanter's,
-    any other material's the smith's, a herb's the herbalist's. A craft id passes through."""
+    any other material's the smith's, a herb's — on either shelf — the herbalist's. A
+    craft id passes through (`ALCHEMIST` included: `lore(ALCHEMIST)`, `manuals(ALCHEMIST)`).
+
+    An alchemist's reagent still answers to the SMITH's rows here, as it always has
+    (tests/test_enchant_knowledge.py pins camphor to it), so a smith is its teacher and a
+    guildhall its library. That never showed while no reagent had a property to teach;
+    it will once lane D's pass lands. Left for the bench lane to switch together with
+    that test and an alchemy lore file, which no wave-1 lane owns (lane A's report)."""
     if isinstance(doc_or_craft, str):
-        return doc_or_craft if doc_or_craft in (BLACKSMITH, ENCHANTER) else HERBALIST
+        return doc_or_craft if doc_or_craft in (BLACKSMITH, ENCHANTER, ALCHEMIST) \
+            else HERBALIST
     if is_essence(doc_or_craft):
         return ENCHANTER
-    return BLACKSMITH if is_material(doc_or_craft) else HERBALIST
+    if not is_material(doc_or_craft) or _is_herb_view(doc_or_craft):
+        return HERBALIST
+    return BLACKSMITH
 
 
 def lore(doc_or_craft=HERBALIST) -> dict:
     """The prices, times and DCs of learning, for this document's craft."""
-    return _rule_file(_LORE_FILES[craft_of(doc_or_craft)])
+    craft = craft_of(doc_or_craft)
+    while craft in _LORE_FALLBACK and not _has_content(_LORE_FILES[craft]):
+        craft = _LORE_FALLBACK[craft]
+    return _rule_file(_LORE_FILES[craft])
 
 
-@functools.lru_cache(maxsize=4)
+@functools.lru_cache(maxsize=8)
 def _manual_rows(craft: str) -> tuple:
+    if not _has_content(_MANUAL_FILES[craft]):
+        return ()
     return tuple(_rule_file(_MANUAL_FILES[craft]).get("manuals") or ())
 
 
@@ -191,10 +247,18 @@ def material_of(material_id: str) -> str:
 
 
 def material(material_id: str) -> dict | None:
-    """The normalised material document, or None. A form resolves to its parent."""
+    """The normalised material document, or None. A form resolves to its parent, except
+    an alchemist's form, which is its own document (`_own_store`): cinnabar is not
+    quicksilver at the alchemist's bench, whatever it smelts to."""
     door = _door()
     if door is None:
         return None
+    try:
+        own = door.get(str(material_id or ""))
+    except KeyError:
+        own = None
+    if own and _own_store(own):
+        return own
     for mid in dict.fromkeys((material_of(material_id), str(material_id or ""))):
         try:
             got = door.get(mid)
@@ -219,6 +283,14 @@ def is_material(doc) -> bool:
     """A material document is a dict (contract §3); an ingredient is an object with
     `pairs`. Asked by shape, so a document from any craft's file counts."""
     return isinstance(doc, dict)
+
+
+def _is_herb_view(doc) -> bool:
+    """A hybrid herb as the alchemy shelf serves it (`materials.herb_view`): a dict, so
+    it is keyed as a material is, but the herb's own document underneath — its knowledge
+    lives under the herb's id, its rows are the herbalist's, and a bare save gate in it
+    guards its poison exactly as on the herb's card."""
+    return isinstance(doc, dict) and doc.get("catalogue") == "ingredients"
 
 
 def _ingredient(ingredient_or_id):
@@ -246,9 +318,33 @@ def _field(doc, name: str, default=""):
 
 
 def doc_id(doc) -> str:
-    """The id knowledge is stored under: a material's parent, an ingredient's own id."""
+    """The id knowledge is stored under: a material's parent, an ingredient's own id, and
+    an alchemist's material its own id (`_own_store`)."""
     raw = str(_field(doc, "id", "") or "")
-    return material_of(raw) if is_material(doc) else raw
+    if not is_material(doc) or _own_store(doc):
+        return raw
+    return material_of(raw)
+
+
+def _own_store(doc) -> bool:
+    """Whether a material keeps what is known of it under its OWN id, not its parent's.
+
+    Every alchemist material and hybrid herb does. A forge form shares its parent's
+    store because a form of mithral is mithral, read by mithral's lists; an alchemist's
+    form is NOT read by its parent's lists — iron filings carry their own product traits,
+    and iron its weapon and armour effects — and positional keys under one store would
+    mean two documents' "p0" were one fact. Measured 2026-10-06 when the alchemist's
+    lists joined `MATERIAL_LISTS`: of the 9 alchemist forms, iron filings and the iron
+    flask would have shared "p0" (and, after lane D's working traits, "t0" with iron's own
+    forge trait), and cinnabar would have shared "p0" with quicksilver, itself an
+    alchemist reagent with an effect: the basilisk-eye collision again, one level down."""
+    if not isinstance(doc, dict):
+        return False
+    if _is_herb_view(doc):
+        return True
+    door = _door()
+    fn = getattr(door, "is_alchemy", None) if door is not None else None
+    return bool(callable(fn) and fn(doc))
 
 
 def is_essence(doc) -> bool:
@@ -311,10 +407,15 @@ def _material_specs(doc: dict) -> list[tuple[str, dict, str]]:
     out: list[tuple[str, dict, str]] = []
     for group, prefix in MATERIAL_LISTS:
         raw = doc.get(group)
-        if group == "quench_mark":
+        if group in _SINGLE_LISTS:
             raw = [raw] if isinstance(raw, dict) else []
         for i, spec in enumerate(raw or ()):
             if isinstance(spec, dict):
+                if group in ("mishap", "toxic") and spec.get("drawback") is not True:
+                    # What a reagent does to the one working it is a cost whatever its
+                    # type: a mishap that hastes nobody is still a mishap. Said on the
+                    # spec, so every reader of the class (card, picks, teacher) agrees.
+                    spec = dict(spec, drawback=True)
                 out.append((f"{prefix}{i}", spec, group))
     return out
 
@@ -378,6 +479,13 @@ def classify(spec: dict) -> str:
         # What an essence binds is why you would bind it; where it sits and what suits
         # it are what it is.
         return BENEFIT if spec.get("fact") == "grants" else NEUTRAL
+    # An alchemist's product trait says outright when it is a cost to the user (alchemy
+    # contracts §2.1, `drawback: true`), and says where it lands by its route: harm on the
+    # struck foe or in the cloud is what the flask is FOR.
+    if spec.get("drawback") is True:
+        return DRAWBACK
+    if str(spec.get("route") or "") in _FOE_ROUTES:
+        return BENEFIT
     if kind == "working":
         trait = str(spec.get("trait") or spec.get("target") or "")
         return DRAWBACK if trait in _BAD_TRAITS else BENEFIT
@@ -421,9 +529,11 @@ def anatomy(doc) -> dict:
     keys = property_keys(doc)
     kinds = {k: classify(s) for s, k in zip(specs, keys)}
     gate_of: dict[str, str] = {}
-    if not is_material(doc):
+    if not is_material(doc) or _is_herb_view(doc):
+        # A herb on the alchemy shelf is the same herb: its loose gates guard the same
+        # bodies, so a taste and an assay of it pick the same keys.
         index = {id(s): k for s, k in zip(specs, keys)}
-        name = str(getattr(doc, "name", "") or "")
+        name = str(_field(doc, "name", "") or "")
         for poison in consumables.poisons(specs, source=name):
             gate = index.get(id(poison.gate)) if poison.gate is not None else None
             for body in poison.effects:
@@ -473,8 +583,9 @@ def reveal(actor, ingredient_id: str, keys, how: str) -> list[str]:
 
 
 def _store_id(any_id) -> str:
-    """The id knowledge lives under. A material form goes to its parent; anything else,
-    an ingredient above all, is its own id — the door is only asked about materials."""
+    """The id knowledge lives under. A material form goes to its parent (an alchemist's
+    material excepted: `_own_store`); anything else, an ingredient above all, is its own
+    id — the door is only asked about materials."""
     raw = str(any_id or "")
     door = _door()
     if door is None or not hasattr(door, "material_of"):
@@ -483,7 +594,7 @@ def _store_id(any_id) -> str:
         known = door.get(raw)
     except KeyError:
         known = None
-    return material_of(raw) if known else raw
+    return material_of(raw) if known and not _own_store(known) else raw
 
 
 def meet(actor, ingredient_id: str) -> None:
@@ -846,7 +957,7 @@ def holds_manual(actor, manual: dict) -> bool:
 def known_material(actor, material_id: str) -> bool:
     """A material counts as known for comparison once one property of it is: a needle
     you have never read anything off is not a reference."""
-    entry = _entry(actor, material_of(material_id))
+    entry = _entry(actor, _store_id(material_id))
     return bool(entry and entry.get("keys"))
 
 
@@ -883,7 +994,29 @@ def assay_cost(doc) -> dict:
     form = str(_field(doc, "form", "") or "")
     if kind == "ore" or form == "ore":
         return {"ore": int(rules["ore_sliver"])}
+    if _is_alchemy(doc):
+        # Alchemy plan §13.2: "a pinch (a tenth of a unit, tracked as tenths, as the
+        # forge's slivers are)" — the sliver's own row, under the alchemist's word.
+        return {"pinch": float(rules["bar_sliver"])}
     return {"bars": float(rules["bar_sliver"])}
+
+
+def _is_alchemy(doc) -> bool:
+    door = _door()
+    fn = getattr(door, "is_alchemy", None) if door is not None else None
+    return bool(callable(fn) and fn(doc))
+
+
+def _assay_doc(material_id: str):
+    """What an assay reads: a material through the door, else a hybrid herb off the
+    alchemy shelf — an alchemist assays a basilisk eye as readily as brimstone, and what
+    it teaches is the herb's own keys (one document, two shelves)."""
+    doc = material(material_id)
+    if doc is None:
+        door = _door()
+        fn = getattr(door, "alchemy_doc", None) if door is not None else None
+        doc = fn(material_id) if callable(fn) else None
+    return doc
 
 
 def is_reactive(doc) -> bool:
@@ -943,7 +1076,7 @@ def assay(actor, material_id: str, total: int, *, clock: int) -> dict:
     engine with `apply_danger`, so it lands as an ActiveEffect through the one applicator
     (law 2) and is told like every other effect (law 3). Nothing here writes a condition.
     """
-    doc = material(material_id)
+    doc = _assay_doc(material_id)
     if doc is None:
         raise KeyError(f"no material called {material_id!r}")
     mid = doc_id(doc)
@@ -1110,6 +1243,43 @@ def ledger(actor) -> list[dict]:
     return sorted(rows, key=lambda r: (r["kind"], r["name"].lower()))
 
 
+def alchemy_codex(actor) -> list[dict]:
+    """The alchemist's reagent ledger (alchemy plan §13.3, "3 of 7 known"): every
+    document on the alchemy shelf the character has met — known of, or carried — as the
+    smith's ledger rows, by kind then name. A hybrid herb tasted at the herb bench is
+    here with what the taste taught, because it is one document (plan §13.2)."""
+    door = _door()
+    fn = getattr(door, "alchemy_shelf", None) if door is not None else None
+    if not callable(fn):
+        return []
+    shelf = fn()
+    by_name = {str(d.get("name", "")).lower(): mid for mid, d in shelf.items()}
+    # A form's knowledge is stored under its parent (mithral dust's under mithral), so a
+    # store id leads back to the shelf entries that are forms of it.
+    by_store: dict[str, list[str]] = {}
+    for mid, d in shelf.items():
+        by_store.setdefault(doc_id(d), []).append(mid)
+    met: list[str] = [k for k in (getattr(actor, "herb_known", None) or {})
+                      if not str(k).startswith("_")]
+    met += [k for k, n in (getattr(actor, "inventory", None) or {}).items() if n]
+    for s in (getattr(actor, "stock", None) or {}).values():
+        base = str(getattr(s, "base", "") or "").lower()
+        if int(getattr(s, "count", 0) or 0) > 0:
+            met.append(base if base in shelf else by_name.get(base, ""))
+    rows, seen = [], set()
+    for raw in met:
+        for mid in ([raw] if raw in shelf else by_store.get(str(raw), [])):
+            if mid in seen:
+                continue
+            seen.add(mid)
+            # The row is the shelf's entry (mithral dust, not mithral); `store` is where
+            # what is known of it lives.
+            row = ledger_row(actor, shelf[mid])
+            rows.append(dict(row, id=mid, store=row["id"],
+                             hybrid=bool(shelf[mid].get("hybrid"))))
+    return sorted(rows, key=lambda r: (r["kind"], r["name"].lower()))
+
+
 # --- the enchanter: essences, items and unbinding (enchanting plan §12-13; contracts §7) -----
 #
 # Still one store. An essence's traits live under its own id, as a metal's do; a recipe (a
@@ -1169,6 +1339,135 @@ def knows_recipe(actor, recipe_id: str) -> bool:
 
 def learn_recipe(actor, recipe_id: str, how: str) -> bool:
     return _learn(actor, str(recipe_id or ""), RECIPE_KEY, how)
+
+
+# --- the alchemist: formulae, potions and the codex (alchemy contracts §4-§5) ---------------
+#
+# Still one store. A formula is kept under "formula:<id>" — the property type's colon
+# trick, so a formula id can never be read as a material, a herb or a recipe — with one
+# key, "formula". Lane E's `formulae.known` and `formulae.learn` read and write through
+# these and never keep a second list (contract §4).
+
+FORMULA_PREFIX = "formula:"
+FORMULA_KEY = "formula"
+POTION_PREFIX = "potion:"
+IDENTIFIED_KEY = "identified"
+# The book's number, used until an alchemy lore file states it as a rule row
+# (`identify_potion.dc_base`). The CRB disagrees with itself on what is added to it,
+# checked 2026-10-06: the Potions page says "15 + the spell level of the potion"
+# (legacy.aonprd.com/coreRulebook/magicItems/potions.html), the Perception table says
+# "15 + the potion's caster level" (.../skills/perception.html). The contract (alchemy
+# contracts §4, plan §11.3) takes the Potions page, the rule written for potions; the
+# owner has not been asked to choose, and the report says so.
+POTION_IDENTIFY_DC = 15
+
+
+def formula_store_id(formula_id: str) -> str:
+    """Where knowledge of a formula is kept in `Actor.herb_known`."""
+    return FORMULA_PREFIX + str(formula_id or "").strip().lower()
+
+
+def knows_formula(actor, formula_id: str) -> bool:
+    return _knows(actor, formula_store_id(formula_id), FORMULA_KEY)
+
+
+def learn_formula(actor, formula_id: str, how: str) -> bool:
+    """Record a formula as known, and how ("experiment, day 4", "copied from a
+    spellbook"). True when it was new — the caller's cue to pay mastery for a first."""
+    return _learn(actor, formula_store_id(formula_id), FORMULA_KEY, how)
+
+
+def known_formulae(actor) -> list[str]:
+    """Every formula id the character knows, sorted."""
+    out = []
+    for sid, entry in (getattr(actor, "herb_known", None) or {}).items():
+        if str(sid).startswith(FORMULA_PREFIX) and FORMULA_KEY in set(
+                (entry or {}).get("keys") or ()):
+            out.append(str(sid)[len(FORMULA_PREFIX):])
+    return sorted(out)
+
+
+def formula_how(actor, formula_id: str) -> str:
+    """How the character came to know a formula, or "" when they do not."""
+    entry = _entry(actor, formula_store_id(formula_id)) or {}
+    return str((entry.get("how") or {}).get(FORMULA_KEY) or "")
+
+
+def _potion_spell_level(stock) -> int | None:
+    """A potion's spell level: what its own row says, else the authored spell potion's
+    row for its spell, else the spell's lowest level on any list (the level a brewer
+    could have made it at). None when it holds no spell."""
+    sid = str(getattr(stock, "holds_spell", None) or "")
+    if not sid:
+        return None
+    own = getattr(stock, "spell_level", None)
+    if isinstance(own, int):
+        return own
+    try:
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "materials" / \
+            "alchemist-spell-potions.json"
+        for row in json.loads(path.read_text(encoding="utf-8")).get("potions") or ():
+            if str(row.get("spell") or "") == sid and row.get("spell_level") is not None:
+                return int(row["spell_level"])
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        from . import spells
+
+        return spells.get(sid).min_level
+    except (KeyError, ImportError):
+        return None
+
+
+def potion_identify_dc(stock) -> int:
+    """DC 15 + the potion's spell level (alchemy plan §11.3: the book's Perception DC to
+    identify a potion, which the APG alchemist reads with his own skill). A product that
+    holds no spell is the DC with nothing added."""
+    rules = lore(ALCHEMIST).get("identify_potion") or {}
+    base = int(rules.get("dc_base", POTION_IDENTIFY_DC))
+    return base + int(_potion_spell_level(stock) or 0)
+
+
+def potion_known(actor, stock) -> bool:
+    """Whether the character has identified potions of this kind. Kept per stock id (a
+    stack's id is a digest of what the thing IS: `crafting.Stock.id`), so a second vial
+    from the same brewing needs no second check, and a different brewing does."""
+    sid = str(getattr(stock, "id", "") or "")
+    return bool(sid) and _knows(actor, POTION_PREFIX + sid, IDENTIFIED_KEY)
+
+
+def identify_potion(actor, stock, total: int, *, clock: int | None = None) -> dict:
+    """Identify a potion on a total already rolled (alchemy contracts §4; plan §11.3).
+
+    The check is the alchemist's own, holding the vial for a round; no natural 20 (a skill
+    check, CRB p.180). Success reveals what the potion IS — its spell and caster level, or
+    a house product's name — and is remembered (`potion_known`); it does NOT teach the
+    formula, which is the potion-in-hand route of lane E (plan §10.4). A miss teaches
+    nothing; the book sets no wait on this check, and each try costs the round.
+
+    {"dc", "total", "margin", "success", "spell": id | None, "spell_level": int | None,
+     "caster_level": int | None, "name": str | None, "rounds": 1, "repeat": bool}
+    Nothing about the potion is in the answer on a miss: it goes to the page."""
+    dc = potion_identify_dc(stock)
+    margin = int(total) - dc
+    success = margin >= 0
+    repeat = potion_known(actor, stock)
+    out = {"dc": dc, "total": int(total), "margin": margin, "success": success,
+           "spell": None, "spell_level": None, "caster_level": None, "name": None,
+           "rounds": 1, "repeat": repeat}
+    if not success:
+        return out
+    sid = str(getattr(stock, "id", "") or "")
+    if sid:
+        how = f"identified, day {day_of(clock)}" if clock is not None else "identified"
+        _learn(actor, POTION_PREFIX + sid, IDENTIFIED_KEY, how)
+    spell = str(getattr(stock, "holds_spell", None) or "") or None
+    return dict(out, spell=spell,
+                spell_level=_potion_spell_level(stock) if spell else None,
+                caster_level=getattr(stock, "caster_level", None) if spell else None,
+                name=str(getattr(stock, "base", "") or "") or None)
 
 
 # --- essences --------------------------------------------------------------------------------
