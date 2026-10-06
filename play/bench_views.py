@@ -227,13 +227,17 @@ def _state_body(c, pc) -> dict:
 
 
 def _ready(request):
-    """The campaign and its character, or the refusal. Steeping jars whose day has come
-    are settled first, so every answer reads the shelf as it now is."""
+    """The campaign and its character, or the refusal.
+
+    Steeping jars were settled here until 2026-10-05, silently, on every request. A jar's
+    day now turns it ready inside the clock's own door (`Scene.advance` ->
+    `inprogress.settle`), which tells it; settling here as well would swallow that tell.
+    The satchel reads each jar's state off the clock (`inprogress.state_of`), so nothing
+    is stale without it."""
     c = campaign_mod.current()
     pc = c.scene.pc()
     if pc is None:
         return None, None, _err("There is no character to work the bench.", 409)
-    crafting.settle_steeping(pc, int(c.scene.clock_minutes or 0))
     return c, pc, None
 
 

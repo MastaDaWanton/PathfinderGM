@@ -357,18 +357,37 @@ Routes (lane G, works block of `urls.py`): `GET api/works` → `{rows, summary}`
 `works: inprogress.summary(...)` so the door's count renders without a fetch (**the field is
 added by U4** in the table state view, wave 2).
 
+**As built (lane G, 2026-10-05).** The owner's Round 4 rulings override the above where they
+differ: **no limit** in any craft (`register(..., limit=...)` raises, naming the ruling); `begin`
+also takes `where_name` (how the page says the place) and `doing` (the gerund refusals use, "still
+binding"); `register` also takes `stop_words` (the confirm's consequence, a string or `f(item)`);
+rows also carry `ready_when` ("day 15, morning"). Readers for doors: `inprogress.held_back(item,
+now) -> str` (why it cannot be used yet, "" when free), `work_of`, `state_of`, `end_of`.
+`Scene.advance` calls `settle` (lane G added the one call, since the tell was in its brief) and
+buffers "<name>'s <thing> is ready to collect." on `Scene._works_said`, told at the end of each
+engine op and batch by `Engine._works_settles` (op `works`), as the body's tolls are. A forged
+vessel's block is kept in `record["work"]` too, because `ForgedStock.as_dict` writes only its
+record. Herbalism's jars have no Stop (a steep cannot be hurried; the owner may rule otherwise).
+
 ### 8.3 Sky
 
+**Replaced by the owner (Round 4, point 10): phases of the day, not planets.** As built:
+
 ```python
-sky.PLANETS            # ("saturn", "jupiter", "mars", "sun", "venus", "mercury", "moon"), Chaldean order
-sky.planet_of_day(day: int) -> str                # day 1 the Sun's, then the weekday order
-sky.hour_at(clock_minutes: int) -> dict           # {"planet", "starts", "ends", "day": bool}
-sky.next_hour(planet: str, clock_minutes: int) -> int    # minutes until it begins (0 if now)
-sky.words(clock_minutes, planet) -> str           # "Mars hour, 42 minutes left" / "Mars hour in 3 hours"
+sky.PHASES             # ("dawn", "morning", "noon", "afternoon", "dusk", "night", "midnight")
+sky.OWNER_PHASES       # the six the owner named; `afternoon` exists so 15:00 is never "noon"
+sky.phase_at(clock_minutes) -> dict      # {"phase", "starts", "ends", "left"}, absolute minutes
+sky.inside(phase, clock_minutes) -> bool
+sky.next_phase(phase, clock_minutes) -> int   # minutes until it begins (0 if now)
+sky.words(clock_minutes, phase) -> str   # "Noon, 42 minutes left" / "Midnight in 3 hours 10 minutes"
+sky.windows() -> list[dict]              # one day's windows, for a dial
+sky.span_words(minutes) -> str           # the countdowns' words, shared with In progress
 ```
 
-Dawn 06:00, dusk 18:00, 60-minute hours (revamp plan §17), read from one constant pair so a world
-with seasons changes one place.
+Dawn 06:00 and dusk 18:00 (the engine's), one constant pair; each turning point (dawn, noon, dusk,
+midnight) holds the two hours centred on it, morning, afternoon and night fill between. Sources
+in `rules/sky.py`'s docstring. An essence family names its `phase` in data (lane D) and an unknown
+phase raises by name.
 
 ---
 

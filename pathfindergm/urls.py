@@ -32,7 +32,8 @@ def static_serve(request, path, **kwargs):
 from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
-                  craft_views, home_views, views, bench_views, herb_views, forge_views)
+                  craft_views, home_views, views, bench_views, herb_views, forge_views,
+                  works_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -108,6 +109,11 @@ urlpatterns = [
     path("api/forge/ask", forge_views.forge_ask, name="forge_ask"),
     path("api/forge/material/<str:material_id>", forge_views.forge_material,
          name="forge_material"),
+    # In progress, every craft's unfinished work (docs/enchanting-contracts.md §8.2). Lane
+    # G's block; fixed names only, so no pattern below can read them as a parameter.
+    path("api/works", works_views.works, name="works"),
+    path("api/works/collect", works_views.works_collect, name="works_collect"),
+    path("api/works/cancel", works_views.works_cancel, name="works_cancel"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
     # `api/bench/<bench_id>`: Django takes the first match, and below it "state" was read
     # as a homebrew bench id and answered 404 "no bench 'state'" (Lane D, 2026-10-02).

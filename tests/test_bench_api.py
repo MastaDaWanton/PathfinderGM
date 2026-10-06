@@ -461,27 +461,9 @@ def test_bark_grinds_into_a_salve_base_and_a_salve_needs_its_oil(bench):
 
 # --- steeping -------------------------------------------------------------------------------
 
-def test_a_tincture_is_not_ready_before_its_day(bench):
-    """Plan §6 / Q6: steeping is real world time, two weeks for a tincture. Advance 13
-    days and the jar still refuses with the day it will be ready; advance to 14 and it
-    is a tincture like any other."""
-    _level(2)
-    _carry(mint=2, spirits=1)
-    done = _craft(bench, "steep", [{"key": _key(bench, "Mint"), "count": 1},
-                                   {"key": _key(bench, "Strong Spirits"), "count": 1}])
-    jar = done["made"]
-    assert jar["form"] == "tincture" and jar["ready_at"] is not None
-    c = _c()
-    c.scene.advance(13 * 1440, charge_body=False)
-    fits = _post(bench, "/api/bench/check", {"method": "reduce", "items": []})["fits"]
-    assert fits[jar["key"]].startswith("still steeping: ready on day")
-    stock = _pc().stock[jar["key"].split(":", 1)[1]]
-    assert "steeping" in stock.how
-    c.scene.advance(1 * 1440, charge_body=False)
-    item = next(i for i in _get(bench, "/api/bench/state")["satchel"]
-                if i["key"] == jar["key"])
-    assert item["ready_at"] is None
-    assert "steeping" not in _pc().stock[jar["key"].split(":", 1)[1]].how
+# The tincture's two weeks (plan §6 / Q6) moved to tests/test_inprogress.py on 2026-10-05,
+# when the owner's In-progress ruling made a finished jar wait to be collected rather than
+# lift itself: `test_a_tincture_is_not_collectable_on_day_13_and_is_on_day_14`.
 
 
 # --- bulk and time --------------------------------------------------------------------------
