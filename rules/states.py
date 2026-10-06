@@ -197,6 +197,30 @@ BYSTANDER_KEY = "bystander"
 MATERIAL = "material"
 MATERIAL_MAIN = "material.main"
 METAL = "material.metal"
+
+# What a cursed item is and what it does to whoever bears it (enchanting plan §11; lane F,
+# `rules/curses.py`, `content/rules/curses.json`). Two kinds of tag under one root:
+#
+#   curse.<row>[.<sub>...]       which curse an item carries — `curse.drawback.blurred`,
+#                                `curse.intermittent.dependent.night` — written once, by
+#                                `curses.roll` (the curse record's `tags`). A tag of the
+#                                ITEM's record, never laid on a person: it names what is
+#                                hidden until the item is identified, and a person's tags
+#                                reach the sheet.
+#   curse.bars-casting.<what>    what the drawback stops its bearer doing while the item
+#                                is held or worn, laid on the BEARER through the layer's
+#                                `tags` (`Actor._worn_tags`) and answered in BLOCKS below:
+#                                `.arcane`, `.divine`, or `.any`. `.any` is a sibling and
+#                                not the bare family on purpose: tags answer by prefix, so
+#                                a bare `curse.bars-casting` row in BLOCKS would also
+#                                answer for an `.arcane` tag and stop a cleric praying.
+#
+# Asked by prefix like every other family (`matches`), never by `==`.
+CURSE = "curse"
+CURSE_BARS = "curse.bars-casting"
+CURSE_BARS_ANY = "curse.bars-casting.any"
+CURSE_BARS_ARCANE = "curse.bars-casting.arcane"
+CURSE_BARS_DIVINE = "curse.bars-casting.divine"
 # The substances a piece can be. Fixed so a reader can name a family without guessing
 # its spelling; `item_tags` refuses (by test) a substance not on the list.
 SUBSTANCES: tuple[str, ...] = ("metal", "wood", "leather", "bone", "horn", "cloth", "cord",
@@ -560,6 +584,15 @@ BLOCKS: dict[str, frozenset[str]] = {
     "state.unable": frozenset(ACTIONS + ("any",)),
     # "The only action such a character can take is a single move action per turn."
     "state.impaired.nauseated": frozenset(("attack", "check", "cast")),
+    # A cursed item's drawback (CRB, Cursed Items, the drawback table: "character cannot
+    # cast arcane spells", "... divine spells", "... any spells"), held while the item is
+    # held or worn (`Actor._worn_tags`, lane F's `bars`). The arcane and divine bars stop
+    # only that tradition's casting, which is asked as its own action, `cast.arcane` or
+    # `cast.divine` (`Actor.barred_from_casting`) — never the whole `cast`, or an
+    # arcane-barred cleric could not pray.
+    CURSE_BARS_ANY: frozenset(("cast", "cast.arcane", "cast.divine")),
+    CURSE_BARS_ARCANE: frozenset(("cast.arcane",)),
+    CURSE_BARS_DIVINE: frozenset(("cast.divine",)),
 }
 
 

@@ -507,6 +507,20 @@ def _situation_clause(sit: dict, curse: dict) -> dict:
     return clause
 
 
+def dependent_clause(curse) -> dict | None:
+    """The situation a dependent curse needs (`{"daylight": False}`, `{"near": {"type":
+    "undead"}}`), or None for any other curse. The same clause `documents` lays on every
+    document's `when`; lane C2 asks it of the readers that read the layer as a fact of
+    the item (a weapon's threat range, the strikes-as traits, a suit's folded armour
+    bonus) and never ask a `when` (`Actor.layer_awake`)."""
+    c = curse if isinstance(curse, dict) else {}
+    if c.get("row") != "intermittent" or (c.get("detail") or {}).get(
+            "intermittent") != "dependent":
+        return None
+    sit = _sub(c, "dependent")
+    return _situation_clause(sit, c) if sit else None
+
+
 def _flip(d: dict) -> dict | None:
     """One standing document under an opposite curse: a bonus becomes the same-sized
     penalty, untyped, because 1e's penalties carry no bonus type ("an enhancement
@@ -774,4 +788,5 @@ def tell(curse, item_name: str, *, known: bool) -> str:
 
 __all__ = ["roll", "documents", "describe", "tell", "clings", "gutters", "noticed",
            "lift", "lift_dc", "settle_day", "curse_of", "table", "rows", "sub_table",
-           "table_problems", "BadCurses", "SITUATION_FACTS", "REQUIREMENT_FACTS"]
+           "table_problems", "BadCurses", "SITUATION_FACTS", "REQUIREMENT_FACTS",
+           "dependent_clause"]

@@ -11,6 +11,7 @@ player.
 """
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -721,6 +722,18 @@ class Actor:
         name = str(record.get("name") or "").strip()
         if not name:
             raise IllegalSheet("this item has no name to wear")
+        # Work In progress is not worn until it is collected (contracts §8.2): a ring on
+        # the enchanter's circle. The engine's `wear` asks `inprogress.held_back`; this is
+        # the sheet's own door (the Equipment tab's slot items), which did not.
+        from . import inprogress
+
+        rid = str(record.get("id") or "").strip().lower()
+        for sid, entry in self.stock.items():
+            if rid and rid in {str(sid).lower(), str(getattr(entry, "id", "") or "").lower()} \
+                    and inprogress.work_of(entry) is not None:
+                why = inprogress.held_back(entry, None)
+                raise IllegalSheet(f"The {name} is {why}." if why else
+                                   f"The {name} is In progress: collect it first.")
         if slot not in SLOTS:
             raise IllegalSheet(f"{name} is not something you wear")
         current = self.slot_list(slot)
@@ -734,11 +747,68 @@ class Actor:
         self.worn[name.strip().lower()] = dict(record)
         return slot
 
+    def refresh_worn(self) -> list[str]:
+        """Re-read each worn copy from the pack's record it was copied from (by id), and
+        return the names refreshed.
+
+        `wear` keeps a COPY in `worn` (the pack keeps the record), and a bench that
+        rewrites the pack's record — a binding collected at the enchanter's, an unbinding,
+        a curse lifted — left the copy as it was. Measured by lane E's live check
+        (2026-10-06): a sword drawn while its binding was In progress came out of
+        Collect still unenchanted in the hand, and stayed so until it was drawn again.
+        The pack's record is the one the benches write, so it is the one that wins; a
+        record renamed by the bench is re-keyed here and in the slot that names it."""
+        from . import forge_items
+
+        by_id: dict[str, dict] = {}
+        for item in self.stock.values():
+            rec = forge_items.record_of(item)
+            if rec is None and (getattr(item, "weapon", None) or getattr(item, "armour", None)):
+                rec = item.as_dict()
+            rid = str((rec or {}).get("id") or "").strip().lower()
+            if rid:
+                by_id[rid] = rec
+        changed: list[str] = []
+        for key, worn in list(self.worn.items()):
+            src = by_id.get(str((worn or {}).get("id") or "").strip().lower())
+            if src is None or src == worn:
+                continue
+            new = dict(src)
+            new_key = str(new.get("name") or key).strip().lower()
+            if new_key != key:
+                del self.worn[key]
+                for slot in self.slots.values():
+                    for i, w in enumerate(slot):
+                        if w and str(w).strip().lower() == key:
+                            slot[i] = str(new.get("name") or w)
+            self.worn[new_key] = new
+            changed.append(new_key)
+        return changed
+
     def take_off(self, name: str) -> bool:
         """Remove a worn item from whatever slot holds it. The record is kept: the
         thing still exists, it is simply not being worn, and its effects stop because
         `worn_items` reads the slots."""
         key = str(name or "").strip().lower()
+        # A specific cursed item will not come off (`curses.clings`, lane F; read by lane
+        # C2): the sheet's own door (the Equipment tab's Take off for a slot item) asks as
+        # the engine's ops do, and the refusal is how the curse is found.
+        rec = self.worn.get(key)
+        if isinstance(rec, dict) and any(
+                w and str(w).strip().lower() == key for s in self.slots.values() for w in s):
+            from . import curses as curses_mod
+            from . import knowledge
+
+            curse = curses_mod.curse_of(rec)
+            if curse is not None and curses_mod.clings(rec):
+                rid = str(rec.get("id") or rec.get("name") or "")
+                new = False
+                for holder in self.item_records(rid) or [rec]:
+                    new = knowledge.learn_by_use(self, holder, "curse") or new
+                label = str(rec.get("name") or key)
+                raise IllegalSheet(
+                    f"The {label} will not come off {self.name}."
+                    + (" " + curses_mod.tell(curse, label.lower(), known=True) if new else ""))
         found = False
         for slot in self.slots.values():
             for i, w in enumerate(slot):
@@ -814,15 +884,18 @@ class Actor:
             row = dict(row, damage=weapons_mod.first_end_damage(row["damage"]),
                        damage_text=str(row["damage"]))
         if forge_items.is_forged(rec):
-            b = forge_items.build(rec)
+            # A layer asleep this instant (a dependent curse out of its situation, an
+            # unreliable one rolled off for this swing) is no layer for the row: no keen
+            # range, no strikes-as, no riders (`layer_awake`).
+            b = self._live_build(rec)
             return _with_layer(forge_items.weapon_row(row, b, rec), b.get("magic"))
         row.update({"name": str(rec.get("name") or row.get("name")),
                     "crafted_record": rec, "crafted_base": str(row.get("id") or base_key),
                     "masterwork": bool(rec.get("masterwork"))})
         from . import magic_layer
 
-        if magic_layer.has_layer(rec):
-            lay = magic_layer.layer(rec)
+        if magic_layer.has_layer(rec) and self.layer_awake(rec):
+            lay = layered(rec)
             row["strikes_as"] = sorted(set(row.get("strikes_as") or ())
                                        | set(lay["strikes_as"]))
             return _with_layer(row, lay)
@@ -846,7 +919,7 @@ class Actor:
             rec = self.worn.get(str(name or "").strip().lower())
             if not forge_items.is_forged(rec) or rec.get("gear") != "armour":
                 continue
-            kind, key = armour_mod.key_for(str(rec.get("base") or ""))
+            kind, key = _armour_key(str(rec.get("base") or ""))
             if (key or str(rec.get("base") or "").lower()) == self.armour:
                 return rec
         return None
@@ -861,7 +934,7 @@ class Actor:
         rec = self.armour_record()
         if rec is None:
             return base
-        return forge_items.armour_row(base, forge_items.build(rec))
+        return forge_items.armour_row(base, self._live_build(rec))
 
     def shield_record(self) -> dict | None:
         """The forged shield on the arm, when it is the shield being carried — the armour
@@ -880,7 +953,7 @@ class Actor:
             rec = self.worn.get(str(name or "").strip().lower())
             if not forge_items.is_forged(rec) or rec.get("gear") != "shield":
                 continue
-            kind, key = armour_mod.key_for(str(rec.get("base") or ""))
+            kind, key = _armour_key(str(rec.get("base") or ""))
             if (key or str(rec.get("base") or "").lower()) == self.shield:
                 return rec
         return None
@@ -895,7 +968,7 @@ class Actor:
         rec = self.shield_record()
         if rec is None:
             return base
-        return forge_items.armour_row(base, forge_items.build(rec))
+        return forge_items.armour_row(base, self._live_build(rec))
 
     def _armour_build_specs(self, kind: str) -> list[dict]:
         """The worn forged suit's specs of one type — its DR, its resistances."""
@@ -904,7 +977,7 @@ class Actor:
         rec = self.armour_record()
         if rec is None:
             return []
-        return [s for s in forge_items.roll_specs(forge_items.build(rec))
+        return [s for s in forge_items.roll_specs(self._live_build(rec))
                 if str(s.get("type") or "") == kind]
 
     def wielded_record(self) -> dict | None:
@@ -936,14 +1009,19 @@ class Actor:
         `walk` is a walk already taken (`_worn_walk`) by a caller asking several types.
         """
         out: list[tuple[dict, str, str]] = []
+        if ctx is None:
+            # A reader with no roll (resistance, SR, fortification) still knows where and
+            # when the wearer is (`_situation_ctx`): a dependent curse's clause on worn
+            # armour is answered; any other conditional document is dropped, the rule for
+            # every clause nothing can evaluate — never applied.
+            ctx = self._situation_ctx()
         for s, name, origin, _ in (self._worn_walk() if walk is None else walk):
             if str(s.get("type") or "") != kind:
                 continue
-            # A `when` is asked of the context the reader gave; a reader with none
-            # (resistance, SR, fortification) drops a conditional document, the rule
-            # for every clause nothing can evaluate — never applies it.
             if ask_when and s.get("when") and not _when_holds(s.get("when"), ctx):
                 continue
+            if guttered(s):
+                continue                        # rolled off for this use (`Moment`)
             out.append((s, name, origin))
         return out
 
@@ -969,7 +1047,7 @@ class Actor:
         for rec in (self.armour_record(), self.shield_record()):
             if rec is None:
                 continue
-            b = forge_items.build(rec)
+            b = self._live_build(rec)
             name = str(rec.get("name") or b.get("name") or "armour")
             origin = f"item:{b.get('id')}"
             take(forge_items.roll_specs(b), name, origin)
@@ -981,8 +1059,8 @@ class Actor:
             name = str(rec.get("name") or "worn gear")
             origin = f"item:{rec.get('id') or name}"
             take(rec.get("specs"), name, origin)
-            if rec.get("magic") and magic_layer.has_layer(rec):
-                lay = magic_layer.layer(rec)
+            if rec.get("magic") and magic_layer.has_layer(rec) and self.layer_awake(rec):
+                lay = layered(rec)
                 take(lay["specs"], name, origin)
                 take(lay["worn"], name, origin, True)
         for slot_key, items in self.slots.items():
@@ -992,7 +1070,7 @@ class Actor:
                     continue
                 take(magicitem.worn_specs(str(item)), str(item), f"item:{item}")
         held = self.wielded_record()
-        if held is not None and held.get("magic"):
+        if held is not None and held.get("magic") and self.layer_awake(held):
             lay = layer_of(held) or {}
             take(lay.get("wielded"), str(held.get("name") or "the weapon"),
                  f"item:{held.get('id') or held.get('name')}", True)
@@ -1019,6 +1097,14 @@ class Actor:
         for e in self.effects:
             if e.kind == "spell_resistance" and int(e.amount or 0) > best:
                 best, why = int(e.amount), e.source or e.name
+        # An authored `combat_mod` aimed at `spell_resistance` (the vocabulary's own
+        # target, effectspec VOCAB) — a buff, a worn document — through the one funnel.
+        # Until 2026-10-06 nothing read it: tests/test_three_laws.py carried it on the
+        # inert list "until something rolls to overcome SR", and lane C built the roll.
+        # The best one applies, as above; SR is never summed.
+        for m in self._buff_mods("combat_mod", "spell_resistance"):
+            if m.value > best:
+                best, why = int(m.value), m.source
         for spec, name, _ in self.worn_specs_of("spell_resistance"):
             try:
                 n = int(spec.get("amount") or 0)
@@ -1055,7 +1141,7 @@ class Actor:
                 continue
             rec = forge_items.record_of(item)
             if rec is not None:
-                b = forge_items.build(rec)
+                b = built(rec)
                 for n, r in enumerate(x for x in b["riders"] if x.get("trigger") == "carried"):
                     out[f"item:{b['id']}#{n}"] = (r, f"item:{b['id']}", b["name"])
                 continue
@@ -1352,6 +1438,10 @@ class Actor:
 
         want = str(target).lower()
         out: list[Modifier] = []
+        if ctx is None:
+            # Where and when, for a dependent curse's clause (`_situation_ctx`); nothing
+            # about a weapon or a foe, so every other conditional term is still dropped.
+            ctx = self._situation_ctx()
 
         def read(specs, name: str):
             for spec in specs or []:
@@ -1361,6 +1451,8 @@ class Actor:
                     continue
                 if not _when_holds(spec.get("when"), ctx):
                     continue
+                if guttered(spec):
+                    continue                    # an unreliable item, off for this use
                 try:
                     amount = int(spec.get("amount", 0) or 0)
                 except (TypeError, ValueError):
@@ -1377,7 +1469,7 @@ class Actor:
                 continue                        # its own swing only: read below
             if forge_items.is_forged(rec):
                 if rec is suit or rec is arm:
-                    read(forge_items.standing_specs(forge_items.build(rec)),
+                    read(forge_items.standing_specs(self._live_build(rec)),
                          str(rec.get("name") or "worn gear"))
                 continue
             # An unforged record — a ring, a cloak, an old enchanter's piece — with its
@@ -1389,7 +1481,7 @@ class Actor:
         if held:
             rec = self.crafted_record(held)
             if rec is not None and _is_weapon_record(rec):
-                read(_raised_specs(rec, ctx), str(rec.get("name") or held))
+                read(self._weapon_specs(rec, ctx), str(rec.get("name") or held))
         from . import magicitem
 
         for slot_key, items in self.slots.items():
@@ -1405,6 +1497,42 @@ class Actor:
         # is the wielder's, not the swing's (lane F's blurred sight).
         for doc, name, _ in self._layer_trigger_docs():
             read([doc], name)
+        return out
+
+    def _weapon_specs(self, rec: dict, ctx: dict | None) -> list[dict]:
+        """A weapon record's own terms for this swing: with bane's raise
+        (`_raised_specs`), or — its layer asleep this instant (`layer_awake`) — the
+        smith's work alone (masterwork's +1 stays; the enchantment does not)."""
+        if isinstance(rec.get("magic"), dict) and not self.layer_awake(rec):
+            return _record_specs(_stripped(rec))
+        return _raised_specs(rec, ctx)
+
+    def weapon_own_mods(self, kind: str, target: str, weapon_key: str,
+                        defender=None) -> list[Modifier]:
+        """Only what the weapon itself lends a roll — its enhancement (raised by bane
+        against its foe), masterwork — and nothing of its wielder's: a dancing weapon
+        "fights ... using the base attack bonus of the one who loosed it" (CRB) and that
+        is all it takes from them (no Strength, no feats: Paizo's rules forum reads it so,
+        and the 3.5 FAQ said it outright; no PF1 FAQ entry was found)."""
+        ctx = self._roll_context(weapon_key, defender=defender)
+        rec = self.crafted_record(str((ctx.get("weapon") or {}).get("record") or ""))
+        if rec is None or not _is_weapon_record(rec):
+            return []
+        out: list[Modifier] = []
+        for spec in self._weapon_specs(rec, ctx):
+            if not isinstance(spec, dict) or spec.get("type") != kind \
+                    or str(spec.get("target", "")).lower() != target:
+                continue
+            if not _when_holds(spec.get("when"), ctx) or guttered(spec):
+                continue
+            try:
+                amount = int(spec.get("amount", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if amount:
+                out.append(Modifier(amount, str(spec.get("label") or rec.get("name")
+                                                or weapon_key),
+                                    _bonus_type(spec.get("bonus_type"))))
         return out
 
     # --- the effect engine ---------------------------------------------------------
@@ -2258,6 +2386,18 @@ class Actor:
 
         wanted = (key or self.wielded_key()).strip().lower()
         grants = classfeatures.weapon_grants(self, wanted)
+        if "property.ki-focus" in ((row.get("magic") or {}).get("tags") or ()):
+            # Ki focus (CRB): "allowing her to use her special ki attacks through the
+            # weapon as if they were unarmed attacks. These attacks include the monk's ki
+            # strike, quivering palm, and the Stunning Fist feat". Ki strike's materials
+            # are the fist's grant (`classfeatures.weapon_grants`, "unarmed"); its strikes
+            # pass through the blade. The fist's DIE does not: that is the body's, not a
+            # ki attack. Stunning fist's charge is `Engine._charges_for`'s.
+            fist = classfeatures.weapon_grants(self, "unarmed")
+            if fist.get("strikes_as"):
+                grants = dict(grants or {})
+                grants["strikes_as"] = list(grants.get("strikes_as") or ()) + [
+                    t for t in fist["strikes_as"] if t not in (grants.get("strikes_as") or ())]
         if not grants:
             return row
         row = dict(row)
@@ -2270,11 +2410,70 @@ class Actor:
             row["strikes_as"] = have + [t for t in grants["strikes_as"] if t not in have]
         return row
 
+    def shield_bash(self, key: str | None) -> dict | None:
+        """The weapons-table row for a bash with the shield on this creature's arm, when
+        `key` names it ("shield bash", "shield", the shield's table key or its record);
+        None otherwise. A buckler and a tower shield do not bash (CRB, Shields).
+
+        The table's shield rows refused to be wielded ("the rules hold one weapon at a
+        time"), so before lane C2 no shield ever bashed and the bashing property (CRB:
+        "deals damage as if it were a weapon of two size categories larger (a Medium light
+        shield thus deals 1d6 points of damage and a Medium heavy shield deals 1d8 points
+        of damage). The shield acts as a +1 weapon when used to bash.") had nothing to
+        change. A bash is one attack in place of the weapon's; there is no off hand in the
+        app, so no two-weapon penalty is charged and no second swing is offered.
+        """
+        from . import weapons as weapons_mod
+
+        shield = str(self.shield or "none").strip().lower()
+        if not key or shield in ("none", "buckler", "tower shield") \
+                or shield not in SHIELDS:
+            return None
+
+        def norm(s) -> str:
+            return " ".join(str(s or "").replace("-", " ").split()).lower()
+
+        rec = self.shield_record()
+        names = {norm(shield), "shield", "shield bash", "bash",
+                 norm(SHIELDS[shield].get("name"))}
+        if rec is not None:
+            names |= {norm(rec.get("id")), norm(rec.get("name"))}
+        if norm(key) not in names - {""}:
+            return None
+        try:
+            row = dict(weapons_mod.get("light-shield" if "light" in shield
+                                       else "heavy-shield"))
+        except KeyError:
+            return None
+        row.pop("unwieldable", None)
+        label = str((rec or {}).get("name") or SHIELDS[shield].get("name") or shield)
+        row.update({"name": f"{label} (bash)", "shield_bash": True})
+        tags = ()
+        if rec is not None and isinstance(rec.get("magic"), dict) and self.layer_awake(rec):
+            tags = tuple(str(t) for t in (layer_of(rec) or {}).get("tags") or ())
+        if "property.bashing" in tags:
+            # Two size steps up from the bearer's own die, one step at a time along Table
+            # 6-5's progression (`weapons.SIZE_DIE`, Medium to Large): a Medium heavy
+            # shield's 1d4 -> 1d6 -> 1d8 and a light one's 1d3 -> 1d4 -> 1d6, the book's
+            # own two examples.
+            die = weapons_mod.size_die(str(row.get("damage") or "1d4"),
+                                       str(self.size or "medium"))
+            for _ in range(2):
+                die = weapons_mod.size_die(die, "large")
+            row["damage"] = die
+            row["bash_plus"] = 1
+            # "Acts as a +1 weapon": magic for damage reduction, as any +1 is.
+            row["strikes_as"] = sorted(set(row.get("strikes_as") or ()) | {"magic"})
+        return row
+
     def _weapon_row(self, key: str | None = None) -> dict:
         from . import weapons as weapons_mod
 
         from . import leveling
 
+        bash = self.shield_bash(key) if key else None
+        if bash is not None:
+            return bash
         wanted = (key or self.wielded_key()).strip().lower()
         # A granted weapon rides every unarmed strike while its toggle holds, and
         # answers to its own aliases whether or not it is formed — the engine's gate
@@ -2740,6 +2939,10 @@ class Actor:
         mods.extend(self._buff_mods("combat_mod", "attack",
                                     self._roll_context(key, power_attack=power_attack,
                                                       defender=defender)))
+        if w.get("bash_plus"):
+            # A bashing shield "acts as a +1 weapon when used to bash" (`shield_bash`).
+            mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
+                                 "enhancement"))
         return stack(mods)
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
@@ -2823,6 +3026,9 @@ class Actor:
         mods.extend(self._buff_mods("combat_mod", "damage",
                                     self._roll_context(key, power_attack=power_attack,
                                                       defender=defender)))
+        if w.get("bash_plus"):
+            mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
+                                 "enhancement"))
         return stack(mods)
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
@@ -2848,9 +3054,10 @@ class Actor:
             # Typed, so the channels collide as 1e intends: bracers of armour over a
             # breastplate is the better of the two, not the sum, while a ring's
             # deflection sits beside either untouched.
-            if armour["ac"]:
+            melded = self._melded_gear()
+            if armour["ac"] and "armour" not in melded:
                 mods.append(Modifier(armour["ac"], armour["name"], "armour"))
-            if shield["ac"]:
+            if shield["ac"] and "shield" not in melded:
                 mods.append(Modifier(shield["ac"], shield["name"], "shield"))
             if self.natural_armour:
                 mods.append(Modifier(self.natural_armour, "natural armour",
@@ -2909,6 +3116,38 @@ class Actor:
             if against == "melee":
                 mods.append(Modifier(-4, "helpless, against melee"))
         return stack(mods)
+
+    def _melded_gear(self) -> set[str]:
+        """Which of "armour" and "shield" give no AC right now, and why it is the rule.
+
+        - **A new body.** "Your gear melds into your new form ... Items that provide
+          constant bonuses ... continue to function while melded in this way (with the
+          exception of armor and shield bonuses, which cease to function)" (CRB,
+          Polymorph). Until 2026-10-06 a druid in wild shape kept her breastplate's +6 —
+          the druid document's own `not_yet` said so — so the wild property (CRB: "The
+          wearer ... preserves his armor bonus (and any enhancement bonus) while in a wild
+          shape") had nothing to preserve. Asked of `buff.form` (every shape-taking
+          ability's tag), never of the ability's name; a suit or shield carrying
+          `property.wild` keeps its bonus.
+        - **No body.** Ghost touch armour "can be picked up, moved, and worn by corporeal
+          and incorporeal creatures alike" (CRB) — the second clause lane C left: any
+          other suit on an incorporeal wearer gives nothing.
+        A stat block's printed AC never comes here (`_printed_ac_modifiers`)."""
+        polymorphed = self.has_state("buff.form")
+        ghostly = self.has_state("subtype.incorporeal")
+        if not polymorphed and not ghostly:
+            return set()
+        out = set()
+        for slot, rec in (("armour", self.armour_record()), ("shield", self.shield_record())):
+            tags = ()
+            if rec is not None and isinstance(rec.get("magic"), dict) \
+                    and self.layer_awake(rec):
+                tags = tuple(str(t) for t in (layer_of(rec) or {}).get("tags") or ())
+            if polymorphed and "property.wild" not in tags:
+                out.add(slot)
+            if ghostly and "property.ghost-touch-armour" not in tags:
+                out.add(slot)
+        return out
 
     def _printed_ac_modifiers(self) -> list[Modifier]:
         """A stat block's printed AC, as the typed terms it is made of.
@@ -4000,15 +4239,29 @@ class Actor:
             sense = str(spec.get("target") or "").strip().lower().replace(" ", "-")
             if sense:
                 out.append(f"sense.{sense}")
-        for rec in (self.armour_record(), self.shield_record(), self.wielded_record()):
-            # The record's own ids, read without `magic_layer.magic_of` (which deep-
-            # copies the layer, and this runs inside every `has_state`).
+        on = [self.armour_record(), self.shield_record(), self.wielded_record()]
+        seen = {id(r) for r in on if r is not None}
+        # A cursed ring or cloak lays its drawback's `curse.*` tag on its wearer too
+        # (lane F: "cannot cast arcane spells while it is held or worn").
+        on += [r for r in self.worn_items() if id(r) not in seen
+               and isinstance((r.get("magic") or {}).get("curse"), dict)]
+        for rec in on:
             m = (rec or {}).get("magic")
             if not isinstance(m, dict):
                 continue
-            out.extend(effectspec_property_tag(e.get("id"))
-                       for e in (m.get("properties") or []) + (m.get("flat") or [])
-                       if isinstance(e, dict) and e.get("id"))
+            if not isinstance(m.get("curse"), dict):
+                # The record's own ids, read without `magic_layer.magic_of` (which deep-
+                # copies the layer, and this runs inside every `has_state`).
+                out.extend(effectspec_property_tag(e.get("id"))
+                           for e in (m.get("properties") or []) + (m.get("flat") or [])
+                           if isinstance(e, dict) and e.get("id"))
+                continue
+            # A cursed item's tags are its layer's AS THE CURSE LEAVES IT: a delusion
+            # carries none, an opposite curse none, a drawback adds its `curse.bars-*`
+            # tag (`curses.documents`). Read off the record's ids, an opposite-cursed
+            # ghost touch suit still answered `property.ghost-touch-armour`.
+            if self.layer_awake(rec):
+                out.extend(str(t) for t in (layer_of(rec) or {}).get("tags") or ())
         return out
 
     def death_floor(self) -> int:
@@ -4268,7 +4521,83 @@ class Actor:
         defender = extra.pop("defender", None)
         if defender is not None:
             extra["target_actor"] = defender
+        sit = situation_of(self)
+        if sit is not None:
+            extra.setdefault("situation", sit)
         return {"weapon": weapon, **extra}
+
+    def _situation_ctx(self) -> dict:
+        """The context a reader with no roll of its own asks a `when` against: where and
+        when this creature is (`Situation`), and nothing about a weapon or a foe — so a
+        dependent curse's clause on worn armour is answered, and "+2 against fey" is
+        still dropped for want of a fey."""
+        sit = situation_of(self)
+        return {"situation": sit} if sit is not None else {}
+
+    # --- a layer that is not working right now (lane F's intermittent curses) -----------
+
+    def layer_awake(self, rec) -> bool:
+        """Whether this record's magic layer works at this instant for this bearer.
+
+        Lane F's dependent curse puts its situation on every document's `when`
+        (`curses.documents`), which the readers that ask a `when` answer on their own. The
+        readers that read the layer as a FACT OF THE ITEM never ask one: the weapon row's
+        threat range and extra attack (`_with_layer`), the strikes-as traits a blow
+        carries, the armour bonus folded into the suit's row (`forge_items.armour_row`).
+        Measured on a night-only +1 keen longsword before this: by day it rolled no +1 —
+        and still threatened on 17-20 and bit past DR/magic. So those readers ask this,
+        and an asleep layer is read as no layer at all. An unreliable item rolled off for
+        this use (`Moment.guttered`) is asleep for the same readers, the same way.
+        """
+        m = rec.get("magic") if isinstance(rec, dict) else None
+        curse = m.get("curse") if isinstance(m, dict) else None
+        if not isinstance(curse, dict) or curse.get("row") != "intermittent":
+            return True
+        mo = _MOMENT.get()
+        if mo is not None and mo.guttered and _record_origin(rec) in mo.guttered:
+            return False
+        from . import curses as curses_mod
+
+        clause = curses_mod.dependent_clause(curse)
+        if not clause:
+            return True
+        return _when_holds(clause, self._situation_ctx())
+
+    def cursed_on(self) -> list[dict]:
+        """Every record held or worn that carries a curse: the suit, the shield, the
+        weapon in hand and anything else in a slot."""
+        out, seen = [], set()
+        for rec in [self.armour_record(), self.shield_record(), self.wielded_record(),
+                    *self.worn_items()]:
+            if rec is None or id(rec) in seen:
+                continue
+            seen.add(id(rec))
+            if isinstance((rec.get("magic") or {}).get("curse"), dict):
+                out.append(rec)
+        return out
+
+    def barred_from_casting(self, arcane: bool) -> dict | None:
+        """The held or worn record whose curse stops this cast, or None.
+
+        The drawback's tag is the bearer's (`_worn_tags`), and what it stops is the
+        vocabulary's to say (`states.BLOCKS`): the cast is asked as `cast` and as its own
+        tradition, `cast.arcane` or `cast.divine`."""
+        from . import states
+
+        action = "cast.arcane" if arcane else "cast.divine"
+        for rec in self.cursed_on():
+            if not self.layer_awake(rec):
+                continue
+            tags = (layer_of(rec) or {}).get("tags") or ()
+            if states.stops(tags, "cast") or states.stops(tags, action):
+                return rec
+        return None
+
+    def _live_build(self, rec: dict) -> dict:
+        """A forged record's build, with its layer only while the layer works (above)."""
+        if isinstance(rec.get("magic"), dict) and not self.layer_awake(rec):
+            return built(_stripped(rec))
+        return built(rec)
 
     def _feat_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
         """Modifiers from the feats this character holds, read off their documents.
@@ -4964,6 +5293,9 @@ def full_sheet(actor: Actor) -> dict:
     +3 class skill, +3 Dex, +2 Stealthy". The section names match the Pathfinder Player
     Character Folio, so a player who knows the paper sheet knows where to look.
     """
+    # A bench may have rewritten a record under its worn copy since the last op (a
+    # Collect): the sheet shows the thing as the pack now holds it (`refresh_worn`).
+    actor.refresh_worn()
     cls = actor.class_data
     weapons = actor.weapons or ([actor.equipped] if actor.equipped else ["unarmed"])
 
@@ -5465,8 +5797,12 @@ def _record_specs(rec: dict) -> list[dict]:
     from . import forge_items, magic_layer
 
     if forge_items.is_forged(rec):
-        return forge_items.standing_specs(forge_items.build(rec))
-    return magic_layer.record_specs(rec)
+        return forge_items.standing_specs(built(rec))
+    out = [dict(s) for s in rec.get("specs") or () if isinstance(s, dict)]
+    if magic_layer.has_layer(rec):
+        # `magic_layer.record_specs`'s own sum, with the layer memoised for the moment.
+        out += [dict(s) for s in layered(rec)["specs"]]
+    return out
 
 
 def effectspec_property_tag(pid) -> str:
@@ -5526,8 +5862,31 @@ def layer_of(rec) -> dict | None:
     if not isinstance(rec, dict) or not magic_layer.has_layer(rec):
         return None
     if forge_items.is_forged(rec):
-        return forge_items.build(rec).get("magic")
-    return magic_layer.layer(rec)
+        return built(rec).get("magic")
+    return layered(rec)
+
+
+@functools.lru_cache(maxsize=512)
+def _armour_key(base: str) -> tuple[str, str]:
+    """`armour.key_for`, kept: a pure reading of a suit's name against the fixed armour
+    tables, asked by `armour_record` and `shield_record` inside every `has_state` (9,151
+    calls and 0.7 s of a 5 s profiled run of twenty combat turns, 2026-10-06)."""
+    from . import armour as armour_mod
+
+    return armour_mod.key_for(base)
+
+
+def _record_origin(rec) -> str:
+    """`item:<id>` as `magic_layer.layer` stamps every document of this record."""
+    rec = rec if isinstance(rec, dict) else {}
+    return f"item:{str(rec.get('id') or rec.get('name') or 'item').strip()}"
+
+
+def _stripped(rec: dict) -> dict:
+    """The record as the smith left it: no layer (`magic_layer.strip`)."""
+    from . import magic_layer
+
+    return magic_layer.strip(rec)[0]
 
 
 # The book's threat-range rule, said once (CRB, keen: "Doubles the threat range of a
@@ -5573,8 +5932,9 @@ def _with_layer(row: dict, lay: dict | None) -> dict:
             if not int(row.get("range_ft") or 0):
                 row["range_ft"] = int(spec.get("amount", 10) or 10)
         elif kind == "gear_mod" and spec.get("target") == "range_pct":
-            # Distance (CRB): "doubles the range increment". The row's `range_ft`, so the
-            # sheet shows it; no range-increment penalty is rolled by the engine yet.
+            # Distance (CRB): "doubles the range increment". The row's `range_ft`, which
+            # the sheet shows and the attack's range penalty reads (`Engine.
+            # _range_increment`, lane C2: -2 per full increment past the first).
             if int(row.get("range_ft") or 0):
                 row["range_ft"] = int(row["range_ft"]) * (100 + int(spec.get("amount", 0)
                                                                      or 0)) // 100
@@ -5705,6 +6065,191 @@ def _effect_scope_holds(m: dict, ctx: dict | None) -> bool:
     return _when_holds(when, ctx) if when else True
 
 
+# --- the moment a roll is made (enchanting lane C2) ------------------------------------------
+#
+# A dependent curse (CRB, Cursed Items: "the item functions only in certain situations")
+# asks of the roll things the Actor cannot answer alone: is it day, are we underground,
+# what phase of the day is it, is a creature of a kind within 10 feet. Lane F wrote them as
+# `when` clauses on the layer's documents (`curses.SITUATION_FACTS`) and left the context
+# to the engine — and the roll context is built on the Actor, which holds no clock.
+#
+# Three shapes were weighed. A copy of the clock on each actor is a second clock to keep
+# level with `Scene.clock_minutes` (the fork the lane brief forbids). A back-reference
+# from each actor to its scene is deep-copied by every `Scene.snapshot` — measured on the
+# shape: the snapshot then carries a whole second Scene, and a restored actor points at
+# the stale one. What is left is the shape `intents._CARRIED_WEAPONS` already uses for the
+# parse gate: a context variable naming the scene a roll is being made in, set by the
+# doors that roll (`Engine.run`, `Engine.resume`, `Scene.advance`) and read live, so the
+# clock stays the scene's one clock. Outside those doors there is no moment, the facts
+# are unknown, and a dependent clause fails closed — its magic is off, never on
+# (`curses.SITUATION_FACTS`' own rule).
+#
+# The moment also holds what is guttering this instant: an unreliable item (CRB: "each
+# time the item is activated, there is a 5% chance (01-05 on d%) that it does not
+# function") rolled for one use is off for that use only, and a swing is one use.
+
+import contextvars as _contextvars
+from contextlib import contextmanager as _contextmanager
+
+# The situation keys a `when` may name, answered off the moment (curses.SITUATION_FACTS).
+SITUATION_KEYS = ("daylight", "underground", "near", "wielder_casts", "day_phase")
+# "Within 10 feet of a creature type" (CRB, the dependent table): the book's distance.
+NEAR_FT = 10
+
+
+class Moment:
+    """The scene a roll is made in, the items failing this instant (by origin), and what
+    was built from an item's record during it (`built`)."""
+    __slots__ = ("scene", "guttered", "builds")
+
+    def __init__(self, scene):
+        self.scene = scene
+        self.guttered: set[str] = set()
+        self.builds: dict = {}
+
+
+# What an item's record builds to, kept for one moment (one engine batch), keyed by the
+# record's whole content (its `repr`), so a record changed in the batch — a use counted, a
+# curse's day settled, a layer collected — is simply a different key and is built afresh:
+# the memo can be missed, never stale. Measured 2026-10-06 (lane C2, before this): a full
+# combat turn with a layered suit and a layered sword took a median 108-122 ms against
+# 51-56 ms bare, and cProfile put 2.9 s of a 7.5 s run in 5,689 `forge_items.build` calls —
+# every `has_state` walks the gear (`_worn_walk`) and rebuilt both items from scratch. A
+# build never depends on the moment's situation (`layer_awake` is asked outside it), and
+# its readers only read it. Outside a moment (a view rendering the sheet) nothing is kept.
+def _memo_build(kind: str, rec: dict, make):
+    m = _MOMENT.get()
+    if m is None:
+        return make(rec)
+    try:
+        key = (kind, repr(rec))
+    except Exception:  # noqa: BLE001 - an unreprable record is built every time
+        return make(rec)
+    got = m.builds.get(key)
+    if got is None:
+        got = m.builds[key] = make(rec)
+    return got
+
+
+def built(rec: dict) -> dict:
+    """`forge_items.build(rec)`, memoised for the moment (`_memo_build`)."""
+    from . import forge_items
+
+    return _memo_build("build", rec, forge_items.build)
+
+
+def layered(rec: dict) -> dict:
+    """`magic_layer.layer(rec)`, memoised for the moment (`_memo_build`)."""
+    from . import magic_layer
+
+    return _memo_build("layer", rec, magic_layer.layer)
+
+
+_MOMENT: _contextvars.ContextVar = _contextvars.ContextVar("pathfinder_moment",
+                                                          default=None)
+
+
+@_contextmanager
+def situated(scene):
+    """Rolls made inside this block are made in `scene`'s moment. Re-entrant: a door
+    inside a door (an op that advances the clock) keeps the moment it is already in, so
+    what is guttering for this swing stays guttering."""
+    cur = _MOMENT.get()
+    if scene is None or (cur is not None and cur.scene is scene):
+        yield cur
+        return
+    token = _MOMENT.set(Moment(scene))
+    try:
+        yield _MOMENT.get()
+    finally:
+        _MOMENT.reset(token)
+
+
+def current_moment() -> Moment | None:
+    return _MOMENT.get()
+
+
+class Situation:
+    """What a `when` may ask of where and when a creature is, read lazily off the moment.
+
+    Each fact is None when it cannot be known (no moment, no place), and `_when_holds`
+    treats None as "no" — the clause fails closed."""
+    __slots__ = ("actor", "scene", "_facts")
+
+    def __init__(self, actor, scene):
+        self.actor = actor
+        self.scene = scene
+        self._facts: dict = {}
+
+    def fact(self, key: str):
+        if key not in self._facts:
+            self._facts[key] = self._read(key)
+        return self._facts[key]
+
+    def _read(self, key: str):
+        from . import sky
+
+        scene = self.scene
+        clock = getattr(scene, "clock_minutes", None)
+        if key == "daylight":
+            # By day: the engine's sunrise to its nightfall (`sky.DAWN_MINUTE`,
+            # `DUSK_MINUTE`, the one constant pair). A time, not a light level: the
+            # book's row is "during the day", and a cave at noon is still the day.
+            if clock is None:
+                return None
+            minute = int(clock) % sky.DAY
+            return sky.DAWN_MINUTE <= minute < sky.DUSK_MINUTE
+        if key == "day_phase":
+            return None if clock is None else sky.phase_at(int(clock))["phase"]
+        if key == "underground":
+            from . import places as places_mod
+
+            at = str(getattr(self.actor, "at", "") or getattr(scene, "at", "") or "")
+            return places_mod.terrain_of(at) == "underground" if at else None
+        if key == "wielder_casts":
+            from . import casting
+
+            return casting.is_caster(self.actor)
+        return None
+
+    def near(self, want) -> bool:
+        """Whether a creature of the type (or subtype) asked is within 10 feet of this one.
+        Measured on the board as every distance is (`Scene.distance_between`); with no map
+        there is no distance, and everyone in the room is taken to be near — the
+        convention lane C's blinding burst uses for "within 20 feet" (`Engine._use_power`)."""
+        if not isinstance(want, dict) or self.scene is None:
+            return False
+        me = getattr(self.actor, "ref", None)
+        here = getattr(self.scene, "actors", {}) or {}
+        for ref, other in here.items():
+            if ref == me or getattr(other, "is_dead", False):
+                continue
+            if not all(_is_of_kind(other, f, v) for f, v in want.items()
+                       if f in ("type", "subtype")):
+                continue
+            try:
+                feet = self.scene.distance_between(me, ref)
+            except Exception:  # noqa: BLE001 - an unplaced body is unmeasured, not a crash
+                feet = None
+            if feet is None or int(feet) <= NEAR_FT:
+                return True
+        return False
+
+
+def situation_of(actor) -> Situation | None:
+    m = _MOMENT.get()
+    return Situation(actor, m.scene) if m is not None else None
+
+
+def guttered(doc: dict) -> bool:
+    """Whether an unreliable document's magic has failed for the use in hand: it carries
+    `gutters_pct` (lane F's unreliable curse) and its item was rolled off this instant."""
+    if not doc.get("gutters_pct"):
+        return False
+    m = _MOMENT.get()
+    return bool(m is not None and m.guttered and str(doc.get("origin") or "") in m.guttered)
+
+
 def _when_holds(when, ctx: dict | None) -> bool:
     """A `when` is a condition on the roll context; an unevaluable key means no.
 
@@ -5787,6 +6332,21 @@ def _when_holds(when, ctx: dict | None) -> bool:
                 wanted = value if isinstance(value, (list, tuple)) else [value]
                 if not any(f"{field_name}.{_kind_leaf(v)}" in tags for v in wanted):
                     return False
+        elif key in SITUATION_KEYS:
+            # Lane F's dependent curses (curses.SITUATION_FACTS), answered off the moment
+            # the roll is made in (`Situation`): by day or night, underground or above,
+            # in one phase of the day, in a caster's hands, within 10 feet of a kind of
+            # creature. No moment, no answer — and no answer is no (fails closed).
+            # A context that states the fact outright (`{"daylight": True}`) answers it
+            # as stated — lane F's own test asks that way.
+            sit = ctx.get("situation")
+            if key == "near":
+                if sit is None or not sit.near(want):
+                    return False
+                continue
+            have = ctx[key] if key in ctx else (sit.fact(key) if sit is not None else None)
+            if have is None or have != want:
+                return False
         elif isinstance(want, dict):
             have = ctx.get(key)
             if have is None:

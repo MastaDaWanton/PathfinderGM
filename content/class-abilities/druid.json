@@ -44,7 +44,7 @@
       "not_yet": [
         "Elemental body (6th, 8th, 10th, 12th), plant shape (8th on), and beast shape III's Diminutive and Huge animals (8th).",
         "The form's movement (climb, fly, swim) and senses (darkvision, low-light vision, scent).",
-        "Gear melding: worn armour still counts while the shape holds.",
+        "Gear melding is the armour and shield bonuses only (Actor._melded_gear, 2026-10-06): an item that must be activated still works in the shape.",
         "Casting while shaped is not refused (the book needs Natural Spell for it).",
         "At will at 20th: the pool still counts uses."
       ]
