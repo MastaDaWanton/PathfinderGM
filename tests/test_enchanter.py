@@ -92,7 +92,9 @@ def test_the_level_five_deed_is_reachable_from_level_four(track):
     and that success is the deed."""
     result = en.preview(
         4,
-        _full_chain(["thundering-essence", "ruby-focus", "auric-ink", "void-chalk"],
+        # Any exotic essence. Thundering was exotic until the data pass tiered essences by
+        # the market value of their motes (rules/materials.PRICE_BANDS): it is rare now.
+        _full_chain(["holy-essence", "ruby-focus", "auric-ink", "void-chalk"],
                     methods=["attune", "scribe", "focus", "channel", "bind",
                              "empower", "seal"]),
         item=MASTERWORK_SWORD)

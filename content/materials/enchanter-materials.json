@@ -1,6 +1,430 @@
 {
  "source": "Enchanter world class — authored for Pathfinder GM against the PF1e magic item rules.",
- "note": "Kinds: essence (what is bound; carries the effect family), focus (the gem that anchors a binding and gates how much essence it holds — `capacity` is the highest tier rank it takes AND the total ranks it holds), ink / chalk / salt (circle materials, consumed by scribing), vessel (what the item being enchanted must be — prose plus a `requires` field), catalyst (eases the working; `dc_mod` applies to the chain DC), treatment (preparation of the vessel). Effects are rules/effectspec.py specs and every one must validate; what the vocabulary cannot express is prose in `text` and, where the item still costs its bearer something, a `narrative` spec so the GM sees it at the table. Weapon-property essences carry `adjective` for naming; the enhancement ladders carry `plus`. `prefers` names the vessel kind the essence wants — binding it elsewhere is +5 DC, the material resisting. `binds_at`: \"night\" means the essence will not bind under the sun.",
+ "note": "The enchanter's shelf. Kinds: essence (what is bound), focus (the stone a ring or amulet is set with), ink / chalk / salt (the circle's materials, consumed by Prepare), catalyst (eases the binding; `dc_mod`), treatment (vessel preparation), vessel (retired: vessels are real item records now). An essence's enchanting fields, read through rules/materials.py (docs/enchanting-contracts.md §5): `grants` (a property in content/rules/magic-properties.json, or an enhancement step), `motes` (potency: 1 mote = 100 gp of the book's making cost; a bought essence carries exactly what its grant costs to make and sells for motes x 100), `tier` (the band of the market value its motes carry, the magic items' price bands), `family` and its `phase` of the day (the `families` table; never a planet), `polarity`, `affinity`, `house` (small typed top-ups, scaled by binding quality, for the owner's review in docs/enchanting-review.md), `working` and `color`. `effects`, `drawbacks`, `prefers`, `plus`, `adjective` and `binds_at` are the pre-revamp fields rules/enchanter.py still reads until its bench moves. Written by tools/enchant_data_pass.py.",
+ "families": {
+  "cold": {
+   "phase": "dawn",
+   "color": "#8fd3ff",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "Frost before dawn (the owner's own example): the coldest hour of the day is just before sunrise, when the night's cooling has run longest and the sun has not yet begun to repay it (the diurnal temperature minimum; any meteorology text)."
+  },
+  "earth": {
+   "phase": "dawn",
+   "color": "#9a7b55",
+   "affinity": [
+    "iron",
+    "bulette-plate",
+    "ironwood-haft"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "Stone takes at sunrise: in the Eddic Alvissmal the dwarf All-Wise is kept talking until dawn and the first light turns him to stone (https://en.wikipedia.org/wiki/Alv%C3%ADssm%C3%A1l); trolls share the fate in Norse folklore."
+  },
+  "invulnerability": {
+   "phase": "dawn",
+   "color": "#8a8f99",
+   "affinity": [
+    "adamantine",
+    "tarrasque-plate"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "The hardening at first light, as earth: Alvissmal's dwarf made stone by the sunrise (https://en.wikipedia.org/wiki/Alv%C3%ADssm%C3%A1l). A house pairing with earth; no separate source."
+  },
+  "light": {
+   "phase": "dawn",
+   "color": "#fff4c2",
+   "affinity": [
+    "silver",
+    "gold",
+    "glowlizard-hide"
+   ],
+   "working": [
+    "pure"
+   ],
+   "why": "First light, the cockcrow: in the folk belief the crow before dawn sends the night's spirits home (https://www.almanac.com/folklore-cocks-cockcrows-and-weathercocks); Hamlet's ghost fades at it."
+  },
+  "holy": {
+   "phase": "dawn",
+   "color": "#ffe08a",
+   "affinity": [
+    "silver",
+    "angelskin-binding",
+    "unicorn-hide",
+    "elysian-bronze"
+   ],
+   "working": [
+    "pure"
+   ],
+   "why": "The cockcrow that ends the dead's hour: spirits and devils \"disappear with the first cry of the cock\" (https://www.almanac.com/folklore-cocks-cockcrows-and-weathercocks). Dawn is the hour the holy wins back."
+  },
+  "vorpal": {
+   "phase": "dawn",
+   "color": "#e8e8f0",
+   "affinity": [
+    "adamantine",
+    "high-carbon-steel"
+   ],
+   "working": [
+    "volatile"
+   ],
+   "why": "Executions at dawn, the custom of military and civil justice alike. A house reading; not sourced in this pass."
+  },
+  "air": {
+   "phase": "morning",
+   "color": "#cfe8f2",
+   "affinity": [
+    "griffon-hide",
+    "bat-wing-leather",
+    "mithral"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "The day's winds rise as the morning sun warms the ground and the air above it begins to climb (the same heating that builds the afternoon's storms, https://geo.libretexts.org/Bookshelves/Meteorology_and_Climate_Science/Practical_Meteorology_(Stull)/14%3A_Thunderstorm_Fundamentals/14.7%3A_Thunderstorm_Forecasting). A house reading of the meteorology."
+  },
+  "keen": {
+   "phase": "morning",
+   "color": "#d8dde3",
+   "affinity": [
+    "high-carbon-steel",
+    "pattern-steel"
+   ],
+   "working": [
+    "eager"
+   ],
+   "why": "The mower's hours: scythes were whetted and the hay cut early, while the dew still softened the stalks. Common country practice; not sourced in this pass."
+  },
+  "speed": {
+   "phase": "morning",
+   "color": "#ffd25a",
+   "affinity": [
+    "mithral",
+    "wyvern-sinew"
+   ],
+   "working": [
+    "eager"
+   ],
+   "why": "The messenger's start at first light, the day's whole road ahead. A house reading; not sourced."
+  },
+  "mercy": {
+   "phase": "morning",
+   "color": "#f6c9d7",
+   "affinity": [
+    "silver",
+    "moonstone-focus"
+   ],
+   "working": [
+    "pure"
+   ],
+   "why": "Mercies \"new every morning\" (Lamentations 3:22-23, a text in the public domain): the morning is the hour of a fresh start."
+  },
+  "vigour": {
+   "phase": "morning",
+   "color": "#e07a4a",
+   "affinity": [
+    "wolf-pelt",
+    "grizzly-hide",
+    "black-bear-hide"
+   ],
+   "working": [
+    "eager"
+   ],
+   "why": "The body's strength is for the day's first work: the field hands out before the heat Lady Midday walks in (https://en.wikipedia.org/wiki/Lady_Midday). A house reading."
+  },
+  "skill": {
+   "phase": "morning",
+   "color": "#c8b28a",
+   "affinity": [
+    "brass",
+    "leather-grip"
+   ],
+   "working": [],
+   "why": "The working day's opening hours, when a craftsman's hand is freshest. A house reading; not sourced."
+  },
+  "fire": {
+   "phase": "noon",
+   "color": "#e0703a",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "working": [
+    "eager"
+   ],
+   "why": "Fire at noon (the owner's own example): the sun at its height, and Lady Midday of the Slavic fields, the personified sunstroke who walks only in the hottest part of the day (https://en.wikipedia.org/wiki/Lady_Midday)."
+  },
+  "axiomatic": {
+   "phase": "noon",
+   "color": "#c0c8d8",
+   "affinity": [
+    "platinum",
+    "steel"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "Noon is the hour of plain sight: the shortest shadows, nothing hidden, the court in session. A house reading; not sourced."
+  },
+  "fortification": {
+   "phase": "noon",
+   "color": "#b7a27a",
+   "affinity": [
+    "adamantine",
+    "dragon-turtle-shell",
+    "bulette-plate"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "Fortification turns the blow from hiding (the sneak attack and the vital strike), and at noon there is least shadow to strike from. A house reading."
+  },
+  "electricity": {
+   "phase": "afternoon",
+   "color": "#f2e85c",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "Thunderstorms over land peak in the late afternoon and early evening, two or three hours before sunset, when the day's heating has lifted the most air (https://geo.libretexts.org/Bookshelves/Meteorology_and_Climate_Science/Practical_Meteorology_(Stull)/14%3A_Thunderstorm_Fundamentals/14.7%3A_Thunderstorm_Forecasting). The one family in the afternoon the owner added in round 5; dusk is the alternative if afternoon should stay empty."
+  },
+  "sonic": {
+   "phase": "afternoon",
+   "color": "#c9b6ff",
+   "affinity": [
+    "bell-bronze",
+    "singing-steel"
+   ],
+   "working": [
+    "eager"
+   ],
+   "why": "Thunder, the storm's voice: the same afternoon peak (https://geo.libretexts.org/Bookshelves/Meteorology_and_Climate_Science/Practical_Meteorology_(Stull)/14%3A_Thunderstorm_Fundamentals/14.7%3A_Thunderstorm_Forecasting)."
+  },
+  "defending": {
+   "phase": "afternoon",
+   "color": "#7d93a8",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "The long watch of the afternoon. The weakest reason in the table, a house placement; noon (with fortification) is the alternative."
+  },
+  "acid": {
+   "phase": "dusk",
+   "color": "#9ccc3c",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "working": [
+    "volatile"
+   ],
+   "why": "The evening damp the old physicians feared: the miasma theory held the night air that rises at nightfall to be corrupting. A house reading; not sourced in this pass."
+  },
+  "warding": {
+   "phase": "dusk",
+   "color": "#6f9bd1",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "working": [
+    "heavy"
+   ],
+   "why": "Curfew: the medieval evening bell (couvre-feu, cover-fire) at which hearths were covered and the house shut against the night (https://wordhistories.net/2016/08/22/curfew/)."
+  },
+  "abjuration": {
+   "phase": "dusk",
+   "color": "#9db7ff",
+   "affinity": [
+    "platinum",
+    "silver"
+   ],
+   "working": [
+    "pure"
+   ],
+   "why": "Wards set at nightfall, as the curfew's (https://wordhistories.net/2016/08/22/curfew/)."
+  },
+  "bane": {
+   "phase": "dusk",
+   "color": "#b5651d",
+   "affinity": [
+    "cold-iron",
+    "silver"
+   ],
+   "working": [],
+   "why": "The hunter's hour: wolves, owls and the great cats are crepuscular, hunting at dusk and dawn. Cold iron against fey and silver against the shapechangers line up with the book's own materials."
+  },
+  "anarchic": {
+   "phase": "dusk",
+   "color": "#d14fd1",
+   "affinity": [
+    "living-steel",
+    "chimera-hide"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "Twilight is the liminal hour, neither day nor night, when the order of the day comes apart. A house reading; not sourced."
+  },
+  "wounding": {
+   "phase": "dusk",
+   "color": "#a3122a",
+   "affinity": [
+    "high-carbon-steel",
+    "viper-skin"
+   ],
+   "working": [
+    "eager"
+   ],
+   "why": "The sky's red hour. A house image, the weakest kind of reason; not sourced."
+  },
+  "water": {
+   "phase": "night",
+   "color": "#3a7bd5",
+   "affinity": [
+    "kraken-hide",
+    "sharkskin-grip",
+    "crocodile-hide"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "Dew settles through the night as the ground cools below the air (and was gathered before sunrise for magic, Folkard's Plant Lore, cited in rules/sky.py)."
+  },
+  "shadow": {
+   "phase": "night",
+   "color": "#3b3355",
+   "affinity": [
+    "shadow-silk",
+    "shadow-mastiff-hide",
+    "umbral-dragonhide",
+    "shadow-black"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "Darkness itself: the hours with no sun."
+  },
+  "slick": {
+   "phase": "night",
+   "color": "#c4b07a",
+   "affinity": [
+    "mink-oil",
+    "currier-tallow",
+    "troll-fat"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "The burglar's hours, slipping through bars and bonds. A house reading; not sourced."
+  },
+  "vicious": {
+   "phase": "night",
+   "color": "#8b1e2d",
+   "affinity": [
+    "fiend-bone-core",
+    "abysium"
+   ],
+   "working": [
+    "volatile"
+   ],
+   "why": "The predator's dark, when the wolf comes to the fold. A house reading; not sourced."
+  },
+  "dancing": {
+   "phase": "night",
+   "color": "#e0a8ff",
+   "affinity": [
+    "singing-steel",
+    "silk-thread"
+   ],
+   "working": [
+    "skittish"
+   ],
+   "why": "The fairy revel, danced through the night until the cockcrow breaks it. Widespread in British fairy lore; not sourced in this pass."
+  },
+  "arcane": {
+   "phase": "night",
+   "color": "#7b6cf6",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "working": [],
+   "why": "The scholar's lamp: study by night, the midnight oil. A house reading; not sourced."
+  },
+  "mind": {
+   "phase": "night",
+   "color": "#8fb3e8",
+   "affinity": [
+    "gold",
+    "silver"
+   ],
+   "working": [
+    "pure"
+   ],
+   "why": "The night owl and the scholar's lamp, as arcane: wisdom keeps the night hours. A house reading; not sourced."
+  },
+  "unholy": {
+   "phase": "midnight",
+   "color": "#6b1030",
+   "affinity": [
+    "fiend-bone-core",
+    "hell-hound-hide",
+    "abysium"
+   ],
+   "working": [
+    "volatile"
+   ],
+   "why": "The witching hour, \"the hour immediately after midnight\", when witches, demons and ghosts are at their most powerful (https://en.wikipedia.org/wiki/Witching_hour)."
+  },
+  "ghost": {
+   "phase": "midnight",
+   "color": "#b8f0e8",
+   "affinity": [
+    "ghost-wax",
+    "silver"
+   ],
+   "working": [
+    "night_only"
+   ],
+   "why": "The dead at midnight (the owner's own example; https://en.wikipedia.org/wiki/Witching_hour)."
+  },
+  "negative": {
+   "phase": "midnight",
+   "color": "#2f2a3a",
+   "affinity": [
+    "bone-grip",
+    "fiend-bone-core"
+   ],
+   "working": [
+    "volatile"
+   ],
+   "why": "The dead at midnight, as ghost (https://en.wikipedia.org/wiki/Witching_hour)."
+  }
+ },
  "materials": [
   {
    "id": "fire-mote",
@@ -10,7 +434,12 @@
    "family": "fire",
    "adjective": "Smouldering",
    "prefers": "weapon",
-   "obtain": "gathered", "biomes": ["mountain", "underground", "urban"],
+   "obtain": "gathered",
+   "biomes": [
+    "mountain",
+    "underground",
+    "urban"
+   ],
    "text": "A pinch of captured flame in a wax-stoppered phial. It wants an edge: fire motes leap gladly into steel and sulk in leather and plate — binding one to armour is working against the grain (+5 DC).",
    "effects": [
     {
@@ -21,7 +450,34 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "trigger": "hit",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "frost-mote",
@@ -31,7 +487,11 @@
    "family": "cold",
    "adjective": "Rimed",
    "prefers": "weapon",
-   "obtain": "gathered", "biomes": ["tundra", "mountain"],
+   "obtain": "gathered",
+   "biomes": [
+    "tundra",
+    "mountain"
+   ],
    "text": "Winter kept small. Frost motes settle into weapons; pressed into armour they weep meltwater through the ritual and fight the binding (+5 DC).",
    "effects": [
     {
@@ -42,7 +502,32 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "trigger": "hit",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "spark-mote",
@@ -52,7 +537,12 @@
    "family": "electricity",
    "adjective": "Crackling",
    "prefers": "weapon",
-   "obtain": "gathered", "biomes": ["grassland", "coast", "mountain"],
+   "obtain": "gathered",
+   "biomes": [
+    "grassland",
+    "coast",
+    "mountain"
+   ],
    "text": "A thumb of bottled lightning that stands the enchanter's hair on end through the glass. Wants a weapon; grounds out through armour (+5 DC).",
    "effects": [
     {
@@ -63,7 +553,33 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "trigger": "hit",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "stone-mote",
@@ -73,7 +589,12 @@
    "family": "earth",
    "adjective": "Stoneskin",
    "prefers": "armour",
-   "obtain": "mined", "biomes": ["mountain", "hills", "underground"],
+   "obtain": "mined",
+   "biomes": [
+    "mountain",
+    "hills",
+    "underground"
+   ],
    "text": "Grit from a place that has never moved. It wants to be worn, not swung: bound to a weapon it drags at the wrist (+5 DC).",
    "effects": [
     {
@@ -86,7 +607,31 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "iron",
+    "bulette-plate",
+    "ironwood-haft"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 1,
+     "bonus_type": "natural armour",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#9a7b55"
   },
   {
    "id": "gale-mote",
@@ -96,7 +641,12 @@
    "family": "air",
    "adjective": "Whistling",
    "prefers": "",
-   "obtain": "gathered", "biomes": ["mountain", "coast", "grassland"],
+   "obtain": "gathered",
+   "biomes": [
+    "mountain",
+    "coast",
+    "grassland"
+   ],
    "text": "A breath of high wind that never quite stops circling its phial. Indifferent to what it is bound to, which makes it a favourite for practice work.",
    "effects": [
     {
@@ -109,7 +659,31 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "any",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "griffon-hide",
+    "bat-wing-leather",
+    "mithral"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 1,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#cfe8f2"
   },
   {
    "id": "tide-mote",
@@ -119,7 +693,11 @@
    "family": "water",
    "adjective": "Brinebound",
    "prefers": "armour",
-   "obtain": "gathered", "biomes": ["coast", "swamp"],
+   "obtain": "gathered",
+   "biomes": [
+    "coast",
+    "swamp"
+   ],
    "text": "Seawater that remembers the moon. Bound to armour or a cloak it carries its bearer through water like a friend.",
    "effects": [
     {
@@ -132,7 +710,31 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "kraken-hide",
+    "sharkskin-grip",
+    "crocodile-hide"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "swim",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#3a7bd5"
   },
   {
    "id": "glow-mote",
@@ -142,7 +744,11 @@
    "family": "light",
    "adjective": "Glimmering",
    "prefers": "",
-   "obtain": "gathered", "biomes": ["urban", "ruins"],
+   "obtain": "gathered",
+   "biomes": [
+    "urban",
+    "ruins"
+   ],
    "text": "Lamplight skimmed off a temple candle. The classic first binding: it asks nothing and refuses nothing.",
    "effects": [
     {
@@ -150,7 +756,31 @@
      "target": "Sheds light as a candle, always"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "any",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "silver",
+    "gold",
+    "glowlizard-hide"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#fff4c2"
   },
   {
    "id": "hearth-ember",
@@ -160,7 +790,11 @@
    "family": "fire",
    "adjective": "Hearthwarm",
    "prefers": "armour",
-   "obtain": "gathered", "biomes": ["urban", "farmland"],
+   "obtain": "gathered",
+   "biomes": [
+    "urban",
+    "farmland"
+   ],
    "text": "An ember from a hearth that burned unbroken for a generation. The one fire essence that prefers to be worn: it keeps the cold out rather than putting the heat in.",
    "effects": [
     {
@@ -172,17 +806,43 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "motes": 2,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 1,
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "arcane-essence-i",
    "name": "Arcane Essence I",
    "kind": "essence",
-   "tier": "common",
-   "family": "enhancement",
+   "tier": "uncommon",
+   "family": "arcane",
    "plus": 1,
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 150,
+   "obtain": "bought",
+   "price_gp": 1000,
    "text": "Raw magic settled into liquid, the first rung of the +1 to +5 ladder. Bound to a weapon it is the book's +1: +1 enhancement on attack and damage rolls. One rung only per vessel — enhancement essences are one family, and a vessel takes one.",
    "effects": [
     {
@@ -204,17 +864,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "enhancement": 1
+   },
+   "motes": 10,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#7b6cf6"
   },
   {
    "id": "arcane-essence-ii",
    "name": "Arcane Essence II",
    "kind": "essence",
-   "tier": "uncommon",
-   "family": "enhancement",
+   "tier": "rare",
+   "family": "arcane",
    "plus": 2,
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 600,
+   "obtain": "bought",
+   "price_gp": 4000,
    "text": "The second rung: the book's +2 weapon. Denser than the first — it needs at least an amethyst to anchor it.",
    "effects": [
     {
@@ -236,17 +919,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "enhancement": 2
+   },
+   "motes": 40,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#7b6cf6"
   },
   {
    "id": "arcane-essence-iii",
    "name": "Arcane Essence III",
    "kind": "essence",
    "tier": "rare",
-   "family": "enhancement",
+   "family": "arcane",
    "plus": 3,
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 2400,
+   "obtain": "bought",
+   "price_gp": 9000,
    "text": "The third rung: the book's +3 weapon. From here up the essence has a pulse.",
    "effects": [
     {
@@ -268,17 +974,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "enhancement": 3
+   },
+   "motes": 90,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#7b6cf6"
   },
   {
    "id": "arcane-essence-iv",
    "name": "Arcane Essence IV",
    "kind": "essence",
    "tier": "exotic",
-   "family": "enhancement",
+   "family": "arcane",
    "plus": 4,
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 9000,
+   "obtain": "bought",
+   "price_gp": 16000,
    "text": "The fourth rung: the book's +4 weapon. It hums against the phial glass and needs a ruby at least.",
    "effects": [
     {
@@ -300,17 +1029,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "enhancement": 4
+   },
+   "motes": 160,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#7b6cf6"
   },
   {
    "id": "arcane-essence-v",
    "name": "Arcane Essence V",
    "kind": "essence",
    "tier": "legendary",
-   "family": "enhancement",
+   "family": "arcane",
    "plus": 5,
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 22000,
+   "obtain": "bought",
+   "price_gp": 25000,
    "text": "The top of the ladder: the book's +5 weapon. Only a diamond holds it, and only a sanctum keeps the working quiet enough to try.",
    "effects": [
     {
@@ -332,17 +1084,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "enhancement": 5
+   },
+   "motes": 250,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 3,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#7b6cf6"
   },
   {
    "id": "warding-essence-i",
    "name": "Warding Essence I",
    "kind": "essence",
-   "tier": "common",
-   "family": "enhancement",
+   "tier": "uncommon",
+   "family": "warding",
    "plus": 1,
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 100,
+   "obtain": "bought",
+   "price_gp": 500,
    "text": "The armour ladder's first rung: the book's +1 armour, +1 enhancement to AC. Same family as the arcane essences — a vessel takes one enhancement essence, never two.",
    "effects": [
     {
@@ -355,17 +1130,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "enhancement": 1
+   },
+   "motes": 5,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 1,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
   },
   {
    "id": "warding-essence-ii",
    "name": "Warding Essence II",
    "kind": "essence",
    "tier": "uncommon",
-   "family": "enhancement",
+   "family": "warding",
    "plus": 2,
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 400,
+   "obtain": "bought",
+   "price_gp": 2000,
    "text": "The book's +2 armour.",
    "effects": [
     {
@@ -378,17 +1180,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "enhancement": 2
+   },
+   "motes": 20,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 1,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
   },
   {
    "id": "warding-essence-iii",
    "name": "Warding Essence III",
    "kind": "essence",
    "tier": "rare",
-   "family": "enhancement",
+   "family": "warding",
    "plus": 3,
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1600,
+   "obtain": "bought",
+   "price_gp": 4500,
    "text": "The book's +3 armour.",
    "effects": [
     {
@@ -401,17 +1230,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "enhancement": 3
+   },
+   "motes": 45,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
   },
   {
    "id": "warding-essence-iv",
    "name": "Warding Essence IV",
    "kind": "essence",
-   "tier": "exotic",
-   "family": "enhancement",
+   "tier": "rare",
+   "family": "warding",
    "plus": 4,
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 6000,
+   "obtain": "bought",
+   "price_gp": 8000,
    "text": "The book's +4 armour.",
    "effects": [
     {
@@ -424,17 +1280,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "enhancement": 4
+   },
+   "motes": 80,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
   },
   {
    "id": "warding-essence-v",
    "name": "Warding Essence V",
    "kind": "essence",
-   "tier": "legendary",
-   "family": "enhancement",
+   "tier": "exotic",
+   "family": "warding",
    "plus": 5,
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 15000,
+   "obtain": "bought",
+   "price_gp": 12500,
    "text": "The book's +5 armour. Diamond-and-sanctum work.",
    "effects": [
     {
@@ -447,17 +1330,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "enhancement": 5
+   },
+   "motes": 125,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
   },
   {
    "id": "merciful-essence",
    "name": "Merciful Essence",
    "kind": "essence",
-   "tier": "uncommon",
+   "tier": "rare",
    "family": "mercy",
    "adjective": "Merciful",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 500,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "Distilled restraint, milky and warm. The book's merciful weapon: +1d6 damage, and all the weapon's damage is nonlethal.",
    "effects": [
     {
@@ -472,17 +1382,44 @@
      "target": "All of the weapon's damage is nonlethal"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "merciful"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "silver",
+    "moonstone-focus"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "heal",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#f6c9d7"
   },
   {
    "id": "vicious-essence",
    "name": "Vicious Essence",
    "kind": "essence",
-   "tier": "uncommon",
+   "tier": "rare",
    "family": "vicious",
    "adjective": "Vicious",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 500,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "Spite, bottled. The book's vicious weapon: a flare of destructive energy on every hit — +2d6 to the target and 1d6 to the wielder. The first essence most enchanters meet whose binding costs the bearer something, and the cheap ferocity is exactly why apprentices reach for it.",
    "effects": [
     {
@@ -501,7 +1438,40 @@
      "lethality": "lethal",
      "note": "to the wielder, each hit"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "grants": {
+    "property": "vicious"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "fiend-bone-core",
+    "abysium"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#8b1e2d"
   },
   {
    "id": "flaming-essence",
@@ -511,7 +1481,8 @@
    "family": "fire",
    "adjective": "Flaming",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 1800,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "A fire mote grown up: it roars when the phial is unstoppered. The book's flaming weapon — the blade is sheathed in fire on command and deals +1d6 fire damage on a hit. It wants steel; bound to armour it fights the working (+5 DC).",
    "effects": [
     {
@@ -522,7 +1493,42 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "flaming"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "frost-essence",
@@ -532,7 +1538,8 @@
    "family": "cold",
    "adjective": "Frost",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 1800,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "The book's frost weapon: the blade sweats rime and deals +1d6 cold damage on a hit. Cross-craft favourite — a winter wolf pelt from the leatherworker takes it without complaint.",
    "effects": [
     {
@@ -543,7 +1550,40 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "frost"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "shock-essence",
@@ -553,7 +1593,8 @@
    "family": "electricity",
    "adjective": "Shock",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 1800,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "The book's shock weapon: +1d6 electricity damage on a hit, and the smell of a storm about to break.",
    "effects": [
     {
@@ -564,7 +1605,41 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "shock"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "corrosive-essence",
@@ -574,7 +1649,8 @@
    "family": "acid",
    "adjective": "Corrosive",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 1800,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "The corrosive weapon: +1d6 acid damage on a hit. Stored in wax-lined glass because it ate the first three phials.",
    "effects": [
     {
@@ -585,7 +1661,40 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "corrosive"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#9ccc3c"
   },
   {
    "id": "keen-essence",
@@ -595,7 +1704,8 @@
    "family": "keen",
    "adjective": "Keen",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 1800,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "The idea of sharpness, extracted. The book's keen weapon: doubles the threat range of a piercing or slashing weapon; does not stack with Improved Critical. The engine has no vocabulary for threat ranges, so this stays the GM's to apply — which is why the effect is narrative rather than a guessed spec.",
    "effects": [
     {
@@ -603,7 +1713,33 @@
      "target": "Doubles the weapon's threat range (piercing or slashing only; does not stack with Improved Critical)"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "keen"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "high-carbon-steel",
+    "pattern-steel"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#d8dde3"
   },
   {
    "id": "bane-essence",
@@ -613,7 +1749,8 @@
    "family": "bane",
    "adjective": "Bane",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 2000,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "Old grudge rendered down; the enchanter names the foe at the binding. The book's bane weapon: against the designated foe the weapon's enhancement is +2 better and it deals +2d6 damage.",
    "effects": [
     {
@@ -634,17 +1771,39 @@
      "note": "against the designated foe"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "bane"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "cold-iron",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "survival",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#b5651d"
   },
   {
    "id": "thundering-essence",
    "name": "Thundering Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "sonic",
    "adjective": "Thundering",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 4000,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "The book's thundering weapon: on a confirmed critical hit, a cannon-crack — +1d8 sonic damage per point of the weapon's critical multiplier beyond one, and the struck creature must save or be deafened.",
    "effects": [
     {
@@ -655,17 +1814,50 @@
      "note": "on a confirmed critical, per multiplier step"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "thundering"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "bell-bronze",
+    "singing-steel"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "sonic",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#c9b6ff"
   },
   {
    "id": "flaming-burst-essence",
    "name": "Flaming Burst Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "fire",
    "adjective": "Blazing",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 5000,
+   "obtain": "bought",
+   "price_gp": 8000,
    "text": "Flaming essence wound spring-tight. The book's flaming burst: +1d6 fire on every hit, and on a confirmed critical an extra +1d10 fire per point of critical multiplier beyond two.",
    "effects": [
     {
@@ -683,17 +1875,53 @@
      "note": "on a confirmed critical"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "flaming-burst"
+   },
+   "motes": 80,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "icy-burst-essence",
    "name": "Icy Burst Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "cold",
    "adjective": "Icebound",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 5000,
+   "obtain": "bought",
+   "price_gp": 8000,
    "text": "The book's icy burst: +1d6 cold on every hit, +1d10 cold on a confirmed critical.",
    "effects": [
     {
@@ -711,17 +1939,51 @@
      "note": "on a confirmed critical"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "icy-burst"
+   },
+   "motes": 80,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "shocking-burst-essence",
    "name": "Shocking Burst Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "electricity",
    "adjective": "Stormlit",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 5000,
+   "obtain": "bought",
+   "price_gp": 8000,
    "text": "The book's shocking burst: +1d6 electricity on every hit, +1d10 electricity on a confirmed critical.",
    "effects": [
     {
@@ -739,7 +2001,41 @@
      "note": "on a confirmed critical"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "shocking-burst"
+   },
+   "motes": 80,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "holy-essence",
@@ -749,7 +2045,17 @@
    "family": "holy",
    "adjective": "Holy",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["planar", "ruins"], "from_creature": ["celestial", "angel", "archon", "azata"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar",
+    "ruins"
+   ],
+   "from_creature": [
+    "celestial",
+    "angel",
+    "archon",
+    "azata"
+   ],
    "text": "Light that fell somewhere sanctified and never got up. The book's holy weapon: +2d6 damage against evil creatures. It judges the hand that holds it — an evil wielder gains a negative level while it is carried, and the essence refuses outright to be bound by an enchanter of evil deeds; the working simply dies in the circle. That refusal is a fact about the material, not a rule the engine rolls.",
    "effects": [
     {
@@ -765,7 +2071,35 @@
      "type": "narrative",
      "target": "An evil wielder gains a negative level while carrying it"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "grants": {
+    "property": "holy"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "silver",
+    "angelskin-binding",
+    "unicorn-hide",
+    "elysian-bronze"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#ffe08a"
   },
   {
    "id": "unholy-essence",
@@ -775,7 +2109,17 @@
    "family": "unholy",
    "adjective": "Unholy",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["planar", "underground"], "from_creature": ["demon", "devil", "fiend", "daemon"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar",
+    "underground"
+   ],
+   "from_creature": [
+    "demon",
+    "devil",
+    "fiend",
+    "daemon"
+   ],
    "text": "The mirror of holy essence, cold to the touch in a way that has nothing to do with temperature. +2d6 damage against good creatures; a good wielder gains a negative level while carrying it.",
    "effects": [
     {
@@ -791,7 +2135,41 @@
      "type": "narrative",
      "target": "A good wielder gains a negative level while carrying it"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "grants": {
+    "property": "unholy"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "fiend-bone-core",
+    "hell-hound-hide",
+    "abysium"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "profane",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#6b1030"
   },
   {
    "id": "anarchic-essence",
@@ -801,7 +2179,15 @@
    "family": "anarchic",
    "adjective": "Anarchic",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["planar"], "from_creature": ["demon", "protean", "azata"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar"
+   ],
+   "from_creature": [
+    "demon",
+    "protean",
+    "azata"
+   ],
    "text": "Chaos that agreed, briefly, to sit in a phial. The book's anarchic weapon: +2d6 damage against lawful creatures; a lawful wielder gains a negative level.",
    "effects": [
     {
@@ -817,7 +2203,40 @@
      "type": "narrative",
      "target": "A lawful wielder gains a negative level while carrying it"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "grants": {
+    "property": "anarchic"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "living-steel",
+    "chimera-hide"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 2,
+     "bonus_type": "luck",
+     "house": true
+    },
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#d14fd1"
   },
   {
    "id": "axiomatic-essence",
@@ -827,7 +2246,15 @@
    "family": "axiomatic",
    "adjective": "Axiomatic",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["planar"], "from_creature": ["devil", "inevitable", "archon"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar"
+   ],
+   "from_creature": [
+    "devil",
+    "inevitable",
+    "archon"
+   ],
    "text": "Perfect order in suspension; the phial's contents form the same lattice every dawn. The book's axiomatic weapon: +2d6 damage against chaotic creatures; a chaotic wielder gains a negative level.",
    "effects": [
     {
@@ -843,17 +2270,51 @@
      "type": "narrative",
      "target": "A chaotic wielder gains a negative level while carrying it"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "grants": {
+    "property": "axiomatic"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "platinum",
+    "steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#c0c8d8"
   },
   {
    "id": "wounding-essence",
    "name": "Wounding Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "wounding",
    "adjective": "Wounding",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 5000,
+   "obtain": "bought",
+   "price_gp": 8000,
    "text": "The book's wounding weapon: a hit deals 1 point of bleed damage each round until the wound is bound or healed.",
    "effects": [
     {
@@ -862,7 +2323,33 @@
      "stopped_by": "DC 15 Heal check or any magical healing"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "wounding"
+   },
+   "motes": 80,
+   "form": "phial",
+   "affinity": [
+    "high-carbon-steel",
+    "viper-skin"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#a3122a"
   },
   {
    "id": "ghost-touch-essence",
@@ -873,7 +2360,12 @@
    "adjective": "Ghost Touch",
    "prefers": "weapon",
    "binds_at": "night",
-   "obtain": "gathered", "biomes": ["ruins", "underground", "swamp"],
+   "obtain": "gathered",
+   "biomes": [
+    "ruins",
+    "underground",
+    "swamp"
+   ],
    "text": "Refined ghost residue, thin as regret. The book's ghost touch weapon: it strikes incorporeal creatures as though they were solid, and an incorporeal creature can wield it. Like the residue it is refined from, it will only bind after dark.",
    "effects": [
     {
@@ -881,17 +2373,44 @@
      "target": "Strikes incorporeal creatures as if they were corporeal; incorporeal creatures can wield or wear it"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "ghost-touch"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "ghost-wax",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "night_only"
+    }
+   ],
+   "color": "#b8f0e8"
   },
   {
    "id": "defending-essence",
    "name": "Defending Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "defending",
    "adjective": "Defending",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 4500,
+   "obtain": "bought",
+   "price_gp": 3000,
    "text": "The book's defending weapon: each round, the wielder may shift some or all of the weapon's enhancement bonus to AC until their next turn. A choice, so it stays the wielder's to declare and the GM's to apply.",
    "effects": [
     {
@@ -899,17 +2418,44 @@
      "target": "The wielder may transfer any part of the weapon's enhancement bonus to AC each round"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "defending"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#7d93a8"
   },
   {
    "id": "speed-essence",
    "name": "Speed Essence",
    "kind": "essence",
-   "tier": "legendary",
+   "tier": "exotic",
    "family": "speed",
    "adjective": "Swift",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 20000,
+   "obtain": "bought",
+   "price_gp": 15000,
    "text": "Time, shaved thin and folded. The book's speed weapon: on a full attack, one extra attack at the wielder's full base attack bonus. The extra attack is an action-economy fact the engine's buff vocabulary cannot carry, so it stays narrative.",
    "effects": [
     {
@@ -917,17 +2463,44 @@
      "target": "One extra attack at full base attack bonus when making a full attack"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "speed"
+   },
+   "motes": 150,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "wyvern-sinew"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#ffd25a"
   },
   {
    "id": "dancing-essence",
    "name": "Dancing Essence",
    "kind": "essence",
-   "tier": "legendary",
+   "tier": "exotic",
    "family": "dancing",
    "adjective": "Dancing",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 28000,
+   "obtain": "bought",
+   "price_gp": 24000,
    "text": "Will without a body, humming against the stopper. The book's dancing weapon: loosed as a standard action, it fights on its own for four rounds before falling. Sanctum work — awaken is the only method that persuades it into steel.",
    "effects": [
     {
@@ -935,7 +2508,33 @@
      "target": "As a standard action the weapon fights on its own for 4 rounds (wielder's base attack), then falls"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "dancing"
+   },
+   "motes": 240,
+   "form": "phial",
+   "affinity": [
+    "singing-steel",
+    "silk-thread"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "acrobatics",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#e0a8ff"
   },
   {
    "id": "vorpal-essence",
@@ -945,7 +2544,8 @@
    "family": "vorpal",
    "adjective": "Vorpal",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 45000,
+   "obtain": "bought",
+   "price_gp": 35000,
    "text": "Nobody agrees what it is distilled from and the ones who know do not say. The book's vorpal weapon: on a natural 20 followed by a confirmed critical, it severs the opponent's head. Slashing weapons only.",
    "effects": [
     {
@@ -953,17 +2553,51 @@
      "target": "On a natural 20 and a confirmed critical, severs the opponent's head (slashing weapons only)"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "vorpal"
+   },
+   "motes": 350,
+   "form": "phial",
+   "affinity": [
+    "adamantine",
+    "high-carbon-steel"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 3,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#e8e8f0"
   },
   {
    "id": "brilliant-energy-essence",
    "name": "Brilliant Energy Essence",
    "kind": "essence",
-   "tier": "legendary",
+   "tier": "exotic",
    "family": "light",
    "adjective": "Brilliant",
    "prefers": "weapon",
-   "obtain": "bought", "price_gp": 32000,
+   "obtain": "bought",
+   "price_gp": 24000,
    "text": "The book's brilliant energy weapon: the blade becomes light itself, ignoring armour and shield bonuses to AC — but it cannot harm undead, constructs, or objects.",
    "effects": [
     {
@@ -971,7 +2605,41 @@
      "target": "Ignores armour and shield bonuses to AC; cannot harm undead, constructs or objects"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "brilliant-energy"
+   },
+   "motes": 240,
+   "form": "phial",
+   "affinity": [
+    "silver",
+    "gold",
+    "glowlizard-hide"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#fff4c2"
   },
   {
    "id": "slick-essence",
@@ -981,7 +2649,8 @@
    "family": "slick",
    "adjective": "Slick",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 300,
+   "obtain": "bought",
+   "price_gp": 1900,
    "text": "Oil that refuses to be anywhere in particular. The book's slick armour: +5 competence on Escape Artist checks.",
    "effects": [
     {
@@ -994,7 +2663,41 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "slick"
+   },
+   "motes": 19,
+   "form": "phial",
+   "affinity": [
+    "mink-oil",
+    "currier-tallow",
+    "troll-fat"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 1,
+     "bonus_type": "luck",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "climb",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#c4b07a"
   },
   {
    "id": "improved-slick-essence",
@@ -1004,7 +2707,8 @@
    "family": "slick",
    "adjective": "Slick",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1200,
+   "obtain": "bought",
+   "price_gp": 7500,
    "text": "The book's improved slick: +10 competence on Escape Artist checks.",
    "effects": [
     {
@@ -1017,7 +2721,41 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "slick-improved"
+   },
+   "motes": 75,
+   "form": "phial",
+   "affinity": [
+    "mink-oil",
+    "currier-tallow",
+    "troll-fat"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 2,
+     "bonus_type": "luck",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "climb",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#c4b07a"
   },
   {
    "id": "greater-slick-essence",
@@ -1027,7 +2765,8 @@
    "family": "slick",
    "adjective": "Slick",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 2700,
+   "obtain": "bought",
+   "price_gp": 16900,
    "text": "The book's greater slick: +15 competence on Escape Artist checks.",
    "effects": [
     {
@@ -1040,7 +2779,41 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "slick-greater"
+   },
+   "motes": 169,
+   "form": "phial",
+   "affinity": [
+    "mink-oil",
+    "currier-tallow",
+    "troll-fat"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 2,
+     "bonus_type": "luck",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "climb",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#c4b07a"
   },
   {
    "id": "shadow-essence",
@@ -1050,7 +2823,8 @@
    "family": "shadow",
    "adjective": "Shadowed",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 300,
+   "obtain": "bought",
+   "price_gp": 1900,
    "text": "The book's shadow armour: +5 competence on Stealth checks. Refined from raw shadowstuff, with the dimming worked out of it — the raw material still dims its bearer; this does not.",
    "effects": [
     {
@@ -1063,7 +2837,42 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "shadow"
+   },
+   "motes": 19,
+   "form": "phial",
+   "affinity": [
+    "shadow-silk",
+    "shadow-mastiff-hide",
+    "umbral-dragonhide",
+    "shadow-black"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "bluff",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#3b3355"
   },
   {
    "id": "improved-shadow-essence",
@@ -1073,7 +2882,8 @@
    "family": "shadow",
    "adjective": "Shadowed",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1200,
+   "obtain": "bought",
+   "price_gp": 7500,
    "text": "The book's improved shadow: +10 competence on Stealth checks.",
    "effects": [
     {
@@ -1086,7 +2896,42 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "shadow-improved"
+   },
+   "motes": 75,
+   "form": "phial",
+   "affinity": [
+    "shadow-silk",
+    "shadow-mastiff-hide",
+    "umbral-dragonhide",
+    "shadow-black"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "bluff",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#3b3355"
   },
   {
    "id": "greater-shadow-essence",
@@ -1096,7 +2941,8 @@
    "family": "shadow",
    "adjective": "Shadowed",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 2700,
+   "obtain": "bought",
+   "price_gp": 16900,
    "text": "The book's greater shadow: +15 competence on Stealth checks.",
    "effects": [
     {
@@ -1109,17 +2955,53 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "shadow-greater"
+   },
+   "motes": 169,
+   "form": "phial",
+   "affinity": [
+    "shadow-silk",
+    "shadow-mastiff-hide",
+    "umbral-dragonhide",
+    "shadow-black"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "bluff",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#3b3355"
   },
   {
    "id": "fortification-light-essence",
    "name": "Light Fortification Essence",
    "kind": "essence",
-   "tier": "rare",
+   "tier": "uncommon",
    "family": "fortification",
    "adjective": "Fortified",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 2000,
+   "obtain": "bought",
+   "price_gp": 1500,
    "text": "The book's light fortification: a 25% chance that any critical hit or sneak attack against the wearer is negated and resolved as a normal hit. A percentage roll on the attacker's dice, which the buff vocabulary cannot carry — narrative, for the GM's table.",
    "effects": [
     {
@@ -1127,17 +3009,45 @@
      "target": "25% chance to negate a critical hit or sneak attack (resolved as a normal hit)"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "fortification-light"
+   },
+   "motes": 15,
+   "form": "phial",
+   "affinity": [
+    "adamantine",
+    "dragon-turtle-shell",
+    "bulette-plate"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 1,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#b7a27a"
   },
   {
    "id": "fortification-moderate-essence",
    "name": "Moderate Fortification Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "fortification",
    "adjective": "Fortified",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 7000,
+   "obtain": "bought",
+   "price_gp": 7500,
    "text": "The book's moderate fortification: a 50% chance to negate critical hits and sneak attacks.",
    "effects": [
     {
@@ -1145,17 +3055,45 @@
      "target": "50% chance to negate a critical hit or sneak attack"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "fortification-moderate"
+   },
+   "motes": 75,
+   "form": "phial",
+   "affinity": [
+    "adamantine",
+    "dragon-turtle-shell",
+    "bulette-plate"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#b7a27a"
   },
   {
    "id": "fortification-heavy-essence",
    "name": "Heavy Fortification Essence",
    "kind": "essence",
-   "tier": "legendary",
+   "tier": "exotic",
    "family": "fortification",
    "adjective": "Fortified",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 18000,
+   "obtain": "bought",
+   "price_gp": 17500,
    "text": "The book's heavy fortification: a 75% chance to negate critical hits and sneak attacks.",
    "effects": [
     {
@@ -1163,17 +3101,45 @@
      "target": "75% chance to negate a critical hit or sneak attack"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "fortification-heavy"
+   },
+   "motes": 175,
+   "form": "phial",
+   "affinity": [
+    "adamantine",
+    "dragon-turtle-shell",
+    "bulette-plate"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#b7a27a"
   },
   {
    "id": "spell-resistance-essence",
    "name": "Spell Resistance Essence",
    "kind": "essence",
-   "tier": "exotic",
+   "tier": "rare",
    "family": "abjuration",
    "adjective": "Spellguard",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 8000,
+   "obtain": "bought",
+   "price_gp": 7500,
    "text": "The book's spell resistance armour, at the 15 rating: hostile spells must beat SR 15 to affect the wearer. SR is a defence the engine does not compute yet, so it is recorded for the GM.",
    "effects": [
     {
@@ -1181,17 +3147,51 @@
      "target": "Grants the wearer spell resistance 15"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "spell-resistance-15"
+   },
+   "motes": 75,
+   "form": "phial",
+   "affinity": [
+    "platinum",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#9db7ff"
   },
   {
    "id": "invulnerability-essence",
    "name": "Invulnerability Essence",
    "kind": "essence",
-   "tier": "legendary",
+   "tier": "rare",
    "family": "invulnerability",
    "adjective": "Invulnerable",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 16000,
+   "obtain": "bought",
+   "price_gp": 7500,
    "text": "The book's armour of invulnerability: DR 5/magic against ordinary blows.",
    "effects": [
     {
@@ -1203,7 +3203,33 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "invulnerability"
+   },
+   "motes": 75,
+   "form": "phial",
+   "affinity": [
+    "adamantine",
+    "tarrasque-plate"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8a8f99"
   },
   {
    "id": "etherealness-essence",
@@ -1214,7 +3240,11 @@
    "adjective": "Ethereal",
    "prefers": "armour",
    "binds_at": "night",
-   "obtain": "gathered", "biomes": ["ruins", "planar"],
+   "obtain": "gathered",
+   "biomes": [
+    "ruins",
+    "planar"
+   ],
    "text": "Ghost residue's final refinement. The book's etherealness armour: on command, once per day, the wearer becomes ethereal as the ethereal jaunt spell. It keeps the residue's habit — night bindings only.",
    "effects": [
     {
@@ -1222,7 +3252,33 @@
      "target": "On command, once per day, become ethereal (as ethereal jaunt)"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "etherealness"
+   },
+   "motes": 250,
+   "form": "phial",
+   "affinity": [
+    "ghost-wax",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 3,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "night_only"
+    }
+   ],
+   "color": "#b8f0e8"
   },
   {
    "id": "resist-fire-essence",
@@ -1232,7 +3288,8 @@
    "family": "fire",
    "adjective": "Fire-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1600,
+   "obtain": "bought",
+   "price_gp": 9000,
    "text": "The book's energy resistance armour, tuned to flame: the wearer ignores the first 10 points of fire damage per attack.",
    "effects": [
     {
@@ -1244,7 +3301,39 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance",
+    "choice": {
+     "energy": "fire"
+    }
+   },
+   "motes": 90,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "resist-cold-essence",
@@ -1254,7 +3343,8 @@
    "family": "cold",
    "adjective": "Frost-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1600,
+   "obtain": "bought",
+   "price_gp": 9000,
    "text": "Energy resistance, tuned to cold: ignore the first 10 points of cold damage per attack. The natural partner of a winter wolf pelt cloak from the leatherworker — the pelt half-wants the binding already.",
    "effects": [
     {
@@ -1266,7 +3356,37 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance",
+    "choice": {
+     "energy": "cold"
+    }
+   },
+   "motes": 90,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "resist-electricity-essence",
@@ -1276,7 +3396,8 @@
    "family": "electricity",
    "adjective": "Storm-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1600,
+   "obtain": "bought",
+   "price_gp": 9000,
    "text": "Energy resistance, tuned to lightning: ignore the first 10 points of electricity damage per attack.",
    "effects": [
     {
@@ -1288,7 +3409,38 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance",
+    "choice": {
+     "energy": "electricity"
+    }
+   },
+   "motes": 90,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "resist-acid-essence",
@@ -1298,7 +3450,8 @@
    "family": "acid",
    "adjective": "Acid-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1600,
+   "obtain": "bought",
+   "price_gp": 9000,
    "text": "Energy resistance, tuned to acid: ignore the first 10 points of acid damage per attack.",
    "effects": [
     {
@@ -1310,7 +3463,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance",
+    "choice": {
+     "energy": "acid"
+    }
+   },
+   "motes": 90,
+   "form": "phial",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#9ccc3c"
   },
   {
    "id": "resist-sonic-essence",
@@ -1320,7 +3510,8 @@
    "family": "sonic",
    "adjective": "Storm-Quiet",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 1600,
+   "obtain": "bought",
+   "price_gp": 9000,
    "text": "Energy resistance, tuned to thunder: ignore the first 10 points of sonic damage per attack.",
    "effects": [
     {
@@ -1332,7 +3523,36 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance",
+    "choice": {
+     "energy": "sonic"
+    }
+   },
+   "motes": 90,
+   "form": "phial",
+   "affinity": [
+    "bell-bronze",
+    "singing-steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#c9b6ff"
   },
   {
    "id": "resist-fire-essence-improved",
@@ -1342,7 +3562,8 @@
    "family": "fire",
    "adjective": "Fire-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 6000,
+   "obtain": "bought",
+   "price_gp": 21000,
    "text": "The improved rating: ignore the first 20 points of fire damage per attack.",
    "effects": [
     {
@@ -1354,7 +3575,39 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-improved",
+    "choice": {
+     "energy": "fire"
+    }
+   },
+   "motes": 210,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "resist-cold-essence-improved",
@@ -1364,7 +3617,8 @@
    "family": "cold",
    "adjective": "Frost-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 6000,
+   "obtain": "bought",
+   "price_gp": 21000,
    "text": "The improved rating: ignore the first 20 points of cold damage per attack.",
    "effects": [
     {
@@ -1376,7 +3630,37 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-improved",
+    "choice": {
+     "energy": "cold"
+    }
+   },
+   "motes": 210,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "resist-electricity-essence-improved",
@@ -1386,7 +3670,8 @@
    "family": "electricity",
    "adjective": "Storm-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 6000,
+   "obtain": "bought",
+   "price_gp": 21000,
    "text": "The improved rating: ignore the first 20 points of electricity damage per attack.",
    "effects": [
     {
@@ -1398,7 +3683,38 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-improved",
+    "choice": {
+     "energy": "electricity"
+    }
+   },
+   "motes": 210,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "resist-acid-essence-improved",
@@ -1408,7 +3724,8 @@
    "family": "acid",
    "adjective": "Acid-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 6000,
+   "obtain": "bought",
+   "price_gp": 21000,
    "text": "The improved rating: ignore the first 20 points of acid damage per attack.",
    "effects": [
     {
@@ -1420,7 +3737,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-improved",
+    "choice": {
+     "energy": "acid"
+    }
+   },
+   "motes": 210,
+   "form": "phial",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#9ccc3c"
   },
   {
    "id": "resist-sonic-essence-improved",
@@ -1430,7 +3784,8 @@
    "family": "sonic",
    "adjective": "Storm-Quiet",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 6000,
+   "obtain": "bought",
+   "price_gp": 21000,
    "text": "The improved rating: ignore the first 20 points of sonic damage per attack.",
    "effects": [
     {
@@ -1442,7 +3797,36 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-improved",
+    "choice": {
+     "energy": "sonic"
+    }
+   },
+   "motes": 210,
+   "form": "phial",
+   "affinity": [
+    "bell-bronze",
+    "singing-steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#c9b6ff"
   },
   {
    "id": "resist-fire-essence-greater",
@@ -1452,7 +3836,8 @@
    "family": "fire",
    "adjective": "Fire-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 15000,
+   "obtain": "bought",
+   "price_gp": 33000,
    "text": "The greater rating: ignore the first 30 points of fire damage per attack.",
    "effects": [
     {
@@ -1464,7 +3849,39 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-greater",
+    "choice": {
+     "energy": "fire"
+    }
+   },
+   "motes": 330,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "resist-cold-essence-greater",
@@ -1474,7 +3891,8 @@
    "family": "cold",
    "adjective": "Frost-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 15000,
+   "obtain": "bought",
+   "price_gp": 33000,
    "text": "The greater rating: ignore the first 30 points of cold damage per attack.",
    "effects": [
     {
@@ -1486,7 +3904,37 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-greater",
+    "choice": {
+     "energy": "cold"
+    }
+   },
+   "motes": 330,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "resist-electricity-essence-greater",
@@ -1496,7 +3944,8 @@
    "family": "electricity",
    "adjective": "Storm-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 15000,
+   "obtain": "bought",
+   "price_gp": 33000,
    "text": "The greater rating: ignore the first 30 points of electricity damage per attack.",
    "effects": [
     {
@@ -1508,7 +3957,38 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-greater",
+    "choice": {
+     "energy": "electricity"
+    }
+   },
+   "motes": 330,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "resist-acid-essence-greater",
@@ -1518,7 +3998,8 @@
    "family": "acid",
    "adjective": "Acid-Warded",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 15000,
+   "obtain": "bought",
+   "price_gp": 33000,
    "text": "The greater rating: ignore the first 30 points of acid damage per attack.",
    "effects": [
     {
@@ -1530,7 +4011,44 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-greater",
+    "choice": {
+     "energy": "acid"
+    }
+   },
+   "motes": 330,
+   "form": "phial",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#9ccc3c"
   },
   {
    "id": "resist-sonic-essence-greater",
@@ -1540,7 +4058,8 @@
    "family": "sonic",
    "adjective": "Storm-Quiet",
    "prefers": "armour",
-   "obtain": "bought", "price_gp": 15000,
+   "obtain": "bought",
+   "price_gp": 33000,
    "text": "The greater rating: ignore the first 30 points of sonic damage per attack.",
    "effects": [
     {
@@ -1552,7 +4071,36 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-greater",
+    "choice": {
+     "energy": "sonic"
+    }
+   },
+   "motes": 330,
+   "form": "phial",
+   "affinity": [
+    "bell-bronze",
+    "singing-steel"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#c9b6ff"
   },
   {
    "id": "ghost-residue",
@@ -1563,7 +4111,12 @@
    "adjective": "Haunted",
    "prefers": "",
    "binds_at": "night",
-   "obtain": "gathered", "biomes": ["ruins", "underground", "swamp"],
+   "obtain": "gathered",
+   "biomes": [
+    "ruins",
+    "underground",
+    "swamp"
+   ],
    "text": "What is left on the flagstones after a haunting ends: a film like cold breath that only exists convincingly after dark. It will not bind under the sun — the working simply finds nothing in the phial. Bound to a weapon it lets the edge find things that are not entirely there.",
    "effects": [
     {
@@ -1571,7 +4124,33 @@
      "target": "The weapon deals half damage to incorporeal creatures even when unenhanced"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "ghost-touch"
+   },
+   "motes": 30,
+   "form": "phial",
+   "affinity": [
+    "ghost-wax",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 2,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "night_only"
+    }
+   ],
+   "color": "#b8f0e8"
   },
   {
    "id": "shadowstuff",
@@ -1581,7 +4160,12 @@
    "family": "shadow",
    "adjective": "Shadowdrunk",
    "prefers": "armour",
-   "obtain": "gathered", "biomes": ["underground", "ruins", "urban"],
+   "obtain": "gathered",
+   "biomes": [
+    "underground",
+    "ruins",
+    "urban"
+   ],
    "text": "Raw shadow, skimmed where two torches disagree. Cheaper than refined shadow essence and it shows: the shadow does not come from nowhere — it is borrowed from the bearer's own eyes, and the world sits a shade darker for whoever wears the binding. Enchanting's materials can cost.",
    "effects": [
     {
@@ -1605,7 +4189,42 @@
      },
      "note": "the world is a shade darker to the bearer"
     }
-   ]
+   ],
+   "polarity": "armour",
+   "grants": {
+    "property": "shadow"
+   },
+   "motes": 19,
+   "form": "phial",
+   "affinity": [
+    "shadow-silk",
+    "shadow-mastiff-hide",
+    "umbral-dragonhide",
+    "shadow-black"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "bluff",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#3b3355"
   },
   {
    "id": "red-dragon-ichor",
@@ -1615,7 +4234,11 @@
    "family": "fire",
    "adjective": "Wyrmfire",
    "prefers": "weapon",
-   "obtain": "harvested", "from_creature": ["red dragon", "dragon"],
+   "obtain": "harvested",
+   "from_creature": [
+    "red dragon",
+    "dragon"
+   ],
    "text": "Ichor keeps the colour's temper: red binds fire and nothing else — offer it a frost working and it boils the circle dry. Bound true it gives flame with a memory of the wyrm behind it.",
    "effects": [
     {
@@ -1634,7 +4257,35 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "flaming"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "blue-dragon-ichor",
@@ -1644,7 +4295,11 @@
    "family": "electricity",
    "adjective": "Wyrmstorm",
    "prefers": "weapon",
-   "obtain": "harvested", "from_creature": ["blue dragon", "dragon"],
+   "obtain": "harvested",
+   "from_creature": [
+    "blue dragon",
+    "dragon"
+   ],
    "text": "Blue binds lightning and only lightning; the phial crackles when storms pass. The matching-energy rule is the colour's pride, not the enchanter's choice.",
    "effects": [
     {
@@ -1663,7 +4318,34 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "shock"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 2,
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "white-dragon-ichor",
@@ -1673,7 +4355,11 @@
    "family": "cold",
    "adjective": "Wyrmfrost",
    "prefers": "weapon",
-   "obtain": "harvested", "from_creature": ["white dragon", "dragon"],
+   "obtain": "harvested",
+   "from_creature": [
+    "white dragon",
+    "dragon"
+   ],
    "text": "White binds cold. The phial frosts over from the inside when it is ready to work.",
    "effects": [
     {
@@ -1692,7 +4378,33 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "frost"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "frost-forged-steel",
+    "white-dragonhide",
+    "winter-wolf-pelt"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2,
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#8fd3ff"
   },
   {
    "id": "green-dragon-ichor",
@@ -1702,7 +4414,11 @@
    "family": "acid",
    "adjective": "Wyrmbile",
    "prefers": "weapon",
-   "obtain": "harvested", "from_creature": ["green dragon", "dragon"],
+   "obtain": "harvested",
+   "from_creature": [
+    "green dragon",
+    "dragon"
+   ],
    "text": "Green binds acid, and the stopper is replaced monthly whether it needs it or not.",
    "effects": [
     {
@@ -1721,7 +4437,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "corrosive"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#9ccc3c"
   },
   {
    "id": "black-dragon-ichor",
@@ -1731,7 +4480,11 @@
    "family": "acid",
    "adjective": "Wyrmrot",
    "prefers": "weapon",
-   "obtain": "harvested", "from_creature": ["black dragon", "dragon"],
+   "obtain": "harvested",
+   "from_creature": [
+    "black dragon",
+    "dragon"
+   ],
    "text": "Black binds acid, like green, but meaner about it — the two colours share a family and a vessel will not take both.",
    "effects": [
     {
@@ -1750,7 +4503,40 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "corrosive"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "black-dragonhide",
+    "green-dragonhide",
+    "ankheg-shell-leather"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#9ccc3c"
   },
   {
    "id": "celestial-tears",
@@ -1760,7 +4546,15 @@
    "family": "holy",
    "adjective": "Blessed",
    "prefers": "",
-   "obtain": "harvested", "biomes": ["planar"], "from_creature": ["celestial", "angel", "couatl"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar"
+   ],
+   "from_creature": [
+    "celestial",
+    "angel",
+    "couatl"
+   ],
    "text": "Grief from somewhere better than here, and it has standards: celestial essence refuses a wielder of evil deeds — the binding holds, and simply goes quiet in an unworthy hand until the item finds a better one. That refusal is the material's own judgement, prose and not a save.",
    "effects": [
     {
@@ -1773,7 +4567,36 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "ward",
+   "grants": {
+    "property": "deflection",
+    "bonus": 2
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "silver",
+    "angelskin-binding",
+    "unicorn-hide",
+    "elysian-bronze"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#ffe08a"
   },
   {
    "id": "fiend-ash",
@@ -1783,7 +4606,15 @@
    "family": "unholy",
    "adjective": "Ashen",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["planar"], "from_creature": ["demon", "devil", "fiend"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar"
+   ],
+   "from_creature": [
+    "demon",
+    "devil",
+    "fiend"
+   ],
    "text": "What is left when something from below is unmade above. It binds eagerly — too eagerly — and it never entirely stops talking to whoever carries the result.",
    "effects": [
     {
@@ -1799,7 +4630,40 @@
      "type": "narrative",
      "target": "The item whispers to its bearer in quiet moments; sleeping within arm's reach of it brings poor dreams"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "grants": {
+    "property": "flaming"
+   },
+   "motes": 100,
+   "form": "phial",
+   "affinity": [
+    "fiend-bone-core",
+    "hell-hound-hide",
+    "abysium"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "house": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#6b1030"
   },
   {
    "id": "phoenix-ember",
@@ -1809,7 +4673,14 @@
    "family": "fire",
    "adjective": "Phoenix",
    "prefers": "armour",
-   "obtain": "harvested", "biomes": ["planar", "desert"], "from_creature": ["phoenix"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar",
+    "desert"
+   ],
+   "from_creature": [
+    "phoenix"
+   ],
    "text": "An ember from the pyre that is also a nest. The one legendary fire essence that wants to be worn: it keeps its bearer the way the fire keeps the bird.",
    "effects": [
     {
@@ -1828,7 +4699,37 @@
      }
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "energy-resistance-greater",
+    "choice": {
+     "energy": "fire"
+    }
+   },
+   "motes": 330,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "red-dragonhide",
+    "salamander-hide",
+    "ruby-focus",
+    "fire-forged-steel"
+   ],
+   "house": [
+    {
+     "type": "fast_healing",
+     "amount": 1,
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e0703a"
   },
   {
    "id": "lich-dust",
@@ -1838,7 +4739,14 @@
    "family": "negative",
    "adjective": "Grave-Cold",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["ruins", "underground"], "from_creature": ["lich"],
+   "obtain": "harvested",
+   "biomes": [
+    "ruins",
+    "underground"
+   ],
+   "from_creature": [
+    "lich"
+   ],
    "text": "Swept from a phylactery chamber after the end. It binds death into an edge, and it remembers being someone — the vessel is never quite warm again.",
    "effects": [
     {
@@ -1854,7 +4762,38 @@
      "type": "narrative",
      "target": "The vessel is cold to the touch and animals refuse to be near it"
     }
-   ]
+   ],
+   "polarity": "weapon",
+   "motes": 250,
+   "form": "phial",
+   "affinity": [
+    "bone-grip",
+    "fiend-bone-core"
+   ],
+   "house": [
+    {
+     "type": "damage",
+     "dice": "2",
+     "damage_type": "negative",
+     "lethality": "lethal",
+     "trigger": "hit",
+     "house": true
+    },
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "volatile"
+    }
+   ],
+   "color": "#2f2a3a"
   },
   {
    "id": "storm-heart",
@@ -1864,7 +4803,16 @@
    "family": "electricity",
    "adjective": "Stormheart",
    "prefers": "weapon",
-   "obtain": "harvested", "biomes": ["planar", "mountain"], "from_creature": ["air elemental", "storm giant", "roc"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar",
+    "mountain"
+   ],
+   "from_creature": [
+    "air elemental",
+    "storm giant",
+    "roc"
+   ],
    "text": "The middle of a storm that never found its way out. The reference legendary essence: a quartz cannot hold a storm — nothing below a diamond can.",
    "effects": [
     {
@@ -1875,7 +4823,34 @@
      "note": "on a hit"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "weapon",
+   "grants": {
+    "property": "shocking-burst"
+   },
+   "motes": 250,
+   "form": "phial",
+   "affinity": [
+    "copper",
+    "blue-dragonhide",
+    "electric-eel-skin",
+    "behir-hide"
+   ],
+   "house": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 3,
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "skittish"
+    }
+   ],
+   "color": "#f2e85c"
   },
   {
    "id": "angel-feather",
@@ -1885,7 +4860,16 @@
    "family": "holy",
    "adjective": "Winged",
    "prefers": "armour",
-   "obtain": "harvested", "biomes": ["planar"], "from_creature": ["angel", "celestial", "solar", "planetar"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar"
+   ],
+   "from_creature": [
+    "angel",
+    "celestial",
+    "solar",
+    "planetar"
+   ],
    "text": "Given, never taken — a taken feather is just a feather. Like all celestial material it refuses a wielder of evil deeds, and the refusal is its own, not a rule the dice know.",
    "effects": [
     {
@@ -1902,7 +4886,35 @@
      "target": "Once per day, on command, feather fall for one minute"
     }
    ],
-   "drawbacks": []
+   "drawbacks": [],
+   "polarity": "armour",
+   "grants": {
+    "property": "deflection"
+   },
+   "motes": 250,
+   "form": "phial",
+   "affinity": [
+    "silver",
+    "angelskin-binding",
+    "unicorn-hide",
+    "elysian-bronze"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#ffe08a"
   },
   {
    "id": "quartz-focus",
@@ -1910,7 +4922,13 @@
    "kind": "focus",
    "tier": "common",
    "capacity": 1,
-   "obtain": "mined", "biomes": ["hills", "mountain", "underground"], "price_gp": 20,
+   "obtain": "mined",
+   "biomes": [
+    "hills",
+    "mountain",
+    "underground"
+   ],
+   "price_gp": 20,
    "text": "A clear thumb of quartz, polished on a trouser leg. It anchors exactly one common essence and not a scrap more — a quartz cannot hold a storm, and the refusal happens in the circle, before anything is risked. Survives most mishaps with a new internal flaw and a story.",
    "effects": [],
    "drawbacks": []
@@ -1921,7 +4939,13 @@
    "kind": "focus",
    "tier": "common",
    "capacity": 1,
-   "obtain": "mined", "biomes": ["hills", "coast", "underground"], "price_gp": 30,
+   "obtain": "mined",
+   "biomes": [
+    "hills",
+    "coast",
+    "underground"
+   ],
+   "price_gp": 30,
    "text": "Milky and faintly lit from inside. Holds one common essence, like quartz; enchanters keep one anyway because night-binding materials — ghost residue and its refinements — sit calmer against it.",
    "effects": [],
    "drawbacks": []
@@ -1932,7 +4956,12 @@
    "kind": "focus",
    "tier": "uncommon",
    "capacity": 2,
-   "obtain": "mined", "biomes": ["underground", "mountain"], "price_gp": 120,
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "mountain"
+   ],
+   "price_gp": 120,
    "text": "Holds essence up to uncommon, and two ranks of it in total — an uncommon essence alone, or a pair of motes bound side by side.",
    "effects": [],
    "drawbacks": []
@@ -1943,7 +4972,12 @@
    "kind": "focus",
    "tier": "rare",
    "capacity": 3,
-   "obtain": "mined", "biomes": ["underground", "mountain"], "price_gp": 700,
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "mountain"
+   ],
+   "price_gp": 700,
    "text": "Holds essence up to rare, three ranks in total. The working stone of most journeyman enchanters: a flaming binding lives on a sapphire.",
    "effects": [],
    "drawbacks": []
@@ -1954,7 +4988,12 @@
    "kind": "focus",
    "tier": "exotic",
    "capacity": 4,
-   "obtain": "mined", "biomes": ["underground", "mountain"], "price_gp": 3500,
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "mountain"
+   ],
+   "price_gp": 3500,
    "text": "Holds essence up to exotic, four ranks in total. Warm even in a cold room once something is bound through it.",
    "effects": [],
    "drawbacks": []
@@ -1965,7 +5004,12 @@
    "kind": "focus",
    "tier": "exotic",
    "capacity": 4,
-   "obtain": "mined", "biomes": ["underground", "desert"], "price_gp": 3500,
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "desert"
+   ],
+   "price_gp": 3500,
    "text": "A ruby's equal in capacity with a temperament of its own: shadow and ghost workings settle into it a little too comfortably, and enchanters who use nothing else get a reputation.",
    "effects": [],
    "drawbacks": []
@@ -1977,7 +5021,12 @@
    "tier": "legendary",
    "capacity": 5,
    "fragile": true,
-   "obtain": "mined", "biomes": ["underground", "mountain"], "price_gp": 20000,
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "mountain"
+   ],
+   "price_gp": 20000,
    "text": "Holds anything — a storm, a lich's dust, the top of the enhancement ladder. Its price is how it fails: where a lesser stone is scorched and survives, a diamond under a mishap cracks through and is lost outright. Lost, not spent — a successful working returns it to the pouch as every focus is returned; only the mishap takes it.",
    "effects": [],
    "drawbacks": []
@@ -1989,7 +5038,8 @@
    "kind": "ink",
    "tier": "common",
    "consumed": true,
-   "obtain": "bought", "price_gp": 15,
+   "obtain": "bought",
+   "price_gp": 15,
    "text": "Silver filings in gum and lamp-water. The scribing ink for common work; the sigils stay faintly visible in moonlight forever, which apprentices consider a feature.",
    "effects": [],
    "drawbacks": []
@@ -2000,7 +5050,8 @@
    "kind": "ink",
    "tier": "uncommon",
    "consumed": true,
-   "obtain": "bought", "price_gp": 60,
+   "obtain": "bought",
+   "price_gp": 60,
    "text": "Octopus ink cut with iron gall, stirred widdershins. Uncommon scribing: it grips a sigil the way plain silver cannot, and it stains the fingers for a week.",
    "effects": [],
    "drawbacks": []
@@ -2012,7 +5063,8 @@
    "kind": "ink",
    "tier": "rare",
    "consumed": true,
-   "obtain": "bought", "price_gp": 250,
+   "obtain": "bought",
+   "price_gp": 250,
    "text": "Alive on the page until the seal sets it. Rare scribing; the pen must keep moving or the line walks off on its own.",
    "effects": [],
    "drawbacks": []
@@ -2024,7 +5076,8 @@
    "kind": "ink",
    "tier": "exotic",
    "consumed": true,
-   "obtain": "bought", "price_gp": 1200,
+   "obtain": "bought",
+   "price_gp": 1200,
    "text": "Gold dissolved by a method the guild does not write down. Exotic scribing — the sigils it draws are warm to the touch for a year.",
    "effects": [],
    "drawbacks": []
@@ -2035,7 +5088,14 @@
    "kind": "ink",
    "tier": "legendary",
    "consumed": true,
-   "obtain": "harvested", "biomes": ["planar", "desert"], "from_creature": ["phoenix"],
+   "obtain": "harvested",
+   "biomes": [
+    "planar",
+    "desert"
+   ],
+   "from_creature": [
+    "phoenix"
+   ],
    "text": "Any ink, laid by a phoenix quill — the quill is the material, and it burns to nothing at the last stroke of a legendary scribing. One working per quill.",
    "effects": [],
    "drawbacks": []
@@ -2046,7 +5106,12 @@
    "kind": "chalk",
    "tier": "common",
    "consumed": true,
-   "obtain": "mined", "biomes": ["coast", "hills"], "price_gp": 5,
+   "obtain": "mined",
+   "biomes": [
+    "coast",
+    "hills"
+   ],
+   "price_gp": 5,
    "text": "Plain cliff chalk, and nothing wrong with it: half the circles ever drawn were drawn in this. Consumed — a circle is swept away when the working ends, whichever way it ended.",
    "effects": [],
    "drawbacks": []
@@ -2057,7 +5122,8 @@
    "kind": "chalk",
    "tier": "uncommon",
    "consumed": true,
-   "obtain": "bought", "price_gp": 25,
+   "obtain": "bought",
+   "price_gp": 25,
    "text": "Chalk blessed at a shrine of any honest god. Uncommon circle work, and the polite minimum for binding anything with opinions about virtue.",
    "effects": [],
    "drawbacks": []
@@ -2068,7 +5134,12 @@
    "kind": "chalk",
    "tier": "rare",
    "consumed": true,
-   "obtain": "harvested", "biomes": ["ruins", "underground"], "price_gp": 125,
+   "obtain": "harvested",
+   "biomes": [
+    "ruins",
+    "underground"
+   ],
+   "price_gp": 125,
    "text": "Burnt bone, ground and pressed. Rare circle work; ghost and shadow essences read a bone circle as home ground and fight the binding less.",
    "effects": [],
    "drawbacks": []
@@ -2079,7 +5150,8 @@
    "kind": "salt",
    "tier": "uncommon",
    "consumed": true,
-   "obtain": "bought", "price_gp": 40,
+   "obtain": "bought",
+   "price_gp": 40,
    "text": "Salt cut with silver filings, poured in an unbroken line outside the chalk. The circle's insurance: what a mishap spills, the salt line catches.",
    "effects": [],
    "drawbacks": []
@@ -2090,7 +5162,8 @@
    "kind": "chalk",
    "tier": "exotic",
    "consumed": true,
-   "obtain": "bought", "price_gp": 900,
+   "obtain": "bought",
+   "price_gp": 900,
    "text": "Chalk that fell somewhere it should not have been and was retrieved at cost. Exotic circle work: lines drawn in it are slightly more real than the floor they are drawn on.",
    "effects": [],
    "drawbacks": []
@@ -2101,7 +5174,8 @@
    "kind": "salt",
    "tier": "legendary",
    "consumed": true,
-   "obtain": "bought", "price_gp": 5000,
+   "obtain": "bought",
+   "price_gp": 5000,
    "text": "A poured line of diamond dust, the legendary circle's outer ring. Consumed like any salt, which is why legendary work is priced the way it is.",
    "effects": [],
    "drawbacks": []
@@ -2112,10 +5186,14 @@
    "kind": "vessel",
    "tier": "common",
    "requires": "a masterwork weapon, from the smith",
-   "obtain": "bought", "price_gp": 300, "book": true,
+   "obtain": "bought",
+   "price_gp": 300,
+   "book": true,
    "text": "The book's own gate, kept: only a masterwork weapon can hold an enchantment. An ordinary blade has nowhere in it for the essence to live — the binding runs off it like water. This is the cross-craft handoff: the smith's masterwork output is the enchanter's raw material.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "masterwork-armour-vessel",
@@ -2123,10 +5201,14 @@
    "kind": "vessel",
    "tier": "common",
    "requires": "masterwork armour, from the smith",
-   "obtain": "bought", "price_gp": 150, "book": true,
+   "obtain": "bought",
+   "price_gp": 150,
+   "book": true,
    "text": "Masterwork armour, as the book requires for any armour enchantment. The smith's finishing marks are, to an enchanter's eye, half a sigil already.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "masterwork-shield-vessel",
@@ -2134,10 +5216,14 @@
    "kind": "vessel",
    "tier": "uncommon",
    "requires": "a masterwork shield, from the smith",
-   "obtain": "bought", "price_gp": 150, "book": true,
+   "obtain": "bought",
+   "price_gp": 150,
+   "book": true,
    "text": "A masterwork shield, taking armour essences by the armour rules.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "masterwork-cloak-vessel",
@@ -2145,10 +5231,13 @@
    "kind": "vessel",
    "tier": "uncommon",
    "requires": "a masterwork cloak, hide or leather piece, from the leatherworker",
-   "obtain": "bought", "price_gp": 200,
+   "obtain": "bought",
+   "price_gp": 200,
    "text": "The leatherworker's masterwork output as an enchanting vessel: a winter wolf cloak, a drake-hide jerkin. Takes armour-family essences; a pelt often keeps a preference from the animal it was — winter wolf hide takes frost workings a shade easier than the DC suggests, which is the GM's colour to grant, not a number here.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "ring-vessel",
@@ -2156,10 +5245,13 @@
    "kind": "vessel",
    "tier": "rare",
    "requires": "a masterwork ring blank, from the jeweller",
-   "obtain": "bought", "price_gp": 200,
+   "obtain": "bought",
+   "price_gp": 200,
    "text": "A masterwork ring blank. Small vessels are honest vessels: a ring holds what its focus holds and nothing rides along.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "wand-vessel",
@@ -2167,10 +5259,13 @@
    "kind": "vessel",
    "tier": "rare",
    "requires": "a masterwork wand blank of coldwood or bone",
-   "obtain": "bought", "price_gp": 200,
+   "obtain": "bought",
+   "price_gp": 200,
    "text": "A masterwork wand blank. Wand work leans on the spell side of the craft, which this bench does not model yet; the vessel is listed so the material exists when it does.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "amulet-vessel",
@@ -2178,10 +5273,13 @@
    "kind": "vessel",
    "tier": "exotic",
    "requires": "a masterwork amulet blank, from the jeweller",
-   "obtain": "bought", "price_gp": 200,
+   "obtain": "bought",
+   "price_gp": 200,
    "text": "A masterwork amulet blank, for workings worn at the throat.",
    "effects": [],
-   "drawbacks": []
+   "drawbacks": [],
+   "retired": true,
+   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
    "id": "powdered-pearl",
@@ -2190,7 +5288,8 @@
    "tier": "uncommon",
    "consumed": true,
    "dc_mod": -2,
-   "obtain": "bought", "price_gp": 100,
+   "obtain": "bought",
+   "price_gp": 100,
    "text": "A pearl ground to dust and cast across the circle at the channelling. It smooths the essence's temper: -2 to the working's DC. Consumed whatever happens.",
    "effects": [],
    "drawbacks": []
@@ -2203,7 +5302,8 @@
    "tier": "uncommon",
    "consumed": true,
    "dc_mod": -2,
-   "obtain": "bought", "price_gp": 120,
+   "obtain": "bought",
+   "price_gp": 120,
    "text": "Mithral offcuts begged from the smith. Scattered on the vessel they carry the essence in like a channel cut for water: -2 DC.",
    "effects": [],
    "drawbacks": []
@@ -2215,7 +5315,8 @@
    "tier": "rare",
    "consumed": true,
    "dc_mod": -2,
-   "obtain": "bought", "price_gp": 400,
+   "obtain": "bought",
+   "price_gp": 400,
    "text": "Bought, never taken; taken dust curdles a working instead of helping it. -2 DC, and the circle glitters for days.",
    "effects": [],
    "drawbacks": []
@@ -2228,7 +5329,8 @@
    "tier": "rare",
    "consumed": true,
    "dc_mod": -2,
-   "obtain": "bought", "price_gp": 500,
+   "obtain": "bought",
+   "price_gp": 500,
    "text": "Finer than the smith's shavings and twice the price. -2 DC; the sigils take a moon-colour sheen.",
    "effects": [],
    "drawbacks": []
@@ -2241,7 +5343,8 @@
    "tier": "exotic",
    "consumed": true,
    "dc_mod": -3,
-   "obtain": "bought", "price_gp": 1500,
+   "obtain": "bought",
+   "price_gp": 1500,
    "text": "Dust from the hardest thing there is, and the working borrows the stubbornness: -3 DC.",
    "effects": [],
    "drawbacks": []
@@ -2253,7 +5356,10 @@
    "tier": "exotic",
    "consumed": true,
    "dc_mod": -3,
-   "obtain": "harvested", "from_creature": ["dragon"],
+   "obtain": "harvested",
+   "from_creature": [
+    "dragon"
+   ],
    "text": "A single scale, burnt at the channelling. -3 DC, and by long observation the smoke leans toward whichever essence shares the scale's colour.",
    "effects": [],
    "drawbacks": []
@@ -2264,7 +5370,8 @@
    "kind": "treatment",
    "tier": "common",
    "consumed": true,
-   "obtain": "bought", "price_gp": 5,
+   "obtain": "bought",
+   "price_gp": 5,
    "text": "Beeswax and resin, pressed over the final sigil at the seal. Not strictly required and always used: an unwaxed seal weathers.",
    "effects": [],
    "drawbacks": []
@@ -2275,7 +5382,8 @@
    "kind": "treatment",
    "tier": "common",
    "consumed": true,
-   "obtain": "bought", "price_gp": 10,
+   "obtain": "bought",
+   "price_gp": 10,
    "text": "Bites the scribed sigils a hair's depth into metal before the ink goes down, so the working is in the vessel and not merely on it.",
    "effects": [],
    "drawbacks": []
@@ -2286,7 +5394,8 @@
    "kind": "treatment",
    "tier": "uncommon",
    "consumed": true,
-   "obtain": "bought", "price_gp": 50,
+   "obtain": "bought",
+   "price_gp": 50,
    "text": "A polish that leaves the vessel very faintly ringing. Channelling into a polished vessel spills less; enchanters apply it out of habit more than arithmetic.",
    "effects": [],
    "drawbacks": []
@@ -2298,7 +5407,8 @@
    "tier": "rare",
    "consumed": true,
    "lifts": "night",
-   "obtain": "bought", "price_gp": 350,
+   "obtain": "bought",
+   "price_gp": 350,
    "text": "Varnish steeped a full month under open moonlight. A vessel treated with it carries its own midnight: night-binding essences — ghost residue and its refinements — will bind by day through the varnish. The bottled workaround for a rule the material otherwise enforces itself.",
    "effects": [],
    "drawbacks": []
@@ -2309,10 +5419,439 @@
    "kind": "treatment",
    "tier": "rare",
    "consumed": true,
-   "obtain": "bought", "price_gp": 300,
+   "obtain": "bought",
+   "price_gp": 300,
    "text": "Worked into the vessel before the circle is drawn. It does nothing for the enchantment and everything for the enchanter: a mishap through an oiled vessel burns the circle, not the hands.",
    "effects": [],
    "drawbacks": []
+  },
+  {
+   "id": "deflecting-essence",
+   "name": "Deflecting Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "A pale phial that turns aside what reaches for it. Grants deflection: the ring of protection's ward.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "warding",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "deflection"
+   },
+   "motes": 10,
+   "price_gp": 1000,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 1,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
+  },
+  {
+   "id": "barkhide-essence",
+   "name": "Barkhide Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Sap gone hard as bark. Grants a natural armour bonus: the amulet of natural armour's toughening.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "earth",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "natural-armour"
+   },
+   "motes": 10,
+   "price_gp": 1000,
+   "form": "phial",
+   "affinity": [
+    "iron",
+    "bulette-plate",
+    "ironwood-haft"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "survival",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#9a7b55"
+  },
+  {
+   "id": "mantling-essence",
+   "name": "Mantling Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "A shimmer that settles like a mail shirt nobody wears. Grants an armour bonus: the bracers of armour's force.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "warding",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "armour-bonus"
+   },
+   "motes": 5,
+   "price_gp": 500,
+   "form": "phial",
+   "affinity": [
+    "steel",
+    "adamantine"
+   ],
+   "house": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 1,
+     "bonus_type": "insight",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "heavy"
+    }
+   ],
+   "color": "#6f9bd1"
+  },
+  {
+   "id": "resistance-essence",
+   "name": "Resistance Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "A faint ward that braces body and mind. Grants a resistance bonus on saves: the cloak of resistance's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "abjuration",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "resistance"
+   },
+   "motes": 5,
+   "price_gp": 500,
+   "form": "phial",
+   "affinity": [
+    "platinum",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#9db7ff"
+  },
+  {
+   "id": "might-essence",
+   "name": "Essence of Might",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Grants an enhancement bonus to Strength: the belt of giant strength's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "vigour",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "ability-strength"
+   },
+   "motes": 20,
+   "price_gp": 2000,
+   "form": "phial",
+   "affinity": [
+    "wolf-pelt",
+    "grizzly-hide",
+    "black-bear-hide"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "climb",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e07a4a"
+  },
+  {
+   "id": "grace-essence",
+   "name": "Essence of Grace",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Grants an enhancement bonus to Dexterity: the belt of incredible dexterity's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "vigour",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "ability-dexterity"
+   },
+   "motes": 20,
+   "price_gp": 2000,
+   "form": "phial",
+   "affinity": [
+    "wolf-pelt",
+    "grizzly-hide",
+    "black-bear-hide"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "acrobatics",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e07a4a"
+  },
+  {
+   "id": "endurance-essence",
+   "name": "Essence of Endurance",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Grants an enhancement bonus to Constitution: the belt of mighty constitution's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "vigour",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "ability-constitution"
+   },
+   "motes": 20,
+   "price_gp": 2000,
+   "form": "phial",
+   "affinity": [
+    "wolf-pelt",
+    "grizzly-hide",
+    "black-bear-hide"
+   ],
+   "house": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "eager"
+    }
+   ],
+   "color": "#e07a4a"
+  },
+  {
+   "id": "cunning-essence",
+   "name": "Essence of Cunning",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Grants an enhancement bonus to Intelligence: the headband of vast intelligence's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "mind",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "ability-intelligence"
+   },
+   "motes": 20,
+   "price_gp": 2000,
+   "form": "phial",
+   "affinity": [
+    "gold",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#8fb3e8"
+  },
+  {
+   "id": "insight-essence",
+   "name": "Essence of Insight",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Grants an enhancement bonus to Wisdom: the headband of inspired wisdom's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "mind",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "ability-wisdom"
+   },
+   "motes": 20,
+   "price_gp": 2000,
+   "form": "phial",
+   "affinity": [
+    "gold",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "sense motive",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#8fb3e8"
+  },
+  {
+   "id": "splendour-essence",
+   "name": "Essence of Splendour",
+   "kind": "essence",
+   "tier": "uncommon",
+   "obtain": "bought",
+   "text": "Grants an enhancement bonus to Charisma: the headband of alluring charisma's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "mind",
+   "prefers": "",
+   "polarity": "ward",
+   "grants": {
+    "property": "ability-charisma"
+   },
+   "motes": 20,
+   "price_gp": 2000,
+   "form": "phial",
+   "affinity": [
+    "gold",
+    "silver"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "color": "#8fb3e8"
+  },
+  {
+   "id": "knack-essence",
+   "name": "Essence of Knack",
+   "kind": "essence",
+   "tier": "common",
+   "obtain": "bought",
+   "text": "A knack in a phial. Grants a competence bonus on one skill, chosen when it is bound: the boots of elvenkind's, the cloak of elvenkind's.",
+   "effects": [],
+   "drawbacks": [],
+   "family": "skill",
+   "prefers": "",
+   "polarity": "any",
+   "grants": {
+    "property": "skill-competence"
+   },
+   "motes": 1,
+   "price_gp": 100,
+   "form": "phial",
+   "affinity": [
+    "brass",
+    "leather-grip"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "appraise",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#c8b28a"
   }
  ]
 }

@@ -215,6 +215,24 @@ never given the shipped metal's numbers by guess.
 | `play.materials[].quench_mark` | Absent | Quenchants only: one small effect |
 | `play.materials[].forms`, `feeds`, `finishes`, `not_on`, `book`, `assay_danger` | Absent | As `campaign-format.md` describes; all default sensibly, and `book` stays `false` for a world's own metal |
 
+### A world's essences (added 2026-10-05, enchanting lane D)
+
+The enchanter binds essences, and a world's own creatures and places are where the found
+ones come from. A world essence is a `play.materials[]` row with `kind` `essence`, shaped
+as `campaign-format.md` ("A world's essences") describes and checked by the same validator
+as the shipped shelf. The owner's rulings that bind it: **phases of the day, never
+planets** ("this is not earth"), so an essence's family favours `dawn`, `morning`, `noon`,
+`afternoon`, `dusk`, `night` or `midnight` and nothing asks the world for a sky; and **its
+tier is its price band**, computed from its motes, never chosen.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.materials[]` rows of `kind` `essence` | Absent: every enchanter binds the shipped 92 | One row per essence the world names, `text` in its own words; `from_creature` (the world's creature) or `biomes` (the fourteen terrain words) for where it is found |
+| `.grants` | Absent | A property id from the app's table, an enhancement step, or nothing (a mote supply). Never a new property: what an essence *does* is the book's |
+| `.motes`, `.tier`, `.price_gp` | Absent | Computed by the app's rules (`materials.grant_motes`, `essence_tier`): World Bible may run them before export or leave `tier` and `price_gp` out for the app to refuse with the fix named; never a guessed number |
+| `.family`, `.phase` | Absent | A shipped family, or the world's own with its own `phase` |
+| `.house`, `.working`, `.affinity`, `.color` | Absent | As the shipped rows: at least one small typed top-up inside the tier's ceiling |
+
 ### What a trade keeps on its counter
 
 Added 2026-10-05 (the owner: "the most important thing for places like the smithy to sell
