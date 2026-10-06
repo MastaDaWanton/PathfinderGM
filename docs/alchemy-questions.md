@@ -587,3 +587,27 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 All ten rounds answered (2026-10-05). Cross-craft rulings made during the leatherworking rounds
 also bind alchemy: an "In progress" section for every craft with game-time countdowns until
 collected; a metal tag on armour and weapons. The plan can be written.
+
+## Plan open points (alchemy-revamp-plan.md §21), answered 2026-10-06
+
+| # | Open point | Owner's answer |
+|---|---|---|
+| 1 | The essence vocabulary | **Keep the 18.** |
+| 2 | The stacking switch's reach | **Every typed bonus.** With `magic_stacking` on, same-type bonuses from different sources all stack (enhancement, morale and the rest), as the house rule's own text reads. Off (the default) is the book. |
+| 3 | Do house splash flasks splash? | **All flasks splash** within 5 ft, like the book's splash weapons. |
+| 4 | Experiment against writings | **As planned**: the classics and the 44 by experiment; the rest from writings. |
+| 5 | Harmful spells in a potion | **Also as thrown flasks**: a harmful spell may go into a splash flask, thrown, the struck creature its target (house rule); drunk, the drinker is still the target. |
+| 6 | Quality and a spell potion's price | **Caster level only**: quality raises CL; the book price follows CL; no second multiplier. |
+| 7 | City laboratories | **Yes**: every city has a laboratory to rent. |
+| 8 | The light model's reach | **Later**: miss chance now; Stealth and Perception in a later pass. |
+| 9 | Learning a formula from a potion | **Yes**: spend the potion to learn its formula. |
+| 10 | Transmute flag ratio | **3×**. |
+| 11 | Icons | **Yes, download them** (game-icons.net, CC BY 3.0, credited, as the forge's). |
+| 12 | The alchemist class's extract list | **Keep unused** until an alchemist character class exists. |
+
+Standing rulings from the enchanting build that bind alchemy too: no real-world planets
+anywhere (world-agnostic; times of day via `rules/sky.py` phases if timing is used); no limit
+on works in progress; every successful step pays mastery (no repeat cap, MISHAP_LIMIT stays);
+the shared In progress store is `rules/inprogress.py` (`register`, `begin`, `collect`,
+`cancel`, `held_back`) and the metal tag is `rules/item_tags.py` — the enchanting lanes' names
+win over contracts §10's.
