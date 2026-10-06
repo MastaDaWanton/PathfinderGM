@@ -3005,6 +3005,13 @@
                       min-height: 40px; }
     #sheettoggle { display: none; }
     .talkbtn { min-height: 36px; padding: 6px 12px; }
+    /* Music and Settings take Talk's phone size. At their desktop 18px sides and 1.8px
+       tracking the end group measured 273px, and with the device beside it the bar was
+       403px wide on a 390px phone: the whole page scrolled sideways (enchanting
+       leftovers, 2026-10-06; the same on master). Now 221px, which leaves the world's
+       name room down to a 360px phone. */
+    .topend { gap: 6px; }
+    .topend > .v2-btn.is-quiet { min-height: 36px; padding: 6px 10px; letter-spacing: .04em; }
 
     .stage, body.mode-map .stage {
       grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk";

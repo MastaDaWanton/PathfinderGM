@@ -235,13 +235,17 @@ def test_a_drawback_save_is_the_books_dc_and_rides_the_bearer():
 
 def test_blurred_sight_is_three_untyped_penalties_through_the_funnel():
     """CRB: "-2 penalty on attack rolls, saves, and sight-based skill checks", each a
-    standing modifier in the layer's specs (the funnel), not a note."""
+    standing modifier through the funnel, not a note — on the BEARER's list (`wielded` for
+    a blade), because a weapon's `specs` belong to its own swing alone: measured
+    2026-10-06 (enchanting leftovers), in `specs` it left the wielder's saves untouched and
+    put its -2 on that sword's swings only (tests/test_enchant_leftovers.py)."""
     row = next(r for r in curses.sub_table("drawback") if r["id"] == "blurred")
     rec, _ = flawed(Script(61, row["d100"][0]))
-    pens = {(s["type"], s["target"]) for s in magic_layer.layer(rec)["specs"]
-            if s.get("amount") == -2}
+    lay = magic_layer.layer(rec)
+    pens = {(s["type"], s["target"]) for s in lay["wielded"] if s.get("amount") == -2}
     assert pens == {("combat_mod", "attack"), ("save_mod", "fort"), ("save_mod", "ref"),
                     ("save_mod", "will"), ("skill_mod", "perception")}
+    assert not any(s.get("amount") == -2 for s in lay["specs"])
 
 
 def test_a_dependent_item_fails_closed_until_the_situation_is_known():

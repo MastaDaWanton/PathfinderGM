@@ -70,7 +70,7 @@
     }
     if (it.group === "Essences") {
       var ph = it.phase ? it.phase.charAt(0).toUpperCase() + it.phase.slice(1) : "";
-      return [it.grants, it.motes != null ? String(it.motes) + (Number(it.motes) === 1 ? " mote" : " motes") : "", ph ? "favours " + ph.toLowerCase() : ""]
+      return [it.grants, E.moteWords(it.motes), ph ? "favours " + ph.toLowerCase() : ""]
         .filter(Boolean).join(", ");
     }
     if (it.dc_mod) return (it.dc_mod < 0 ? "" : "+") + it.dc_mod + " to Bind's DC";

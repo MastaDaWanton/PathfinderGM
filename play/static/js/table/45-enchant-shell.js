@@ -99,6 +99,17 @@
   E.api = C.api; E.minutes = C.minutes; E.sign = C.sign; E.sound = C.sound;
   E.reduced = C.reduced; E.steady = C.steady;
   E.cssEsc = function (s) { return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/"/g, '\\"'); };
+  // A phial's motes in words. The server sends the WHOLE motes the engine will count
+  // (`enchanter.phials`: full x tenths, rounded down), so a one-mote essence read down to
+  // nine tenths is 0 to the engine, and "0 motes" beside "0.9 on your shelf" read as a
+  // fault (seen in the final pass, 2026-10-06). It is said as what it is: less than a
+  // whole mote, nothing a working can count yet.
+  E.moteWords = function (n) {
+    if (n == null || n === "") return "";
+    var v = Number(n);
+    if (v === 0) return "less than a whole mote";
+    return String(n) + (v === 1 ? " mote" : " motes");
+  };
   function remember(key, value) { try { window.localStorage.setItem(key, value); } catch (err) { /* */ } }
   function recall(key) { try { return window.localStorage.getItem(key); } catch (err) { return null; } }
 
@@ -427,7 +438,13 @@
       wrap.remove();
       noticeUp = false;
       list.forEach(function (x) { E.api("/api/enchant/seen", { key: x.key }).catch(function () { /* shown again next time */ }); });
-      if (back && document.contains(back) && back.focus) back.focus();
+      // The notice opens on the circle's first state, before the method strip exists, so
+      // what had focus then was the layer's Close (the opener's fallback), and closing the
+      // notice put the player back on Close, one Enter from leaving (the final pass,
+      // 2026-10-06). Back to where the layer's own first stop is now: the chosen method.
+      if (!back || !document.contains(back) || back === document.body ||
+          back.id === "enchant-close") core.focusFirst();
+      else if (back.focus) back.focus();
     };
     core.pushEsc(close);
     wrap.querySelector("[data-convert-ok]").addEventListener("click", close);
@@ -1027,6 +1044,25 @@
     if (!games || typeof games.play !== "function" || !def || def.track !== "enchant") return null;
     return games;
   };
+  // Which quality band a live score sits in, by the game strip's own rule (33-bench-games.js
+  // `bandOf`): the server's `tuning.bands` when there is one per name, else even shares, and
+  // a 0.015 margin either side of a bound so a needle resting on an edge does not ring the
+  // tier-up over and over. Returns a function answering "did this score rise a band?".
+  function tierWatch(tuning) {
+    var names = Array.isArray(tuning.names) && tuning.names.length ? tuning.names : null;
+    var n = names ? names.length : 5;
+    var b = Array.isArray(tuning.bands) && tuning.bands.length === n ? tuning.bands.slice()
+      : Array.apply(null, Array(n)).map(function (_, i) { return i / n; });
+    var band = -1;
+    return function (s) {
+      var i = band < 0 ? 0 : band;
+      while (i + 1 < b.length && s >= b[i + 1] + 0.015) i++;
+      while (i > 0 && s < b[i] - 0.015) i--;
+      var up = band >= 0 && i > band;
+      band = i;
+      return up;
+    };
+  }
   function play(r, order) {
     var tuning = r.tuning || {};
     E.live = { token: r.token, tuning: tuning, flawed: (r.verdict || {}).verdict === "flawed" };
@@ -1043,6 +1079,7 @@
     var game;
     if (games) {
       var view = stageCall("game", method) || null;
+      var rose = tierWatch(tuning);
       game = Promise.resolve(games.play({
         // The clock's minute rides with the phase so Bind's band can draw a needle at now
         // (lane U2's ask); it is the server's minute, attached, never computed.
@@ -1051,7 +1088,14 @@
         seq: tuning.seq || null,
         seats: tuning.seats || null, mount: strip, stage: view,
         steady: E.steady(), reducedMotion: E.reduced(),
-        onScore: function (s) { E.emit("score", s); },
+        onScore: function (s) {
+          E.emit("score", s);
+          // The live score crossed into a better quality: the stage's tier-up (its gilt
+          // and `enchant.tier.up`). The stage has had `flourish("tierUp")` since lane U1
+          // and nothing ever called it, so the sound was registered and never heard
+          // (the final pass's report, 2026-10-06).
+          if (rose(s)) flourish("tierUp");
+        },
       }));
     } else {
       // The enchanting games are lane U2's; until one is in the build for this method the
@@ -1162,6 +1206,12 @@
     // final pass, 2026-10-06, counted with a Sound.play spy).
     if (kind === "read" || kind === "identify") {
       if (!staged) E.sound("enchant." + kind);
+      return;
+    }
+    // A tier up mid-game: the stage rings `enchant.tier.up` with its gilt; flat, the ring
+    // alone (the game strip brightens its own word).
+    if (kind === "tierUp") {
+      if (!staged) E.sound("enchant.tier.up");
       return;
     }
     if (!staged) E.sound("enchant." + (kind === "fail" ? "fail" : kind === "flawless" ? "flawless" :

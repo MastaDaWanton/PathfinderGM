@@ -476,11 +476,14 @@ def documents(curse, layer: dict) -> dict:
         sub = _sub(curse, "drawback") or {}
         add: dict = {}
         for d in sub.get("documents") or ():
+            # Every drawback document rides the BEARER (`wielded` / `worn`), the numbers
+            # included: blurred sight is "-2 on attack rolls, saves, and skill checks
+            # requiring vision" for the one whose eyes it is. Until 2026-10-06 its mods
+            # went in `specs`, and a weapon's specs belong to its own swing alone
+            # (`Actor._standing_mods`): measured, a blurred-sight longsword in hand left
+            # the wielder's Fortitude untouched and put its -2 on that sword's swings only.
             doc = _stamp(_filled(d, int(curse.get("cl") or 0)), origin)
-            if doc.get("type") in _MOD_TYPES:
-                add.setdefault("specs", []).append(doc)
-            else:
-                add.setdefault(_trigger(curse), []).append(dict(doc, trigger=_trigger(curse)))
+            add.setdefault(_trigger(curse), []).append(dict(doc, trigger=_trigger(curse)))
         if sub.get("bars"):
             add.setdefault("tags", []).append(str(sub["bars"]))
         return {"add": add} if add else {}
@@ -668,9 +671,16 @@ def gutters(curse, d100: int) -> bool:
 
 def noticed(curse) -> bool:
     """A drawback anyone can see the moment the item is carried (hair, skin, a mark, a
-    sound, a mood): it is found the hard way at once, when the item is first held or worn."""
+    sound, a mood), or one its bearer feels at once (`felt`: blurred sight, "Character's
+    vision is blurry", CRB): it is found the hard way when the item is first held or worn.
+
+    `felt` was added 2026-10-06 (enchanting leftovers): blurred sight acts only through
+    roll terms (a -2 on every attack, save and Perception), and nothing ever found it — a
+    bearer squinting through every fight was never told why. Found at the draw, before
+    any roll, because a blur is the first thing the eyes say."""
     c = curse if isinstance(curse, dict) else {}
-    return c.get("row") == "drawback" and bool((_sub(c, "drawback") or {}).get("noticed"))
+    sub = _sub(c, "drawback") or {}
+    return c.get("row") == "drawback" and bool(sub.get("noticed") or sub.get("felt"))
 
 
 def lift_dc(curse) -> int:

@@ -195,7 +195,7 @@
       html += '<div class="ew-seat is-full" data-seat-row="' + esc(s.seat) + '">' +
         '<span class="ew-label">' + esc(s.name || words(s.seat)) + '</span>' +
         '<span class="ew-piece"><i class="fr-swatch" style="--sw:' + esc(color) + '" aria-hidden="true"></i>' +
-          '<span class="ew-name">' + esc(name) + (s.grants ? '<small>' + esc(s.grants) + (s.motes != null ? ", " + esc(s.motes) + (Number(s.motes) === 1 ? " mote" : " motes") : "") + '</small>' : "") +
+          '<span class="ew-name">' + esc(name) + (s.grants ? '<small>' + esc(s.grants) + (s.motes != null ? ", " + esc(E.moteWords(s.motes)) : "") + '</small>' : "") +
           sign + '</span></span>' +
         (m === "attune" ? '<button type="button" class="ew-x" data-unput="seat" data-key="' + esc(s.seat) +
           '" data-seat="' + esc(s.seat) + '" aria-label="Lift ' + esc(name) + ' off the ' + esc(String(s.name || s.seat).toLowerCase()) + '">×</button>' : "") +
