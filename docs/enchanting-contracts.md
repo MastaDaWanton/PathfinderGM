@@ -46,31 +46,65 @@ Their ownership is §12 below, fixed now so wave 1 does not take their files.
 
 ### 2.1 New effect types and fields in `rules/effectspec.py`
 
-| Type | Fields |
-|---|---|
-| `crit_range` | `multiply` (int, 2), `not_with` (a tag prefix, `feat.improved-critical`) |
-| `extra_attack` | `on` (`full_attack`), `count` (int), `not_with` (`spell.haste`) |
-| `enhancement_to_ac` | `max` (`"enhancement"`); the amount is a per-turn choice param, validated by the engine |
-| `fortification` | `percent` (25, 50, 75) |
-| `ignore_armour` | `except` (creature types: `undead`, `construct`; `object`) |
-| `item_power` | `spell` (a spell id in `content/spells`) **or** `effect` (one effect document), `uses` (`{"per": "day", "n": 1}` or `"at_will"`), `caster_level` (optional, defaults to the item's) |
-| `deflect_ranged` | `per` (`round`), `save` (`{"reflex": 20}`) or `auto` (arrow catching) |
+**As built by lane A (2026-10-05).** Where this differs from the table first written here, the
+reason is in the code comment beside it and in brief in the "Changed" column. Every type is
+**standing** (no trigger; `_STANDING_TYPES`) except `slay` and `item_power`; all are in the new
+`magic_item` catalogue category with a validator and a renderer. **`engine` is False for all ten
+until lane C's readers land**, not True as first drafted: the existing honesty ratchet
+(`tests/test_effectspec_extensions.py::test_every_executable_type_has_something_that_executes_it`)
+refuses a type that claims the engine runs it when nothing does, and the first full run failed
+on exactly these ten. `effectspec.AWAITING_READER` lists each with its reader's site; **lane C
+deletes a type's line when its reader lands** (and adds the type, with the site, to that
+test's `already` set), which makes it executable. Consequences now: `materials.validate`
+refuses these types inside a material's own effects (lane D: essences name properties through
+`grants`, never these documents), and `consumables` narrates them.
+
+| Type | Fields | Changed from the first draft, and why |
+|---|---|---|
+| `crit_range` | `multiply` (int, default 2), `stacking` (group, default `"threat-range"`) | `not_with: "feat.improved-critical"` named a tag nothing grants (Improved Critical has no feat document, keen edge is prose). The book's rule is a stacking rule ("doesn't stack with any other effect that expands the threat range"): the reader applies the best of each `stacking` group once. |
+| `extra_attack` | `on` (`full_attack`), `count` (int, 1), `stacking` (default `"haste"`) | Same reason: speed is "not cumulative with similar effects, such as a haste spell"; haste's extra attack joins the `haste` group when it gets a document. |
+| `enhancement_raise` | `amount` (int) | **New.** Bane: "its enhancement bonus is +2 better". As a `combat_mod` +2 enhancement it collides with the sword's own +1 in `dice.stack` and the +1 bane sword hits at +2, not the book's +3 (measured in the test). It raises the weapon's enhancement for attack, damage and the DR thresholds (Q8). |
+| `enhancement_to_ac` | `max` (`"enhancement"`) | As drafted. The amount is a per-turn param from the combat bar, validated by the engine; the AC bonus is untyped ("stacks with all others"). |
+| `fortification` | `percent` (1-100; the book's 25, 50, 75) | As drafted. |
+| `ignore_armour` | `cannot_harm` (list of creature types and `object`) | `except` read as "the armour still counts against these"; the book says brilliant energy "cannot harm undead, constructs, or objects" at all. |
+| `deflect_ranged` | `per` (`round`), `save` (`ref`), `dc` (int), `dc_adds_enhancement` (bool), `draws_ft` (int), `deflection` (int) | `{"reflex": 20}` split into `save` + `dc` (save_gate's shape). `auto` dropped: no shield in the book catches automatically (that is Snatch Arrows, a feat). Arrow catching is `draws_ft: 5` + `deflection: 1`. |
+| `weapon_lethality` | `lethality` (`nonlethal`), `suppressible` (bool) | **New.** Merciful: "all damage it deals is nonlethal ... on command, suppresses this ability". Read where `weapons.lethality_of` reads a sap's. |
+| `slay` | `natural` (int, optional), `except` (creature types) | **New.** Vorpal (`trigger: crit`, `natural: 20`) and disruption (inside a `save_gate`'s `on_failure`): the creature dies through `Actor.die`. |
+| `item_power` | exactly one of `spell` (spell id), `effect` (one document) or `tell` (a power that changes no number: glamered); `caster_level`; `area` (`{"shape": "burst", "ft": 20}`, class_abilities' shape); **`uses` required** | Uses are the `uses`/`uses_count` every effect already carries (`"per_day"`, 2; `"unlimited"` is at will), not a second `{"per", "n"}` spelling. Required, so a power cannot be at will by accident. |
 
 Additions to existing lists and fields:
-- `STRIKES_AS` gains `magic`, `good`, `evil`, `law`, `chaos`.
-- `ITEM_TRIGGERS` gains `wielded` and `worn` (a standing `ActiveEffect` granted while the item is
-  held or worn and removed with it, the `carried` mechanism).
-- `damage` gains `per_multiplier: bool` (a crit rider's dice step with the weapon's multiplier:
-  ×2 1d10, ×3 2d10, ×4 3d10) and `recipient: "wielder"` (vicious).
-- Any effect may carry `choice_key` naming a choice the property asks (`"foe"`, `"energy"`), and
-  `when` may reference it: `{"target": {"choice": "foe"}}`. `_when_holds` resolves it against the
-  property's stored choice (lane C).
-- Any effect may carry `"book": true` (printed number, never scaled) as the forge's do, and
-  `"house": true` (scaled by binding quality).
+- `STRIKES_AS` gains `magic`, `good`, `evil`, **`lawful`, `chaotic`** (not `law`/`chaos`: the
+  bestiary prints "DR 10/chaotic" and "DR 5/lawful", and `bypassed_by` compares words).
+  `ENHANCEMENT_STRIKES_AS` and `strikes_as_for_enhancement(n)` give the glossary thresholds
+  (+1 magic, +3 cold iron and silver, +4 adamantine, +5 the four alignments) for lane B's layer;
+  pass the enhancement *as raised* against the creature struck.
+- `ITEM_TRIGGERS` gains `wielded` and `worn`, valid on `WORN_TYPES`: the carried three plus
+  `fast_healing`, `sense`, `spell_effect`, `immunity`, `negative_level`. A plain modifier on a
+  worn item takes **no** trigger (it is a standing spec) and `worn` on one is refused.
+- `damage` gains `per_multiplier: bool` (crit damage only; dice × (multiplier − 1)). Vicious's
+  wielder damage is **`recipient: "self"`** ("The one who has it", already in the vocabulary),
+  not a new `"wielder"`.
+- `bleed` gains `stacks: bool` (wounding).
+- Any effect may carry `choice_key`; a `when` may reference it as `{"target": {"choice": key}}`
+  and the validator requires the two to agree. **Lane C does not resolve choices in
+  `_when_holds`:** `effectspec.bind(prop, choice)` fills them before any document leaves the
+  table — bane bound against undead carries `when: {"target": {"type": "undead"}}`, the clause
+  `_when_holds` already reads (`{"subtype": ...}` for a humanoid or outsider foe). For an
+  energy or skill choice, `bind` writes the chosen value into `target`.
+- Booleans with no form field, validated as `book` is (`_BOOLEAN_KEYS`): `book`, `house`,
+  `per_multiplier`, `stacks`, `suppressible`, `dc_adds_enhancement`. `book` and `house` together
+  are refused.
+- `GEAR_TARGETS` gains `range_pct` (distance: +100) and `throw_range_ft` (throwing: 10).
+- `FORMULA_VARS` gains `bonus`: a scaled property's documents say `"amount": "bonus"` and `bind`
+  works it out.
+- `WORKING_TRAITS` gains `night_only`, `eager`, `skittish`, `heavy`, `volatile` (lane D's §5
+  request, done now so D is not blocked).
+- `when.target.alignment` is legal in property documents and **not read** by `_when_holds` yet
+  (`WHEN_NOT_READ`); every property using it says so in `not_yet` (the validator holds it to
+  that). Lane C reads it from a creature's printed alignment, as `Engine._could_be_evil` does.
 
-Each new type gets a validator, a renderer and a catalogue entry. `executable()` is True for all.
 `narrative` stays legal in the vocabulary; **lane D's validator refuses it** in essences and
-recipes.
+recipes, and the property table refuses it outright.
 
 ### 2.2 `content/rules/magic-properties.json` (lane A writes, by hand from AoN)
 
@@ -90,16 +124,60 @@ entered by hand from the AoN pages cited in the revamp plan §8 (no model author
 }
 ```
 
-- `plus` (bonus equivalent) **or** `gp` (flat price, outside the +10), never both.
+- `plus` (bonus equivalent) **or** `gp` (flat price, outside the +10) **or** `scaled`, exactly
+  one. `scaled` is the ring and wondrous pricing table's "bonus squared × K":
+  `{"values": [1, 2, 3, 4, 5], "gp_per_square": 2000, "creator_cl_per_bonus": 3, "tiers": [...]}`;
+  the bonus is bound like a choice, under the key `bonus`.
 - `spells` is a list of alternatives groups: each inner list is "any one of these" (flaming: any
-  of three). Each group not met is one +5 DC (revamp plan §4.2).
-- `requires`: weapon restrictions (`melee`, `damage_types_any: ["piercing", "slashing"]` for keen,
-  `ranged`, `thrown`), and `creator_alignment` (waived and noted until Q7).
-- `choice`: `{"key": "foe", "of": "creature_type" | "subtype" | "damage_type", "options": [...]}`.
-- All 26 weapon and 32 armour entries now in `magic-items.json` move here; their ids keep the
-  `mi-` alias for old saves (lane H maps).
+  of three; shadow is two groups, invisibility **and** silence). Each group not met is one +5 DC
+  (revamp plan §4.2). Ids are the Spells bench's (`summon-monster-1`), checked by the test.
+- `requires`: vessel restrictions, a refusal — `melee`, `ranged`, `thrown` (only that kind),
+  `launcher: false` (brilliant energy: not the bow itself), `damage_types_any` — each the
+  ability's own restriction sentence, never the random table it appears on. Creator clauses,
+  each one more +5 DC: `creator_alignment` (waived, Q7), `creator_class` (ki focus: monk),
+  `creator_caster_level` (spell storing: 12).
+- `choice`: `{"key": "foe", "of": "creature_type" | "damage_type" | "skill", "options": [...]}`.
+  A `creature_type` choice is a type, or `{"subtype": "goblinoid"}` for `humanoid`/`outsider`
+  (the book: "pick one subtype"; subtypes are the world's own and not listed).
+- `wielder`: `{"alignment": "evil", "negative_levels": 1}` for the holy family, data only (Q7).
+- `reads_tag`: for a property with no documents, whose whole effect is a rule a reader asks of
+  its tag `property.<id>` (returning, seeking, ki focus, mighty cleaving, ghost touch armour,
+  wild, bashing, animated, dancing and spell storing): names the reader. Such a property must
+  also carry a `not_yet`.
+- `not_yet`: every clause of the book nothing executes yet, said out loud. `house`: which of the
+  entry's numbers are not the book's (only `skill-competence`, whose free-form CL and cap the
+  book does not print).
+- `aliases`: `{"mi-energy-resistance-fire": {"energy": "fire"}, ...}` — **every one of the 58** old
+  weapon and armour ids, with the choice it implies. `mi-bane` maps to `{}`: the old bane never
+  named its foe, so the migration (lane H) must ask. `mi-silent-moves` maps to `shadow` (Pathfinder
+  folded it in).
+- `aura`: `{"strength", "school": [...]}`, `source` (the AoN page), `text` (the card line).
 
-`effectspec.properties() -> dict[str, dict]` loads and validates the file; `effectspec.property(id)`.
+API:
+
+```python
+effectspec.properties() -> dict[str, dict]       # by id; validated on load (BadProperties)
+effectspec.property(id_or_old_id) -> dict | None
+effectspec.from_alias("mi-...") -> (property id, choice) | None      # lane H
+effectspec.bind(prop | id, choice=None) -> list[dict]
+#   the documents with choice and bonus filled, deep-copied, each "source": "property:<id>";
+#   raises ValueError (choice_problems) for bane with no foe, a scaled one with no bonus...
+effectspec.choice_problems(prop, choice) -> list[str]
+effectspec.price_of(prop, bonus=None) -> {"plus": n} | {"gp": n}
+effectspec.property_lines(prop | id, choice=None) -> list[str]   # card lines, "against undead"
+effectspec.property_tag(id) -> "property.<id>"
+effectspec.strikes_as_for_enhancement(n) -> tuple[str, ...]
+effectspec.property_problems(entry, spell_ids=None), all_property_problems(entries, spell_ids=None)
+```
+
+The table is shipped data with no homebrew overlay, cached with `lru_cache`
+(`effectspec._property_table.cache_clear()` in a test that swaps the file).
+
+Counts: 71 entries — 32 weapon, 28 armour and shield (9 armour only, 6 shield only, 13 both),
+11 ring and wondrous (deflection, natural armour, armour bonus, resistance, six ability
+bonuses, skill competence). Free-form *spell* powers on wondrous items (continuous or command
+word, priced spell level × CL × 2,000/1,800) are **not** in the table: they stay recipes
+(lane D) until a free-form spell pricing rule is agreed.
 
 ---
 
@@ -195,8 +273,11 @@ keeps passing.
   weapon scope (`_standing_mods` with `ctx["weapon"]["record"]`), and competes best-only with
   masterwork's +1.
 - `Engine._item_riders` (`engine.py:11170`) reads `build["magic"]["riders"]` too; crit riders
-  fire on a confirmed crit with `per_multiplier`; `recipient: "wielder"` riders hit the wielder.
-- The threat test (`engine.py:5213`) reads `crit_range` (keen), refused with Improved Critical.
+  fire on a confirmed crit with `per_multiplier`; `recipient: "self"` riders hit the wielder
+  (vicious; §2.1).
+- The threat test (`engine.py:5213`) reads `crit_range` (keen), best of each `stacking` group
+  once (keen with Improved Critical doubles once). `enhancement_raise` (bane) raises the
+  weapon's enhancement for attack, damage and `strikes_as_for_enhancement`.
 - `extra_attack` adds one attack to a full attack, not with haste; `enhancement_to_ac` takes a
   `defending` param from the combat bar (validated, never model-written); `fortification` rolls
   d% against a confirmed crit or sneak attack and says so; `ignore_armour` drops armour and

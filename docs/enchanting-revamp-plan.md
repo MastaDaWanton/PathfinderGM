@@ -543,6 +543,15 @@ on a name (law 1).
 
 ### 8.1 New vocabulary
 
+**As built, the vocabulary differs from this table in six places** (lane A, 2026-10-05; the
+reasons are in `docs/enchanting-contracts.md` §2.1, which is the shape to build against):
+`not_with` became a `stacking` group; bane is `enhancement_raise`, not a `combat_mod`
+enhancement (which `dice.stack` swallows beside the sword's own +1); the alignment traits are
+`lawful` and `chaotic` (the bestiary's words); `ignore_armour.except` became `cannot_harm`;
+item powers count uses in the existing `uses`/`uses_count`; vicious's wielder is
+`recipient: "self"`. Choices are filled by `effectspec.bind`, so `_when_holds` gains no choice
+key.
+
 | Addition | Shape | Why |
 |---|---|---|
 | `crit_range` | `{"multiply": 2, "not_with": "feat.improved-critical"}` | keen |
@@ -653,7 +662,7 @@ The layer builder emits these as `strikes_as` traits, so the existing door
 | +1 or more | `magic` |
 | +3 or more | `cold_iron`, `silver` |
 | +4 or more | `adamantine` (for DR only: it does not ignore hardness) |
-| +5 or more | `good`, `evil`, `law`, `chaos` |
+| +5 or more | `good`, `evil`, `lawful`, `chaotic` |
 | holy / unholy / axiomatic / anarchic | its own alignment, at any + |
 | bane against its foe | +2 to the enhancement for this test **(reading: Q8)** |
 
