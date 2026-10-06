@@ -4,9 +4,7 @@
   "_starting_note": "What every alchemist knows from the start (owner Q5.4): the four book classics. formulae.grant_starting writes them.",
   "starting": ["alchemists-fire", "acid-flask", "antitoxin", "tanglefoot-bag"],
   "_awaiting_note": "Conditions a core may name before the engine lane adds them this wave (contracts §2.3). Validation treats them as present; formulae.get(id)['waiting'] names them, so nothing pretends. Delete a line when rules/states.py has the condition.",
-  "awaiting": {
-    "glued": "the glued condition and the break_free op (rules/states.py, rules/engine.py), alchemy lane C, contracts §2.3 and §7"
-  },
+  "awaiting": {},
   "_left_out": "Two of docs/alchemy.md's eighteen recipe-table items have no formula, on purpose. Bladeguard (UE p.101: a weapon immune to an ooze's or rust monster's corrosion for 24 hours) and vermin repellent (UE p.101: Fine vermin avoid you; swarms need DC 15 Fortitude to enter your square) say nothing a typed effect can carry today: no reader asks whether a held weapon resists object damage, and no reader asks a swarm to save before it moves. Typed as a prose `immunity` they would be granted and read by nobody — prose that pretends. They stay shop goods until a reader exists.",
   "classics": [
     {
