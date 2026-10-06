@@ -1,6 +1,6 @@
 {
   "source": "PF1e Core Rulebook alchemical items, Ultimate Equipment, and the bestiary's classic reagent creatures, worked into the tier scheme rules/worldclass.py defines.",
-  "note": "Materials are to the Alchemist what herbs are to the Herbalist, and the file follows content/ingredients/herbs-and-parts.json's shape with two additions: `volatile` (two volatiles in one vessel need Stabilize, and each volatile past the first raises the DC — rules/alchemist.py) and `needs_stabilizer` (the material attacks its own vessel). Where a material's text names a classic output — alchemist's fire, acid flask, tanglefoot bag — that is the recipe table in docs/alchemy.md speaking; the material is the identity, the chain is the item. Every material also declares `obtain` — bought, mined, gathered or harvested — in the flat shape the other three crafts use: the word itself, with `market` and `price_gp` for what is bought, `biomes` (from rules/biomes.py) for what is dug or gathered, `from_creatures` for what is cut off a corpse the way the leatherworker writes it, and `obtain_dc` for the check. The craft-action excursion is the single hub for obtaining materials, so where a thing comes from is data here rather than a special case in the UI.",
+  "note": "Materials are to the Alchemist what herbs are to the Herbalist, and the file follows content/ingredients/herbs-and-parts.json's shape with two additions: `volatile` (two volatiles in one vessel need Stabilize, and each volatile past the first raises the DC — rules/alchemist.py) and `needs_stabilizer` (the material attacks its own vessel). Where a material's text names a classic output — alchemist's fire, acid flask, tanglefoot bag — that is the recipe table in docs/alchemy.md speaking; the material is the identity, the chain is the item. Every material also declares `obtain` — bought, mined, gathered or harvested — in the flat shape the other three crafts use: the word itself, with `market` and `price_gp` for what is bought, `biomes` (from rules/biomes.py) for what is dug or gathered, `from_creatures` for what is cut off a corpse the way the leatherworker writes it, and `obtain_dc` for the check. The craft-action excursion is the single hub for obtaining materials, so where a thing comes from is data here rather than a special case in the UI.\n\nThe alchemy revamp (2026-10-06, docs/alchemy-revamp-plan.md §5, lane D, tools/alchemy_data_pass.py): every material now carries the alchemy document's fields (docs/alchemy-contracts.md §3) — `product` (what it puts in a bottle: typed effects, each with an `essence`, a `route` and a `grade`, `drawback: true` where it costs the user), `working` (how it behaves at the bench), `mishap` (volatile materials: what a roll failed by 5 or more does to the alchemist), `toxic` (toxic-to-handle materials: what working it unprotected does) and `color`. `rules/materials.py` reads `product` first; `effects` is the pre-revamp list the old chain bench reads until it retires, and nothing new reads it. House numbers are the owner's to review in docs/alchemy-review.md.",
   "materials": [
     {
       "id": "brimstone",
@@ -25,7 +25,58 @@
         "mountain",
         "underground"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the charge flashes in the crucible"
+      },
+      "toxic": null,
+      "color": [
+        0.86,
+        0.78,
+        0.22
+      ]
     },
     {
       "id": "saltpetre",
@@ -43,7 +94,56 @@
         "underground",
         "urban"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "sonic",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "thunder"
+        },
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against disease",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the nitre takes the flame and roars"
+      },
+      "toxic": null,
+      "color": [
+        0.93,
+        0.93,
+        0.9
+      ]
     },
     {
       "id": "willow-charcoal",
@@ -68,7 +168,40 @@
       "price_gp": 5,
       "market": "apothecary",
       "part": "mineral",
-      "neutralizer": 1
+      "neutralizer": 1,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against ingested poison",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.12,
+        0.12,
+        0.12
+      ]
     },
     {
       "id": "quicklime",
@@ -90,7 +223,56 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        },
+        {
+          "type": "combat_mod",
+          "target": "damage",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "note": "the coated weapon; the lime scalds where it bites",
+          "route": "external",
+          "grade": 1,
+          "essence": "might"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it slakes in a sweating hand"
+      },
+      "toxic": null,
+      "color": [
+        0.95,
+        0.95,
+        0.92
+      ]
     },
     {
       "id": "slaked-lime",
@@ -107,7 +289,38 @@
       "price_gp": 10,
       "market": "apothecary",
       "part": "mineral",
-      "neutralizer": 2
+      "neutralizer": 2,
+      "product": [
+        {
+          "type": "resistance",
+          "target": "acid",
+          "amount": 2,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.96,
+        0.96,
+        0.94
+      ]
     },
     {
       "id": "natron",
@@ -125,7 +338,55 @@
       "biomes": [
         "desert"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "remove_condition",
+          "target": "bleed",
+          "route": "skin",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against heat, cold and thirst",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.9,
+        0.88,
+        0.8
+      ]
     },
     {
       "id": "rock-salt",
@@ -144,7 +405,48 @@
         "underground",
         "coast"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against disease",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.92,
+        0.9,
+        0.88
+      ]
     },
     {
       "id": "alum",
@@ -167,7 +469,55 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "remove_condition",
+          "target": "bleed",
+          "route": "skin",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "skill_mod",
+          "target": "heal",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "to staunch bleeding",
+          "route": "skin",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.95,
+        0.97
+      ]
     },
     {
       "id": "green-vitriol",
@@ -184,7 +534,47 @@
       "biomes": [
         "underground"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.45,
+        0.75,
+        0.5
+      ]
     },
     {
       "id": "blue-vitriol",
@@ -217,7 +607,44 @@
       "biomes": [
         "underground"
       ],
-      "obtain_dc": 13
+      "obtain_dc": 13,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 12,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "sickened",
+              "duration": {
+                "amount": "1d4",
+                "unit": "round"
+              }
+            }
+          ],
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.2,
+        0.45,
+        0.9
+      ]
     },
     {
       "id": "pine-pitch",
@@ -243,7 +670,37 @@
       "biomes": [
         "forest"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "apply_condition",
+          "target": "entangled",
+          "duration": {
+            "amount": "2d4",
+            "unit": "round"
+          },
+          "route": "struck",
+          "grade": 1,
+          "essence": "binding"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.45,
+        0.28,
+        0.1
+      ]
     },
     {
       "id": "birch-tar",
@@ -260,7 +717,40 @@
       "biomes": [
         "forest"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against disease carried by a wound",
+          "route": "skin",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.1,
+        0.08,
+        0.06
+      ]
     },
     {
       "id": "iron-filings",
@@ -276,7 +766,66 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "smith"
+      "market": "smith",
+      "product": [
+        {
+          "type": "combat_mod",
+          "target": "ac",
+          "amount": 1,
+          "bonus_type": "natural armour",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "essence": "change",
+          "note": "the skin takes on a little of the iron",
+          "route": "ingest",
+          "grade": 1
+        },
+        {
+          "type": "combat_mod",
+          "target": "damage",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "the iron's heft in the blow",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.35,
+        0.33,
+        0.32
+      ]
     },
     {
       "id": "lead-dust",
@@ -285,7 +834,7 @@
       "kind": "reagent",
       "tier": "common",
       "craft_dc": null,
-      "text": "Sweet, soft, heavy and slowly ruinous. It sweetens sour wine and weights a sap, and it costs the alchemist who breathes it — the trembling hands of the old trade are lead's signature, not age's.",
+      "text": "Sweet, soft, heavy and slowly ruinous. Thrown as a choking cloud it weakens whoever breathes it, and swallowed it poisons the drinker; it costs the alchemist who works it unmasked — the trembling hands of the old trade are lead's signature, not age's.",
       "risky": true,
       "volatile": false,
       "effects": [
@@ -300,7 +849,63 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "smith"
+      "market": "smith",
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 12,
+          "on_failure": [
+            {
+              "type": "ability_damage",
+              "target": "str",
+              "dice": "1"
+            }
+          ],
+          "route": "area",
+          "grade": 1,
+          "essence": "decay"
+        },
+        {
+          "type": "ability_damage",
+          "target": "con",
+          "dice": "1",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 12,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "lead breathed at the bench: the trembling hands of the old trade"
+      },
+      "color": [
+        0.55,
+        0.55,
+        0.58
+      ]
     },
     {
       "id": "powdered-chalk",
@@ -317,7 +922,44 @@
       "biomes": [
         "hills"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "climb",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "chalked hands",
+          "route": "skin",
+          "grade": 1,
+          "essence": "lightness"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "stabilizer"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.97,
+        0.97,
+        0.95
+      ]
     },
     {
       "id": "lamp-black",
@@ -332,7 +974,63 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "concealment",
+          "miss_chance": 20,
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "area",
+          "grade": 1,
+          "essence": "shadow"
+        },
+        {
+          "type": "skill_mod",
+          "target": "linguistics",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "the ink remembers every hand it wrote",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.05,
+        0.05,
+        0.05
+      ]
     },
     {
       "id": "tallow",
@@ -347,7 +1045,40 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "escape artist",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "greased",
+          "route": "skin",
+          "grade": 1,
+          "essence": "grace"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.9,
+        0.75
+      ]
     },
     {
       "id": "distilled-water",
@@ -355,14 +1086,36 @@
       "kind": "solvent",
       "tier": "common",
       "craft_dc": null,
-      "text": "Water with nothing in it, which is rarer than it sounds. The default medium: what a reaction happens in when nothing stronger is called for.",
+      "text": "Water with nothing in it, which is rarer than it sounds. The default medium: a reaction happens in it and it adds nothing of its own to the bottle.",
       "risky": false,
       "volatile": false,
       "effects": [],
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:water"
+        },
+        {
+          "type": "working",
+          "trait": "stabilizer"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.92,
+        0.98
+      ]
     },
     {
       "id": "strong-spirits",
@@ -379,7 +1132,69 @@
       "price_gp": 2,
       "market": "market",
       "part": "liquid",
-      "solvent": "alcohol"
+      "solvent": "alcohol",
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "will",
+          "amount": 1,
+          "bonus_type": "morale",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "against fear",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "ability_mod",
+          "target": "dex",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:alcohol"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d3",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the spirit catches with a blue flame"
+      },
+      "toxic": null,
+      "color": [
+        0.95,
+        0.93,
+        0.85
+      ]
     },
     {
       "id": "white-vinegar",
@@ -396,7 +1211,44 @@
       "price_gp": 1,
       "market": "market",
       "part": "liquid",
-      "solvent": "vinegar"
+      "solvent": "vinegar",
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against disease",
+          "route": "skin",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:vinegar"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.97,
+        0.96,
+        0.9
+      ]
     },
     {
       "id": "lamp-oil",
@@ -419,7 +1271,50 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:oil"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d3",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the oil takes the lamp's flame"
+      },
+      "toxic": null,
+      "color": [
+        0.85,
+        0.7,
+        0.3
+      ]
     },
     {
       "id": "olive-oil",
@@ -436,7 +1331,44 @@
       "price_gp": 1,
       "market": "market",
       "part": "oil",
-      "solvent": "oil"
+      "solvent": "oil",
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "escape artist",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "oiled skin",
+          "route": "skin",
+          "grade": 1,
+          "essence": "grace"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:oil"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.65,
+        0.2
+      ]
     },
     {
       "id": "turpentine",
@@ -451,7 +1383,62 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "inhale",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:oil"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d3",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the fumes take a flame across the bench"
+      },
+      "toxic": null,
+      "color": [
+        0.9,
+        0.85,
+        0.6
+      ]
     },
     {
       "id": "lye-water",
@@ -473,7 +1460,39 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:water"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.85,
+        0.7
+      ]
     },
     {
       "id": "brine",
@@ -488,7 +1507,44 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against disease carried by a wound",
+          "route": "skin",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:water"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.85,
+        0.9
+      ]
     },
     {
       "id": "brewers-yeast",
@@ -503,7 +1559,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
-      "market": "market"
+      "market": "market",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.75,
+        0.5
+      ]
     },
     {
       "id": "mother-of-vinegar",
@@ -518,7 +1596,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
-      "market": "market"
+      "market": "market",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst"
+        },
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.7,
+        0.6,
+        0.4
+      ]
     },
     {
       "id": "rennet",
@@ -533,7 +1633,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
-      "market": "market"
+      "market": "market",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.7,
+        0.6
+      ]
     },
     {
       "id": "clay-flask",
@@ -548,7 +1670,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "glassblower"
+      "market": "glassblower",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "shatters"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.7,
+        0.45,
+        0.3
+      ]
     },
     {
       "id": "glass-vial",
@@ -563,7 +1707,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "glassblower"
+      "market": "glassblower",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "drinkable"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.92,
+        0.95
+      ]
     },
     {
       "id": "waxed-bladder",
@@ -578,7 +1744,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "bursts"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.7,
+        0.5
+      ]
     },
     {
       "id": "stoneware-pot",
@@ -593,7 +1781,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "market"
+      "market": "market",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "struck"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.55,
+        0.5,
+        0.45
+      ]
     },
     {
       "id": "beeswax",
@@ -614,6 +1824,37 @@
         "salve",
         "balm",
         "cream"
+      ],
+      "product": [
+        {
+          "type": "resistance",
+          "target": "acid",
+          "amount": 1,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.8,
+        0.35
       ]
     },
     {
@@ -629,7 +1870,35 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d2",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.6,
+        0.4
+      ]
     },
     {
       "id": "oilcloth-wrap",
@@ -644,7 +1913,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "market"
+      "market": "market",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        },
+        {
+          "type": "working",
+          "trait": "lead_lined"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.55,
+        0.35
+      ]
     },
     {
       "id": "fullers-earth",
@@ -661,7 +1952,72 @@
       "price_gp": 5,
       "market": "market",
       "part": "mineral",
-      "neutralizer": 1
+      "neutralizer": 1,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against ingested poison",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "skill_mod",
+          "target": "acrobatics",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "essence": "grace",
+          "note": "sure footing on a slick floor",
+          "route": "skin",
+          "grade": 1
+        },
+        {
+          "type": "combat_mod",
+          "target": "cmd",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "essence": "might",
+          "note": "against a trip, on a sure footing",
+          "route": "skin",
+          "grade": 1
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "stabilizer"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.7,
+        0.55
+      ]
     },
     {
       "id": "fire-beetle-gland",
@@ -669,7 +2025,7 @@
       "kind": "gland",
       "tier": "common",
       "craft_dc": null,
-      "text": "The luminous organ of a fire beetle, still glowing days after the beetle has stopped needing it. Ten feet of steady red light — the cold heart of a sunrod, and the striker-paste of a tindertwig.",
+      "text": "The luminous organ of a fire beetle, still glowing for days after the beetle has stopped needing it: ten feet of steady red light. The cold heart of a sunrod, and the striker-paste of a tindertwig.",
       "risky": false,
       "volatile": false,
       "effects": [
@@ -684,7 +2040,50 @@
         "fire beetle",
         "giant fire beetle"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "light",
+          "radius_ft": 10,
+          "duration": {
+            "amount": "1d6",
+            "unit": "day"
+          },
+          "route": "external",
+          "grade": 1,
+          "essence": "light",
+          "book": true
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.35,
+        0.15
+      ],
+      "book": true,
+      "book_source": [
+        "https://legacy.aonprd.com/bestiary/vermin.html#beetle-fire"
+      ]
     },
     {
       "id": "skunk-musk-gland",
@@ -718,7 +2117,52 @@
         "skunk",
         "giant skunk"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 13,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "sickened",
+              "duration": {
+                "amount": "1d4",
+                "unit": "round"
+              }
+            }
+          ],
+          "route": "area",
+          "grade": 1,
+          "essence": "decay"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "inhale",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.6,
+        0.4
+      ]
     },
     {
       "id": "camphor",
@@ -741,7 +2185,47 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against disease and inhaled poison",
+          "route": "inhale",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d3",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the camphor fumes take light"
+      },
+      "toxic": null,
+      "color": [
+        0.95,
+        0.95,
+        0.95
+      ]
     },
     {
       "id": "quicksilver",
@@ -749,7 +2233,7 @@
       "kind": "reagent",
       "tier": "uncommon",
       "craft_dc": 15,
-      "text": "Living metal that pools and runs. Nothing else dissolves gold and silver into itself; nothing else in the trade rewards mastery so richly or punishes carelessness so quietly. The classic potent reagent — and the classic slow ruin of the alchemist who works it bare-handed over heat.",
+      "text": "Living metal that pools and runs. A draught of it quickens the step and poisons the blood together; worked bare-handed over heat it costs the alchemist, never the target — the classic slow ruin of the trade, and the classic reward for mastering it.",
       "risky": true,
       "volatile": false,
       "effects": [
@@ -764,7 +2248,60 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "speed",
+          "target": "land",
+          "amount": 5,
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace"
+        },
+        {
+          "type": "ability_damage",
+          "target": "con",
+          "dice": "1",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 14,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "quicksilver worked over heat without a mask and gloves: its price is paid by the alchemist, never the target"
+      },
+      "color": [
+        0.8,
+        0.82,
+        0.85
+      ]
     },
     {
       "id": "oil-of-vitriol",
@@ -786,7 +2323,39 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 30,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:acid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.7,
+        0.4
+      ]
     },
     {
       "id": "aqua-fortis",
@@ -808,7 +2377,54 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 35,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        },
+        {
+          "type": "skill_mod",
+          "target": "disguise",
+          "amount": -2,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 1,
+            "unit": "day"
+          },
+          "note": "the warning-yellow stain on the skin",
+          "route": "skin",
+          "grade": 1,
+          "essence": "change",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:acid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.85,
+        0.4
+      ]
     },
     {
       "id": "phosphorus",
@@ -830,7 +2446,75 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 40,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "light",
+          "radius_ft": 0,
+          "raised_ft": 5,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "external",
+          "grade": 1,
+          "essence": "light"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the open air is enough to light it"
+      },
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 13,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "phosphorus handled bare: the old match-makers' jaw"
+      },
+      "color": [
+        0.95,
+        0.95,
+        0.8
+      ]
     },
     {
       "id": "sal-ammoniac",
@@ -845,7 +2529,48 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 15,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "perception",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "the pungent spirit clears the head",
+          "route": "inhale",
+          "grade": 1,
+          "essence": "sight"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "inhale",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.93,
+        0.93,
+        0.9
+      ]
     },
     {
       "id": "sal-volatile",
@@ -865,7 +2590,69 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "remove_condition",
+          "target": "dazed",
+          "route": "inhale",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "save_mod",
+          "target": "will",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "against sleep",
+          "route": "inhale",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "save_mod",
+          "target": "will",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "essence": "binding",
+          "note": "against hold and paralysis",
+          "route": "inhale",
+          "grade": 1
+        },
+        {
+          "type": "apply_condition",
+          "target": "dazzled",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "eyes",
+          "grade": 1,
+          "essence": "light",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.95,
+        0.92
+      ]
     },
     {
       "id": "antimony-regulus",
@@ -882,7 +2669,65 @@
       "biomes": [
         "mountain"
       ],
-      "obtain_dc": 15
+      "obtain_dc": 15,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against ingested poison",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 13,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.6,
+        0.62,
+        0.68
+      ]
     },
     {
       "id": "realgar",
@@ -912,7 +2757,55 @@
       "biomes": [
         "underground"
       ],
-      "obtain_dc": 15
+      "obtain_dc": 15,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 13,
+          "on_failure": [
+            {
+              "type": "ability_damage",
+              "target": "con",
+              "dice": "1d2"
+            }
+          ],
+          "note": "arsenic smoke; the book's arsenic is Fort DC 13, 1d2 Con",
+          "route": "area",
+          "grade": 1,
+          "essence": "decay"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 12,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.85,
+        0.25,
+        0.15
+      ]
     },
     {
       "id": "cinnabar",
@@ -930,7 +2823,62 @@
       "biomes": [
         "underground"
       ],
-      "obtain_dc": 15
+      "obtain_dc": 15,
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "disguise",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "vermilion paint",
+          "route": "skin",
+          "grade": 1,
+          "essence": "change"
+        },
+        {
+          "type": "ability_damage",
+          "target": "con",
+          "dice": "1",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 13,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.85,
+        0.15,
+        0.12
+      ]
     },
     {
       "id": "verdigris",
@@ -945,7 +2893,48 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 15,
-      "market": "smith"
+      "market": "smith",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 12,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.3,
+        0.7,
+        0.55
+      ]
     },
     {
       "id": "naphtha",
@@ -970,7 +2959,50 @@
         "desert",
         "hills"
       ],
-      "obtain_dc": 14
+      "obtain_dc": 14,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:oil"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it ignites at a harsh word"
+      },
+      "toxic": null,
+      "color": [
+        0.7,
+        0.55,
+        0.25
+      ]
     },
     {
       "id": "rectified-spirits",
@@ -978,7 +3010,7 @@
       "kind": "solvent",
       "tier": "uncommon",
       "craft_dc": null,
-      "text": "Spirits distilled past drinkability into a pure working solvent. Extracts essences whole, preserves specimens indefinitely, and vanishes from the finished work without a trace of itself.",
+      "text": "Spirits distilled past drinkability into a pure working solvent. Extracts essences whole and vanishes from the finished work without a trace of itself: it carries no trait into the bottle.",
       "risky": false,
       "volatile": true,
       "effects": [],
@@ -987,7 +3019,36 @@
       "price_gp": 25,
       "market": "apothecary",
       "part": "liquid",
-      "solvent": "alcohol"
+      "solvent": "alcohol",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:alcohol"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the spirit flashes off the bench"
+      },
+      "toxic": null,
+      "color": [
+        0.95,
+        0.95,
+        0.95
+      ]
     },
     {
       "id": "storm-quartz",
@@ -1021,7 +3082,61 @@
         "hills",
         "mountain"
       ],
-      "obtain_dc": 16
+      "obtain_dc": 16,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 15,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "deafened",
+              "duration": {
+                "amount": 1,
+                "unit": "hour"
+              }
+            }
+          ],
+          "note": "the thunderstone's own numbers (CRB)",
+          "route": "area",
+          "grade": 1,
+          "essence": "thunder"
+        },
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "sonic",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "thunder"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d4",
+        "damage_type": "sonic",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it cracks with a report that boxes the ears"
+      },
+      "toxic": null,
+      "color": [
+        0.75,
+        0.78,
+        0.85
+      ]
     },
     {
       "id": "smoke-resin",
@@ -1043,7 +3158,52 @@
       "biomes": [
         "jungle"
       ],
-      "obtain_dc": 14
+      "obtain_dc": 14,
+      "product": [
+        {
+          "type": "manifest",
+          "what": "thick grey smoke",
+          "terrain": "obscuring",
+          "shape": "square",
+          "size": 10,
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "route": "area",
+          "grade": 1,
+          "essence": "shadow"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "inhale",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.48,
+        0.45
+      ]
     },
     {
       "id": "itchweed-floss",
@@ -1079,7 +3239,61 @@
       "biomes": [
         "swamp"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 12,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "sickened",
+              "duration": {
+                "amount": 10,
+                "unit": "minute"
+              }
+            }
+          ],
+          "essence": "decay",
+          "note": "maddening itch until washed off",
+          "route": "struck",
+          "grade": 1,
+          "book": true
+        },
+        {
+          "type": "combat_mod",
+          "target": "attack",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "handling the floss",
+          "route": "skin",
+          "grade": 1,
+          "essence": "might",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.78,
+        0.7
+      ],
+      "book": true,
+      "book_source": [
+        "https://www.aonprd.com/EquipmentMiscDisplay.aspx?ItemName=Itching%20powder"
+      ]
     },
     {
       "id": "ankheg-acid-sac",
@@ -1103,7 +3317,35 @@
       "from_creatures": [
         "ankheg"
       ],
-      "obtain_dc": 15
+      "obtain_dc": 15,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.75,
+        0.3
+      ]
     },
     {
       "id": "shocker-lizard-node",
@@ -1127,7 +3369,42 @@
       "from_creatures": [
         "shocker lizard"
       ],
-      "obtain_dc": 15
+      "obtain_dc": 15,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "electricity",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "storm"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d6",
+        "damage_type": "electricity",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the node discharges into the hand"
+      },
+      "toxic": null,
+      "color": [
+        0.55,
+        0.75,
+        0.95
+      ]
     },
     {
       "id": "giant-frog-mucus",
@@ -1161,7 +3438,44 @@
         "giant frog",
         "giant toad"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "ref",
+          "dc": 15,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "entangled",
+              "duration": {
+                "amount": "2d4",
+                "unit": "round"
+              }
+            }
+          ],
+          "route": "struck",
+          "grade": 1,
+          "essence": "binding"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.65,
+        0.8,
+        0.45
+      ]
     },
     {
       "id": "adder-venom-gland",
@@ -1193,7 +3507,74 @@
         "viper",
         "giant viper"
       ],
-      "obtain_dc": 14
+      "obtain_dc": 14,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 11,
+          "on_failure": [
+            {
+              "type": "ability_damage",
+              "target": "con",
+              "dice": "1d2"
+            }
+          ],
+          "note": "black adder venom",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay",
+          "book": true
+        },
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "essence": "ward",
+          "note": "against poison: the cure is taught by the poison",
+          "route": "ingest",
+          "grade": 1
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 11,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "venom on a cut finger"
+      },
+      "color": [
+        0.85,
+        0.85,
+        0.6
+      ],
+      "book": true,
+      "book_source": [
+        "https://legacy.aonprd.com/coreRulebook/glossary.html (Poison, Table 13-5)"
+      ]
     },
     {
       "id": "silver-salt",
@@ -1216,7 +3597,40 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 60,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "essence": "ward",
+          "note": "against disease: disease does not argue with silver",
+          "route": "ingest",
+          "grade": 1
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.88,
+        0.88,
+        0.92
+      ]
     },
     {
       "id": "bitter-aloes",
@@ -1241,7 +3655,67 @@
       "biomes": [
         "desert"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against ingested poison",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 11,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "sickened",
+              "duration": {
+                "amount": 1,
+                "unit": "round"
+              }
+            }
+          ],
+          "note": "the purgative, thrown",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.55,
+        0.45,
+        0.2
+      ]
     },
     {
       "id": "slick-jelly",
@@ -1264,7 +3738,58 @@
         "greasefish",
         "giant eel"
       ],
-      "obtain_dc": 13
+      "obtain_dc": 13,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "ref",
+          "dc": 10,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "prone",
+              "duration": {
+                "amount": 1,
+                "unit": "round"
+              }
+            }
+          ],
+          "essence": "grace",
+          "note": "the floor it coats",
+          "route": "area",
+          "grade": 1
+        },
+        {
+          "type": "skill_mod",
+          "target": "escape artist",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "grace"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.8,
+        0.7
+      ]
     },
     {
       "id": "lodestone-powder",
@@ -1281,7 +3806,29 @@
       "biomes": [
         "mountain"
       ],
-      "obtain_dc": 14
+      "obtain_dc": 14,
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.25,
+        0.25,
+        0.28
+      ]
     },
     {
       "id": "quick-match-cord",
@@ -1296,7 +3843,46 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 15,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "1d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the cord runs faster than a shout"
+      },
+      "toxic": null,
+      "color": [
+        0.8,
+        0.75,
+        0.6
+      ]
     },
     {
       "id": "iron-flask",
@@ -1312,7 +3898,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
-      "market": "smith"
+      "market": "smith",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "drinkable"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.35,
+        0.35,
+        0.38
+      ]
     },
     {
       "id": "lead-glass-vial",
@@ -1327,7 +3935,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
-      "market": "glassblower"
+      "market": "glassblower",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "drinkable"
+        },
+        {
+          "type": "working",
+          "trait": "warded"
+        },
+        {
+          "type": "working",
+          "trait": "lead_lined"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.62,
+        0.6
+      ]
     },
     {
       "id": "brass-casing",
@@ -1343,7 +3973,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 30,
-      "market": "smith"
+      "market": "smith",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "struck"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.65,
+        0.3
+      ]
     },
     {
       "id": "wintergreen-essence",
@@ -1368,7 +4020,48 @@
       "biomes": [
         "forest"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against fatigue and exhaustion",
+          "essence": "vigour",
+          "route": "skin",
+          "grade": 1
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": "1d4",
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.9,
+        0.8
+      ]
     },
     {
       "id": "oil-of-cloves",
@@ -1388,7 +4081,51 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "save_mod",
+          "target": "will",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "against pain effects",
+          "essence": "ward",
+          "route": "skin",
+          "grade": 1
+        },
+        {
+          "type": "skill_mod",
+          "target": "sleight of hand",
+          "amount": -2,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "numb fingers",
+          "route": "skin",
+          "grade": 1,
+          "essence": "grace",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.65,
+        0.4,
+        0.2
+      ]
     },
     {
       "id": "dragons-blood-resin",
@@ -1403,7 +4140,39 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "disguise",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "change"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.65,
+        0.08,
+        0.08
+      ]
     },
     {
       "id": "alkahest",
@@ -1426,7 +4195,50 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 500,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d6",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:acid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d6",
+        "damage_type": "acid",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it finds a way out of the vessel"
+      },
+      "toxic": null,
+      "color": [
+        0.85,
+        0.9,
+        0.7
+      ]
     },
     {
       "id": "aqua-regia",
@@ -1448,7 +4260,53 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 300,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d8",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        },
+        {
+          "type": "object_damage",
+          "dice": "1d6",
+          "damage_type": "acid",
+          "item": "metal armour or weapon",
+          "note": "the struck creature's metal gear (the metal tag)",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:acid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.65,
+        0.2
+      ]
     },
     {
       "id": "white-phosphorus",
@@ -1471,7 +4329,75 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 150,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d4",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "burning",
+          "dice": "1d4",
+          "damage_type": "fire",
+          "rounds": 1,
+          "save": "ref",
+          "dc": 15,
+          "smother_bonus": 2,
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it ignites on air and sticks while it burns"
+      },
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 15,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.98,
+        0.98,
+        0.9
+      ]
     },
     {
       "id": "cockatrice-wattle",
@@ -1504,7 +4430,60 @@
       "from_creatures": [
         "cockatrice"
       ],
-      "obtain_dc": 17
+      "obtain_dc": 17,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 12,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "staggered",
+              "duration": {
+                "amount": "1d2",
+                "unit": "round"
+              }
+            }
+          ],
+          "route": "struck",
+          "grade": 1,
+          "essence": "binding"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 12,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "apply_condition",
+            "target": "staggered",
+            "duration": {
+              "amount": 1,
+              "unit": "round"
+            }
+          }
+        ],
+        "note": "the joints stiffen in the hand that grinds it"
+      },
+      "color": [
+        0.8,
+        0.3,
+        0.25
+      ]
     },
     {
       "id": "dragon-bile",
@@ -1529,7 +4508,46 @@
         "young dragon",
         "adult dragon"
       ],
-      "obtain_dc": 22
+      "obtain_dc": 22,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the dragon's element leaves the jar"
+      },
+      "toxic": null,
+      "color": [
+        0.9,
+        0.45,
+        0.1
+      ]
     },
     {
       "id": "frostworm-chill-gland",
@@ -1553,7 +4571,42 @@
       "from_creatures": [
         "frost worm"
       ],
-      "obtain_dc": 22
+      "obtain_dc": 22,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d6",
+          "damage_type": "cold",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "frost"
+        },
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "cold",
+          "lethality": "lethal",
+          "note": "it never quite warms up",
+          "route": "skin",
+          "grade": 1,
+          "essence": "frost",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.7,
+        0.85,
+        1.0
+      ]
     },
     {
       "id": "salamander-ash",
@@ -1581,7 +4634,56 @@
         "salamander",
         "fire salamander"
       ],
-      "obtain_dc": 18
+      "obtain_dc": 18,
+      "product": [
+        {
+          "type": "resistance",
+          "target": "fire",
+          "amount": 3,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        },
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "vulnerability",
+          "target": "cold",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "the salamander's own weakness",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "frost",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.45,
+        0.4,
+        0.38
+      ]
     },
     {
       "id": "winter-wolf-humour",
@@ -1608,7 +4710,47 @@
       "from_creatures": [
         "winter wolf"
       ],
-      "obtain_dc": 18
+      "obtain_dc": 18,
+      "product": [
+        {
+          "type": "resistance",
+          "target": "cold",
+          "amount": 3,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        },
+        {
+          "type": "vulnerability",
+          "target": "fire",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "the winter wolf's own weakness",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "fire",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.8,
+        0.95
+      ]
     },
     {
       "id": "gray-ooze-core",
@@ -1634,7 +4776,45 @@
         "gray ooze",
         "ochre jelly"
       ],
-      "obtain_dc": 18
+      "obtain_dc": 18,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d4",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        },
+        {
+          "type": "object_damage",
+          "dice": "1d6",
+          "damage_type": "acid",
+          "item": "metal armour or weapon",
+          "note": "the struck creature's metal gear (the metal tag)",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.52,
+        0.5
+      ]
     },
     {
       "id": "ghost-salt",
@@ -1658,7 +4838,59 @@
       "biomes": [
         "underground"
       ],
-      "obtain_dc": 18
+      "obtain_dc": 18,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "negative",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 14,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "wis",
+            "dice": "1"
+          }
+        ],
+        "note": "cold to the soul of whoever grinds it"
+      },
+      "color": [
+        0.8,
+        0.85,
+        0.9
+      ]
     },
     {
       "id": "sunmetal-filings",
@@ -1666,7 +4898,7 @@
       "kind": "reagent",
       "tier": "rare",
       "craft_dc": null,
-      "text": "Filings of temple-forged sunmetal, warm in the hand at midnight. Anathema to the unliving: a preparation carrying them burns the dead the way brimstone burns the living.",
+      "text": "Filings of temple-forged sunmetal, warm in the hand at midnight. Anathema to the unliving: thrown, they burn the dead and do nothing to the living; drunk, the warmth steadies the nerve.",
       "risky": false,
       "volatile": false,
       "effects": [
@@ -1681,7 +4913,68 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 250,
-      "market": "temple"
+      "market": "temple",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "positive",
+          "lethality": "lethal",
+          "when": {
+            "target": {
+              "type": "undead"
+            }
+          },
+          "note": "harms only undead; the living feel warmth",
+          "route": "struck",
+          "grade": 1,
+          "essence": "light"
+        },
+        {
+          "type": "save_mod",
+          "target": "will",
+          "amount": 1,
+          "bonus_type": "morale",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "against fear",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "combat_mod",
+          "target": "attack",
+          "amount": 1,
+          "bonus_type": "morale",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        1.0,
+        0.85,
+        0.4
+      ]
     },
     {
       "id": "essence-of-ether",
@@ -1712,7 +5005,55 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 180,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 13,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "staggered",
+              "duration": {
+                "amount": "1d4",
+                "unit": "round"
+              }
+            }
+          ],
+          "route": "area",
+          "grade": 1,
+          "essence": "binding"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the vapour finds the lamp"
+      },
+      "toxic": null,
+      "color": [
+        0.9,
+        0.92,
+        0.95
+      ]
     },
     {
       "id": "philosophers-wool",
@@ -1720,7 +5061,7 @@
       "kind": "catalyst",
       "tier": "rare",
       "craft_dc": null,
-      "text": "Snow-white flakes that drift up from burning zinc — the old texts thought it wool from a hidden sheep. Soothes raw flesh, seeds crystallisation, and quiets a reaction's temper without joining it.",
+      "text": "Snow-white flakes that drift up from burning zinc — the old texts thought it wool from a hidden sheep. It seeds crystallisation and quiets a reaction's temper without joining it: a catalyst, never spent, that calms one volatile input in the step it sits in.",
       "risky": false,
       "volatile": false,
       "effects": [
@@ -1733,7 +5074,30 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 150,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst",
+          "note": "proposed: widens the step's band and calms one volatile input (it is a stabilizer too)"
+        },
+        {
+          "type": "working",
+          "trait": "stabilizer"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.97,
+        0.97,
+        0.97
+      ]
     },
     {
       "id": "mithral-dust",
@@ -1749,7 +5113,30 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 400,
-      "market": "smith"
+      "market": "smith",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst",
+          "note": "proposed: widens the step's band (plan §5.5) and the check is rolled twice, the better kept (pure)"
+        },
+        {
+          "type": "working",
+          "trait": "pure"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.88,
+        0.95
+      ]
     },
     {
       "id": "everfrost-salt",
@@ -1773,7 +5160,54 @@
       "biomes": [
         "tundra"
       ],
-      "obtain_dc": 18
+      "obtain_dc": 18,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "cold",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "frost"
+        },
+        {
+          "type": "resistance",
+          "target": "fire",
+          "amount": 2,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "ward"
+        },
+        {
+          "type": "damage",
+          "dice": "1d3",
+          "damage_type": "cold",
+          "lethality": "lethal",
+          "note": "frost in the throat",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "frost",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.9,
+        1.0
+      ]
     },
     {
       "id": "wyvern-venom-gland",
@@ -1803,7 +5237,60 @@
       "from_creatures": [
         "wyvern"
       ],
-      "obtain_dc": 20
+      "obtain_dc": 20,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 17,
+          "on_failure": [
+            {
+              "type": "ability_damage",
+              "target": "con",
+              "dice": "1d4"
+            }
+          ],
+          "note": "wyvern poison",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay",
+          "book": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 15,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.5,
+        0.6,
+        0.3
+      ],
+      "book": true,
+      "book_source": [
+        "https://legacy.aonprd.com/coreRulebook/glossary.html (Poison, Table 13-5)"
+      ]
     },
     {
       "id": "troll-marrow",
@@ -1830,7 +5317,48 @@
         "troll",
         "troll hunter"
       ],
-      "obtain_dc": 18
+      "obtain_dc": 18,
+      "product": [
+        {
+          "type": "fast_healing",
+          "amount": 1,
+          "duration": {
+            "amount": 5,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "ability_mod",
+          "target": "cha",
+          "amount": -2,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "it keeps trying to be a troll",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.55,
+        0.35
+      ]
     },
     {
       "id": "pyre-gel",
@@ -1853,7 +5381,58 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 200,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "burning",
+          "dice": "1d6",
+          "damage_type": "fire",
+          "rounds": 1,
+          "save": "ref",
+          "dc": 15,
+          "smother_bonus": 2,
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it clings to the sleeve and burns there"
+      },
+      "toxic": null,
+      "color": [
+        0.9,
+        0.5,
+        0.15
+      ]
     },
     {
       "id": "drakes-breath-sac",
@@ -1861,7 +5440,7 @@
       "kind": "gland",
       "tier": "rare",
       "craft_dc": null,
-      "text": "The breath-bladder of a fire drake, tied off full. Punctured, it spends the drake's last breath all at once — a cone of flame with nobody behind it.",
+      "text": "The breath-bladder of a fire drake, tied off full. Punctured, it spends the drake's last breath all at once — a burst of flame that catches everyone in it.",
       "risky": true,
       "volatile": true,
       "effects": [
@@ -1879,7 +5458,42 @@
         "fire drake",
         "forest drake"
       ],
-      "obtain_dc": 19
+      "obtain_dc": 19,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d4",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "area",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d4",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the bladder spends its breath at the bench"
+      },
+      "toxic": null,
+      "color": [
+        0.95,
+        0.55,
+        0.2
+      ]
     },
     {
       "id": "crystal-retort",
@@ -1894,7 +5508,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 250,
-      "market": "glassblower"
+      "market": "glassblower",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "apparatus"
+        },
+        {
+          "type": "working",
+          "trait": "pure"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.9,
+        0.95,
+        1.0
+      ]
     },
     {
       "id": "salamander-glass-flask",
@@ -1909,7 +5545,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 300,
-      "market": "glassblower"
+      "market": "glassblower",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "shatters"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.5,
+        0.3
+      ]
     },
     {
       "id": "warded-phial",
@@ -1924,7 +5582,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 350,
-      "market": "temple"
+      "market": "temple",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "drinkable"
+        },
+        {
+          "type": "working",
+          "trait": "warded"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.82,
+        0.88
+      ]
     },
     {
       "id": "quenching-clay",
@@ -1939,7 +5619,42 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 120,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "resistance",
+          "target": "fire",
+          "amount": 2,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "stabilizer"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.5,
+        0.52
+      ]
     },
     {
       "id": "saints-tallow",
@@ -1962,7 +5677,42 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 200,
-      "market": "temple"
+      "market": "temple",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "1d4",
+          "damage_type": "positive",
+          "lethality": "lethal",
+          "trigger": "hit",
+          "when": {
+            "target": {
+              "type": "undead"
+            }
+          },
+          "essence": "vigour",
+          "note": "the coated blade, against undead only",
+          "route": "external",
+          "grade": 1
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.98,
+        0.95,
+        0.8
+      ]
     },
     {
       "id": "phlogiston",
@@ -1985,7 +5735,46 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1200,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "3d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "3d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the fire-principle gets loose"
+      },
+      "toxic": null,
+      "color": [
+        0.95,
+        0.65,
+        0.15
+      ]
     },
     {
       "id": "azoth",
@@ -2006,7 +5795,82 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1500,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [
+        {
+          "type": "heal",
+          "dice": "2d8",
+          "lethality": "lethal",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "remove_condition",
+          "target": "nauseated",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "save_mod",
+          "target": "fort",
+          "amount": 2,
+          "bonus_type": "resistance",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:alcohol"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d6",
+        "damage_type": "acid",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the restless liquid eats at the bench"
+      },
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 16,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "quicksilver's wilder cousin, and the same slow tax"
+      },
+      "color": [
+        0.85,
+        0.85,
+        0.95
+      ]
     },
     {
       "id": "fire-elemental-ember",
@@ -2040,7 +5904,54 @@
         "fire elemental",
         "fire mephit"
       ],
-      "obtain_dc": 22
+      "obtain_dc": 22,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "3d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "resistance",
+          "target": "fire",
+          "amount": 3,
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "3d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "a knot of the plane of fire comes undone"
+      },
+      "toxic": null,
+      "color": [
+        1.0,
+        0.45,
+        0.1
+      ]
     },
     {
       "id": "bottled-thunderhead",
@@ -2065,7 +5976,51 @@
         "air elemental",
         "djinni"
       ],
-      "obtain_dc": 22
+      "obtain_dc": 22,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "3d6",
+          "damage_type": "electricity",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "storm"
+        },
+        {
+          "type": "damage",
+          "dice": "1d6",
+          "damage_type": "sonic",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "thunder"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "3d6",
+        "damage_type": "electricity",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "weather, indoors, at you"
+      },
+      "toxic": null,
+      "color": [
+        0.45,
+        0.5,
+        0.65
+      ]
     },
     {
       "id": "umbral-distillate",
@@ -2096,7 +6051,80 @@
         "shadow",
         "shadow mastiff"
       ],
-      "obtain_dc": 22
+      "obtain_dc": 22,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 17,
+          "on_failure": [
+            {
+              "type": "ability_drain",
+              "target": "str",
+              "dice": "1"
+            },
+            {
+              "type": "ability_damage",
+              "target": "str",
+              "dice": "1d2"
+            }
+          ],
+          "note": "shadow essence",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay",
+          "book": true
+        },
+        {
+          "type": "concealment",
+          "miss_chance": 20,
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "shadow"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 17,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "str",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.08,
+        0.06,
+        0.12
+      ],
+      "book": true,
+      "book_source": [
+        "https://legacy.aonprd.com/coreRulebook/glossary.html (Poison, Table 13-5)"
+      ]
     },
     {
       "id": "demon-ichor",
@@ -2123,7 +6151,54 @@
         "babau",
         "vrock"
       ],
-      "obtain_dc": 24
+      "obtain_dc": 24,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d6",
+          "damage_type": "acid",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "acid"
+        },
+        {
+          "type": "bleed",
+          "amount": 1,
+          "note": "wounds it opens scar black and heal slow",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "corrosive"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "2d6",
+        "damage_type": "acid",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it eats what it touches out of spite"
+      },
+      "toxic": null,
+      "color": [
+        0.35,
+        0.05,
+        0.1
+      ]
     },
     {
       "id": "angel-tears",
@@ -2148,7 +6223,50 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2000,
-      "market": "temple"
+      "market": "temple",
+      "product": [
+        {
+          "type": "heal",
+          "dice": "3d6",
+          "lethality": "lethal",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "remove_condition",
+          "target": "sickened",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "apply_condition",
+          "target": "dazzled",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "note": "a light the eyes were not made for",
+          "route": "eyes",
+          "grade": 1,
+          "essence": "light",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.9,
+        0.95,
+        1.0
+      ]
     },
     {
       "id": "ectoplasm-residuum",
@@ -2172,7 +6290,37 @@
         "spectre",
         "wraith"
       ],
-      "obtain_dc": 20
+      "obtain_dc": 20,
+      "product": [
+        {
+          "type": "strikes_as",
+          "target": "ghost_touch",
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "route": "external",
+          "grade": 1,
+          "essence": "change"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "light_sensitive"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.9,
+        0.85
+      ]
     },
     {
       "id": "void-salt",
@@ -2194,7 +6342,60 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 900,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [
+        {
+          "type": "damage",
+          "dice": "2d6",
+          "damage_type": "cold",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "frost"
+        },
+        {
+          "type": "resistance",
+          "target": "fire",
+          "amount": 3,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "skin",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 16,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.2,
+        0.2,
+        0.35
+      ]
     },
     {
       "id": "star-iron-dust",
@@ -2224,7 +6425,52 @@
         "desert",
         "tundra"
       ],
-      "obtain_dc": 20
+      "obtain_dc": 20,
+      "product": [
+        {
+          "type": "combat_mod",
+          "target": "damage",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        },
+        {
+          "type": "combat_mod",
+          "target": "attack",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.4,
+        0.4,
+        0.5
+      ]
     },
     {
       "id": "purple-worm-venom",
@@ -2254,7 +6500,60 @@
       "from_creatures": [
         "purple worm"
       ],
-      "obtain_dc": 26
+      "obtain_dc": 26,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 24,
+          "on_failure": [
+            {
+              "type": "ability_damage",
+              "target": "str",
+              "dice": "1d3"
+            }
+          ],
+          "note": "purple worm poison",
+          "route": "struck",
+          "grade": 1,
+          "essence": "decay",
+          "book": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 18,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "str",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.45,
+        0.2,
+        0.5
+      ],
+      "book": true,
+      "book_source": [
+        "https://legacy.aonprd.com/coreRulebook/glossary.html (Poison, Table 13-5)"
+      ]
     },
     {
       "id": "remorhaz-thermal-gland",
@@ -2278,7 +6577,42 @@
       "from_creatures": [
         "remorhaz"
       ],
-      "obtain_dc": 25
+      "obtain_dc": 25,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "3d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "3d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it still thinks it is inside the worm"
+      },
+      "toxic": null,
+      "color": [
+        1.0,
+        0.75,
+        0.4
+      ]
     },
     {
       "id": "genie-breath-phial",
@@ -2293,7 +6627,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1600,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "struck"
+        },
+        {
+          "type": "working",
+          "trait": "warded"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.7,
+        0.35
+      ]
     },
     {
       "id": "adamantine-crucible",
@@ -2309,7 +6665,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 3000,
-      "market": "smith"
+      "market": "smith",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "apparatus"
+        },
+        {
+          "type": "working",
+          "trait": "fireproof"
+        },
+        {
+          "type": "working",
+          "trait": "warded"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.3,
+        0.3,
+        0.32
+      ]
     },
     {
       "id": "prima-materia",
@@ -2324,7 +6702,36 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 6000,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "wild"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "4d6",
+        "damage_type": "force",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "it becomes, briefly, something that explodes"
+      },
+      "toxic": null,
+      "color": [
+        0.6,
+        0.55,
+        0.6
+      ]
     },
     {
       "id": "phoenix-ash",
@@ -2351,7 +6758,48 @@
       "from_creatures": [
         "phoenix"
       ],
-      "obtain_dc": 28
+      "obtain_dc": 28,
+      "product": [
+        {
+          "type": "heal",
+          "dice": "4d6",
+          "lethality": "lethal",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "remove_condition",
+          "target": "fatigued",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "4d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "the pyre remembers it is a pyre"
+      },
+      "toxic": null,
+      "color": [
+        1.0,
+        0.6,
+        0.2
+      ]
     },
     {
       "id": "philosophers-mercury",
@@ -2366,7 +6814,43 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 8000,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst",
+          "note": "Transmute: one unit makes one, not two for one (plan §9)"
+        },
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 20,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.85,
+        0.75,
+        0.9
+      ]
     },
     {
       "id": "dragon-heart-blood",
@@ -2390,7 +6874,55 @@
       "from_creatures": [
         "great wyrm"
       ],
-      "obtain_dc": 30
+      "obtain_dc": 30,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "4d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        },
+        {
+          "type": "ability_mod",
+          "target": "str",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "4d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "centuries of banked fire, at the bench"
+      },
+      "toxic": null,
+      "color": [
+        0.6,
+        0.05,
+        0.05
+      ]
     },
     {
       "id": "linnorm-venom",
@@ -2420,7 +6952,66 @@
       "from_creatures": [
         "linnorm"
       ],
-      "obtain_dc": 30
+      "obtain_dc": 30,
+      "product": [
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 24,
+          "on_failure": [
+            {
+              "type": "damage",
+              "dice": "2d6",
+              "damage_type": "fire",
+              "lethality": "lethal"
+            },
+            {
+              "type": "ability_drain",
+              "target": "con",
+              "dice": "1d4"
+            }
+          ],
+          "note": "crag linnorm poison",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire",
+          "book": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "toxic_to_handle"
+        }
+      ],
+      "mishap": null,
+      "toxic": {
+        "type": "save_gate",
+        "target": "fort",
+        "dc": 20,
+        "recipient": "self",
+        "on_failure": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1"
+          }
+        ],
+        "note": "working it bare-handed, without a mask and gloves or a fume hood"
+      },
+      "color": [
+        0.3,
+        0.5,
+        0.25
+      ],
+      "book": true,
+      "book_source": [
+        "https://www.d20pfsrd.com/bestiary/monster-listings/dragons/linnorm/linnorm-crag/ (Bestiary 2, crag linnorm: poison)"
+      ]
     },
     {
       "id": "world-egg-shell",
@@ -2435,7 +7026,29 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 12000,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "apparatus"
+        },
+        {
+          "type": "working",
+          "trait": "warded"
+        },
+        {
+          "type": "working",
+          "trait": "pure"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.93,
+        0.85
+      ]
     },
     {
       "id": "quintessence",
@@ -2460,7 +7073,47 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 10000,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [
+        {
+          "type": "temp_hp",
+          "dice": "20",
+          "source": "quintessence",
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "apply_condition",
+          "target": "dazed",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "note": "the fifth element's weight",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.95,
+        0.95,
+        1.0
+      ]
     },
     {
       "id": "tarrasque-humour",
@@ -2486,7 +7139,48 @@
       "from_creatures": [
         "tarrasque"
       ],
-      "obtain_dc": 35
+      "obtain_dc": 35,
+      "product": [
+        {
+          "type": "fast_healing",
+          "amount": 4,
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "ability_mod",
+          "target": "int",
+          "amount": -2,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "note": "it does not accept that anything has happened",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.4,
+        0.45,
+        0.3
+      ]
     },
     {
       "id": "starfall-core",
@@ -2512,7 +7206,42 @@
         "desert",
         "tundra"
       ],
-      "obtain_dc": 25
+      "obtain_dc": 25,
+      "product": [
+        {
+          "type": "damage",
+          "dice": "4d6",
+          "damage_type": "fire",
+          "lethality": "lethal",
+          "route": "struck",
+          "grade": 1,
+          "essence": "fire"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "volatile"
+        }
+      ],
+      "mishap": {
+        "type": "damage",
+        "dice": "4d6",
+        "damage_type": "fire",
+        "lethality": "lethal",
+        "recipient": "self",
+        "note": "a very small apocalypse"
+      },
+      "toxic": null,
+      "color": [
+        1.0,
+        0.9,
+        0.6
+      ]
     },
     {
       "id": "orichalcum-grains",
@@ -2527,7 +7256,30 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 9000,
-      "market": "planar broker"
+      "market": "planar broker",
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst",
+          "note": "proposed: an experiment that fits several formulae is the one the alchemist names, if it is within reach"
+        },
+        {
+          "type": "working",
+          "trait": "pure"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.9,
+        0.6,
+        0.3
+      ]
     },
     {
       "id": "gum-arabic",
@@ -2542,7 +7294,61 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "apothecary"
+      "market": "apothecary",
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "stealth",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "shadow"
+        },
+        {
+          "type": "skill_mod",
+          "target": "disguise",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "it holds an illusion together",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "change"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.9,
+        0.82,
+        0.6
+      ]
     },
     {
       "id": "talc",
@@ -2560,7 +7366,75 @@
         "mountain",
         "hills"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "perception",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "sight"
+        },
+        {
+          "type": "skill_mod",
+          "target": "escape artist",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "small and slippery as the flour itself",
+          "route": "skin",
+          "grade": 1,
+          "essence": "grace"
+        },
+        {
+          "type": "skill_mod",
+          "target": "disguise",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "a dusted, pale face",
+          "route": "skin",
+          "grade": 1,
+          "essence": "change"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "inhale",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.97,
+        0.97,
+        0.97
+      ]
     },
     {
       "id": "agate-chip",
@@ -2578,7 +7452,37 @@
         "hills",
         "underground"
       ],
-      "obtain_dc": 14
+      "obtain_dc": 14,
+      "product": [
+        {
+          "type": "sense",
+          "target": "low_light",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "sight"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.7,
+        0.55,
+        0.45
+      ]
     },
     {
       "id": "standing-oak-bark",
@@ -2595,7 +7499,67 @@
       "biomes": [
         "forest"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "combat_mod",
+          "target": "ac",
+          "amount": 1,
+          "bonus_type": "natural armour",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        },
+        {
+          "type": "skill_mod",
+          "target": "disguise",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "skin gone rough as bark",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "change"
+        },
+        {
+          "type": "ability_mod",
+          "target": "dex",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.45,
+        0.35,
+        0.25
+      ]
     },
     {
       "id": "licorice-root",
@@ -2613,7 +7577,66 @@
         "grassland",
         "farmland"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "speed",
+          "target": "land",
+          "amount": 5,
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace"
+        },
+        {
+          "type": "skill_mod",
+          "target": "acrobatics",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "a lighter step",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "lightness"
+        },
+        {
+          "type": "ability_mod",
+          "target": "wis",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.35,
+        0.2,
+        0.1
+      ]
     },
     {
       "id": "river-reed",
@@ -2631,7 +7654,38 @@
         "swamp",
         "coast"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "permission",
+          "target": "Breathe water freely.",
+          "tag": "breathe_water",
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "change"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.65,
+        0.35
+      ]
     },
     {
       "id": "fine-gauze",
@@ -2646,7 +7700,54 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "escape artist",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "essence": "change",
+          "note": "slips through as a vapour does",
+          "route": "skin",
+          "grade": 1
+        },
+        {
+          "type": "skill_mod",
+          "target": "fly",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "it drifts",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "lightness"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.92,
+        0.9,
+        0.85
+      ]
     },
     {
       "id": "powdered-silver",
@@ -2662,7 +7763,77 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 30,
-      "market": "smith"
+      "market": "smith",
+      "product": [
+        {
+          "type": "combat_mod",
+          "target": "ac",
+          "amount": 1,
+          "bonus_type": "deflection",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "it refuses the profane",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        },
+        {
+          "type": "skill_mod",
+          "target": "perception",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "sight"
+        },
+        {
+          "type": "strikes_as",
+          "target": "silver",
+          "duration": {
+            "amount": 1,
+            "unit": "minute"
+          },
+          "route": "external",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "light",
+          "radius_ft": 0,
+          "raised_ft": 5,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "note": "it glints where nothing should be: the outline of the unseen",
+          "route": "external",
+          "grade": 1,
+          "essence": "light"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.76,
+        0.78
+      ]
     },
     {
       "id": "bull-hairs",
@@ -2681,7 +7852,53 @@
         "aurochs",
         "cattle"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "ability_mod",
+          "target": "str",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        },
+        {
+          "type": "ability_mod",
+          "target": "int",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.3,
+        0.2,
+        0.15
+      ]
     },
     {
       "id": "cat-fur",
@@ -2700,7 +7917,66 @@
         "leopard",
         "lion"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "ability_mod",
+          "target": "dex",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace"
+        },
+        {
+          "type": "combat_mod",
+          "target": "attack",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        },
+        {
+          "type": "ability_mod",
+          "target": "wis",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.8,
+        0.6,
+        0.35
+      ]
     },
     {
       "id": "bear-hairs",
@@ -2718,7 +7994,64 @@
         "bear",
         "dire bear"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "ability_mod",
+          "target": "con",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "ability_mod",
+          "target": "dex",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.35,
+        0.25,
+        0.18
+      ]
     },
     {
       "id": "eagle-feathers",
@@ -2737,7 +8070,52 @@
         "giant eagle",
         "roc"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "ability_mod",
+          "target": "cha",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "skill_mod",
+          "target": "fly",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "lightness"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.55,
+        0.4,
+        0.25
+      ]
     },
     {
       "id": "fox-hairs",
@@ -2755,7 +8133,53 @@
         "fox",
         "dire fox"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "ability_mod",
+          "target": "int",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "ability_mod",
+          "target": "wis",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.4,
+        0.15
+      ]
     },
     {
       "id": "owl-feathers",
@@ -2773,7 +8197,66 @@
         "owl",
         "giant owl"
       ],
-      "obtain_dc": 10
+      "obtain_dc": 10,
+      "product": [
+        {
+          "type": "ability_mod",
+          "target": "wis",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "skill_mod",
+          "target": "perception",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "sight"
+        },
+        {
+          "type": "ability_mod",
+          "target": "dex",
+          "amount": -1,
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "grace",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.6,
+        0.5,
+        0.4
+      ]
     },
     {
       "id": "grasshopper-legs",
@@ -2791,7 +8274,62 @@
         "grassland",
         "farmland"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "acrobatics",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "to jump",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "lightness"
+        },
+        {
+          "type": "ability_mod",
+          "target": "str",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "the spring in its legs",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "might"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.6,
+        0.25
+      ]
     },
     {
       "id": "cellar-spider",
@@ -2809,7 +8347,47 @@
         "spider",
         "giant spider"
       ],
-      "obtain_dc": 8
+      "obtain_dc": 8,
+      "product": [
+        {
+          "type": "skill_mod",
+          "target": "climb",
+          "amount": 2,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "lightness"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.4,
+        0.35,
+        0.3
+      ]
     },
     {
       "id": "unicorn-horn-shaving",
@@ -2817,7 +8395,7 @@
       "kind": "catalyst",
       "tier": "rare",
       "craft_dc": null,
-      "text": "A curl of alicorn, given by a living unicorn or taken from one that died unhunted — the distinction matters, and the shaving knows. It purifies what it is stirred through and is never itself spent.",
+      "text": "A curl of alicorn, given by a living unicorn or taken from one that died unhunted — the distinction matters, and the shaving knows. It purifies what it is stirred through and mends what was wasted, and is never itself spent.",
       "risky": false,
       "volatile": false,
       "effects": [],
@@ -2826,7 +8404,51 @@
       "from_creatures": [
         "unicorn"
       ],
-      "obtain_dc": 22
+      "obtain_dc": 22,
+      "product": [
+        {
+          "type": "remove_condition",
+          "target": "sickened",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "purity"
+        },
+        {
+          "type": "ability_restore",
+          "target": "str",
+          "dice": "1",
+          "essence": "might",
+          "note": "it mends what was wasted",
+          "route": "ingest",
+          "grade": 1
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "catalyst",
+          "note": "proposed: strips one drawback in the step, as Filter does"
+        },
+        {
+          "type": "working",
+          "trait": "pure"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "slow_to_dissolve"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.97,
+        0.95,
+        0.98
+      ]
     },
     {
       "id": "font-water",
@@ -2834,14 +8456,71 @@
       "kind": "solvent",
       "tier": "uncommon",
       "craft_dc": null,
-      "text": "Water sanctified in a font and drawn off in a silver dipper. It is the medium every kind draught is built in: it carries a benediction the way spirits carry an essence.",
+      "text": "Water sanctified in a font and drawn off in a silver dipper. It is the medium every kind draught is built in, and carries a little healing of its own; the dead who drink it are scalded.",
       "risky": false,
       "volatile": false,
       "effects": [],
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
-      "market": "temple"
+      "market": "temple",
+      "product": [
+        {
+          "type": "heal",
+          "dice": "1d4",
+          "lethality": "lethal",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "vigour"
+        },
+        {
+          "type": "save_mod",
+          "target": "will",
+          "amount": 1,
+          "bonus_type": "morale",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "against fear",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "mind"
+        },
+        {
+          "type": "damage",
+          "dice": "1",
+          "damage_type": "positive",
+          "lethality": "lethal",
+          "when": {
+            "target": {
+              "type": "undead"
+            }
+          },
+          "note": "it scalds the dead who drink it",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "light",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "liquid"
+        },
+        {
+          "type": "working",
+          "trait": "solvent:water"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.85,
+        0.9,
+        1.0
+      ]
     },
     {
       "id": "mistletoe-sprig",
@@ -2858,7 +8537,60 @@
       "biomes": [
         "forest"
       ],
-      "obtain_dc": 12
+      "obtain_dc": 12,
+      "product": [
+        {
+          "type": "permission",
+          "target": "Leave no trail.",
+          "tag": "pass_without_trace",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "shadow"
+        },
+        {
+          "type": "skill_mod",
+          "target": "acrobatics",
+          "amount": 1,
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "note": "owing the earth no footprint",
+          "route": "ingest",
+          "grade": 1,
+          "essence": "lightness"
+        },
+        {
+          "type": "apply_condition",
+          "target": "sickened",
+          "duration": {
+            "amount": 1,
+            "unit": "round"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "decay",
+          "drawback": true
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.75,
+        0.85,
+        0.6
+      ]
     },
     {
       "id": "cured-leather-scrap",
@@ -2873,7 +8605,39 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "product": [
+        {
+          "type": "combat_mod",
+          "target": "ac",
+          "amount": 1,
+          "bonus_type": "armour",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.5,
+        0.33,
+        0.2
+      ]
     },
     {
       "id": "holy-parchment",
@@ -2888,7 +8652,39 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
-      "market": "temple"
+      "market": "temple",
+      "product": [
+        {
+          "type": "combat_mod",
+          "target": "ac",
+          "amount": 1,
+          "bonus_type": "deflection",
+          "duration": {
+            "amount": 10,
+            "unit": "minute"
+          },
+          "route": "ingest",
+          "grade": 1,
+          "essence": "ward"
+        }
+      ],
+      "working": [
+        {
+          "type": "working",
+          "trait": "solid"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.92,
+        0.88,
+        0.75
+      ]
     }
   ]
 }

@@ -29,8 +29,10 @@ part of what `validate` judges.
 """
 from __future__ import annotations
 
+import builtins
 import copy
 import json
+import re
 from pathlib import Path
 
 from . import effectspec
@@ -493,6 +495,12 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
         if known is not None and doc["material"] not in known:
             say(f"names {doc['material']!r} as its material, and no material has that id. "
                 f"Point it at a real parent or remove the field.")
+    if doc.get("catalogue") == ALCHEMY_CATALOGUE:
+        # The alchemist's own fences (alchemy lane D, contracts §3), asked before the
+        # enchanter's: ten alchemist materials are of the kind `essence` too, and the
+        # circle's rules (motes, phases, grants) mean nothing on the alchemist's shelf.
+        out.extend(alchemy_problems(doc, shelf=known))
+        return out
     if doc.get("kind") == "essence" and not is_forge(doc):
         out.extend(essence_problems(doc, shelf=known))
         return out
@@ -1505,3 +1513,177 @@ def product_essences(doc) -> set[str]:
     enchanter's (`essences()`, every essence document on its shelf), and the enchanter's
     name stands, so the alchemist's question is asked by this one."""
     return {str(t["essence"]) for t in product_traits(doc) if t.get("essence")}
+
+
+# =============================================================================================
+# The alchemist's validator (docs/alchemy-contracts.md §3, plan §5.6; alchemy lane D,
+# 2026-10-06): what an alchemy material must add up to, each refusal with its fix named.
+# =============================================================================================
+#
+# Measured before the pass (plan §5.1): of 139 materials, 70 carried no effect at all, 5
+# carried only narrative, none carried three properties, and no material could say how it
+# behaves at the bench. The forge's branch above returns early for every non-forge entry,
+# so nothing judged an alchemist's document at all.
+#
+# **The house ceilings.** Flat numbers are held to the forge's `TIER_CEILING` (plan §5.6:
+# "the forge's TIER_CEILING ... bounds every flat house number"), counted by `points`.
+# House dice are held to `ALCHEMY_DICE_CEILING` (PROPOSED in plan §5.6, open to playtest),
+# compared by the largest roll, so 2d8 (16) fits under an exotic 3d6 (18) and 3d8 (24) does
+# not. Book effects are exempt, being the book.
+#
+# **Who needs a drawback.** Q7.1's ruling is "at least three discoverable traits per
+# reagent, one a drawback". A material that puts nothing into the bottle — a vessel, a
+# catalyst that is never spent, a neutral medium, prima materia's wild trait — is apparatus
+# rather than a reagent, and has no cost of its own to carry into a product; it is held
+# to three properties and not to the drawback. The drawback is judged by
+# `knowledge.classify`, the one judge the card uses, so a "drawback" here is exactly what
+# the player sees marked as one.
+
+ALCHEMY_DICE_CEILING = {"common": "1d4", "uncommon": "1d6", "rare": "2d6",
+                        "exotic": "3d6", "legendary": "4d6"}
+# Working traits that give a material a job at the bench without a product trait: a
+# vessel's family, a solvent, a stabilizer, a catalyst or apparatus, the wild trait.
+_ALCHEMY_ROLES = ("catalyst", "apparatus", "stabilizer", "wild")
+# The routes on which a trait lands on a foe or on everyone near where the product lands,
+# never on the user: a cost on one of them is not a cost to anybody who chose it.
+_FOE_ROUTES = ("struck", "splash", "area")
+
+
+def dice_max(dice) -> int | None:
+    """The largest total a dice string can roll ("2d6+1" -> 13, "20" -> 20); None when it
+    is not one (a formula, a word)."""
+    s = str(dice or "").replace(" ", "").lower()
+    if not s:
+        return None
+    total = 0
+    for part in re.split(r"(?=[+-])", s):
+        if not part:
+            continue
+        sign = -1 if part[0] == "-" else 1
+        body = part.lstrip("+-")
+        m = re.fullmatch(r"(\d*)d(\d+)", body)
+        if m:
+            total += sign * int(m.group(1) or 1) * int(m.group(2))
+        elif body.isdigit():
+            total += sign * int(body)
+        else:
+            return None
+    return total
+
+
+def alchemy_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
+    """Everything wrong with one alchemist's material (plan §5.6), each with the fix named.
+
+    Takes a normalised alchemy document (`normalise(raw, ALCHEMY_CATALOGUE)`). Checks:
+    the kind; every product trait through `effectspec.product_trait_problems` (essence,
+    route, never narrative) and executable, or waiting on a reader the vocabulary names;
+    a drawback is never on a foe's route; working traits are the alchemist's; at least
+    three properties; a drawback on anything with product traits; the house ceilings;
+    `volatile` with a mishap and `toxic_to_handle` with a toxic document, both ways; a
+    job at the bench for anything with no product trait; the book flags; the colour.
+    """
+    from . import knowledge
+
+    mid = doc.get("id") or "?"
+    out: list[str] = []
+
+    def say(msg: str) -> None:
+        out.append(f"{mid}: {msg}")
+
+    kind, tier = doc.get("kind"), doc.get("tier")
+    if kind not in ALCHEMY_KINDS:
+        say(f"kind {kind!r} is not an alchemist's kind. One of: {', '.join(ALCHEMY_KINDS)}.")
+    product = list(doc.get("product") or [])
+    working = list(doc.get("working") or [])
+    traits = [str(w.get("trait") or "") for w in working]
+
+    for i, spec in enumerate(product):
+        here = f"{mid} product {i + 1}"
+        out.extend(effectspec.product_trait_problems(spec, here))
+        for nested in _walk(spec):
+            if nested is not spec and str(nested.get("type") or "") == "narrative":
+                out.append(f"{here}: carries narrative prose inside it. Type it or leave "
+                           f"it out.")
+        t = str(spec.get("type") or "")
+        waiting = (t in effectspec.AWAITING_READER
+                   or str(spec.get("target") or "") in
+                   effectspec.TARGETS_AWAITING_READER.get(t, {}))
+        if effectspec.find(t) is not None and not effectspec.executable(spec) \
+                and not waiting and t != "narrative":
+            out.append(f"{here}: {t} is not executable by the engine, and no reader is "
+                       f"promised for it. Use a type the engine runs.")
+        if spec.get("drawback") and str(spec.get("route") or "") in _FOE_ROUTES:
+            out.append(f"{here}: is marked a drawback but lands on a foe "
+                       f"({spec.get('route')}). A drawback is a cost to whoever uses the "
+                       f"product: give it a route that reaches them (ingest, skin, eyes, "
+                       f"inhale, carried), or drop the mark.")
+
+    for i, spec in enumerate(working):
+        if spec.get("type") != "working":
+            say(f"working entry {i + 1} is a {spec.get('type')!r}, not a working trait. "
+                f"Write {{\"type\": \"working\", \"trait\": ...}}.")
+        elif traits[i] not in effectspec.ALCHEMY_WORKING_TRAITS:
+            say(f"working trait {traits[i]!r} means nothing at the alchemist's bench. One "
+                f"of: {', '.join(effectspec.ALCHEMY_WORKING_TRAITS)}.")
+
+    for key in ("mishap", "toxic"):
+        if doc.get(key):
+            out.extend(_effect_problems(doc[key], f"{mid} {key}"))
+    volatile = "volatile" in traits
+    if volatile and not doc.get("mishap"):
+        say("is volatile and has no mishap. Say what a roll failed by 5 or more does to the "
+            "alchemist (plan §8.2), in \"mishap\".")
+    if doc.get("mishap") and not volatile:
+        say("has a mishap and is not volatile; only a volatile input flares. Add the "
+            "`volatile` working trait or remove the mishap.")
+    if "toxic_to_handle" in traits and not doc.get("toxic"):
+        say("is toxic to handle and has no toxic document. Say what working it unprotected "
+            "does (plan §8.4), in \"toxic\".")
+    if doc.get("toxic") and "toxic_to_handle" not in traits:
+        say("has a toxic document and is not toxic_to_handle. Add the trait or remove it.")
+
+    count = len(product) + len(working) + bool(doc.get("mishap")) + bool(doc.get("toxic"))
+    if count < 3:
+        say(f"has {count} discoverable propert{'y' if count == 1 else 'ies'}; every "
+            f"alchemist's material needs at least 3 (product traits, working traits, the "
+            f"mishap, the toxic document).")
+    if product and knowledge.DRAWBACK not in knowledge.anatomy(doc)["kinds"].values():
+        say("puts traits in a bottle and has no drawback; every reagent has at least one "
+            "(owner, Q7.1). Add a product trait with \"drawback\": true, a working trait "
+            "that costs (volatile, corrosive, combustible...), or a mishap.")
+    if not product and not any(t in _ALCHEMY_ROLES or t.startswith("solvent:")
+                               or t in effectspec.VESSEL_TRAITS for t in traits):
+        say("puts nothing in a bottle and has no job at the bench. Give it product traits, "
+            "or a role: a vessel trait, a solvent, stabilizer, catalyst or apparatus.")
+
+    ceiling = TIER_CEILING.get(tier, 2)
+    dice_cap = dice_max(ALCHEMY_DICE_CEILING.get(tier, "1d4"))
+    for label, spec in ([(f"product {i + 1}", s) for i, s in enumerate(product)]
+                        + [(k, doc[k]) for k in ("mishap", "toxic") if doc.get(k)]):
+        if spec.get("book"):
+            continue
+        for nested in _walk(spec):
+            pts = points(nested)
+            if pts is not None and pts > ceiling:
+                say(f"{label} ({nested.get('type')} {nested.get('target', '')}) is {pts:g} "
+                    f"points; a {tier} house number is at most ±{ceiling}. Bring it inside "
+                    f"or mark a printed rule \"book\": true.")
+            top = dice_max(nested.get("dice")) if "dice" in nested else None
+            if top is not None and dice_cap is not None and top > dice_cap:
+                say(f"{label} ({nested.get('type')} {nested.get('dice')}) can roll {top}; a "
+                    f"{tier} house die is at most {ALCHEMY_DICE_CEILING.get(tier)} "
+                    f"({dice_cap}). Shrink it or mark a printed rule \"book\": true.")
+
+    has_book = any(s.get("book") for s in product)
+    if has_book and not doc.get("book"):
+        say("carries book traits but is not marked \"book\": true. Mark the document.")
+    if doc.get("book") and not has_book:
+        say("is marked \"book\": true with no book trait. Remove the mark.")
+    colour = doc.get("color")
+    if colour not in ("", None) and not (
+            isinstance(colour, list) and len(colour) == 3
+            # `builtins.all`: this module's own `all()` is the shelf.
+            and builtins.all(isinstance(c, (int, float)) and 0 <= c <= 1
+                             for c in colour)):
+        say("color is three numbers from 0 to 1, [r, g, b], the stage's liquid colour.")
+    return out
