@@ -28,10 +28,10 @@ How to read it:
 
 ## The counts
 
-- **138 materials**: 113 carry product traits (209 traits, 44 of them drawbacks); 25 are apparatus, media or wild.
+- **138 materials**: 113 carry product traits (210 traits, 44 of them drawbacks); 25 are apparatus, media or wild.
 - Every material has at least 3 properties (fewest: 3); 29 carry a mishap, 18 a toxic document, 7 a book trait.
-- **By essence** (product traits): fire 21, frost 6, acid 13, storm 2, thunder 4, light 7, shadow 5, vigour 12, purity 18, ward 17, might 13, grace 14, mind 15, lightness 7, sight 5, binding 5, decay 35, change 10.
-- **By route**: area 9, external 7, eyes 2, ingest 100, inhale 10, skin 28, struck 53.
+- **By essence** (product traits): fire 21, frost 7, acid 13, storm 2, thunder 4, light 7, shadow 5, vigour 12, purity 18, ward 17, might 13, grace 14, mind 15, lightness 7, sight 5, binding 5, decay 35, change 10.
+- **By route**: area 9, external 7, eyes 2, ingest 100, inhale 10, skin 29, struck 53.
 - **Working traits**: apparatus 3, bursts 1, catalyst 9, combustible 36, corrosive 14, drinkable 4, fireproof 7, lead_lined 2, light_sensitive 9, liquid 45, pure 5, shatters 2, slow_to_dissolve 11, solid 89, solvent:acid 4, solvent:alcohol 3, solvent:oil 4, solvent:vinegar 1, solvent:water 4, stabilizer 5, struck 3, toxic_to_handle 18, volatile 29, warded 5, wild 1.
 - **Hybrid herbs**: 63 on the shelf, 201 effects, each given an essence by the same rule: fire 6, light 1, shadow 2, vigour 21, purity 15, ward 42, might 20, grace 6, mind 54, lightness 6, sight 11, binding 3, decay 12, change 2.
 
@@ -70,7 +70,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Lye Water | common | 1d2 acid damage | 1d3 acid damage |
 | Fire Beetle Gland | common | Sheds light in a 10-foot radius for 1d6 days after harvesting | Normal light 10 ft for 1d6 days; Causes sickened for 1 round |
 | Skunk Musk Gland | common | Fortitude DC 13 · fail: Causes sickened for 1d4 rounds | Fortitude DC 13 · fail: Causes sickened for 1d4 rounds; Causes sickened for 1 round |
-| Camphor | common | +1 Fortitude against disease and inhaled effects | +1 Fortitude against disease and inhaled poison for 1 hour |
+| Camphor | common | +1 Fortitude against disease and inhaled effects | +1 Fortitude against disease and inhaled poison for 1 hour; Resist fire 2 for 1 hour |
 | Quicksilver | uncommon | 1d3 poison non-lethal damage | +5 ft land speed for 10 minutes; 1 Constitution damage; toxic: Fortitude DC 14 · fail: 1 Constitution damage, on whoever has it |
 | Aqua Fortis | uncommon | 1d4 acid damage | 1d4 acid damage; -2 Disguise the warning-yellow stain on the skin for 1 day |
 | Phosphorus | uncommon | 1d4 fire damage | 1d4 fire damage; One step brighter out to 5 ft for 1 hour; toxic: Fortitude DC 13 · fail: 1 Constitution damage, on whoever has it |
@@ -127,7 +127,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Brewer's Yeast | catalyst | 5 gp | (apparatus) | catalyst, solid, light_sensitive | - |
 | Mother of Vinegar | catalyst | 5 gp | (apparatus) | catalyst, liquid, corrosive | - |
 | Rennet | catalyst | 5 gp | (apparatus) | catalyst, solid, light_sensitive | - |
-| Camphor | essence | 5 gp | +1 Fortitude against disease and inhaled poison for 1 hour (inhale) [purity] | solid, volatile | mishap: 1d3 fire damage, on whoever has it |
+| Camphor | essence | 5 gp | +1 Fortitude against disease and inhaled poison for 1 hour (inhale) [purity]<br>Resist fire 2 for 1 hour (skin) [frost] | solid, volatile | mishap: 1d3 fire damage, on whoever has it |
 | Cellar Spider | gland | unpriced | +2 Climb for 10 minutes (ingest) [lightness]<br>**Causes sickened for 1 round (ingest) [decay]** | solid | - |
 | Fire Beetle Gland | gland | unpriced | Normal light 10 ft for 1d6 days (external) [light] *book*<br>**Causes sickened for 1 round (ingest) [decay]** | solid | - |
 | Skunk Musk Gland | gland | unpriced | Fortitude DC 13 · fail: Causes sickened for 1d4 rounds (area) [decay]<br>**Causes sickened for 1 round (inhale) [decay]** | liquid | - |
@@ -306,11 +306,11 @@ Ids, spells, caster levels and materials are unchanged (your Q10.2). Each narrat
 | Potion of Mage Armor | - | - | ward | ward |
 | Potion of Shield of Faith | - | - | ward | mind, vigour, ward |
 | Potion of Protection from Evil | blocks mental control and bars bodily contact by summoned cr | Blocks mental control. for 1 minute; Bars bodily contact by summoned creatures. for 1 minute | mind, ward | light, mind, purity, sight, vigour, ward |
-| Potion of Remove Fear | - | - | mind, purity | mind, purity, vigour |
+| Potion of Remove Fear | - | - | mind, purity | frost, mind, purity, vigour |
 | Potion of Jump | - | - | lightness | lightness, might |
 | Potion of Longstrider | - | - | grace | grace, might, purity |
 | Potion of Expeditious Retreat | - | - | grace | grace, lightness |
-| Potion of Endure Elements | the drinker exists comfortably in conditions between -50 and | Comfortable between -50 and 140 degrees Fahrenheit, with no Fortitude saves. for 24 hours | ward | purity, ward |
+| Potion of Endure Elements | the drinker exists comfortably in conditions between -50 and | Comfortable between -50 and 140 degrees Fahrenheit, with no Fortitude saves. for 24 hours | ward | frost, purity, ward |
 | Potion of Comprehend Languages | the drinker understands any spoken or written language they  | Understands any spoken or written language; no ciphers or secret writing. for 10 minutes | mind | mind, purity, shadow |
 | Potion of Pass without Trace | the drinker leaves no tracks, trail or scent; tracking them  | Leaves no tracks, trail or scent. for 1 hour | shadow | lightness, shadow |
 | Oil of Magic Weapon | - | - | might | acid, might, purity |

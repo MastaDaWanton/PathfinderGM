@@ -2200,6 +2200,19 @@
           "route": "inhale",
           "grade": 1,
           "essence": "purity"
+        },
+        {
+          "type": "resistance",
+          "target": "fire",
+          "amount": 2,
+          "duration": {
+            "amount": 1,
+            "unit": "hour"
+          },
+          "essence": "frost",
+          "note": "its cooling vapour against heat",
+          "route": "skin",
+          "grade": 1
         }
       ],
       "working": [

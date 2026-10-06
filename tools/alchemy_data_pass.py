@@ -354,7 +354,13 @@ PLAN: dict[str, dict] = {
         color=[0.6, 0.6, 0.4]),
     "camphor": dict(
         product=[mod("save_mod", "fort", 1, dur=(1, "hour"), route="inhale",
-                     note="against disease and inhaled poison")],
+                     note="against disease and inhaled poison"),
+                 # Camphor's cooling, as frost (a cold that holds heat off): the second
+                 # essence the potion of endure elements needs from its old recipe. Every
+                 # other pair its ingredients carried was another potion's signature
+                 # (antiplague, mage armor, protection from energy), measured 2026-10-06.
+                 res("fire", 2, route="skin", essence="frost",
+                     note="its cooling vapour against heat")],
         working=W("solid", "volatile"),
         mishap=mishap("1d3", "fire", "the camphor fumes take light"),
         color=[0.95, 0.95, 0.95]),

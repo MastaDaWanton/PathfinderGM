@@ -288,13 +288,13 @@
     {"id": "potion-of-mage-armor", "requires": {"essences": {"ward": 1}}},
     {"id": "potion-of-resist-energy", "requires": {"essences": {"ward": 1, "fire": 1}}},
     {"id": "potion-of-protection-from-energy", "requires": {"essences": {"ward": 1, "frost": 1}}},
-    {"id": "potion-of-endure-elements", "requires": {"essences": {"ward": 1, "storm": 1}}},
+    {"id": "potion-of-endure-elements", "requires": {"essences": {"ward": 1, "frost": 1, "purity": 1}}},
     {"id": "potion-of-protection-from-evil", "requires": {"essences": {"ward": 1, "light": 1}}},
     {"id": "potion-of-shield-of-faith", "requires": {"essences": {"ward": 1, "mind": 1}}},
     {"id": "potion-of-barkskin", "requires": {"essences": {"ward": 1, "change": 1}}},
     {"id": "oil-of-magic-weapon", "requires": {"essences": {"might": 1}}},
     {"id": "oil-of-magic-fang", "requires": {"essences": {"might": 1, "grace": 1}}},
-    {"id": "oil-of-align-weapon", "requires": {"essences": {"light": 1, "binding": 1}}},
-    {"id": "oil-of-keen-edge", "requires": {"essences": {"might": 1, "change": 1}}}
+    {"id": "oil-of-align-weapon", "requires": {"essences": {"light": 1, "purity": 1}}},
+    {"id": "oil-of-keen-edge", "requires": {"essences": {"might": 1, "ward": 1}}}
   ]
 }
