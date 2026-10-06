@@ -43,6 +43,9 @@
 
   // What a choice is called in its seat row, by what it chooses among (lane A's `of`).
   var CHOICE = { creature_type: "Against", damage_type: "Energy", skill: "Skill" };
+  // Which shelf group an empty slot takes from (the server's `group` on each row).
+  var PICK = { seat: "Essences", essence: "Essences", vessel: "Vessels", item: "Vessels",
+               circle: "Circle", focus: "Gems", catalyst: "Catalysts" };
   function cap(t) { t = String(t || ""); return t.charAt(0).toUpperCase() + t.slice(1); }
   function words(t) { return cap(String(t || "").replace(/-/g, " ")); }
 
@@ -85,6 +88,7 @@
         var line = h.masterwork === false ? "not masterwork" : "holds +" + h.bonus;
         html += filled("Vessel", v, "vessel", "", '<small>' + esc(line) +
           (v.attuned ? ", attuned, " + esc(v.attuned.left_words) + " left" : "") + '</small>');
+        html += questions(v);
       } else {
         html += empty("Vessel", m === "prepare" ? "A Superior weapon or armour, a ring or an amulet from the shelf"
                                  : m === "attune" ? "A prepared vessel from the shelf"
@@ -98,20 +102,28 @@
     if (m === "refine") html += dropper();
     if (m === "read") {
       var es = E.item(o.essence);
-      html += '<h3 class="ew-h">Essence</h3>' + (es ? filled("Essence", es, "essence") :
+      html += (es ? filled("Essence", es, "essence") :
         empty("Essence", "Pick an essence on the shelf: a pinch of it, a tenth of the phial", { pick: "essence" }));
     }
     if (m === "identify") {
       var it = E.item(o.item);
-      html += '<h3 class="ew-h">Item</h3>' + (it ? filled("Item", it, "item") :
+      html += (it ? filled("Item", it, "item") :
         empty("Item", "Pick a magic item on the shelf to study", { pick: "item" }));
-      if (it && it.card) html += cardLines(it.card);
+      if (it && it.card) html += cardLines(it.card) + questions(it);
     }
     takeEl.innerHTML = html;
     if (keepSel) {
       var again = takeEl.querySelector(keepSel);
       if (again && !again.disabled) again.focus();
     }
+  }
+
+  // A converted item's open questions (lane H's `card.questions`): asked on its card until
+  // answered, with the engine's options only (45's `questionHtml`).
+  function questions(it) {
+    var qs = it && it.card && it.card.questions;
+    if (!qs || !qs.length || typeof E.questionHtml !== "function") return "";
+    return '<div class="eq-item ew-questions">' + qs.map(function (q) { return E.questionHtml(it.key, q); }).join("") + '</div>';
   }
 
   function circleSlots() {
@@ -345,7 +357,8 @@
     }
     var f = r.finish || {};
     var made = (f.products || [])[0];
-    if (r.flawed) parts.push('<p class="tr-loss">Flawed. It took, but something went wrong in the binding.</p>');
+    // The word only: the server's own sentence follows and already says what it means.
+    if (r.flawed) parts.push('<p class="tr-loss">Flawed.</p>');
     if (f.said) parts.push('<p class="tr-made">' + esc(f.said) + '</p>');
     if (f.tier_name && r.method !== "bind") parts.push('<p class="tr-note">Quality: ' + esc(f.tier_name) + '.</p>');
     if (f.tier_name && r.method === "bind") parts.push('<p class="tr-note">Bound at ' + esc(f.tier_name) + '.</p>');
@@ -396,8 +409,11 @@
       // "Next: Attune" takes the vessel with it (its key after this step), then the keyboard
       // goes to where the next thing is picked: the shelf's first fitting row, or Roll.
       var going = E.setMethod(n.dataset.next, { carry: n.dataset.carry });
-      if (going) going.then(function () {
-        E.refocus(["#enchant-take .ew-slot-b", "#enchant-list .es-add:not([aria-disabled='true'])", "enchant-roll"]);
+      // Roll when the step can be rolled already (Bind after Attune: its empty slots are
+      // optional, and the catalyst's took the keyboard, seen live 2026-10-06).
+      if (going) going.then(function (c) {
+        E.refocus(c && c.can_roll ? ["enchant-roll"] :
+                  ["#enchant-take .ew-slot-b", "#enchant-list .es-add:not([aria-disabled='true'])", "enchant-roll"]);
       });
       return;
     }
@@ -417,7 +433,12 @@
       // Enter there fills it. An empty seat remembers itself as where that essence goes.
       if (b.dataset.seat) E.seatHint = b.dataset.seat;
       drawTake();
-      var row = document.querySelector("#enchant-list .es-add[data-add]:not([aria-disabled='true'])");
+      // The first row of the kind this slot takes. The first fitting row of any kind was
+      // the first answer, and an empty seat sent the keyboard to the sword lying in the
+      // circle, not to an essence (seen live, 2026-10-06).
+      var group = PICK[b.dataset.pick] || "";
+      var row = document.querySelector("#enchant-list .es" + (group ? '[data-group="' + group + '"]' : "") +
+                                       ":not(.is-dim) .es-add[data-add]");
       if (row) { row.focus(); E.say("Pick what goes here on the shelf."); }
       else E.say("Nothing on your shelf goes here.");
     }

@@ -1287,7 +1287,10 @@ def _carried(pc) -> list[dict]:
         k = weapons_mod.key_for(w) or str(w or "").strip().lower()
         if k and k != "unarmed" and not weapons_mod.is_ammunition(k):
             counts[k] = counts.get(k, 0) + 1
-    if held and held != "unarmed" and held not in counts:
+    # A forged weapon in hand is its pack row's (the stock loop below gives it Put away);
+    # counted here too it came up twice, "+1 Flaming ... Longsword" and "iron-longsword"
+    # (seen live, enchanting lane U1, 2026-10-06).
+    if held and held != "unarmed" and held not in counts and pc.crafted_record(held) is None:
         counts[held] = 1
     # Whether a suit can change now (owner's ruling E2): only out of a fight. Asked of the
     # running campaign, and only when this sheet IS its character — a roster preview has

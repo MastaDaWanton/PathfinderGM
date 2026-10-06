@@ -94,7 +94,8 @@
       ". " + sub(it) + (unknown ? ", " + it.unknown + " unknown" : "") + ".";
     var icon = E.iconHtml(E.rowIcon(it), { size: 30, tier: it.tier, label: it.name });
     var swatch = it.color ? '<i class="fr-swatch" style="--sw:' + esc(it.color) + '" aria-hidden="true"></i>' : "";
-    return '<li class="bt es' + (dim ? " is-dim" : "") + (ledger ? " has-info" : "") + '" data-key="' + esc(it.key) + '">' +
+    return '<li class="bt es' + (dim ? " is-dim" : "") + (ledger ? " has-info" : "") + '" data-key="' + esc(it.key) +
+      '" data-group="' + esc(it.group || "") + '">' +
       '<button type="button" class="bt-add es-add" data-add="' + esc(it.key) + '"' +
       (dim ? ' aria-disabled="true" aria-describedby="es-why-' + esc(it.key) + '"' : ' draggable="true"') +
       ' aria-label="' + esc(label) + '">' +
@@ -124,10 +125,10 @@
   // that only speaks after the button is pressed reads as no rule).
   function whyOf(it) {
     var m = E.order.method;
-    if (it.why_not) return it.why_not;
-    if (!m) return "";
     if (m === "read") return it.group === "Essences" ? "" : "Read takes an essence";
     if (m === "identify") return it.card ? "" : "Identify takes a magic item";
+    if (it.why_not) return it.why_not;
+    if (!m) return "";
     var w = E.why(it.key);
     if (w !== null) return w;
     if (!E.check) return "";
@@ -189,8 +190,11 @@
       if (landed) landed.classList.add("is-landed");
     }
     if (hadKey) {
+      // Found again WITHOUT scrolling to it: a chalk put in the circle moves down to "Can't
+      // use now", and following it there jumped the list 343px, leaving the ink the player
+      // was reaching for above the fold (seen live, 2026-10-06).
       var again = list.querySelector((hadInfo ? '.bt-info[data-for="' : '.es-add[data-add="') + E.cssEsc(hadKey) + '"]');
-      if (again) again.focus();
+      if (again) again.focus({ preventScroll: true });
     }
   }
   E.drawShelf = draw;

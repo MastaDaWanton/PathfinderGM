@@ -458,5 +458,62 @@ def test_the_equipment_tab_wields_a_forged_weapon_and_reads_its_magic(circle):
     assert row["acts"][0]["body"] == {"item": "flame-sword", "op": "wield"}
     assert row["known"] and "fire" in row["line"]
     pc.equipped = "flame-sword"
-    row = next(r for r in views._carried(pc) if r["key"] == "flame-sword")
-    assert [a["label"] for a in row["acts"]] == ["Put away"]
+    rows = [r for r in views._carried(pc) if r["key"] == "flame-sword"]
+    # Once in hand it is one row, not its pack row and a second "flame-sword" weapon row.
+    assert len(rows) == 1 and [a["label"] for a in rows[0]["acts"]] == ["Put away"]
+
+
+def test_the_shelf_never_jumps_and_an_empty_slot_sends_the_keyboard_to_its_kind():
+    """Seen live (2026-10-06): a chalk put in the circle moved to "Can't use now", the list
+    followed the focused row there and jumped 343px, leaving the ink above the fold; and an
+    empty seat sent the keyboard to the first fitting row of any kind, the sword lying in
+    the circle, not an essence. The row is found again without scrolling, and each row
+    carries its group so a slot picks the first row of its own kind."""
+    assert "focus({ preventScroll: true })" in _code(_src(SHELF))
+    assert 'data-group="' in _src(SHELF)
+    work = _code(_src(WORKING))
+    assert 'seat: "Essences"' in work and "[data-group=" in work
+
+
+def test_an_enchanted_item_shows_what_it_holds_as_made(circle):
+    """Lane H's report (2026-10-06): the shelf measured every vessel in this binder's hands,
+    so an old +3 shield read "+3 of +2" for an Enchanter 5, as if it were over-full. A row
+    with a layer says what its own binding holds; here a +1 flaming sword bound by an
+    Enchanter 4 (+2 of +2) shown to an Enchanter 1, whose own hands would hold +1. Each
+    piece also carries its colour, the forge's swatch, for lane U3's stage."""
+    pc = cm.current().scene.pc()
+    pc.track("enchanter").level = 1
+    pc.add_stock(forge_items.stock_item(_layered()), 1)
+    cm.current().save()
+    d = circle.get("/api/enchant/state").json()
+    row = next(v for g in ("vessels", "intermediates", "cant_use")
+               for v in d["shelf"][g] if v["key"] == "stock:flame-sword")
+    assert row["holds"]["words"] == "+2 of +2" and row["holds_as"] == "made"
+    assert row["pieces"] and all(p.get("color", "").startswith("#")
+                                 for p in row["pieces"].values() if p.get("material"))
+
+
+def test_converted_items_are_answered_through_the_bench(circle):
+    """Lane H converts old enchanted items onto the layer and asks what an old record never
+    said (the old bane never named its foe). The state carries the one-time notice
+    (`conversions`, [] when nothing was converted) and the bench answers and marks seen
+    through its own routes; on a tree without lane H the routes say so (501) rather than
+    pretending to have answered."""
+    from django.urls import resolve
+
+    from rules import enchanter as en
+
+    assert resolve("/api/enchant/answer").func is enchant_views.enchant_answer
+    assert resolve("/api/enchant/seen").func is enchant_views.enchant_seen
+    d = circle.get("/api/enchant/state").json()
+    assert d["conversions"] == []
+    r = circle.post("/api/enchant/seen", data=json.dumps({"key": "stock:nothing"}),
+                    content_type="application/json")
+    if callable(getattr(en, "conversion_seen", None)):
+        assert r.status_code == 400          # not carrying it: lane H's own sentence
+    else:
+        assert r.status_code == 501
+    bad = circle.post("/api/enchant/answer", data=json.dumps({"key": "x", "property": "bane",
+                                                               "answer": "undead"}),
+                      content_type="application/json")
+    assert bad.status_code in (400, 501)

@@ -304,6 +304,110 @@
   }
   E.adopt = adopt;
 
+  // --- old enchanted items, converted (lane H, owner round 3 "Old saves: convert") ---------
+  // The first time the circle opens after the revamp, a notice lists every item the
+  // conversion changed (its change lines, in the server's words) and every question still
+  // open, such as the old bane that never named its foe. Each question is answered from the
+  // engine's own options; "Got it" marks the items seen, and an open question stays on the
+  // item's card in the working until it is answered. Nothing here is decided by the page.
+  E.questionHtml = function (key, q) {
+    var id = "eq-" + String(key).replace(/[^A-Za-z0-9_-]/g, "_") + "-" + q.property;
+    var opts = (q.options || []).map(function (o) {
+      var v = typeof o === "object" ? JSON.stringify(o) : String(o);
+      return '<option value="' + esc(v) + '">' + esc(v.replace(/-/g, " ")) + '</option>';
+    }).join("");
+    var sub = q.of === "creature_type" ?
+      '<label class="eq-field eq-sub" for="' + id + '-s" hidden><span>Which subtype (the world\'s own word)</span>' +
+      '<input type="text" id="' + id + '-s" class="v2-well" data-sub autocomplete="off" spellcheck="false"></label>' : "";
+    var bonus = (q.bonus_values || []).length ?
+      '<label class="eq-field" for="' + id + '-b"><span>Bonus</span><select id="' + id + '-b" class="v2-well" data-bonus>' +
+      q.bonus_values.map(function (n) { return '<option value="' + esc(n) + '">+' + esc(n) + '</option>'; }).join("") +
+      '</select></label>' : "";
+    return '<form class="eq-q" data-question data-key="' + esc(key) + '" data-property="' + esc(q.property) +
+      '" data-choice="' + esc(q.key || "") + '">' +
+      '<p class="eq-words">' + esc(q.words || "") + '</p>' +
+      (opts ? '<label class="eq-field" for="' + id + '"><span>' + esc(q.of === "creature_type" ? "Its foe" :
+        q.of === "damage_type" ? "Its energy" : q.of === "skill" ? "Its skill" : "Choose") + '</span>' +
+        '<select id="' + id + '" class="v2-well" data-value><option value="">Choose</option>' + opts + '</select></label>' : "") +
+      sub + bonus +
+      '<div class="eq-acts"><button type="submit" class="v2-btn is-small is-go">Name it</button>' +
+      '<span class="eq-why" role="status"></span></div></form>';
+  };
+  layer.addEventListener("change", function (e) {
+    var sel = e.target.closest("form[data-question] select[data-value]");
+    if (!sel) return;
+    var sub = sel.form.querySelector(".eq-sub");
+    // A humanoid or outsider foe is one of the world's subtypes, typed (lane A's choice:
+    // "pick one subtype"; the subtypes are the world's own and never listed).
+    if (sub) sub.hidden = !(sel.value === "humanoid" || sel.value === "outsider");
+  });
+  layer.addEventListener("submit", function (e) {
+    var f = e.target.closest("form[data-question]");
+    if (!f) return;
+    e.preventDefault();
+    var why = f.querySelector(".eq-why");
+    var answer = {}, k = f.dataset.choice;
+    var val = f.querySelector("[data-value]"), sub = f.querySelector("[data-sub]"), bonus = f.querySelector("[data-bonus]");
+    if (val && k) {
+      var v = val.value;
+      if (sub && !sub.closest("[hidden]") && sub.value.trim()) v = { subtype: sub.value.trim() };
+      if (v === "") { why.textContent = "Choose one first."; return; }
+      answer[k] = v;
+    }
+    if (bonus) answer.bonus = Number(bonus.value);
+    why.textContent = "";
+    E.api("/api/enchant/answer", { key: f.dataset.key, property: f.dataset.property, answer: answer })
+      .then(function (r) {
+        var lines = (r.lines || []).join("; ");
+        E.say("Named. " + lines);
+        if (r.state) adopt(r.state);
+        var left = f.closest(".eq-item");
+        f.outerHTML = '<p class="eq-done">' + esc(lines ? "Named: " + lines + "." : "Named.") + '</p>';
+        if (left && !left.querySelector("form[data-question]")) left.classList.add("is-answered");
+        E.runCheck();
+      }).catch(function (err) { why.textContent = err.message || String(err); });
+  });
+
+  var noticeUp = false;
+  function showConversions() {
+    var list = ((E.state && E.state.conversions) || []).filter(function (x) { return !x.seen; });
+    if (!list.length || noticeUp) return;
+    noticeUp = true;
+    var pops = $id("enchant-pops");
+    var back = document.activeElement;
+    var wrap = document.createElement("div");
+    wrap.className = "bench-modal en-convert";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-labelledby", "en-convert-t");
+    wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog v2-framed v2-card-leather en-convert-d">' +
+      '<i class="v2-rim" aria-hidden="true"></i>' +
+      '<h3 id="en-convert-t">Your enchanted things, brought over</h3>' +
+      '<p>Enchanting works on a layer over the smith\'s work now. What changed on each item you carry:</p>' +
+      '<ul class="eq-list">' + list.map(function (x) {
+        return '<li class="eq-item"><b>' + esc(x.name) + '</b>' +
+          ((x.changes || []).length ? '<ul class="eq-changes">' + x.changes.map(function (c) {
+            return '<li>' + esc(c) + '</li>'; }).join("") + '</ul>' : "") +
+          (x.questions || []).map(function (q) { return E.questionHtml(x.key, q); }).join("") + '</li>';
+      }).join("") + '</ul>' +
+      '<p class="eq-note">A question left open waits on the item\'s card until you answer it.</p>' +
+      '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-go" data-convert-ok>Got it</button></div></div>';
+    pops.appendChild(wrap);
+    var close = function () {
+      core.dropEsc(close);
+      wrap.remove();
+      noticeUp = false;
+      list.forEach(function (x) { E.api("/api/enchant/seen", { key: x.key }).catch(function () { /* shown again next time */ }); });
+      if (back && document.contains(back) && back.focus) back.focus();
+    };
+    core.pushEsc(close);
+    wrap.querySelector("[data-convert-ok]").addEventListener("click", close);
+    var first = wrap.querySelector("select, [data-convert-ok]");
+    if (first) first.focus();
+  }
+  E.showConversions = showConversions;
+  E.on("state", function () { if (E.open) showConversions(); });
+
   E.refresh = function () {
     return E.api("/api/enchant/state").then(function (s) { adopt(s); return E.runCheck(); })
       .catch(function (err) { E.say(err.message); });
@@ -394,7 +498,9 @@
     var it = E.item(key);
     if (!it) return false;
     var why = E.why(key);
-    if (it.why_not) return refuse(it, it.why_not);
+    // Read and Identify ask nothing of a vessel's state: a sword in hand can be studied
+    // (its "take it off first" is for working it, not for looking at it).
+    if (it.why_not && m !== "identify" && m !== "read") return refuse(it, it.why_not);
     if (m === "read") {
       if (it.group !== "Essences") return refuse(it, "Read takes a pinch of an essence");
       o.essence = key;
@@ -571,8 +677,10 @@
     var s = E.state;
     if (!s || !stageMounted) return;
     var w = s.where || {};
-    stageCall("setScene", { kind: w.sanctum ? "sanctum" : "camp", biome: w.biome || "",
-                            roofed: !!w.sanctum, minute: s.clock ? s.clock.minute : 720 });
+    // Lane U3's four grounds: an owned sanctum, a hired circle, a roof, or the open ground.
+    var kind = w.sanctum ? (w.sanctum.kind === "hired" ? "hired" : "sanctum") : (w.roofed ? "roofed" : "camp");
+    stageCall("setScene", { kind: kind, biome: w.biome || "", roofed: kind !== "camp",
+                            minute: s.clock ? s.clock.minute : 720 });
     stageCall("hour", E.check && E.check.hour ? E.check.hour : (s.hour || null));
   }
   // What lies in the circle, for the stage: the vessel as the forge built it (its gear, base
@@ -580,11 +688,13 @@
   function stageWork() {
     if (!stageMounted) return;
     var v = E.vessel();
-    stageCall("setVessel", v ? { gear: v.gear, base: v.base, pieces: v.pieces || {}, family: v.gear,
-                                 quality_index: v.quality_index, slot: v.slot } : null);
+    stageCall("setVessel", v ? { key: v.key, name: v.name, gear: v.gear, base: v.base, pieces: v.pieces || {},
+                                 family: v.gear, quality_index: v.quality_index, slot: v.slot } : null);
     var c = E.check || {};
     stageCall("setSeats", (c.seats || []).map(function (s) {
-      return { seat: s.seat, essence: s.essence, color: s.color, seated: !!s.seated };
+      var it = s.seated ? E.item(s.seated) : null;
+      return { seat: s.seat, essence: s.essence, color: s.color, phase: it ? it.phase : "",
+               seated: !!s.seated, lit: !!s.seated };
     }));
     if (c.hour) stageCall("hour", c.hour);
   }
@@ -916,7 +1026,11 @@
     if (games) {
       var view = stageCall("game", method) || null;
       game = Promise.resolve(games.play({
-        method: method, tuning: tuning, hour: tuning.hour || null, seq: tuning.seq || null,
+        // The clock's minute rides with the phase so Bind's band can draw a needle at now
+        // (lane U2's ask); it is the server's minute, attached, never computed.
+        method: method, tuning: tuning,
+        hour: tuning.hour ? Object.assign({}, tuning.hour, { minute: E.state && E.state.clock ? E.state.clock.minute : null }) : null,
+        seq: tuning.seq || null,
         seats: tuning.seats || null, mount: strip, stage: view,
         steady: E.steady(), reducedMotion: E.reduced(),
         onScore: function (s) { E.emit("score", s); },
@@ -992,7 +1106,8 @@
   function land(f, from) {
     var made = (f.products || [])[0];
     var flawless = (Number(f.tier) || 0) >= 4 && f.verdict !== "flawed";
-    flourish(f.verdict === "flawed" ? "flawed" : flawless ? "flawless" : "land", f.tier_name);
+    flourish(f.verdict === "flawed" ? "flawed" : flawless ? "flawless" :
+             made && made.state === "in_progress" ? "bind" : "land", f.tier_name);
     E.say(f.said || (made ? made.name : "Done."));
     if (!made) return;
     var sel = made.state === "in_progress"
@@ -1023,6 +1138,9 @@
     if (st && stageMounted && typeof st.flourish === "function") {
       try { st.reducedMotion(E.reduced()); st.flourish(kind); staged = true; } catch (err) { staged = false; }
     }
+    // Read and Identify have their own sound already (played as the die was asked for);
+    // their flourish is the stage's eye over the phial or the item, and nothing more.
+    if (kind === "read" || kind === "identify") return;
     if (!staged) E.sound("enchant." + (kind === "fail" ? "fail" : kind === "flawless" ? "flawless" :
                                        kind === "flawed" ? "flawed" : "land"));
     if (staged && kind !== "flawless") return;
@@ -1069,6 +1187,7 @@
       }).then(function (r) {
         E.busy = false;
         E.result = { read: r, method: "read" };
+        flourish("read");
         if (r.shelf && E.state) { E.state.shelf = r.shelf; }
         E.order.essence = r.pinch && r.pinch.key && r.pinch.left > 0 ? r.pinch.key : "";
         if (window.EnchantLedger && EnchantLedger.forget) { try { EnchantLedger.forget(); } catch (err) { /* */ } }
@@ -1105,6 +1224,7 @@
     }).then(function (r) {
       E.busy = false;
       E.result = { identify: r, method: "identify" };
+      flourish("identify");
       E.emit("result", E.result);
       E.say(r.words || "");
       return E.refresh();

@@ -150,6 +150,50 @@ def _masked_shelf(pc, shelf: dict) -> dict:
     return out
 
 
+def _vessel_rows(pc, shelf: dict, now: int) -> dict:
+    """Two things the shelf's vessel rows need that the bench's rows do not carry.
+
+    What an item ALREADY enchanted holds, as it was made (lane H's report, 2026-10-06): the
+    bench measures every vessel in this binder's hands, so an old +3 shield read "+3 of +2"
+    for an Enchanter 5. A row with a layer says what its own binding holds; the working's
+    check still measures a new binding in the binder's hands.
+
+    Each piece's colour, the forge's own swatch table (`forge_views.material_color`), so
+    lane U3's stage lays the vessel on the circle in its own metals and never guesses one."""
+    from rules import magic_layer
+
+    from .forge_views import material_color
+
+    records = {v.key: v.record for v in en.vessels(pc, now)}
+    out = dict(shelf)
+    for group in ("vessels", "intermediates", "cant_use"):
+        rows = []
+        for row in shelf.get(group) or ():
+            row = dict(row)
+            rec = records.get(row.get("key"))
+            if rec is not None and magic_layer.has_layer(rec):
+                row["holds"] = en._holds_view(magic_layer.capacity(rec))
+                row["holds_as"] = "made"
+            pieces = {}
+            for slot, p in (row.get("pieces") or {}).items():
+                p = dict(p) if isinstance(p, dict) else {"material": p}
+                if p.get("material"):
+                    p["color"] = material_color(str(p["material"]))
+                pieces[slot] = p
+            row["pieces"] = pieces
+            rows.append(row)
+        out[group] = rows
+    return out
+
+
+def _conversions(pc) -> list[dict]:
+    """Lane H's one-time notice of old enchanted items converted onto the layer, with their
+    open questions. [] on a tree without lane H (its functions are looked up, not
+    imported, so this lane's branch runs alone)."""
+    fn = getattr(en, "conversions", None)
+    return list(fn(pc) or []) if callable(fn) else []
+
+
 def _rolls(pc, level: int) -> dict:
     """The terms the dice mat shows BEFORE a Read or an Identify is thrown (lane U1): the
     page never adds them up, and Read and Identify have no check request to carry them.
@@ -179,7 +223,8 @@ def _state_body(c, pc) -> dict:
         "ceiling": worldclass.ceiling_index(progress),
         "picks_banked": worldclass.perk_picks_banked(progress),
         "methods": en.methods_view(progress.level, where),
-        "shelf": _masked_shelf(pc, en.shelf(pc, now)),
+        "shelf": _vessel_rows(pc, _masked_shelf(pc, en.shelf(pc, now)), now),
+        "conversions": _conversions(pc),
         "works": _works(c, pc),
         "where": where,
         "seats": {g: en.seats_for(g) for g in (en.bench_rules().get("seats") or {})},
@@ -542,7 +587,8 @@ def enchant_read(request):
         "danger": danger, "danger_text": effectspec.render(danger) if danger else "",
         "danger_applied": bool(applied), "stub": bool(got.get("stub")),
         "mastery": {"lines": lines, "total": progress.mp, "level": progress.level},
-        "clock": _clock(c), "shelf": _masked_shelf(pc, en.shelf(pc, _now(c))),
+        "clock": _clock(c),
+        "shelf": _vessel_rows(pc, _masked_shelf(pc, en.shelf(pc, _now(c))), _now(c)),
     })
 
 
@@ -681,6 +727,59 @@ def enchant_perks(request):
         return _err(str(exc))
     c.save()
     return JsonResponse(_track(track, progress))
+
+
+# --- old enchanted items, converted (lane H) ---------------------------------------------
+
+def _lane_h(name: str):
+    fn = getattr(en, name, None)
+    if not callable(fn):
+        return None, _err("Converted items are answered once lane H's conversion is in this "
+                          "build.", 501)
+    return fn, None
+
+
+@require_POST
+def enchant_answer(request):
+    """Answer a converted item's open question (lane H): `{key, property, answer}`, where
+    `answer` is the choice's own keys from the engine's options ({"foe": "undead"}, or
+    {"foe": {"subtype": "goblinoid"}} for a humanoid or outsider foe). A choice the property
+    would not bind is a 400 with the engine's sentence, and the question stays open."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    fn, refused = _lane_h("answer_question")
+    if refused:
+        return refused
+    body = read_body(request)
+    answer = body.get("answer")
+    if not isinstance(answer, dict):
+        return _err("`answer` must be the choice, as {key: value}.")
+    try:
+        got = dict(fn(pc, str(body.get("key") or ""), str(body.get("property") or ""),
+                      answer) or {})
+    except ValueError as exc:
+        return _err(str(exc))
+    c.save()
+    return JsonResponse(dict(got, state=_state_body(c, pc)))
+
+
+@require_POST
+def enchant_seen(request):
+    """The one-time notice of converted items was shown: `{key}` marks that item seen (its
+    open questions stay on its card until answered)."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    fn, refused = _lane_h("conversion_seen")
+    if refused:
+        return refused
+    try:
+        fn(pc, str(read_body(request).get("key") or ""))
+    except ValueError as exc:
+        return _err(str(exc))
+    c.save()
+    return JsonResponse({"ok": True, "conversions": _conversions(pc)})
 
 
 # --- the magic items carried ---------------------------------------------------------------

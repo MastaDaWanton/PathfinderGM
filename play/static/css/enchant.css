@@ -145,6 +145,23 @@
 .ew-problems { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
 .ew-problems li { color: var(--bench-ink); border-left: 2px solid var(--edge); padding-left: 10px; }
 
+/* --- old enchanted items, converted (lane H) ------------------------------------------------ */
+/* The one-time notice and an item card's open question: the bench's own dialog and fields,
+   labels above their fields. */
+.en-convert-d { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; }
+.eq-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 12px; }
+.eq-item > b { color: var(--bench-ink); font-weight: 400; }
+.eq-changes { margin: 4px 0 0; padding-left: 18px; color: var(--bench-quiet); font-size: 15px; }
+.eq-q { display: grid; gap: 6px; margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--bench-accent-deep); }
+.eq-words { margin: 0; font-size: 15px; }
+.eq-field { display: grid; gap: 4px; }
+.eq-field > span { color: var(--bench-quiet); font-size: 13px; }
+.eq-field[hidden] { display: none; }
+.enchant .eq-field select, .enchant .eq-field input { min-height: 34px; padding: 5px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink); }
+.eq-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.eq-why { color: var(--bench-ink); font-size: 13px; }
+.eq-done, .eq-note { margin: 6px 0 0; color: var(--bench-quiet); font-size: 13px; }
+
 /* --- other sizes (UI plan §5.3) --------------------------------------------------------------- */
 /* 1280 to 1439: the shelf to 240px and the working to 320px, as the plan says; the strip
    goes to icons by bench.css's own rule for this band. */

@@ -130,6 +130,9 @@ urlpatterns = [
     path("api/enchant/recipes", enchant_views.enchant_recipes, name="enchant_recipes"),
     # The magic items carried with their cards, read only (lane U1 for lane U5's ledger).
     path("api/enchant/items", enchant_views.enchant_items, name="enchant_items"),
+    # Old enchanted items converted onto the layer (lane H): answer a question, mark seen.
+    path("api/enchant/answer", enchant_views.enchant_answer, name="enchant_answer"),
+    path("api/enchant/seen", enchant_views.enchant_seen, name="enchant_seen"),
     path("api/enchant/essence/<str:essence_id>", enchant_views.enchant_essence,
          name="enchant_essence"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
