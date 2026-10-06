@@ -224,8 +224,12 @@ def test_an_old_alchemist_entry_reads_its_effects_as_product():
     `product`, the forge's legacy trick, so nothing needs rewriting before lane D's pass.
     A forge or enchanter row's `effects` is NOT a product (the blacksmith still reads it
     as item effects)."""
+    # The shipped rows were rewritten by lane D (they write `product`, and keep `effects`
+    # for the old chain bench), so the legacy read is held on an unwritten row below; a
+    # shipped row's `product` is what it wrote, never its legacy `effects`.
     brim = materials.get("brimstone")
-    assert brim["product"] and brim["product"] == brim["effects"]
+    assert brim["product"] and brim["product"] != brim["effects"]
+    assert all(t.get("essence") for t in brim["product"])
     assert materials.is_alchemy(brim)
     for mid in ("iron", "mithral"):
         doc = materials.get(mid)
@@ -327,9 +331,12 @@ def test_the_shipped_alchemist_materials_now_have_properties():
     mats = [d for d in shelf.values() if not d.get("hybrid")]
     with_keys = [d for d in mats if knowledge.property_keys(d)]
     assert len(mats) == 138                               # 139 less the basilisk eye
-    assert len(with_keys) >= 68
+    # Lane D's data pass (2026-10-06) gave every one of the 138 its properties: product
+    # traits on the 112 reagents, working traits (and a mishap or toxic document) on the
+    # 26 vessels, catalysts, neutral media and prima materia, at least 3 on each.
+    assert len(with_keys) == 138
     for d in with_keys:
-        assert len(knowledge.property_keys(d)) >= len(d["product"])
+        assert len(knowledge.property_keys(d)) >= max(3, len(d["product"]))
 
 
 def test_the_forge_and_the_circle_keep_their_keys():

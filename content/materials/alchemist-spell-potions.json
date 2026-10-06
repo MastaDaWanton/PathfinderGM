@@ -66,8 +66,9 @@
      }
     },
     {
-     "type": "narrative",
-     "target": "size category increases by one; space becomes 10 ft and natural reach 10 ft, and equipment grows with the wearer",
+     "type": "permission",
+     "target": "One size larger: space and natural reach 10 ft, gear grows with the wearer.",
+     "tag": "size_larger",
      "duration": {
       "amount": 1,
       "unit": "minute"
@@ -139,8 +140,9 @@
      }
     },
     {
-     "type": "narrative",
-     "target": "size category decreases by one; space becomes 2-1/2 ft and natural reach 0 ft, and carried gear shrinks along",
+     "type": "permission",
+     "target": "One size smaller: space 2-1/2 ft, natural reach 0 ft, gear shrinks with the wearer.",
+     "tag": "size_smaller",
      "duration": {
       "amount": 1,
       "unit": "minute"
@@ -317,8 +319,18 @@
      "note": "against effects created by evil creatures"
     },
     {
-     "type": "narrative",
-     "target": "blocks mental control and bars bodily contact by summoned creatures",
+     "type": "permission",
+     "target": "Blocks mental control.",
+     "tag": "ward_mind_control",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "permission",
+     "target": "Bars bodily contact by summoned creatures.",
+     "tag": "ward_summoned_contact",
      "duration": {
       "amount": 1,
       "unit": "minute"
@@ -496,8 +508,9 @@
    "text": "Camphor and embalmer's salt: one keeps the head cool and the other refuses to let the body lose water. A full day of weather being somebody else's problem.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "the drinker exists comfortably in conditions between -50 and 140 degrees Fahrenheit without needing to make Fortitude saves",
+     "type": "permission",
+     "target": "Comfortable between -50 and 140 degrees Fahrenheit, with no Fortitude saves.",
+     "tag": "endure_elements",
      "duration": {
       "amount": 24,
       "unit": "hour"
@@ -530,8 +543,9 @@
    "text": "Soot and salt, which is what the spell prints and what the trade has always used. Ten minutes in which every inscription in the room is suddenly addressed to you.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "the drinker understands any spoken or written language they hear or touch, though it does not decode ciphers or secret writing",
+     "type": "permission",
+     "target": "Understands any spoken or written language; no ciphers or secret writing.",
+     "tag": "comprehend_languages",
      "duration": {
       "amount": 10,
       "unit": "minute"
@@ -563,8 +577,9 @@
    "text": "Mistletoe cut with bronze and never allowed to touch ground, dissolved in spirits. A plant that owes the earth no footprint, lending the habit out for an hour.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "the drinker leaves no tracks, trail or scent; tracking them by any mundane means is impossible for the duration",
+     "type": "permission",
+     "target": "Leaves no tracks, trail or scent.",
+     "tag": "pass_without_trace",
      "duration": {
       "amount": 1,
       "unit": "hour"
@@ -986,11 +1001,17 @@
      "note": "while invisible and moving; +40 while invisible and holding still"
     },
     {
-     "type": "narrative",
-     "target": "the drinker and their carried gear become invisible; attacking or casting an offensive spell ends it immediately",
+     "type": "apply_condition",
+     "target": "invisible",
      "duration": {
       "amount": 3,
       "unit": "minute"
+     },
+     "ends_when": {
+      "acts": [
+       "attack",
+       "cast_offensive"
+      ]
      }
     }
    ]
@@ -1020,8 +1041,8 @@
    "text": "Mithral dust suspended in gum until the flask itself is hard to focus on. Cheaper than invisibility and harder to argue with, because it does not end when you swing.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "the drinker's outline wavers: all attacks against them suffer a 20% miss chance, and it does not end when they attack",
+     "type": "concealment",
+     "miss_chance": 20,
      "duration": {
       "amount": 3,
       "unit": "minute"
@@ -1129,14 +1150,6 @@
       "amount": 3,
       "unit": "hour"
      }
-    },
-    {
-     "type": "narrative",
-     "target": "poison already in the body is suspended rather than cured: when the draught expires, the remaining duration resumes where it left off",
-     "duration": {
-      "amount": 3,
-      "unit": "hour"
-     }
     }
    ]
   },
@@ -1165,12 +1178,43 @@
    "text": "Alicorn and font water, which is the oldest answer in the book to being diminished. What it mends is whichever score is hurt worst — the drinker chooses as they swallow.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "heals 1d4 points of temporary ability damage to a single ability score, chosen by the drinker as they swallow"
-    },
-    {
      "type": "remove_condition",
      "target": "fatigued"
+    },
+    {
+     "type": "choose_one",
+     "options": [
+      {
+       "type": "ability_restore",
+       "target": "str",
+       "dice": "1d4"
+      },
+      {
+       "type": "ability_restore",
+       "target": "dex",
+       "dice": "1d4"
+      },
+      {
+       "type": "ability_restore",
+       "target": "con",
+       "dice": "1d4"
+      },
+      {
+       "type": "ability_restore",
+       "target": "int",
+       "dice": "1d4"
+      },
+      {
+       "type": "ability_restore",
+       "target": "wis",
+       "dice": "1d4"
+      },
+      {
+       "type": "ability_restore",
+       "target": "cha",
+       "dice": "1d4"
+      }
+     ]
     }
    ]
   },
@@ -1203,14 +1247,6 @@
      "type": "speed",
      "target": "climb",
      "amount": 20,
-     "duration": {
-      "amount": 30,
-      "unit": "minute"
-     }
-    },
-    {
-     "type": "narrative",
-     "target": "the drinker climbs walls and ceilings with their hands free, and need not make Climb checks to do it",
      "duration": {
       "amount": 30,
       "unit": "minute"
@@ -1369,10 +1405,6 @@
     {
      "type": "remove_condition",
      "target": "paralyzed"
-    },
-    {
-     "type": "narrative",
-     "target": "frees one creature from magical paralysis, hold or slow; a creature that is merely staggered is unaffected"
     }
    ]
   },
@@ -1401,8 +1433,8 @@
    "text": "Silver and font water, wiped down the blade with a rag that is burned afterwards. Three minutes in which the sword argues on the right side of a demon's hide.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "the coated weapon counts as good-aligned for the purpose of overcoming damage reduction",
+     "type": "strikes_as",
+     "target": "good",
      "duration": {
       "amount": 3,
       "unit": "minute"
@@ -1475,8 +1507,10 @@
      }
     },
     {
-     "type": "narrative",
-     "target": "flight with good manoeuvrability; when the draught expires the drinker falls, so the last round is spent landing",
+     "type": "skill_mod",
+     "target": "fly",
+     "amount": 2,
+     "bonus_type": "untyped",
      "duration": {
       "amount": 5,
       "unit": "minute"
@@ -1615,8 +1649,350 @@
      }
     },
     {
-     "type": "narrative",
-     "target": "the same +2 morale bonus applies to every skill check the drinker makes",
+     "type": "skill_mod",
+     "target": "acrobatics",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "appraise",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "bluff",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "climb",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "craft",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "disable device",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "disguise",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "escape artist",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "fly",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "handle animal",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "heal",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (arcana)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (dungeoneering)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (engineering)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (geography)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (history)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (local)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (nature)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (nobility)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (planes)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "knowledge (religion)",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "linguistics",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "perception",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "perform",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "profession",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "ride",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "sense motive",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "sleight of hand",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "survival",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "swim",
+     "amount": 2,
+     "bonus_type": "morale",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "skill_mod",
+     "target": "use magic device",
+     "amount": 2,
+     "bonus_type": "morale",
      "duration": {
       "amount": 50,
       "unit": "minute"
@@ -1649,8 +2025,9 @@
    "text": "A hollow reed cut below the waterline, which carries air through water as a plain fact before the chain makes a subtler one of it. Ten hours, and it divides among everyone who shares the flask.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "the drinker breathes water freely for ten hours; the duration divides evenly among all creatures who share a single dose",
+     "type": "permission",
+     "target": "Breathes water freely.",
+     "tag": "breathe_water",
      "duration": {
       "amount": 10,
       "unit": "hour"
@@ -1693,8 +2070,9 @@
      }
     },
     {
-     "type": "narrative",
-     "target": "the drinker and their gear become insubstantial smoke: fly 10 ft (perfect), pass through small holes and cracks, immune to poison and critical hits, and unable to attack, cast with somatic components or use most items",
+     "type": "permission",
+     "target": "Insubstantial smoke: fly 10 ft (perfect), through small cracks, immune to poison and critical hits, no attacks, somatic casting or most items.",
+     "tag": "gaseous_form",
      "duration": {
       "amount": 10,
       "unit": "minute"
@@ -1734,10 +2112,6 @@
       "amount": 50,
       "unit": "minute"
      }
-    },
-    {
-     "type": "narrative",
-     "target": "detoxifies any venom in the creature: poison currently affecting them ends, and they cannot be poisoned again for the duration"
     }
    ]
   },
@@ -1766,8 +2140,9 @@
    "text": "A bank against one element rather than a wall: it absorbs, keeps count, and stops the moment the account is empty. The elemental reagent chosen at brewing decides which element it argues with.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "absorbs up to 60 points of damage of one energy type — acid, cold, electricity, fire or sonic, fixed when the potion is brewed — and ends early once that total is spent",
+     "type": "permission",
+     "target": "Absorbs up to 60 points of one energy type, fixed when brewed, then ends.",
+     "tag": "absorb_energy",
      "duration": {
       "amount": 50,
       "unit": "minute"
@@ -1800,8 +2175,9 @@
    "text": "Star-iron in azoth, wiped down the edge with the grain. The steel does not get sharper so much as more willing, and the difference shows up in the crits.",
    "effects": [
     {
-     "type": "narrative",
-     "target": "doubles the threat range of the coated slashing or piercing weapon; it does not stack with any other effect that widens a threat range",
+     "type": "crit_range",
+     "multiply": 2,
+     "stacking": "threat-range",
      "duration": {
       "amount": 50,
       "unit": "minute"
