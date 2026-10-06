@@ -509,6 +509,7 @@
      58,
      60
     ],
+    "felt": true,
     "documents": [
      {
       "type": "combat_mod",

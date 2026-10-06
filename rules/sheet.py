@@ -849,6 +849,57 @@ class Actor:
                 return rec
         return None
 
+    def crafted_records_called(self, word: str) -> list[dict]:
+        """Every carried gear record a looser word could mean — "my longsword", "sword" —
+        one per thing (a worn copy and its pack record are one sword).
+
+        `crafted_record` matches the id or the whole name and nothing else, and it has to:
+        `Actor.weapon("longsword")` asks it, and a loose match there would turn an NPC's
+        plain longsword into the forged one in his pack. Measured 2026-10-06 (enchanting
+        leftovers): "longsword", "my longsword" and "sword" were all refused as "is not
+        carrying" while the Superior Iron Longsword sat in the pack. So the loose reading
+        is its own question, asked by the doors a player names a thing at (`wear`) only
+        after the exact one and the plain gear have both said no; the caller decides what
+        one match, or two, means.
+
+        A possessive or article in front is dropped, and the rest must appear inside the
+        record's name or its base ("sword" is in "longsword": the word the player said,
+        not a word boundary, because that is how people shorten a weapon's name)."""
+        from . import forge_items
+
+        want = " ".join(str(word or "").split()).lower()
+        want = re.sub(r"^(?:my|the|his|her|their|its|a|an)\s+", "", want).strip()
+        if not want:
+            return []
+        exact = self.crafted_record(want)
+        if exact is not None:
+            return [exact]
+        out: list[dict] = []
+        seen: set[str] = set()
+
+        def consider(rec) -> None:
+            if not _is_gear_record(rec):
+                return
+            rid = str(rec.get("id") or rec.get("name") or "").strip().lower()
+            if rid in seen:
+                return
+            said = {" ".join(str(rec.get(k) or "").split()).lower()
+                    for k in ("name", "base", "weapon", "armour")} - {""}
+            if any(want in s for s in said):
+                seen.add(rid)
+                out.append(rec)
+
+        for rec in self.worn.values():
+            if isinstance(rec, dict):
+                consider(rec)
+        for item in self.stock.values():
+            rec = forge_items.record_of(item)
+            if rec is None and (getattr(item, "weapon", None) or getattr(item, "armour", None)):
+                rec = item.as_dict()
+            if rec is not None:
+                consider(rec)
+        return out
+
     def crafted_weapon_names(self) -> set[str]:
         """Every word a crafted weapon this creature carries answers to — its record's id
         and name, and its shelf key — for the parse gate (`intents.carrying`)."""
@@ -1205,6 +1256,13 @@ class Actor:
             for n, (spec, name, origin) in enumerate(self.worn_specs_of(kind)):
                 if str(spec.get("periodic") or "").lower() == "day":
                     out[f"worn:{origin}#{kind}#{n}"] = (spec, origin, name)
+        # A condition that strikes its bearer once a day at a moment of its own (the
+        # stunning drawback: "stunned for 1d4 rounds ... randomly, 1/day", CRB): a standing
+        # effect holding the day's moment, which the scene's clock fires
+        # (`Scene._curse_strikes`).
+        for n, (spec, name, origin) in enumerate(self.worn_specs_of("apply_condition")):
+            if str(spec.get("periodic") or "").lower() == "day":
+                out[f"worn:{origin}#strike#{n}"] = (spec, origin, name)
         return out
 
     def sync_carried(self, dice=None) -> list[dict]:
@@ -1243,6 +1301,23 @@ class Actor:
                 out.append({"kind": "worn", "ref": self.ref, "what": item_name,
                             "grants": f"fast healing {amount}"})
                 continue
+            if kind == "apply_condition" and key.startswith("worn:") and "#strike#" in key:
+                # Held, not yet struck: the moment is rolled by the scene's clock and the
+                # stun lands through this applicator then (`Scene._curse_strikes`). Said
+                # when it strikes and not now — a hidden curse announced on the draw
+                # would name what the bench kept hidden (law 3, `curses.tell`).
+                cond = str(eff.get("target") or eff.get("condition") or "").strip().lower()
+                if not cond:
+                    continue
+                self.apply_effect(ActiveEffect(
+                    name=f"wielding the {item_name}" if eff.get("trigger") == "wielded"
+                    else f"wearing the {item_name}",
+                    kind="worn", key=key, source=source, origin=source,
+                    payload={"carried_key": key, "carried_from": item_name, "worn": True,
+                             "strikes": {"condition": cond,
+                                         "duration": eff.get("duration") or {}},
+                             "due": {}}))
+                continue
             if kind == "apply_condition":
                 cond = str(eff.get("target") or eff.get("condition") or "").strip().lower()
                 if not cond:
@@ -1277,6 +1352,8 @@ class Actor:
             if key in want:
                 continue
             self.remove_effects(match=lambda x, e=e: x is e)
+            if e.payload.get("strikes"):
+                continue                # never said on: a hidden stun says nothing going
             how = "worn" if e.payload.get("worn") else "carried"
             out.append({"kind": "effect_ended", "ref": self.ref,
                         "what": f"{e.name} (the {e.payload.get('carried_from') or 'item'} "
@@ -2859,11 +2936,17 @@ class Actor:
     def attack_modifiers(
         self, weapon_key: str | None = None, iteration: int = 0,
         power_attack: bool = False, lethality: str | None = None, defender=None,
+        thrown: bool = False,
     ) -> list[Modifier]:
         w = self.weapon(weapon_key)
         key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
         printed = w.get("stat_block")
+        # A melee weapon thrown (a dagger, a javelin) is a ranged attack for this roll:
+        # Dexterity, not Strength, and none of the melee-only terms. Measured 2026-10-06
+        # (enchanting leftovers): a thrown dagger rolled BAB + Str, as if it were stabbed.
+        # Strength stays on its damage (`damage_modifiers`, untouched), which is the book's.
+        ranged = w["category"] == "ranged" or (thrown and bool(w.get("range_ft")))
 
         if printed:
             # The stat block's own total for THIS swing — "+11/+6" is two numbers, and
@@ -2882,7 +2965,7 @@ class Actor:
             mods.append(Modifier(self.bab, "BAB"))
             # Str for melee, Dex for ranged — and Dex for melee only when Weapon Finesse
             # applies and actually helps.
-            if w["category"] == "ranged":
+            if ranged:
                 ab, label = "dex", "Dex"
             elif (sub := self._attack_ability(w, key)):
                 ab, label = sub, f"{sub.title()} (Finesse)"
@@ -2921,7 +3004,7 @@ class Actor:
             mods.append(Modifier(LETHALITY_SWAP_PENALTY, swap))
 
         mods.extend(self._condition_mods("attack"))
-        if w["category"] == "melee":
+        if not ranged:
             mods.extend(self._condition_mods("melee_attack"))
         # What the water takes off this particular swing. Scoped to the damage TYPE
         # because that is how the Core Rulebook scopes it — a spear works down there and
@@ -2938,7 +3021,8 @@ class Actor:
         # their documents — never as literals appended above.
         mods.extend(self._buff_mods("combat_mod", "attack",
                                     self._roll_context(key, power_attack=power_attack,
-                                                      defender=defender)))
+                                                      defender=defender,
+                                                      thrown=ranged and thrown)))
         if w.get("bash_plus"):
             # A bashing shield "acts as a +1 weapon when used to bash" (`shield_bash`).
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
@@ -4518,6 +4602,11 @@ class Actor:
         if isinstance(rec, dict):
             weapon["key"] = str(w.get("crafted_base") or key)
             weapon["record"] = str(rec.get("id") or rec.get("name") or key).lower()
+        # A melee weapon thrown is a ranged attack for every `when` that asks (a feat's
+        # `{"weapon": {"ranged": true}}`), and says it was thrown.
+        if extra.pop("thrown", False):
+            weapon["ranged"] = True
+            weapon["thrown"] = True
         defender = extra.pop("defender", None)
         if defender is not None:
             extra["target_actor"] = defender
@@ -5286,6 +5375,41 @@ def body_slots(actor: Actor) -> dict:
     }
 
 
+def _crafted_weapons(actor: Actor) -> list[dict]:
+    """Every crafted weapon record this creature carries, once each: the worn copy (the
+    one `wear` keeps) before the pack's, the way `crafted_record` reads them."""
+    from . import forge_items
+
+    out, seen = [], set()
+    recs = [r for r in actor.worn.values() if isinstance(r, dict)]
+    for item in actor.stock.values():
+        rec = forge_items.record_of(item)
+        if rec is None and getattr(item, "weapon", None):
+            rec = item.as_dict()
+        if rec is not None:
+            recs.append(rec)
+    for rec in recs:
+        if not _is_weapon_record(rec):
+            continue
+        rid = str(rec.get("id") or rec.get("name") or "").strip().lower()
+        if rid and rid not in seen:
+            seen.add(rid)
+            out.append(rec)
+    return out
+
+
+def _thrown_terms(actor: Actor, key: str, w: dict) -> dict:
+    """A melee weapon with a range increment (a dagger, a spear, a starknife) is also a
+    thrown weapon, and a throw is a RANGED attack: Dexterity to hit, Strength still to
+    damage (CRB, Combat: the ranged attack bonus is "Base attack bonus + Dexterity
+    modifier + size modifier + range penalty", and "When you hit with a melee or thrown
+    weapon, including a sling, add your Strength modifier to the damage result"). The row
+    carries the throw's own to-hit so the sheet need not say "thrown to-hit not known"."""
+    if w.get("category") != "melee" or not w.get("range_ft"):
+        return {}
+    return {"thrown_attack": _terms(actor.attack_modifiers(key, thrown=True))}
+
+
 def full_sheet(actor: Actor) -> dict:
     """Everything on the character, with every number's provenance attached.
 
@@ -5355,6 +5479,55 @@ def full_sheet(actor: Actor) -> dict:
             "finessable": bool(w.get("finessable")),
             "traits": list(w.get("traits") or []),
             "weight_lb": w.get("weight_lb"),
+            **_thrown_terms(actor, key, w),
+        })
+
+    # A weapon made at a bench (a forged or enchanted record) is a weapon too: its row is
+    # computed from the record the same way a swing is (`Actor.weapon` reads the record,
+    # `attack_modifiers` its own terms), keyed by the record's id — what `equipped` holds
+    # and what the attack op takes. Measured 2026-10-06 (enchanting leftovers): with the
+    # Superior Iron Longsword in hand this list held only the rapier and the dagger, so the
+    # Combat card had no to-hit for the weapon actually being swung and the Equipment row
+    # fell back to its own line.
+    for rec in _crafted_weapons(actor):
+        rid = str(rec.get("id") or rec.get("name") or "").strip()
+        if not rid or rid.lower() in {a["key"] for a in attacks}:
+            continue
+        try:
+            w = actor.weapon(rid)
+        except KeyError:
+            continue
+        if not w.get("crafted_record"):
+            continue
+        base = str(w.get("crafted_base") or "")
+        attacks.append({
+            "key": rid.lower(),
+            "name": str(rec.get("name") or w.get("name") or rid),
+            "crafted": True,
+            "base": base,
+            "equipped": rid.lower() == held_key or str(rec.get("name") or "").lower()
+                        == held_key,
+            "category": w.get("category", "melee"),
+            "hands": w.get("hands", 1),
+            "proficient": actor.is_proficient(rid),
+            "attack": _terms(actor.attack_modifiers(rid)),
+            "damage": _terms(actor.damage_modifiers(rid)),
+            "damage_dice": str(w.get("damage_text") or w.get("damage") or ""),
+            "launcher": False,
+            "ammo": None,
+            "crit": (f"{w['crit_range']}-20" if int(w.get("crit_range") or 20) < 20
+                     else "20") + f"/x{int(w.get('crit_mult') or 2)}",
+            "type": w.get("type", ""),
+            "type_text": w.get("type_text") or w.get("type", ""),
+            "sequence": len(actor.attack_sequence(rid, full_attack=True)),
+            "swings": [sum(m.value for m in actor.attack_modifiers(rid, iteration=i))
+                       for i in actor.attack_sequence(rid, full_attack=True)],
+            "range_ft": w.get("range_ft"),
+            "light": bool(w.get("light")),
+            "finessable": bool(w.get("finessable")),
+            "traits": list(w.get("traits") or []),
+            "weight_lb": w.get("weight_lb"),
+            **_thrown_terms(actor, rid, w),
         })
 
     skills = []

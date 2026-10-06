@@ -10,6 +10,7 @@ same list from exactly where it stopped.
 """
 from __future__ import annotations
 
+import contextlib
 import copy
 import re
 from collections.abc import Mapping
@@ -1306,6 +1307,7 @@ class Scene:
             # from the engine's ops is first noticed.
             said += a.sync_carried(self._dice)
             ended.extend(t for t in (_ward_tell(self, r) for r in said) if t)
+            ended.extend(self._curse_strikes(a, started))
         # The scene's own standing things expire on the same clock. `tick_standing` fires
         # `each_round` wards as well, which is exactly the work this must not repeat — so
         # it is called once, for expiry, and the firing stays where the rounds are real.
@@ -1390,6 +1392,85 @@ class Scene:
                 if isinstance(m, dict) and isinstance(fresh, dict):
                     m["curse"] = dict(fresh)
             out.extend(f"{a.name}: {s}" for s in said)
+        return out
+
+    def _curse_strikes(self, a: "Actor", started: int) -> list[str]:
+        """A curse that strikes its bearer once a day at a moment of its own choosing —
+        the stunning drawback, "Character is stunned for 1d4 rounds once item function is
+        finished (or randomly, 1/day)" (CRB, Cursed Items, Drawbacks). A blade or a ring
+        has no function that finishes, so it is the random once a day.
+
+        The moment is a minute of the day, rolled the first time the clock is seen to
+        enter that day with the item held (kept on the standing effect `sync_carried`
+        made, `payload.due`), and the stun lands when this stretch of the clock crosses
+        it, through the one applicator, for 1d4 rounds less whatever of the stretch was
+        left after it. A stun that ran its course inside a long wait is told as past.
+
+        Measured 2026-10-06 (enchanting leftovers): the drawback's `apply_condition` with
+        `periodic: "day"` had no reader at all — a day of waiting with it in hand changed
+        nothing and said nothing (lane C2's report: "not read"). What this still cannot
+        do: the world clock does not move during a fight's rounds, so a stun only ever
+        lands in time that passes (a wait, a walk, a rest), never in the middle of a
+        fight. The book's chance of that is small (ten rounds of a 14,400-round day), and
+        a second, round-by-round roll would be a second ticker for one curse.
+        """
+        from . import curses as curses_mod
+        from . import knowledge
+        from .sheet import _rounds_of
+
+        out: list[str] = []
+        now = int(self.clock_minutes)
+        if self._dice is None or now <= int(started):
+            return out
+        for e in list(a.effects):
+            strike = (e.payload or {}).get("strikes") if e.kind == "worn" else None
+            if not isinstance(strike, dict):
+                continue
+            due = dict(e.payload.get("due") or {})
+            first, last = int(started) // 1440, now // 1440
+            hit = None
+            # A stretch of many days (a long rest, a binding wait): only its last two days
+            # can leave a stun still running or worth a line.
+            for day in range(max(first, last - 1), last + 1):
+                if str(day) not in due:
+                    # The hour, then the minute in it (the dice refuse a d1440): every
+                    # minute of the day equally likely.
+                    what = f"the {e.payload.get('carried_from') or 'item'}"
+                    hour = self._dice.roll("1d24", label=f"{what}: which hour",
+                                           visibility="hidden")
+                    minute = self._dice.roll("1d60", label=f"{what}: which minute",
+                                             visibility="hidden")
+                    due[str(day)] = (day * 1440 + (int(hour.total) - 1) * 60
+                                     + int(minute.total) - 1)
+                if int(started) < int(due[str(day)]) <= now:
+                    hit = int(due[str(day)])
+            e.payload["due"] = {k: v for k, v in due.items() if int(k) >= last}
+            if hit is None:
+                continue
+            cond = str(strike.get("condition") or "stunned")
+            rounds = int(_rounds_of(strike.get("duration"), self._dice) or 1)
+            left = rounds - (now - hit) * self.ROUNDS_PER_MINUTE
+            name = str(e.payload.get("carried_from") or "item")
+            rid = str(e.origin or "").split(":", 1)[-1]
+            holders = [h for h in a.item_records(rid) if curses_mod.curse_of(h)]
+            # The first time it bites, the curse is found (`knowledge.learn_by_use`), and
+            # named once (`curses.tell`, known); its id never leaves the engine.
+            new = False
+            for h in holders:
+                new = knowledge.learn_by_use(a, h, "curse") or new
+            found = (" " + curses_mod.tell(curses_mod.curse_of(holders[0]), name.lower(),
+                                           known=True)) if new and holders else ""
+            said_rounds = f"{rounds} round{'' if rounds == 1 else 's'}"
+            if left > 0:
+                a.apply_effect(ActiveEffect(
+                    name=CONDITIONS.get(cond, {}).get("name", cond.title()),
+                    kind="condition", key=cond, source=f"the {name}", origin=e.origin,
+                    tags=states.tags_for(cond), duration="rounds", rounds_left=left))
+                out.append(f"{a.name} is {cond} by the {name.lower()} for "
+                           f"{said_rounds}.{found}")
+            else:
+                out.append(f"The {name.lower()} left {a.name} {cond} for {said_rounds} "
+                           f"along the way; it has passed.{found}")
         return out
 
     def _curse_tolls_found(self, a: "Actor") -> list[str]:
@@ -5162,13 +5243,19 @@ class Engine:
         # A save a spell document called for is a save against a spell (the provenance
         # stamp, stage 8), which noqual's `when: {"against": "spell"}` asks.
         ctx = {"against": "spell"} if str(intent.origin or "").startswith("spell:") else None
-        mods = actor.save_modifiers(save, ctx)
+        # An unreliable cloak or ring that lends this save its bonus is used by the save
+        # (`_save_gutters`): rolled once, kept across the dice popup.
+        gut = partial.get("save_gutter")
+        if gut is None:
+            gut = self._save_gutters(actor)
+        with self._guttered(gut["origins"]):
+            mods = actor.save_modifiers(save, ctx)
         level = actor.level if actor.is_pc else 1
         resolved_dc = dc_mod.resolve(intent.params["dc"], level)
 
         roll = self._roll_or_suspend(
             intent, actor, mods, label=f"{SAVES[save]} save",
-            dc=resolved_dc.final, partial=partial,
+            dc=resolved_dc.final, partial=partial, extra_partial={"save_gutter": gut},
         )
 
         # The face decides before the total (CRB p.180; `dice.d20_succeeds`). Until
@@ -5261,9 +5348,13 @@ class Engine:
 
         crossed = self._hp_state_effects(actor)
         effects.extend(crossed)
+        tell_bits = list(gut["tells"]) + tell_bits
 
         return Outcome(
-            intent_id=intent.id, op="save", rolls=[roll], dc=resolved_dc.as_dict(),
+            intent_id=intent.id, op="save",
+            # The save first: readers take `rolls[0]` as the save.
+            rolls=[roll] + [_roll_from_dict(r) for r in gut["rolls"]],
+            dc=resolved_dc.as_dict(),
             verdict=verdict, margin=margin, effects=effects,
             tell=" ".join(tell_bits) + self._hp_state_tell(crossed),
             because=intent.because,
@@ -5496,6 +5587,14 @@ class Engine:
                                                         thrown_real)
         if out_of_range and partial.get("attack_state") is None:
             return self._refuse(intent, out_of_range)
+        if thrown_real:
+            # Thrown, it is a ranged attack for everything that asks the blow's kind: the
+            # AC it is rolled against (cover, a helpless target's -4 is melee-only),
+            # flanking (melee only), arrow catching and deflection, and no thorns for the
+            # thrower (retribution is owed to a melee attack). Its damage is still read by
+            # key, so Strength stays on it (`damage_modifiers`). Before 2026-10-06 the
+            # throw was a melee blow in every one of these but the range increment.
+            weapon = dict(weapon, category="ranged", thrown=True)
         # Which kind of damage this swing deals: the weapon's own, unless the swing was
         # declared the other way (`lethality`), which costs the -4 `attack_modifiers`
         # charges. Measured 2026-09-27 before this was read: a punch took a thug from 13
@@ -5734,6 +5833,8 @@ class Engine:
             if isinstance(weapon.get("crafted_record"), dict) \
                     and (weapon["crafted_record"].get("magic") or {}).get("curse"):
                 weapon = self._cursed_swing(actor, weapon_key, weapon, state)
+                if thrown_real and weapon.get("category") != "ranged":
+                    weapon = dict(weapon, category="ranged", thrown=True)
             printed = weapon.get("stat_block") or {}
             swing_ac, swing_note = target_ac, ac_note
             if printed.get("touch"):
@@ -5769,8 +5870,10 @@ class Engine:
                                  + actor.weapon_own_mods("combat_mod", "attack", weapon_key,
                                                          defender=defender))
             else:
+                # A throw is a ranged attack: Dex to hit (`attack_modifiers(thrown=)`).
                 atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
-                                                  lethality=lethality, defender=defender)
+                                                  lethality=lethality, defender=defender,
+                                                  thrown=thrown_real)
                 # Compulsions are charged here rather than in `attack_modifiers` because
                 # the penalty depends on *who is being attacked*, which the sheet does not
                 # know. It penalises and never prohibits: see rules/compulsion.py.
@@ -7080,12 +7183,30 @@ class Engine:
                                                              or h.lower() in named)), None)
                       or held[0]]
         effects, recs = [], []
+        # A specific cursed item will not leave its bearer's hand (`_clinging`: "it can
+        # be gotten rid of only by means of break enchantment, limited wish, miracle,
+        # remove curse, or wish", the -2 cursed sword, CRB; its owner "automatically draws
+        # it"). The manoeuvre is rolled — the disarmer cannot know — and the blade stays;
+        # that is how its bearer finds the curse. Measured 2026-10-06 (enchanting
+        # leftovers): a clinging sword was knocked to the ground by a disarm, the one door
+        # out of the hand `_clinging` was never asked at.
+        clung = [(h, why) for h in chosen if (why := self._clinging(defender, h))]
+        chosen = [h for h in chosen if h not in {c for c, _ in clung}]
+        for h, why in clung:
+            effects.append({"ref": defender.ref, "kind": "kept", "item": h.lower(),
+                            "from": m["name"], "why": "clings"})
+        if not chosen:
+            # `_clinging`'s first sentence is the clause ("... will not leave X's hand"),
+            # spliced after the lead's colon; the curse's own words, found, follow it.
+            first, _, rest = clung[0][1].partition(". ")
+            return (first[:1].lower() + first[1:].rstrip("."),
+                    [r for r in [rest.strip()] + [w for _, w in clung[1:]] if r], effects)
         for h in chosen:
             rec = self._let_go(defender, h)
             recs.append(rec)
             effects.append({"ref": defender.ref, "kind": "dropped", "item": h.lower(),
                             "prop": rec["name"], "from": m["name"]})
-        extra = []
+        extra = [why for _, why in clung]
         # "If you successfully disarm your opponent without using a weapon, you may
         # automatically pick up the item dropped." A formed class weapon is a weapon.
         if weapon_key == "unarmed" and not actor.weapon(weapon_key).get("granted_by"):
@@ -12562,6 +12683,55 @@ class Engine:
                        tell=f"The {name}'s four rounds are over, and it drops at "
                             f"{actor.name}'s feet.", because="")
 
+    def _gutters_for(self, actor: Actor, rolls: list, wants) -> tuple[list[str], list[str]]:
+        """The bearer's unreliable worn or wielded items whose own documents this roll
+        reads (`wants(doc)`), each rolled once (`_gutter`): (origins rolled off, tells).
+
+        An item is "activated" (CRB, Unreliable) by the use that reads it: a cloak of
+        resistance by a save, a robe of spell resistance by a spell reaching its wearer.
+        Asked only of the items whose documents the roll reads, so a save does not roll
+        the d% of a ring that lends nothing to saves and tell that it guttered."""
+        from .sheet import _record_origin
+
+        relevant = {str(origin) for doc, _, origin, _ in actor._worn_walk()
+                    if doc.get("gutters_pct") and wants(doc)}
+        origins, tells = [], []
+        if not relevant:
+            return origins, tells
+        for rec in actor.cursed_on():
+            if _record_origin(rec) not in relevant:
+                continue
+            off, said = self._gutter(actor, rec, rolls)
+            if off:
+                origins.append(_record_origin(rec))
+                tells.append(said)
+        return origins, tells
+
+    def _save_gutters(self, actor: Actor) -> dict:
+        """An unreliable item that lends saving throws its bonus, rolled for one save.
+        Measured 2026-10-06 (enchanting leftovers): an unreliable +2 cloak of resistance
+        was rolled for every blow aimed at its wearer (`_worn_gutters`) and never for the
+        saves it exists to help, so its +2 never once failed where it mattered."""
+        rolls: list = []
+        origins, tells = self._gutters_for(
+            actor, rolls, lambda d: str(d.get("type") or "") == "save_mod")
+        return {"origins": origins, "tells": tells, "rolls": rolls}
+
+    @contextlib.contextmanager
+    def _guttered(self, origins):
+        """The items in `origins` count as rolled off for what is read inside the block,
+        and only there: a save's gutter must not take the cloak off the next roll in the
+        batch."""
+        m = current_moment()
+        added = set(origins or ()) - (m.guttered if m is not None else set())
+        if m is not None:
+            m.guttered.update(added)
+        try:
+            yield
+        finally:
+            if m is not None:
+                m.guttered.difference_update(added)
+
     def _worn_gutters(self, defender: Actor, rolls: list) -> tuple[list[str], list[str]]:
         """The defender's unreliable worn gear, rolled once for the blow coming at them:
         (origins rolled off, tells)."""
@@ -14156,14 +14326,23 @@ class Engine:
             amount, saved = rolled, False
 
             if plan["save"]:
+                # An unreliable cloak lending this save its bonus is used by it: rolled
+                # once per target, kept in the cast's state across the popup.
+                guts = state.setdefault("save_gutter", {})
+                if target.ref not in guts:
+                    gut = self._save_gutters(target)
+                    guts[target.ref] = {"origins": gut["origins"]}
+                    state["rolls"].extend(gut["rolls"])
+                    state["tells"].extend(gut["tells"])
+                with self._guttered(guts[target.ref]["origins"]):
+                    save_mods = target.save_modifiers(plan["save"], {"against": "spell"})
                 # Rolled by whoever is saving, not by the caster — which is what lets a
                 # PC roll their own save against a spell and keeps every NPC's save with
                 # the engine, through the one rule `_force_visibility` states.
                 save_roll = self._roll_or_suspend_stage(
                     # Against a spell: noqual armour's +2 resistance "on saves against
                     # spells" is a `when: {"against": "spell"}` term, asked of this.
-                    intent, target, target.save_modifiers(plan["save"],
-                                                          {"against": "spell"}),
+                    intent, target, save_mods,
                     f"{SAVES[plan['save']]} save against {spell.name}", dc,
                     partial, state, "1d20", state_key="cast_state",
                 )
@@ -14304,7 +14483,21 @@ class Engine:
             return not done[target.ref]
         if target is actor:
             return False
-        sr, whose = target.spell_resistance_rating()
+        # Unreliable armour of spell resistance is used by the spell reaching its wearer
+        # (`_gutters_for`): rolled once per target. Measured 2026-10-06 (enchanting
+        # leftovers): only a blow at the wearer ever rolled it, so its SR never failed.
+        guts = state.setdefault("sr_gutter", {})
+        if target.ref not in guts:
+            g_rolls: list = []
+            origins, said = self._gutters_for(
+                target, g_rolls, lambda d: str(d.get("type") or "") == "spell_resistance"
+                or (str(d.get("type") or "") == "combat_mod"
+                    and str(d.get("target") or "") == "spell_resistance"))
+            guts[target.ref] = origins
+            state["rolls"].extend(g_rolls)
+            state["tells"].extend(said)
+        with self._guttered(guts[target.ref]):
+            sr, whose = target.spell_resistance_rating()
         if sr <= 0:
             return False
         # The caster's own bonuses "on caster level checks to overcome spell resistance"
@@ -16469,6 +16662,10 @@ class Engine:
         moved = 0
         note = ""
         from_ground = False
+        # A crafted thing picked up off the ground (thrown, disarmed, dropped by a dance):
+        # its record never left its owner's pack, so the pick-up is the props ledger's
+        # alone (below).
+        crafted_back: dict | None = None
         # A record off somebody's shelf, kept whole for the taker (below).
         shelf_item = None
         # Who it was taken from without being handed over, when the holder search
@@ -16636,6 +16833,10 @@ class Engine:
                         item = str(rec["from_"])
                         from_ground = True
                         moved = 1           # that one thing, not `count` of them
+                        maker = self.scene.actors.get(whose_rec)
+                        made = maker.crafted_record(item) if maker is not None else None
+                        if made is not None:
+                            crafted_back = made
                     whose = self.scene.actors.get(whose_rec)
                     if whose is not None and whose.ref != taker.ref:
                         note = f" — {whose.name}'s, not {taker.name}'s"
@@ -16645,7 +16846,18 @@ class Engine:
                         # lying there nor that it is in the hand again.
                         note = "back up off the ground; it is in hand again"
 
-        if taker is not None and moved:
+        if taker is not None and moved and crafted_back is not None:
+            # Its record is still in its owner's pack (a thrown or disarmed crafted blade
+            # is the props ledger's `held_by` now, `hold_prop` above), so nothing is
+            # written to anybody's goods. Measured 2026-10-06 (enchanting leftovers): a
+            # thrown Fine Iron Dagger picked back up left `goods: {"fdag": 1}` — a second,
+            # nameless line for a thing already on the shelf — stayed out of the hand
+            # though the tell said "in hand again", and the tell named it "the fdag".
+            # Back in its owner's hand it is drawn again (the plain weapon's rule below).
+            if taker.ref == whose_rec and _record_gear(crafted_back) == "weapon":
+                taker.equipped = str(crafted_back.get("id") or crafted_back.get("name"))
+            item = str(crafted_back.get("name") or item).lower()
+        elif taker is not None and moved:
             if denom:
                 taker.purse[denom] = taker.purse.get(denom, 0) + moved
             elif shelf_item is not None:
@@ -18203,7 +18415,8 @@ class Engine:
         # chain shirt. Before the forge revamp this op set `equipped` and `armour` from
         # table keys only, so a thing made at the bench could be carried and never held.
         crafted = actor.crafted_record(item)
-        if crafted is not None and _record_gear(crafted) in ("weapon", "armour", "shield"):
+
+        def wear_crafted(crafted: dict) -> Outcome:
             # A sword on the enchanter's circle is not in anybody's hand (contracts §8.2,
             # lane G: "wear/sell doors must ask `inprogress.held_back`"): the binding in
             # progress holds it until it is collected.
@@ -18221,6 +18434,9 @@ class Engine:
                           f"'{lying['name']}').")
             return self._wear_crafted(intent, actor, crafted, no)
 
+        if crafted is not None and _record_gear(crafted) in ("weapon", "armour", "shield"):
+            return wear_crafted(crafted)
+
         # The one key, by the two resolvers (E1). Compared key to key, so "leather
         # armour", "Chain Shirt" and "bo staff" find what the sheet holds as "leather",
         # "chain shirt" and "bo-staff" — and what is put on is stored by its key.
@@ -18232,6 +18448,20 @@ class Engine:
                    | {str(actor.armour), str(actor.shield)})
         # Putting away what is in hand is drawing nothing: the fists are always there.
         if key not in carried and key != "unarmed":
+            # Not by its whole name and not plain gear: the looser word a player says
+            # ("draw my longsword", "the sword") for a thing made at a bench. Measured
+            # 2026-10-06: all three were refused "is not carrying" with the Superior Iron
+            # Longsword in the pack. One match is that thing; two are asked about by name,
+            # never guessed between (`Actor.crafted_records_called`).
+            loose = [r for r in actor.crafted_records_called(item)
+                     if _record_gear(r) in ("weapon", "armour", "shield")]
+            if len(loose) == 1:
+                return wear_crafted(loose[0])
+            if len(loose) > 1:
+                names = [str(r.get("name") or r.get("id")) for r in loose]
+                return no(f"{actor.name} carries more than one that answers to "
+                          f"'{item}': " + ", ".join(f"the {n}" for n in names[:-1])
+                          + f" and the {names[-1]}. Which one?")
             return no(f"{actor.name} is not carrying {item}.")
 
         before = actor.ac()
