@@ -460,6 +460,15 @@ GEAR: dict[str, dict] = {
     "caltrops": {"name": "caltrops", "cost_gp": 1.0, "lb": 2},
     "sunrod": {"name": "sunrod", "cost_gp": 2.0, "lb": 1},
     "alchemist's fire": {"name": "alchemist's fire", "cost_gp": 20.0, "lb": 1},
+    # The rest of the CRB's alchemical eight (Goods and Services, "Special Substances and
+    # Items", legacy.aonprd.com/coreRulebook/equipment.html, read 2026-10-06), added for
+    # the alchemy plan §12.5. What every one of the eight DOES is its formula's book core
+    # (`CLASSIC_GEAR` below), never a row here.
+    "acid": {"name": "acid", "cost_gp": 10.0, "lb": 1},
+    "tanglefoot bag": {"name": "tanglefoot bag", "cost_gp": 50.0, "lb": 4},
+    "smokestick": {"name": "smokestick", "cost_gp": 20.0, "lb": 0.5},
+    "tindertwig": {"name": "tindertwig", "cost_gp": 1.0, "lb": 0},
+    "thunderstone": {"name": "thunderstone", "cost_gp": 30.0, "lb": 1},
     # The blacksmith's field kit (docs/blacksmithing-revamp-plan.md §10; `places.FIELD_KIT`
     # names it): common and uncommon smithing anywhere, without a smithy. PROPOSED price
     # and weight, not the book's, which prints no such kit: Ultimate Equipment's farrier's
@@ -564,7 +573,7 @@ GOOD_PREFIX = "gear:"
 # What each kind of good is filed under on a shelf. The id carries the kind, so a row
 # picked on the screen names its own shelf with nothing looked up twice.
 PREFIXES = {"gear": "gear:", "weapon": "weapon:", "armour": "armour:", "shield": "shield:",
-            "mount": "mount:", "tack": "tack:", "manual": "manual:"}
+            "mount": "mount:", "tack": "tack:", "manual": "manual:", "alchemy": "alchemy:"}
 # The smallest coin, for the four weapons the Core Rulebook prints a dash for (club,
 # quarterstaff, sling, wooden stake). The outfit page gives them away; a counter cannot,
 # because `pricing.worth` reads an authored price of 0 as "no price written" and prices
@@ -676,12 +685,102 @@ def table_goods(table: str) -> list[Good]:
         return [Good(id=PREFIXES["manual"] + m["id"], name=str(m["name"]),
                      price_gp=float(m["price_gp"]), kind="gear", key=str(m["id"]))
                 for m in knowledge.manuals(MANUAL_TABLES[table]).values()]
+    if table == ALCHEMY_CLASSICS:
+        return alchemy_classic_goods()
     return []
 
 
 # Which craft's manuals each counter table sells (content/rules/stall-lines.json `tables`).
+# The alchemy manuals were the 0.2.4 defect waiting to happen again: a craft's books on no
+# counter. The alchemist's shop names this table (stall-lines.json), and a test holds every
+# manual of every craft to some counter.
 MANUAL_TABLES = {"herbal-manuals": "herbalist", "smithing-manuals": "blacksmith",
-                 "enchanting-manuals": "enchanter"}
+                 "enchanting-manuals": "enchanter", "alchemy-manuals": "alchemist"}
+
+
+# --- the alchemist's goods are the bench's own products (alchemy plan §12.5, owner Q8.3) -----
+#
+# Before this, a bought alchemist's fire, antitoxin or sunrod was a jar with a name and no
+# document (`deliver` made `Stock(base=name)` and nothing else): the antitoxin a counter sold
+# "the GM narrates" (rules/consumables.py), and the flask could not be thrown at anybody.
+# The owner's Q8.3: "the same documents as the crafted ones", bought at Sound quality. So a
+# bought classic is built from its FORMULA ROW (content/rules/alchemy-formulae.json, lane E)
+# — the book core, the book price — and so is a potion on sale. One item, whether bought or
+# made; nothing here restates what an item does.
+#
+# The CRB eight keep their GEAR rows (the outfit page sells from GEAR, and the alchemist's
+# shop names them), and this map is the one place a GEAR key becomes its formula. The other
+# ten classics (Ultimate Equipment's, and the house holy weapon balm) have no GEAR row and
+# are sold as the `alchemy-classics` table. tests/test_alchemy_prices.py holds every GEAR
+# price here to its formula's printed price, so the two cannot drift.
+CLASSIC_GEAR: dict[str, str] = {
+    "alchemist's fire": "alchemists-fire", "acid": "acid-flask", "antitoxin": "antitoxin",
+    "sunrod": "sunrod", "tanglefoot bag": "tanglefoot-bag", "smokestick": "smokestick",
+    "tindertwig": "tindertwig", "thunderstone": "thunderstone",
+}
+ALCHEMY_CLASSICS = "alchemy-classics"
+# How each family is used (alchemy plan §12.1, "Used by"): drunk, coated or rubbed on,
+# thrown, thrown at a square, struck or lit. What `consumables.plan` reads in `Stock.how`.
+FAMILY_HOW: dict[str, tuple[str, ...]] = {
+    "potion": ("drink",), "oil": ("coat", "apply"), "splash": ("throw",),
+    "cloud": ("throw",), "tool": ("light",),
+}
+
+
+def alchemy_stock(fid: str):
+    """The stock row a bought formula product is: the formula's own core at Sound quality
+    (its book numbers), its family's uses, and — for a potion holding a spell — the spell
+    and its caster level, so the enchanter's stand-in and the drink door both read it
+    (contracts §6: `holds_spell` and `caster_level` always written). A derived spell row has
+    no authored core: its `specs` stay empty and the drink resolves the spell's own documents
+    (`consumables.spell_of`). None for an id that is no formula."""
+    from . import effectspec, formulae
+    from .crafting import Stock
+
+    row = formulae.get(fid)
+    if row is None:
+        return None
+    specs = [dict(s) for s in (row.get("core") or ())]
+    family = str(row.get("family") or "")
+    return Stock(base=str(row["name"]), tier=str(row.get("tier") or "common"), potency=1.0,
+                 craft="alchemist", specs=specs,
+                 effects=[effectspec.render(s) for s in specs],
+                 how=list(FAMILY_HOW.get(family, ())), quality=formulae.SOUND,
+                 holds_spell=row.get("spell") if row.get("kind") == "spell" else None,
+                 caster_level=row.get("caster_level") if row.get("kind") == "spell" else None)
+
+
+def _alchemy_good(row: dict, *, staple: bool) -> Good:
+    from . import pricing
+
+    return Good(id=PREFIXES["alchemy"] + str(row["id"]), name=str(row["name"]),
+                price_gp=float(pricing.book_price(row) or 0), tier=str(row.get("tier") or "common"),
+                staple=staple, kind="alchemy", key=str(row["id"]))
+
+
+def alchemy_classic_goods() -> list[Good]:
+    """Every brewable classic a GEAR row does not already sell, as a staple of the
+    alchemist's counter at its book price."""
+    from . import formulae
+
+    geared = set(CLASSIC_GEAR.values())
+    return [_alchemy_good(r, staple=True) for fid, r in sorted(formulae.all().items())
+            if r.get("kind") == "classic" and r.get("brewable", True) and fid not in geared]
+
+
+def potion_goods() -> list[Good]:
+    """Every brewable spell potion and oil, at Sound quality and the book price (plan
+    §12.5), for the alchemist's daily draw: NOT staples. Which of them a counter has today
+    is the market's existing rule — the rarity quota and the till (`market.on_sale`) — so
+    the alchemist's till bounds the dearest potion it shelves.
+
+    A harmful spell's row is left off the counter: bought, it is a potion, and a potion's
+    target is its drinker (owner, open point 5) — a shop selling "potion of touch of
+    fatigue" to drink is selling poison as medicine. Its thrown-flask form is the bench's."""
+    from . import formulae
+
+    return [_alchemy_good(r, staple=False) for fid, r in sorted(formulae.all().items())
+            if r.get("kind") == "spell" and r.get("brewable", True) and not r.get("harmful")]
 
 
 def catalogue_ids() -> set[str]:
@@ -769,6 +868,16 @@ def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
                          f" {', '.join(names)} are {actor.name}'s now, and go where "
                          f"they go.")
     per = int(getattr(found, "per", 1) or 1)
+    # An alchemist's product — a classic off the shelf or a potion from today's draw — is
+    # the bench's own stock row (`alchemy_stock`), so a bought antitoxin gives its +5 and a
+    # bought flask of acid can be thrown (owner Q8.3).
+    fid = (key if kind == "alchemy"
+           else CLASSIC_GEAR.get(key) if isinstance(found, Good) and kind == "gear" else None)
+    if fid:
+        made = alchemy_stock(fid)
+        if made is not None:
+            actor.add_stock(made, count * per)
+            return [], ""
     # A craft's material — a counter's staple charcoal, or one drawn onto today's shelf —
     # goes in the satchel under its own id, where every bench reads it and where the
     # forge's "Buy from the market" has always put it. Before this it became a pack jar
