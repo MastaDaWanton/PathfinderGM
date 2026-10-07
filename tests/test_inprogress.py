@@ -403,7 +403,8 @@ def test_the_enchanter_is_registered_whatever_was_imported_first():
 
     code = ("import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', "
             "'pathfindergm.settings'); django.setup(); "
-            "from rules import inprogress; print('enchanter' in inprogress._registry())")
+            "from rules import inprogress; r = inprogress._registry(); "
+            "print('enchanter' in r and 'alchemist' in r)")
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                          stdin=subprocess.DEVNULL, timeout=120)
     assert out.stdout.strip().endswith("True"), out.stderr[-500:]

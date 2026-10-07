@@ -56,7 +56,7 @@ from django.test.signals import setting_changed  # noqa: E402
 # rules/ for the declaration pattern and fails if this tuple has drifted, which is the
 # same arrangement `test_packaging.py` uses for the spec's content directories.
 _CACHED = (
-    "rules.alchemist", "rules.backgrounds", "rules.bestiary", "rules.blacksmith", "rules.bluff",
+    "rules.backgrounds", "rules.bestiary", "rules.blacksmith", "rules.bluff",
     "rules.class_abilities", "rules.classes",
     "rules.enchanter", "rules.feats", "rules.gear", "rules.hazards", "rules.ingredients",
     "rules.lives",

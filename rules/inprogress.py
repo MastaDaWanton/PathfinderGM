@@ -106,6 +106,9 @@ def _registry() -> dict[str, _Craft]:
     # decided whether a +1 sword was ever made.
     if "enchanter" not in _CRAFTS:
         from . import enchanter  # noqa: F401  — registers `enchanter`
+    # And the alchemist (alchemy lane F): its spell potions, transmutes and long steps.
+    if "alchemist" not in _CRAFTS:
+        from . import alchemist  # noqa: F401  — registers `alchemist`
     return _CRAFTS
 
 
