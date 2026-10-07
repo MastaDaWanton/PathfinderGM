@@ -162,7 +162,8 @@ const out = {};
     out.none = R.card(Object.assign({}, data.qs_after, { carried: 0 }), { actions: true });
     out.teacher = R.card(Object.assign({}, data.qs_after, { teachers: [{ ref: 'npc:mirela', name: 'Mirela', price: '5 gp' }] }), { actions: true });
     out.brimstone = R.card(data.brimstone, { actions: true });
-    out.confirmBlind = R.needsConfirm(data.qs_before, {});
+    out.confirmBlind = R.needsConfirm(Object.assign({}, data.qs_before, { hazards: [] }), {});
+    out.confirmServer = R.needsConfirm(data.qs_before, {});
     out.confirmShelf = R.needsConfirm(data.qs_before, { hazards: ['toxic to handle'] });
     out.confirmHood = R.needsConfirm(data.qs_before, { hazards: ['toxic to handle'], where: { protected: "the laboratory's fume hood" } });
     out.confirmVolatile = R.needsConfirm(data.brimstone, { hazards: ['volatile'], where: { protected: "the laboratory's fume hood" } });
@@ -232,18 +233,23 @@ def _text(html: str) -> str:
 
 def test_an_unassayed_reagent_shows_an_unknown_line_per_property_and_nothing_else(served, drawn):
     """Lane A's knowledge: nothing about quicksilver is known before an assay, so the card
-    must say "unknown" five times and nothing of what it does. The route sends each unknown
-    row's list (`group`: "toxic"), and a careless card prints it: "toxic" beside an unknown
-    line teaches the danger before any assay. The document's own `text` ("poisons the blood
-    together") gives the properties away in prose, so it is not drawn at all."""
+    must say "unknown" five times and nothing of what it does. The route used to send each
+    unknown row's list (`group`: "toxic"), and a careless card printed it: "toxic" beside an
+    unknown line teaches the danger before any assay. Lane U1 closed that at the server
+    (2026-10-07): an unknown row is `unknown-N` and nothing else. The document's own `text`
+    ("poisons the blood together") gives the properties away in prose, so it is not drawn."""
     card = served["qs_before"]
-    assert card["unknown"] == 5 and any(p["group"] == "toxic" for p in card["properties"])
+    unknown = [p for p in card["properties"] if not p.get("known")]
+    assert card["unknown"] == 5 and len(unknown) == 5
+    assert all(p.get("group") is None and p.get("text") is None for p in unknown), unknown
     html = drawn["before"]
     assert html.count(">unknown</span>") == 5
     text = _text(html).lower()
     for secret in ("toxic", "constitution", "speed", "harmful", "poison", "mishap"):
         assert secret not in text, secret
-    assert "In the bottle" in html and "At the bench" in html
+    # The group headings went with the groups: an "At the bench" heading over five unknown
+    # lines says one of them is a handling danger, which is the leak U1 closed.
+    assert "In the bottle" not in html and "At the bench" not in html
 
 
 def test_an_assay_fills_the_card_with_what_it_taught_and_how(served, drawn):
@@ -289,8 +295,10 @@ def test_a_dangerous_assay_asks_first_only_on_what_the_player_was_told(drawn):
     teach the hazard (the enchanter's card asked about `volatile` before any read). So it
     asks when the shelf has named the hazard (it always names these two, plan §8.1), or the
     toxic or mishap row is known; never on a blind card. A fume hood spares a toxic assay,
-    so only a volatile one asks there."""
-    assert drawn["confirmBlind"] is False
+    so only a volatile one asks there. Since lane U1 the card's own `hazards` carries the
+    shelf's words (quicksilver: "toxic to handle"), so the served card asks with no help
+    from the caller, and only a card stripped of them is blind."""
+    assert drawn["confirmBlind"] is False and drawn["confirmServer"] is True
     assert drawn["confirmShelf"] is True and drawn["knownToxic"] is True
     assert drawn["confirmHood"] is False and drawn["confirmVolatile"] is True
     bare = drawn["confirmBare"]

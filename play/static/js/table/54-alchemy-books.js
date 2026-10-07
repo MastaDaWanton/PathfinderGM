@@ -159,11 +159,16 @@
   function propsHtml(c) {
     var props = c.properties || [];
     if (!props.length) return '<p class="hc-sub">There is nothing to learn about it.</p>';
-    var groups = [["In the bottle", props.filter(inBottle)],
-                  ["At the bench", props.filter(function (p) { return !inBottle(p); })]];
+    // Only known rows are grouped. An unknown row carries no `group` (the server stopped
+    // sending it, 2026-10-07): filed under a heading, five blanks read as "in the bottle",
+    // and one under "At the bench" would say it is a handling danger before any assay.
+    var known = props.filter(function (p) { return p.known; });
+    var blind = props.filter(function (p) { return !p.known; });
+    var groups = [["In the bottle", known.filter(inBottle)],
+                  ["At the bench", known.filter(function (p) { return !inBottle(p); })]];
     return groups.filter(function (g) { return g[1].length; }).map(function (g) {
       return '<h4 class="ab-group">' + g[0] + '</h4><ul class="hc-props">' + g[1].map(propRow).join("") + '</ul>';
-    }).join("");
+    }).join("") + (blind.length ? '<ul class="hc-props">' + blind.map(propRow).join("") + '</ul>' : "");
   }
   function dangerHtml(c) {
     return c.danger_known ? '<p class="ab-danger">You know this can hurt you: ' + esc(c.danger_known) + '.</p>' : "";
