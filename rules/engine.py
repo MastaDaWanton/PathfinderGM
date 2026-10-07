@@ -32,6 +32,7 @@ from . import ingredients as ing_mod
 from . import resources
 from . import states
 from . import survival
+from . import object_numbers
 from . import tradecraft
 from . import troops as troops_mod
 from . import water
@@ -8481,10 +8482,16 @@ class Engine:
             trained = int(actor.ranks.get("craft", 0) or 0) > 0 \
                 or not r.get("numbers_trained_only")
             if roll.total >= int(r["numbers_dc"]) and trained:
-                obj = tradecraft.damage_of(owner, name) or owner.item(name)
-                state = ("broken" if obj.broken else "sound")
-                bits.append(f"Hardness {obj.hardness}, {obj.hp} of {obj.hp_max} hit "
-                            f"points; {state}.")
+                # Read through the one reader without minting a record: a look leaves
+                # nothing behind on the sheet. The row it was read off is named, so the
+                # player sees why a longsword has 5 hit points (CRB Table 7-12).
+                obj = tradecraft.damage_of(owner, name)
+                got = object_numbers.for_actor(owner, name)
+                hp, hp_max = (obj.hp, obj.hp_max) if obj else (got.hp_max, got.hp_max)
+                state = ("sound" if obj is None else "ruined" if obj.destroyed
+                         else "broken" if obj.broken else "sound")
+                bits.append(f"Hardness {got.hardness}, {hp} of {hp_max} hit points; "
+                            f"{state}" + (f" — {got.why[0]}" if got.why else "") + ".")
             tell = " ".join(bits)
         self.scene.dealings[key] = {"tell": tell, "margin": margin}
         return Outcome(intent_id=intent.id, op="judge", rolls=[roll],

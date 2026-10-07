@@ -221,8 +221,14 @@ def price_gp(actor, name: str) -> float:
 
 def damage_of(actor, name: str):
     """The thing's object record if anything has ever hurt it, else None — read from
-    `Actor.gear` without minting one (`Actor.item` creates on first ask)."""
-    return (getattr(actor, "gear", None) or {}).get(name.strip().lower())
+    `Actor.gear` without minting one (`Actor.item` creates on first ask), its numbers
+    re-read through `object_numbers` as `Actor.item` re-reads them."""
+    from . import object_numbers
+
+    rec = (getattr(actor, "gear", None) or {}).get(name.strip().lower())
+    if rec is not None:
+        object_numbers.carry_damage(rec, object_numbers.for_actor(actor, rec.name))
+    return rec
 
 
 # --- B. haggling -----------------------------------------------------------------------

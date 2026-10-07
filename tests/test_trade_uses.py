@@ -66,7 +66,8 @@ def test_beaten_by_five_the_look_reads_hardness_and_hit_points():
     pc.damage_item("quarterstaff", 12)
     out = _run(e, {"op": "judge", "params": {"item": "my quarterstaff"}}, 15)
     assert "not masterwork" in out.tell
-    assert "Hardness 5, 3 of 10 hit points; broken." in out.tell
+    assert ("Hardness 5, 3 of 10 hit points; broken — a two-handed hafted weapon "
+            "(CRB Table 7-12).") in out.tell
 
 
 def test_a_second_look_the_same_day_reveals_the_same_result():
@@ -98,10 +99,11 @@ def test_a_broken_staff_is_mended_whole_for_a_fifth_of_its_price_and_an_hour_a_p
 
 def test_a_failure_by_five_ruins_half_the_materials_and_mends_nothing():
     s, e, pc = _table(craft=1)
-    pc.damage_item("light crossbow", 12)              # a crossbow is DC 15 to make
+    # A projectile weapon: hardness 5, 5 hit points (CRB Table 7-12); 8 leaves 2.
+    pc.damage_item("light crossbow", 8)               # a crossbow is DC 15 to make
     purse = dict(pc.purse)
     out = _run(e, {"op": "mend", "params": {"item": "light crossbow"}}, 1)
-    assert pc.gear["light crossbow"].hp == 3
+    assert pc.gear["light crossbow"].hp == 2
     assert "the DC for a crossbow" in out.tell
     assert "ruins half the materials" in out.tell
     assert pc.purse != purse
@@ -228,6 +230,23 @@ def test_the_pay_is_the_task_and_training_not_the_dies_total():
     assert tradecraft.degree(10) == tradecraft.degree(30) == "critical success"
     assert offer["pay_cp"]["critical success"] > offer["pay_cp"]["success"] \
         > offer["pay_cp"]["failure"] > offer["pay_cp"]["critical failure"] == 0
+
+
+def test_a_level_3_week_in_a_city_pays_half_what_it_did():
+    """The owner, 2026-10-07: "Paid work: halve it." At coin_scale 10 a level-3 expert in
+    a city (task 3, DC 18) earned 500 cp a day on a success — 35 gp a week, about four
+    times the CRB's half-the-check wage of 8 gp. At 5: 250 cp a day, 17 gp 5 sp a week.
+    The untrained wage is the CRB's own 1 sp and does not move."""
+    assert tradecraft.row("day-work")["coin_scale"] == 5
+    pc = load_pc("fixtures/pc-thessaly.json")
+    pc.level, pc.ranks["profession"] = 3, 3
+    offer = tradecraft.work_offer(pc, "city")
+    assert (offer["task"], offer["proficiency"], offer["dc"]) == (3, "expert", 18)
+    assert offer["pay_cp"] == {"critical success": 400, "success": 250, "failure": 40,
+                               "critical failure": 0}
+    assert 7 * offer["pay_cp"]["success"] == 1750
+    pc.ranks["profession"] = 0
+    assert tradecraft.work_offer(pc, "city")["pay_cp"] == {"untrained": 10}
 
 
 def test_the_task_is_capped_by_the_settlement_and_by_the_level():
