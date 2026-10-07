@@ -273,13 +273,21 @@ def test_working_a_metal_reveals_its_working_traits(forge):
 
 def test_assay_takes_a_sliver_and_pays_for_what_it_teaches(forge):
     """Plan §9.2 through lane E's `knowledge.assay`: a tenth of a carried bar, ten
-    minutes, the revealed properties in words and +3 mastery each."""
+    minutes, the revealed properties in words, and a point of mastery for each. It paid
+    +3 for each property revealed until the owner, 2026-10-06: "studying materials should
+    give you 1 point and 0 if you dont find anything. I had made almost nothing and was
+    level 5 blacksmithing" ("1 for each property it finds is okay") — this assay paid 6
+    then and pays 2 now."""
     _carry(iron=1)
     clock = cm.current().scene.clock_minutes
     d = post(forge, "/api/forge/assay", {"material": "iron", "face": 15}).json()
     assert [x["key"] for x in d["revealed"]] == ["k0", "k1"]
     assert d["minutes"] == 10 and cm.current().scene.clock_minutes == clock + 10
-    assert sum(x["mp"] for x in d["mastery"]["lines"]) == 6
+    assert sum(x["mp"] for x in d["mastery"]["lines"]) == 2
+    # A second assay of the same material that learns nothing new pays nothing.
+    again = post(forge, "/api/forge/assay", {"material": "iron", "face": 1}).json()
+    if not again.get("revealed"):
+        assert sum(x["mp"] for x in (again.get("mastery") or {}).get("lines") or []) == 0
     iron = [x for x in d["rack"] if x["material"] == "iron"]
     assert [x["amount"] for x in iron] == [0.9]
     none = post(forge, "/api/forge/assay", {"material": "mithral"})
