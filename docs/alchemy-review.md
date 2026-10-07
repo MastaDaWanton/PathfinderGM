@@ -339,7 +339,7 @@ Ids, spells, caster levels and materials are unchanged (your Q10.2). Each narrat
 | Potion of Cure Serious Wounds | - | - | vigour | might, purity, vigour, ward |
 | Potion of Fly | flight with good manoeuvrability; when the draught expires t | +2 Fly for 5 minutes | lightness | lightness, mind, purity, vigour, ward |
 | Potion of Haste | - | - | grace, might, ward | grace, lightness, purity, vigour, ward |
-| Potion of Heroism | the same +2 morale bonus applies to every skill check the dr | +2 morale on each of the 35 skills | change, grace, lightness, might, mind, shadow, sight, vigour, ward | light, might, mind, purity, vigour, ward |
+| Potion of Heroism | the same +2 morale bonus applies to every skill check the dr | +2 All skills for 50 minutes | might, mind, ward | light, might, mind, purity, vigour, ward |
 | Potion of Water Breathing | the drinker breathes water freely for ten hours; the duratio | Breathes water freely. for 10 hours | change | change, purity, vigour, ward |
 | Potion of Gaseous Form | the drinker and their gear become insubstantial smoke: fly 1 | Insubstantial smoke: fly 10 ft (perfect), through small cracks, immune to poison and critical hits, no attacks, somatic casting or most items. for 10 minutes | change, ward | change, lightness, purity, shadow, vigour, ward |
 | Potion of Neutralize Poison | detoxifies any venom in the creature: poison currently affec | dropped: the potion's other lines already carry it | purity | decay, purity, vigour, ward |

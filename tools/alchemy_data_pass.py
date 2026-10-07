@@ -1090,14 +1090,12 @@ POTION_TYPING: dict[str, list] = {
     # Fly (CRB): "a bonus on Fly skill checks equal to 1/2 your caster level" (CL 5: +2).
     "potion-of-fly": [{"type": "skill_mod", "target": "fly", "amount": 2,
                        "bonus_type": "untyped", "duration": D(5, "minute")}],
-    # Heroism (CRB): "+2 morale bonus on attack rolls, saves, and skill checks". The
-    # engine has one target for every skill (`sheet.ALL_SKILLS`, "all"), but the
-    # vocabulary's skill dropdown refuses it, so the line is one skill_mod per skill the
-    # vocabulary lists. Asked of the lead: `all` in effectspec's skill vocabulary would
-    # make this one line (rules/effectspec.py is lane B's file).
-    "potion-of-heroism": [{"type": "skill_mod", "target": s["id"], "amount": 2,
-                           "bonus_type": "morale", "duration": D(50, "minute")}
-                          for s in effectspec.VOCAB["skill"]],
+    # Heroism (CRB): "+2 morale bonus on attack rolls, saves, and skill checks". One line
+    # at the engine's every-skill target (`sheet.ALL_SKILLS`, "all"), which the
+    # vocabulary has listed since alchemy lane C3; lane D had to write it as 35 lines, one
+    # per skill, while the vocabulary refused it.
+    "potion-of-heroism": [{"type": "skill_mod", "target": "all", "amount": 2,
+                           "bonus_type": "morale", "duration": D(50, "minute")}],
     "potion-of-water-breathing": [_perm("Breathes water freely.", "breathe_water",
                                         D(10, "hour"))],
     "potion-of-gaseous-form": [_perm("Insubstantial smoke: fly 10 ft (perfect), through "
@@ -1181,6 +1179,19 @@ def _drinkable(mid: str) -> bool:
     return any(w.get("trait") == "drinkable" for w in plan.get("working") or [])
 
 
+# Lines an earlier run of this pass wrote in place of a narrative line, which a later
+# typing supersedes. The pass replaces narrative lines and nothing else, so once a row was
+# typed a changed typing could never reach the file again: heroism's 35 per-skill lines
+# (lane D, written while the skill vocabulary refused `all`) would have stayed beside the
+# one `all` line for ever. Each predicate names exactly the old lines; the new typing is
+# then added once, so the run stays idempotent.
+SUPERSEDED = {
+    "potion-of-heroism": lambda e: (e.get("type") == "skill_mod"
+                                    and e.get("bonus_type") == "morale"
+                                    and e.get("target") != "all"),
+}
+
+
 def build_potion(raw: dict) -> dict:
     row = copy.deepcopy(raw)
     if not any(_drinkable(m) for m in row.get("materials") or []):
@@ -1188,6 +1199,12 @@ def build_potion(raw: dict) -> dict:
         row["materials"] = list(row.get("materials") or []) + [vessel]
     typing = POTION_TYPING.get(row["id"])
     narr = [i for i, e in enumerate(row["effects"]) if e.get("type") == "narrative"]
+    old = SUPERSEDED.get(row["id"])
+    if not narr and old is not None and typing:
+        kept = [e for e in row["effects"] if not old(e)]
+        kept.extend(copy.deepcopy(t) for t in typing if t is not None and t not in kept)
+        row["effects"] = kept
+        return row
     if not narr:
         return row
     if typing is None or len(typing) < 1:

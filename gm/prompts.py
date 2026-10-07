@@ -1893,7 +1893,7 @@ EARLIER_BEATS = 2
 EARLIER_CHARS = 1400
 
 
-def scene_now(scene, was_clock: int | None = None) -> str:
+def scene_now(scene, was_clock: int | None = None, outcomes=None) -> str:
     """The scene as it stands this moment, derived from engine state, for the END of
     the prose prompt.
 
@@ -1974,6 +1974,9 @@ def scene_now(scene, was_clock: int | None = None) -> str:
     hour = hour_now(scene, was_clock)
     if hour:
         out.append(hour)
+    light = light_now(scene, outcomes)
+    if light:
+        out.append(light)
     body = body_now(scene.pc() if hasattr(scene, "pc") else None)
     if body:
         out.append(body)
@@ -2008,6 +2011,72 @@ def hour_now(scene, was_clock: int | None) -> str:
             f"{_residency.day_part(int(was_clock))} when the player spoke; it is now "
             f"{_residency.time_words(now)}. The light, the sky and the air are this "
             f"hour's, not the hour the turn began in.")
+
+
+def light_now(scene, outcomes=None) -> str:
+    """How little the player can see, last in the prompt, on a beat where it matters: a
+    fight, or a search, in dim light or darkness — and only then.
+
+    The owner, 2026-10-06: *"keep the book rule but make sure that it naturally makes it
+    into prose that you can barely see and that it making it hard to hit your target."*
+    The light model already decides it (`Scene.light_at`; dim is a 20% miss chance,
+    darkness 50%), and the one place the narrator heard of it was a tell on a swing the
+    miss chance happened to decide. `hour_now`'s reasoning holds here too: a line that is
+    always there is a formula, so a quiet night walk is not told it is dark every beat —
+    a fight or a search is where poor sight changes what happens. The derivation is
+    `checks.light_shown.sight`, which the check holding the page to it reads as well.
+    Words, never numbers (law 3)."""
+    from rules import places as _places
+
+    from .checks import light_shown
+
+    if scene is None:
+        return ""
+    fighting = bool(getattr(scene, "in_encounter", False)) or any(
+        getattr(o, "op", None) == "attack" for o in outcomes or ())
+    searching = any(getattr(o, "op", None) == "check"
+                    and "perception" in str(getattr(o, "tell", "") or "").lower()
+                    for o in outcomes or ())
+    if not (fighting or searching):
+        return ""
+    seen = light_shown.sight(scene)
+    if seen is None:
+        # Lit where the player stands, in a place the night or the ground holds dark:
+        # the light they fight in is a thing they carry, and its edge is part of it.
+        try:
+            ambient = scene.ambient_light()
+        except Exception:       # noqa: BLE001
+            return ""
+        # Who carries a light, never the light's own name: live (2026-10-06) a struck
+        # sunrod's effect was named "Normal light 30 ft, one step brighter out to 60 ft"
+        # — its document's description — and that is numbers in the author's-note slot.
+        # The carrier is whoever stands on the light's square: `Scene.lights` is the
+        # engine's one reading of what burns here (a light moves with its carrier), and
+        # the prompt asks it rather than reading anybody's effects (law 3's ratchet).
+        squares = {tuple(sq) for sq, _r, _rr, _n in (scene.lights()
+                                                     if hasattr(scene, "lights") else ())}
+        carriers = [a for r, a in (getattr(scene, "actors", {}) or {}).items()
+                    if scene.positions.get(r) is not None
+                    and tuple(scene.positions[r][:2]) in squares]
+        if ambient not in ("dim", "dark") or not carriers:
+            return ""
+        held = "; ".join("the light in the player's hand" if a.is_pc
+                         else f"the light {a.name} carries" for a in carriers)
+        dark = "underground dark" if _places.terrain_of(
+            str(getattr(scene, "at", "") or "")) == "underground" else "night"
+        return (f"THE LIGHT (engine fact, this moment): {held} lights the ground close "
+                f"around it; past its edge is the {dark}, where shapes are hard to make "
+                f"out. Never sunlight or glare beyond it; no numbers.")
+    if seen["level"] == "dark":
+        sight_words = ("pitch dark — the player can barely see their own hands; they "
+                       "fight by sound and touch, and swing at where a noise was")
+    else:
+        sight_words = ("dim — the player can barely make out the shapes around them; "
+                       "faces and edges are lost past arm's reach, and a blow can go "
+                       "wide at a shape that is not quite where it looked")
+    return (f"THE LIGHT (engine fact, this moment): {seen['why']}, {sight_words}. It "
+            f"shows in what they see and in how the blows find or miss their marks. "
+            f"Never sunlight or glare; no numbers.")
 
 
 def body_now(pc) -> str:
@@ -2837,6 +2906,28 @@ def fill_companion(value, *, self_ref: str, name: str, foe_ref: str, foe: str):
             .replace("{Foe Ref}", foe_ref).replace("{Foe}", _definite(foe)))
 
 
+def stuck_note(actor) -> str:
+    """Fire clinging to the creature, or goo holding it to the floor, as a fact for its
+    turn prompt with the op that answers it — asked of the vocabulary (law 1), never of a
+    condition's name. `burning` is an effect, not a condition, so the conditions line
+    above never said it: a creature on fire was told "conditions: none" and swung. Words
+    and op names only; the engine owns the DC and the bonus (law 3)."""
+    ref = getattr(actor, "ref", "")
+    lines = []
+    if actor.has_state("state.burning"):
+        lines.append('They are ON FIRE: it burns them again next round unless put out. '
+                     'Putting it out takes the whole turn: {"op": "extinguish", "actor": '
+                     f'"{ref}", "params": {{"roll": true}}}} to roll on the ground, '
+                     '"roll": false to beat at the flames.')
+    if actor.has_state("state.held.glued"):
+        lines.append('They are GLUED to the floor by sticky goo and cannot move until '
+                     'they tear loose: {"op": "break_free", "actor": '
+                     f'"{ref}", "params": {{"how": "strength"}}}} to heave free, or '
+                     '"how": "slash" to '
+                     'hack it off with a slashing weapon.')
+    return "".join(line + "\n" for line in lines)
+
+
 def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
                       actor, round_no: int, first: str = "",
                       companion: str = "", foe: tuple[str, str] | None = None
@@ -2897,6 +2988,7 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
         f"They are {hp_note} and their conditions are: {conditions}.\n"
         f"{arms}"
         + (f"{first}\n" if first else holding)
+        + stuck_note(actor)
         + (f"{companion}\n" if companion else "")
         + f"What does {ref} do?"})
     return messages
@@ -3364,8 +3456,12 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
 # taught the model to route around (docs/stage-7-plan.md); an enum it cannot emit
 # from has no route. Potions are `use_item`, spells are `cast`, powers are
 # `use_ability`; the document supplies the number.
+# `extinguish` and `break_free` since alchemy lane C3 (2026-10-06): lane C built the two
+# ops and left them no door in a fight — a creature burning from alchemist's fire or glued
+# by a tanglefoot bag could not be sampled putting itself out or tearing loose, which is
+# exactly when either is wanted. `npc_turn_messages` says when one applies.
 _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools",
-              "guard", "end_encounter", "check", "save")
+              "guard", "end_encounter", "check", "save", "extinguish", "break_free")
 
 # The one exception, named: a bestiary creature has no path, no spellbook and no
 # satchel, and its bite's poison lives in a stat block no locator reads yet — 5,735

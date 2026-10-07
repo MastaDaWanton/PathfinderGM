@@ -822,3 +822,75 @@ branch on a scratch data directory):
   dice write them); a fight's blows are the blow checks'; the intimate beat is exempt.
 - The reader's 3 false alarms in 26 each cost one sentence restating the act.
 - Latency: one read per owed turn (~0.8–1.3 s), plus a call and a read per repair.
+
+## The light on the page (2026-10-06)
+
+The owner, on the light model's miss chance (alchemy open point 8):
+
+> "keep the book rule but make sure that it naturally makes it into prose that you can
+> barely see and that it making it hard to hit your target."
+
+**Measured before.** Alchemy lane C's light model decides the miss chance (`Scene.light_at`,
+`Actor.concealment`: dim 20%, dark 50%, CRB Vision and Light). The narrator heard of the
+light only through the tell on a swing the miss chance happened to decide ("Kesst Vayr
+finds nothing there — dim light, 20% miss chance (8)"), and nothing read the page for it.
+
+**What the traditions do.** DikuMUD's descendants put sight into the message itself:
+CircleMUD's `PERS(ch, vict)` is `CAN_SEE(vict, ch) ? GET_NAME(ch) : "someone"`
+(src/utils.h), so a blow from the dark arrives as "Someone hits you". The narrator here is
+a model, so the house shape stands in for the macro: the fact last in the prompt, and the
+page held to it.
+
+**What changed.**
+- **The brief** (`prompts.light_now`, in `scene_now` beside `hour_now` and `body_now`): on
+  a fight or a Perception search in dim light or darkness — never every beat, a line that
+  is always there is a formula — "THE LIGHT (engine fact, this moment): night under the
+  open sky, starlight and moonlight only, dim — the player can barely make out the shapes
+  around them…". Lit where the player stands (a sunrod) in a dark place: the light they
+  carry and its edge. Words, never numbers: the first cut named the light by its effect,
+  and a struck sunrod's effect is named for its document's description, "Normal light 30
+  ft, one step brighter out to 60 ft".
+- **The check** (`gm/checks/light_shown.py`, doors `turn` and `outcome`), sharing one
+  derivation of the player's sight with the brief (`light_shown.sight`):
+  `light-miss-unshown` — a light miss in the tells and no sentence carrying both a word of
+  poor sight and the blow failing; `light-left-off-the-page` — a fight or search in poor
+  light with no word of it anywhere; `light-contradicted` — sunlight, daylight, glare, a
+  well-lit room (not a torch's own glare), or the rule's "miss chance"/a percentage on the
+  page. One rewrite of the anchor; then an authored line per cell (the player's miss, a
+  miss at the player, the gloom; dim or dark), least-recently-used, marked ours (D4). On
+  a creature's consequence beat the check is asked once more as the beat ships: the
+  wrong-actor rewrite runs after the truth pass inside the groom and, live, rewrote the
+  repaired gloom away.
+
+**The family, measured on clean beats** (the 191 recorded gm beats in tests/replay, every
+one in a lit scene): the first, generous word list found "poor sight" in 51 — "shadow" 30
+times, "silhouette" 10, "faint" 6 (a smell), "pitch" 2 (a voice), "obscured" 2 (by the
+crowd). Cut to words that say the light itself is poor, a colour's "dark" blanked
+("stained dark by countless spills") and "squint" removed (one was "against the pale
+morning light"): 7 of 191, all dim rooms. BRIGHT and NUMBERS flagged nothing in the 191.
+
+**Live** (scratch campaigns, outdoors at 23:00, real narration through `/api/combat/act`,
+gemma-4-12B on the shared Ollama):
+1. Before the blow-failing rule, under heavy contention (turns of 18 to 26 minutes, two
+   prose calls lost): the player's swing lost to the dim light shipped as "The rapier's
+   tip whistles through the air, missing his ribs by a hair's breadth as he ducks", and
+   passed on a later sentence — "his eyes narrowed in the dim light, the heavy sap held
+   ready for a second strike". `MISSED` came from that beat.
+2. After it (turns of 37 s to 4 min): the light line was in the brief on all five turns,
+   and all five drafts were flagged all the same — the brief alone did not carry it, the
+   rule CLAUDE.md records. Four were found left off the page and rewritten in place — "missing his chest by a hair's breadth and clanging against a
+   support beam you can barely discern in the gloom", "The rapier's point bites deep in
+   the gloom". The thug's miss the dim light decided was rewritten on its outcome line and
+   then undone by the wrong-actor rewrite (the reason for the ship-time pass above); the
+   player's own light miss was rewritten into "the blow passes through empty air where the
+   shape was lost in the gloom" — inside a draft that had narrated the thug's sap instead
+   of the player's swing, which the light check cannot mend.
+3. A sunrod struck at night: "a harsh, steady brilliance cuts through the gloom … a
+   defiant bloom against the dimness of the evening"; the player stood in normal light,
+   nothing was owed and nothing was flagged.
+
+**Not done.** Stealth and Perception in the dark (the owner's later pass). Darkvision's
+grey world is not described (a player with darkvision in range is not in poor light by
+the engine's reading, so nothing is owed). The NPC wind-up door (`npc`) is not checked;
+its outcome line is. No labelled bench of night-fight beats exists yet: the precision on
+dim beats is the five live ones read by hand, not a measured rate.
