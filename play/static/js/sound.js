@@ -2,8 +2,11 @@
  *
  *   Sound.play(name, {volume, rate, delay})   one-shot; unknown names are a silent no-op
  *                                             (forge sounds also read {hardness, bath},
- *                                             enchant sounds {phase})
+ *                                             enchant sounds {phase}, alchemy sounds
+ *                                             {pitch, stage, heat, level, seal})
  *   Sound.loop(name)                          -> {stop()}, for the ambience beds
+ *   Sound.burner({kind, liquid})              -> {heat(0..1), stop()}, the alchemy games'
+ *                                             flame, whose roar and hiss follow the heat
  *   Sound.unlock()                            resume the context on a user gesture
  *
  * EVERY SOUND IS SYNTHESISED. There are no sample files in this batch and the app
@@ -14,7 +17,7 @@
  * took for its clack ("a dozen lines of Web Audio and no asset in the installer").
  *
  * NAMES are `<bus>.<what>[.<which>]`; the first segment picks the bus. Buses (ui, dice,
- * bench, forge, enchant, works, ambience, combat, verdict) feed one master gain, then a
+ * bench, forge, enchant, alchemy, works, ambience, combat, verdict) feed one master gain, then a
  * makeup gain, then a gentle limiter, then the
  * speakers. Each bus gain follows its PGMPrefs volume live, so a Settings slider moved in
  * another window changes this one's mix too. `verdict` has no slider of its own in the
@@ -45,15 +48,17 @@
   // `works` is the shared In progress panel (37-works.js), which every bench opens; it has
   // no slider of its own and rides on `sound.ui`, as `verdict` rides on `sound.dice`: a
   // player who turns the circle down has not asked for a quieter "your work is ready".
-  var BUSES = ["ui", "dice", "bench", "forge", "enchant", "works", "ambience", "combat",
-               "verdict"];
+  // `alchemy` is the Alchemy bench's (alchemy UI plan §11), beside the others for the same
+  // reason: glassware heard louder or quieter than the anvil or the bowls.
+  var BUSES = ["ui", "dice", "bench", "forge", "enchant", "alchemy", "works", "ambience",
+               "combat", "verdict"];
   var BUS_PREF = {
     ui: "sound.ui", dice: "sound.dice", bench: "sound.bench", forge: "sound.forge",
-    enchant: "sound.enchant", works: "sound.ui",
+    enchant: "sound.enchant", alchemy: "sound.alchemy", works: "sound.ui",
     ambience: "sound.ambience", combat: "sound.combat", verdict: "sound.dice",
   };
-  var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, forge: 0.8, enchant: 0.8, works: 0.6,
-                      ambience: 0.4, combat: 0.7, verdict: 0.8 };
+  var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, forge: 0.8, enchant: 0.8, alchemy: 0.8,
+                      works: 0.6, ambience: 0.4, combat: 0.7, verdict: 0.8 };
   // Simultaneous one-shots allowed before new ones are dropped. A grind game at full tilt
   // plus a verdict plus ambience events is well under this; a runaway caller is not.
   var MAX_VOICES = 28;
@@ -1267,6 +1272,524 @@
     return tone(c, { at: 0.1, f: 190, f2: 140, glide: 0.1, peak: 0.015, d: 0.1 });
   });
 
+  /* --- alchemy: the Alchemy bench (alchemy UI plan §11, contracts §11-§12, lane U5) --- *
+   * `Sound.play("alchemy.<event>", {pitch, stage, heat, level, seal})`, and `Sound.burner()`
+   * for the games' flame. Grounded in how the real things sound:
+   *
+   * GLASS. A struck glass vessel rings in its flexural ring modes. For a thin ring, Rayleigh's
+   * bending modes stand at n(n²-1)/sqrt(n²+1), so 1, 2.83 and 5.42 times the lowest, and
+   * a real glass splits each into a close doublet (Jundt, Radu, Fort, Duda, Vach and
+   * Fletcher, "Vibrational modes of partly filled wine glasses", JASA 2006: "the splitting
+   * is only about 4 Hz" on an empty glass). Liquid LOWERS the ring, as w² = w0²/(1 + a·h^n)
+   * with their fitted n of about 5.5, so a clink knows how full the vessel is: almost no
+   * change to half full, then a fall of about a third at the brim (a = 1 here, our choice;
+   * the paper's constant depends on the glass). Small labware rings high and short.
+   *
+   * BUBBLES AND DRIPS. A drop's "plink" is the bubble it traps, ringing at its Minnaert
+   * frequency, f·a ≈ 3.26 m/s for air in water (a the radius), and rising as the bubble
+   * nears the surface (Phillips, Agarwal and Jordan, "The Sound Produced by a Dripping Tap
+   * is Driven by Resonant Oscillations of an Entrapped Air Bubble", Scientific Reports
+   * 2018). So a 1 mm bubble plinks at 3.3 kHz, a 4 mm one at 800 Hz, and drop() rises.
+   * EFFERVESCENCE is the same physics in miniature: champagne's "sizzling or crackling" is
+   * short tone bursts a few cycles long, 6.7 kHz for a 0.94 mm bubble (Physics Today,
+   * "Champagne acoustics"), so the fizz is many tiny high grains, never a hiss.
+   *
+   * HEAT AND BOILING. A kettle is loudest BEFORE it boils: subcooled bubbles form on the
+   * hot floor and collapse before they reach the surface, ringing the vessel, and the noise
+   * peaks near 80-90 °C and drops back somewhat at a full boil (Aljishi and Tatarkiewicz,
+   * "Why does heating water in a kettle produce sound?", Am. J. Phys. 1991). So the boil and
+   * the burner's liquid layer follow simmer(): rising to a peak at 0.85 of the heat and
+   * easing at the top. The FLAME's roar is broadband and low (see the forge bank's header,
+   * "Combustion roar of premix burners"), louder and brighter as the fuel is fed; a small
+   * flame flickers about ten to fifteen times a second (the pool-fire flicker correlation,
+   * f ≈ 1.5/sqrt(D), gives 15 Hz at a centimetre; Hamins, Yang and Kashiwagi 1992, cited
+   * from memory of the correlation and not re-read for this lane).
+   *
+   * POURING. The pitch of a pour is the air column left above the liquid, a quarter-wave
+   * pipe, so it climbs as the vessel fills, and people judge "nearly full" from that sound
+   * alone (Cabe and Pittenger, "Human sensitivity to acoustic information from vessel
+   * filling", JEP:HPP 2000). Bottle's pour to the mark therefore rises with `level`, and a
+   * player can hear the mark coming.
+   *
+   * THE CORK. Pulling a stopper is a Helmholtz resonator, the air in the neck bouncing on
+   * the air in the body; a beer bottle's pop measured a single strong peak near 700 Hz
+   * ("On the popping sound and liquid sloshing when opening a beer bottle", Physics of
+   * Fluids 2025). A vial's neck is smaller, so it pops higher. Pressing one IN is the
+   * squeak of cork on glass and a soft seat, no pop.
+   *
+   * BREAKING GLASS. Glass-break detectors listen for exactly two things: the low thump of
+   * the pane flexing, centred near 350 Hz, then the high scatter of fragments centred near
+   * 6.5 kHz (Cypress, "Consumer or Industrial Acoustic Glass Break Detector", AN2186). A
+   * splash flask's shatter is that pair with the contents' splash, and a thermal crack is
+   * the tink alone, without the thump of a break.
+   *
+   * THE SCRAPE. Scraping a crust off glass is the chalkboard's danger (the enchant bank's
+   * header: Reuter and Oehler, the 2000-4000 Hz band), so it stays under 2 kHz.
+   *
+   * PITCH. `{pitch: n}` is a step on a major pentatonic (0 2 4 7 9, then up an octave), the
+   * same no-clash ladder the enchant bowls use, so a game can climb it per drop or per stage
+   * and nothing ever jars. `{stage}` names a Transmute colour stage (nigredo 0, albedo 1,
+   * citrinitas 2, rubedo 3). Only the tonal events read it; a whump or a shatter ignores it.
+   *
+   * LEVELS. Measured through the real chain (bus, master, makeup x6, limiter) rendered
+   * offline in Chrome, every slider at its top, median of eight renders; see the test file
+   * for the figures. Every peak literal stays under combat.hit's body (0.24). */
+
+  var PENTA = [0, 2, 4, 7, 9];
+  var STAGE_STEP = { nigredo: 0, albedo: 1, citrinitas: 2, rubedo: 3 };
+  // The semitones above the home note that `{pitch}` (or `{stage}`) asks for.
+  function degree(c) {
+    try {
+      var o = c.o || {}, n = o.pitch;
+      if (n == null && o.stage != null) {
+        var s = STAGE_STEP[String(o.stage).trim().toLowerCase()];
+        n = s == null ? 0 : s;
+      }
+      n = Math.round(Number(n));
+      if (!isFinite(n)) return 0;
+      n = clamp(n, -5, 14);
+      var oct = Math.floor(n / 5);
+      return 12 * oct + PENTA[n - oct * 5];
+    } catch (e) { return 0; }
+  }
+  function heatOf(c, dflt) {
+    var h = Number((c.o || {}).heat);
+    return isFinite(h) && (c.o || {}).heat != null ? clamp(h, 0, 1) : dflt;
+  }
+  function levelOf(c, dflt) {
+    var l = Number((c.o || {}).level);
+    return isFinite(l) && (c.o || {}).level != null ? clamp(l, 0, 1) : dflt;
+  }
+  // The kettle's curve (see the header): quiet cold, loudest just under the boil.
+  function simmer(h) {
+    h = clamp(h, 0, 1);
+    return h <= 0.85 ? Math.pow(h / 0.85, 1.6) : 1 - (h - 0.85) / 0.15 * 0.3;
+  }
+
+  // A struck glass vessel (see the header): the contact tick, the lowest ring mode as a
+  // doublet 0.6% apart, the 2.83 and 5.42 modes quieter and shorter. `fill` (0..1) lowers
+  // and damps it as liquid does.
+  function glass(c, o) {
+    var at = o.at || 0, p = o.peak, fill = o.fill || 0;
+    var f = o.f / Math.sqrt(1 + Math.pow(fill, 5.5));
+    var d = (o.d || 0.35) * (1 - 0.45 * fill);
+    noise(c, { at: at, type: "highpass", f: 4200, q: 0.7, peak: p * 0.45, a: 0.001,
+               d: 0.006 });
+    tone(c, { at: at, f: f * 1.006, peak: p * 0.35, a: 0.0015, d: d * 0.9 });
+    tone(c, { at: at, f: f * 2.83, peak: p * 0.3, a: 0.0015, d: d * 0.45 });
+    tone(c, { at: at, f: f * 5.42, peak: p * 0.12, a: 0.0015, d: d * 0.25 });
+    return tone(c, { at: at, f: f, peak: p * 0.6, a: 0.0015, d: d });
+  }
+
+  // One bubble, by radius in millimetres (Minnaert, see the header): 3.26 kHz per mm⁻¹.
+  function bubble(c, o) {
+    return drop(c, { at: o.at, f: 3260 / o.mm, rise: o.rise || 1.5, peak: o.peak,
+                     d: o.d || (0.03 + o.mm * 0.012) });
+  }
+
+  // A run of fizz: `n` effervescent bursts of a few cycles each, bubbles of 0.5-1.5 mm.
+  function fizz(c, o) {
+    var end = c.t, at0 = o.at || 0;
+    for (var i = 0; i < o.n; i++) {
+      var mm = (o.mm || 0.5) + Math.random() * (o.spread || 1);
+      var when = at0 + o.span * Math.pow(Math.random(), o.bunch || 1);
+      var f = 3260 / mm;
+      // One cycle up, four down: a burst a few cycles long, as measured, not a ping.
+      end = Math.max(end, tone(c, { at: when, f: f, f2: f * 1.15, glide: 4 / f,
+                                    peak: o.peak * (0.5 + Math.random() * 0.5),
+                                    a: 1 / f, d: 4 / f }));
+    }
+    return end;
+  }
+
+  // A pour: a stream of noise gurgling on a slow wobble, through the air column's band
+  // (see the header) which climbs from `from` to `to` as the vessel fills.
+  function pour(c, o) {
+    var x = c.x, t = c.t + (o.at || 0), dur = o.dur || 0.45;
+    var col = function (lv) { return 650 / (1 - 0.88 * clamp(lv, 0, 0.98)); };
+    var src = x.createBufferSource(); src.buffer = buf("pink");
+    var f = x.createBiquadFilter(); f.type = "bandpass"; f.Q.value = o.q || 4;
+    f.frequency.setValueAtTime(hz(col(o.from) * c.p), t);
+    f.frequency.exponentialRampToValueAtTime(hz(col(o.to) * c.p), t + dur);
+    var lfo = x.createOscillator(); lfo.frequency.value = o.wobble || 9;
+    var depth = x.createGain(); depth.gain.value = col(o.from) * 0.25;
+    lfo.connect(depth); depth.connect(f.frequency);
+    var g = x.createGain();
+    var end = env(g, t, o.peak, 0.04, 0.12, Math.max(0.01, dur - 0.16));
+    src.connect(f); f.connect(g); g.connect(o.dest || c.out);
+    // The splash under the stream, low and broad.
+    noise(c, { at: o.at, src: "pink", type: "lowpass", f: 900, q: 0.6, peak: o.peak * 0.45,
+               a: 0.03, hold: Math.max(0.01, dur - 0.13), d: 0.1 });
+    src.start(t, Math.random() * 2); src.stop(end + 0.03);
+    lfo.start(t); lfo.stop(end + 0.03);
+    return end;
+  }
+
+  // A defined alchemy sound that reads `{pitch}`: the step's ratio rides on the play's
+  // own pitch multiplier, so every partial moves together.
+  function pitched(fn) {
+    return function (c) {
+      var m = Math.pow(2, degree(c) / 12);
+      return fn({ x: c.x, out: c.out, t: c.t, p: c.p * m, v: c.v, o: c.o });
+    };
+  }
+
+  def("alchemy.open", 3, function (c) {
+    // The spirit lamp lit (UI plan §10): a match struck, the wick catching with a soft
+    // low breath of flame, then the flask on its ring answering with a small clink.
+    noise(c, { f: k(c, [1600, 1750, 1450]), f2: 900, q: 1, peak: 0.07, a: 0.003, d: 0.05 });
+    noise(c, { at: 0.06, src: "brown", type: "lowpass", f: 180, f2: k(c, [620, 560, 680]),
+               q: 0.7, peak: 0.091, a: 0.08, d: 0.4 });
+    return glass(c, { at: 0.34, f: k(c, [1180, 1250, 1120]), peak: 0.035, d: 0.4 });
+  });
+
+  // Choosing a method: the vessel swapped in (UI plan §10, "a glass clink"), one per
+  // operation in rules/alchemist.py METHODS.
+  var ALCHEMY_METHOD = {
+    dissolve: function (c) {     // the round flask set on its ring, the solvent stirring
+      knock(c, { f: k(c, [260, 240, 280]), peak: 0.043, lp: 1200, d: 0.03, wave: "sine" });
+      glass(c, { at: 0.005, f: k(c, [900, 960, 850]), fill: 0.5, peak: 0.051, d: 0.35 });
+      return noise(c, { at: 0.12, src: "pink", f: 500, f2: 900, q: 1.4, peak: 0.043,
+                        a: 0.06, d: 0.14 });
+    },
+    calcine: function (c) {      // the clay crucible seated in its triangle: a dull ceramic
+      knock(c, { f: k(c, [330, 310, 350]), peak: 0.076, lp: 1500, d: 0.04, wave: "sine" });
+      return grains(c, { at: 0.03, n: 5, span: 0.1, f: 1400, q: 1.5, peak: 0.043, d: 0.012 });
+    },
+    filter: function (c) {       // the funnel dropped in its ring, the cloth unfolded
+      glass(c, { f: k(c, [1300, 1380, 1230]), peak: 0.05, d: 0.3 });
+      return noise(c, { at: 0.1, f: 1800, f2: 1200, q: 1.2, peak: 0.05, a: 0.03, d: 0.12 });
+    },
+    distill: function (c) {      // the alembic's head seated: a short glass-on-glass grind
+      noise(c, { f: k(c, [1500, 1650, 1400]), q: 3, peak: 0.019, a: 0.04, d: 0.12 });
+      grains(c, { n: 6, span: 0.14, f: 1700, q: 3, peak: 0.011, d: 0.008, even: true });
+      return glass(c, { at: 0.16, f: k(c, [520, 560, 490]), peak: 0.016, d: 0.5 });
+    },
+    react: function (c) {        // the dropper's bulb squeezed, one drop let fall
+      tone(c, { type: "triangle", f: k(c, [320, 300, 340]), f2: 210, glide: 0.08, lp: 800,
+                peak: 0.017, a: 0.01, d: 0.08 });
+      return bubble(c, { at: 0.14, mm: k(c, [2.6, 2.4, 2.8]), peak: 0.02 });
+    },
+    sublime: function (c) {      // the aludel's lid set on: ceramic and a glass ring
+      knock(c, { f: k(c, [280, 260, 300]), peak: 0.07, lp: 1400, d: 0.035, wave: "sine" });
+      return glass(c, { at: 0.01, f: k(c, [740, 790, 700]), peak: 0.04, d: 0.35 });
+    },
+    bottle: function (c) {       // the rack of vials: three small clinks along the row
+      var end = c.t, base = k(c, [2300, 2450, 2200]);
+      for (var i = 0; i < 3; i++) {
+        end = Math.max(end, glass(c, { at: i * 0.07 + Math.random() * 0.02,
+                                       f: base * (1 + i * 0.06), peak: 0.015, d: 0.18 }));
+      }
+      return end;
+    },
+    transmute: function (c) {    // the athanor's iron door, and its fire drawing up
+      bell(c, { f: k(c, [196, 185, 208]), peak: 0.025, d: 0.35 });
+      knock(c, { f: k(c, [120, 110, 130]), peak: 0.04, lp: 600, d: 0.06 });
+      return noise(c, { at: 0.1, src: "brown", type: "lowpass", f: 220, f2: 420, q: 0.7,
+                        peak: 0.06, a: 0.2, d: 0.5 });
+    },
+    assay: function (c) {        // a glass slide laid on the bench, drawn a finger's width
+      glass(c, { f: k(c, [3000, 3200, 2850]), peak: 0.054, d: 0.15 });
+      return noise(c, { at: 0.05, f: 1400, f2: 1700, q: 2, peak: 0.063, a: 0.03, d: 0.1 });
+    },
+  };
+  Object.keys(ALCHEMY_METHOD).forEach(function (m) {
+    def("alchemy.method." + m, 3, ALCHEMY_METHOD[m]);
+  });
+
+  // A material landing in a slot (UI plan §11: powder, liquid, glass), and the words a
+  // caller may have instead: the alchemy kinds (contracts §3) and the intermediate forms
+  // (rules/alchemist.py: solution, calx, sublimate, spirit, filtrate, admixture).
+  var ALCHEMY_DROP = {
+    powder: function (c) {       // a pinch tipped in: a soft sift and its settling
+      noise(c, { src: "pink", type: "highpass", f: k(c, [2400, 2700, 2200]), q: 0.6,
+                 peak: 0.06, a: 0.02, d: 0.14 });
+      return grains(c, { at: 0.02, n: k(c, [8, 10, 9]), span: 0.14, f: 3000, q: 0.9,
+                         type: "highpass", peak: 0.035, d: 0.005 });
+    },
+    liquid: function (c) {       // poured in: a short splash and the bubbles it traps
+      noise(c, { f: 1600, f2: 800, q: 0.8, peak: 0.053, a: 0.004, d: 0.12 });
+      bubble(c, { at: 0.03, mm: k(c, [3.5, 4, 3.2]), peak: 0.038 });
+      return bubble(c, { at: 0.08, mm: k(c, [2.2, 2.6, 2]), peak: 0.022 });
+    },
+    glass: function (c) {        // a vial or flask set down: wood under, the glass rings
+      knock(c, { f: k(c, [230, 215, 245]), peak: 0.038, lp: 1300, d: 0.03 });
+      return glass(c, { at: 0.003, f: k(c, [2100, 2250, 1980]), peak: 0.045, d: 0.25 });
+    },
+    crystal: function (c) {      // a salt or a crust: a dry glassy patter
+      grains(c, { n: k(c, [5, 7, 6]), span: 0.1, f: 3800, q: 4, peak: 0.078, d: 0.012 });
+      return glass(c, { at: 0.04, f: k(c, [3300, 3500, 3150]), peak: 0.023, d: 0.1 });
+    },
+    wet: function (c) {          // a gland: soft and wet
+      noise(c, { src: "pink", f: 700, f2: 300, q: 2, peak: 0.105, a: 0.01, d: 0.08 });
+      return bubble(c, { at: 0.02, mm: 9, rise: 1.4, peak: 0.045, d: 0.05 });
+    },
+  };
+  var ALCHEMY_DROP_ALIAS = {
+    reagent: "powder", salt: "crystal", catalyst: "crystal", treatment: "powder",
+    calx: "powder", precipitate: "powder", dust: "powder", solid: "powder",
+    solvent: "liquid", essence: "liquid", solution: "liquid", filtrate: "liquid",
+    spirit: "liquid", admixture: "liquid", intermediate: "liquid",
+    sublimate: "crystal", gland: "wet", vessel: "glass", phial: "glass", vial: "glass",
+    flask: "glass",
+    // A finished product, by its family (alchemist.json bench.families): it is in glass.
+    potion: "glass", oil: "glass", splash: "glass", cloud: "glass", tool: "glass",
+  };
+  Object.keys(ALCHEMY_DROP).forEach(function (f) {
+    def("alchemy.drop." + f, 3, ALCHEMY_DROP[f]);
+  });
+  Object.keys(ALCHEMY_DROP_ALIAS).forEach(function (f) {
+    def("alchemy.drop." + f, 3, ALCHEMY_DROP[ALCHEMY_DROP_ALIAS[f]]);
+  });
+
+  def("alchemy.roll", 3, function (c) {        // the step's d20, rattled in a horn cup
+    knock(c, { f: 270, peak: 0.045, lp: 1000, d: 0.04 });
+    rattle(c, k(c, [2300, 2600, 2450]), k(c, [6, 7, 8]), 0.12);
+    return glass(c, { at: 0.26, f: k(c, [2900, 3100, 2750]), peak: 0.012, d: 0.1 });
+  });
+
+  // --- the work's own sounds, heard in the games and on the stage.
+  def("alchemy.pour", 4, function (c) {
+    // Into the vessel, the pitch climbing with the level (see the header). `level` is
+    // where the liquid stands when this pour starts; each pour fills a little more.
+    var lv = levelOf(c, 0.3);
+    return pour(c, { from: lv, to: Math.min(0.98, lv + 0.12), peak: 0.068,
+                     wobble: k(c, [9, 11, 8, 10]), dur: k(c, [0.42, 0.48, 0.4, 0.45]) });
+  });
+  def("alchemy.stir", 4, function (c) {
+    // A glass rod drawn round the flask: the liquid swirling there and back, and the rod's
+    // two light touches on the wall.
+    noise(c, { src: "pink", f: 480, f2: k(c, [1000, 1100, 920, 1050]), q: 1.5, peak: 0.102,
+               a: 0.08, d: 0.1 });
+    noise(c, { at: 0.15, src: "pink", f: 1000, f2: 460, q: 1.5, peak: 0.075, a: 0.04,
+               d: 0.12 });
+    glass(c, { at: 0.06, f: k(c, [1500, 1600, 1420, 1550]), fill: 0.6, peak: 0.034, d: 0.2 });
+    return glass(c, { at: 0.2, f: k(c, [1500, 1600, 1420, 1550]) * 0.97, fill: 0.6,
+                      peak: 0.024, d: 0.2 });
+  });
+  def("alchemy.bubble", 4, pitched(function (c) {
+    // One to three bubbles breaking, 2.5-4.5 mm: more of them, and quicker, with `heat`.
+    var h = heatOf(c, 0.5), n = 1 + Math.round(h * 2), end = c.t;
+    for (var i = 0; i < n; i++) {
+      end = Math.max(end, bubble(c, { at: i * (0.09 - h * 0.04) + Math.random() * 0.02,
+                                      mm: k(c, [3.2, 2.7, 4.2, 3.6]) * (0.85 + Math.random() * 0.3),
+                                      peak: 0.06 * (1 - i * 0.2) }));
+    }
+    return end;
+  }));
+  def("alchemy.boil", 3, function (c) {
+    // A rolling boil: the vessel's seethe and a run of bubbles of every size, on the
+    // kettle's curve (loudest at 0.85 heat, easing at the top).
+    var s = simmer(heatOf(c, 0.85)), n = 4 + Math.round(6 * s), end;
+    end = noise(c, { src: "pink", f: k(c, [450, 520, 400]), q: 1.6, peak: 0.006 + 0.021 * s,
+                     a: 0.06, hold: 0.25, d: 0.25 });
+    for (var i = 0; i < n; i++) {
+      end = Math.max(end, bubble(c, { at: Math.random() * 0.55, mm: 1.8 + Math.random() * 3.5,
+                                      peak: (0.012 + 0.021 * s) * (0.5 + Math.random() * 0.5) }));
+    }
+    return end;
+  });
+  def("alchemy.drip", 4, pitched(function (c) {
+    // One drop of distillate into the receiver: a tiny tick and the trapped bubble's plink.
+    noise(c, { type: "highpass", f: 3500, q: 0.7, peak: 0.025, a: 0.001, d: 0.004 });
+    return bubble(c, { at: 0.004, mm: k(c, [2.8, 2.5, 3.1, 2.65]), rise: 1.7, peak: 0.141 });
+  }));
+  def("alchemy.fizz", 3, function (c) {
+    // Effervescence (see the header): a quick cloud of sub-millimetre bursts, thinning.
+    return fizz(c, { n: k(c, [26, 32, 22]), span: 0.45, mm: 0.45, spread: 0.9, bunch: 1.8,
+                     peak: 0.034 });
+  });
+  def("alchemy.hiss", 3, function (c) {
+    // Vapour escaping: brighter and louder with `heat`, a breath when cool, steam when hot.
+    var h = heatOf(c, 0.6);
+    return noise(c, { type: "bandpass", f: (2400 + 3200 * h) * k(c, [1, 1.08, 0.93]),
+                      f2: (1800 + 2400 * h), q: 0.8, peak: 0.024 + 0.048 * h, a: 0.05,
+                      d: 0.35 + 0.25 * h });
+  });
+
+  def("alchemy.chime", 3, pitched(function (c) {
+    // A Transmute stage sealed at its peak: a glass struck clear, up the pentatonic by
+    // `stage` (or `pitch`). Rubedo, the last stage of the Great Work, rings its fifth and
+    // octave with it, at the level of the one glass: a chord, not a louder note.
+    var f = k(c, [880, 932, 831]);
+    if (String((c.o || {}).stage || "").trim().toLowerCase() !== "rubedo") {
+      return glass(c, { f: f, peak: 0.12, d: 1.1 });
+    }
+    glass(c, { f: f, peak: 0.06, d: 1.1 });
+    glass(c, { at: 0.06, f: f * 1.4983, peak: 0.035, d: 1.2 });
+    return glass(c, { at: 0.12, f: f * 2, peak: 0.025, d: 1.3 });
+  }));
+
+  // The stopper going IN: cork squeaking on the glass and seating with a soft thup, or,
+  // with `{seal: "wax"}`, a wax seal pressed.
+  function cork(c) {
+    tone(c, { type: "sawtooth", f: k(c, [980, 1100, 900]), f2: k(c, [1250, 1380, 1150]),
+              glide: 0.09, lp: 1800, peak: 0.015, a: 0.01, d: 0.09 });
+    noise(c, { f: 1300, q: 3, peak: 0.025, a: 0.01, d: 0.09 });
+    return tone(c, { at: 0.11, f: k(c, [620, 660, 590]), f2: 520, glide: 0.04, peak: 0.04,
+                     a: 0.002, d: 0.05 });
+  }
+  function wax(c) {
+    noise(c, { src: "pink", type: "lowpass", f: 700, q: 0.7, peak: 0.104, a: 0.01, d: 0.1 });
+    knock(c, { at: 0.02, f: k(c, [200, 185, 215]), peak: 0.078, lp: 800, d: 0.05, wave: "sine" });
+    return noise(c, { at: 0.12, f: 1100, f2: 800, q: 2, peak: 0.033, a: 0.02, d: 0.08 });
+  }
+  def("alchemy.stopper", 3, function (c) {
+    return String((c.o || {}).seal || "").toLowerCase() === "wax" ? wax(c) : cork(c);
+  });
+  def("alchemy.seal", 3, wax);
+  def("alchemy.uncork", 3, function (c) {
+    // Pulled: the squeak, then the Helmholtz pop of the neck, higher than a bottle's.
+    tone(c, { type: "sawtooth", f: k(c, [1100, 1200, 1000]), f2: 900, glide: 0.08, lp: 1800,
+              peak: 0.009, a: 0.01, d: 0.08 });
+    noise(c, { at: 0.09, f: 1200, q: 0.9, peak: 0.02, a: 0.001, d: 0.025 });
+    return tone(c, { at: 0.09, f: k(c, [980, 1050, 920]), f2: 900, glide: 0.03, peak: 0.044,
+                     a: 0.001, d: 0.06 });
+  });
+
+  def("alchemy.glass.tick", 4, pitched(function (c) {
+    // A beat pip: the smallest glass tick, the vessel ticking as it warms.
+    return glass(c, { f: k(c, [2640, 2800, 2490, 2720]), peak: 0.039, d: 0.09 });
+  }));
+  def("alchemy.clink", 4, pitched(function (c) {
+    // Glass touching glass: the rod on a flask, a vial on the rack.
+    return glass(c, { f: k(c, [1760, 1865, 1661, 1820]), fill: levelOf(c, 0), peak: 0.091,
+                      d: 0.3 });
+  }));
+  def("alchemy.crack", 3, function (c) {
+    // Glass cracking under heat: a sharp tink and a run of crackle, no break (see the
+    // header: no flexing thump, no falling fragments).
+    noise(c, { type: "highpass", f: 4500, q: 0.8, peak: 0.12, a: 0.001, d: 0.01 });
+    tone(c, { f: k(c, [3600, 3400, 3800]), peak: 0.06, a: 0.001, d: 0.05 });
+    return grains(c, { at: 0.02, n: k(c, [6, 8, 7]), span: 0.18, f: 5200, q: 2.5,
+                       peak: 0.075, d: 0.006, bunch: 1.6 });
+  });
+  function shatter(c) {
+    // The flex thump (about 350 Hz), the fragments (centred near 6.5 kHz) falling over half
+    // a second as single high glass pings, and the contents' splash.
+    knock(c, { f: k(c, [350, 330, 370]), peak: 0.14, lp: 900, d: 0.05, wave: "sine" });
+    noise(c, { at: 0.005, type: "highpass", f: 5000, q: 0.6, peak: 0.08, a: 0.001, d: 0.08 });
+    var end = c.t, n = k(c, [9, 11, 8]);
+    for (var i = 0; i < n; i++) {
+      var when = 0.01 + 0.5 * Math.pow(Math.random(), 1.7);
+      end = Math.max(end, tone(c, { at: when, f: 4500 + Math.random() * 4000,
+                                    peak: 0.03 * (0.4 + Math.random() * 0.6),
+                                    a: 0.001, d: 0.03 + Math.random() * 0.05 }));
+    }
+    noise(c, { at: 0.02, src: "pink", f: 1400, f2: 600, q: 0.8, peak: 0.08, a: 0.005, d: 0.2 });
+    return Math.max(end, grains(c, { at: 0.03, n: 10, span: 0.45, f: 6500, q: 1.5,
+                                     type: "highpass", peak: 0.045, d: 0.008, bunch: 1.5 }));
+  }
+  def("alchemy.shatter", 3, shatter);
+  // A splash flask thrown in a fight breaks on the combat bus, under the Combat slider.
+  def("combat.shatter", 3, shatter);
+
+  def("alchemy.flare", 3, function (c) {
+    // A volatile mishap (UI plan §7.5): the vapour catching all at once, a low whump of air,
+    // the flame's roar rising and falling, then crackle and a fizzling hiss.
+    tone(c, { f: k(c, [62, 56, 68]), f2: 38, glide: 0.25, peak: 0.23, a: 0.008, d: 0.3 });
+    noise(c, { src: "brown", type: "lowpass", f: 140, f2: 520, q: 0.7, peak: 0.23, a: 0.02,
+               d: 0.55 });
+    noise(c, { at: 0.04, src: "pink", type: "bandpass", f: 900, f2: 400, q: 0.7, peak: 0.15,
+               a: 0.05, d: 0.6 });
+    noise(c, { at: 0.2, type: "highpass", f: 3500, q: 0.6, peak: 0.03, a: 0.1, d: 0.6 });
+    return grains(c, { at: 0.12, n: k(c, [12, 15, 10]), span: 0.7, f: 3200, q: 1.3,
+                       type: "highpass", peak: 0.11, d: 0.007, bunch: 1.4 });
+  });
+
+  // --- a game's good beat and its miss (UI plan §10: "a bloom of colour, a soft chime";
+  // "a dull fizz, vapour puffs").
+  def("alchemy.hit", 4, pitched(function (c) {
+    bubble(c, { mm: k(c, [3, 2.7, 3.3, 2.9]), peak: 0.034 });
+    return glass(c, { at: 0.03, f: k(c, [1318, 1397, 1245, 1356]), peak: 0.053, d: 0.55 });
+  }));
+  def("alchemy.miss", 4, function (c) {
+    // A dull fizz in the low bands, a puff of vapour, a soft thud: no ring at all, so a
+    // miss never sounds like a hit.
+    knock(c, { f: k(c, [140, 130, 150, 135]), peak: 0.117, lp: 450, d: 0.05, wave: "sine" });
+    noise(c, { src: "pink", type: "bandpass", f: 900, f2: 500, q: 0.9, peak: 0.091, a: 0.01,
+               d: 0.12 });
+    return grains(c, { at: 0.02, n: 9, span: 0.14, f: 1500, q: 1.2, peak: 0.065, d: 0.008 });
+  });
+  def("alchemy.spill", 3, function (c) {
+    // Too fast: the funnel or the flask overflowing, a slop and a hiss off the hot glass.
+    noise(c, { src: "pink", f: 1200, f2: 500, q: 0.9, peak: 0.088, a: 0.01, d: 0.2 });
+    bubble(c, { at: 0.04, mm: 5, peak: 0.035 });
+    return noise(c, { at: 0.08, type: "highpass", f: 3800, q: 0.6, peak: 0.022, a: 0.03,
+                      d: 0.25 });
+  });
+  def("alchemy.swap", 3, function (c) {
+    // Distill's cut: the receiver slid out and the next one under the beak.
+    noise(c, { f: k(c, [1300, 1450, 1200]), f2: 1600, q: 2, peak: 0.023, a: 0.02, d: 0.08 });
+    return glass(c, { at: 0.1, f: k(c, [1250, 1330, 1180]), peak: 0.032, d: 0.3 });
+  });
+  def("alchemy.scrape", 3, function (c) {
+    // Sublime's crust scraped off the cool wall, under 2 kHz throughout (see the header).
+    noise(c, { f: k(c, [800, 900, 750]), f2: k(c, [1300, 1400, 1250]), q: 1.2, peak: 0.204,
+               a: 0.02, d: 0.14 });
+    return grains(c, { n: k(c, [7, 8, 6]), span: 0.14, f: 1500, q: 1.6, peak: 0.119, d: 0.008 });
+  });
+  def("alchemy.feed", 3, function (c) {
+    // Calcine and Distill's "feed the flame": a breath of air and the fire drawing up.
+    noise(c, { src: "pink", f: 500, f2: k(c, [1200, 1100, 1300]), q: 1, peak: 0.06, a: 0.15,
+               d: 0.25 });
+    return noise(c, { at: 0.06, src: "brown", type: "lowpass", f: 240, f2: 420, q: 0.7,
+                      peak: 0.11, a: 0.15, d: 0.35 });
+  });
+  def("alchemy.bank", 3, function (c) {
+    // Banked: the damper slid across, the roar falling away under it.
+    noise(c, { f: k(c, [1800, 1650, 1950]), f2: 1300, q: 2.2, peak: 0.04, a: 0.02, d: 0.1 });
+    return noise(c, { at: 0.04, src: "brown", type: "lowpass", f: 420, f2: 180, q: 0.7,
+                      peak: 0.08, a: 0.02, d: 0.35 });
+  });
+
+  // --- the verdicts (lane U3's stage flourishes).
+  def("alchemy.tier.up", 3, pitched(function (c) {       // the liquid glints: two glasses
+    var root = k(c, [1568, 1661, 1480]);
+    glass(c, { f: root, peak: 0.033, d: 0.45 });
+    return glass(c, { at: 0.09, f: root * 1.4983, peak: 0.037, d: 0.6 });
+  }));
+  def("alchemy.flawless", 3, pitched(function (c) {
+    // Every glass on the bench rung on purpose: a pentatonic stack, then the gilt shimmer.
+    var root = k(c, [1047, 1109, 988]);
+    var steps = [1, 1.1225, 1.2599, 1.4983, 2], end = c.t;
+    for (var i = 0; i < steps.length; i++) {
+      end = Math.max(end, glass(c, { at: i * 0.07, f: root * steps[i], peak: 0.038,
+                                     d: 1.0 + i * 0.12 }));
+    }
+    noise(c, { at: 0.1, type: "highpass", f: 7500, q: 0.5, peak: 0.006, a: 0.12, d: 0.7 });
+    return end;
+  }));
+  def("alchemy.fail", 3, function (c) {
+    // The liquid clouds and dulls: one big sour bubble, the flask's dead thunk, and the
+    // last of the vapour sighing out.
+    bubble(c, { mm: k(c, [11, 12.5, 10]), rise: 1.3, peak: 0.049, d: 0.14 });
+    knock(c, { at: 0.06, f: k(c, [74, 68, 80]), peak: 0.11, lp: 300, d: 0.14, drop: 0.6,
+               wave: "sine" });
+    glass(c, { at: 0.06, f: k(c, [700, 660, 740]), fill: 0.9, peak: 0.018, d: 0.2 });
+    return noise(c, { at: 0.12, src: "pink", f: 900, f2: 300, q: 0.8, peak: 0.031, a: 0.06,
+                      d: 0.6 });
+  });
+  def("alchemy.land", 3, function (c) {
+    // The vial to its shelf row: a soft wooden seat and its glass touching the next.
+    knock(c, { f: k(c, [210, 195, 225]), peak: 0.048, lp: 1100, d: 0.04 });
+    return glass(c, { at: 0.012, f: k(c, [2350, 2490, 2220]), fill: 0.7, peak: 0.04, d: 0.25 });
+  });
+  def("alchemy.assay", 3, function (c) {
+    // The pinch meets a drop of reagent on the glass slide: a wisp of fizz, the slide's tink.
+    drop(c, { f: k(c, [700, 760, 650]), peak: 0.027 });
+    fizz(c, { at: 0.05, n: 10, span: 0.25, mm: 0.5, spread: 0.6, bunch: 1.5, peak: 0.027 });
+    return glass(c, { at: 0.3, f: k(c, [3000, 3200, 2850]), peak: 0.022, d: 0.2 });
+  });
+  def("alchemy.found", 3, pitched(function (c) {
+    // A formula found by experiment (UI plan §10, the vessel glowing gold once): a glass
+    // rim rubbed into a swell, then answered by a clear struck note.
+    var f = k(c, [1046, 1108, 988]);
+    tone(c, { f: f * 1.004, peak: 0.014, a: 0.25, hold: 0.15, d: 0.6 });
+    tone(c, { f: f, peak: 0.021, a: 0.25, hold: 0.15, d: 0.6 });
+    return glass(c, { at: 0.4, f: f * 1.4983, peak: 0.037, d: 0.9 });
+  }));
+
   /* --- ambience: beds that loop ----------------------------------------------------- *
    * A bed is continuous noise through a filter whose level breathes on a slow LFO (wind
    * gusts), plus scheduled one-shots (a bird, a cricket's chirp, a crackle, a drip) at
@@ -1358,6 +1881,15 @@
       grains(c, { n: 2 + (Math.random() * 2 | 0), span: 0.08, f: 2600, q: 1.4,
                   peak: 0.012, d: 0.006 });
     },
+    glasstick: function (c) {    // a flask on the shelf ticking as the room's heat moves
+      glass(c, { f: 2200 + Math.random() * 1200, peak: 0.012, d: 0.12 });
+    },
+    blub: function (c) {         // the bain-marie at a slow simmer: one or two big bubbles
+      var n = 1 + (Math.random() * 2 | 0);
+      for (var i = 0; i < n; i++) {
+        bubble(c, { at: i * 0.12, mm: 4 + Math.random() * 3, peak: 0.016 });
+      }
+    },
   };
 
   // Each ambience: its beds and its events ([name, min seconds, max seconds] apart).
@@ -1417,13 +1949,23 @@
                       { f: 420, q: 1.2, level: 0.012, gust: 3.1, gustDepth: 0.6 },
                       { src: "white", type: "highpass", f: 6500, level: 0.0025, gust: 0.4 }],
                events: [["sputter", 4, 12], ["creak", 20, 50]] },
+    // The laboratory (alchemy UI plan §11): "a low athanor roar and the odd glass tick".
+    // The athanor is a slow, steady coal furnace, so its roar sits lower and steadier than
+    // the smithy's bellows-driven hearth; a quiet flutter of flame, a thread of hiss, and
+    // the room's own events: glass ticking, the bain-marie's slow bubble, coals settling.
+    // At the field kit there is no laboratory: the bench plays the biome's bed instead.
+    laboratory: { beds: [{ src: "brown", type: "lowpass", f: 260, q: 0.7, level: 0.06,
+                           gust: 0.04, gustDepth: 0.25 },
+                         { f: 380, q: 1.0, level: 0.014, gust: 2.4, gustDepth: 0.5 },
+                         { type: "highpass", f: 4000, level: 0.0025, gust: 0.15 }],
+                  events: [["glasstick", 5, 14], ["blub", 4, 11], ["coals", 10, 25]] },
   };
   // The app's canonical biomes (rules/biomes.py BIOMES) onto the nearest bed, so
   // `ambience.<biome>` for any ground the bench reports is never silent by accident.
   var AMBIENCE_ALIAS = {
     urban: "road", farmland: "grassland", jungle: "swamp", hills: "grassland",
     mountain: "tundra", water: "coast", deck: "coast", underwater: "cave",
-    underground: "cave", ruins: "night", planar: "night",
+    underground: "cave", ruins: "night", planar: "night", lab: "laboratory",
   };
 
   function startAmbience(spec) {
@@ -1590,6 +2132,110 @@
     }
   }
 
+  // The alchemy games' flame (Calcine, Distill, Sublime: UI plan §9's heat gauge), live
+  // for as long as the game runs. `heat(v)` takes 0 to 1, the needle's place on the gauge
+  // (the page never sends degrees here: each operation's scale is its own). It follows:
+  //   the roar, brown noise low-passed where combustion roar lives, louder and a little
+  //     brighter as the fire is fed, fluttering at the flame's own flicker;
+  //   the hiss, which only comes in high on the gauge, the flame pushed hard;
+  //   with `{liquid: true}`, the vessel over it: a seethe and bubbles on the kettle's curve
+  //     (simmer(), loudest just under the boil, see the alchemy header).
+  // `{kind: "athanor"}` is the laboratory's coal furnace, lower and heavier than the field
+  // kit's spirit lamp (the default). On the alchemy bus, so the Alchemy slider owns it.
+  var SILENT_BURNER = { heat: function () {}, stop: function () {} };
+  function burner(opts) {
+    try {
+      var x = ensure();
+      if (!x || !hasGesture() || masterLevel() <= 0) return SILENT_BURNER;
+      opts = opts || {};
+      var big = String(opts.kind || "").toLowerCase() === "athanor";
+      var out = x.createGain();
+      out.gain.value = 0;
+      out.connect(buses.alchemy);
+      var nodes = [], timers = [], live = true, level = 0;
+      var src = function (kind) {
+        var s = x.createBufferSource();
+        s.buffer = buf(kind); s.loop = true;
+        s.playbackRate.value = 0.94 + Math.random() * 0.12;
+        nodes.push(s); return s;
+      };
+      var filt = function (type, f, q) {
+        var b = x.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q;
+        return b;
+      };
+      // Roar, with the flicker on its level.
+      var roar = src("brown"), rf = filt("lowpass", big ? 220 : 300, 0.7), rg = x.createGain();
+      rg.gain.value = 0.0001;
+      var flick = x.createOscillator(), fAmt = x.createGain();
+      flick.frequency.value = big ? 7 : 13; fAmt.gain.value = 0;
+      flick.connect(fAmt); fAmt.connect(rg.gain); nodes.push(flick);
+      roar.connect(rf); rf.connect(rg); rg.connect(out);
+      // Hiss.
+      var hiss = src("white"), hf = filt("bandpass", 3000, 0.8), hg = x.createGain();
+      hg.gain.value = 0.0001;
+      hiss.connect(hf); hf.connect(hg); hg.connect(out);
+      // The vessel's seethe, if there is liquid over the flame.
+      var sg = null, sf = null;
+      if (opts.liquid) {
+        var seethe = src("pink"); sf = filt("bandpass", 420, 1.6); sg = x.createGain();
+        sg.gain.value = 0.0001;
+        seethe.connect(sf); sf.connect(sg); sg.connect(out);
+        (function next() {
+          // Bubbles more often the nearer the simmer's peak: every 0.9 s cold, 0.12 s at it.
+          var wait = (0.9 - 0.78 * simmer(level)) * (0.6 + Math.random() * 0.8) * 1000;
+          timers.push(setTimeout(function () {
+            if (!live) return;
+            try {
+              if (x.state === "running" && level > 0.15) {
+                bubble({ x: x, out: out, t: x.currentTime + 0.01, p: 0.95 + Math.random() * 0.1,
+                         v: 0, o: {} },
+                       { mm: 2 + Math.random() * 3, peak: 0.06 * simmer(level) });
+              }
+            } catch (e) { /* one bad bubble never stops the flame */ }
+            next();
+          }, wait));
+        })();
+      }
+      var t0 = x.currentTime + 0.01;
+      nodes.forEach(function (n) { try { n.start(t0); } catch (e) { /* */ } });
+      out.gain.setTargetAtTime(1, x.currentTime, 0.15);
+      var handle = {
+        heat: function (v) {
+          if (!live) return;
+          try {
+            v = clamp(Number(v), 0, 1);
+            level = v;
+            var now = x.currentTime, r = (big ? 0.036 : 0.03) * (0.3 + 0.7 * v);
+            rg.gain.setTargetAtTime(r, now, 0.08);
+            fAmt.gain.setTargetAtTime(r * 0.35, now, 0.08);
+            rf.frequency.setTargetAtTime((big ? 180 : 240) + (big ? 260 : 420) * v, now, 0.1);
+            hg.gain.setTargetAtTime(0.0001 + 0.01 * Math.pow(v, 3), now, 0.1);
+            hf.frequency.setTargetAtTime(2200 + 2600 * v, now, 0.1);
+            if (sg) {
+              sg.gain.setTargetAtTime(0.0001 + 0.03 * simmer(v), now, 0.2);
+              sf.frequency.setTargetAtTime(320 + 260 * v, now, 0.2);
+            }
+          } catch (e) { /* */ }
+        },
+        stop: function () {
+          if (!live) return;
+          live = false;
+          try {
+            timers.forEach(clearTimeout);
+            var now = x.currentTime;
+            out.gain.setTargetAtTime(0, now, 0.15);
+            nodes.forEach(function (n) { try { n.stop(now + 0.9); } catch (e) { /* */ } });
+            setTimeout(function () { try { out.disconnect(); } catch (e) { /* */ } }, 1000);
+          } catch (e) { /* already gone */ }
+        },
+      };
+      handle.heat(opts.heat == null ? 0.5 : opts.heat);
+      return handle;
+    } catch (e) {
+      return SILENT_BURNER;
+    }
+  }
+
   function loop(name) {
     try {
       var parts = String(name).split(".");
@@ -1620,6 +2266,7 @@
     play: play,
     loop: loop,
     machine: machine,
+    burner: burner,
     unlock: unlock,
     names: names,
     has: function (name) {

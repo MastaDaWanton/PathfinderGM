@@ -46,6 +46,9 @@
     // The Enchanting circle's chalk, bowls and phials (sound.js's `enchant` bus,
     // enchanting UI plan §11), at the other benches' level.
     "sound.enchant": 0.8,
+    // The Alchemy bench's glassware, bubbles and flame (sound.js's `alchemy` bus, alchemy
+    // UI plan §11), at the other benches' level.
+    "sound.alchemy": 0.8,
     "sound.ambience": 0.4,
     "sound.combat": 0.7,
     "sound.mute": false,
