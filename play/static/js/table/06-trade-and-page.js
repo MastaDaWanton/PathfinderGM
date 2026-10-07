@@ -375,7 +375,9 @@ function drawTrade() {
     ? label.replace(/^the /, "").replace(/^./, c => c.toUpperCase())
     : "At the counter";
   const who = (TRADE.seller && TRADE.seller.name) || TRADE.stall;
-  $("#trademeta").textContent = `${who} · day ${TRADE.day}`;
+  // `TRADE.day` is the shelf's key (`market.day_of`, counted from 0); every clock the
+  // player reads counts from 1 (`fmtClock` below, the bench's "Day 2"), so add one here.
+  $("#trademeta").textContent = `${who} · day ${Number(TRADE.day || 0) + 1}`;
   drawLines();
   $("#tradepurse").textContent = TRADE.purse;
   $("#tradetill").textContent = `${TRADE.till.text} in the till`;

@@ -119,3 +119,17 @@ def test_a_week_of_work_by_button_pays_into_the_purse(market):
 def test_the_button_door_takes_only_its_closed_uses(market):
     assert _post("/api/tradeskill", {"use": "steal"}).status_code == 400
     assert _post("/api/tradeskill", {"use": "judge"}).status_code == 400
+
+
+def test_the_trade_header_counts_days_from_one_like_every_other_clock():
+    """Measured 2026-10-07 by the alchemy finishing lane: the Trade header read "day 1" while
+    the alchemy bench read "Day 2" on the same turn. `market.day_of` is the shelf's key and
+    counts from 0; the header printed it raw. Every clock the player reads counts from 1."""
+    from pathlib import Path
+    from rules import market
+
+    src = (Path(__file__).resolve().parent.parent / "play" / "static" / "js" / "table"
+           / "06-trade-and-page.js").read_text(encoding="utf-8")
+    assert "day ${TRADE.day}`" not in src
+    assert "day ${Number(TRADE.day || 0) + 1}`" in src
+    assert market.day_of(0) == 0 and market.day_of(24 * 60 + 5) == 1
