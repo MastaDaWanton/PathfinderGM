@@ -165,6 +165,11 @@ def check_terms(actor, level: int, *, lab: bool = False) -> list[dict]:
         {"label": f"half character level ({char_level})", "value": char_level // 2},
         {"label": "Intelligence", "value": intelligence},
     ]
+    # Half the Craft ranks (option A, 2026-10-07; `tradecraft.bench_terms`), as at every
+    # other bench, so Craft (alchemy) is worth a rank here too.
+    from . import tradecraft
+
+    out += tradecraft.bench_terms(actor, "alchemist")
     if lab:
         out.append({"label": "laboratory", "value": int(bench_rules().get("lab_bonus", 2))})
     return out
