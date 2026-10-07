@@ -278,7 +278,7 @@ not parse an id.
 | `footing` | `firm`, `broken`, `bad` |
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — how the place is shaped upward |
 | `storeys` | `{up, down}`, counts of floors. Omit outdoors |
-| `kind` | *optional* — what the place IS when its name does not say: one of the consumer's settlement kinds (`docs/place-vocabulary.json`, the `settlement_places` names without "the"), or a word folded to one ("forge" → `smithy`, "alchemist's lab" → `laboratory`). Read since 2026-10-06 (alchemy lane G; lane I owns this file in wave 2): "the Glasshouse" with `"kind": "laboratory"` is a laboratory, kept by an alchemist, and its city gets no second one appended. A kind the consumer does not know is dropped and the name reads as before |
+| `kind` | *optional* — what the place IS when its name does not say: one of the consumer's settlement kinds (`docs/place-vocabulary.json`, the `settlement_places` names without "the"), or a word folded to one ("forge" → `smithy`, "alchemist's lab" → `laboratory`). Read since 2026-10-06 (the alchemy revamp; see "Alchemy" below): "the Glasshouse" with `"kind": "laboratory"` is a laboratory, kept by an alchemist, and its city gets no second one appended. A kind the consumer does not know is dropped and the name reads as before |
 | `keeper` | *optional* — `{"name": str, "known": "publicly"}` for a keeper everybody knows by name (the name over the shop). Without `known: "publicly"` the consumer keeps the name back until it is given in play, as it does for every keeper it mints (owner ruling F1, 2026-09-30; `keepers.publicly_known`). A `play.cast[]` row may say the same with `"keeps": "<place id>", "known": "publicly"` |
 
 All five of the tier-2 fields are **read** as of 2026-09-16 (`rules/floorplan.from_world`,
@@ -350,7 +350,9 @@ defaults, so a world that sends only `name` and `about` still loads.
 
 ### `play.materials[]` (proposed: no export carries it yet, and it has no version number)
 
-A world's own metals, alloys, fittings and forge reagents, for the smith's bench. Until an
+A world's own metals, alloys, fittings and forge reagents, for the smith's bench — and the
+same list carries every other craft's materials, an alchemist's reagents among them (see
+"Alchemy" below: one material, many shelves, the shelf decided by `kind`). Until an
 export carries them the app uses its shipped shelf, `content/materials/*.json`, read through
 the one door `rules/materials.py`, whose rows already have this shape. Written down
 2026-10-04 (the blacksmithing revamp, plan §15.1) under the standing instruction that fixes
@@ -522,6 +524,116 @@ consumes is the app's (`consumables.kinds`), read off each row's `kind`, never i
 The app reads these through `rules/materials.py`; the forge's item build
 (`rules/forge_items.py`) computes everything else on read — a record of a forged item
 stores which material went into each piece, never a number.
+
+## Alchemy
+
+Written 2026-10-07 by the alchemy revamp's lane I (docs/alchemy-revamp-plan.md §19), which
+folds in what lanes A to H found. Nothing here is a new export section: a world's alchemy
+arrives through the rows it already has — `play.materials[]` for its reagents, `play.flora[]`
+for its hybrid herbs, `play.places[]` for its laboratories, `play.cast[]` for its alchemists.
+Fixes are world-agnostic (the standing instruction of 2026-09-28), so every field below is
+what the shipped shelf itself is written in: `content/materials/alchemist-materials.json`
+(139 rows: reagent 46, gland 22, solvent 16, vessel 14, salt 11, treatment 11, essence 10,
+catalyst 9) and the 63 hybrid herbs of `content/ingredients/herbs-and-parts.json`. As with
+races, flora and metals, a world's reagent is its own even when it is called Brimstone; it
+is never validated against the shipped row it shares a name with.
+
+### A world's reagents: `play.materials[]` rows of an alchemist's kind
+
+`play.materials[]` (above) is one list for every craft: **one material, many shelves** (the
+owner's Q2.1). A row is on the alchemist's shelf when its `kind` is one of the alchemist's
+eight — `reagent`, `gland`, `solvent`, `vessel`, `salt`, `catalyst` (only the alchemist's),
+`treatment` and `essence` (shared with the forge and the enchanter, so a row of those two
+kinds says which by carrying `product`) — or when it writes `product` at all. No `shelves`
+field is read: the plan proposed one, and `kind` already answers the question (`materials.
+is_alchemy`).
+
+```json
+{
+  "id": "5bbd0c40345f~material:fen-sulphur",
+  "name": "Fen sulphur",
+  "kind": "reagent",
+  "tier": "common",
+  "text": "Yellow crust off the marsh vents; it burns with a choking blue flame.",
+  "product": [
+    {"type": "damage", "dice": "1d4", "damage_type": "fire", "route": "struck",
+     "essence": "fire", "grade": 1},
+    {"type": "apply_condition", "target": "sickened", "duration": {"amount": 1, "unit": "round"},
+     "route": "ingest", "essence": "decay", "drawback": true}
+  ],
+  "working": [{"type": "working", "trait": "solid"}, {"type": "working", "trait": "volatile"}],
+  "mishap": {"type": "damage", "dice": "1d4", "damage_type": "fire", "recipient": "self",
+             "note": "the charge flashes in the crucible"},
+  "toxic": null,
+  "color": [0.86, 0.78, 0.22],
+  "biomes": ["marsh"], "obtain": "gathered", "price_gp": 1
+}
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `product[]` | what it puts into a bottle: effect documents in the app's vocabulary (`rules/effectspec.py`), each with an **`essence`** (one of the eighteen below), a **`route`** (below), a `grade` (1 and up; same-named traits from two materials add their grades at the bench, capped by the Alchemist level) and `drawback: true` on a cost. Never `narrative`: the validator refuses it with the fix named | `[]`: the row brings nothing to a bottle and must then have a job at the bench (a solvent, a vessel, a catalyst) |
+| `working[]` | how it behaves at the bench, `{"type": "working", "trait": ...}`: `solid`, `liquid`, `volatile`, `stabilizer`, `catalyst`, `apparatus`, `combustible`, `slow_to_dissolve`, `light_sensitive`, `corrosive`, `toxic_to_handle`, `wild`, `fireproof`, `warded`, `lead_lined`, `solvent:<water\|alcohol\|vinegar\|oil\|acid>`, and the vessel traits that decide a product's family — `drinkable` (potion or oil), `shatters` and `bursts` (a thrown splash flask), `struck` (a cloud), `stick` (a tool) | `[]` |
+| `mishap` | `volatile` only, and required with it: one effect document (with `"recipient": "self"`) that lands on the alchemist when a step with it fails by 5 or more, stated before the roll | `null` |
+| `toxic` | `toxic_to_handle` only, and required with it: what working it unprotected does to the alchemist | `null` |
+| `color` | `[r, g, b]`, 0 to 1: the liquid colour on the bench's glassware, mixed by amount | none: the stage shows a neutral glass |
+| `form` | its own form word when its `kind` does not say it (`powder`, `liquid`) | its `kind` |
+| `material` | the id of the material this is a form of, as the forge's rows (a world's "red sulphur" naming `brimstone`) | its own id |
+| `tier`, `text`, `biomes`, `obtain`, `obtain_dc`, `from_creature(s)`, `price_gp` | as every `play.materials[]` row. `tier` gates the bench (common and uncommon at Alchemist 1, rare and exotic at 2 and in a laboratory, legendary at 3); `obtain` and `biomes` send the alchemist's quarry, gathering and harvest excursions for it (`content/rules/gathering.json`; a `salt` or `reagent` comes to the alchemist's quarry in full batches and to the smith's prospect at half); `price_gp` is held to the one price rule (×5 for an `essence` or `catalyst`) | as above |
+| `craft_dc`, `book` | a book reagent's printed numbers; a world's own row leaves both out | `null`, `false` |
+
+**The fences a world's row is held to** (`materials.validate`, the alchemy branch; each
+refusal names its fix): at least three discoverable properties across `product`, `working`,
+`mishap` and `toxic`; at least one drawback when it has product traits; every product trait
+with an `essence` and a `route`; house numbers inside the tier's ceiling (plan §5.6); a
+`volatile` row has a `mishap` and only a volatile one does; a `toxic_to_handle` row has a
+`toxic` document and only such a one does. The shipped shelf is pinned clean against the
+same validator by test (`tests/test_alchemy_materials.py`); the day `play.materials[]` has a
+reader, a world's row that fails must be reported with those words, never repaired by guess.
+
+**The eighteen essences** (`effectspec.ESSENCES`, kept by the owner on 2026-10-06): `fire`,
+`frost`, `acid`, `storm` (electricity), `thunder` (sonic), `light`, `shadow`, `vigour`
+(healing), `purity` (ending conditions, poison, disease), `ward` (resistance, saves, AC),
+`might` (Str, Con, attack, damage), `grace` (Dex, land speed), `mind` (Int, Wis, Cha,
+emotion), `lightness` (flight, climbing, falling softly), `sight` (senses, divination),
+`binding` (entangling, gluing, holding), `decay` (poison, sickness, necromancy), `change`
+(form, size, substance). A world never adds one: formulae key on these ids, and an essence
+no formula asks is a reagent nothing can be made of.
+
+**Routes** — how a trait reaches whoever it reaches: the herb's six (`ingest`, `skin`,
+`eyes`, `wound`, `inhale`, `external`) and the alchemist's four (`struck`, what a thrown
+flask does to the creature it hits; `splash`, everyone within 5 ft of where it lands;
+`area`, everyone inside a cloud; `carried`, a cost on whoever carries the product). A
+product's family (potion, oil, splash flask, cloud, tool) carries only the routes it can
+deliver; a trait that cannot travel is shown dimmed with its reason at the bench and left out.
+
+### A world's hybrid herbs: `play.flora[]`
+
+`hybrid: true` puts a herb on the alchemist's shelf as well as the herbalist's, one document
+on two shelves; its `external` uses are the alchemist's own (the herb bench drops them). Each
+use may name an **`essence`** (`uses[].essence`, one of the eighteen): without one it is a
+herb to the alchemist but makes no formula. Every one of the 201 shipped hybrid herb effects
+carries one. A herb's id and a material's id must never be the same: `basilisk-eye` was both
+until the alchemy revamp merged the gland into the herb, and one knowledge entry stood for
+two documents (`tests/test_alchemy_shelf.py` now pins every material id against every
+ingredient id).
+
+### Formulae are not exported
+
+What a mix can become is a fixed, world-agnostic table (the owner's Q5.2: "never secret per
+world"): the sixteen book classics and the 44 authored spell potions in
+`content/rules/alchemy-formulae.json`, and one derived row for every corpus spell whose
+effects all run (425 today, `rules/formulae.py`). A world feeds it two ways only: its
+reagents carry essences, and its spells (if it ever exports any) join the spell corpus. A
+world that sends a recipe list is sending something the app will not read.
+
+### Laboratories and alchemists
+
+| Field | Meaning |
+|---|---|
+| `play.places[].kind: "laboratory"` | read since 2026-10-06 (the places row's `kind`, above): a world's own laboratory by any name ("the Glasshouse") is one, its keeper an alchemist, and its city gets no second one appended. Every city the world does not give one has "the laboratory" appended (the owner: "every city has a laboratory to rent"); a town or village has one only when its own words name its alchemists or play founds one |
+| `play.cast[]` alchemists | words only: a person described as "an alchemist" or "a chymist" is one (the app's occupation `alchemist`, tag `alchemy`, `content/people/occupations.json`). A world's own word for the trade needs that table to learn it |
+| prices | none from a world. A town laboratory rents at 2 sp an hour (`market.LAB_RENT_CP_PER_HOUR`, a house rate; the book only sells a lab outright, 200 gp); the party's own costs nothing. Products sell at the book's price (a spell potion 50 gp × spell level × caster level), the tier ladder for a house compound, the quality ladder multiplying both; reagents at their own `price_gp` |
 
 ## SQLite
 

@@ -171,8 +171,12 @@ def test_a_corrected_material_fixes_every_bottle_on_the_next_load(monkeypatch):
 
 
 def test_old_alchemist_work_is_never_rebuilt():
-    """Contracts §6: old work (a row with no record) stays exactly as it was."""
+    """Contracts §6: old work (a row with no record) stays exactly as it was. The row is in
+    the old chain bench's real shape, `from_materials` included (every old preview wrote
+    the chain's materials; tests/alchemy_migration/old-items.json): a plain alchemist row
+    WITHOUT materials is a bought product, finished work rather than old (lane I)."""
     d = {"base": "Brimstone Sealed Flask", "craft": "alchemist", "count": 2,
+         "from_materials": ["brimstone", "lamp-oil"],
          "specs": [{"type": "damage", "dice": "2d6", "damage_type": "fire"}]}
     st = from_stock_dict(d)
     assert not isinstance(st, items.AlchemyStock) and st.specs == d["specs"]

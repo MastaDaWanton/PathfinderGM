@@ -397,7 +397,11 @@ class Item:
 
     @property
     def finished(self) -> bool:
-        return bool(self.record) and not self.intermediate
+        if self.record:
+            return not self.intermediate
+        # A bought product (`goods.alchemy_stock`: a plain shelf row with the formula's
+        # documents and no record) is finished work too, never an input.
+        return self.kind == "product" and self.stock is not None and not self.old
 
     def has(self, trait: str) -> bool:
         return trait in self.traits
@@ -526,9 +530,22 @@ def shelf(actor, now: int = 0, reserved: dict | None = None) -> list[Item]:
         if count <= 0:
             continue
         if str(getattr(st, "craft", "") or "") == TRACK_ID:
-            out.append(Item(key=key, name=st.name, kind="old", tier=str(st.tier or "common"),
-                            count=count, stock=st, old=OLD_WORK,
-                            work=inprogress.held_back(st, now)))
+            # Old work is what the old chain bench made: it carries the materials its chain
+            # used (`alchemy_migration.is_old_work`, the one definition). A bought classic
+            # or potion (`goods.alchemy_stock`) is also a plain alchemist row, with no
+            # materials, and this said "made at the old bench" of it. Measured live
+            # 2026-10-07 (lane I) on a converted save: 8 of 8 bought jars, and every
+            # purchase since lane H, listed as Old work.
+            from .alchemy_migration import is_old_work
+
+            if is_old_work(st.as_dict()):
+                out.append(Item(key=key, name=st.name, kind="old",
+                                tier=str(st.tier or "common"), count=count, stock=st,
+                                old=OLD_WORK, work=inprogress.held_back(st, now)))
+            else:
+                out.append(Item(key=key, name=st.name, kind="product",
+                                tier=str(st.tier or "common"), count=count, stock=st,
+                                work=inprogress.held_back(st, now)))
             continue
         if names is None:
             names = _by_name()
