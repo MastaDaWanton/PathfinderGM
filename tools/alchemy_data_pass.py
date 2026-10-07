@@ -9,11 +9,12 @@ What it writes:
   or more does to the alchemist), `toxic` (toxic-to-handle materials only: what working it
   unprotected does), `color` (the [r, g, b] the stage draws it in) and, where a printed
   number was used, `book` and `book_source`. Ids, names, kinds, tiers and prices do not
-  change. The pre-revamp `effects` list is left exactly as it was: the old chain bench
-  (rules/alchemist.py) still reads it until lane F retires that bench, and
-  `materials.normalise` reads `product` first, so the new door never sees it.
+  change. The pre-revamp `effects` list was kept for the old chain bench until alchemy
+  lane F retired it (2026-10-06); the pass now removes it (`RETIRED_FIELDS`), and adds
+  the rows in `NEW_MATERIALS` (the tool family's wooden rod).
 - `content/materials/alchemist-spell-potions.json`: the 44 potions' narrative lines typed
-  (plan §16.9). Ids, spells, caster levels and materials do not change (owner, Q10.2).
+  (plan §16.9). Ids, spells and caster levels do not change (owner, Q10.2); a recipe
+  with no drinkable vessel among its materials gains one (`RECIPE_VESSEL`, lane F).
 - `content/ingredients/herbs-and-parts.json`: an `essence` on every effect of the 63
   hybrid herbs, and nothing else (contracts §1 row D).
 
@@ -315,6 +316,13 @@ PLAN: dict[str, dict] = {
         color=[0.8, 0.7, 0.6]),
     "clay-flask": dict(product=[], working=W("shatters", "fireproof", "solid"),
                        color=[0.7, 0.45, 0.3]),
+    # The tool family's vessel (alchemy lane F, 2026-10-06): lane D's pass found no material
+    # with the `stick` trait, so the tool family (sunrod, tindertwig, smokestick, plan §12.1)
+    # had no vessel and none of the three could be bottled. A whittled rod: the book's
+    # tindertwig and smokestick are wooden sticks, and a sunrod is a rod (CRB, Goods and
+    # Services). Combustible, because it is wood; free at a counter, as water is.
+    "wooden-rod": dict(product=[], working=W("stick", "combustible", "solid"),
+                       color=[0.55, 0.4, 0.25]),
     "glass-vial": dict(product=[], working=W("drinkable", "solid", "light_sensitive"),
                        color=[0.85, 0.92, 0.95]),
     "waxed-bladder": dict(product=[], working=W("bursts", "solid", "combustible"),
@@ -999,7 +1007,9 @@ TEXTS = {
         "drake's last breath all at once — a burst of flame that catches everyone in it."),
 }
 
-ALCHEMIST_NOTE_ADD = (
+# The note lane D's first run wrote, replaced (not appended to) by the one below now that
+# `effects` is gone.
+ALCHEMIST_NOTE_WAS = (
     "\n\nThe alchemy revamp (2026-10-06, docs/alchemy-revamp-plan.md §5, lane D, "
     "tools/alchemy_data_pass.py): every material now carries the alchemy document's fields "
     "(docs/alchemy-contracts.md §3) — `product` (what it puts in a bottle: typed effects, "
@@ -1009,6 +1019,16 @@ ALCHEMIST_NOTE_ADD = (
     "what working it unprotected does) and `color`. `rules/materials.py` reads `product` "
     "first; `effects` is the pre-revamp list the old chain bench reads until it retires, "
     "and nothing new reads it. House numbers are the owner's to review in "
+    "docs/alchemy-review.md.")
+ALCHEMIST_NOTE_ADD = (
+    "\n\nThe alchemy revamp (2026-10-06, docs/alchemy-revamp-plan.md §5, lanes D and F, "
+    "tools/alchemy_data_pass.py): every material carries the alchemy document's fields "
+    "(docs/alchemy-contracts.md §3) — `product` (what it puts in a bottle: typed effects, "
+    "each with an `essence`, a `route` and a `grade`, `drawback: true` where it costs the "
+    "user), `working` (how it behaves at the bench), `mishap` (volatile materials: what a "
+    "roll failed by 5 or more does to the alchemist), `toxic` (toxic-to-handle materials: "
+    "what working it unprotected does) and `color`. The pre-revamp `effects` lists retired "
+    "with the old chain bench (lane F). House numbers are the owner's to review in "
     "docs/alchemy-review.md.")
 
 
@@ -1097,6 +1117,33 @@ POTION_TYPING: dict[str, list] = {
 }
 
 
+# Rows this pass adds to the catalogue (alchemy lane F): their own fields, beside the PLAN
+# entry that gives them their alchemy fields. Appended when the file does not have them.
+NEW_MATERIALS: list[dict] = [
+    {"id": "wooden-rod", "name": "Wooden rod", "kind": "vessel", "tier": "common",
+     "craft_dc": None,
+     "text": ("A whittled stick or a short rod of hard wood: the body of a tindertwig, a "
+              "smokestick or a sunrod. Bottled into, the work becomes a tool you strike or "
+              "light rather than a thing you drink or throw."),
+     "risky": False, "volatile": False, "obtain": "bought", "market": "market",
+     "price_gp": 0.01},
+]
+
+# The old chain bench's own lists, retired with it (alchemy lane F): `effects` was the
+# pre-revamp product the chain bench read, and `effects_converted` its bookkeeping. The
+# step bench reads `product` through rules/materials.py, so the copies go (lane D's
+# hand-off: "when your bench replaces it, retire the old chain bench for alchemy and
+# delete `effects` from the alchemist rows").
+RETIRED_FIELDS = ("effects", "effects_converted")
+
+# Every old recipe bottles in a drinkable vessel (alchemy lane F). Lane D found the nine
+# 3rd-level recipes naming the crystal retort as their only vessel, and the retort is
+# `apparatus` now (a vessel that is equipment, never spent): with no vial among their
+# materials they could not be bottled as a potion at all. The retort stays (it is the
+# apparatus that helps); the vial the book's 3rd-level work wants is added.
+RECIPE_VESSEL = {1: "glass-vial", 2: "glass-vial", 3: "warded-phial"}
+
+
 # --- assembling -----------------------------------------------------------------------------------
 
 def build_material(raw: dict) -> dict:
@@ -1104,7 +1151,7 @@ def build_material(raw: dict) -> dict:
     plan = PLAN[mid]
     row = {k: v for k, v in raw.items()
            if k not in ("product", "working", "mishap", "toxic", "color", "book",
-                        "book_source")}
+                        "book_source") + RETIRED_FIELDS}
     product = [copy.deepcopy(p) for p in plan.get("product", [])]
     cites = []
     for p in product:
@@ -1129,8 +1176,16 @@ def build_material(raw: dict) -> dict:
     return row
 
 
+def _drinkable(mid: str) -> bool:
+    plan = PLAN.get(mid) or {}
+    return any(w.get("trait") == "drinkable" for w in plan.get("working") or [])
+
+
 def build_potion(raw: dict) -> dict:
     row = copy.deepcopy(raw)
+    if not any(_drinkable(m) for m in row.get("materials") or []):
+        vessel = RECIPE_VESSEL.get(int(row.get("spell_level") or 1), "glass-vial")
+        row["materials"] = list(row.get("materials") or []) + [vessel]
     typing = POTION_TYPING.get(row["id"])
     narr = [i for i, e in enumerate(row["effects"]) if e.get("type") == "narrative"]
     if not narr:
@@ -1163,6 +1218,9 @@ def main() -> int:
     pots = json.loads(POTIONS.read_text(encoding="utf-8"))
     herbs = json.loads(HERBS.read_text(encoding="utf-8"))
 
+    have = {m["id"] for m in alch["materials"]}
+    alch["materials"] = list(alch["materials"]) + [copy.deepcopy(m) for m in NEW_MATERIALS
+                                                   if m["id"] not in have]
     ids = [m["id"] for m in alch["materials"]]
     missing = [i for i in ids if i not in PLAN]
     extra = [i for i in PLAN if i not in ids]
@@ -1170,7 +1228,7 @@ def main() -> int:
         print(f"NO PLAN for {missing}; planned but not in the file: {extra}")
         return 1
     rows = [build_material(m) for m in alch["materials"]]
-    note = alch.get("note", "")
+    note = alch.get("note", "").replace(ALCHEMIST_NOTE_WAS, "")
     if ALCHEMIST_NOTE_ADD.strip() not in note:
         note += ALCHEMIST_NOTE_ADD
     new_alch = {"source": alch.get("source"), "note": note, "materials": rows}

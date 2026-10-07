@@ -1,6 +1,6 @@
 {
   "source": "PF1e Core Rulebook alchemical items, Ultimate Equipment, and the bestiary's classic reagent creatures, worked into the tier scheme rules/worldclass.py defines.",
-  "note": "Materials are to the Alchemist what herbs are to the Herbalist, and the file follows content/ingredients/herbs-and-parts.json's shape with two additions: `volatile` (two volatiles in one vessel need Stabilize, and each volatile past the first raises the DC — rules/alchemist.py) and `needs_stabilizer` (the material attacks its own vessel). Where a material's text names a classic output — alchemist's fire, acid flask, tanglefoot bag — that is the recipe table in docs/alchemy.md speaking; the material is the identity, the chain is the item. Every material also declares `obtain` — bought, mined, gathered or harvested — in the flat shape the other three crafts use: the word itself, with `market` and `price_gp` for what is bought, `biomes` (from rules/biomes.py) for what is dug or gathered, `from_creatures` for what is cut off a corpse the way the leatherworker writes it, and `obtain_dc` for the check. The craft-action excursion is the single hub for obtaining materials, so where a thing comes from is data here rather than a special case in the UI.\n\nThe alchemy revamp (2026-10-06, docs/alchemy-revamp-plan.md §5, lane D, tools/alchemy_data_pass.py): every material now carries the alchemy document's fields (docs/alchemy-contracts.md §3) — `product` (what it puts in a bottle: typed effects, each with an `essence`, a `route` and a `grade`, `drawback: true` where it costs the user), `working` (how it behaves at the bench), `mishap` (volatile materials: what a roll failed by 5 or more does to the alchemist), `toxic` (toxic-to-handle materials: what working it unprotected does) and `color`. `rules/materials.py` reads `product` first; `effects` is the pre-revamp list the old chain bench reads until it retires, and nothing new reads it. House numbers are the owner's to review in docs/alchemy-review.md.",
+  "note": "Materials are to the Alchemist what herbs are to the Herbalist, and the file follows content/ingredients/herbs-and-parts.json's shape with two additions: `volatile` (two volatiles in one vessel need Stabilize, and each volatile past the first raises the DC — rules/alchemist.py) and `needs_stabilizer` (the material attacks its own vessel). Where a material's text names a classic output — alchemist's fire, acid flask, tanglefoot bag — that is the recipe table in docs/alchemy.md speaking; the material is the identity, the chain is the item. Every material also declares `obtain` — bought, mined, gathered or harvested — in the flat shape the other three crafts use: the word itself, with `market` and `price_gp` for what is bought, `biomes` (from rules/biomes.py) for what is dug or gathered, `from_creatures` for what is cut off a corpse the way the leatherworker writes it, and `obtain_dc` for the check. The craft-action excursion is the single hub for obtaining materials, so where a thing comes from is data here rather than a special case in the UI.\n\nThe alchemy revamp (2026-10-06, docs/alchemy-revamp-plan.md §5, lanes D and F, tools/alchemy_data_pass.py): every material carries the alchemy document's fields (docs/alchemy-contracts.md §3) — `product` (what it puts in a bottle: typed effects, each with an `essence`, a `route` and a `grade`, `drawback: true` where it costs the user), `working` (how it behaves at the bench), `mishap` (volatile materials: what a roll failed by 5 or more does to the alchemist), `toxic` (toxic-to-handle materials: what working it unprotected does) and `color`. The pre-revamp `effects` lists retired with the old chain bench (lane F). House numbers are the owner's to review in docs/alchemy-review.md.",
   "materials": [
     {
       "id": "brimstone",
@@ -11,15 +11,6 @@
       "text": "Yellow sulphur, dug from fumaroles and ground fine. It burns — that is its whole identity — and it is the heart of alchemist's fire, tindertwigs and every stinking fume the bench produces.",
       "risky": false,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "mountain",
@@ -87,8 +78,6 @@
       "text": "Nitre scraped from cellar walls and old dung heaps. On its own it is a preservative; added to anything that burns it makes the burning violent. Smokesticks and thunderstones both want it, and so does every mishap the craft is famous for.",
       "risky": false,
       "volatile": true,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "underground",
@@ -154,16 +143,6 @@
       "text": "Soft charcoal burned slow from willow wands. It drinks up poisons and impurities, which makes it the working body of antitoxin, and it fuels the crucible without spitting.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_mod",
-          "amount": 1,
-          "bonus_type": "alchemical",
-          "target": "fort",
-          "note": "against ingested poison"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
       "market": "apothecary",
@@ -212,15 +191,6 @@
       "text": "Burnt limestone. It hisses and scalds the moment water touches it, which is either a burn on your hands or the heat source of a flameless firepot, depending on who was careless. Base of the alkali flask that eats oozes.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d3",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "apothecary",
@@ -283,8 +253,6 @@
       "text": "Quicklime that has already drunk its water and given up its heat: a soft white powder, still alkaline enough to quiet an acid or a biting sap, and safe to handle with a dry hand.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 10,
       "market": "apothecary",
@@ -332,8 +300,6 @@
       "text": "The embalmer's salt, harvested from dry lakebeds. It pulls water out of anything, which keeps a perishable reagent from rotting and dries a wound to a crust.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "desert"
@@ -398,8 +364,6 @@
       "text": "Mined halite, crushed coarse. The plainest preservative there is, and the plainest ionic body a solution can be given.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "underground",
@@ -457,16 +421,6 @@
       "text": "Astringent white crystal. Stops small bleeding at a touch and fixes dyes; a styptic pencil of it rides in every field surgeon's kit.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "skill_mod",
-          "amount": 1,
-          "bonus_type": "alchemical",
-          "target": "heal",
-          "note": "to staunch bleeding"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "apothecary",
@@ -528,8 +482,6 @@
       "text": "Iron sulphate, glassy green crystals. Ink-making and mordants day to day — but roasted in a retort it gives up oil of vitriol, which is the road to every acid the bench sells.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "underground"
@@ -585,24 +537,6 @@
       "text": "Copper sulphate, a blue too pretty to be as emetic as it is. A pinch in a draught empties the stomach it lands in.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 12,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "sickened",
-              "duration": {
-                "amount": "1d4",
-                "unit": "round"
-              }
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "underground"
@@ -655,17 +589,6 @@
       "text": "Boiled-down conifer resin, stickier than regret. The body of the tanglefoot bag, waterproofing for boots and hulls, and a slow hot fuel when the fire needs to cling.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "apply_condition",
-          "target": "entangled",
-          "duration": {
-            "amount": "2d4",
-            "unit": "round"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "forest"
@@ -711,8 +634,6 @@
       "text": "Dry-distilled birch bark: black, antiseptic, and the oldest glue in the world. Binds fletching, seals seams, and keeps a wound clean while it knits.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "forest"
@@ -762,8 +683,6 @@
       "text": "Bench sweepings from the smith next door. They rust, spark and precipitate copper out of vitriol — a cheap reactive body for a dozen small works.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "smith",
@@ -837,16 +756,6 @@
       "text": "Sweet, soft, heavy and slowly ruinous. Thrown as a choking cloud it weakens whoever breathes it, and swallowed it poisons the drinker; it costs the alchemist who works it unmasked — the trembling hands of the old trade are lead's signature, not age's.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d2",
-          "damage_type": "poison",
-          "lethality": "nonlethal",
-          "note": "to the handler, per session of unmasked work"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "smith",
@@ -916,8 +825,6 @@
       "text": "Ground limestone. A mild base, a marking dust, and the filler that keeps a violent mixture from being all violence.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "hills"
@@ -970,8 +877,6 @@
       "text": "Soot gathered from a starved flame. The blackest pigment there is, and the smoke-body of the smokestick.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "apothecary",
@@ -1041,8 +946,6 @@
       "text": "Clean animal fat. Carries a salve, greases a mould, and slicks whatever alchemical grease is asked to slick.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1089,8 +992,6 @@
       "text": "Water with nothing in it, which is rarer than it sounds. The default medium: a reaction happens in it and it adds nothing of its own to the bottle.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "apothecary",
@@ -1126,8 +1027,6 @@
       "text": "Twice-distilled grain alcohol. Dissolves resins and essences water refuses, burns with a blue flame, and doubles as the antiseptic of last resort.",
       "risky": false,
       "volatile": true,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "market",
@@ -1205,8 +1104,6 @@
       "text": "A weak, patient acid. Quenches quicklime, teases verdigris out of copper, and settles a dozen gentle reactions that stronger acids would ruin.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1259,16 +1156,6 @@
       "text": "Pressed and clarified oil. Dissolves what spirits will not, and a flask of it is half an alchemist's fire before the bench has done anything at all.",
       "risky": false,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d3",
-          "damage_type": "fire",
-          "lethality": "lethal",
-          "note": "when lit"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1325,8 +1212,6 @@
       "text": "Cold-pressed kitchen oil, green and mild. It will not burn a lamp clean, but it carries what a leaf or a flower gives up into a body that can be rubbed on the skin, which is the whole of an infused oil.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1379,8 +1264,6 @@
       "text": "Distilled pine resin, sharp enough to smell across a room. Cuts pitch and tar like nothing else, and takes a flame with enthusiasm.",
       "risky": false,
       "volatile": true,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "market",
@@ -1449,15 +1332,6 @@
       "text": "Wood-ash leachate, caustic enough to eat wool and skin. Renders fat to soap, strips hide to leather, and is the cheap answer when a chain needs something dissolved that acid will not touch.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d2",
-          "damage_type": "acid",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1503,8 +1377,6 @@
       "text": "Water carrying all the salt it can hold. Preserves what sits in it and forces dissolved salts out of rival solutions — the cheapest precipitant on the shelf.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1555,8 +1427,6 @@
       "text": "A living ferment, kept fed in a crock. It starts changes it does not finish — the humblest catalyst there is, and the first most alchemists ever meet.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
       "market": "market",
@@ -1592,8 +1462,6 @@
       "text": "The slick living mat that turns wine sour. Drop a piece in any thin alcohol and it will make acid of it, patiently, forever.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
       "market": "market",
@@ -1629,8 +1497,6 @@
       "text": "Dried calf stomach lining. Curdles and sets liquids into solids — the bench borrows it whenever a preparation must gel rather than pour.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
       "market": "market",
@@ -1666,8 +1532,6 @@
       "text": "Cheap fired clay with a wax stopper. Shatters on impact, which is not a flaw: it is the throwing vessel of alchemist's fire and every splash weapon after it.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "glassblower",
@@ -1703,8 +1567,6 @@
       "text": "A thumb of blown glass. Holds a dose of anything mild and shows its colour, which matters more than it sounds when the shelf holds forty of them.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "glassblower",
@@ -1740,8 +1602,6 @@
       "text": "A supple animal bladder, waxed tight. Bursts rather than shatters — the tanglefoot bag's skin, and the right vessel for anything meant to splatter instead of splash.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1777,8 +1637,6 @@
       "text": "Heavy salt-glazed stoneware. Sits in a fire without complaint; the vessel a calcination happens in.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "market",
@@ -1814,8 +1672,6 @@
       "text": "Clean comb wax. Seals a stopper airtight, coats a pill so it survives the stomach, and buys a perishable preparation weeks of shelf life.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1866,8 +1722,6 @@
       "text": "A drilled cork carrying a twist of oiled wick. The fuse-and-stopper of a fire flask: seal the vessel with this and the contents can be lit before they are thrown.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -1909,8 +1763,6 @@
       "text": "Linen boiled in oil and dried stiff. Wraps a sealed work against damp, dust and the inside of a saddlebag.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "market",
@@ -1946,8 +1798,6 @@
       "text": "Absorbent clay that drinks oil and grease out of anything it touches. Cleans wool, dries a spill, and blots a greased floor back to walkable.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
       "market": "market",
@@ -2028,13 +1878,6 @@
       "text": "The luminous organ of a fire beetle, still glowing for days after the beetle has stopped needing it: ten feet of steady red light. The cold heart of a sunrod, and the striker-paste of a tindertwig.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "sheds light in a 10-foot radius for 1d6 days after harvesting"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "fire beetle",
@@ -2094,24 +1937,6 @@
       "text": "Exactly what it says, and worse than you remember. The active principle of the stink-pot, and of every vermin repellent that works by being unbearable.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 13,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "sickened",
-              "duration": {
-                "amount": "1d4",
-                "unit": "round"
-              }
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "skunk",
@@ -2173,16 +1998,6 @@
       "text": "Waxy aromatic crystal from the camphor laurel. Clears the head, repels insects and moths, and steadies the gut against bad air — the working half of antiplague and vermin repellent both.",
       "risky": false,
       "volatile": true,
-      "effects": [
-        {
-          "type": "save_mod",
-          "amount": 1,
-          "bonus_type": "alchemical",
-          "target": "fort",
-          "note": "against disease and inhaled effects"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 5,
       "market": "apothecary",
@@ -2249,16 +2064,6 @@
       "text": "Living metal that pools and runs. A draught of it quickens the step and poisons the blood together; worked bare-handed over heat it costs the alchemist, never the target — the classic slow ruin of the trade, and the classic reward for mastering it.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d3",
-          "damage_type": "poison",
-          "lethality": "nonlethal",
-          "note": "to the handler, per unmasked working — quicksilver's price is paid by the alchemist, not the target"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
       "market": "apothecary",
@@ -2325,15 +2130,6 @@
       "text": "Thick, oily and hungry: the strong acid, roasted out of green vitriol. Char first, questions later. The working body of the acid flask, and the solvent of choice when a metal must be eaten rather than asked.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "acid",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 30,
       "market": "apothecary",
@@ -2379,15 +2175,6 @@
       "text": "The strong water: fuming acid distilled from saltpetre and vitriol. Dissolves silver and copper outright, etches steel, and stains skin a warning yellow.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d4",
-          "damage_type": "acid",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 35,
       "market": "apothecary",
@@ -2448,15 +2235,6 @@
       "text": "Waxy, pale, and glowing faintly in the dark — kept under water because open air is enough to light it. Tindertwigs strike because of it, sunrods burn white because of it, and flash powder is mostly it.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d4",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 40,
       "market": "apothecary",
@@ -2538,8 +2316,6 @@
       "text": "The volatile salt of the old texts, sublimed from soot and urine. Cleans a soldering iron, sharpens other salts' reactions, and gives up pungent spirits when warmed with lime.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 15,
       "market": "apothecary",
@@ -2594,13 +2370,6 @@
       "text": "Smelling salts: hartshorn spirit fixed as a crystal. One sharp breath of it drags a stunned mind back to its feet.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "remove_condition",
-          "target": "dazed"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
       "market": "apothecary",
@@ -2676,8 +2445,6 @@
       "text": "The starred metal button smelted from stibnite. Hardens lead, purges what it is fed to, and holds a place in half the old transmutation recipes for reasons the new ones have not disproved.",
       "risky": true,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "mountain"
@@ -2751,21 +2518,6 @@
       "text": "Ruby-red arsenic ore, pretty as stained glass. The classic slow poison of courts and kitchens; the bench keeps it for pigment and pest-work, behind a label nobody misreads twice.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 14,
-          "on_failure": [
-            {
-              "type": "ability_damage",
-              "target": "con",
-              "dice": "1d2"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "underground"
@@ -2830,8 +2582,6 @@
       "text": "Vermilion mercury ore. Roast it and quicksilver runs out; grind it and you have the reddest pigment money buys, plus a slow dose of the same poison quicksilver charges.",
       "risky": true,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "underground"
@@ -2902,8 +2652,6 @@
       "text": "The green bloom vinegar raises on copper. A pigment, a mordant, and a mild caustic — bladeguard pastes use it to keep rust honest.",
       "risky": true,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 15,
       "market": "smith",
@@ -2958,15 +2706,6 @@
       "text": "Thin rock-oil skimmed from tar seeps. Dissolves pitch, wax and rubber, evaporates in a breath, and ignites at a harsh word — the accelerant half of alchemist's fire.",
       "risky": false,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "desert",
@@ -3026,8 +2765,6 @@
       "text": "Spirits distilled past drinkability into a pure working solvent. Extracts essences whole and vanishes from the finished work without a trace of itself: it carries no trait into the bottle.",
       "risky": false,
       "volatile": true,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
       "market": "apothecary",
@@ -3072,24 +2809,6 @@
       "text": "Cloudy crystal from lightning-struck ground, still holding the argument. Strike it and it cracks with a report that boxes ears — ground and sealed, it is the whole working principle of the thunderstone.",
       "risky": false,
       "volatile": true,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 15,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "deafened",
-              "duration": {
-                "amount": "1",
-                "unit": "hour"
-              }
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "hills",
@@ -3160,13 +2879,6 @@
       "text": "Gum resin that smoulders without flaming, pouring out ten times its volume in thick grey smoke. With saltpetre and lamp black it is a smokestick; alone it is a signal, a screen, or an eviction notice for anything living in a burrow.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "fills a 10-foot cube with obscuring smoke for 1 minute"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "jungle"
@@ -3227,27 +2939,6 @@
       "text": "Glassy barbed hairs combed off itchweed pods, each one a tiny fishhook. Milled fine it is itching powder — harmless, humiliating, and impossible to ignore in armour.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 12,
-          "on_failure": [
-            {
-              "type": "combat_mod",
-              "amount": -2,
-              "bonus_type": "untyped",
-              "target": "attack",
-              "duration": {
-                "amount": "1d4",
-                "unit": "minute"
-              },
-              "note": "maddening itch"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "swamp"
@@ -3317,15 +3008,6 @@
       "text": "The digestive sac of an ankheg, harvested whole and unruptured or not at all. The acid inside outperforms anything the bench can brew at this tier — an acid flask made from one hits like the beast did.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d4",
-          "damage_type": "acid",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "ankheg"
@@ -3369,15 +3051,6 @@
       "text": "The paired electrical organ from a shocker lizard's tail, still holding a charge it did not get to spend. Discharges once, hard, when breached — the seed of every jolting preparation the bench makes.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d8",
-          "damage_type": "electricity",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "shocker lizard"
@@ -3428,24 +3101,6 @@
       "text": "Scraped from the tongue-glands of a giant frog, and stickier than pine pitch ever dreams of being. Reacted with resin it sets on contact with air — the grip inside a well-made tanglefoot bag.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "ref",
-          "dc": 15,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "entangled",
-              "duration": {
-                "amount": "2d4",
-                "unit": "round"
-              }
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "giant frog",
@@ -3499,21 +3154,6 @@
       "text": "A snake's venom gland, milked or excised. A weapon poison as it stands — and, worked backwards through charcoal and aloes, the seed of antitoxin, because the cure is taught by the poison.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 13,
-          "on_failure": [
-            {
-              "type": "ability_damage",
-              "target": "con",
-              "dice": "1d2"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "adder",
@@ -3598,16 +3238,6 @@
       "text": "Silver dissolved in aqua fortis and crystallised back out. Blackens in light, sears infected flesh clean, and anchors antiplague — disease does not argue with silver.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "alchemical",
-          "target": "fort",
-          "note": "against disease"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 60,
       "market": "apothecary",
@@ -3654,16 +3284,6 @@
       "text": "Dried aloe latex, bitter enough to teach a lesson. A purgative that hurries poison out of the body before the body absorbs it — the third leg of antitoxin.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_mod",
-          "amount": 1,
-          "bonus_type": "alchemical",
-          "target": "fort",
-          "note": "against ingested poison"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "desert"
@@ -3739,13 +3359,6 @@
       "text": "Rendered from the skin-glands of the greasefish, which nothing has ever held onto. Reacted with tallow it is alchemical grease: a flask of it makes a floor, a ladder or a wrestled wizard essentially theoretical.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "coats one 5-foot square or one object; balancing or gripping through it is a DC 10 Acrobatics or Reflex matter"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "greasefish",
@@ -3813,8 +3426,6 @@
       "text": "Ground magnetite that never forgets north. Draws iron out of a mixture without touching anything else, and steers a precipitation the way a seed crystal steers frost.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "mountain"
@@ -3852,8 +3463,6 @@
       "text": "Cotton cord boiled in saltpetre and spirits, then dried. Fire runs down it faster than a shout — the timing element of any sealed work that must go off later rather than now.",
       "risky": false,
       "volatile": true,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 15,
       "market": "apothecary",
@@ -3907,8 +3516,6 @@
       "text": "A squat forged flask with a screw stopper. Heavy, but it holds a violent preparation that would burst clay, and shrugs off the inside of a pack in a fall.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
       "market": "smith",
@@ -3944,8 +3551,6 @@
       "text": "Dense, dull-glinting glass that acid cannot chew. The proper home of oil of vitriol and aqua fortis; ordinary glass merely delays them.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
       "market": "glassblower",
@@ -3982,8 +3587,6 @@
       "text": "A turned brass shell that threads shut. Scores itself along the seams so it bursts evenly — the difference between a bang and a spray is the vessel, not the charge.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 30,
       "market": "smith",
@@ -4019,16 +3622,6 @@
       "text": "Sharp sweet oil distilled from wintergreen leaves. Warms deep muscle through the skin — a liniment of it keeps a surgeon's hands and a soldier's back working.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "skill_mod",
-          "amount": 2,
-          "bonus_type": "alchemical",
-          "target": "heal",
-          "note": "when treating strains, bruises and exhaustion"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "forest"
@@ -4085,13 +3678,6 @@
       "text": "Numbing aromatic oil. Deadens a tooth, an incision or a stitch-line — the difference between surgery and torture, one drop at a time.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "numbs a touched area to pain for about an hour"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
       "market": "apothecary",
@@ -4149,8 +3735,6 @@
       "text": "Crimson palm resin — no dragon involved, whatever the seller says. Binds, colours and preserves; the traditional body for varnishes, sealing waxes and impressive-looking lies.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
       "market": "apothecary",
@@ -4197,15 +3781,6 @@
       "risky": true,
       "volatile": true,
       "needs_stabilizer": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d6",
-          "damage_type": "acid",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 500,
       "market": "apothecary",
@@ -4262,15 +3837,6 @@
       "text": "The royal water: fortis and spirit-of-salt blended fuming fresh, because it does not keep. The only mundane liquid that dissolves gold — which makes it the assayer's oath and the forger's nightmare.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d8",
-          "damage_type": "acid",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 300,
       "market": "apothecary",
@@ -4330,16 +3896,6 @@
       "text": "Phosphorus purified past caution: it ignites on air, burns under water, and sticks while it does. The incendiary heart of the worst things the bench knows how to make.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d4",
-          "damage_type": "fire",
-          "lethality": "lethal",
-          "note": "and keeps burning 1 further round unless smothered"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 150,
       "market": "apothecary",
@@ -4421,24 +3977,6 @@
       "text": "The comb of a cockatrice, dried and ground. A lesser cousin of the basilisk's humour — it stiffens joints rather than turning them, which is sometimes exactly the dose required.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 12,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "staggered",
-              "duration": {
-                "amount": "1d2",
-                "unit": "round"
-              }
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "cockatrice"
@@ -4507,15 +4045,6 @@
       "text": "Bile from a true dragon's fire-gland, still warm in the jar years later. It is the dragon's element in suspension: reacted into a preparation, the preparation breathes what the dragon breathed.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "3d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "young dragon",
@@ -4571,15 +4100,6 @@
       "text": "The cold-organ of a frost worm, which freezes the water around it as it dies. It never quite warms up; a preparation built on one bites like the tundra that grew it.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d6",
-          "damage_type": "cold",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "frost worm"
@@ -4630,18 +4150,6 @@
       "text": "Ash calcined from shed salamander hide, which remembers being fireproof. Worked into a lacquer or a draught it lends that memory to whoever wears it.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "resistance",
-          "target": "fire",
-          "amount": 5,
-          "duration": {
-            "amount": "1",
-            "unit": "hour"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "salamander",
@@ -4707,18 +4215,6 @@
       "text": "The frost-gland of a winter wolf, rendered to a clear blue oil. The wolf walked bare through blizzards; a dose of its humour is an hour of the same indifference.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "resistance",
-          "target": "cold",
-          "amount": 5,
-          "duration": {
-            "amount": "1",
-            "unit": "hour"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "winter wolf"
@@ -4774,16 +4270,6 @@
       "text": "The digestive nucleus of a gray ooze, kept in wax because it eats glass, iron and shelving. Its acid ignores flesh-and-metal distinctions the way the ooze did.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d4",
-          "damage_type": "acid",
-          "lethality": "lethal",
-          "note": "corrodes metal and wood as readily as flesh"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "gray ooze",
@@ -4838,15 +4324,6 @@
       "text": "Salt crystallised from water that stood a year in a haunted crypt. Cold to the tongue and colder to the soul; it carries the grave's leverage into a preparation.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "negative",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "underground"
@@ -4914,16 +4391,6 @@
       "text": "Filings of temple-forged sunmetal, warm in the hand at midnight. Anathema to the unliving: thrown, they burn the dead and do nothing to the living; drunk, the warmth steadies the nerve.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "positive",
-          "lethality": "lethal",
-          "note": "harms only undead; the living feel warmth"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 250,
       "market": "temple",
@@ -4998,24 +4465,6 @@
       "text": "Sweet heavy vapour condensed to a liquid that wants to be vapour again. A rag of it quiets a patient for the saw; an open jar of it quiets the whole room, surgeon included.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 13,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "staggered",
-              "duration": {
-                "amount": "1d4",
-                "unit": "round"
-              }
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 180,
       "market": "apothecary",
@@ -5077,14 +4526,6 @@
       "text": "Snow-white flakes that drift up from burning zinc — the old texts thought it wool from a hidden sheep. It seeds crystallisation and quiets a reaction's temper without joining it: a catalyst, never spent, that calms one volatile input in the step it sits in.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "1d4",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 150,
       "market": "apothecary",
@@ -5122,8 +4563,6 @@
       "text": "Polishing dust from a mithralsmith's floor, worth more than the broom. It refuses to combine with anything, which is exactly what a catalyst should do — reactions run cleaner around it and it sieves back out unspent.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 400,
       "market": "smith",
@@ -5160,15 +4599,6 @@
       "text": "Blue-white crystal from a glacier that never saw summer. Dissolving it drinks heat out of everything nearby — the working principle of liquid ice, and of any preparation that must bite cold.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "cold",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "tundra"
@@ -5231,21 +4661,6 @@
       "text": "The sting-gland of a wyvern, taken with the last foot of tail. The venom inside is a professional's argument: it goes for the blood and does not negotiate.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 17,
-          "on_failure": [
-            {
-              "type": "ability_damage",
-              "target": "con",
-              "dice": "1d4"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "wyvern"
@@ -5314,17 +4729,6 @@
       "text": "Marrow scraped from a troll's thighbone while both were still arguing about it. It keeps trying to be a troll: a preparation carrying it knits the drinker's wounds closed for a while.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "fast_healing",
-          "amount": 1,
-          "duration": {
-            "amount": "5",
-            "unit": "round"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "troll",
@@ -5382,16 +4786,6 @@
       "text": "Naphtha thickened with resins until it clings like honey and burns like a grudge. The step beyond alchemist's fire: it stays where it lands and keeps burning there.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d6",
-          "damage_type": "fire",
-          "lethality": "lethal",
-          "note": "clings and burns again the following round unless scraped or smothered"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 200,
       "market": "apothecary",
@@ -5456,16 +4850,6 @@
       "text": "The breath-bladder of a fire drake, tied off full. Punctured, it spends the drake's last breath all at once — a burst of flame that catches everyone in it.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d4",
-          "damage_type": "fire",
-          "lethality": "lethal",
-          "note": "spends itself as a 15-foot cone"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "fire drake",
@@ -5517,8 +4901,6 @@
       "text": "A retort ground from a single rock-crystal, clear as the work deserves. It neither taints nor tints: the vessel of record when the product must be exactly what the chain made and nothing else.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 250,
       "market": "glassblower",
@@ -5554,8 +4936,6 @@
       "text": "Glass blown with salamander ash in the frit. It holds a burning preparation calmly — pyre gel, dragon bile, lit naphtha — and hands the fire on intact when thrown.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 300,
       "market": "glassblower",
@@ -5591,8 +4971,6 @@
       "text": "A silvered phial etched inside with rest-quietly script. Ghost salt, grave-water and the crypt tiers of the trade sit inert in it; in anything else they seep.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 350,
       "market": "temple",
@@ -5628,8 +5006,6 @@
       "text": "Dense grey clay that drinks heat and violence alike. Packed around a volatile work it deadens the temper of the reaction — the physical half of what the stabilize method does with timing and nerve.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 120,
       "market": "apothecary",
@@ -5678,16 +5054,6 @@
       "text": "Candle-tallow that burned a year before a shrine and was gathered as it dripped. Blades dressed with it bite the profane harder; the pious swear it hums, and the undead do not stay to argue.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "1d4",
-          "damage_type": "positive",
-          "lethality": "lethal",
-          "note": "against undead only, for the coated blade's next hit"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 200,
       "market": "temple",
@@ -5737,15 +5103,6 @@
       "risky": true,
       "volatile": true,
       "needs_stabilizer": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "4d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1200,
       "market": "planar broker",
@@ -5798,14 +5155,6 @@
       "text": "The planar quicksilver: the solvent that is also the medicine, first matter and final agent in one restless liquid. It dissolves toward healing rather than ruin — but it is still quicksilver's wilder cousin, and it costs the alchemist who works it unmasked the same slow tax.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "2d8",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1500,
       "market": "planar broker",
@@ -5894,24 +5243,6 @@
       "text": "The heart-coal left when a fire elemental is banished: a knot of its home plane that never cools. Reacted into a work it brings both halves of fire — the burning, and the being at home in it.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "3d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        },
-        {
-          "type": "resistance",
-          "target": "fire",
-          "amount": 10,
-          "duration": {
-            "amount": "10",
-            "unit": "minute"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "fire elemental",
@@ -5975,15 +5306,6 @@
       "text": "A fist of storm-cloud taken alive from the Plane of Air, pressing against its jar and flickering. Opened carelessly it is simply weather, indoors, at you.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "3d6",
-          "damage_type": "electricity",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "air elemental",
@@ -6044,21 +5366,6 @@
       "text": "Distilled from the Shadow Plane's cold margins, and famous for the wrong reasons: the assassins' poison that drinks strength rather than blood. It pours like ink that has given up on light.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 17,
-          "on_failure": [
-            {
-              "type": "ability_damage",
-              "target": "str",
-              "dice": "1d6"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "shadow",
@@ -6148,16 +5455,6 @@
       "text": "What runs in a demon instead of blood, jarred hot from the wound. It hates the vessel, the bench and the alchemist, roughly in that order, and it eats what it touches out of spite as much as chemistry.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d6",
-          "damage_type": "acid",
-          "lethality": "lethal",
-          "note": "wounds it opens scar black and heal slow"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "dretch",
@@ -6222,18 +5519,6 @@
       "text": "Given, never taken — a phial of them is a favour owed somewhere. They close wounds the way forgiveness closes arguments: completely, and a little embarrassingly.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "3d8",
-          "lethality": "lethal"
-        },
-        {
-          "type": "remove_condition",
-          "target": "sickened"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2000,
       "market": "temple",
@@ -6290,13 +5575,6 @@
       "text": "The film a manifested ghost leaves on the world, scraped and potted. Worked into a preparation it lends the work one foot on the other side: the product touches the incorporeal as though it were flesh.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the finished preparation affects incorporeal creatures at full effect"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "ghost",
@@ -6344,15 +5622,6 @@
       "text": "Crystals raked from the shore where the planes run out. They are cold the way a closed door is cold: heat that enters does not come back out.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "2d6",
-          "damage_type": "cold",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 900,
       "market": "planar broker",
@@ -6420,19 +5689,6 @@
       "text": "Grindings from a fallen sky-iron, still faintly warm from the trip. It fell through the roof of the world once and remembers how; works built on it hit as though they had the same running start.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "alchemical",
-          "target": "damage",
-          "duration": {
-            "amount": "1",
-            "unit": "hour"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "desert",
@@ -6494,21 +5750,6 @@
       "text": "Venom drawn from the stinger of a purple worm by a crew that will tell the story forever. There is no subtlety in it: it is a landslide, refined.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 24,
-          "on_failure": [
-            {
-              "type": "ability_damage",
-              "target": "str",
-              "dice": "1d3"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "purple worm"
@@ -6577,15 +5818,6 @@
       "text": "The furnace-organ that lets a remorhaz glow white-hot in a glacier. Harvested fast and packed in everfrost salt, it still thinks it is inside the worm, and heats accordingly.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "3d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "remorhaz"
@@ -6636,8 +5868,6 @@
       "text": "A brass phial whose stopper was set by a djinni's word rather than a cork. It holds a vapour, a gas or a captive reaction indefinitely — nothing diffuses through a promise.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1600,
       "market": "planar broker",
@@ -6674,8 +5904,6 @@
       "text": "A crucible milled from adamantine, worth a village. It is the one vessel alkahest merely sulks in rather than escapes — though the chain still wants stabilizing, because the fumes have no such respect.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 3000,
       "market": "smith",
@@ -6711,8 +5939,6 @@
       "text": "The first matter: what everything was before it made up its mind. A grain of it will consent to become anything the chain asks, which is why every legendary recipe wants some and no honest ledger says where it comes from.",
       "risky": true,
       "volatile": true,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 6000,
       "market": "planar broker",
@@ -6755,18 +5981,6 @@
       "text": "Ash from a phoenix's pyre, gathered before the bird finished using it. It has not entirely stopped being a resurrection: worked into a draught it hands some of that stubbornness on.",
       "risky": false,
       "volatile": true,
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "4d8",
-          "lethality": "lethal"
-        },
-        {
-          "type": "remove_condition",
-          "target": "fatigued"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "phoenix"
@@ -6823,8 +6037,6 @@
       "text": "Quicksilver taken through the whole work — dissolved, calcined, sublimed and returned — until what pools in the crucible is the idea of transformation with a meniscus. It changes whatever it touches and is never itself spent, which is the definition the word catalyst was invented for.",
       "risky": true,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 8000,
       "market": "planar broker",
@@ -6874,15 +6086,6 @@
       "text": "Blood drawn from the heart of a great wyrm, by consent or by epic. It is centuries of banked fire in a jar; preparations built on it do not so much burn a target as audit it.",
       "risky": true,
       "volatile": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "4d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "great wyrm"
@@ -6946,21 +6149,6 @@
       "text": "Venom of a linnorm, which curses as it kills and means both. The old kings proved themselves against it; the bench mostly proves that the warded phial was worth its price.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 26,
-          "on_failure": [
-            {
-              "type": "ability_damage",
-              "target": "con",
-              "dice": "2d6"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "linnorm"
@@ -7035,8 +6223,6 @@
       "text": "A curved shard of shell from the egg the first stories say the world hatched from. Whatever is worked inside it is, briefly, the only thing that exists — reactions run in it cannot escape, spoil or be observed by jealous gods.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 12000,
       "market": "planar broker",
@@ -7072,18 +6258,6 @@
       "text": "The fifth element: what the other four are standing on. A dose lends the body a margin the world did not issue it — hurt that lands there was never really yours.",
       "risky": false,
       "volatile": false,
-      "effects": [
-        {
-          "type": "temp_hp",
-          "dice": "20",
-          "source": "quintessence",
-          "duration": {
-            "amount": "1",
-            "unit": "hour"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 10000,
       "market": "planar broker",
@@ -7137,17 +6311,6 @@
       "text": "A sample of the tarrasque's regenerating humour, which is a sentence that does all its own bragging. It does not accept that damage has happened; carried in a draught, neither does the drinker, for a while.",
       "risky": true,
       "volatile": false,
-      "effects": [
-        {
-          "type": "fast_healing",
-          "amount": 5,
-          "duration": {
-            "amount": "1",
-            "unit": "minute"
-          }
-        }
-      ],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "tarrasque"
@@ -7205,15 +6368,6 @@
       "risky": true,
       "volatile": true,
       "needs_stabilizer": true,
-      "effects": [
-        {
-          "type": "damage",
-          "dice": "5d6",
-          "damage_type": "fire",
-          "lethality": "lethal"
-        }
-      ],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "desert",
@@ -7265,8 +6419,6 @@
       "text": "Grains of the sunken empire's metal, which conducts intention the way copper conducts lightning. In the crucible they steer a transformation toward what the alchemist meant rather than what they mixed — the last correction the great work allows.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 9000,
       "market": "planar broker",
@@ -7303,8 +6455,6 @@
       "text": "Pale acacia gum, dissolved to a clear syrup. It binds a suspension so it will not settle, and every illusion the trade bottles — invisibility, blur — is held together with it.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
       "market": "apothecary",
@@ -7372,8 +6522,6 @@
       "text": "The softest stone there is, ground to a slippery white flour. Dusted over a surface it shows what the eye cannot: the outline of a thing that is not there.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "mountain",
@@ -7458,8 +6606,6 @@
       "text": "A banded agate, polished thin enough to see a candle through. Held to the eye in the dark it gathers what little light there is and hands it back doubled.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "mined",
       "biomes": [
         "hills",
@@ -7506,8 +6652,6 @@
       "text": "Rough plates of bark taken from a standing oak without ringing it. Tannin-rich, patient, and stubborn about being damaged — which is the whole point.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "forest"
@@ -7583,8 +6727,6 @@
       "text": "Sweet woody root, shaved into curls. A stimulant that hurries the blood without the shakes; the traditional accelerant of anything meant to make a body quick.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "grassland",
@@ -7660,8 +6802,6 @@
       "text": "A hollow green reed cut below the waterline and stoppered wet. It carries air through water, which is a plain fact about a reed and the seed of a subtler one.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "swamp",
@@ -7709,8 +6849,6 @@
       "text": "Loose-woven linen, so open it is more air than cloth. Strains a vapour without catching it, and gives a preparation something to be diffuse against.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -7772,8 +6910,6 @@
       "text": "Assay silver ground to a grey flour. It refuses the profane on contact — the component every ward against evil is drawn with, and half of what makes the invisible visible.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 30,
       "market": "smith",
@@ -7857,8 +6993,6 @@
       "text": "A few coarse hairs from the shoulder of a bull, which is exactly what the spell asks for and no more. Sympathy is cheap; the strength it borrows is not.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "bull",
@@ -7922,8 +7056,6 @@
       "text": "A pinch of fur, combed rather than pulled. Nothing in the world lands better than the animal it came off, and the preparation remembers that.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "cat",
@@ -8000,8 +7132,6 @@
       "text": "Guard hairs from a bear's winter coat, oily at the root. It is an animal that sleeps through half a year of hunger; endurance is what it has to lend.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "bear",
@@ -8075,8 +7205,6 @@
       "text": "Two clean pinion feathers. Bearing and flight both, depending on which the chain asks for — presence in a draught, altitude in an exotic one.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "eagle",
@@ -8139,8 +7267,6 @@
       "text": "Red guard hairs from the ruff. The animal is a byword for thinking sideways, and the trade has never found a better sympathy for wit.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "fox",
@@ -8203,8 +7329,6 @@
       "text": "Soft-edged feathers that fly silent. Judgement and quiet watching — what a draught borrows when it wants the drinker to know better.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "owl",
@@ -8280,8 +7404,6 @@
       "text": "The hind legs of a field grasshopper, dried on a thread. A thing the length of a thumb clears twenty times its own body; the preparation asks it how.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "grassland",
@@ -8353,8 +7475,6 @@
       "text": "A live house spider, kept in a pierced box until the brewing. Its feet hold to whitewash and glass alike, and the chain takes that and nothing else.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "spider",
@@ -8411,8 +7531,6 @@
       "text": "A curl of alicorn, given by a living unicorn or taken from one that died unhunted — the distinction matters, and the shaving knows. It purifies what it is stirred through and mends what was wasted, and is never itself spent.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "harvested",
       "from_creatures": [
         "unicorn"
@@ -8472,8 +7590,6 @@
       "text": "Water sanctified in a font and drawn off in a silver dipper. It is the medium every kind draught is built in, and carries a little healing of its own; the dead who drink it are scalded.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
       "market": "temple",
@@ -8544,8 +7660,6 @@
       "text": "Cut from an oak with a bronze sickle, never touching the ground. It grows between things — rooted in nothing, owing the earth no footprint.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "gathered",
       "biomes": [
         "forest"
@@ -8614,8 +7728,6 @@
       "text": "An offcut of finished leather from the tanner two doors down. Armour in miniature: what the spell needs is the idea of it, not the hide.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
       "market": "market",
@@ -8661,8 +7773,6 @@
       "text": "A strip of vellum carrying one line of scripture in a steady hand. Dissolved, the ink goes into the draught and the promise goes with it.",
       "risky": false,
       "volatile": false,
-      "effects": [],
-      "effects_converted": true,
       "obtain": "bought",
       "price_gp": 20,
       "market": "temple",
@@ -8697,6 +7807,41 @@
         0.92,
         0.88,
         0.75
+      ]
+    },
+    {
+      "id": "wooden-rod",
+      "name": "Wooden rod",
+      "kind": "vessel",
+      "tier": "common",
+      "craft_dc": null,
+      "text": "A whittled stick or a short rod of hard wood: the body of a tindertwig, a smokestick or a sunrod. Bottled into, the work becomes a tool you strike or light rather than a thing you drink or throw.",
+      "risky": false,
+      "volatile": false,
+      "obtain": "bought",
+      "market": "market",
+      "price_gp": 0.01,
+      "product": [],
+      "working": [
+        {
+          "type": "working",
+          "trait": "stick"
+        },
+        {
+          "type": "working",
+          "trait": "combustible"
+        },
+        {
+          "type": "working",
+          "trait": "solid"
+        }
+      ],
+      "mishap": null,
+      "toxic": null,
+      "color": [
+        0.55,
+        0.4,
+        0.25
       ]
     }
   ]

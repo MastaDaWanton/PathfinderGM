@@ -37,8 +37,10 @@ def herbalist():
 @pytest.fixture
 def per_recipe():
     """A track still scored per recipe by `award`, with the 25/65/50/100 table and a
-    deed at 5. The Herbalist was this until 2026-10-02."""
-    return wc.get("alchemist")
+    deed at 5. The Herbalist was this until 2026-10-02, and the Alchemist until its own
+    revamp (2026-10-06: three levels and endless perks, pinned by tests/test_alchemist.py);
+    the Leatherworker keeps the table."""
+    return wc.get("leatherworker")
 
 
 @pytest.fixture
@@ -83,7 +85,7 @@ def test_either_half_of_a_tier_name_is_understood(written, rank):
 # --- earning mastery ---------------------------------------------------------------------
 
 def test_a_first_craft_pays_more_than_a_repeat(per_recipe):
-    p = wc.Progress(track="alchemist")
+    p = wc.Progress(track="leatherworker")
     first = wc.award(per_recipe, p, recipe_id="woundwort styptic", tier="common")
     again = wc.award(per_recipe, p, recipe_id="woundwort styptic", tier="common")
     assert first["mp"] == 3 and again["mp"] == 1
@@ -92,13 +94,13 @@ def test_a_first_craft_pays_more_than_a_repeat(per_recipe):
 def test_a_chain_pays_per_stage_beyond_the_first(per_recipe):
     """"Multi-Stage Crafting Chain" — a single grind is not a chain. Counting the first
     stage would hand +2 to every craft in the game and re-inflate the whole curve."""
-    p = wc.Progress(track="alchemist")
+    p = wc.Progress(track="leatherworker")
     assert wc.award(per_recipe, p, recipe_id="a", tier="common", stages=1)["mp"] == 3
     assert wc.award(per_recipe, p, recipe_id="b", tier="common", stages=3)["mp"] == 3 + 4
 
 
 def test_a_risky_harvest_is_worth_two(per_recipe):
-    p = wc.Progress(track="alchemist", level=2)
+    p = wc.Progress(track="leatherworker", level=2)
     got = wc.award(per_recipe, p, recipe_id="trollheart tonic", tier="uncommon",
                    risky=True, stages=2)
     assert got["mp"] == 3 + 2 + 2
@@ -107,7 +109,7 @@ def test_a_risky_harvest_is_worth_two(per_recipe):
 def test_the_stated_pacing_is_what_the_thresholds_produce(per_recipe):
     """The check that decided the numbers. A qualifying craft at each tier, repeated
     until the level turns over, must land inside the author's own stated craft counts."""
-    p = wc.Progress(track="alchemist")
+    p = wc.Progress(track="leatherworker")
     crafts = 0
     while p.level == 1:
         crafts += 1
@@ -133,17 +135,17 @@ def test_trivial_recipes_stop_paying(per_recipe):
     """"Once an Herbalist reaches Level 3, Level 1 recipes no longer grant Mastery
     Points." Generalised to a gap so it keeps working at 4 and 5 without a new special
     case at each level."""
-    p = wc.Progress(track="alchemist", level=3)
+    p = wc.Progress(track="leatherworker", level=3)
     assert wc.award(per_recipe, p, recipe_id="basic tea", tier="common")["mp"] == 0
 
-    p2 = wc.Progress(track="alchemist", level=2)
+    p2 = wc.Progress(track="leatherworker", level=2)
     assert wc.award(per_recipe, p2, recipe_id="basic tea", tier="common")["mp"] == 3
 
 
 def test_a_trivial_craft_still_counts_as_known(per_recipe):
     """It earns nothing and is still something you have made — otherwise it would pay the
     first-time bonus again later."""
-    p = wc.Progress(track="alchemist", level=3)
+    p = wc.Progress(track="leatherworker", level=3)
     wc.award(per_recipe, p, recipe_id="basic tea", tier="common")
     assert p.knows("basic tea")
 
@@ -153,7 +155,7 @@ def test_every_repeat_craft_pays(per_recipe):
     production run of one tea paid [3, 1, 1, 0, 0, ...] — the fourth tea and every one
     after taught nothing, and a batch of ten paid what three did. Every successful craft
     now pays: the first-time award once, then the repeat award each time."""
-    p = wc.Progress(track="alchemist")
+    p = wc.Progress(track="leatherworker")
     earned = [wc.award(per_recipe, p, recipe_id="same tea", tier="common")["mp"]
               for _ in range(5)]
     assert earned == [3, 1, 1, 1, 1]
@@ -162,14 +164,14 @@ def test_every_repeat_craft_pays(per_recipe):
 def test_failure_teaches_something_the_first_time_and_not_the_fifth(per_recipe):
     """"Ensures failure still feels like learning." Without a limit, deliberate failure
     on cheap ingredients is free progress."""
-    p = wc.Progress(track="alchemist")
+    p = wc.Progress(track="leatherworker")
     got = [wc.award(per_recipe, p, recipe_id="hard one", tier="common",
                     success=False)["mp"] for _ in range(5)]
     assert got == [1, 1, 0, 0, 0]
 
 
 def test_a_failed_craft_is_not_a_recipe_you_know(per_recipe):
-    p = wc.Progress(track="alchemist")
+    p = wc.Progress(track="leatherworker")
     wc.award(per_recipe, p, recipe_id="hard one", tier="common", success=False)
     assert not p.knows("hard one")
     assert wc.award(per_recipe, p, recipe_id="hard one", tier="common")["mp"] == 3
@@ -178,7 +180,7 @@ def test_a_failed_craft_is_not_a_recipe_you_know(per_recipe):
 # --- levelling ----------------------------------------------------------------------------
 
 def test_mastery_is_spent_on_the_level_not_kept(per_recipe):
-    p = wc.Progress(track="alchemist", mp=24)
+    p = wc.Progress(track="leatherworker", mp=24)
     got = wc.award(per_recipe, p, recipe_id="one more", tier="common", stages=2)
     assert got["levelled"] == [2]
     assert p.mp == 24 + 5 - 25
@@ -190,7 +192,7 @@ def test_the_top_level_waits_on_a_deed_as_well_as_points(per_recipe):
     Herbalist's catalyst, which the 2026-10-02 ruling retired; the Alchemist's own deed
     keeps the gate's mechanics pinned."""
     deed = per_recipe.milestones[5]
-    p = wc.Progress(track="alchemist", level=4, mp=500)
+    p = wc.Progress(track="leatherworker", level=4, mp=500)
     wc.award(per_recipe, p, recipe_id="something", tier="exotic")
     assert p.level == 4
     assert p.mp >= 100

@@ -194,6 +194,9 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "risky": bool(raw.get("risky", False)),
         "source": str(raw.get("source") or ""),
         "from_creatures": [str(c).lower() for c in _list(raw.get("from_creatures"))],
+        # The excursion's own DC (the alchemist's `obtain_dc`), passed through so the
+        # alchemist's shelf, which now reads through this door (alchemy lane F), keeps it.
+        "obtain_dc": raw.get("obtain_dc"),
         "weight_factor": float(raw.get("weight_factor", 1.0) or 1.0),
         "effects": [dict(e) for e in _list(raw.get("effects")) if isinstance(e, dict)],
         # The enchanter's fields (enchanting contracts §5), defaulted on every entry so a

@@ -166,11 +166,11 @@ def craft_of(doc_or_craft) -> str:
     any other material's the smith's, a herb's — on either shelf — the herbalist's. A
     craft id passes through (`ALCHEMIST` included: `lore(ALCHEMIST)`, `manuals(ALCHEMIST)`).
 
-    An alchemist's reagent still answers to the SMITH's rows here, as it always has
-    (tests/test_enchant_knowledge.py pins camphor to it), so a smith is its teacher and a
-    guildhall its library. That never showed while no reagent had a property to teach;
-    it will once lane D's pass lands. Left for the bench lane to switch together with
-    that test and an alchemy lore file, which no wave-1 lane owns (lane A's report)."""
+    An alchemist's reagent answers to the ALCHEMIST's rows (content/rules/alchemy-lore.json,
+    alchemy lane F, 2026-10-06): an alchemist is its teacher and a library its record.
+    Until then it answered to the smith's (lane A left the switch for the bench lane with
+    this file), so a blacksmith taught camphor once lane D's pass gave it properties. A
+    hybrid herb on the alchemy shelf is still a herb, and a healer still teaches it."""
     if isinstance(doc_or_craft, str):
         return doc_or_craft if doc_or_craft in (BLACKSMITH, ENCHANTER, ALCHEMIST) \
             else HERBALIST
@@ -178,6 +178,10 @@ def craft_of(doc_or_craft) -> str:
         return ENCHANTER
     if not is_material(doc_or_craft) or _is_herb_view(doc_or_craft):
         return HERBALIST
+    door = _door()
+    fn = getattr(door, "is_alchemy", None) if door is not None else None
+    if callable(fn) and isinstance(doc_or_craft, dict) and fn(doc_or_craft):
+        return ALCHEMIST
     return BLACKSMITH
 
 
@@ -643,7 +647,11 @@ def line(spec: dict) -> str:
         return _fact_line(spec)
     if kind == "working":
         trait = str(spec.get("trait") or spec.get("target") or "")
-        words = (lore(BLACKSMITH).get("working_words") or {}).get(trait)
+        # The smith's words, then the alchemist's (content/rules/alchemy-lore.json): a
+        # trait's line does not know which shelf it came from, and the two lists share
+        # only `pure`, which says the same thing in both.
+        words = (lore(BLACKSMITH).get("working_words") or {}).get(trait) or \
+            (lore(ALCHEMIST).get("working_words") or {}).get(trait)
         name = trait.replace("_", " ").capitalize()
         return f"{name}: {words}" if words else name
     return said or str(spec.get("note") or kind or "?")

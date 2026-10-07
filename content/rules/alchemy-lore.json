@@ -1,0 +1,78 @@
+{
+  "_about": [
+    "How a character learns what a reagent does, and who teaches formulae",
+    "(docs/alchemy-revamp-plan.md §10.4, §13; contracts §4). Read by rules/knowledge.py",
+    "beside herb-lore.json and smithing-lore.json, whose shape this mirrors, so one module",
+    "answers all three. Words, prices and times only: every number is the rules' own, so no",
+    "model ever authors one, and every one can be tuned in play without a code change.",
+    "",
+    "Before this file (alchemy lane F, 2026-10-06) an alchemist's reagent answered to the",
+    "SMITH's rows (knowledge.craft_of): a blacksmith was camphor's teacher and a guildhall",
+    "its library. Lane A named the gap and left it for the bench lane with this file.",
+    "Prices are in copper (Core Rulebook Table 6-1); a lesson is priced as a healer's and a",
+    "smith's are, a skilled hireling's hour."
+  ],
+  "study": {
+    "minutes": 10,
+    "_dc": "10 + 5 per rarity band, as herbs and metals (plan §13.2: 'the study DC, 10 + 5 per band').",
+    "dc_base": 10,
+    "dc_per_band": 5,
+    "reveal_per_margin": 5
+  },
+  "teacher": {
+    "price_cp": 20,
+    "minutes": 10,
+    "_works": "Occupation ids (content/people/occupations.json) whose people know reagents: the new `alchemist` occupation (lane G, plan §14). 'apothecary' is NOT here: it is a match word of `healer`, which stays herbalism's (plan §14), so an apothecary teaches herbs. The words name the trade when no population record carries one.",
+    "works": ["alchemist"],
+    "words": ["alchemist", "alchemists", "chymist", "chemist", "distiller", "philosopher of fire",
+              "transmuter", "spagyrist"],
+    "_teaches": "Properties taught per lesson by attitude step (rules/attitude.py), the herb teacher's rows: below indifferent they refuse in words.",
+    "teaches": {"indifferent": 1, "friendly": 2, "helpful": 2}
+  },
+  "_formula_lesson": "An alchemist teacher teaches any formula, the classics included (plan §10.4, 'fee, 1 h'); a companion who knows the spell teaches a spell formula free in 1 h a spell level. The fee is PROPOSED: the book's spellbook writing cost for the formula's spell level would charge nothing for a classic, so a teacher charges a lesson's fee per spell level, at least one.",
+  "formula_lesson": {"price_cp": 500, "per_spell_level_cp": 500, "minutes": 60},
+  "library": {
+    "price_cp": 50,
+    "minutes": 60,
+    "words": ["library", "scriptorium", "archive", "archives", "athenaeum"],
+    "_common": "What the world writes down about reagents: the benefits of common and uncommon ones. A rare reagent's secrets and every drawback stay unwritten, as for herbs and metals.",
+    "tiers": ["common", "uncommon"],
+    "reveals": ["benefit", "neutral"]
+  },
+  "manual": {
+    "mastery": 5
+  },
+  "identify_potion": {
+    "_dc": "DC 15 + the potion's spell level (plan §11.3; the CRB Potions page). The Perception table's '15 + caster level' was not taken; knowledge.POTION_IDENTIFY_DC says why.",
+    "dc_base": 15
+  },
+  "_working_words": "A working trait's line on a card (plan §5.5's table): what the trait does at the bench, in words. The numbers are the bench's rules (content/world-classes/alchemist.json), not this file's.",
+  "working_words": {
+    "volatile": "a roll failed by 5 or more flares in your face; a second volatile in the step adds 3 to the DC",
+    "stabilizer": "calms one volatile input in the step it goes into",
+    "catalyst": "never spent: set beside the work, it widens the step's window",
+    "apparatus": "never spent: equipment that widens the step's window",
+    "solid": "a solid: it calcines and sublimes, and dissolves",
+    "liquid": "a liquid: it distills, filters and is a reaction's medium",
+    "combustible": "it burns away rather than calcining",
+    "slow_to_dissolve": "a narrower window when it is dissolved",
+    "light_sensitive": "keep it sealed: it fades in the light",
+    "corrosive": "eats a metal vessel; bottle it in glass or clay",
+    "toxic_to_handle": "hurts the one who works it, unless a mask and gloves or a fume hood spare them",
+    "wild": "copies one trait of another input in the step",
+    "drinkable": "a vessel: what is bottled in it is drunk or poured on",
+    "shatters": "a vessel: what is bottled in it is thrown and breaks",
+    "bursts": "a vessel: what is bottled in it is thrown and bursts",
+    "struck": "a vessel: what is bottled in it is a cloud, thrown or set off",
+    "stick": "a vessel: what is bottled in it is a tool, struck or lit",
+    "fireproof": "takes the heat of the bench",
+    "warded": "holds what would eat an ordinary vessel",
+    "lead_lined": "lead-lined: shields what it holds",
+    "pure": "the check is rolled twice, the better kept",
+    "solvent:water": "a solvent: water",
+    "solvent:alcohol": "a solvent: spirits",
+    "solvent:vinegar": "a solvent: vinegar",
+    "solvent:oil": "a solvent: oil",
+    "solvent:acid": "a solvent: acid"
+  }
+}

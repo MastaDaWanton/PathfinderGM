@@ -257,12 +257,17 @@ def test_essence_keys_agree_with_lane_ds_door():
 
 def test_an_alchemists_essence_keeps_its_material_keys():
     """The alchemist's catalogue files camphor under kind `essence` too; it is a
-    reagent, not the circle's, and keeps the keys it always had."""
+    reagent, not the circle's, and keeps the keys it always had. It answers to the
+    alchemist's rows (content/rules/alchemy-lore.json, alchemy lane F): until 2026-10-06
+    it answered to the SMITH's, so once lane D's pass gave camphor properties a
+    blacksmith was its teacher and a guildhall its library."""
     from rules import materials
 
     camphor = materials.get("camphor")
     assert camphor is not None and not knowledge.is_essence(camphor)
-    assert knowledge.craft_of(camphor) == knowledge.BLACKSMITH
+    assert knowledge.craft_of(camphor) == knowledge.ALCHEMIST
+    assert "alchemist" in knowledge.lore(camphor)["teacher"]["works"]
+    assert knowledge.craft_of(materials.get("iron")) == knowledge.BLACKSMITH
 
 
 def test_reading_an_essence_reveals_one_benefit_and_one_drawback(door):

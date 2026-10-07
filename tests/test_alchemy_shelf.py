@@ -330,11 +330,13 @@ def test_the_shipped_alchemist_materials_now_have_properties():
     shelf = materials.alchemy_shelf()
     mats = [d for d in shelf.values() if not d.get("hybrid")]
     with_keys = [d for d in mats if knowledge.property_keys(d)]
-    assert len(mats) == 138                               # 139 less the basilisk eye
-    # Lane D's data pass (2026-10-06) gave every one of the 138 its properties: product
-    # traits on the 112 reagents, working traits (and a mishap or toxic document) on the
-    # 26 vessels, catalysts, neutral media and prima materia, at least 3 on each.
-    assert len(with_keys) == 138
+    # 139 less the basilisk eye, plus the wooden rod alchemy lane F added (the tool
+    # family had no vessel: no material carried the `stick` trait).
+    assert len(mats) == 139
+    # Lane D's data pass (2026-10-06) gave every one of them its properties: product
+    # traits on the reagents, working traits (and a mishap or toxic document) on the
+    # vessels, catalysts, neutral media and prima materia, at least 3 on each.
+    assert len(with_keys) == 139
     for d in with_keys:
         assert len(knowledge.property_keys(d)) >= max(3, len(d["product"]))
 

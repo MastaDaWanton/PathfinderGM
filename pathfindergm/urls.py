@@ -33,7 +33,7 @@ from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
-                  works_views, enchant_views)
+                  works_views, enchant_views, alchemy_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -135,6 +135,25 @@ urlpatterns = [
     path("api/enchant/seen", enchant_views.enchant_seen, name="enchant_seen"),
     path("api/enchant/essence/<str:essence_id>", enchant_views.enchant_essence,
          name="enchant_essence"),
+    # The alchemy bench (docs/alchemy-contracts.md §8). Lane F's block: every fixed name
+    # above the one pattern with a parameter, and all of it above the homebrew benches'
+    # `api/bench/<bench_id>` (the herb bench's route-order bug; tests/test_alchemy_api.py
+    # pins it).
+    path("api/alchemy/state", alchemy_views.alchemy_state, name="alchemy_state"),
+    path("api/alchemy/check", alchemy_views.alchemy_check, name="alchemy_check"),
+    path("api/alchemy/roll", alchemy_views.alchemy_roll, name="alchemy_roll"),
+    path("api/alchemy/finish", alchemy_views.alchemy_finish, name="alchemy_finish"),
+    path("api/alchemy/assay", alchemy_views.alchemy_assay, name="alchemy_assay"),
+    path("api/alchemy/identify", alchemy_views.alchemy_identify, name="alchemy_identify"),
+    path("api/alchemy/learn", alchemy_views.alchemy_learn, name="alchemy_learn"),
+    path("api/alchemy/ask", alchemy_views.alchemy_ask, name="alchemy_ask"),
+    path("api/alchemy/collect", alchemy_views.alchemy_collect, name="alchemy_collect"),
+    path("api/alchemy/perks", alchemy_views.alchemy_perks, name="alchemy_perks"),
+    path("api/alchemy/recipe", alchemy_views.alchemy_recipe, name="alchemy_recipe"),
+    path("api/alchemy/formulary", alchemy_views.alchemy_formulary, name="alchemy_formulary"),
+    path("api/alchemy/codex", alchemy_views.alchemy_codex, name="alchemy_codex"),
+    path("api/alchemy/material/<str:material_id>", alchemy_views.alchemy_material,
+         name="alchemy_material"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
     # `api/bench/<bench_id>`: Django takes the first match, and below it "state" was read
     # as a homebrew bench id and answered 404 "no bench 'state'" (Lane D, 2026-10-02).

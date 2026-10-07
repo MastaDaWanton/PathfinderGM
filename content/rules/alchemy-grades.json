@@ -1,0 +1,29 @@
+{
+  "_about": [
+    "What a trait's GRADE means, per effect shape (docs/alchemy-revamp-plan.md §6.2;",
+    "contracts §1 row F). Same-named traits from distinct materials merge and their grades",
+    "add (Atelier: Ryza, 'Critical Lv 2 and a Critical Lv 5 will yield a Critical Lv 7'),",
+    "capped by the Alchemist level. A grade is read here, never stored as a number on a",
+    "product: the product record keeps ids and grades, and rules/alchemy_items.build turns",
+    "them into documents on read (contracts §6). Every value is PROPOSED in plan §6.2 and",
+    "tunable here without a code change.",
+    "",
+    "Two traits are the same trait when their type, their target (a damage's type, a",
+    "condition, a save, a skill...) and their route agree (plan §6.2): fire damage struck",
+    "and fire resistance drunk are two traits, two fire-damage traits are one."
+  ],
+  "cap": "level",
+  "_cap": "The highest grade a merge reaches: the Alchemist level (plan §6.2, proposed). At Alchemist 1 nothing merges past grade 1; endless levels deepen it one step a level.",
+  "dice": "count",
+  "_dice": "Grade g multiplies the dice COUNT (1d6 at grade 3 is 3d6) and any flat part with it.",
+  "amount": "multiply",
+  "_amount": "A flat amount (a bonus, a resistance, hit points healed) is g x the amount; a penalty grows in magnitude the same way.",
+  "save_dc_per_grade": 2,
+  "_save_dc": "A save's DC rises 2 for each grade above 1.",
+  "condition_duration": "multiply",
+  "_condition_duration": "A condition's duration is g x as long.",
+  "bonus_duration": "longest",
+  "_bonus_duration": "Any other duration is the longest of the merged traits', never multiplied: a stronger draught, not a longer one.",
+  "unscaled_types": ["light", "manifest", "permission", "sense", "strikes_as", "remove_condition", "immunity"],
+  "_unscaled_types": "Shapes a grade adds nothing to: a light's radius, a cloud's size, a tag granted, a condition lifted. They merge and keep the strongest source's document as it is."
+}
