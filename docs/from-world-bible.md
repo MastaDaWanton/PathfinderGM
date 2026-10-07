@@ -289,11 +289,34 @@ says so in two places, both words, never prices.
 | `play.materials[]` rows of a consumed kind | Absent (the whole of `play.materials[]` is proposed, above) | A world's own fuel or quench as a `play.materials[]` row with `kind` `fuel`, `flux`, `quenchant` (or for the other crafts `solvent`, `salt`, `catalyst`, `vessel`, `tannin`, `oil`, `wax`, `thread`, `ink`, `chalk`, `treatment`) and `tier` `common`. Such a row is a staple on every counter that sells that craft's supplies the day `play.materials[]` has a reader, and it must carry `price_gp` or it is on no counter: the app refuses an unpriced common consumable in its own catalogues for exactly that reason (0 days of 60 for curing salt, measured) |
 | `play.materials[].price_gp`, any kind | Absent | A number World Bible can check before it exports, by the app's one price rule (`rules/pricing.py`, `material_floor`; `campaign-format.md`, the `price_gp` row): at least the rung's floor — common 1, uncommon 5, rare 25, exotic 125, legendary 625 gp — ×5 for an essence, catalyst, ink, chalk, focus or neutralizer, × the row's strength above its rung; a rarer row never cheaper than a commoner one of its kind, a stronger one dearer than a weaker one. A world's "fen-salt neutralizer" priced like its water would be refused with the floor named. 1 cp is "free", for a plain common thing only. Leave `price_gp` out for a thing the world does not sell; never write a guess to fill the field |
 
-### Where an alchemist works (alchemy revamp, lane G)
+### What an alchemist needs from a world (alchemy revamp, lanes A to I)
 
-Added 2026-10-06 by the alchemy places lane; lane I owns this file in wave 2 and may fold it
-into the sections above. The owner ruled that **every city has an alchemist's laboratory to
-rent**. Distill, Sublime, Transmute and rare reagents need one (`places.laboratory_here`);
+Consolidated 2026-10-07 by lane I (docs/alchemy-revamp-plan.md §19) from what the other
+lanes found; the shapes are in `campaign-format.md`, "Alchemy". Before the revamp this file
+asked nothing of alchemy (no reagent fields, no volatile flag, no potion list), and
+`play.materials[]` read as forge material only. The alchemist's shelf is now 139 shipped
+materials and every hybrid herb (63 shipped), and every world gets all of them.
+
+What a world must **never** send: a recipe or formula list (the table is fixed and
+world-agnostic, the owner's Q5.2: a world's reagents feed it through their essences, its
+spells through the spell corpus), a product's numbers (the app builds every product from
+its formula and its reagents, on read), a laboratory's rent, or a sky ("this is not earth":
+timing, where it matters, is the app's day phases).
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.materials[]` rows of an alchemist's kind | Absent; every world brews from the shipped shelf | One row per reagent, gland, solvent, vessel, salt or catalyst the world names, in the world's words, with `text`, `biomes` and `obtain` (`mined`, `gathered`, `harvested`, `bought`). `kind` decides the shelf — one material, many shelves; no `shelves` field. A world's "red sulphur" that is brimstone by another name sets `material: "brimstone"` and shares its knowledge |
+| `.product[]` | Absent | What it puts into a bottle: effect documents, each with an `essence` from the app's eighteen (`fire`, `frost`, `acid`, `storm`, `thunder`, `light`, `shadow`, `vigour`, `purity`, `ward`, `might`, `grace`, `mind`, `lightness`, `sight`, `binding`, `decay`, `change`), a `route` (`ingest`, `skin`, `eyes`, `wound`, `inhale`, `external`, `struck`, `splash`, `area`, `carried`), a `grade` (1) and `drawback: true` on a cost. At least one drawback; never `narrative`; house numbers at ±2 inside the tier's ceiling. This is the field that matters: without it a reagent can only be a solvent, a vessel or a catalyst |
+| `.working[]` | Absent | Bench behaviour: `solid` or `liquid`, `volatile`, `stabilizer`, `catalyst`, `combustible`, `corrosive`, `toxic_to_handle`, `light_sensitive`, `solvent:<water\|alcohol\|vinegar\|oil\|acid>`; a vessel says which product it makes (`drinkable`, `shatters`, `bursts`, `struck`, `stick`) |
+| `.mishap`, `.toxic` | Absent | One effect each, required exactly when `volatile` (what a badly failed step does to the alchemist) or `toxic_to_handle` (what working it unprotected does) is in `working` |
+| `.color` | Absent | `[r, g, b]` 0..1, the liquid on the bench's glassware. Optional; without it the glass shows neutral |
+| `.price_gp` | Absent | The one price rule (above, "What a trade keeps on its counter"): ×5 for an `essence` or `catalyst`. A common `solvent`, `salt` or `vessel` must carry one or no counter stocks it |
+| `play.flora[].hybrid` + `.uses[].essence` | `hybrid` proposed (above); `essence` absent | `hybrid: true` on a plant or part whose use is magical puts it on the alchemist's shelf too, and each use names an `essence` so it can make a formula (all 201 shipped hybrid effects do). A herb's id never equals a material's id (the `basilisk-eye` collision, merged 2026-10-06) |
+| creature harvest tags | Reader built 2026-10-06 (`gathering.harvest_tagged`) | `harvest.reagent.<material-id>` on a world's creature's `tags`, so a slain one yields its reagent by the same reader every craft uses |
+| `play.places[].kind: "laboratory"` | Read since 2026-10-06 | See "Where an alchemist works" below |
+
+**Where an alchemist works.** The owner ruled that **every city has an alchemist's
+laboratory to rent**. Distill, Sublime, Transmute and rare reagents need one (`places.laboratory_here`);
 the field kit does the rest anywhere. Measured the same day: a laboratory in **0 of the 82
 settlements** of the three shipped exports. So the app appends "the laboratory" to every
 authored city that lists none, as it does the smithy, and a town or village has one only

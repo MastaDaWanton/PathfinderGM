@@ -282,6 +282,8 @@ HERBALISM_SCHEMA = 2
 BLACKSMITH_SCHEMA = 2
 # The stamp `migrate_enchanter` writes (docs/enchanting-revamp-plan.md §19).
 ENCHANTER_SCHEMA = 2
+# The stamp `migrate_alchemist` writes (docs/alchemy-revamp-plan.md §18, `alchemy_v2`).
+ALCHEMIST_SCHEMA = 2
 
 
 def quality_name(index: int) -> str:
@@ -583,10 +585,40 @@ def migrate_enchanter(progress: Progress) -> bool:
     return True
 
 
+def migrate_alchemist(progress: Progress) -> bool:
+    """`alchemy_v2`: settle a pre-revamp Alchemist under the 2026-10-05 rules, once (alchemy
+    plan §18; owner Q10.1). True if it ran.
+
+    The other three crafts' conversion: the unlocks stop at 3 and the bank is counted from
+    the level, so an old Alchemist 4 holds one pick-pair and an old 5 two, waiting at the
+    bench's perk picker; banked mastery is untouched; the old `legendary-work` milestone is
+    inert. Under the owner's spell rule an old Alchemist 3 now bottles 1st-level spells only
+    (they needed 4 for 2nd before): that is the rule, and their stock is untouched.
+
+    Unlike the other three it stamps **only a level past the unlocks**, the one case the
+    conversion changes anything. Levels 1 to 3 are the same three levels before and after,
+    and every owner save measured on 2026-10-07 holds an Alchemist 1 with no stamp: stamping
+    it would rewrite every save on its first load for nothing, where "a save with no alchemy
+    in it round-trips byte for byte" (tests/test_alchemy_migration.py). Old ITEMS, knowledge
+    and saved chains are rules/alchemy_migration.py's (on load, from `sheet._migrated` and
+    `Campaign.load`).
+
+    Idempotent by the stamp, so running it on every load is safe.
+    """
+    if int(progress.schema) >= ALCHEMIST_SCHEMA:
+        return False
+    track = _track_of(progress)
+    unlocks = track.max_level if track is not None else UNLOCK_LEVELS
+    if int(progress.level) <= unlocks:
+        return False
+    progress.schema = ALCHEMIST_SCHEMA
+    return True
+
+
 # Load-time migrations by track id. The one place a track is named in this module, and
 # only because a migration is by definition about one track's own history.
 MIGRATIONS = {"herbalist": migrate_herbalist, "blacksmith": migrate_blacksmith,
-              "enchanter": migrate_enchanter}
+              "enchanter": migrate_enchanter, "alchemist": migrate_alchemist}
 
 
 def migrate(progress: Progress) -> bool:

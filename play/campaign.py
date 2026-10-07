@@ -531,6 +531,13 @@ class Campaign:
                             else opening._seed_from(campaign.id))
         campaign._heal_places(str(s.get("biome") or ""), unplaced)
         campaign._retire_stale_masters()
+        # The alchemist's half of the alchemy conversion (plan §18): what an old alchemist
+        # now knows, the one-time notice, and the old chain recipes dropped. Needs the
+        # campaign's recipes beside the character, which is why it is here and not in
+        # `from_dict`. A no-op, writing nothing, for a campaign with no old alchemy.
+        from rules import alchemy_migration
+
+        alchemy_migration.settle_campaign(campaign)
         return campaign
 
     def _retire_stale_masters(self) -> None:
