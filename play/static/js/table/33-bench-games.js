@@ -87,6 +87,30 @@
   // when there is an hour (contracts §13: Sound.play("enchant.<event>", {phase})). A herb or
   // forge game has no HOUR, so for them nothing here runs: no band, no phase in the voice.
 
+  // THE ALCHEMIST'S GAMES (docs/alchemy-contracts.md §11-12, alchemy UI plan §6.4 and §9, added
+  // 2026-10-07). The eight games under js/alchemy-games/ register with `track: "alchemy"` and
+  // read what the server's roll sent (rules/alchemist.py tuning_for): `opts.heat`, `opts.reaction`,
+  // `opts.pour` and `opts.stages`, each falling back to the same name on `opts.tuning`. Three
+  // new gauges live here, each behind its own definition key, so a herb, forge or enchant game
+  // (which carries none of them) runs exactly as before:
+  //   FLAME:    the alchemist's fire (Calcine, Distill, Sublime). Not the forge's HEAT: a forge
+  //             bar cools on its own and is reheated with R; an alchemist's vessel sits over a
+  //             fire the player FEEDS (hold, or a toggle in Steady) and banks, and the vessel's
+  //             heat follows the fire with a lag. Bands are the server's own words ("heads,
+  //             hearts, tails"; "dull, calcining, fusing"), the target outlined, everything
+  //             above it the danger, cross-hatched. The number is in °C in the hint column.
+  //   REACTION: a 0 to 100 gauge with a band, a flare line and the zone's name in words
+  //             (React's drops, Dissolve's fizz, Bottle's vapour; Filter's pour rate with
+  //             `from: "pour"`). Inputs ADD to it; it settles on its own; a drop may bloom over
+  //             a moment, and the gauge then shows where the pending rise will land.
+  //   STAGES:   the colour-stage track (Transmute): nigredo, albedo, citrinitas, rubedo named
+  //             in words along a timeline, each stage's peak window hatched and notched. The
+  //             game owns the timing (its `track()`); the frame draws it.
+  // How generous a band is: the frame's generous start (`baseWin`) times the server's band scale
+  // times the game's Steady factor, EXCEPT the reaction band, which rules/alchemist.py already
+  // widened by the working traits before sending it: counting band_scale again would widen a
+  // catalyst's band twice (the forge's narrow_window lesson, makeCtx below).
+
   // Every method a game is registered for: the herb list first, in its fixed order, then any
   // other definition on the registry in the order it registered. Read at call time, so a game
   // file loaded after this one is still found (the registry is one shared object).
@@ -510,12 +534,19 @@
   // metal leaves the band), because a strike out of band is wasted whatever the game's own
   // hint says; then the game's live hint, if it has one; then its fixed one.
   var HEAT_WORDS = { reheating: "Reheating", hot: "Too hot: let it cool", burn: "Burning: let it cool" };
+  // An alchemy game may have words more urgent than its gauge's (Distill's cut, "Hearts now:
+  // swap to the flask", matters more than the fire), through `urgent()`; the alchemist's fire
+  // and the reaction gauge speak through their own `say()`. No herb, forge or enchant game has
+  // either, so for them this reads exactly as it did.
   function hintNow(r) {
-    if (r.heat) {
+    if (r.game && r.game.urgent) { var u = r.game.urgent(); if (u) return u; }
+    if (r.heat && r.heat.say) { var fw = r.heat.say(); if (fw) return fw; }
+    else if (r.heat) {
       var s = r.heat.status();
       if (s === "cold") return r.heat.coldHint;
       if (HEAT_WORDS[s]) return HEAT_WORDS[s];
     }
+    if (r.react) { var rw = r.react.say(); if (rw) return rw; }
     var live = r.game && r.game.hint ? r.game.hint() : null;
     return live || r.def.hint(r.steady);
   }
@@ -635,6 +666,334 @@
     g.restore();
   }
 
+  // --- the alchemist's gauges (alchemy games with FLAME, REACTION or STAGES only) -------------
+  // Three lessons decided their shape before any code (alchemy UI plan §9; the research in the
+  // lane report):
+  //   - A GAUGE MUST READ AS A GAUGE. On 2026-10-06 the owner traced the herb Mix game's
+  //     texture line, a wavy stroke, believing it was the path (bench-games/mix.js header). So
+  //     every gauge here is a straight horizontal bar with a scale, a needle with a keel, the
+  //     band outlined in gold and notched at both ends, and its name in words under it; the
+  //     game's own input lives above it in the meter and never looks like the gauge.
+  //   - NO MOMENTUM. Stardew Valley's fishing bar accelerates and coasts, and its creator said
+  //     it "starts too hard" (herbalism prior art). The fire here moves the heat toward a goal
+  //     with a first-order lag: it never overshoots on its own, so where the needle is heading
+  //     is where it will stop.
+  //   - SHOW WHAT IS COMING. A titration's indicator "lingers longer" as the endpoint nears and
+  //     the chemist slows to single drops (University of Wisconsin general chemistry lab,
+  //     "Using an indicator during a titration"); a drop here blooms over a moment, and the gauge
+  //     draws a hollow mark where the pending rise will land, so overshooting is a choice the
+  //     player could see, not a surprise.
+  var FLAME_TAU = 3;           // seconds for the heat to go 63% of the way to the fire's goal
+  var STAGE_H = 34;            // px the colour-stage track takes from the foot of the meter
+
+  function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // The fire for one game. `spec` is the game's FLAME, `given` the server's opts.heat
+  // {unit, lo, hi, start, bands: [{name, lo, hi}], target}; every field the server sends wins.
+  // The target band is widened about its middle by `scale`, and its neighbours give way to it
+  // so the named bands still tile the scale without a gap or an overlap.
+  function makeFlame(spec, given, steady, scale) {
+    given = given && typeof given === "object" ? given : {};
+    var num = function (k) { return finite(+given[k]) ? +given[k] : spec[k]; };
+    var lo = num("lo"), hi = num("hi");
+    if (!(hi > lo)) { lo = spec.lo; hi = spec.hi; }
+    var tidy = function (list) {
+      return (Array.isArray(list) ? list : []).filter(function (b) {
+        return b && typeof b.name === "string" && b.name && finite(+b.lo) && finite(+b.hi) && +b.hi > +b.lo;
+      }).map(function (b) { return { name: b.name, lo: +b.lo, hi: +b.hi }; })
+        .sort(function (a, b) { return a.lo - b.lo; });
+    };
+    var target = typeof given.target === "string" && given.target ? given.target : spec.target;
+    var bands = tidy(given.bands);
+    var ti = bands.map(function (b) { return b.name; }).indexOf(target);
+    if (ti < 0) { bands = tidy(spec.bands); target = spec.target; ti = bands.map(function (b) { return b.name; }).indexOf(target); }
+    var tb = bands[ti];
+    var mid = (tb.lo + tb.hi) / 2, half = (tb.hi - tb.lo) / 2 * scale;
+    var band = [clamp(mid - half, lo, hi), clamp(mid + half, lo, hi)];
+    bands = bands.map(function (b, i) {
+      if (i === ti) return { name: b.name, lo: band[0], hi: band[1], target: true };
+      if (i < ti) return { name: b.name, lo: Math.min(b.lo, band[0]), hi: Math.min(b.hi, band[0]) };
+      return { name: b.name, lo: Math.max(b.lo, band[1]), hi: Math.max(b.hi, band[1]), danger: true };
+    }).filter(function (b) { return b.hi > b.lo; });
+    var tau = FLAME_TAU * (spec.tau || 1) * (steady ? 2 : 1);   // Steady: the drift at half speed
+    var start = clamp(num("start"), lo, hi);
+    var f = {
+      named: true, label: spec.label || "Heat", c: start, band: band, bands: bands, target: tb.name,
+      scale: [lo, hi], mid: mid, burn: null, reheats: 0, reheating: 0, quiet: false, canReheat: false,
+      coldHint: "", fed: false, damp: false,
+      // The fire's goal: a little past the top of the scale while fed (holding the fire on is
+      // never safe), the foot of the scale while banked, below it while damped.
+      step: function (dt) {
+        var span = hi - lo;
+        var goal = f.fed ? hi + span * 0.06 : f.damp ? lo - span * 0.12 : lo;
+        f.c += (goal - f.c) * (1 - Math.exp(-dt / tau));
+        f.c = clamp(f.c, lo, hi + span * 0.06);
+      },
+      reheat: function () { return false; },
+      add: function (deg) { f.c = clamp(f.c + deg, lo, hi); },
+      inBand: function () { return f.c >= band[0] && f.c <= band[1]; },
+      // 1 in the band's inner half, falling to `edge` at its rim, 0 outside (the forge's curve).
+      quality: function (inner, edge) {
+        if (!f.inBand()) return 0;
+        var hw = (band[1] - band[0]) / 2, d = Math.abs(f.c - (band[0] + band[1]) / 2);
+        var iw = hw * (inner == null ? 0.5 : inner);
+        return d <= iw ? 1 : 1 - (1 - (edge == null ? 0.6 : edge)) * ((d - iw) / Math.max(1e-6, hw - iw));
+      },
+      // What a game scores the heat at: its quality, except that the way IN is free. Until the
+      // needle first reaches the band's inner part, any heat in the band counts in full, because
+      // every run has to cross the rim to get there: measured 2026-10-07, a bot that held the
+      // exact middle once it arrived scored 0.975 on Calcine and 0.951 in Steady for the crossing
+      // alone. The herb Mix lesson again: no credit lost before the player could have done better.
+      settled: false,
+      credit: function (inner, edge) {
+        var q = f.quality(inner, edge);
+        if (q >= 1) f.settled = true;
+        return f.settled ? q : q > 0 ? 1 : 0;
+      },
+      bandAt: function (c) {
+        for (var i = 0; i < bands.length; i++) if (c >= bands[i].lo && c <= bands[i].hi) return bands[i];
+        return null;
+      },
+      // "burn" is any band above the target: fusing, melting, tails. The stylesheet's heat-burn
+      // class and the cross-hatched gauge zone say it twice over; the words say it first.
+      status: function () { return f.c < band[0] ? "cold" : f.c > band[1] ? "burn" : "in"; },
+      say: function () {
+        var s = f.status(), b = f.bandAt(f.c);
+        if (s === "cold") return (b ? cap(b.name) : "Cold") + ": feed the fire";
+        if (s === "burn") return (b ? cap(b.name) : "Too hot") + ": bank the fire";
+        return null;
+      },
+      // A still's head reads to the degree (its bands are 8 °C wide); a calcining crucible to 5.
+      text: function () {
+        var n = hi - lo < 200 ? Math.round(f.c) : Math.round(f.c / 5) * 5;
+        return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " °C";
+      }
+    };
+    return f;
+  }
+
+  // The reaction gauge (UI plan §6.4, the owner's Q9.4): `spec` the game's REACTION
+  // {label, band, rise, settle, flare_at, start, words: [below, in, above, flare], say,
+  // bloom?, steadyBand?, steadySettle?, from?}; `given` the server's {start, band, rise, settle,
+  // flare_at} (or Filter's pour {band, start}). The server's fields win. A band that starts at
+  // 0 (Bottle's vapour, where less is better) widens upward only.
+  function makeReaction(spec, given, steady, scale) {
+    given = given && typeof given === "object" ? given : {};
+    var num = function (k) { return finite(+given[k]) ? +given[k] : spec[k]; };
+    var b = Array.isArray(given.band) && given.band.length === 2 && finite(+given.band[0]) &&
+      finite(+given.band[1]) && +given.band[1] > +given.band[0] ? [+given.band[0], +given.band[1]] : spec.band.slice();
+    var floor = b[0] <= 0;
+    var band = floor ? [0, clamp(b[1] * scale, 1, 95)]
+      : [clamp((b[0] + b[1]) / 2 - (b[1] - b[0]) / 2 * scale, 0, 100), clamp((b[0] + b[1]) / 2 + (b[1] - b[0]) / 2 * scale, 0, 100)];
+    var flare = num("flare_at");
+    if (!(flare > band[1] + 2)) flare = Math.min(100, band[1] + 10);   // never inside the band
+    var settle = Math.max(0, num("settle")) * (steady ? (spec.steadySettle || 1) : 1);
+    var bloom = spec.bloom || 0, words = spec.words || ["low", "in band", "high", "over"];
+    var R = {
+      label: spec.label || "Reaction", v: clamp(num("start"), 0, 100), band: band, flare: flare,
+      rise: num("rise"), settle: settle, pending: 0, flares: 0, over: false, floor: floor, words: words,
+      step: function (dt) {
+        if (R.pending > 0) {
+          var take = bloom > 0 ? R.pending * (1 - Math.exp(-dt / bloom)) : R.pending;
+          if (R.pending - take < 0.05) take = R.pending;
+          R.v += take; R.pending -= take;
+        }
+        R.v = clamp(R.v - R.settle * dt, 0, 100);
+        // A flare is counted on the way over the line, once, and not again until the gauge has
+        // fallen clear of it: a needle resting on the line is one flare, not sixty.
+        if (R.v >= R.flare && !R.over) { R.over = true; R.flares++; }
+        else if (R.v < R.flare - 4) R.over = false;
+      },
+      add: function (x) { if (bloom > 0) R.pending += x; else R.v = clamp(R.v + x, 0, 100); },
+      lands: function () { return clamp(R.v + R.pending, 0, 100); },
+      inBand: function () { return R.v >= band[0] && R.v <= band[1]; },
+      quality: function () {
+        if (!R.inBand()) return 0;
+        if (floor) {   // lower is better: the inner 60% of the band from the floor is full credit
+          var top = band[1], d = R.v / Math.max(1e-6, top);
+          return d <= 0.6 ? 1 : 1 - 0.4 * (d - 0.6) / 0.4;
+        }
+        var hw = (band[1] - band[0]) / 2, a = Math.abs(R.v - (band[0] + band[1]) / 2), iw = hw * 0.6;
+        return a <= iw ? 1 : 1 - 0.4 * ((a - iw) / Math.max(1e-6, hw - iw));
+      },
+      // The way in is free, as the fire's `credit` (above): until the needle first reaches the
+      // band's inner part, any reading in the band counts in full.
+      settled: false,
+      credit: function () {
+        var q = R.quality();
+        if (q >= 1) R.settled = true;
+        return R.settled ? q : q > 0 ? 1 : 0;
+      },
+      status: function () {
+        return R.v < band[0] ? "low" : R.v <= band[1] ? "in" : R.v < R.flare ? "high" : "flare";
+      },
+      name: function () { return words[["low", "in", "high", "flare"].indexOf(R.status())] || ""; },
+      say: function () { var s = spec.say || {}; return s[R.status()] || null; },
+      text: function () { return R.label + " " + Math.round(R.v); }
+    };
+    return R;
+  }
+
+  // The colour stages, normalised: the server's list of names (`["nigredo", ...]`) or of
+  // {name, length, window} where `length` and `window` are factors on the game's own (the
+  // contracts' "per-stage windows"). Anything unreadable falls back to the definition's list.
+  function readStages(list, fallback) {
+    var out = (Array.isArray(list) ? list : []).map(function (s) {
+      if (typeof s === "string") return s ? { name: s, length: 1, window: 1 } : null;
+      if (!s || typeof s !== "object" || typeof s.name !== "string" || !s.name) return null;
+      var L = +s.length, Wn = +s.window;
+      return { name: s.name, length: finite(L) && L > 0 ? clamp(L, 0.5, 2) : 1,
+        window: finite(Wn) && Wn > 0 ? clamp(Wn, 0.5, 2) : 1 };
+    }).filter(function (s) { return s; });
+    if (!out.length) out = fallback.map(function (n) { return { name: n, length: 1, window: 1 }; });
+    return out.slice(0, 6).map(function (s) { s.word = cap(s.name); return s; });
+  }
+
+  // Shared by the two straight gauges: the needle, in ink on a dark keel so it reads on any
+  // part of the bar, with a diamond cap.
+  function needle(g, C, nx, by, bh) {
+    g.save();
+    g.lineCap = "round";
+    g.strokeStyle = C.sunk; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(nx, by - 6); g.lineTo(nx, by + bh + 4); g.stroke();
+    g.strokeStyle = C.ink; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(nx, by - 6); g.lineTo(nx, by + bh + 4); g.stroke();
+    g.restore();
+    KIT.diamond(g, nx, by - 7, 3.5, C.ink, C.sunk, 1);
+  }
+  // Names under a straight gauge, the first in `items` placed first; one that would collide with
+  // a name already placed is left out (the heat gauge's rule), so the band that matters always
+  // has its name.
+  function gaugeNames(g, C, items, x0, x1, y) {
+    g.save();
+    g.font = "12px " + C.body;
+    g.textBaseline = "middle";
+    var spans = [];
+    items.forEach(function (it) {
+      if (!it.text || it.b - it.a < 2) return;
+      var w = g.measureText(it.text).width;
+      var l = clamp((it.a + it.b) / 2 - w / 2, x0, x1 - w);
+      for (var k = 0; k < spans.length; k++) if (l < spans[k][1] + 6 && l + w > spans[k][0] - 6) return;
+      spans.push([l, l + w]);
+      g.fillStyle = it.colour;
+      g.fillText(it.text, l, y);
+    });
+    g.restore();
+  }
+  // The danger zone: cross-hatched in the alarm colour with a saw edge above it, as the forge's
+  // burning zone is, so it reads in greyscale.
+  function dangerZone(g, C, xa, xb, by, bh) {
+    if (xb - xa < 1) return;
+    KIT.barBand(g, xa, by - 2, Math.max(2, xb - xa), bh + 4, C.alarm, { cross: true, gap: 4 });
+    g.save(); g.strokeStyle = C.alarm; g.lineWidth = 1.2; g.beginPath();
+    for (var i = 0, n = Math.max(2, Math.round((xb - xa) / 5)); i <= n; i++) {
+      var px = xa + (xb - xa) * i / n, py = by - 3 - (i % 2 ? 4 : 0);
+      if (i) g.lineTo(px, py); else g.moveTo(px, py);
+    }
+    g.stroke(); g.restore();
+  }
+  function targetBand(g, C, xa, xb, by, bh) {
+    KIT.barBand(g, xa, by, Math.max(2, xb - xa), bh, C.goldDim, { gap: 4 });
+    g.save(); g.strokeStyle = C.gold; g.lineWidth = 2; g.strokeRect(xa, by - 4, Math.max(2, xb - xa), bh + 8); g.restore();
+    KIT.notch(g, xa, by - 5, Math.PI / 2, 5, C.gold);
+    KIT.notch(g, xb, by - 5, Math.PI / 2, 5, C.gold);
+  }
+
+  // The fire's gauge: the scale as a plain bar (an alembic's heat has no glow to show, so no
+  // blackbody colours: those are the forge's content), a tick and the number at each band's
+  // edge, the target band hatched and outlined in gold with its notches, the danger above it
+  // cross-hatched, the needle, and the bands' own names under the bar, the target's first.
+  function drawFlameGauge(r, g, W, top) {
+    var H = r.heat, C = r.C, x0 = 10, x1 = W - 10;
+    if (x1 - x0 < 80) return;
+    var lo = H.scale[0], hi = H.scale[1];
+    var X = function (c) { return x0 + (x1 - x0) * clamp((c - lo) / (hi - lo), 0, 1); };
+    var by = top + 6, bh = 9;
+    g.save();
+    g.fillStyle = C.panel; g.fillRect(x0, by, x1 - x0, bh);
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.strokeRect(x0 + 0.5, by + 0.5, x1 - x0 - 1, bh - 1);
+    g.fillStyle = C.ash;
+    H.bands.forEach(function (b) { g.fillRect(Math.round(X(b.lo)), by + bh, 1, 4); });
+    g.restore();
+    H.bands.forEach(function (b) { if (b.danger) dangerZone(g, C, X(b.lo), X(b.hi), by, bh); });
+    targetBand(g, C, X(H.band[0]), X(H.band[1]), by, bh);
+    needle(g, C, X(H.c), by, bh);
+    var items = H.bands.slice().sort(function (p, q) {
+      var rank = function (b) { return b.target ? 0 : b.danger ? 1 : 2; };
+      return rank(p) - rank(q) || p.lo - q.lo;
+    }).map(function (b) {
+      return { text: b.name, a: X(b.lo), b: X(b.hi), colour: b.target ? C.ink : b.danger ? C.ink : C.dim };
+    });
+    gaugeNames(g, C, items, x0, x1, by + bh + 12);
+  }
+
+  // The reaction gauge: 0 to 100 as a plain bar with a tick every 25, the band hatched and
+  // outlined in gold with its notches, everything from the flare line up cross-hatched, the
+  // hollow "lands here" mark while a drop is still blooming, the needle, and the zones' words
+  // under the bar ("calm", "working", "racing", "boiling over"), the band's word first.
+  function drawReaction(r, g, W, top) {
+    var R = r.react, C = r.C, x0 = 10, x1 = W - 10;
+    if (x1 - x0 < 80) return;
+    var X = function (v) { return x0 + (x1 - x0) * clamp(v / 100, 0, 1); };
+    var by = top + 6, bh = 9;
+    g.save();
+    g.fillStyle = C.panel; g.fillRect(x0, by, x1 - x0, bh);
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.strokeRect(x0 + 0.5, by + 0.5, x1 - x0 - 1, bh - 1);
+    g.fillStyle = C.ash;
+    for (var t = 0; t <= 100; t += 25) g.fillRect(Math.round(X(t)), by + bh, 1, 4);
+    g.restore();
+    dangerZone(g, C, X(R.flare), x1, by, bh);
+    targetBand(g, C, X(R.band[0]), X(R.band[1]), by, bh);
+    if (R.pending > 0.5) {
+      var lx = X(R.lands());
+      g.save(); g.strokeStyle = C.ink; g.lineWidth = 1.2; g.setLineDash && g.setLineDash([2, 2]);
+      g.beginPath(); g.moveTo(lx, by - 2); g.lineTo(lx, by + bh + 2); g.stroke();
+      g.setLineDash && g.setLineDash([]);
+      g.restore();
+      KIT.diamond(g, lx, by - 6, 3.5, null, C.ink, 1.2);
+    }
+    needle(g, C, X(R.v), by, bh);
+    var w = R.words;
+    gaugeNames(g, C, [
+      { text: w[1], a: X(R.band[0]), b: X(R.band[1]), colour: C.ink },
+      { text: w[3], a: X(R.flare), b: x1, colour: C.ink },
+      { text: w[0], a: x0, b: X(R.band[0]), colour: C.dim },
+      { text: w[2], a: X(R.band[1]), b: X(R.flare), colour: C.dim }
+    ], x0, x1, by + bh + 12);
+  }
+
+  // The colour-stage track (Transmute): the run as a timeline cut into its stages, each named
+  // under the bar, each stage's peak window hatched and notched, the stage now outlined in ink,
+  // and a needle at now. Under reduced motion the needle is not drawn: the game counts each
+  // peak in ("3", "2", "1", "Now", the enchant games' counted beat) and the track stands still.
+  function drawStageTrack(r, g, W, top) {
+    var T = r.game.track(), C = r.C, x0 = 10, x1 = W - 10;
+    if (!T || x1 - x0 < 80 || !(T.end > T.start)) return;
+    var X = function (s) { return x0 + (x1 - x0) * clamp((s - T.start) / (T.end - T.start), 0, 1); };
+    var by = top + 6, bh = 9;
+    g.save();
+    g.fillStyle = C.panel; g.fillRect(x0, by, x1 - x0, bh);
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.strokeRect(x0 + 0.5, by + 0.5, x1 - x0 - 1, bh - 1);
+    g.fillStyle = C.ash;
+    T.items.forEach(function (it) { g.fillRect(Math.round(X(it.s)), by - 2, 1, bh + 4); });
+    g.restore();
+    T.items.forEach(function (it) {
+      var a = X(it.peak - it.hw), b = X(it.peak + it.hw);
+      KIT.barBand(g, a, by, Math.max(2, b - a), bh, it.current ? C.gold : C.goldDim, { gap: 4 });
+      KIT.notch(g, a, by - 1, Math.PI / 2, 4, it.current ? C.gold : C.goldDim);
+      KIT.notch(g, b, by - 1, Math.PI / 2, 4, it.current ? C.gold : C.goldDim);
+      if (it.current) {
+        g.save(); g.strokeStyle = C.ink; g.lineWidth = 1.5;
+        g.strokeRect(X(it.s), by - 3, Math.max(2, X(it.e) - X(it.s)), bh + 6);
+        g.restore();
+      }
+    });
+    if (!r.reduced && T.now >= T.start && T.now <= T.end) needle(g, C, X(T.now), by, bh);
+    gaugeNames(g, C, T.items.map(function (it) {
+      return { text: it.word, a: X(it.s), b: X(it.e), colour: it.current ? C.ink : C.dim };
+    }).sort(function (p, q) { return (q.colour === C.ink ? 1 : 0) - (p.colour === C.ink ? 1 : 0); }), x0, x1, by + bh + 12);
+  }
+
   function degrees(c) {
     var n = String(Math.round(c / 5) * 5);
     return n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " °C";
@@ -648,6 +1007,7 @@
   // one that is always named.
   function drawGauge(r, g, W, top) {
     var H = r.heat, C = r.C, x0 = 10, x1 = W - 10;
+    if (H.named) { drawFlameGauge(r, g, W, top); return; }   // an alchemist's fire (FLAME)
     if (x1 - x0 < 80) return;
     var lo = H.scale[0], hi = H.scale[1];
     var X = function (c) { return x0 + (x1 - x0) * clamp((c - lo) / (hi - lo), 0, 1); };
@@ -751,6 +1111,27 @@
         tools.appendChild(reheat);
       }
     }
+    // An alchemy game's gauge number: the fire's °C (it shares the forge's number and its
+    // heat-* classes, so the stylesheet's rules for "cold" and "burn" hold), or the reaction's
+    // label and value ("Fizz 56"). No Reheat: an alchemist feeds the fire instead. The hint is
+    // spoken when it changes, because it is where the gauge's words go.
+    var reactNum = null;
+    if (def.FLAME) {
+      root.classList.add("has-heat");
+      heatNum = el("p", "bench-game__heat-num");
+      heatNum.setAttribute("aria-label", (def.FLAME.label || "Heat") + " in degrees");
+      hint.appendChild(heatNum);
+      hintText.setAttribute("aria-live", "polite");
+    }
+    if (def.REACTION) {
+      root.classList.add("has-react");
+      reactNum = el("p", "bench-game__react-num");
+      reactNum.setAttribute("aria-label", (def.REACTION.label || "Reaction") + ", 0 to 100");
+      hint.appendChild(reactNum);
+      hintText.setAttribute("aria-live", "polite");
+    }
+    if (def.STAGES) root.classList.add("has-stages");
+    if (def.track === "alchemy") hintText.setAttribute("aria-live", "polite");
     if (def.track) root.classList.add("bench-game--" + def.track);
     // An enchant game's day-phase band: the server's words above the hint (the band itself is
     // drawn on the canvas), and the hint spoken when it changes, because an order game's hint
@@ -797,7 +1178,7 @@
     return { root: root, thread: thread, meter: meter, canvas: canvas, hint: hint, tier: tier,
       hintText: hintText, tools: tools, help: help, word: word, band: band, live: live,
       card: card, cardText: cardText, cardSub: cardSub, heatNum: heatNum, reheat: reheat,
-      hour: hourWordsEl };
+      hour: hourWordsEl, reactNum: reactNum };
   }
 
   // --- the loop ---------------------------------------------------------------------------
@@ -820,9 +1201,12 @@
     // A heat game draws in the meter above the gauge; the gauge takes the foot. An enchant
     // game with an hour does the same with the day-phase band (no game has both).
     var gh = r.heat ? GAUGE_H : r.hour ? HOUR_H : 0;
+    if (r.react) gh = GAUGE_H; else if (r.stages) gh = STAGE_H;   // alchemy only
     r.game.draw(g, r.W, r.H - gh);
     if (r.heat) drawGauge(r, g, r.W, r.H - gh);
     else if (r.hour) drawHourBand(r, g, r.W, r.H - gh);
+    if (r.react) drawReaction(r, g, r.W, r.H - gh);
+    else if (r.stages && r.game.track) drawStageTrack(r, g, r.W, r.H - gh);
     if (r.particles.length) drawParticles(r, g);
     var p = r.game.progress ? r.game.progress(r.t) : r.t / r.game.duration;
     r.dom.thread.style.transform = "scaleX(" + clamp(p, 0, 1).toFixed(4) + ")";
@@ -848,6 +1232,7 @@
   function advance(r, dt) {
     r.t += dt;
     if (r.heat) r.heat.step(dt);
+    if (r.react) r.react.step(dt);
     r.game.tick(dt, r.t);
   }
 
@@ -867,10 +1252,17 @@
       try {
         if (typeof r.stage.update === "function") r.stage.update(r.game.state());
         if (r.heat && typeof r.stage.heat === "function") r.stage.heat(r.heat.c);
+        // AlchemyStage (contracts §12): `reaction(value)` churns the liquid with the gauge.
+        if (r.react && typeof r.stage.reaction === "function") r.stage.reaction(r.react.v);
       }
       catch (e) { r.stage = null; if (window.console) console.warn("bench stage update failed; the strip plays on", e); }
     }
+    if (r.burner) {
+      try { r.burner.heat(clamp((r.heat.c - r.heat.scale[0]) / (r.heat.scale[1] - r.heat.scale[0]), 0, 1)); }
+      catch (e) { r.burner = null; }
+    }
     if (r.heat) showHeat(r);
+    else if (r.react) showReact(r);
     else if (r.game.hint) setHint(r, hintNow(r));
     var s = clamp(r.game.score(), 0, 1);
     if (Math.abs(s - r.lastScore) >= 0.004) {
@@ -890,13 +1282,25 @@
   // The number in °C (rounded to 5, so it reads instead of flickering), the hint, and a class
   // on the strip naming the heat's state for the stylesheet.
   function showHeat(r) {
-    var n = degrees(r.heat.c), s = r.heat.status();
+    var n = r.heat.text ? r.heat.text() : degrees(r.heat.c), s = r.heat.status();
     if (r.dom.heatNum && n !== r.heatShown) { r.heatShown = n; r.dom.heatNum.textContent = n; }
     if (s !== r.heatState) {
       if (r.heatState) r.dom.root.classList.remove("heat-" + r.heatState);
       r.heatState = s;
       r.dom.root.classList.add("heat-" + s);
       if (r.dom.reheat) r.dom.reheat.disabled = s === "reheating";
+    }
+    setHint(r, hintNow(r));
+  }
+  // The reaction's number and zone (alchemy games with REACTION): "Fizz 56", a `react-<zone>`
+  // class on the strip (low, in, high, flare) for the stylesheet, and the hint.
+  function showReact(r) {
+    var n = r.react.text(), s = r.react.status();
+    if (r.dom.reactNum && n !== r.reactShown) { r.reactShown = n; r.dom.reactNum.textContent = n; }
+    if (s !== r.reactState) {
+      if (r.reactState) r.dom.root.classList.remove("react-" + r.reactState);
+      r.reactState = s;
+      r.dom.root.classList.add("react-" + s);
     }
     setHint(r, hintNow(r));
   }
@@ -998,6 +1402,22 @@
     if (heatIn && heatIn.narrow && traits.indexOf("narrow_window") < 0) bandScale *= NARROW;
     r.bandScale = bandScale;
     r.heat = r.def.HEAT ? makeHeat(r.def.HEAT, heatIn, steady, baseWin * bandScale, narrow) : null;
+    // The alchemist's gauges (alchemy contracts §12), each read from the opts first and the
+    // server's tuning second, as the enchant games' seq and seats are.
+    var DF = r.def.FLAME, DR = r.def.REACTION;
+    if (DF) {
+      r.heat = makeFlame(DF, heatIn || tuning.heat, steady,
+        baseWin * bandScale * (steady ? (DF.steadyBand || 1) : 1));
+    }
+    if (DR) {
+      var from = DR.from || "reaction";
+      // rules/alchemist.py tuning_for has already widened `reaction.band` by the working traits
+      // (a catalyst's 1.2); `pour` it has not. So band_scale counts for the pour, not twice for
+      // the reaction.
+      r.react = makeReaction(DR, opts[from] || tuning[from], steady,
+        baseWin * (from === "reaction" ? 1 : bandScale) * (steady ? (DR.steadyBand || 1) : 1));
+    }
+    if (r.def.STAGES) r.stages = readStages(opts.stages || tuning.stages, r.def.STAGE_NAMES || []);
     var voice = { hardness: tuning.hardness, bath: tuning.bath };
     // The enchanter's sound contract (contracts §13): enchant events carry the day phase.
     // Only an hour adds it, and only an enchant game with HOUR has one.
@@ -1014,6 +1434,9 @@
       // generous start times the band scale, times the game's own Steady factor from the UI
       // plan §9 table (they differ by game: x1.5 for Alloy, x1.6 for Forge's ring).
       heat: r.heat,
+      // The alchemist's reaction gauge and colour stages (null for every other game).
+      react: r.react || null,
+      stages: r.stages || null,
       narrow: narrow,
       bandScale: bandScale,
       band: function (steadyFactor) { return baseWin * bandScale * (steady ? (steadyFactor || 1) : 1); },
@@ -1275,6 +1698,7 @@
     clearTimeout(r.cardTimer);
     r.phase = "done";
     unbind(r);
+    if (r.burner) { try { r.burner.stop(); } catch (e) { /* the fire goes out regardless */ } r.burner = null; }
     var score = clamp(+r.game.score() || 0, 0, 1);
     // One last still picture: the particles go, the meter stays as it ended.
     r.particles.length = 0;
@@ -1347,6 +1771,16 @@
         dom.tools.insertBefore(b, dom.help);
         dom.button = b;
       }
+      // The alchemist's fire is heard (lane U5, `Sound.burner`): one burner per FLAME game, fed
+      // the needle's place on the scale every frame (`feed`) and stopped when the game ends
+      // (`finish`). `opts.burner` ("lamp" at the field kit, "athanor" in a laboratory) is the
+      // shell's to say; a game without FLAME, or a page without the bus, has none.
+      if (def.FLAME && r.heat && window.Sound && typeof window.Sound.burner === "function") {
+        try {
+          r.burner = window.Sound.burner({ kind: opts.burner || tuning.burner || def.FLAME.burner || "lamp",
+            liquid: !!def.FLAME.liquid });
+        } catch (e) { r.burner = null; }
+      }
       run = r;
       bind(r);
       paint(r);
@@ -1390,7 +1824,7 @@
     var ctx = makeCtx(r, opts);
     r.game = def.create(ctx);
     return {
-      game: r.game, heat: r.heat, ctx: ctx, hour: r.hour,
+      game: r.game, heat: r.heat, ctx: ctx, hour: r.hour, react: r.react || null, stages: r.stages || null,
       // What the strip would say over the hint (the day-phase words), for the tests.
       hourWords: function () { return r.hour ? hourWords(r.hour, finite(r.game.widen) ? r.game.widen : null) : ""; },
       t: function () { return r.t; },
