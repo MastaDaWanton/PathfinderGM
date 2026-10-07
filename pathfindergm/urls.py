@@ -149,6 +149,7 @@ urlpatterns = [
     path("api/alchemy/ask", alchemy_views.alchemy_ask, name="alchemy_ask"),
     path("api/alchemy/collect", alchemy_views.alchemy_collect, name="alchemy_collect"),
     path("api/alchemy/perks", alchemy_views.alchemy_perks, name="alchemy_perks"),
+    path("api/alchemy/seen", alchemy_views.alchemy_seen, name="alchemy_seen"),
     path("api/alchemy/recipe", alchemy_views.alchemy_recipe, name="alchemy_recipe"),
     path("api/alchemy/formulary", alchemy_views.alchemy_formulary, name="alchemy_formulary"),
     path("api/alchemy/codex", alchemy_views.alchemy_codex, name="alchemy_codex"),

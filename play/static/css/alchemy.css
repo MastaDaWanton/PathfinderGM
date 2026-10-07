@@ -1,0 +1,190 @@
+/* The alchemy bench (docs/alchemy-ui-plan.md), over the play table, after bench.css,
+   forge.css and enchant.css.
+
+   THE SAME BENCH, LAID OUT FOR THE GLASS. The layer carries both classes, `bench alchemy`,
+   so every rule of bench.css (the layer at z 35, the leather strip and footer, the tooled
+   panels, the method strip, the shelf rows, the paper tag and its ladder, the confirms, the
+   reduced-motion block, the 1180px and 768px collapses with their 16px gutters) is the
+   bench's too, and this sheet holds only what is alchemy's own: the shelf (UI plan §5.2,
+   290px for the longer names) and the formula card (360px, for the slots and the stakes),
+   the stakes under the stage, the flat stand-in's level bar, the trait slots and the
+   drawbacks. The material's swatch is the forge's `.fr-swatch` (forge.css), one rule for all.
+
+   NO NEW COLOUR, FONT OR TEXTURE (UI plan §4). Every value is a theme-v2.css token or the
+   bench's semantic layer over them. The one exception is content, not chrome: a material's
+   or a mix's own colour (`--sw`, sent by the server as "#rrggbb"), exactly as heat lives
+   only in the forge's scene. Volatile and toxic are words with a shape and a rule of
+   --alarm beside them, never a red panel (UI plan §4, §6.2).
+
+   LAYERS. Only the bench's own: 1 to 9 inside the layer's stacking context. MOTION.
+   Transform and opacity only, 200ms at most; the reduced-motion block in bench.css reaches
+   every element here. */
+
+.alchemy {
+  --bench-satchel-w: 290px;
+  --bench-tag-w: 360px;
+}
+.alchemy .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(600px, 1fr) var(--bench-tag-w); }
+
+/* Eleven methods: locked ones keep their reason under the name, as the forge's strip does. */
+.alchemy .bench-methods { flex-wrap: wrap; row-gap: 4px; }
+.alchemy .bm.is-locked {
+  display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  column-gap: 7px; row-gap: 1px; align-content: center; justify-items: start;
+}
+.alchemy .bm.is-locked .bicon { grid-row: 1 / span 2; align-self: center; }
+.alchemy .bm.is-locked .bm-lock { font-size: 12px; line-height: 1.1; }
+.alchemy .bm.is-locked .bm-name { line-height: 1; }
+.alchemy .bicon-l.is-two { font-size: calc(var(--bi) * .42); letter-spacing: -.02em; }
+
+/* --- the shelf (UI plan §6.2) --------------------------------------------------------------- */
+.alchemy .as .bt-name { white-space: normal; overflow: visible; }
+.as-sub { color: var(--bench-quiet); }
+/* What time has done (gone off, faded in the light): words with a rule beside them. */
+.as-warn { color: var(--bench-ink); border-left: 2px solid var(--bench-warn); padding-left: 6px; }
+.alchemy .bt-badge { display: inline-flex; align-items: center; gap: 3px; }
+.alchemy .bt-badge .bicon { --bi: 14px; }
+.alchemy .bt-badge.is-warn { color: var(--bench-ink); border-color: var(--bench-warn); }
+
+/* --- the stage (UI plan §6.3) ---------------------------------------------------------------- */
+.alchemy .bench-stage { grid-template-rows: minmax(0, 1fr) auto auto auto auto; }
+.alchemy .bench-info { display: grid; gap: 2px; max-width: 64ch; }
+.alchemy .bench-chip small { color: var(--bench-quiet); font-size: 12px; }
+/* The stakes, before the roll and in words: the mishap and the toxic line marked by a rule
+   of --alarm beside them, a shape as well as a colour (UI plan §6.3). */
+.al-lines { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; max-width: 64ch;
+            font-size: 15px; color: var(--bench-quiet); }
+.al-lines[hidden] { display: none; }
+.al-lines li { padding-left: 13px; }
+.al-lines .is-warn { color: var(--bench-ink); border-left: 3px solid var(--bench-warn); padding-left: 10px; }
+
+/* The flat stand-in (UI plan §6.3, "WebGL fallback"): the method's icon at 160px with a level
+   bar beside it, the mix's own colour filled to the server's level, and its words. */
+.al-glass { display: flex; align-items: flex-end; gap: 18px; }
+.al-level { display: grid; justify-items: center; gap: 6px; }
+.al-level-tube {
+  position: relative; display: block; width: 22px; height: 120px; overflow: hidden;
+  border-radius: 3px; box-shadow: inset 0 0 0 1px var(--edge), var(--bevel);
+}
+.al-level-tube i {
+  position: absolute; left: 2px; right: 2px; bottom: 2px; height: calc((100% - 4px) * var(--lv, 0));
+  border-radius: 2px; background: var(--sw, var(--ash));
+}
+.al-level-words { color: var(--bench-quiet); font-size: 13px; text-align: center; max-width: 12ch; }
+
+/* The minigame strip rises from the stage's foot (UI plan §6.4), as #bench-game does. */
+#alchemy-game {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4;
+  transform: translateY(calc(100% + 12px)); opacity: 0;
+  transition: transform .2s ease-out, opacity .2s ease-out;
+}
+#alchemy-game.is-up { transform: none; opacity: 1; }
+#alchemy-game[hidden] { display: none; }
+
+/* --- the formula card (UI plan §6.5) --------------------------------------------------------- */
+.alchemy .bench-tagcol-in { gap: 14px; }
+.ac-take, .ac-formula, .ac-sums { display: grid; gap: 6px; }
+.ac-take:empty, .ac-formula:empty, .ac-sums:empty { display: none; }
+.ac-h { margin: 6px 0 2px; color: var(--bench-quiet); font: 400 13px/1.4 var(--body); }
+.ac-h:first-child { margin-top: 0; }
+.ac-h small { font-size: 12px; }
+.ac-slot { position: relative; border-radius: var(--bench-radius); }
+/* Filled: the thing on leather, its label in small caps on the left. Empty: a dashed rim, a
+   shape as well as a colour, saying what goes there. */
+.ac-slot.is-full {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) 30px; align-items: center; gap: 8px;
+  min-height: 52px; padding: 6px 4px 6px 10px;
+  border: 1px solid #3b3022; border-radius: var(--bench-radius);
+  background: linear-gradient(#2a2118, #18130e); box-shadow: var(--bevel), var(--sh-1);
+}
+.ac-label { color: var(--bench-accent); font: 400 15px/1.1 var(--display); letter-spacing: .05em; font-variant: small-caps;
+            text-shadow: var(--engraved); }
+.ac-piece { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ac-piece .fr-swatch { margin-left: -4px; }
+.ac-name { display: grid; min-width: 0; font-size: 15px; line-height: 1.25; color: var(--bench-ink); }
+.ac-name small { color: var(--bench-quiet); font-size: 12px; line-height: 1.3; }
+.alchemy .ac-x { width: 28px; height: 28px; display: grid; place-items: center; color: var(--bench-quiet); font-size: 17px; }
+.alchemy .ac-x:hover { color: var(--bench-ink); }
+.alchemy .ac-slot-b {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; width: 100%;
+  min-height: 52px; padding: 6px 10px; text-align: left; border: 1px dashed var(--edge); border-radius: var(--bench-radius);
+}
+.alchemy .ac-slot-b:hover { border-color: var(--gold-dim); }
+.ac-hint { color: var(--bench-quiet); font-size: 13px; line-height: 1.3; }
+.ac-slot.is-optional .ac-label { color: var(--bench-quiet); }
+.ac-batch { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.alchemy .ac-batch .tb-step { display: inline-flex; align-items: center; gap: 3px; }
+.alchemy .ac-batch .tb-step .v2-btn { min-width: 32px; justify-content: center; }
+.ac-n { min-width: 28px; text-align: center; font-variant-numeric: lining-nums tabular-nums; }
+/* A field: its label above it (the skill's form rule). */
+.ac-field { display: grid; gap: 4px; }
+.ac-field > span { color: var(--bench-quiet); font-size: 13px; }
+.alchemy .ac-select { width: 100%; min-height: 34px; padding: 5px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink); }
+.alchemy .ac-select option { background: var(--panel); color: var(--bench-ink); }
+.ac-quiet { margin: 0; color: var(--bench-quiet); font-size: 13px; }
+.ac-match { margin: 0; color: var(--bench-ink); font-size: 15px; }
+.ac-miss { margin: 0; color: var(--bench-ink); font-size: 15px; border-left: 2px solid var(--edge); padding-left: 10px; }
+/* Could still become N: the count is the hint the owner asked for (Q5.3), in the accent. */
+.ac-could { margin: 0; color: var(--bench-accent); font-size: 15px; }
+.ac-writings { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ac-writ { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+
+/* The trait slots: a check per trait, its essence and grade as an engraved word (never a
+   coloured pill: essences are words, UI plan §4), what it does, and why it cannot go in. */
+.ac-traits, .ac-drawbacks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ac-trait { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; }
+.ac-trait input { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--gold); }
+.ac-trait label { display: grid; gap: 1px; font-size: 15px; color: var(--bench-ink); cursor: pointer; }
+.ac-trait small, .ac-drawbacks small { color: var(--bench-quiet); font-size: 12px; }
+.ac-trait.is-off label > span:not(.ac-ess) { color: var(--bench-quiet); }
+.ac-ess { color: var(--bench-quiet); font: 400 12px/1.2 var(--display); letter-spacing: .08em; font-variant: small-caps; }
+.ac-drawbacks li { display: grid; gap: 1px; font-size: 15px; color: var(--bench-ink);
+                   border-left: 2px solid var(--bench-warn); padding-left: 10px; }
+
+.ac-terms { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--bench-quiet); }
+.ac-terms li { display: flex; justify-content: space-between; gap: 10px; }
+.ac-terms b { font-weight: 400; color: var(--bench-ink); font-variant-numeric: lining-nums tabular-nums; }
+.ac-stakes { display: grid; gap: 4px; }
+.ac-warn { margin: 0; color: var(--bench-ink); font-size: 15px; border-left: 3px solid var(--bench-warn); padding-left: 10px; }
+.ac-problems { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
+.ac-problems li { color: var(--bench-ink); border-left: 2px solid var(--edge); padding-left: 10px; }
+
+/* The tag: the product's lines, a drawback marked by a rule, and each rung's caster level
+   and price under its name (UI plan §6.5). */
+.ac-lines { list-style: none; margin: 4px 0 6px; padding: 0; display: grid; gap: 2px; font-size: 14px; }
+.ac-lines .is-bad { border-left: 2px solid var(--bench-warn); padding-left: 6px; }
+.ac-tag .rung-name small { display: block; font-size: 12px; opacity: .85; }
+.tr-flare { font-variant: small-caps; letter-spacing: .08em; }
+
+/* The books' flat stand-ins (lane U4's are the fuller ones): a list in the bench's dialog. */
+.al-book-d { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; }
+.al-book-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 10px; }
+.al-book-list li { display: grid; gap: 2px; }
+.al-book-list b { color: var(--bench-ink); font-weight: 400; }
+.al-book-list span { color: var(--bench-quiet); font-size: 13px; }
+.al-book-list .is-warn { color: var(--bench-ink); border-left: 2px solid var(--bench-warn); padding-left: 6px; }
+
+/* The footer never sets the layer's width (the circle's measured defect at 1280x720: one
+   nowrap row of 1373px in a 1280px window). The place gives way first with an ellipsis. */
+.alchemy { grid-template-columns: minmax(0, 1fr); }
+.alchemy .bf-place { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.alchemy .bf-track { min-width: 0; flex: 0 1 auto; }
+
+/* --- other sizes (UI plan §5.3) ----------------------------------------------------------------- */
+/* 1280 to 1439: the shelf to 250px and the card to 320px, as the plan says; the strip goes to
+   icons by bench.css's own rule for this band. */
+@media (max-width: 1439px) and (min-width: 1180px) {
+  .alchemy { --bench-satchel-w: 250px; --bench-tag-w: 320px; --bench-gap: 28px; }
+  .alchemy .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(520px, 1fr) var(--bench-tag-w); }
+  .alchemy .bm.is-locked { display: inline-flex; }
+  .ac-slot.is-full, .alchemy .ac-slot-b { grid-template-columns: 74px minmax(0, 1fr) auto; }
+  .ac-label { font-size: 13px; letter-spacing: .03em; }
+}
+@media (max-width: 1179px) {
+  .alchemy .bench-frame { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .ac-slot.is-full, .alchemy .ac-slot-b { grid-template-columns: 68px minmax(0, 1fr) auto; }
+  .al-glass { gap: 12px; }
+  .al-level-tube { height: 90px; }
+}

@@ -3196,6 +3196,11 @@
      games' sheet is lane U2's, named only once it is in the build, by the same "?v=" test. -->
 <link rel="stylesheet" href="{% asset 'css/enchant.css' %}">
 {% asset 'css/enchant-games.css' as enchant_games_css %}{% if '?v=' in enchant_games_css %}<link rel="stylesheet" href="{% asset 'css/enchant-games.css' %}">{% endif %}
+<!-- The alchemy bench (docs/alchemy-ui-plan.md §12, alchemy lane U1), after bench.css,
+     forge.css and enchant.css: its layer is a bench and this sheet holds only what is the
+     bench's own. The games' sheet is lane U2's, named only once it is in the build. -->
+<link rel="stylesheet" href="{% asset 'css/alchemy.css' %}">
+{% asset 'css/alchemy-games.css' as alchemy_games_css %}{% if '?v=' in alchemy_games_css %}<link rel="stylesheet" href="{% asset 'css/alchemy-games.css' %}">{% endif %}
 <script src="{% static 'js/dice3d.js' %}"></script>
 <!-- App-wide preferences and sound (Lane G), early and after the dice, so every later
      script can read them. Guarded the same way as bench-games.css above. -->
@@ -3505,6 +3510,11 @@
            the last craft door, so it follows this one. -->
       <button type="button" class="v2-btn door" id="open-enchant" data-enchant-open
               aria-haspopup="dialog" aria-controls="enchant">Enchanting</button>
+      <!-- Alchemy opens the bench over the table the same way (50-alchemy-shell.js,
+           docs/alchemy-ui-plan.md §5.1), after Enchanting and before In progress (50 moves
+           37's In progress door after this one: 37 places it after the doors it knows). -->
+      <button type="button" class="v2-btn door" id="open-alchemy" data-alchemy-open
+              aria-haspopup="dialog" aria-controls="alchemy">Alchemy</button>
       <a class="v2-btn door" href="/craft/">Crafting bench</a>
       <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
       <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
@@ -3860,6 +3870,61 @@
   <div class="vh" id="enchant-say" role="status" aria-live="polite"></div>
 </div>
 
+<!-- The alchemy bench (docs/alchemy-ui-plan.md §5): the fourth bench, mounted on the same
+     core (29-bench-core.js) at the same z-index, so it carries the bench's classes and its
+     own ids. The shelf on the left (only what you carry), the glass in the middle with the
+     stakes said under it before the roll, the formula card on the right (what goes in, the
+     vessel, the formula or Experiment, the possible-formulae count, the trait slots, the
+     drawbacks, the DC and the paper tag). 50 opens it; 51 fills the shelf, 53 the card;
+     52 (lane U3's stage) and 54 (lane U4's books) are optional providers. -->
+<div id="alchemy" class="bench alchemy" role="dialog" aria-modal="true" aria-labelledby="alchemy-title"
+     hidden>
+  <header class="bench-strip v2-card-leather">
+    <div class="bench-cap bench-strip-in">
+      <h2 class="bench-title" id="alchemy-title">Alchemy</h2>
+      <div class="bench-methods" id="alchemy-methods" role="radiogroup"
+           aria-label="Method"></div>
+      <button type="button" class="v2-btn is-quiet bench-close" id="alchemy-close">Close</button>
+    </div>
+  </header>
+
+  <div class="bench-frame alchemy-frame">
+    <section class="bench-panel bench-satchel alchemy-shelf v2-framed v2-tooled-leather" id="alchemy-shelf"
+             aria-label="Your shelf">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-satchel-in" id="alchemy-shelf-in"></div>
+    </section>
+
+    <section class="bench-stage alchemy-stage" id="alchemy-stage" aria-label="The glass">
+      <div class="bench-tool" id="alchemy-tool"></div>
+      <ul class="bench-chips" id="alchemy-chips" aria-label="On the bench" hidden></ul>
+      <p class="bench-info" id="alchemy-info"></p>
+      <ul class="al-lines" id="alchemy-lines" aria-label="Before you roll" hidden></ul>
+      <div class="bench-rollrow">
+        <button type="button" class="v2-btn is-go bench-roll" id="alchemy-roll" disabled
+                aria-describedby="alchemy-why">Roll Craft</button>
+        <span class="bench-why" id="alchemy-why"></span>
+      </div>
+      <!-- Where the minigame rises (contracts §12, `mount`). -->
+      <div class="bench-gamebay" id="alchemy-game" hidden></div>
+    </section>
+
+    <section class="bench-panel bench-tagcol alchemy-card v2-framed v2-tooled-leather" id="alchemy-card"
+             aria-label="The formula card">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-tagcol-in" id="alchemy-card-in"></div>
+    </section>
+  </div>
+
+  <footer class="bench-foot v2-card-leather" id="alchemy-foot">
+    <div class="bench-cap bench-foot-in" id="alchemy-foot-in"></div>
+  </footer>
+  <!-- The bench's own popovers: the confirms, the perk picker, the books (lane U4's or the
+       flat stand-ins), the reagent card. -->
+  <div class="bench-pops" id="alchemy-pops"></div>
+  <div class="vh" id="alchemy-say" role="status" aria-live="polite"></div>
+</div>
+
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
@@ -3984,6 +4049,17 @@ the build; 45-enchant-shell.js finishes a step flat without them.{% endcomment %
 {% asset 'js/enchant-games/refine.js' as eg_refine %}{% if '?v=' in eg_refine %}<script src="{% asset 'js/enchant-games/refine.js' %}"></script>{% endif %}
 {% asset 'js/enchant-games/unbind.js' as eg_unbind %}{% if '?v=' in eg_unbind %}<script src="{% asset 'js/enchant-games/unbind.js' %}"></script>{% endif %}
 {% asset 'js/enchant-games/cleanse.js' as eg_cleanse %}{% if '?v=' in eg_cleanse %}<script src="{% asset 'js/enchant-games/cleanse.js' %}"></script>{% endif %}
+{% comment %}The alchemy bench's games (alchemy lane U2, contracts §12), one file per method
+with a game, each registering on BenchGameDefs with track "alchemy". Named only once in the
+build; 50-alchemy-shell.js finishes a step flat without them.{% endcomment %}
+{% asset 'js/alchemy-games/dissolve.js' as ag_dissolve %}{% if '?v=' in ag_dissolve %}<script src="{% asset 'js/alchemy-games/dissolve.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/calcine.js' as ag_calcine %}{% if '?v=' in ag_calcine %}<script src="{% asset 'js/alchemy-games/calcine.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/filter.js' as ag_filter %}{% if '?v=' in ag_filter %}<script src="{% asset 'js/alchemy-games/filter.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/distill.js' as ag_distill %}{% if '?v=' in ag_distill %}<script src="{% asset 'js/alchemy-games/distill.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/react.js' as ag_react %}{% if '?v=' in ag_react %}<script src="{% asset 'js/alchemy-games/react.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/sublime.js' as ag_sublime %}{% if '?v=' in ag_sublime %}<script src="{% asset 'js/alchemy-games/sublime.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/bottle.js' as ag_bottle %}{% if '?v=' in ag_bottle %}<script src="{% asset 'js/alchemy-games/bottle.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-games/transmute.js' as ag_transmute %}{% if '?v=' in ag_transmute %}<script src="{% asset 'js/alchemy-games/transmute.js' %}"></script>{% endif %}
 {% comment %}The stage's renderer (Lane F), in its own load order: maths, the GL layer,
 meshes, the procedural grounds, particles, props, then the nine tools. 32 below is its
 API. A comment block, not {# #}: Django's hash comment is one line only, and the two-line
@@ -4060,6 +4136,38 @@ the build, so the circle runs flat without them.{% endcomment %}
 {% asset 'js/table/47-enchant-stage.js' as enchant_stage_js %}{% if '?v=' in enchant_stage_js %}<script src="{% asset 'js/table/47-enchant-stage.js' %}"></script>{% endif %}
 <script src="{% asset 'js/table/48-enchant-working.js' %}"></script>
 {% asset 'js/table/49-enchant-ledger.js' as enchant_ledger_js %}{% if '?v=' in enchant_ledger_js %}<script src="{% asset 'js/table/49-enchant-ledger.js' %}"></script>{% endif %}
+<!-- The alchemy bench (docs/alchemy-contracts.md §11, §12): its icon art with the content
+     stamp, a registry of its own beside the herb and forge ones (bench-icons.js pins its 46
+     herb names; game-icons.net, CC BY 3.0, docs/asset-licences.md); lane U3's stage parts
+     (after the bench, forge and enchant stage kits they reuse); then 50 to 54 in number
+     order. 50, 51 and 53 are lane U1's and always named; 52 (lane U3's adapter,
+     window.AlchemyStage) and 54 (lane U4's books, window.AlchemyBooks) are optional
+     providers named only once they are in the build, so the bench runs flat without them. -->
+<script>
+window.ALCHEMY_ICON_URLS = {
+  calcine: "{% asset 'img/icons/calcine.svg' %}", dissolve: "{% asset 'img/icons/dissolve.svg' %}",
+  filter: "{% asset 'img/icons/filter.svg' %}", distill: "{% asset 'img/icons/distill.svg' %}",
+  react: "{% asset 'img/icons/react.svg' %}", sublime: "{% asset 'img/icons/sublime.svg' %}",
+  bottle: "{% asset 'img/icons/bottle.svg' %}", transmute: "{% asset 'img/icons/transmute.svg' %}",
+  vial: "{% asset 'img/icons/vial.svg' %}", flask: "{% asset 'img/icons/flask.svg' %}",
+  bladder: "{% asset 'img/icons/bladder.svg' %}", potion: "{% asset 'img/icons/potion.svg' %}",
+  splash: "{% asset 'img/icons/splash.svg' %}", cloud: "{% asset 'img/icons/cloud.svg' %}",
+  tool: "{% asset 'img/icons/tool.svg' %}", spirit: "{% asset 'img/icons/spirit.svg' %}",
+  calx: "{% asset 'img/icons/calx.svg' %}", crystal: "{% asset 'img/icons/crystal.svg' %}",
+  solvent: "{% asset 'img/icons/solvent.svg' %}", toxic: "{% asset 'img/icons/toxic.svg' %}",
+  catalyst: "{% asset 'img/icons/catalyst.svg' %}", mask: "{% asset 'img/icons/mask.svg' %}",
+};
+</script>
+{% asset 'js/alchemy-stage/00-glass.js' as as_00_glass %}{% if '?v=' in as_00_glass %}<script src="{% asset 'js/alchemy-stage/00-glass.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-stage/01-apparatus.js' as as_01_apparatus %}{% if '?v=' in as_01_apparatus %}<script src="{% asset 'js/alchemy-stage/01-apparatus.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-stage/02-liquid.js' as as_02_liquid %}{% if '?v=' in as_02_liquid %}<script src="{% asset 'js/alchemy-stage/02-liquid.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-stage/03-lab.js' as as_03_lab %}{% if '?v=' in as_03_lab %}<script src="{% asset 'js/alchemy-stage/03-lab.js' %}"></script>{% endif %}
+{% asset 'js/alchemy-stage/04-fx.js' as as_04_fx %}{% if '?v=' in as_04_fx %}<script src="{% asset 'js/alchemy-stage/04-fx.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/50-alchemy-shell.js' %}"></script>
+<script src="{% asset 'js/table/51-alchemy-shelf.js' %}"></script>
+{% asset 'js/table/52-alchemy-stage.js' as alchemy_stage_js %}{% if '?v=' in alchemy_stage_js %}<script src="{% asset 'js/table/52-alchemy-stage.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/53-alchemy-card.js' %}"></script>
+{% asset 'js/table/54-alchemy-books.js' as alchemy_books_js %}{% if '?v=' in alchemy_books_js %}<script src="{% asset 'js/table/54-alchemy-books.js' %}"></script>{% endif %}
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>
