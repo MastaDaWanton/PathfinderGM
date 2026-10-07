@@ -34,6 +34,11 @@ class Row:
     name: str
     tier: str
     rank: int
+    # What the row is (`ore`, `reagent`, `herb`) and how much of a full batch a find of
+    # it brings. 1.0 is a trade finding its own material; a craft's side find comes at
+    # less (`rules/gathering.py`, content/rules/gathering.json). Herbs are always 1.0.
+    kind: str = ""
+    batch: float = 1.0
 
     @property
     def span(self) -> int:
@@ -86,10 +91,34 @@ def table_for(biome: str, rank_ceiling: int = 5) -> Table:
         i for i in ing_mod.all_ingredients().values()
         if i.forageable and biome in i.biomes and i.rank <= rank_ceiling
     ]
+    return lay_table(biome, rank_ceiling, [
+        Candidate(i.id, i.name, i.tier, i.rank, WEIGHT.get(i.rank, 1)) for i in found])
+
+
+@dataclass
+class Candidate:
+    """One thing a table could hold, before it is laid on the d100. `weight` is its share
+    before the table is scaled to fit; `kind` and `batch` ride through to the row."""
+    id: str
+    name: str
+    tier: str
+    rank: int
+    weight: float
+    kind: str = ""
+    batch: float = 1.0
+
+
+def lay_table(biome: str, rank_ceiling: int, found: list[Candidate]) -> Table:
+    """Lay candidates on a d100, rarest kept when there are too many, MIN_NOTHING spare.
+
+    The one layout every gathering table uses (herbs here; ore, salts, tannins and
+    essences through `rules/gathering.py`), so a seam and a wood are read off the same
+    arithmetic and cannot drift apart.
+    """
     if not found:
         return Table(biome=biome, rank_ceiling=rank_ceiling, rows=[], nothing_from=1)
 
-    found.sort(key=lambda i: (i.rank, i.name))
+    found = sorted(found, key=lambda c: (c.rank, c.name))
     span = 100 - MIN_NOTHING
 
     # A d100 table has room for `span` rows at one percent each, and a rich biome can
@@ -103,20 +132,37 @@ def table_for(biome: str, rank_ceiling: int = 5) -> Table:
     if len(found) > span:
         found = found[len(found) - span:]
 
-    weights = [WEIGHT.get(i.rank, 1) for i in found]
+    weights = [c.weight for c in found]
     total = sum(weights)
+    # Every candidate gets at least one percent, so a rare herb in a thin biome is
+    # findable rather than rounded out of existence.
+    widths = [max(1, round(span * w / total)) for w in weights]
+    if sum(widths[:-1]) >= span:
+        # Rounding every heavy row up, and lifting every light one to one percent, can ask
+        # for more than the table holds — and the cursor then ran off the end and dropped
+        # the rarest rows, the end the table exists to gate. No herb table drops a row (so
+        # they lay exactly as they always did; one, planar at ceiling 2, overflows by a
+        # single percent that its last row absorbs, as before); measured 2026-10-06, ten
+        # trade tables did drop rows, the smith's mountain seam among them, which lost
+        # both legendary metals. A table that would drop one now reserves the one percent
+        # first and shares the rest by weight, largest remainder first.
+        spare = span - len(found)
+        exact = [spare * w / total for w in weights]
+        widths = [1 + int(x) for x in exact]
+        left = span - sum(widths)
+        for i in sorted(range(len(found)), key=lambda i: exact[i] - int(exact[i]),
+                        reverse=True)[:max(0, left)]:
+            widths[i] += 1
 
     rows: list[Row] = []
     cursor = 1
-    for ing, weight in zip(found, weights):
-        # Every candidate gets at least one percent, so a rare herb in a thin biome is
-        # findable rather than rounded out of existence.
-        width = max(1, round(span * weight / total))
+    for cand, width in zip(found, widths):
         if cursor > span:
             break
         high = min(span, cursor + width - 1)
-        rows.append(Row(low=cursor, high=high, ingredient_id=ing.id, name=ing.name,
-                        tier=ing.tier, rank=ing.rank))
+        rows.append(Row(low=cursor, high=high, ingredient_id=cand.id, name=cand.name,
+                        tier=cand.tier, rank=cand.rank, kind=cand.kind,
+                        batch=cand.batch))
         cursor = high + 1
 
     nothing_from = rows[-1].high + 1 if rows else 1
@@ -197,15 +243,22 @@ BATCH_TOP = {1: 10, 2: 8, 3: 6, 4: 4, 5: 2}
 BATCH_STEP = 2
 
 
-def batch_for(rank: int, band_index: int) -> int:
+def batch_for(rank: int, band_index: int, times: float = 1.0) -> int:
     """How many of a rank-`rank` plant a hour at `band_index` yields, top band being 0.
 
     A negative index is an hour *above* the top band — see `band_index` — and the same
     arithmetic keeps climbing: the clamp that used to sit here was the plateau the table
     asked to have removed.
+
+    `times` is the row's share of a full batch: 1.0 for a trade's own material, less for
+    what it turns up on the side (content/rules/gathering.json). Rounded half up and
+    never below one, for the reason the floor exists at all.
     """
     top = BATCH_TOP.get(int(rank), 2)
-    return max(1, top - BATCH_STEP * int(band_index))
+    full = max(1, top - BATCH_STEP * int(band_index))
+    if float(times) >= 1.0:
+        return full
+    return max(1, int(full * float(times) + 0.5))
 
 
 def dc_for(biome: str) -> int:
@@ -255,25 +308,29 @@ def band_index(margin: int) -> int:
     return len(BANDS)
 
 
-def check_mods(actor, level: int) -> list:
-    """The modifiers on a foraging Survival check, in one place.
+def check_mods(actor, level: int, craft: str = "herbalism",
+               skill: str = "survival") -> list:
+    """The modifiers on a gathering check, in one place.
 
     Built here rather than inline in `forage_hour` because the dice popup shows the
     player a breakdown *before* the roll, and the engine applies the modifiers *after* —
-    two call sites that must never disagree about what the herbalism level is worth.
+    two call sites that must never disagree about what the craft's level is worth.
+    `craft` is the label the level shows under: herbalism on a forage, the trade's own
+    name on every other excursion (`rules/gathering.py`).
     """
     mods = []
     if actor is not None:
-        mods = list(actor.skill_modifiers("survival"))
+        mods = list(actor.skill_modifiers(skill))
         if int(level) > 0:
             from .dice import Modifier
 
-            mods.append(Modifier(int(level), "herbalism"))
+            mods.append(Modifier(int(level), craft))
     return mods
 
 
 def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
-                face: int | None = None) -> dict:
+                face: int | None = None, *, table_of=None, mods: list | None = None,
+                label: str = "Foraging", dc: int | None = None) -> dict:
     """One hour of looking, as one Survival check and what it turned up.
 
     The check is the character's own Survival, and the world class adds to it on top —
@@ -283,15 +340,24 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
     `face` is a d20 the player already rolled on the popup; the engine still owns the
     modifiers and the total. When it is None the engine rolls, which is what every hour
     after the first does — one session is one popup, not one per hour of an 18-hour day.
-    """
-    table = table_for(biome, rank_ceiling)
-    dc = dc_for(biome)
 
-    mods = check_mods(actor, level)
+    `table_of(ceiling)` is the table the hour is read off: herbs when it is None; a
+    trade's ore, salts or essences when another craft goes out (`rules/gathering.py`).
+    `mods` are that trade's check modifiers (`check_mods`), `label` the roll's name, and
+    `dc` how hard this ground is for what that trade seeks (`gathering.dc_for`; the herb
+    DC when None). Nothing else differs between a forage and a prospect: the same check,
+    the same bands, the same batches.
+    """
+    table_of = table_of or (lambda ceiling: table_for(biome, ceiling))
+    table = table_of(rank_ceiling)
+    dc = dc_for(biome) if dc is None else int(dc)
+
+    if mods is None:
+        mods = check_mods(actor, level)
     if face is not None:
-        roll = dice.given(face, mods, label=f"Foraging ({table.biome})")
+        roll = dice.given(face, mods, label=f"{label} ({table.biome})")
     else:
-        roll = dice.d20(mods, label=f"Foraging ({table.biome})", visibility="player")
+        roll = dice.d20(mods, label=f"{label} ({table.biome})", visibility="player")
     margin = roll.total - dc
     label, finds, lift, pristine = band_for(margin)
 
@@ -300,7 +366,7 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
     hour_ceiling = min(rank_ceiling, rank_ceiling + lift) if lift else rank_ceiling
     if lift:
         hour_ceiling = min(len(WEIGHT), rank_ceiling + lift)
-        table = table_for(biome, hour_ceiling)
+        table = table_of(hour_ceiling)
 
     # `finds` is how many *kinds* the hour turns up, and each of them comes as a patch.
     # A distinct species per find, because eight rolls that all landed on Woundwart is one
@@ -314,7 +380,7 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
     tries = 0
     while len(picks) < finds and tries < finds * 8:
         tries += 1
-        pick = dice.roll("1d100", label=f"Foraging ({table.biome})", visibility="hidden")
+        pick = dice.roll("1d100", label=f"{label} ({table.biome})", visibility="hidden")
         row = table.lookup(pick.total)
         if row is None:
             picks.append({"roll": pick.total, "found": None, "id": None, "count": 0})
@@ -322,9 +388,10 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
         if row.ingredient_id in seen:
             continue
         seen.add(row.ingredient_id)
-        count = batch_for(row.rank, index)
+        count = batch_for(row.rank, index, row.batch)
         picks.append({"roll": pick.total, "found": row.name,
-                      "id": row.ingredient_id, "count": count, "rank": row.rank})
+                      "id": row.ingredient_id, "count": count, "rank": row.rank,
+                      "kind": row.kind})
         found[row.ingredient_id] = found.get(row.ingredient_id, 0) + count
 
     # A botched hour still names what was destroyed. Nothing is carried, but the player is
@@ -345,7 +412,9 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
 
 
 def forage(biome: str, level: int, rank_ceiling: int, dice, hours: int = 1,
-           actor=None, first_face: int | None = None) -> dict:
+           actor=None, first_face: int | None = None, *, table_of=None,
+           mods: list | None = None, label: str = "Foraging",
+           dc: int | None = None) -> dict:
     """A foraging session of however many hours the player asked for.
 
     Hour by hour rather than one roll for the stretch. Each hour is its own check, so a
@@ -362,7 +431,8 @@ def forage(biome: str, level: int, rank_ceiling: int, dice, hours: int = 1,
 
     for n in range(hours):
         hour = forage_hour(biome, level, rank_ceiling, dice, actor=actor,
-                           face=first_face if n == 0 else None)
+                           face=first_face if n == 0 else None, table_of=table_of,
+                           mods=mods, label=label, dc=dc)
         each.append(hour)
         for iid, n in hour["found"].items():
             found[iid] = found.get(iid, 0) + n

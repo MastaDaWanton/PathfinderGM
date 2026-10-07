@@ -453,8 +453,13 @@ every item that carries it.
 | `color` | `#rrggbb`, the glow on the binding stage | required |
 
 A world's essence harvested from its own creature names the creature in `from_creature`,
-in the world's words, and the harvest tag reader is the leatherworker's (`harvest.essence.*`,
-not yet built).
+in the world's words, or — better, and read first — the creature carries the tag
+`harvest.essence.<material-id>` in its own `tags`. The reader is built (2026-10-06,
+`rules/gathering.py` `harvest_tagged`, every carcass excursion): one grammar for every craft,
+`harvest.<branch>.<material-id>` with branches `hide`, `horn`, `bone`, `sinew`, `scales`
+(leatherworking), `blood` (the forge), `reagent` (alchemy), `essence` (enchanting) and `part`
+(herbalism). A tag naming no material on that craft's shelf is ignored, never invented into
+one; a creature with no harvest tags is matched by `from_creature(s)` as before.
 
 What a world never sends for enchanting: **a sky.** The favourable time is the essence
 family's phase of the day (owner, round 4 point 10: "this is not earth", named planets

@@ -26,6 +26,9 @@ def client(tmp_path, monkeypatch):
     # The model is deliberately absent: the excursion's contract is that narration is
     # decoration, and a model being down costs colour, never the herbs.
     monkeypatch.setattr(craft_views, "_narrate", lambda *a, **k: None)
+    # The closing is the table's own narrator since the gathering door was shared
+    # (`GMAgent.narrate_outcome`); absent here for the same reason.
+    monkeypatch.setattr(craft_views, "_narrate_outcome", lambda *a, **k: "")
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))

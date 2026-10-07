@@ -423,7 +423,9 @@ def test_the_foraging_survival_die_lands_and_can_be_closed():
     root = Path(__file__).resolve().parents[1]
     table = table_source()
 
-    at = table.index('post("/api/craftaction", { action: "forage"')
+    # Every open-ground excursion posts here since the gathering door was shared
+    # (2026-10-06); the forage is one key among them.
+    at = table.index('post("/api/craftaction", { action: gather.dataset.gather')
     block = table[at:table.index("render(await", at)]
 
     assert "hold: true" in block, "the forage mat still shuts on the throw"
