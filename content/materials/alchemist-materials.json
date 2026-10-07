@@ -80,6 +80,7 @@
     },
     {
       "id": "saltpetre",
+      "price_gp": 1,
       "name": "Saltpetre",
       "kind": "reagent",
       "tier": "common",
@@ -648,6 +649,7 @@
     },
     {
       "id": "pine-pitch",
+      "price_gp": 1,
       "name": "Pine Pitch",
       "kind": "reagent",
       "tier": "common",
@@ -2021,6 +2023,7 @@
     },
     {
       "id": "fire-beetle-gland",
+      "price_gp": 1,
       "name": "Fire Beetle Gland",
       "kind": "gland",
       "tier": "common",
@@ -2458,7 +2461,7 @@
       ],
       "effects_converted": true,
       "obtain": "bought",
-      "price_gp": 40,
+      "price_gp": 5,
       "market": "apothecary",
       "product": [
         {
@@ -3029,7 +3032,7 @@
       "effects": [],
       "effects_converted": true,
       "obtain": "bought",
-      "price_gp": 25,
+      "price_gp": 5,
       "market": "apothecary",
       "part": "liquid",
       "solvent": "alcohol",

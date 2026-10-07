@@ -776,11 +776,17 @@ def potion_goods() -> list[Good]:
 
     A harmful spell's row is left off the counter: bought, it is a potion, and a potion's
     target is its drinker (owner, open point 5) — a shop selling "potion of touch of
-    fatigue" to drink is selling poison as medicine. Its thrown-flask form is the bench's."""
+    fatigue" to drink is selling poison as medicine. Its thrown-flask form is the bench's.
+
+    Only the authored potions — the 44 classics (cure wounds, invisibility, fly…) — are
+    sold. Owner, 2026-10-07: shops sell "the 44 classic potions"; with every derived row
+    the counter offered 109 potions, oddities like "Rejuvenate Eidolon, Lesser" among
+    them. Derived formulae are the bench's, from writings and experiment."""
     from . import formulae
 
     return [_alchemy_good(r, staple=False) for fid, r in sorted(formulae.all().items())
-            if r.get("kind") == "spell" and r.get("brewable", True) and not r.get("harmful")]
+            if r.get("kind") == "spell" and r.get("authored") and r.get("brewable", True)
+            and not r.get("harmful")]
 
 
 def catalogue_ids() -> set[str]:

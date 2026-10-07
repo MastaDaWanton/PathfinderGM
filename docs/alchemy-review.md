@@ -129,7 +129,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Rennet | catalyst | 5 gp | (apparatus) | catalyst, solid, light_sensitive | - |
 | Camphor | essence | 5 gp | +1 Fortitude against disease and inhaled poison for 1 hour (inhale) [purity]<br>Resist fire 2 for 1 hour (skin) [frost] | solid, volatile | mishap: 1d3 fire damage, on whoever has it |
 | Cellar Spider | gland | unpriced | +2 Climb for 10 minutes (ingest) [lightness]<br>**Causes sickened for 1 round (ingest) [decay]** | solid | - |
-| Fire Beetle Gland | gland | unpriced | Normal light 10 ft for 1d6 days (external) [light] *book*<br>**Causes sickened for 1 round (ingest) [decay]** | solid | - |
+| Fire Beetle Gland | gland | 1 gp | Normal light 10 ft for 1d6 days (external) [light] *book*<br>**Causes sickened for 1 round (ingest) [decay]** | solid | - |
 | Skunk Musk Gland | gland | unpriced | Fortitude DC 13 · fail: Causes sickened for 1d4 rounds (area) [decay]<br>**Causes sickened for 1 round (inhale) [decay]** | liquid | - |
 | Bear Hairs | reagent | unpriced | +2 Constitution for 10 minutes (ingest) [might]<br>1d4 temporary hit points for 10 minutes (ingest) [vigour]<br>**-1 Dexterity for 10 minutes (ingest) [grace]** | solid, combustible | - |
 | Birch Tar | reagent | unpriced | +2 Fortitude against disease carried by a wound for 1 hour (skin) [purity] | liquid, combustible | - |
@@ -148,10 +148,10 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Licorice Root | reagent | unpriced | +5 ft land speed for 10 minutes (ingest) [grace]<br>+1 Acrobatics a lighter step for 10 minutes (ingest) [lightness]<br>**-1 Wisdom for 10 minutes (ingest) [mind]** | solid, combustible | - |
 | Mistletoe Sprig | reagent | unpriced | Leave no trail. for 10 minutes (ingest) [shadow]<br>+1 Acrobatics owing the earth no footprint for 10 minutes (ingest) [lightness]<br>**Causes sickened for 1 round (ingest) [decay]** | solid | - |
 | Owl Feathers | reagent | unpriced | +2 Wisdom for 10 minutes (ingest) [mind]<br>+1 Perception for 10 minutes (ingest) [sight]<br>**-1 Dexterity for 10 minutes (ingest) [grace]** | solid, combustible | - |
-| Pine Pitch | reagent | unpriced | Causes entangled for 2d4 rounds (struck) [binding] | solid, combustible | - |
+| Pine Pitch | reagent | 1 gp | Causes entangled for 2d4 rounds (struck) [binding] | solid, combustible | - |
 | Powdered Chalk | reagent | unpriced | +2 Climb chalked hands for 1 hour (skin) [lightness] | solid, stabilizer, slow_to_dissolve | - |
 | River Reed | reagent | unpriced | Breathe water freely. for 1 minute (ingest) [change] | solid, combustible | - |
-| Saltpetre | reagent | unpriced | 1d4 sonic damage (struck) [thunder]<br>+1 Fortitude against disease for 1 hour (ingest) [purity] | solid, volatile | mishap: 1d4 fire damage, on whoever has it |
+| Saltpetre | reagent | 1 gp | 1d4 sonic damage (struck) [thunder]<br>+1 Fortitude against disease for 1 hour (ingest) [purity] | solid, volatile | mishap: 1d4 fire damage, on whoever has it |
 | Standing Oak Bark | reagent | unpriced | +1 Armour class for 10 minutes (ingest) [ward]<br>+1 Disguise skin gone rough as bark for 10 minutes (ingest) [change]<br>**-1 Dexterity for 10 minutes (ingest) [grace]** | solid, combustible | - |
 | Talc | reagent | unpriced | +2 Perception for 10 minutes (ingest) [sight]<br>+2 Escape Artist small and slippery as the flour itself for 10 minutes (skin) [grace]<br>+1 Disguise a dusted, pale face for 10 minutes (skin) [change]<br>**Causes sickened for 1 round (inhale) [decay]** | solid | - |
 | Willow Charcoal | reagent | 5 gp | +1 Fortitude against ingested poison for 1 hour (ingest) [purity] | solid, combustible | - |
@@ -198,7 +198,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Cinnabar | reagent | unpriced | +2 Disguise vermilion paint for 1 hour (skin) [change]<br>**1 Constitution damage (ingest) [decay]** | solid, toxic_to_handle | toxic: Fortitude DC 13 · fail: 1 Constitution damage, on whoever has it |
 | Dragon's-Blood Resin | reagent | 20 gp | +2 Disguise for 1 hour (skin) [change] | solid, combustible | - |
 | Itchweed Floss | reagent | unpriced | Fortitude DC 12 · fail: Causes sickened for 10 minutes (struck) [decay] *book*<br>**-1 Attack rolls handling the floss for 10 minutes (skin) [might]** | solid | - |
-| Phosphorus | reagent | 40 gp | 1d4 fire damage (struck) [fire]<br>One step brighter out to 5 ft for 1 hour (external) [light] | solid, volatile, combustible, toxic_to_handle | mishap: 1d6 fire damage, on whoever has it<br>toxic: Fortitude DC 13 · fail: 1 Constitution damage, on whoever has it |
+| Phosphorus | reagent | 5 gp | 1d4 fire damage (struck) [fire]<br>One step brighter out to 5 ft for 1 hour (external) [light] | solid, volatile, combustible, toxic_to_handle | mishap: 1d6 fire damage, on whoever has it<br>toxic: Fortitude DC 13 · fail: 1 Constitution damage, on whoever has it |
 | Powdered Silver | reagent | 30 gp | +1 Armour class it refuses the profane for 10 minutes (ingest) [ward]<br>+1 Perception for 10 minutes (ingest) [sight]<br>Strikes as silver for 1 minute (external) [purity]<br>One step brighter out to 5 ft for 1 hour (external) [light] | solid, slow_to_dissolve | - |
 | Quicksilver | reagent | 25 gp | +5 ft land speed for 10 minutes (ingest) [grace]<br>**1 Constitution damage (ingest) [decay]** | liquid, toxic_to_handle | toxic: Fortitude DC 14 · fail: 1 Constitution damage, on whoever has it |
 | Realgar | reagent | unpriced | Fortitude DC 13 · fail: 1d2 Constitution damage (area) [decay] | solid, toxic_to_handle | toxic: Fortitude DC 12 · fail: 1 Constitution damage, on whoever has it |
@@ -212,7 +212,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Font Water | solvent | 25 gp | Heals 1d4 hit points (ingest) [vigour]<br>+1 Will against fear for 10 minutes (ingest) [mind]<br>**1 positive damage (ingest) [light]** | liquid, solvent:water | - |
 | Naphtha | solvent | unpriced | 1d6 fire damage (struck) [fire] | liquid, solvent:oil, volatile, combustible | mishap: 1d6 fire damage, on whoever has it |
 | Oil of Vitriol | solvent | 30 gp | 1d6 acid damage (struck) [acid] | liquid, solvent:acid, corrosive | - |
-| Rectified Spirits | solvent | 25 gp | (apparatus) | liquid, solvent:alcohol, volatile | mishap: 1d4 fire damage, on whoever has it |
+| Rectified Spirits | solvent | 5 gp | (apparatus) | liquid, solvent:alcohol, volatile | mishap: 1d4 fire damage, on whoever has it |
 | Holy Parchment | treatment | 20 gp | +1 Armour class for 10 minutes (ingest) [ward] | solid, combustible | - |
 | Quick-Match Cord | treatment | 15 gp | 1d4 fire damage (struck) [fire] | solid, volatile, combustible | mishap: 1d4 fire damage, on whoever has it |
 | Brass Casing | vessel | 30 gp | (apparatus) | struck, fireproof, solid | - |
@@ -353,55 +353,55 @@ The book: raw materials cost a third of an alchemical item's price (Craft) and h
 |---|---|---|---|---|---|---|
 | Alchemist's fire | 20 gp | 6.67 gp | 1 gp | within | brimstone, naphtha | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
 | Acid flask | 10 gp | 3.33 gp | 55 gp | **over** | - | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
-| Tanglefoot bag | 50 gp | 16.67 gp | 3 gp | within | pine-pitch, giant-frog-mucus | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
-| Thunderstone | 30 gp | 10 gp | 31 gp | **over** | storm-quartz, saltpetre | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
-| Smokestick | 20 gp | 6.67 gp | 2 gp | within | smoke-resin, saltpetre | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalTools |
-| Tindertwig | 1 gp | 0.33 gp | 42 gp | **over** | brimstone | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalTools |
-| Sunrod | 2 gp | 0.67 gp | 41 gp | **over** | fire-beetle-gland | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalTools |
+| Tanglefoot bag | 50 gp | 16.67 gp | 4 gp | within | giant-frog-mucus | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
+| Thunderstone | 30 gp | 10 gp | 32 gp | **over** | storm-quartz | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
+| Smokestick | 20 gp | 6.67 gp | 3 gp | within | smoke-resin | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalTools |
+| Tindertwig | 1 gp | 0.33 gp | 7 gp | **over** | brimstone | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalTools |
+| Sunrod | 2 gp | 0.67 gp | 7 gp | **over** | - | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalTools |
 | Antitoxin | 50 gp | 16.67 gp | 6 gp | within | adder-venom-gland, bitter-aloes | https://aonprd.com/EquipmentMisc.aspx?Category=AlchemicalRemedies |
 | Antiplague | 50 gp | 16.67 gp | 66 gp | **over** | - | https://aonprd.com/EquipmentMisc.aspx?Category=AlchemicalRemedies |
 | Alchemical grease | 5 gp | 1.67 gp | 3 gp | **over** | slick-jelly | https://aonprd.com/EquipmentMisc.aspx?Category=AlchemicalRemedies |
 | Itching powder | 60 gp | 20 gp | 0 gp | within | itchweed-floss | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
 | Alkali flask | 15 gp | 5 gp | 2 gp | within | - | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
 | Liquid ice | 40 gp | 13.33 gp | 1 gp | within | everfrost-salt | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
-| Flash powder | 50 gp | 16.67 gp | 42 gp | **over** | saltpetre | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
+| Flash powder | 50 gp | 16.67 gp | 8 gp | within | - | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
 | Smelling salts | 25 gp | 8.33 gp | 35 gp | **over** | - | https://aonprd.com/EquipmentMisc.aspx?Category=AlchemicalRemedies |
 | Vermin repellent | 5 gp | 1.67 gp | 6 gp | **over** | skunk-musk-gland | https://aonprd.com/EquipmentMisc.aspx?Category=AlchemicalRemedies |
 | Bladeguard | 40 gp | 13.33 gp | 18 gp | **over** | - | https://aonprd.com/EquipmentMisc.aspx?Category=AlchemicalRemedies |
-| Holy weapon balm | 30 gp | 10 gp | 475 gp | **over** | - | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
-| Potion of Enlarge Person | 50 gp | 25 gp | 27 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Reduce Person | 50 gp | 25 gp | 26 gp | **over** | talc | CRB potions: 50 × SL 1 × CL 1 |
+| Holy weapon balm | 30 gp | 10 gp | 455 gp | **over** | - | https://www.aonprd.com/EquipmentMisc.aspx?Category=AlchemicalWeapons |
+| Potion of Enlarge Person | 50 gp | 25 gp | 7 gp | within | - | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Reduce Person | 50 gp | 25 gp | 6 gp | within | talc | CRB potions: 50 × SL 1 × CL 1 |
 | Potion of Cure Light Wounds | 50 gp | 25 gp | 28 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Mage Armor | 50 gp | 25 gp | 27 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Mage Armor | 50 gp | 25 gp | 7 gp | within | - | CRB potions: 50 × SL 1 × CL 1 |
 | Potion of Shield of Faith | 50 gp | 25 gp | 46 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
 | Potion of Protection from Evil | 50 gp | 25 gp | 56 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
 | Potion of Remove Fear | 50 gp | 25 gp | 31 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Jump | 50 gp | 25 gp | 26 gp | **over** | grasshopper-legs | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Longstrider | 50 gp | 25 gp | 31 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Expeditious Retreat | 50 gp | 25 gp | 26 gp | **over** | licorice-root | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Endure Elements | 50 gp | 25 gp | 32 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Comprehend Languages | 50 gp | 25 gp | 28 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Potion of Pass without Trace | 50 gp | 25 gp | 26 gp | **over** | mistletoe-sprig | CRB potions: 50 × SL 1 × CL 1 |
-| Oil of Magic Weapon | 50 gp | 25 gp | 32 gp | **over** | - | CRB potions: 50 × SL 1 × CL 1 |
-| Oil of Magic Fang | 50 gp | 25 gp | 26 gp | **over** | cat-fur | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Jump | 50 gp | 25 gp | 6 gp | within | grasshopper-legs | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Longstrider | 50 gp | 25 gp | 11 gp | within | - | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Expeditious Retreat | 50 gp | 25 gp | 6 gp | within | licorice-root | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Endure Elements | 50 gp | 25 gp | 12 gp | within | - | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Comprehend Languages | 50 gp | 25 gp | 8 gp | within | - | CRB potions: 50 × SL 1 × CL 1 |
+| Potion of Pass without Trace | 50 gp | 25 gp | 6 gp | within | mistletoe-sprig | CRB potions: 50 × SL 1 × CL 1 |
+| Oil of Magic Weapon | 50 gp | 25 gp | 12 gp | within | - | CRB potions: 50 × SL 1 × CL 1 |
+| Oil of Magic Fang | 50 gp | 25 gp | 6 gp | within | cat-fur | CRB potions: 50 × SL 1 × CL 1 |
 | Potion of Cure Moderate Wounds | 300 gp | 150 gp | 26 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Bull's Strength | 300 gp | 150 gp | 26 gp | within | bull-hairs | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Cat's Grace | 300 gp | 150 gp | 26 gp | within | cat-fur | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Bear's Endurance | 300 gp | 150 gp | 26 gp | within | bear-hairs | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Eagle's Splendor | 300 gp | 150 gp | 26 gp | within | eagle-feathers | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Fox's Cunning | 300 gp | 150 gp | 26 gp | within | fox-hairs | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Owl's Wisdom | 300 gp | 150 gp | 26 gp | within | owl-feathers | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Barkskin | 300 gp | 150 gp | 26 gp | within | standing-oak-bark | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Invisibility | 300 gp | 150 gp | 28 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Blur | 300 gp | 150 gp | 28 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Resist Energy (Fire) | 300 gp | 150 gp | 26 gp | within | salamander-ash | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Darkvision | 300 gp | 150 gp | 26 gp | within | agate-chip | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Bull's Strength | 300 gp | 150 gp | 6 gp | within | bull-hairs | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Cat's Grace | 300 gp | 150 gp | 6 gp | within | cat-fur | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Bear's Endurance | 300 gp | 150 gp | 6 gp | within | bear-hairs | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Eagle's Splendor | 300 gp | 150 gp | 6 gp | within | eagle-feathers | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Fox's Cunning | 300 gp | 150 gp | 6 gp | within | fox-hairs | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Owl's Wisdom | 300 gp | 150 gp | 6 gp | within | owl-feathers | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Barkskin | 300 gp | 150 gp | 6 gp | within | standing-oak-bark | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Invisibility | 300 gp | 150 gp | 8 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Blur | 300 gp | 150 gp | 8 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Resist Energy (Fire) | 300 gp | 150 gp | 6 gp | within | salamander-ash | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Darkvision | 300 gp | 150 gp | 6 gp | within | agate-chip | CRB potions: 50 × SL 2 × CL 3 |
 | Potion of Delay Poison | 300 gp | 150 gp | 26 gp | within | bitter-aloes | CRB potions: 50 × SL 2 × CL 3 |
 | Potion of Lesser Restoration | 300 gp | 150 gp | 26 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Spider Climb | 300 gp | 150 gp | 26 gp | within | pine-pitch, cellar-spider | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of See Invisibility | 300 gp | 150 gp | 56 gp | within | talc | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of Spider Climb | 300 gp | 150 gp | 7 gp | within | cellar-spider | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of See Invisibility | 300 gp | 150 gp | 36 gp | within | talc | CRB potions: 50 × SL 2 × CL 3 |
 | Potion of Aid | 300 gp | 150 gp | 26 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of False Life | 300 gp | 150 gp | 26 gp | within | ghost-salt | CRB potions: 50 × SL 2 × CL 3 |
+| Potion of False Life | 300 gp | 150 gp | 6 gp | within | ghost-salt | CRB potions: 50 × SL 2 × CL 3 |
 | Potion of Remove Paralysis | 300 gp | 150 gp | 46 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
 | Oil of Align Weapon (Good) | 300 gp | 150 gp | 56 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
 | Potion of Cure Serious Wounds | 750 gp | 375 gp | 1,500 gp | **over** | - | CRB potions: 50 × SL 3 × CL 5 |
@@ -418,14 +418,12 @@ The book: raw materials cost a third of an alchemical item's price (Craft) and h
 
 Every pair the rule allows (plan §9): the same kind, exactly one band rarer, sharing at least one essence. Worth is `pricing.worth`, what the game prices the material at (an authored price, else the tier ladder times the inert factor for a raw material). The input is two units; with philosopher's mercury, one. Flagged: output worth more than 3× the two units.
 
-301 pairs are possible; **34** are flagged.
+301 pairs are possible; **36** are flagged.
 
 | From (×2) | To | Kind | Shared essence | Worth in | Worth out | ×2 ratio | ×1 ratio (mercury) |
 |---|---|---|---|---|---|---|---|
 | Salamander Ash (rare) | Phlogiston (exotic) | reagent | fire | 10 gp | 1,200 gp | 120.0 | 240.0 |
 | Everfrost Salt (rare) | Void Salt (exotic) | salt | frost, ward | 10 gp | 900 gp | 90.0 | 180.0 |
-| Brimstone (common) | Phosphorus (uncommon) | reagent | fire | 0.76 gp | 40 gp | 52.6 | 105.3 |
-| Saltpetre (common) | Powdered Silver (uncommon) | reagent | purity | 0.76 gp | 30 gp | 39.5 | 78.9 |
 | Birch Tar (common) | Powdered Silver (uncommon) | reagent | purity | 0.76 gp | 30 gp | 39.5 | 78.9 |
 | Talc (common) | Powdered Silver (uncommon) | reagent | sight | 0.76 gp | 30 gp | 39.5 | 78.9 |
 | Standing Oak Bark (common) | Powdered Silver (uncommon) | reagent | ward | 0.76 gp | 30 gp | 39.5 | 78.9 |
@@ -437,9 +435,13 @@ Every pair the rule allows (plan §9): the same kind, exactly one band rarer, sh
 | Talc (common) | Dragon's-Blood Resin (uncommon) | reagent | change | 0.76 gp | 20 gp | 26.3 | 52.6 |
 | Standing Oak Bark (common) | Dragon's-Blood Resin (uncommon) | reagent | change | 0.76 gp | 20 gp | 26.3 | 52.6 |
 | River Reed (common) | Dragon's-Blood Resin (uncommon) | reagent | change | 0.76 gp | 20 gp | 26.3 | 52.6 |
+| Phosphorus (uncommon) | Sunmetal Filings (rare) | reagent | light | 10 gp | 250 gp | 25.0 | 50.0 |
+| Phosphorus (uncommon) | Pyre Gel (rare) | reagent | fire | 10 gp | 200 gp | 20.0 | 40.0 |
 | Green Vitriol (common) | Verdigris (uncommon) | reagent | acid | 0.76 gp | 15 gp | 19.7 | 39.5 |
 | Lye Water (common) | Aqua Fortis (uncommon) | solvent | acid | 2 gp | 35 gp | 17.5 | 35.0 |
+| Saltpetre (common) | Powdered Silver (uncommon) | reagent | purity | 2 gp | 30 gp | 15.0 | 30.0 |
 | Lye Water (common) | Oil of Vitriol (uncommon) | solvent | acid | 2 gp | 30 gp | 15.0 | 30.0 |
+| Phosphorus (uncommon) | White Phosphorus (rare) | reagent | fire | 10 gp | 150 gp | 15.0 | 30.0 |
 | Natron (common) | Sal Volatile (uncommon) | salt | purity | 2 gp | 20 gp | 10.0 | 20.0 |
 | Rock Salt (common) | Sal Volatile (uncommon) | salt | purity | 2 gp | 20 gp | 10.0 | 20.0 |
 | Iron Filings (common) | Dragon's-Blood Resin (uncommon) | reagent | change | 2 gp | 20 gp | 10.0 | 20.0 |
@@ -448,6 +450,7 @@ Every pair the rule allows (plan §9): the same kind, exactly one band rarer, sh
 | Oil of Vitriol (uncommon) | Alkahest (rare) | solvent | acid | 60 gp | 500 gp | 8.3 | 16.7 |
 | Cork and Wick (common) | Quick-Match Cord (uncommon) | treatment | fire | 2 gp | 15 gp | 7.5 | 15.0 |
 | Aqua Fortis (uncommon) | Alkahest (rare) | solvent | acid | 70 gp | 500 gp | 7.1 | 14.3 |
+| Brimstone (common) | Phosphorus (uncommon) | reagent | fire | 0.76 gp | 5 gp | 6.6 | 13.2 |
 | Strong Spirits (common) | Font Water (uncommon) | solvent | mind | 4 gp | 25 gp | 6.2 | 12.5 |
 | Alum (common) | Sal Volatile (uncommon) | salt | purity | 4 gp | 20 gp | 5.0 | 10.0 |
 | Oil of Vitriol (uncommon) | Aqua Regia (rare) | solvent | acid | 60 gp | 300 gp | 5.0 | 10.0 |
@@ -455,7 +458,6 @@ Every pair the rule allows (plan §9): the same kind, exactly one band rarer, sh
 | Aqua Fortis (uncommon) | Aqua Regia (rare) | solvent | acid | 70 gp | 300 gp | 4.3 | 8.6 |
 | Powdered Silver (uncommon) | Sunmetal Filings (rare) | reagent | light | 60 gp | 250 gp | 4.2 | 8.3 |
 | White Phosphorus (rare) | Phlogiston (exotic) | reagent | fire | 300 gp | 1,200 gp | 4.0 | 8.0 |
-| Phosphorus (uncommon) | Sunmetal Filings (rare) | reagent | light | 80 gp | 250 gp | 3.1 | 6.2 |
 
 ## Open rows for you
 

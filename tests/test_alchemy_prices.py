@@ -330,3 +330,28 @@ def test_buying_a_classic_and_a_manual_at_a_town_alchemist(worlds):
     fire = next(st for st in pc.stock.values() if st.base == "Alchemist's fire")
     assert fire.specs == _row("alchemists-fire")["core"] and fire.how == ["throw"]
     assert knowledge.holds_manual(pc, book)
+
+
+def test_a_shop_sells_the_44_classic_potions_only():
+    """Owner, 2026-10-07: alchemists sell "the 44 classic potions". With every derived
+    row the counter offered 109, oddities like "Rejuvenate Eidolon, Lesser" among them."""
+    from rules import formulae, goods
+
+    sold = goods.potion_goods()
+    assert len(sold) == 44
+    assert all(formulae.get(g.id.split(":")[-1]) is None
+               or formulae.get(g.id.split(":")[-1]).get("authored") for g in sold)
+
+
+def test_the_cheap_reagents_carry_the_books_prices():
+    """Owner, 2026-10-07, "to the book's prices": phosphorus 40 gp put flash powder and
+    protection from evil over the book's making cost, and saltpetre, pine pitch and fire
+    beetle gland had no price at all, so thunderstone and 22 other thunder recipes were
+    unbuyable. Phosphorus 5, saltpetre 1, pine pitch 1, fire beetle gland 1, rectified
+    spirits 5."""
+    from rules import materials
+
+    want = {"phosphorus": 5, "saltpetre": 1, "pine-pitch": 1, "fire-beetle-gland": 1,
+            "rectified-spirits": 5}
+    for mid, gp in want.items():
+        assert materials.alchemy_doc(mid)["price_gp"] == gp, mid
