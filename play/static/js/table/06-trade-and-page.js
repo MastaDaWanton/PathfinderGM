@@ -193,6 +193,8 @@ async function openTrade(want, line) {
     TRADE = await post("/api/trade", body);
   } catch (e) {
     $("#trademsg").textContent = e.message;
+    // A shut counter has nobody to haggle with (seen live: the button stood ready).
+    $("#tradehaggle").disabled = true;
     return;
   }
   // Put in once, not once per mention: a second "I buy rope" opens on the same basket.
@@ -377,8 +379,54 @@ function drawTrade() {
   drawLines();
   $("#tradepurse").textContent = TRADE.purse;
   $("#tradetill").textContent = `${TRADE.till.text} in the till`;
+  drawHaggle();
   tradeRedraw();
 }
+
+// The haggle (rules/tradecraft.py, the engine's `haggle` op): once a counter a day, and
+// what it won is said on the button, so a moved price is a price the player can see moved.
+function drawHaggle() {
+  const b = $("#tradehaggle");
+  if (!b) return;
+  const got = Number(TRADE.haggled || 0);
+  b.disabled = !TRADE.can_haggle;
+  b.textContent = got ? `Haggled: ${got}% your way` : TRADE.can_haggle ? "Haggle" : "Haggled today";
+  b.title = TRADE.can_haggle
+    ? "Your Profession against the keeper's Sense Motive: beat it and today's prices here move 2% your way, and 1% more for every point you beat it by, up to 25%."
+    : "Once a counter a day.";
+}
+
+// Waiting on the die the haggle asked for: the answer to that roll redraws the counter.
+let HAGGLE_LINE = null;
+$("#tradehaggle").addEventListener("click", async () => {
+  if (!TRADE || !TRADE.can_haggle) return;
+  const b = $("#tradehaggle");
+  b.disabled = true;
+  const line = TRADE.line || "";
+  try {
+    const d = await post("/api/tradeskill", line ? { use: "haggle", line } : { use: "haggle" });
+    if (d.awaiting) HAGGLE_LINE = line;
+    render(d);
+    if (!d.awaiting) {
+      $("#trademsg").textContent = d.trade_tell || "";
+      TRADE = await post("/api/trade", line ? { line } : {});
+      drawTrade();
+    }
+  } catch (err) {
+    $("#trademsg").textContent = err.message;
+    b.disabled = false;
+  }
+});
+document.addEventListener("table:posted", e => {
+  if (HAGGLE_LINE === null || !e.detail || e.detail.awaiting) return;
+  // The roll's own answer, not the face it posts first (`/api/roll/face`, which answers
+  // before the turn is told and found the table busy when this listened to both).
+  if (!/\/api\/roll$/.test(String(e.detail.url || ""))) return;
+  const line = HAGGLE_LINE;
+  HAGGLE_LINE = null;
+  // After the roll's answer is drawn: the counter again, at the prices the haggle set.
+  setTimeout(() => { if ($("#tradepanel").classList.contains("on")) openTrade(undefined, line); }, 0);
+});
 
 // Everything the basket touches, redrawn together, with the keyboard's place kept: a
 // press of + on a stepper redraws the line it is on, and the focus has to still be on

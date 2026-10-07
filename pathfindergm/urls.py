@@ -33,7 +33,7 @@ from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
-                  works_views, enchant_views, alchemy_views)
+                  works_views, enchant_views, alchemy_views, tradecraft_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -93,6 +93,9 @@ urlpatterns = [
     path("api/character/gender", views.set_gender, name="set_gender"),
     path("api/trade", views.trade, name="trade"),
     path("api/trade/do", views.trade_do, name="trade_do"),
+    # The trade uses by button (rules/tradecraft.py; options B and C, 2026-10-07).
+    path("api/tradeskill", tradecraft_views.tradeskill_act, name="tradeskill_act"),
+    path("api/tradeskill/offer", tradecraft_views.tradeskill_offer, name="tradeskill_offer"),
     path("craft/", craft_views.craft_page, name="craft"),
     path("api/world/<str:world_id>", home_views.world_detail, name="world_detail"),
     # The forge bench (docs/blacksmithing-contracts.md §7). Every fixed name sits above the

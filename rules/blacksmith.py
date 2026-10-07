@@ -669,10 +669,15 @@ def check_terms(actor, level: int) -> list[dict]:
     track_level = max(0, int(level or 0))
     char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
     intel = int(actor.ability_mod("int")) if actor is not None else 0
+    from . import tradecraft
+
     return [
         {"label": f"Blacksmith {track_level}", "value": track_level},
         {"label": f"half character level ({char_level})", "value": char_level // 2},
         {"label": "Intelligence", "value": intel},
+        # Half the Craft ranks: smithing is Craft (weapons) or Craft (armour), and this
+        # game keeps one Craft (option A, 2026-10-07; `tradecraft.bench_terms`).
+        *tradecraft.bench_terms(actor, "blacksmith"),
     ]
 
 

@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 
 from .tables import (
     CIRCUMSTANCE, DC_BANDS, LETHALITIES, MANEUVER_ALIASES, MANEUVERS, SAVES, SKILLS,
-    WEAPONS,
+    WEAPONS, base_skill,
 )
 
 # Hyphens and spaces are already gone when this is read ("non-lethal" -> "nonlethal").
@@ -73,6 +73,11 @@ def normalise_skill(name: str) -> str | None:
     key = str(name).strip().lower()
     if key in SKILLS:
         return key
+    # A trade names its skill: "craft (alchemy)" is Craft (`tables.base_skill`). Before the
+    # fold a GM check naming one was refused as "not a Pathfinder 1e skill".
+    folded = base_skill(key)
+    if folded in SKILLS:
+        return folded
     return SKILL_ALIASES.get(key)
 
 
@@ -324,6 +329,23 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # recognize me as its owner" resolved as nothing, and the prose repaired and tamed it
     # anyway.
     "repair": ((), ("own",), "player"),
+    # The trade uses (rules/tradecraft.py, content/rules/trade-uses.json; the owner's options
+    # B and C, 2026-10-07). Each names WHICH use and WHAT it is used on; the row supplies the
+    # skill, the DC, the time, the cost and the pay, and the player rolls their own die.
+    # `judge`: a Craft look at a carried thing's make — masterwork on sight (Unchained DC 15).
+    "judge": (("item",), (), "player"),
+    # `mend`: Craft on carried gear that has taken damage — the making DC, a fifth of the
+    # price in materials, an hour a point, through the clock and the body.
+    "mend": (("item",), (), "player"),
+    # `trade_lore`: a question of the trade, by Profession — basic DC 10, complex 15 (CRB).
+    # `trade` is the player's own word for it ("sailor"), used to name where it works here.
+    "trade_lore": ((), ("depth", "trade"), "player"),
+    # `haggle`: Profession against the keeper's Sense Motive at the counter named by
+    # `target`; the price moves 2% + 1% a point, never past 25% (Ultimate Campaign).
+    "haggle": ((), ("stall",), "player"),
+    # `work`: a day or a week at the trade, paid by the task level and training (PF2e's
+    # Earn Income table), only where there is work — inside a settlement.
+    "work": ((), ("days", "skill", "trade"), "player"),
     # Naming a creature that is the player's (`bond.owned-by-you`) — the house rule's
     # "you can name it". Aimed by `target`; `name` is the player's own word for it, never
     # the plan's invention (`judgement.declare_name` reads it off the line). Refused for
@@ -1499,6 +1521,28 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                     "schema", index)
             p["template"] = raw_t
+
+    elif op in ("judge", "mend"):
+        p["item"] = " ".join(str(p.get("item") or "").split())[:80]
+        if not p["item"]:
+            raise IntentError(f"{op}: item is the carried thing, by its name", "schema", index)
+
+    elif op == "trade_lore":
+        # A closed word, read rather than refused: anything that is not plainly basic is
+        # a complex question, which is the CRB's "15 or higher".
+        p["depth"] = "basic" if str(p.get("depth") or "").strip().lower() in (
+            "basic", "easy", "simple", "common") else "complex"
+        p["trade"] = " ".join(str(p.get("trade") or "").split())[:40]
+
+    elif op == "work":
+        # A model-authored count, held to the two stints the row offers: a day, or a week
+        # (anything past a day is the week). Never a number of days the plan invents.
+        days = _bounded(p.get("days") or 1, 1, 30, index,
+                        "work: days is how long is worked, a day or a week")
+        p["days"] = 1 if days < 2 else 7
+        skill = base_skill(str(p.get("skill") or ""))
+        p["skill"] = skill if skill in ("craft", "profession") else ""
+        p["trade"] = " ".join(str(p.get("trade") or "").split())[:40]
 
     elif op == "call_on":
         p["who"] = " ".join(str(p["who"] or "").replace("_", " ").split())[:80]

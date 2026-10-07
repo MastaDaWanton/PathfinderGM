@@ -28,9 +28,9 @@ from .tables import (
     CLASSES, CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
-    WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
+    WEAPONS, ENERGY_VS_OBJECTS_HALVED, ability_modifier, bab_for,
     is_physical, iterative_attacks, maneuver_text, material_for, normalise_damage_type,
-    save_for,
+    save_for, base_skill,
 )
 
 
@@ -133,13 +133,17 @@ class Item:
     hp_max: int | None = None
 
     def __post_init__(self):
+        # A bare Item knows only its name: an inch of what the name says it is made of
+        # (Table 7-13). `Actor.item` builds through `object_numbers.for_actor`, which reads
+        # the book's weapon, armour and shield rows first — the one reader.
+        from .object_numbers import substance_numbers
+
         self.material = self.material or material_for(self.name)
-        spec = MATERIALS.get(self.material, MATERIALS["steel"])
+        hardness, per_inch = substance_numbers(self.material)
         if self.hardness is None:
-            self.hardness = spec["hardness"]
+            self.hardness = hardness
         if self.hp_max is None:
-            # An inch is the Core Rulebook's unit and most carried gear is about that.
-            self.hp_max = max(1, spec["hp_per_inch"])
+            self.hp_max = per_inch
         if self.hp is None:
             self.hp = self.hp_max
 
@@ -2403,6 +2407,27 @@ class Actor:
 
     # --- skills --------------------------------------------------------------------
 
+    def printed_skill(self, skill: str) -> tuple[str, int] | None:
+        """(the printed name, its total) a stat block gives for this skill, or None.
+
+        Exact first; then, for the three trade skills, the best total printed under a
+        trade name — "profession (sailor)" answers `profession`. Before this the lookup
+        was exact only, and 2,208 printed trade totals in the bestiary were invisible: a
+        printed sailor (Profession (sailor) +6) was refused at the helm as untrained
+        (measured 2026-10-07, tests/test_trade_names.py). The best of several trades, not
+        a chosen one, because this game keeps one id per trade skill (docs/craft-
+        profession-options.md: option D, the named trades, was not chosen).
+        """
+        skill = str(skill or "").strip().lower()
+        if skill in self.flat_skills:
+            return skill, int(self.flat_skills[skill])
+        best = None
+        for name, total in self.flat_skills.items():
+            if name != skill and base_skill(name) == skill:
+                if best is None or int(total) > best[1]:
+                    best = (name, int(total))
+        return best
+
     def skill_modifiers(self, skill: str) -> list[Modifier]:
         skill = skill.strip().lower()
         if skill not in SKILLS:
@@ -2410,8 +2435,9 @@ class Actor:
         ability, trained_only, acp_applies = SKILLS[skill]
         mods: list[Modifier] = []
 
-        if skill in self.flat_skills:
-            mods.append(Modifier(self.flat_skills[skill], skill.title()))
+        printed = self.printed_skill(skill)
+        if printed is not None:
+            mods.append(Modifier(printed[1], printed[0].title()))
         else:
             rank = self.ranks.get(skill, 0)
             if trained_only and rank == 0:
@@ -3996,34 +4022,35 @@ class Actor:
         return list(dict.fromkeys(out))
 
     def item(self, name: str) -> Item:
-        """The record for one item, created the first time anything happens to it."""
+        """The record for one item, created the first time anything happens to it, its
+        hardness and hit points read through `object_numbers` (the book's Table 7-12 row,
+        then its materials, then its enhancement) every time it is asked for.
+
+        Re-read rather than trusted, with what it has suffered carried over by proportion
+        (`object_numbers.carry_damage`): a sword enchanted after a sunder notched it gains
+        its +10, and a save written under the old inch-of-steel rule (30 hit points for
+        any blade) comes back on the book's numbers. Until 2026-10-07 the forged branch
+        here took Table 7-13's own adamantine (hardness 20) and then added the material
+        document's +10, which is already the step from steel: 29 hardness and 51 hit
+        points on an adamantine longsword the book gives 20 and 6."""
+        from . import object_numbers
+
         key = (name or "").strip().lower()
+        got = object_numbers.for_actor(self, name)
         if key not in self.gear:
-            self.gear[key] = self._forged_item(name) or Item(name=name.strip())
+            self.gear[key] = Item(name=name.strip(), material=got.material,
+                                  hardness=got.hardness, hp_max=got.hp_max)
+        else:
+            object_numbers.carry_damage(self.gear[key], got)
         return self.gear[key]
 
-    def _forged_item(self, name: str) -> Item | None:
-        """A forged thing's object numbers: its main piece's material (the table's
-        hardness and hit points per inch for that metal) moved by the build's own gear
-        numbers — a Strengthened iron head is harder than a plain one. None for anything
-        not forged, which is guessed from its name as before."""
-        from . import forge_items
+    def refresh_gear(self) -> None:
+        """Every stored object record moved onto today's numbers (on load), keeping
+        whole, broken and ruined as they were. See `item`."""
+        from . import object_numbers
 
-        rec = self.crafted_record(name)
-        if not forge_items.is_forged(rec):
-            return None
-        b = forge_items.build(rec)
-        main = (rec.get("pieces") or {}).get(forge_items.MAIN_PIECE.get(b["kind"], "head"))
-        mid = str((main or {}).get("material") if isinstance(main, dict) else main or "")
-        doc = forge_items.material(mid) or {}
-        mat = str(doc.get("material") or mid or "").lower()
-        mat = mat if mat in MATERIALS else material_for(str(rec.get("name") or name))
-        spec = MATERIALS.get(mat, MATERIALS["steel"])
-        hp = max(1, int(spec["hp_per_inch"]) + int(b["gear"].get("hp_per_inch", 0) or 0))
-        return Item(name=str(name).strip(), material=mat,
-                    hardness=max(0, int(spec["hardness"]) + int(b["gear"].get("hardness", 0)
-                                                                 or 0)),
-                    hp_max=hp)
+        for item in self.gear.values():
+            object_numbers.carry_damage(item, object_numbers.for_actor(self, item.name))
 
     def damage_item(self, name: str, amount: int, dtype: str = "untyped",
                     traits: tuple[str, ...] = ()) -> dict:
@@ -4293,7 +4320,7 @@ class Actor:
         """
         t = str(target).lower()
         if kind == "skill_mod":
-            return t in self.flat_skills
+            return self.printed_skill(t) is not None
         if kind == "save_mod":
             return t in self.flat_saves
         if kind == "combat_mod":
@@ -5719,7 +5746,7 @@ def full_sheet(actor: Actor) -> dict:
     for name in sorted(SKILLS):
         ability, trained_only, acp = SKILLS[name]
         rank = actor.ranks.get(name, 0)
-        if trained_only and rank == 0 and name not in actor.flat_skills:
+        if trained_only and rank == 0 and actor.printed_skill(name) is None:
             # Cannot be attempted at all; listed so the absence is visible, not silent.
             skills.append({"name": name, "ability": ability, "rank": 0,
                            "class_skill": name in actor.class_skills,
@@ -7435,6 +7462,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         total += a._feat_hp()
     a.set_hp_max(total)
     _bind_targets(a)
+    # The gear records' numbers re-read off the book (2026-10-07): a save made under the
+    # inch-of-steel rule holds a longsword at 30 hit points, and the book gives it 5.
+    # Last, so the forged records it reads (`stock`, `worn`) are loaded.
+    a.refresh_gear()
     return a
 
 

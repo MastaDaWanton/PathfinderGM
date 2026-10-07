@@ -64,10 +64,20 @@
       "name": "Craft",
       "book": "Make things in one trade (weapons, armour, bows, alchemy and the like), mend them, and earn a living by it.",
       "uses": [
+        {"text": "At every crafting bench (herbalism, smithing, alchemy, leatherwork, enchanting), half your Craft ranks add to the check, shown as its own line in the roll.",
+         "file": "rules/tradecraft.py", "find": "return Modifier(n // RANKS_DIVISOR, f\"{skill.title()} ranks ½ ({n})\")"},
+        {"text": "Judging a thing's make: a Craft check against DC 15 tells masterwork work on sight; beat it by 5 and you read its hardness and hit points too.",
+         "file": "content/rules/trade-uses.json", "find": "\"numbers_dc\": 20,"},
+        {"text": "Mending damaged gear: the DC it took to make, a fifth of its price in materials, and an hour a point of damage. Magic items and ruined ones are past Craft.",
+         "file": "rules/engine.py", "find": "is magic: only a mending or make whole "},
+        {"text": "A day's or a week's paid work where there is work, if your Craft ranks are your best trade: the pay is set by your level, your training and the town, not the die's total.",
+         "file": "rules/tradecraft.py", "find": "def work_offer(actor, scale: str) -> dict:"},
         {"text": "Mending a construct: the better of your Craft and your Knowledge (Engineering). It takes ten minutes and restores 1d6 per Hit Die.",
-         "file": "rules/repair.py", "find": "has neither Craft nor Knowledge (engineering) to mend it"}
+         "file": "rules/repair.py", "find": "has neither Craft nor Knowledge (engineering) to mend it"},
+        {"text": "A feat asking for Craft (alchemy) or any other trade is met by your Craft ranks.",
+         "file": "rules/feats.py", "find": "return actor.ranks.get(base_skill(cond[\"skill\"]), 0) >= int(cond[\"ranks\"])"}
       ],
-      "not_yet": "This game has one Craft with no trade named. The crafting benches (herbalism, smithing, alchemy, leatherwork, enchanting) use their own levels, not Craft ranks. Making items by the week, mending gear, valuing goods of your trade and earning a wage are not in play yet."
+      "not_yet": "This game has one Craft with no trade named: Craft (weapons), Craft (alchemy) and the rest are all it. Making items by the week from the book's Craft rules is not in play; the crafting benches make things instead."
     },
     "diplomacy": {
       "name": "Diplomacy",
@@ -249,12 +259,20 @@
       "name": "Profession",
       "book": "Work a trade such as sailor, merchant, soldier or innkeeper: know its ways and earn a weekly wage.",
       "uses": [
+        {"text": "A question of your trade: DC 10 for a basic one, 15 for a complex one. Knowing it, you also know where your trade works in this town.",
+         "file": "content/rules/trade-uses.json", "find": "\"dc_by_depth\": {\"basic\": 10, \"complex\": 15},"},
+        {"text": "Haggling at a counter, once a day: your Profession against the keeper's Sense Motive. Beat it and that counter's prices move 2% your way, plus 1% a point, up to 25%.",
+         "file": "rules/tradecraft.py", "find": "def undercut(margin: int) -> int:"},
+        {"text": "A day's or a week's paid work in a settlement: the pay is set by your level, your training and the town (village, town or city), and the die picks poor, fair or good pay.",
+         "file": "rules/engine.py", "find": "There is no work out here — paid work is found "},
+        {"text": "At the herbalism bench, half the better of your Profession and Craft ranks adds to the check.",
+         "file": "rules/tradecraft.py", "find": "\"herbalist\": (\"craft\", \"profession\"),"},
         {"text": "Studying a herb at the herbarium: the better of your Profession and Knowledge (Nature), whatever your trade.",
          "file": "content/rules/herb-lore.json", "find": "\"skills\": [\"knowledge (nature)\", \"profession\"],"},
         {"text": "At sea, ramming another ship is a Profession check at the helm against her AC. With no ranks, you cannot ram.",
          "file": "rules/engine.py", "find": "is no sailor. Ramming is a Profession (sailor) "}
       ],
-      "not_yet": "This game has one Profession with no trade named. Earning a wage, your trade's know-how, and anything a sailor, merchant or soldier would know are not in play yet."
+      "not_yet": "This game has one Profession with no trade named: Profession (sailor), Profession (merchant) and the rest are all it, and your trade is whatever you say it is. A sailor's navigation and a soldier's reading of a force are not rules yet."
     },
     "ride": {
       "name": "Ride",

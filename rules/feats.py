@@ -304,7 +304,13 @@ def _check(actor, cond: dict) -> bool | None:
             return False
         return actor.level >= int(cond["value"])
     if kind == "skill_ranks":
-        return actor.ranks.get(cond["skill"].strip().lower(), 0) >= int(cond["ranks"])
+        # Folded onto the one id ranks are placed on: "craft (alchemy)" is Craft here
+        # (`tables.base_skill`; the owner chose one Craft, not named trades, 2026-10-07).
+        # Read raw, 17 feats asking for a trade's ranks could never be met — Master
+        # Alchemist, Sea Legs, Dervish Dance among them.
+        from .tables import base_skill
+
+        return actor.ranks.get(base_skill(cond["skill"]), 0) >= int(cond["ranks"])
     if kind == "feat":
         return cond["feat"] in _held(actor) or cond["name"].strip().lower() in _held(actor)
     # A tag question, not a string match: the race document grants `race.<id>`
