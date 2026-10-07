@@ -513,11 +513,16 @@ def check_terms(actor, level: int) -> list[dict]:
     track_level = max(0, int(level or 0))
     char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
     intelligence = int(actor.ability_mod("int")) if actor is not None else 0
+    from . import tradecraft
+
     return [
         {"label": f"Leatherworker {track_level}", "value": track_level},
         # Half level, rounded down, as every half-level term in 1e rounds.
         {"label": f"half character level ({char_level})", "value": char_level // 2},
         {"label": "Intelligence", "value": intelligence},
+        # Half the Craft ranks: tanning and leatherwork are Craft (leather), and this
+        # game keeps one Craft (option A, 2026-10-07; `tradecraft.bench_terms`).
+        *tradecraft.bench_terms(actor, "leatherworker"),
     ]
 
 

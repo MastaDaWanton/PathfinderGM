@@ -1632,7 +1632,38 @@ def _carried(pc) -> list[dict]:
             "state": "worn", "line": "", "known": item is not None,
             "acts": [], "note": "",
         })
+    _trade_acts(pc, rows)
     return rows
+
+
+def _trade_acts(pc, rows: list[dict]) -> None:
+    """Judge its make and Mend, on the weapons, armour and shields carried — Craft's
+    everyday uses (rules/tradecraft.py; the owner's option B, 2026-10-07), each through
+    `/api/tradeskill`, which runs the engine's `judge` or `mend` op with the player's die.
+
+    Mend is offered only on a thing that has taken damage and is not past it (the op's own
+    questions, asked of the same functions: `tradecraft.damage_of`, `is_magic`), and the
+    row says how hurt it is (`damage`) — a broken sword read like a whole one on this tab
+    before."""
+    from rules import tradecraft
+
+    for r in rows:
+        if r.get("kind") not in ("weapon", "armour", "shield") or r.get("in_progress"):
+            continue
+        name = str(r.get("name") or r.get("key") or "")
+        # Their own list, beside `acts`: those are the wear and use doors a row's state
+        # is drawn from (the first is the row's main button), and a look or a mend is
+        # never the main thing a sword is for.
+        r["trade_acts"] = [{"label": "Judge its make", "api": "/api/tradeskill",
+                            "body": {"use": "judge", "item": name}}]
+        obj = tradecraft.damage_of(pc, name) or tradecraft.damage_of(pc, str(r.get("key")))
+        if obj is None or obj.hp >= obj.hp_max:
+            continue
+        state = ("ruined" if obj.destroyed else "broken" if obj.broken else "damaged")
+        r["damage"] = f"{state}: {obj.hp} of {obj.hp_max} hit points"
+        if not obj.destroyed and not tradecraft.is_magic(pc, name):
+            r["trade_acts"].append({"label": "Mend", "api": "/api/tradeskill",
+                                    "body": {"use": "mend", "item": name}})
 
 
 WRITING_MAX_CHARS = 4000
@@ -5561,7 +5592,7 @@ def trade(request):
     At a market (I2) the body may name the counter (`line`); the answer says which one
     it opened on (`line`), every counter the market has (`lines`) and who is behind this
     one (`seller`) — docs/fix-interfaces.md §2.10."""
-    from rules import goods, market, pricing, states
+    from rules import goods, market, pricing, states, tradecraft
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -5606,6 +5637,9 @@ def trade(request):
 
     till = market.purse(place, stall, day, tier)
     left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
+    haggled = tradecraft.haggled(c.scene, pc.ref, place, stall, day)
+    haggle_spent = (tradecraft.dealing_key("haggle", pc.ref, place, stall, day)
+                    in c.scene.dealings)
     shelf = market.on_sale(place, stall, day, c.scene.market_taken, tier, counter_kind=kind)
     # What the player's words asked for, picked on the counter if it is there — and if
     # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
@@ -5642,12 +5676,18 @@ def trade(request):
         # Priced for THIS buyer in THIS town: a suspected character sees the markup
         # (`pricing.markup_for`) on both columns, which is the whole of what
         # "suspected" costs at a counter that does not refuse them.
+        # And moved by a haggle won at this counter today (`Engine._op_haggle`, the
+        # owner's option B, 2026-10-07): the numbers the engine will charge and pay.
         "mine": sorted(
-            (_row(s, pricing.what_a_shop_pays(s, seller=pc, town=place), s.count)
+            (_row(s, tradecraft.sell_price(
+                pricing.what_a_shop_pays(s, seller=pc, town=place), haggled), s.count)
              for s in pc.stock.values()),
             key=lambda r: -r["gp"]),
-        "theirs": sorted((_row(m, pricing.worth(m, buyer=pc, town=place)) for m in shelf),
+        "theirs": sorted((_row(m, tradecraft.buy_price(
+            pricing.worth(m, buyer=pc, town=place), haggled)) for m in shelf),
                          key=lambda r: -r["gp"]),
+        "haggled": haggled,
+        "can_haggle": not haggle_spent,
         "law": states.standing_with_the_law(pc, place),
     })
 

@@ -32,6 +32,7 @@ from . import ingredients as ing_mod
 from . import resources
 from . import states
 from . import survival
+from . import tradecraft
 from . import troops as troops_mod
 from . import water
 from . import worldclass
@@ -292,6 +293,11 @@ class Scene:
     # that paid for the grind would send the player to climb the same wall all
     # afternoon (`rules/xp.py`, challenge_award).
     rewarded: dict[str, int] = field(default_factory=dict)
+    # The trade uses already spent (rules/tradecraft.py): "haggle|<ref>|place|stall|day" →
+    # {"percent"} for a counter talked round, "judge|<ref>|<thing>|day" → what the look
+    # found. The day is in the key, so yesterday's stop counting without a sweep, the way
+    # `market_taken` works.
+    dealings: dict[str, dict] = field(default_factory=dict)
     # Finds that are booked but not yet in hand: the vein the cave worm is sitting on.
     # Each is {"guard": ref, "what": ..., "found": {...}, "stock": [...]} and pays out
     # when the guard is dead or gone (`rules/gathering.py`).
@@ -8380,6 +8386,378 @@ class Engine:
             tell=" ".join(bits), because=intent.because,
         )
 
+    # --- the trade uses: Craft and Profession away from the benches ---------------------
+    #
+    # The owner, 2026-10-06: "the craft skill and the profession skill seem pretty
+    # useless". Measured that day (docs/craft-profession-options.md §1): a Craft rank
+    # bought one house-rule construct repair and a Profession rank bought herb study and
+    # ramming at sea. The owner chose, 2026-10-07, options A, B and C: these five ops are
+    # B (judge, mend, trade_lore, haggle) and C (work). Every number is a row's in
+    # content/rules/trade-uses.json, read through rules/tradecraft.py; the plan names
+    # only which use and what it is used on, and the player rolls their own die.
+
+    def _trade_skill_mods(self, actor, skill: str):
+        """(modifiers, refusal) for a trade skill: Profession is trained only, and the
+        refusal names that rather than raising."""
+        from .sheet import IllegalSheet
+
+        try:
+            return actor.skill_modifiers(skill), ""
+        except IllegalSheet:
+            return None, (f"{actor.name} has no ranks in {skill.title()}, and "
+                          f"{skill.title()} cannot be tried untrained.")
+
+    def _work_hours(self, pc, hours: int) -> tuple[int, str]:
+        """Spend `hours` of work, a working day (8 hours) at a time with the evening
+        between fed, watered and slept — `_march`'s shape, which is how this game
+        provisions a day on the road. Returns (hours actually worked, what the body
+        said). A body that gives out stops the work at the hour it gave out."""
+        from . import places as places_mod
+
+        day = int(tradecraft.row("day-work")["hours_per_day"])
+        biome = places_mod.terrain_of(self.scene.at) if self.scene.at else ""
+        worked, told, left = 0, [], max(0, int(hours))
+        while left > 0:
+            today = min(day, left)
+            toll = survival.pass_hours(pc, today, self.dice, biome=biome)
+            done = max(1, toll.hours)
+            self.scene.advance(done * survival.MINUTES_PER_HOUR, charge_body=False)
+            worked += min(done, today)
+            if toll.checks:
+                told.append(survival_note(toll))
+            if done < today:
+                return worked, "; ".join(told)
+            left -= today
+            if left > 0:
+                for need, freed in (("hunger", survival.eat(pc)),
+                                    ("thirst", survival.drink(pc))):
+                    if freed:
+                        told.append(survival.released_said(pc, need, freed))
+                survival.sleep(pc)
+                self.scene.advance((24 - day) * survival.MINUTES_PER_HOUR,
+                                   charge_body=False)
+        return worked, "; ".join(told)
+
+    def _op_judge(self, intent: Intent, partial: dict) -> Outcome:
+        """A Craft look at a carried thing's make (Unchained, Expanded Craft): masterwork
+        on sight at DC 15; beaten by 5 — the DC 20 row, trained only — its hardness and
+        hit points as well. What the look reads is the thing's own record (the forged
+        `masterwork` flag, `Actor.gear`'s numbers), never a fact the plan wrote."""
+        actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        owner = self.scene.actors.get(intent.target or "") or actor
+        r = tradecraft.row("judge-make")
+        name = tradecraft.carries(owner, intent.params["item"])
+        if not name:
+            return self._refuse(intent, f"{owner.name} is not carrying "
+                                        f"{intent.params['item']}.")
+        day = self.scene.clock_minutes // (24 * 60)
+        key = tradecraft.dealing_key("judge", actor.ref, name.lower(), day)
+        seen = self.scene.dealings.get(key)
+        if seen:
+            # CRB Appraise: "Additional attempts ... reveal the same result."
+            return Outcome(intent_id=intent.id, op="judge", effects=[],
+                           tell=str(seen.get("tell") or ""), because=intent.because)
+        mods, why = self._trade_skill_mods(actor, r["skill"])
+        if why:
+            return self._refuse(intent, why)
+        dc = int(r["dc"])
+        roll = self._roll_or_suspend(intent, actor, mods, "Craft check (judge its make)",
+                                     dc, partial)
+        margin = roll.total - dc
+        self._judge(roll, margin >= 0)
+        made = f"{roll.total} against DC {dc}"
+        if margin < 0:
+            tell = f"{actor.name} cannot tell {name}'s make from looking ({made})."
+        else:
+            masterwork = tradecraft.is_masterwork(owner, name)
+            rec = tradecraft._record(owner, name) or {}
+            quality = str(rec.get("quality") or "")
+            bits = [f"{actor.name}'s Craft reads {name} ({made}): "
+                    + ("masterwork work" if masterwork else "ordinary work, not masterwork")
+                    + (f", of {quality} quality" if quality and quality != "masterwork"
+                       else "") + "."]
+            if tradecraft.is_magic(owner, name):
+                bits.append("There is more in it than the smith put there.")
+            trained = int(actor.ranks.get("craft", 0) or 0) > 0 \
+                or not r.get("numbers_trained_only")
+            if roll.total >= int(r["numbers_dc"]) and trained:
+                obj = tradecraft.damage_of(owner, name) or owner.item(name)
+                state = ("broken" if obj.broken else "sound")
+                bits.append(f"Hardness {obj.hardness}, {obj.hp} of {obj.hp_max} hit "
+                            f"points; {state}.")
+            tell = " ".join(bits)
+        self.scene.dealings[key] = {"tell": tell, "margin": margin}
+        return Outcome(intent_id=intent.id, op="judge", rolls=[roll],
+                       dc=dc_mod.ResolvedDC(value=dc, band=None).as_dict(),
+                       verdict="success" if margin >= 0 else "failure", margin=margin,
+                       effects=[{"ref": actor.ref, "kind": "judged", "item": name,
+                                 "origin": "rule:judge-make"}],
+                       tell=tell, because=intent.because)
+
+    def _op_mend(self, intent: Intent, partial: dict) -> Outcome:
+        """Craft on carried gear that has taken damage (CRB, Craft and the Broken
+        condition): the DC it took to make, a fifth of its price in materials, an hour a
+        point of damage spent on the clock and charged to the body. Success makes it
+        whole and lifts broken; a failure by 5 or more ruins half the materials. A
+        magic item is past Craft (mending or make whole only), and a ruined one — 0 hit
+        points — is past mending."""
+        from . import pricing
+
+        actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        owner = self.scene.actors.get(intent.target or "") or actor
+        r = tradecraft.row("mend-gear")
+        name = tradecraft.carries(owner, intent.params["item"])
+        if not name:
+            return self._refuse(intent, f"{owner.name} is not carrying "
+                                        f"{intent.params['item']}.")
+        obj = tradecraft.damage_of(owner, name)
+        if obj is None or obj.hp >= obj.hp_max:
+            return self._refuse(intent, f"{name} is whole; there is nothing to mend.")
+        if obj.destroyed:
+            return self._refuse(intent, f"{name} is ruined, past what Craft can mend — "
+                                        f"only make whole brings back a thing destroyed.")
+        if tradecraft.is_magic(owner, name):
+            return self._refuse(intent, f"{name} is magic: only a mending or make whole "
+                                        f"spell repairs it, not Craft.")
+        if self.scene.initiative:
+            return self._refuse(intent, "Not in the middle of a fight: mending takes "
+                                        "hours at a bench.")
+        mods, why = self._trade_skill_mods(actor, r["skill"])
+        if why:
+            return self._refuse(intent, why)
+        dc, dc_why = tradecraft.creation_dc(owner, name)
+        points = obj.hp_max - obj.hp
+        hours = points * int(r["hours_per_point"])
+        cost_gp = round(tradecraft.price_gp(owner, name) * float(r["cost_fraction"]), 2)
+        cost_cp = int(round(cost_gp * 100))
+        if goods.in_copper(actor.purse) < cost_cp:
+            return self._refuse(
+                intent, f"Mending {name} takes {pricing.as_text(cost_gp)} of materials, "
+                        f"a fifth of its price, and {actor.name} has "
+                        f"{goods.purse_line(actor.purse, goods.coinage())}.")
+        roll = self._roll_or_suspend(intent, actor, mods, "Craft check (mend)", dc, partial)
+        margin = roll.total - dc
+        self._judge(roll, margin >= 0)
+        made = f"{roll.total} against DC {dc}, the DC {dc_why}"
+        worked, body = self._work_hours(actor, hours)
+        finished = worked >= hours
+        effects: list[dict] = [{"ref": actor.ref, "kind": "time",
+                                "minutes": worked * survival.MINUTES_PER_HOUR,
+                                "origin": "rule:mend-gear"}]
+        spent = 0
+        if margin >= 0 and finished:
+            spent = cost_cp
+            was_broken = obj.broken
+            obj.hp = obj.hp_max
+            effects.append({"ref": owner.ref, "kind": "mended", "item": name,
+                            "hp": obj.hp, "hp_max": obj.hp_max, "was_broken": was_broken,
+                            "origin": "rule:mend-gear"})
+            tell = (f"{actor.name} mends {name} ({made}): {worked} hour"
+                    f"{'s' if worked != 1 else ''} of work, and it is whole again — "
+                    f"{obj.hp} of {obj.hp_max} hit points"
+                    + (", no longer broken" if was_broken else "") + ".")
+        elif margin >= 0:
+            tell = (f"{actor.name} sets to mending {name} ({made}) and stops after "
+                    f"{worked} of {hours} hours; it is not mended.")
+        elif margin <= -int(r["ruin_by"]):
+            spent = cost_cp // 2
+            tell = (f"{actor.name} fails to mend {name} ({made}) and ruins half the "
+                    f"materials over {worked} hour{'s' if worked != 1 else ''}.")
+        else:
+            tell = (f"{actor.name} works {worked} hour{'s' if worked != 1 else ''} at "
+                    f"{name} without mending it ({made}); the materials are kept.")
+        if spent:
+            actor.purse, _paid = goods.spend(actor.purse, spent)
+            effects.append({"ref": actor.ref, "kind": "spent", "paid_cp": spent,
+                            "for": f"materials to mend {name}",
+                            "origin": "rule:mend-gear"})
+            tell += (f" Materials: {goods.purse_line(goods.coins_for(spent), goods.coinage())}"
+                     f" ({goods.purse_line(actor.purse, goods.coinage())} left).")
+        if body:
+            tell += f" The work cost them: {body}."
+        return Outcome(intent_id=intent.id, op="mend", rolls=[roll],
+                       dc=dc_mod.ResolvedDC(value=dc, band=None).as_dict(),
+                       verdict="success" if margin >= 0 and finished else "failure",
+                       margin=margin, effects=effects, tell=tell, because=intent.because)
+
+    def _op_trade_lore(self, intent: Intent, partial: dict) -> Outcome:
+        """A question of the trade, by Profession (CRB: basic DC 10, complex DC 15). A
+        success licenses the answer, and the tell names the places HERE where the trade
+        works — the engine's own place list, matched by the row's trade words — so the
+        narrator answers with places that exist."""
+        actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        r = tradecraft.row("trade-question")
+        depth = intent.params.get("depth") or "complex"
+        trade = str(intent.params.get("trade") or "").strip().lower()
+        mods, why = self._trade_skill_mods(actor, r["skill"])
+        if why:
+            return self._refuse(intent, why)
+        dc = int(r["dc_by_depth"][depth])
+        roll = self._roll_or_suspend(intent, actor, mods, "Profession check (the trade)",
+                                     dc, partial)
+        margin = roll.total - dc
+        self._judge(roll, margin >= 0)
+        of = f"the {trade}'s trade" if trade else "the trade"
+        made = f"{roll.total} against DC {dc} for a {depth} question of {of}"
+        if margin < 0:
+            tell = f"{actor.name} does not know ({made})."
+            where: list[str] = []
+        else:
+            tell = f"{actor.name} knows the answer ({made})."
+            words = [w.lower() for w in (r["trade_places"].get(trade) or ())]
+            where = [p.name for p in self.places()
+                     if words and any(w in str(p.name).lower() for w in words)]
+            if where:
+                tell += f" Where that trade works here: {', '.join(where)}."
+        return Outcome(intent_id=intent.id, op="trade_lore", rolls=[roll],
+                       dc=dc_mod.ResolvedDC(value=dc, band=None).as_dict(),
+                       verdict="success" if margin >= 0 else "failure", margin=margin,
+                       effects=[{"ref": actor.ref, "kind": "trade_lore", "depth": depth,
+                                 "places": where, "origin": "rule:trade-question"}],
+                       tell=tell, because=intent.because)
+
+    def _op_haggle(self, intent: Intent, partial: dict) -> Outcome:
+        """Profession against the keeper's Sense Motive (Ultimate Campaign's bargaining,
+        Profession standing for Bluff — the owner's option B). Beaten, the counter's
+        prices move 2% + 1% a point in the player's favour, never past 25%, for the rest
+        of the day: `_op_buy` and `_op_sell` read it, and the trade window shows it.
+        Once a counter a day, win or lose."""
+        from . import market as market_mod
+
+        actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        keeper = self.scene.actors.get(intent.target or "")
+        r = tradecraft.row("haggle")
+        if keeper is None or keeper is actor:
+            return self._refuse(intent, "There is nobody behind a counter here to "
+                                        "haggle with.")
+        place = str(self.scene.location_id or "nowhere")
+        stall = str(intent.params.get("stall") or keeper.ref)
+        day = market_mod.day_of(self.scene.clock_minutes)
+        key = tradecraft.dealing_key("haggle", actor.ref, place, stall, day)
+        if key in self.scene.dealings:
+            got = int(self.scene.dealings[key].get("percent", 0) or 0)
+            return self._refuse(
+                intent, f"{_sentence(keeper.name)} has haggled with {actor.name} once today"
+                        + (f" and holds to {got}% off" if got else " and holds to the list")
+                        + ". Tomorrow is another day.")
+        mods, why = self._trade_skill_mods(actor, r["skill"])
+        if why:
+            return self._refuse(intent, why.replace(
+                "untrained.", "untrained — haggling at a counter is a Profession check."))
+        if "opposed_roll" in partial:
+            theirs = _roll_from_dict(partial["opposed_roll"])
+        else:
+            theirs = self.dice.d20(keeper.skill_modifiers(r["opposed_by"]),
+                                   label=f"{keeper.name} Sense Motive", visibility="hidden")
+        roll = self._roll_or_suspend(intent, actor, mods, "Profession check (haggle)",
+                                     theirs.total, partial,
+                                     extra_partial={"opposed_roll": theirs.as_dict()},
+                                     dc_shown=False)
+        margin = roll.total - theirs.total
+        self._judge(roll, margin >= 0)
+        percent = tradecraft.undercut(margin)
+        self.scene.dealings[key] = {"percent": percent, "keeper": keeper.ref}
+        if percent:
+            tell = (f"{actor.name} haggles {keeper.name} down: Profession {roll.total} "
+                    f"against Sense Motive {theirs.total}. For the rest of today "
+                    f"{keeper.name} sells to {actor.name} at {percent}% off and buys at "
+                    f"{percent}% more.")
+        else:
+            tell = (f"{_sentence(keeper.name)} will not be moved: Sense Motive "
+                    f"{theirs.total} against "
+                    f"{actor.name}'s Profession {roll.total}. The list price stands today.")
+        return Outcome(intent_id=intent.id, op="haggle", rolls=[roll, theirs],
+                       verdict="success" if percent else "failure", margin=margin,
+                       effects=[{"ref": actor.ref, "kind": "haggled", "with": keeper.ref,
+                                 "stall": stall, "percent": percent,
+                                 "origin": "rule:haggle"}],
+                       tell=tell, because=intent.because)
+
+    def _op_work(self, intent: Intent, partial: dict) -> Outcome:
+        """A day or a week at the trade, paid (PF2e's Earn Income in PF1's coin; the row
+        cites the table). The pay is set by the task level — the lower of the
+        character's level and what the settlement offers — and by training read from
+        ranks; the die only picks the column. Only inside a settlement: alone in the
+        wilds there is nobody to pay. The days go through the clock and the body, a
+        working day at a time."""
+        from . import places as places_mod
+
+        pc = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        r = tradecraft.row("day-work")
+        if self.scene.initiative:
+            return self._refuse(intent, "Not in the middle of a fight.")
+        loc = self.world.get(self.scene.location_id) if (self.world and
+                                                         self.scene.location_id) else None
+        if loc is None or places_mod.setting_of(self.scene.at) != "in":
+            return self._refuse(intent, "There is no work out here — paid work is found "
+                                        "in a settlement, among people who pay for it.")
+        scale = places_mod.scale_of(loc)
+        offer = tradecraft.work_offer(pc, scale)
+        days = int(intent.params.get("days") or 1)
+        want = str(intent.params.get("skill") or "")
+        if want and offer["skill"] and want != offer["skill"]:
+            ranks = int(pc.ranks.get(want, 0) or 0)
+            if ranks:
+                offer = dict(offer, skill=want, ranks=ranks)
+        trade = str(intent.params.get("trade") or "").strip()
+        town = getattr(loc, "name", "") or "the town"
+        roll, verdict, margin = None, "untrained", None
+        if offer["proficiency"] == "untrained":
+            per_day = int(offer["pay_cp"]["untrained"])
+            how = "untrained labour (the CRB's average wage)"
+        else:
+            mods, why = self._trade_skill_mods(pc, offer["skill"])
+            if why:
+                return self._refuse(intent, why)
+            roll = self._roll_or_suspend(intent, pc, mods,
+                                         f"{offer['skill'].title()} check (a day's work)",
+                                         offer["dc"], partial)
+            margin = roll.total - offer["dc"]
+            self._judge(roll, margin >= 0)
+            verdict = tradecraft.degree(margin)
+            per_day = int(offer["pay_cp"][verdict])
+            how = (f"{offer['skill'].title()} {roll.total} against DC {offer['dc']}, a "
+                   f"{verdict}: task level {offer['task']} in a {scale}, "
+                   f"{offer['proficiency']}")
+        parted = self.end_talk("walked away")
+        if verdict == "critical failure":
+            days = 1                 # PF2e: earns nothing, and is let go the first day
+        worked, body = self._work_hours(pc, days * int(r["hours_per_day"]))
+        # A day is paid when it is worked to its end: a body that gives out at noon has
+        # not earned the afternoon.
+        days_done = worked // int(r["hours_per_day"])
+        paid = per_day * days_done
+        if paid:
+            pc.purse = goods.credit(pc.purse, paid)
+        coins = goods.coinage()
+        as_ = f" as a {trade}" if trade else ""
+        tell = (f"{pc.name} works{as_} in {town} for {days_done} "
+                f"day{'s' if days_done != 1 else ''} ({how}). ")
+        if verdict == "critical failure":
+            tell += "It goes badly enough that the work ends after the first day, unpaid."
+        else:
+            tell += (f"The pay is {goods.purse_line(goods.coins_for(per_day), coins)} a day,"
+                     f" {goods.purse_line(goods.coins_for(paid), coins)} in all "
+                     f"({goods.purse_line(pc.purse, coins)} in hand).")
+        if days_done < days and verdict != "critical failure":
+            tell += f" The body gave out before the {days} days were done."
+        if body:
+            tell += f" The days cost them: {body}."
+        if parted:
+            tell += f" {parted}"
+        effects = [{"ref": pc.ref, "kind": "time",
+                    "minutes": worked * survival.MINUTES_PER_HOUR,
+                    "origin": "rule:day-work"},
+                   {"ref": pc.ref, "kind": "earned", "paid_cp": paid, "days": days_done,
+                    "task": offer["task"], "proficiency": offer["proficiency"],
+                    "degree": verdict, "origin": "rule:day-work"}]
+        return Outcome(intent_id=intent.id, op="work", rolls=[roll] if roll else [],
+                       dc=(dc_mod.ResolvedDC(value=offer["dc"], band=None).as_dict()
+                           if offer.get("dc") is not None else None),
+                       verdict=("success" if verdict in ("success", "critical success",
+                                                          "untrained") else "failure"),
+                       margin=margin, effects=effects, tell=tell, because=intent.because)
+
     def _check_move(self, intent: Intent, index: int) -> None:
         """A square is a claim about geometry, and geometry is checkable.
 
@@ -13786,6 +14164,9 @@ class Engine:
         # The seller's standing with this town's law moves the price (docs/wanted.md):
         # a fence pays a fugitive less for the reason he charges them more.
         asking = round(pricing.what_a_shop_pays(held, seller=actor, town=place) * count, 2)
+        # A counter talked round today pays more (`_op_haggle`, the owner's option B).
+        haggled = tradecraft.haggled(self.scene, actor.ref, place, stall, day)
+        asking = tradecraft.sell_price(asking, haggled)
         # A price the player has already agreed to caps the ask — that is the haggle,
         # and the trade screen is where it gets named. It can only ever lower the price
         # asked: a player cannot talk a stall into paying more than the goods are worth
@@ -13866,6 +14247,8 @@ class Engine:
 
         asking = round(pricing.what_a_shop_pays_for_goods(key, seller=actor, town=place)
                        * count, 2)
+        asking = tradecraft.sell_price(
+            asking, tradecraft.haggled(self.scene, actor.ref, place, stall, day))
         agreed = intent.params.get("accept")
         if agreed is not None:
             try:
@@ -13978,7 +14361,11 @@ class Engine:
                 intent, f"{who} has no {item_id} on the counter today. On the counter: "
                         f"{near or 'nothing'}.")
 
-        price = round(pricing.worth(found, buyer=actor, town=place) * count, 2)
+        # A counter talked round today sells for less (`_op_haggle`, the owner's option
+        # B): the price the shelf shows, moved by the percentage the haggle won.
+        haggled = tradecraft.haggled(self.scene, actor.ref, place, stall, day)
+        price = tradecraft.buy_price(
+            round(pricing.worth(found, buyer=actor, town=place) * count, 2), haggled)
         cp = int(round(price * 100))
         purse, paid = goods.spend(actor.purse, cp)
         coins = goods.coinage()
@@ -14015,6 +14402,7 @@ class Engine:
             tell=f"{actor.name} pays {who} {pricing.as_text(price)} for "
                  + (f"{goods.measure(count * per, found.unit)} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
+                 + (f", {haggled}% off for the haggle" if haggled else "")
                  + f". ({goods.purse_line(actor.purse, coins)} left.)" + arrived_tell,
             because=intent.because,
         )

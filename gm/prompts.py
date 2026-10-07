@@ -812,6 +812,13 @@ Selling something out of the satchel:
 "to": "<the buyer's ref, if they are in the scene>"}} — the engine prices it, checks what
 that stall can actually raise today and moves the coin. Never state a price or a sum of
 money in the narration: what the buyer can pay is not something you know.
+A character's trade (Craft, Profession) has its own ops, and the engine supplies the DC,
+the time, the cost and the pay: looking over a thing's make is {"op": "judge", "params":
+{"item": "<the thing>"}}; mending damaged gear is {"op": "mend", "params": {"item":
+"<the thing>"}}; a question of their trade is {"op": "trade_lore", "params": {"trade":
+"sailor", "depth": "basic"}} ("complex" for a hard one); haggling with the keeper here is
+{"op": "haggle", "target": "<the keeper's ref>"}; working for pay is {"op": "work",
+"params": {"days": 1, "trade": "<their trade>"}} (7 for a week). Never state the pay.
 Taking armour or a shield off, or putting away what is in hand: {"op": "take_off",
 "actor": "pc", "params": {"item": "armour"}} ("shield", or the thing's name). The engine
 says how long it takes, and a suit does not come off in the middle of a fight.

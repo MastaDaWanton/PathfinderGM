@@ -175,10 +175,15 @@ def check_terms(actor, level: int) -> list[dict]:
     track_level = max(0, int(level or 0))
     char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor is not None else 1
     intel = (_base_int(actor) - 10) // 2
+    from . import tradecraft
+
     return [
         {"label": f"Enchanter {track_level}", "value": track_level},
         {"label": f"half character level ({char_level})", "value": char_level // 2},
         {"label": "Intelligence", "value": intel},
+        # Half the Craft ranks (option A, 2026-10-07; `tradecraft.bench_terms`). Ranks
+        # are the character's own count, so the no-feedback rule above still holds.
+        *tradecraft.bench_terms(actor, "enchanter"),
     ]
 
 
