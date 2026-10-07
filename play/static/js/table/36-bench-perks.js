@@ -72,6 +72,23 @@
       ],
       icon: { potency: "essence", quality: "prepare", yield: "phial", capacity: "bind" },
     },
+    // The alchemist's five (owner Q6.2): herbalism's four and Containment, alchemy's own
+    // (-1 DC a pick on volatile steps, and every mishap's dice one step smaller). The words
+    // carry no number: lane F's `perk_info[id].next` says each next pick with its sizes
+    // ("+5% potency to everything you make, total +5%"), and a fallback that named a size
+    // would be a number the server never sent. Five is odd, so the last choice spans the
+    // grid's two columns (below) rather than sitting alone under an empty cell.
+    alchemist: {
+      prefix: "alchemy", title: "Alchemist", route: "/api/alchemy/perks",
+      perks: [
+        { id: "potency", name: "Potency", words: "Everything you make is stronger." },
+        { id: "duration", name: "Duration", words: "Everything you make lasts longer." },
+        { id: "quality", name: "Quality", words: "Your ceiling rises one rung." },
+        { id: "yield", name: "Extra yield", words: "A chance of one more from each bottling." },
+        { id: "containment", name: "Containment", words: "Volatile steps are easier, and a mishap's dice smaller." },
+      ],
+      icon: { potency: "reagent", duration: "brew", quality: "tincture", yield: "liquid", containment: "lock" },
+    },
   };
 
   var escHtml = function (s) {
@@ -82,8 +99,9 @@
   var noop = function () {};
   var openNow = null;            // one picker on the page at a time
 
-  // BenchPerks.open(o) opens the picker for `o.track` ("herbalist", "blacksmith" or
-  // "enchanter"; the enchanting bench, lane U1, calls it with its own pops and Esc stack):
+  // BenchPerks.open(o) opens the picker for `o.track` ("herbalist", "blacksmith", "enchanter"
+  // or "alchemist"; the enchanting and alchemy benches call it with their own pops and Esc
+  // stack):
   //   state      the track summary from the server: level, perks, picks_banked, perk_info
   //   pops       where the modal goes: inside the bench's own layer, so its trap holds it
   //   pushEsc / dropEsc   the bench's Esc stack (29-bench-core.js), one layer at a time
@@ -130,11 +148,14 @@
         '<i class="v2-rim" aria-hidden="true"></i>' +
         '<h3 id="' + titleId + '">' + (need === 1 ? "Pick a perk" : "Pick two perks") + '</h3>' +
         '<p>' + row.title + ' ' + esc(t.level) + '. The same perk twice is allowed.</p>' +
-        '<div class="pk-grid">' + PERKS.map(function (p) {
+        '<div class="pk-grid">' + PERKS.map(function (p, i) {
           var mine = picks.filter(function (x) { return x === p.id; }).length;
           var taken = (t.perks && t.perks[p.id]) || 0;
           var next = info[p.id] && info[p.id].next ? info[p.id].next : p.words;
-          return '<button type="button" class="pk' + (mine ? " is-on" : "") + '" data-perk="' + p.id + '" aria-pressed="' + (mine > 0) + '">' +
+          // An odd last choice spans the row (the alchemist's five); the four-perk tracks'
+          // markup is unchanged, byte for byte.
+          var span = PERKS.length % 2 && i === PERKS.length - 1 ? ' style="grid-column: 1 / -1"' : "";
+          return '<button type="button" class="pk' + (mine ? " is-on" : "") + '" data-perk="' + p.id + '"' + span + ' aria-pressed="' + (mine > 0) + '">' +
             (window.BenchIcons ? BenchIcons.html(ICON[p.id], { size: 34, label: p.name }) : "") +
             '<span class="pk-main"><b>' + esc(p.name) + (mine ? ' <span class="pk-x">×' + mine + '</span>' : "") + '</b>' +
             '<span class="pk-next">' + esc(next) + '</span>' +
