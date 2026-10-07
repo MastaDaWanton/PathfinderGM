@@ -65,12 +65,6 @@ from .tables import (
 SQUARES_BY_ZONE = {"engaged": 1, "near": 3, "far": 8}
 FEET_PER_SQUARE = 5
 
-# The seam, from what any success turns up to what only a check far past the DC reaches:
-# one tier further up for every five points over (`Engine._op_prospect`). It stopped at
-# rare until 2026-10-03, which kept every exotic and legendary mined metal out of reach of
-# the only door that digs.
-PROSPECT_TIERS = ("common", "uncommon", "rare", "exotic", "legendary")
-
 
 def zone_for_feet(feet: int) -> str:
     """The word for a distance. A bowshot is `far` however far past `far` it is."""
@@ -10915,17 +10909,66 @@ class Engine:
                        tell=tell, because=intent.because)
 
     def _op_forage(self, intent: Intent, partial: dict) -> Outcome:
-        """Search the ground here for what grows on it.
+        """Search the ground here for what grows on it: the herbalist's excursion through
+        the one gathering door (`_gather`).
 
         The table is assembled from the ingredient list rather than authored per biome:
         thirteen biomes across a hundred and sixty ingredients is two thousand rows nobody
         would keep current, and a herb added tomorrow should appear on every table it
-        belongs to without anyone editing one.
+        belongs to without anyone editing one. `track` names whose level the search is
+        made at; herbalist unless another craft is named.
         """
+        return self._gather(intent, partial, "herbalist:forage",
+                            level_track=str(intent.params.get("track") or "herbalist"))
+
+    def _op_prospect(self, intent: Intent, partial: dict) -> Outcome:
+        """Search the ground here for what can be dug out of it: the blacksmith's
+        excursion through the one gathering door (`_gather`) — "a search for ore and find
+        a massive vein guarded by a cave worm"."""
+        return self._gather(intent, partial, "blacksmith:prospect")
+
+    def _op_gather(self, intent: Intent, partial: dict) -> Outcome:
+        """Any craft's excursion onto open ground, named by the hub's key
+        ("alchemist:quarry", "leatherworker:gather"). The craft panel's door; the forage
+        and prospect ops are this with the key fixed."""
+        return self._gather(intent, partial, str(intent.params.get("key") or ""))
+
+    # The word for a refused excursion, by op: "No foraging happens."
+    _GATHER_NOUN = {"forage": "foraging", "prospect": "prospecting"}
+
+    def _gather(self, intent: Intent, partial: dict, key: str, *,
+                level_track: str | None = None) -> Outcome:
+        """The one gathering door: every craft's excursion onto open ground.
+
+        Herbalism's shape, which was the only one that ran the ground's encounter, asked
+        the narrator for prose and charged the body hour by hour; the prospect op and the
+        hub's excursions each had a formula of their own, and the alchemist's out-dug the
+        smith's at the smith's own trade (rules/gathering.py has the measurement). Now:
+
+          1. the ground underfoot, and nobody else here (`_too_busy_to_forage`);
+          2. the player's own d20 on the first hour, Survival plus the trade's level;
+          3. `survival.pass_hours` — the body consulted every hour, the stretch stopped
+             at the hour it fell over;
+          4. `foraging.forage` against this trade's table (`gathering.material_table`):
+             the same DC, bands and batches whatever is being gathered;
+          5. the haul carried, the clock advanced through `Scene.advance`;
+          6. mastery, one step per hour (`gathering.mastery_steps`,
+             `worldclass.award_step`);
+          7. the ground's encounter, once (`_gathering_encounter`).
+        """
+        from . import gathering
+
+        op = intent.op
+        noun = self._GATHER_NOUN.get(op, "gathering")
+        spec = gathering.excursion(key)
+        if spec is None:
+            return self._refuse(
+                intent, f"There is no gathering called {key or 'that'} — the craft "
+                        f"panel lists what each trade can go out and do.")
         who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
         actor = self.scene.actors.get(who) if who else None
         if actor is None:
-            raise IntentError("forage: nobody here to look", "refs")
+            raise IntentError(f"{op}: nobody here to look", "refs")
 
         busy = self._too_busy_to_forage(actor)
         if busy:
@@ -10936,9 +10979,8 @@ class Engine:
             # was refused for company, and the player got a 502 where "foraging takes
             # hours alone" should have been. The reason was always printable; now it
             # is printed.
-            return Outcome(intent_id=intent.id, op="forage", effects=[],
-                           tell=f"No foraging happens. {busy}",
-                           because=intent.because)
+            return Outcome(intent_id=intent.id, op=op, effects=[],
+                           tell=f"No {noun} happens. {busy}", because=intent.because)
 
         # The ground underfoot, and nothing else. Foraging used to honour a `biome`
         # parameter, which meant a request could search a forest from the middle of a
@@ -10950,7 +10992,7 @@ class Engine:
                 intent, "The ground here has not been named, so there is nothing to "
                         "search. Travel somewhere first.")
 
-        track_id = str(intent.params.get("track") or "herbalist").strip().lower()
+        track_id = str(level_track or spec["track"]).strip().lower()
         try:
             track = worldclass.get(track_id)
         except KeyError:
@@ -10962,10 +11004,30 @@ class Engine:
         level = actor.track(track.id).level
         ceiling = worldclass.tier_rank(track.at(level).max_tier)
 
-        hours = max(1, int(intent.params.get("hours", 1) or 1))
+        def table_of(at: int):
+            return gathering.material_table(spec, biome, at)
 
-        # The player rolls their own Survival — the popup, with the herbalism bonus in
-        # the breakdown where they can see what the track is worth. Raised before
+        # Ground that holds nothing of this trade's at any tier is said before an hour is
+        # spent on it: there is no ore in a ploughed field, and digging one for a day to
+        # learn so is the bench wasting the player's time. A forage keeps its old shape
+        # (the hours spent, "knows nothing that grows here"), which is a herbalist
+        # learning the ground rather than a smith misreading it.
+        if spec.get("source") != "ingredients" and table_of(len(foraging.WEIGHT)).empty:
+            return Outcome(intent_id=intent.id, op=op, effects=[],
+                           tell=f"{actor.name} looks, and there are no {spec['what']} in "
+                                f"{biomes.describe(biome).lower()} to find.",
+                           because=intent.because)
+
+        hours = max(1, int(intent.params.get("hours", 1) or 1))
+        dc = gathering.dc_for(spec, biome)
+        skill = str(spec.get("skill") or "survival")
+        craft_label = "herbalism" if track.id == "herbalist" else track.name
+        mods = foraging.check_mods(actor, level, craft_label, skill)
+        label = {"forage": "Foraging", "prospect": "Prospecting"}.get(
+            op, str(spec.get("verb") or "Gathering").title())
+
+        # The player rolls their own check — the popup, with the trade's bonus in the
+        # breakdown where they can see what the track is worth. Raised before
         # `pass_hours` because everything below this line mutates: a suspend after the
         # toll would charge the body twice for the same day when the roll came back.
         # The player's face is spent on the first hour; the engine rolls the rest.
@@ -10974,39 +11036,45 @@ class Engine:
             if "player_face" in partial:
                 face = int(partial.pop("player_face"))
             else:
-                mods = foraging.check_mods(actor, level)
                 raise _NeedsPlayerRoll({
-                    "label": f"Survival check — foraging ({biome})",
+                    "label": f"{skill.title()} check — "
+                             f"{noun if op in self._GATHER_NOUN else spec['verb']} "
+                             f"({biome})",
                     "die": "1d20",
                     "actor": actor.name,
                     "min": 1,
                     "max": 20,
                     "modifier": sum(m.value for m in mods),
                     "breakdown": [m.as_dict() for m in mods],
-                    "dc": foraging.dc_for(biome),
+                    "dc": dc,
                     "because": intent.because,
                     "intent_id": intent.id,
                 }, {})
 
-        # Foraging takes real time now, a minimum of an hour and as long as the player
-        # asks for. The body is consulted for every hour of it — see rules/survival.py —
-        # and a character who goes over is stopped at the hour they actually fell over
-        # rather than at the end of the stretch they meant to work.
+        # Real time, a minimum of an hour and as long as the player asks for. The body is
+        # consulted for every hour of it — see rules/survival.py — and a character who
+        # goes over is stopped at the hour they actually fell over rather than at the end
+        # of the stretch they meant to work.
         toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
         worked = max(1, toll.hours)
 
         result = foraging.forage(biome, level, ceiling, self.dice, hours=worked,
-                                 actor=actor, first_face=face)
+                                 actor=actor, first_face=face, table_of=table_of,
+                                 mods=mods, label=label, dc=dc)
         result["asked_for"] = hours
         result["toll"] = toll.as_dict()
+        result["excursion"] = spec["key"]
+        fresh = bool(spec.get("fresh"))
         for iid, n in result["found"].items():
-            # Stamped with the world clock, so the 48 hours an animal part has can
-            # be counted from something. Salt, if the character has any, is applied
-            # here rather than as a separate action — "preservation can be automatic if
-            # i have salt", and the turn you pick a gland up is the turn you are least
-            # likely to be thinking about when it goes off.
-            actor.carry(iid, n, pristine=result["pristine"].get(iid, 0),
-                        at_minute=self.scene.clock_minutes)
+            # Herbs are stamped with the world clock, so the 48 hours an animal part has
+            # can be counted from something, and salted on the spot if the character
+            # carries salt ("preservation can be automatic if i have salt"). Ore and salt
+            # keep: no clock is started on a stone.
+            if fresh:
+                actor.carry(iid, n, pristine=result["pristine"].get(iid, 0),
+                            at_minute=self.scene.clock_minutes)
+            else:
+                actor.carry(iid, n)
 
         # After `carry` above, deliberately: herbs are stamped with the clock as it
         # reads when they are picked, so advancing first would hand the player up to
@@ -11016,45 +11084,114 @@ class Engine:
         # for exactly these hours, and rolled the checks that go with them.
         self.scene.advance(worked * survival.MINUTES_PER_HOUR, charge_body=False)
 
+        names = self._gathered_names(spec, result["found"])
         span = f"{worked} hour{'s' if worked != 1 else ''}"
+        verb = str(spec.get("verb") or "searching")
         if result["empty"]:
             tell = (f"{actor.name} spends {span} and knows nothing that grows in "
-                    f"{biomes.describe(biome).lower()}.")
+                    f"{biomes.describe(biome).lower()}." if fresh else
+                    f"{actor.name} spends {span} and finds no {spec['what']} here that a "
+                    f"{track.name} of their standing can work.")
         elif result["found"]:
-            got = ", ".join(f"{n}× {ing_mod.get(i).name}"
-                            for i, n in result["found"].items())
-            tell = f"{span} of looking: {actor.name} comes back with {got}."
+            got = ", ".join(f"{n}× {names.get(i, i)}" for i, n in result["found"].items())
+            tell = f"{span} of {verb}: {actor.name} comes back with {got}."
             if result["pristine"]:
-                best = ", ".join(ing_mod.get(i).name for i in result["pristine"])
+                best = ", ".join(names.get(i, i) for i in result["pristine"])
                 tell += f" The {best} came up perfect."
         else:
             tell = f"{actor.name} spends {span} and finds nothing worth carrying."
 
         spoiled = [h["wrecked"] for h in result["hourly"] if h.get("wrecked")]
         if spoiled:
-            tell += (f" {len(spoiled)} hour{'s' if len(spoiled) != 1 else ''} came to "
-                     f"nothing but a spoiled {spoiled[0]}.")
+            many = len(spoiled) != 1
+            tell += (f" {len(spoiled)} hour{'s' if many else ''} came to nothing but a "
+                     f"spoiled {spoiled[0]}." if fresh else
+                     f" {len(spoiled)} hour{'s' if many else ''} came to nothing but "
+                     f"{spoiled[0]} broken up and lost in the getting.")
         if toll.checks:
             tell += f" It cost them: {survival_note(toll)}"
         if worked < hours:
-            tell += (f" They meant to keep at it for {hours} and did not last.")
+            tell += f" They meant to keep at it for {hours} and did not last."
 
-        # Once per expedition, the ground answers back (`rules/gathering.py`): a
-        # rich patch, a bear, or a hollow full of the good stuff with something
-        # sitting on it. After the haul is carried, because a rich find doubles what
-        # was actually found, and a guarded one is booked rather than handed over.
-        effects = [{"ref": actor.ref, "kind": "forage", **result}]
-        tell += self._gathering_encounter(actor, biome, level, "herbs",
-                                          found=result["found"], effects=effects)
+        effects = [{"ref": actor.ref, "kind": op,
+                    "names": names, **result}]
+        if op == "prospect":
+            # The prospect's old record shape, kept for the readers that knew it.
+            effects[0]["stock"] = [{"material": i, "base": names.get(i, i), "count": n}
+                                   for i, n in result["found"].items()]
+            effects[0]["hours"] = worked
+        # The work and the haul alone, before mastery and the encounter join the tell:
+        # the craft panel's closing narrates the hours, and the encounter gets a scene
+        # call of its own (`craft_views.encounter_scene`), so the two cannot both set
+        # the creature.
+        effects[0]["haul_tell"] = tell
 
-        return Outcome(
-            intent_id=intent.id, op="forage", effects=effects,
-            tell=tell, because=intent.because,
-        )
+        # Every successful hour pays, like a bench step (owner, 2026-10-05: "every
+        # success pays"; `MISHAP_LIMIT` stays for the hours that missed). Measured before
+        # this door: no gathering paid any mastery at all — a day prospecting taught a
+        # smith nothing.
+        tell += self._gathering_mastery(actor, track, spec, result["hourly"], effects)
+
+        # Once per expedition, the ground answers back (`rules/gathering.py`): a rich
+        # patch, a bear, or a hollow full of the good stuff with something sitting on
+        # it. After the haul is carried, because a rich find doubles what was actually
+        # found, and a guarded one is booked rather than handed over.
+        tell += self._gathering_encounter(actor, biome, level, spec["what"],
+                                          found=result["found"], effects=effects,
+                                          spot=str(spec.get("spot") or ""),
+                                          dug=spec.get("obtain") == "mined",
+                                          fresh=fresh)
+
+        return Outcome(intent_id=intent.id, op=op, effects=effects, tell=tell,
+                       because=intent.because)
+
+    @staticmethod
+    def _gathered_names(spec: dict, found: dict) -> dict:
+        """Display names for a haul: ingredients for herbs, the trade's shelf otherwise."""
+        out: dict[str, str] = {}
+        for iid in found:
+            name = ""
+            if spec.get("source") == "ingredients":
+                try:
+                    name = ing_mod.get(iid).name
+                except KeyError:
+                    name = ""
+            else:
+                from . import benches
+
+                try:
+                    name = benches.module_for(spec["track"]).get(iid).name
+                except Exception:  # noqa: BLE001 - an id is a name of last resort
+                    name = ""
+            out[iid] = name or str(iid).replace("-", " ").title()
+        return out
+
+    def _gathering_mastery(self, actor, track, spec: dict, hourly: list,
+                           effects: list) -> str:
+        """Pay the day's steps through `worldclass.award_step`; return the tell clause."""
+        from . import gathering
+
+        progress = actor.track(track.id)
+        gained, levelled = 0, []
+        for step in gathering.mastery_steps(hourly):
+            got = worldclass.award_step(
+                track, progress, method=str(spec.get("id") or "gather"),
+                ingredient_id=step["id"], rarity_rank=step["rank"], quality_index=0,
+                success=step["success"], name=step["name"])
+            gained += int(got.get("mp", 0) or 0)
+            levelled += list(got.get("levelled") or [])
+        if not gained and not levelled:
+            return ""
+        effects.append({"ref": actor.ref, "kind": "mastery", "track": track.id,
+                        "mp": gained, "levelled": levelled})
+        line = f" {actor.name} gains {gained} {track.name} mastery for the work."
+        if levelled:
+            line += f" {track.name} {max(levelled)} now."
+        return line
 
     def _gathering_encounter(self, actor, biome: str, level: int, what: str, *,
-                             found: dict | None = None, stock: list | None = None,
-                             effects: list) -> str:
+                             found: dict | None = None, effects: list, spot: str = "",
+                             dug: bool | None = None, fresh: bool = True) -> str:
         """The expedition's one encounter roll, applied. Returns the tell's clause.
 
         A rich find multiplies the haul in hand. A creature is brought on by the one
@@ -11062,6 +11199,10 @@ class Engine:
         fight the moment it is seen, with the player's own first swing still theirs.
         A guarded find is booked on the scene and paid when the guard is down or gone
         (`_settle_guarded_finds`), so the vein is real and the fight for it is real.
+
+        `spot` and `dug` are the excursion's own words (content/rules/gathering.json):
+        a seam of salt, a stand of oak, out of the rock or out of the undergrowth.
+        `fresh` stamps the clock on what is carried, which herbs need and stone does not.
         """
         from . import gathering
 
@@ -11069,20 +11210,14 @@ class Engine:
         enc = gathering.roll(biome, max(1, int(level)), self.dice)
         if enc.kind == "quiet":
             return ""
-        clause = " " + gathering.describe(enc, what, biome)
+        clause = " " + gathering.describe(enc, what, biome, spot=spot, dug=dug)
         effects.append({"kind": "gathering", "encounter": enc.kind, "roll": enc.roll,
                         "creature": (enc.creature or {}).get("name", ""),
                         "aggressive": enc.aggressive})
         if enc.kind == "rich":
             for iid, n in list((found or {}).items()):
                 actor.carry(iid, int(n) * (enc.yield_times - 1),
-                            at_minute=self.scene.clock_minutes)
-            for s in stock or []:
-                actor.add_stock(crafting.Stock(base=s["base"], tier=s.get("tier", "common"),
-                                               kind=s.get("kind", "ore"),
-                                               craft=s.get("craft", "blacksmith"),
-                                               from_materials=([s["material"]] if s.get("material") else [])),
-                                int(s.get("count", 1)) * (enc.yield_times - 1))
+                            at_minute=self.scene.clock_minutes if fresh else None)
             return clause
         made = self._bring_in(enc.creature["id"], count=1, name=enc.creature["name"])
         ref = made[0]["ref"]
@@ -11104,11 +11239,13 @@ class Engine:
         # "a Clockwork Spy has the ground you wanted, and has not moved off it", which
         # the owner could not parse — and nothing anywhere held it there: the planner
         # never heard of it and the patch was simply gone.
-        spot = gathering.spot_for(what, biome)
+        spot = gathering.spot_for(what, biome, spot)
         times = enc.yield_times if enc.kind == "guarded" else 1
         booked_found = {iid: int(n) * times for iid, n in (found or {}).items() if int(n)}
-        booked_stock = [dict(s, count=int(s.get("count", 1)) * times)
-                        for s in (stock or []) if int(s.get("count", 1))]
+        # Booked finds held a `stock` list while the prospect wrote Stock records; every
+        # excursion carries by material id now. Kept empty, so `_settle_guarded_finds`
+        # still reads a save booked before the shared door.
+        booked_stock: list = []
         stance = self._hold_ground(ref, spot, f"gathering:{what}@"
                                           f"{self.scene.clock_minutes}")
         clause += " " + stance
@@ -11120,7 +11257,8 @@ class Engine:
             self.scene.guarded_finds.append({
                 "guard": ref, "guard_name": enc.creature["name"],
                 "what": f"{what} find" if enc.kind == "guarded" else spot,
-                "found": booked_found, "stock": booked_stock,
+                "found": booked_found, "stock": booked_stock, "fresh": fresh,
+                "names": dict((effects[0].get("names") or {}) if effects else {}),
                 "at": self.scene.at,
             })
             if enc.kind == "creature":
@@ -11247,114 +11385,6 @@ class Engine:
                                    effects=[{"kind": "guarded_find", "claimed": True}],
                                    tell=line, because="its guard is gone"))
         return out
-
-    def _op_prospect(self, intent: Intent, partial: dict) -> Outcome:
-        """Search the ground here for what can be dug out of it.
-
-        The forage op's shape, against the blacksmith's stock list instead of the
-        herbalist's: the ores that carry this biome in their tags are the table, the
-        Survival check and the hours and the body's toll are the same, and the
-        expedition rolls the same encounter — "a search for ore and find a massive
-        vein guarded by a cave worm".
-        """
-        from . import blacksmith
-
-        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
-        actor = self.scene.actors.get(who) if who else None
-        if actor is None:
-            raise IntentError("prospect: nobody here to look", "refs")
-        busy = self._too_busy_to_forage(actor)
-        if busy:
-            return Outcome(intent_id=intent.id, op="prospect", effects=[],
-                           tell=f"No prospecting happens. {busy}", because=intent.because)
-        biome = biomes.canonical(str(self.scene.biome or ""))
-        if biome is None:
-            return self._refuse(
-                intent, "The ground here has not been named, so there is nothing to "
-                        "search. Travel somewhere first.")
-        # Everything the smith's own shelf says is MINED on this ground (`obtainable`, the
-        # excursion's declared table) — ore, the native metals (star-iron, viridium),
-        # coal, limestone — not only `kind == "ore"`, which left 16 of the shelf's 36 mined
-        # materials unfindable by the one door that digs (measured 2026-10-03).
-        ores = blacksmith.obtainable("mined", biome=biome)
-        if not ores:
-            return Outcome(intent_id=intent.id, op="prospect", effects=[],
-                           tell=f"{actor.name} looks, and there is no ore in "
-                                f"{biomes.describe(biome).lower()} to find.",
-                           because=intent.because)
-        hours = max(1, int(intent.params.get("hours", 1) or 1))
-        level = actor.track("blacksmith").level if hasattr(actor, "track") else 1
-        face = None
-        if actor.is_pc:
-            if "player_face" in partial:
-                face = int(partial.pop("player_face"))
-            else:
-                mods = foraging.check_mods(actor, level)
-                raise _NeedsPlayerRoll({
-                    "label": f"Survival check — prospecting ({biome})",
-                    "die": "1d20", "actor": actor.name, "min": 1, "max": 20,
-                    "modifier": sum(m.value for m in mods),
-                    "breakdown": [m.as_dict() for m in mods],
-                    "dc": foraging.dc_for(biome), "because": intent.because,
-                    "intent_id": intent.id,
-                }, {})
-        toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
-        worked = max(1, toll.hours)
-        dc = foraging.dc_for(biome)
-        mods = foraging.check_mods(actor, level)
-        bonus = sum(m.value for m in mods)
-        # Common ore is the bulk of any seam; rarer ore turns up when the check clears
-        # the DC by more. The player's face on the first hour, the engine's after.
-        stock: list[dict] = []
-        for hour in range(worked):
-            die = face if (hour == 0 and face is not None) else self.dice.roll(
-                "1d20", label="prospecting", visibility="hidden").total
-            margin = die + bonus - dc
-            if margin < 0:
-                continue
-            # Each band of five over the DC reaches one tier further up the seam. The
-            # old fallback (`or ores`) handed out ANY tier when none was in reach, so on
-            # ground whose only mined things are exotic a bare success dug up exotic
-            # metal; nothing in reach now means nothing found that hour.
-            tiers = PROSPECT_TIERS[:1 + min(len(PROSPECT_TIERS) - 1, margin // 5)]
-            pool = [m for m in ores if m.tier in tiers]
-            if not pool:
-                continue
-            pick = pool[self.dice.roll(f"1d{len(pool)}", label="which ore",
-                                       visibility="hidden").total - 1]
-            count = 1 + margin // 5
-            # `craft: "blacksmith"` — the bench's own track id. This wrote "smithing",
-            # and the bench filters its stock on `craft == "blacksmith"`
-            # (`play/craft_views._stock_of`): RUN 2026-10-03 on scratch data, three
-            # hours in the hills brought back 4 Calamine and 1 Copper Ore and the forge
-            # saw none of it. `from_materials` names the material id, so a reader keyed
-            # on ids ("calamine") finds a stack keyed "calamine#1".
-            stock.append({"base": pick.name, "tier": pick.tier, "kind": pick.kind,
-                          "craft": "blacksmith", "count": count, "material": pick.id})
-        for s in stock:
-            actor.add_stock(crafting.Stock(base=s["base"], tier=s["tier"], kind=s["kind"],
-                                           craft="blacksmith",
-                                           from_materials=[s["material"]]), s["count"])
-        self.scene.advance(worked * survival.MINUTES_PER_HOUR, charge_body=False)
-        span = f"{worked} hour{'s' if worked != 1 else ''}"
-        if stock:
-            # One count per thing found: "2× Calamine, 2× Calamine" read as two finds of
-            # something the tell had already named (seen in the same run).
-            totals: dict[str, int] = {}
-            for s in stock:
-                totals[s["base"]] = totals.get(s["base"], 0) + int(s["count"])
-            got = ", ".join(f"{n}× {base}" for base, n in totals.items())
-            tell = f"{span} of digging: {actor.name} comes back with {got}."
-        else:
-            tell = f"{actor.name} spends {span} and turns up nothing worth carrying."
-        if toll.checks:
-            tell += f" It cost them: {survival_note(toll)}"
-        effects = [{"ref": actor.ref, "kind": "prospect", "stock": stock,
-                    "hours": worked, "toll": toll.as_dict()}]
-        tell += self._gathering_encounter(actor, biome, level, "ore",
-                                          stock=stock, effects=effects)
-        return Outcome(intent_id=intent.id, op="prospect", effects=effects,
-                       tell=tell, because=intent.because)
 
     # --- the doors places come in by (rules/places.py) --------------------------------
 
@@ -17360,9 +17390,21 @@ class Engine:
                 kept.append(g)
                 continue
             got = []
+            # `fresh` and `names` arrive with the shared gathering door: a booked seam of
+            # ore has no herb's clock and no entry in the ingredient list, and reading its
+            # name there raised KeyError the first time a guarded vein of ore was paid.
+            # A booking from before them is herbs, which is what they default to.
+            fresh = bool(g.get("fresh", True))
+            names = g.get("names") or {}
             for iid, n in (g.get("found") or {}).items():
-                pc.carry(iid, int(n), at_minute=self.scene.clock_minutes)
-                got.append(f"{n}× {ing_mod.get(iid).name}")
+                pc.carry(iid, int(n), at_minute=self.scene.clock_minutes if fresh else None)
+                name = names.get(iid)
+                if not name:
+                    try:
+                        name = ing_mod.get(iid).name
+                    except KeyError:
+                        name = str(iid).replace("-", " ").title()
+                got.append(f"{n}× {name}")
             for s in g.get("stock") or []:
                 pc.add_stock(crafting.Stock(base=s["base"], tier=s.get("tier", "common"),
                                             kind=s.get("kind", "ore"),

@@ -16,6 +16,10 @@
 // engine does not know"), and tests/test_sheet_pages.py runs these functions in node to
 // hold them to it.
 
+// The skill card (js/skillhelp.js) reads the sheet's own words, `full_sheet`'s
+// "skill_help" — what each skill does in this game.
+if (typeof SkillHelp !== "undefined") SkillHelp.use(() => SHEET && SHEET.skill_help);
+
 const TABS = [
   ["sheet",     "Sheet",     s => pageSheet(s)],
   ["equipment", "Equipment", s => pageEquipment(s)],
@@ -442,11 +446,16 @@ function lvSkillsBlock(due) {
       with a rank adds +3.</p>
     <dl class="skills">${due.skills.map(k => {
       const add = LVSK.spread[k.name] || 0;
-      return `<div><dt>${esc(title(k.name))}${k.class_skill ? ` <small class="cls">class</small>` : ""}</dt>
+      // What the skill does in this game, on hover, on focus of its − / + and on its "?"
+      // (js/skillhelp.js; the owner, 2026-10-06).
+      const help = typeof SkillHelp !== "undefined" ? SkillHelp.descId(k.name) : "";
+      const desc = help ? ` aria-describedby="${help}"` : "";
+      return `<div${help ? ` data-skillhelp="${esc(k.name)}"` : ""}><dt>${esc(title(k.name))}${
+        k.class_skill ? ` <small class="cls">class</small>` : ""}${help ? SkillHelp.info(k.name) : ""}</dt>
         <dd>${k.rank}${add ? ` → ${k.rank + add}` : ""}
-          <button type="button" class="spbtn quiet" data-lvskdn="${esc(k.name)}"
+          <button type="button" class="spbtn quiet" data-lvskdn="${esc(k.name)}"${desc}
             aria-label="One rank fewer in ${esc(k.name)}" ${add ? "" : "disabled"}>−</button>
-          <button type="button" class="spbtn quiet" data-lvskup="${esc(k.name)}"
+          <button type="button" class="spbtn quiet" data-lvskup="${esc(k.name)}"${desc}
             aria-label="One rank more in ${esc(k.name)}" ${
               placed < due.owed && k.rank + add < due.max_rank ? "" : "disabled"}>+</button></dd></div>`;
     }).join("")}</dl>

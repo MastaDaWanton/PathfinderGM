@@ -214,6 +214,7 @@ never given the shipped metal's numbers by guess.
 | `play.materials[].working` | Absent | At least one working trait (`forgiving`, `slaggy`, `narrow_window`, `reactive`...) |
 | `play.materials[].quench_mark` | Absent | Quenchants only: one small effect |
 | `play.materials[].forms`, `feeds`, `finishes`, `not_on`, `book`, `assay_danger` | Absent | As `campaign-format.md` describes; all default sensibly, and `book` stays `false` for a world's own metal |
+| `play.materials[].kind` + `.biomes` + `.obtain` | Absent | **Read by every trade's gathering since 2026-10-06** (the one gathering door, `content/rules/gathering.json`): `obtain` says which excursion can find it (`mined`, `gathered`), `biomes` where, and `kind` which trade goes out for it — an `ore` or `metal` comes to the smith's prospect in full batches and to the alchemist's quarry at half, a `salt` or `reagent` the other way round. How many of a trade's own kinds a ground holds also sets that ground's DC for the trade (none: 20, one to five: 15, six or more: 10), so a world whose hills hold six ores of its own makes its hills easy prospecting. No list of where things are found is needed beyond each row's own `biomes` |
 
 ### What an enchanter needs from a world (enchanting revamp, lanes B, D and H)
 
@@ -254,7 +255,7 @@ come from. A world essence is a `play.materials[]` row with `kind` `essence`, sh
 | `.polarity` | Absent | Where it wants to sit: `weapon`, `armour`, `ward` (rings, cloaks, belts) or `any` |
 | `.house` | Absent | The essence's own small flavour on top of the book: at least one typed top-up, each `"house": true`, inside the tier's ceiling (common and uncommon ±1, rare and exotic ±2, legendary ±3), drawbacks included. Never `narrative`, never one of the magic-item types still waiting on a reader. Scaled at bind time by the binding's quality, read live |
 | `.working`, `.affinity`, `.color` | Absent | As the shipped rows: circle traits (`night_only`, `eager`, `skittish`, `heavy`, `volatile`, `pure`), the material ids that suit it, the glow on the stage |
-| creature harvest tags | Absent | The leatherworker's harvest tags extended to essences (`harvest.essence.fire` on a world's fire creature), so a slain creature yields its family's essence by the same reader. No reader yet |
+| creature harvest tags | Absent | The leatherworker's harvest tags extended to essences (`harvest.essence.fire` on a world's fire creature), so a slain creature yields its family's essence by the same reader. **Reader built 2026-10-06** (`rules/gathering.py` `harvest_tagged`, every carcass excursion): `harvest.<branch>.<material-id>` on the creature's `tags`, branches `hide`/`horn`/`bone`/`sinew`/`scales` (leather), `blood` (forge), `reagent` (alchemy), `essence` (enchanting), `part` (herbalism); a tag naming no material on that craft's shelf is ignored; a creature with none is matched by name as before |
 
 **A world's own named magic items** (lane H). An heirloom blade, the ring every reeve
 wears: `play.magic_items[]` in `campaign-format.md`, shaped as the app stores an enchanted

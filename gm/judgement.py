@@ -802,7 +802,8 @@ def _can_be_fought(actor) -> bool:
 
 # Ops whose subject is a person and whose unnamed subject is the player. `attack` is
 # deliberately absent: who you are hitting is never obvious from the op alone.
-_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "prospect", "found",
+_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "prospect", "gather",
+             "found",
              "venture", "condition",
              "ability_damage", "resource", "give"}
 
@@ -5769,14 +5770,15 @@ def inject_wait(raw_intents, player_text: str, scene) -> list:
         present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
         pc = scene.pc()
         if pc is not None and not present & {"rest", "travel", "venture", "forage",
-                                             "prospect"}:
+                                             "prospect", "gather"}:
             return [r for r in raw_intents if not (isinstance(r, dict) and str(
                 r.get("op", "")).lower() == "narrate_only")] + [{
                 "op": "advance_time", "actor": pc.ref,
                 "params": {"amount": until, "unit": "minutes"},
                 "because": "the player waited until a time they named"}]
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
-    if present & {"advance_time", "rest", "forage", "prospect", "travel", "venture"}:
+    if present & {"advance_time", "rest", "forage", "prospect", "gather", "travel",
+                  "venture"}:
         return raw_intents
     m = _WAITS.search(player_text)
     if not m:

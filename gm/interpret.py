@@ -1105,6 +1105,7 @@ _OP_NEEDS = {
     "sell": {"sell"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
+    "gather": {"gather"},
     "loot": {"take", "steal"}, "cast": {"cast"},
     "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},
     "taste": {"consume", "use"},

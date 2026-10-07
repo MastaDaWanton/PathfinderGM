@@ -404,6 +404,17 @@ def _feat_index() -> list[dict]:
         key=lambda row: row["name"].lower())
 
 
+def _skill_help() -> dict:
+    """The skill hover's words. A missing or broken file costs the hover, not the forge:
+    the creator still builds a character with bare names, as it did before 0.2.10."""
+    try:
+        from . import skillhelp
+
+        return skillhelp.for_page()
+    except Exception:      # noqa: BLE001 - the hover is help text, never a gate
+        return {"general": "", "skills": {}}
+
+
 def _world(world_id: str):
     """The world a forge was opened from, or None: a bad id is the caller's problem
     to report, not this module's to raise over."""
@@ -490,6 +501,9 @@ def options(world_id: str = "") -> dict:
         "ability_cap": houserules.ability_cap(),
         "ability_floor": ABILITY_FLOOR,
         "skills": sorted(SKILLS),
+        # What each skill does in this game, for the hover on its name
+        # (content/rules/skills-explained.json, `rules/skillhelp.py`).
+        "skill_help": _skill_help(),
         "spells_known": SPELLS_KNOWN,
         # What the forge asks. Woman and man, and then whatever sets this table has
         # turned on — a set is offered here rather than in a second question because it

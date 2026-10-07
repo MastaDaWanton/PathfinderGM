@@ -58,10 +58,12 @@ from django.test.signals import setting_changed  # noqa: E402
 _CACHED = (
     "rules.backgrounds", "rules.bestiary", "rules.blacksmith", "rules.bluff",
     "rules.class_abilities", "rules.classes",
-    "rules.enchanter", "rules.feats", "rules.gear", "rules.hazards", "rules.ingredients",
+    "rules.enchanter", "rules.feats", "rules.gathering", "rules.gear", "rules.hazards",
+    "rules.ingredients",
     "rules.lives",
     "rules.leatherworker",
-    "rules.magicitem", "rules.market", "rules.population", "rules.repair", "rules.spells",
+    "rules.magicitem", "rules.market", "rules.population", "rules.repair", "rules.skillhelp",
+    "rules.spells",
     "rules.weapons",
     "rules.worldclass",
 )

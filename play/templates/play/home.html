@@ -10,6 +10,8 @@
      theme's image tokens. The shelf is built by script, so it keeps its own selectors and
      reads the tokens rather than taking the theme's classes. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- The skill card (what a skill does in this game), shared with the table. -->
+<link rel="stylesheet" href="{% asset 'css/skillhelp.css' %}">
 <style>
   @font-face {
     font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
@@ -839,6 +841,7 @@
 <script src="{% asset 'js/sound.js' %}"></script>
 <script src="{% asset 'js/music.js' %}"></script>
 <script>window.Music && Music.start("ambient");</script>
+<script src="{% asset 'js/skillhelp.js' %}"></script>
 <script>
 const STATE = {{ state_json|safe }};
 // Who was just forged, if the forge sent us back here. Opens on the roster rather than
@@ -2151,6 +2154,8 @@ function paneCharacters() {
 // is what the thing is. The server is the authority on every rule — the counters here are
 // a courtesy, and the submit round-trips the whole form and renders every problem at once.
 let FORGE = null;   // { opts, form } while the forge is open
+// The skill card reads the forge's own options (`creation.options`, "skill_help").
+SkillHelp.use(() => FORGE && FORGE.opts && FORGE.opts.skill_help);
 
 // The whole race card, on demand: the forge's cards show one clipped line and a
 // details button, so twelve races fit on a screen.
@@ -2923,10 +2928,13 @@ function paneForgeWho() {
         return n ? ` +${n} ${esc((r.name || "race").toLowerCase())}` : "";
       })()} + Int)` : ""}. More arrive with every level, on the Class tab.</span>
       <b>${f.skills.length} / ${rb}</b></div>
-    <div class="skillgrid">${opts.skills.map(s => `
+    <p class="note">Hover over a skill, tab to it or press its ? to see what it does in
+      this game.</p>
+    <div class="skillgrid">${opts.skills.map(s => SkillHelp.row(s, `
       <label class="${cls && cls.class_skills.includes(s) ? "classskill" : ""}">
         <input type="checkbox" data-crskill="${esc(s)}" ${
-          f.skills.includes(s) ? "checked" : ""}> ${esc(s)}</label>`).join("")}</div>
+          f.skills.includes(s) ? "checked" : ""}${SkillHelp.descId(s)
+          ? ` aria-describedby="${SkillHelp.descId(s)}"` : ""}> ${esc(s)}</label>`)).join("")}</div>
 
     <div id="forgeproblems"></div>
     <div style="display:flex;gap:12px;margin-top:18px">

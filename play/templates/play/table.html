@@ -2530,6 +2530,13 @@
   .skills dt small.cls { color: var(--accent); }
   .skills dd { margin: 0; color: var(--gold); font-variant-numeric: tabular-nums; }
   .skills .terms-line { grid-column: 1 / -1; display: none; font-size: 12.5px; }
+  /* The level-up rank picker borrows the Skills card's two columns, but each row carries
+     a rank and two 60px buttons where the card carries one number: measured 2026-10-06 in
+     a 342px sheet column at a 1440px window, the buttons took 134px of a 158px column and
+     left the name 13.75px, so "Perception" was drawn under its own rank. One column gives
+     the names their room. */
+  .lvskills .skills { grid-template-columns: minmax(0, 1fr); }
+  .lvskills .skills dd { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .skills.showterms .terms-line { display: block; }
   .feats { margin: 0; }
   .feats > div { padding: 5px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
@@ -3196,6 +3203,10 @@
 {% asset 'js/sound.js' as sound_js %}{% if '?v=' in sound_js %}<script src="{% asset 'js/sound.js' %}"></script>{% endif %}
 <script src="{% asset 'js/music.js' %}"></script>
 <script src="{% static 'js/scene3d.js' %}"></script>
+<!-- What a skill does in this game: the card beside a skill's name in the level-up rank
+     picker, shared with the forge. Ahead of the table's scripts, which hand it the sheet. -->
+<link rel="stylesheet" href="{% asset 'css/skillhelp.css' %}">
+<script src="{% asset 'js/skillhelp.js' %}"></script>
 </head>
 <body class="page-backdrop-room mode-table">
 <script>

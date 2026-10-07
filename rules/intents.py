@@ -457,6 +457,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Ore, not herbs: the same expedition against the blacksmith's stock list, in
     # ground that carries it — mountain, hills, underground, a bog for bog iron.
     "prospect": ((), ("actor", "hours"), "player"),
+    # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
+    # "leatherworker:gather", content/rules/gathering.json): the one gathering door
+    # forage and prospect also run through (`Engine._gather`). The same hours, the same
+    # Survival check against the same ground, the same encounter roll.
+    "gather": (("key",), ("actor", "hours"), "player"),
     # Stripping a body. "I loot the watchman I take everything" was narration and
     # nothing else — the coins, the sword, the chain shirt all described and none of
     # them in the inventory — the same gap the trade op closed for shops. `from` is
@@ -1364,7 +1369,11 @@ def _check_params(intent: Intent, index: int) -> None:
                 p["count"], 1, 500, index,
                 "give: count is how many of the item change hands")
 
-    elif op == "forage":
+    elif op in ("forage", "prospect", "gather"):
+        # Every op through the one gathering door (`Engine._gather`) runs the same hour
+        # loop, so every one takes the same bound: prospect had none at all until the
+        # door was shared (2026-10-06), the copy this comment's rule never reached.
+        #
         # Bounded on the browser path and bounded in the injector; unbounded on the one
         # path the model actually uses, where it drives the loop the op runs. A day is
         # already an enormous forage — `_op_forage` refuses company for a reason.
@@ -1376,7 +1385,7 @@ def _check_params(intent: Intent, index: int) -> None:
         if p.get("hours") not in (None, ""):
             p["hours"] = _bounded(
                 p["hours"], 1, 48, index,
-                "forage: hours is how long is spent on the ground, 1 to 48")
+                f"{op}: hours is how long is spent on the ground, 1 to 48")
 
     elif op == "move":
         # Optional now (see the op table): a zone word the fiction never contains is
@@ -1870,7 +1879,9 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
         if op in ("loot", "trade", "buy", "sell", "give", "pay"):
             allow("purse")
             allow("items")
-        if op in ("forage", "craft", "take"):
+        # Every gathering door brings things home; prospect was missing from this list,
+        # so a dug haul's prose could be scrubbed as an invented item.
+        if op in ("forage", "prospect", "gather", "craft", "take"):
             allow("items")
         if op == "xp":
             allow("xp")
