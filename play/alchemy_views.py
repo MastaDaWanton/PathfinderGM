@@ -81,6 +81,24 @@ def _known_places(c):
         return ()
 
 
+def _lab_line(c) -> str:
+    """Lane G's one sentence about where the alchemist can work (`places.laboratory_line`):
+    the city's laboratory by name, or "<town> has no laboratory to rent" with what still
+    works, or "" when standing in one. Before this the state said nothing about where a
+    laboratory was, so Distill read "Needs a laboratory" in a city that had one two
+    streets away, and in a village with none at all, in the same words."""
+    from rules import places
+
+    try:
+        location = c.world.get(c.scene.location_id) if getattr(c, "world", None) else None
+    except Exception:      # noqa: BLE001 - a line is never worth failing the state for
+        location = None
+    try:
+        return places.laboratory_line(c.scene, _known_places(c), location)
+    except Exception:      # noqa: BLE001
+        return ""
+
+
 def _where(c, pc) -> dict:
     got = al.where_here(c.scene, pc, _known_places(c))
     place = ""
@@ -91,6 +109,7 @@ def _where(c, pc) -> dict:
     lab = got.get("lab")
     scene_kind = (lab or {}).get("kind") or ("kit" if got.get("kit") else "")
     return dict(got, place=place, biome=getattr(c, "biome", "") or "",
+                lab_line=_lab_line(c),
                 scene={"kind": scene_kind or "kit", "biome": getattr(c, "biome", "") or "",
                        "minute": _now(c)})
 
@@ -180,8 +199,15 @@ def _row(pc, it: al.Item) -> dict:
     if rec:
         q = rec.get("quality_index")
         out["quality_name"] = worldclass.quality_name(int(q)) if q is not None else None
+        live = it.live or rec
         out["grades"] = [{"essence": r.get("essence") or r["key"], "grade": r.get("grade", 1)}
-                         for r in rec.get("traits") or ()]
+                         for r in live.get("traits") or ()]
+        # What time has done, in words the page prints as they are (plan §5.5, §12.1).
+        out["spoiled"] = it.spoiled or None
+        faded = int(live.get("faded") or 0)
+        out["faded"] = (f"{faded} day{'s' if faded != 1 else ''} unsealed in the light: "
+                        f"each of its virtues {faded} grade{'s' if faded != 1 else ''} "
+                        f"weaker" if faded else None)
         keeps = items.form_row(str(rec.get("form") or "")).get("keeps") \
             if it.intermediate else None
         if keeps:
@@ -290,7 +316,27 @@ def _plan_from(c, pc, body, *, reserved=None):
     _t, progress = _progress(pc)
     plan = al.plan_step(pc, progress, method, body, where=_where(c, pc), now=_now(c),
                         reserved=reserved)
+    # The hours are paid before they are worked, as at the forge (`forge_views._plan_from`):
+    # a purse that cannot cover them is a problem in words before the roll. Before this
+    # the roll's `goods.spend` failed quietly and the step was worked in the town's
+    # laboratory for nothing.
+    rent = al.rent_cp(c.scene, plan.lab, plan.minutes, _known_places(c)) if plan.units else 0
+    if rent:
+        from rules import goods
+
+        have = goods.in_copper(pc.purse)
+        if have < rent:
+            plan.problems.append(f"The laboratory wants {_coins(rent)} for the "
+                                 f"{_hours(plan.minutes)}, and you carry {_coins(have)}.")
     return plan, None
+
+
+def _hours(minutes: int) -> str:
+    minutes = int(minutes or 0)
+    if minutes % 60 == 0:
+        h = minutes // 60
+        return f"{h} hour{'s' if h != 1 else ''}"
+    return f"{minutes} minutes"
 
 
 def _secret(plan) -> bool:
@@ -735,6 +781,15 @@ def alchemy_assay(request):
     face, refused = _face(body)
     if refused:
         return refused
+    from rules import goods
+
+    # An assay in somebody else's laboratory takes the +2 of its glass, so it pays for the
+    # glass's ten minutes too (the roll's rent rule); refused in words before the pinch.
+    est = int((al.method_row("assay") or {}).get("minutes", 10) or 10)
+    owed = al.rent_cp(c.scene, where.get("lab"), est, _known_places(c))
+    if owed and goods.in_copper(pc.purse) < owed:
+        return _err(f"The laboratory wants {_coins(owed)} for the {_hours(est)}, and you "
+                    f"carry {_coins(goods.in_copper(pc.purse))}.", 409)
     track, progress = _progress(pc)
     terms = al.check_terms(pc, progress.level, lab=bool(where.get("lab")))
     bonus_v = sum(t["value"] for t in terms)
@@ -747,6 +802,14 @@ def alchemy_assay(request):
     tenths = int(round(float((got.get("cost") or {}).get("pinch", 0.1) or 0.1) * 10)) or 1
     pinch = al.take_pinch(pc, src, tenths)
     minutes = int(got.get("minutes", (al.method_row("assay") or {}).get("minutes", 10)))
+    paid = []
+    rent = al.rent_cp(c.scene, where.get("lab"), minutes, _known_places(c))
+    if rent:
+        purse, ok = goods.spend(pc.purse, rent)
+        if ok:
+            pc.purse = purse
+            paid.append({"cp": rent, "words": _coins(rent),
+                         "to": (where.get("lab") or {}).get("keeper")})
     c.scene.advance(minutes)
     revealed = list(got.get("revealed") or [])
     rows = {r.get("key"): r for r in knowledge.properties(pc, doc)} if revealed else {}
@@ -775,7 +838,7 @@ def alchemy_assay(request):
         "roll": {"face": face, "bonus": bonus_v, "total": total, "terms": terms,
                  "dc": got.get("dc"), "success": got.get("success")},
         "dc": got.get("dc"), "success": got.get("success"),
-        "revealed": found, "pinch": pinch, "minutes": minutes,
+        "revealed": found, "pinch": pinch, "minutes": minutes, "rent": paid,
         "dangers": [{"kind": k, "text": effectspec.render(s)} for _m, _n, s, k in dangers],
         "danger_applied": applied,
         "flare": any(k == "mishap" for *_x, k in dangers),

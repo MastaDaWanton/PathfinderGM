@@ -385,10 +385,10 @@
      "target": "will"
     },
     {
-     "type": "situational_mod",
+     "type": "skill_mod",
      "amount": 2,
      "bonus_type": "morale",
-     "target": "all skill checks"
+     "target": "all"
     }
    ],
    "duration": {
@@ -398,7 +398,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "'Skill checks' with no skill named is every skill; skill_mod can only name one skill at a time, so the blanket bonus is a situational_mod."
+   "notes": "'Skill checks' with no skill named is every skill; skill_mod can only name one skill at a time, so the blanket bonus is a situational_mod. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "heroism-greater": {
    "effects": [
@@ -427,10 +427,10 @@
      "target": "will"
     },
     {
-     "type": "situational_mod",
+     "type": "skill_mod",
      "amount": 4,
      "bonus_type": "morale",
-     "target": "all skill checks"
+     "target": "all"
     },
     {
      "type": "immunity",
@@ -448,7 +448,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "temp_hp needs a dice string and 'equal to your caster level' is not one, so the temporary hit points are stated in a narrative spec rather than invented as dice."
+   "notes": "temp_hp needs a dice string and 'equal to your caster level' is not one, so the temporary hit points are stated in a narrative spec rather than invented as dice. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "hex-glyph": {
    "effects": [
@@ -1087,10 +1087,10 @@
      "target": "will"
     },
     {
-     "type": "situational_mod",
+     "type": "skill_mod",
      "amount": 2,
      "bonus_type": "morale",
-     "target": "all skill checks"
+     "target": "all"
     },
     {
      "type": "narrative",
@@ -1108,7 +1108,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "'Functions as heroism, except...' so heroism's bonuses are emitted in full. The -2 penalties are not emitted as specs because they only exist after the caster reverses the spell; emitting them would have applied them at casting."
+   "notes": "'Functions as heroism, except...' so heroism's bonuses are emitted in full. The -2 penalties are not emitted as specs because they only exist after the caster reverses the spell; emitting them would have applied them at casting. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "hollow-heroism-greater": {
    "effects": [
@@ -1137,10 +1137,10 @@
      "target": "will"
     },
     {
-     "type": "situational_mod",
+     "type": "skill_mod",
      "amount": 4,
      "bonus_type": "morale",
-     "target": "all skill checks"
+     "target": "all"
     },
     {
      "type": "immunity",
@@ -1166,7 +1166,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "'Functions as greater heroism, except...' so greater heroism's benefits are emitted in full. The reversal damage is not a damage spec: it lands only if the caster reverses the spell, and 'equal to your caster level' is not a dice string."
+   "notes": "'Functions as greater heroism, except...' so greater heroism's benefits are emitted in full. The reversal damage is not a damage spec: it lands only if the caster reverses the spell, and 'equal to your caster level' is not a dice string. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "holy-aura": {
    "effects": [

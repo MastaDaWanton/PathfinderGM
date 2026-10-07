@@ -44,6 +44,14 @@ def bench(tmp_path, where):
         pc.stock.clear()
         pc.herb_known.clear()
         pc.purse = {"gp": 200}
+        # The real field kit, delivered the way a counter hands it over (`goods.deliver`)
+        # and found by lane G's real `places.has_alchemy_kit` — not a stub. Lane F's tests
+        # were written against "the kit folds out everywhere"; the day lane G's rule
+        # merged, 8 of them answered "Needs a field kit or a laboratory", because this
+        # character carried none and no counter sold one.
+        from rules import goods
+
+        goods.deliver(c.scene, pc, goods.good("alchemist's field kit"))
         c.save()
         yield Client()
         cm._LIVE.clear()

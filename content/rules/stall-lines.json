@@ -81,7 +81,8 @@
       "smithy": {"consumables": ["blacksmith"], "draw": ["blacksmith"]},
       "workshops": {"consumables": ["blacksmith", "leatherworker"],
                     "draw": ["blacksmith", "leatherworker"]},
-      "tannery": {"consumables": ["leatherworker"], "draw": ["leatherworker"]}
+      "tannery": {"consumables": ["leatherworker"], "draw": ["leatherworker"]},
+      "laboratory": {"consumables": ["alchemist"], "draw": ["alchemist", "potions"]}
     }
   },
   "shops": [
@@ -103,7 +104,8 @@
     {"id": "alchemist", "label": "the alchemist", "title": "the alchemist",
      "words": ["alchemist", "apothecary", "herbalist"], "smallest": "town",
      "gear": ["alchemist's fire", "acid", "antitoxin", "sunrod", "tanglefoot bag",
-              "smokestick", "tindertwig", "thunderstone"],
+              "smokestick", "tindertwig", "thunderstone", "alchemist's field kit",
+              "alchemist's mask and gloves"],
      "tables": ["herbal-manuals", "alchemy-manuals", "alchemy-classics"],
      "draw": ["alchemist", "herbalist", "potions"],
      "consumables": ["alchemist"],

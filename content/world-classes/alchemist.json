@@ -309,16 +309,17 @@
   },
   "_transmute_note": "Plan §9 (proposed): DC 10 + 5 a band above common for the output (uncommon 15, rare 20, exotic 25, legendary 30); a catalyst whose job names Transmute (philosopher's mercury) makes it one for one.",
   "transmute": {"dc_base": 10, "dc_per_band": 5, "one_for_one": ["philosophers-mercury"]},
-  "_catalyst_jobs_note": "The named jobs of catalysts that are never spent (plan §5.8; lane D's drafts in docs/alchemy-review.md). A catalyst set in the catalyst role is never spent and puts no trait in the pool; set as an ordinary input it is spent and its traits pool like any reagent's (a unicorn horn shaving's two). Built: one_for_one (Transmute), strip_one (a drawback, as Filter does), stabilizes (a stabilizer that is not spent), roll_twice (pure). Orichalcum's 'names the formula' is not built.",
+  "_catalyst_jobs_note": "The named jobs of catalysts that are never spent (plan §5.8; lane D's drafts in docs/alchemy-review.md). A catalyst set in the catalyst role is never spent and puts no trait in the pool; set as an ordinary input it is spent and its traits pool like any reagent's (a unicorn horn shaving's two). Built: one_for_one (Transmute), strip_one (a drawback, as Filter does), stabilizes (a stabilizer that is not spent), roll_twice (pure), names_formula (orichalcum grains: an experiment that fits several formulae is the one the alchemist names in `aim`, a formula id or its spell, if the mix already meets it; a wrong name finds nothing and names nothing). All are lane D's proposals, awaiting the owner's review with the rest of docs/alchemy-review.md item 4.",
   "catalyst_jobs": {
    "philosophers-mercury": ["one_for_one"],
    "unicorn-horn-shaving": ["strip_one"],
    "philosophers-wool": ["stabilizes"],
-   "mithral-dust": ["roll_twice"]
+   "mithral-dust": ["roll_twice"],
+   "orichalcum-grains": ["names_formula"]
   },
-  "_protection_note": "What spares the alchemist a `toxic_to_handle` reagent (plan §8.4): a laboratory's fume hood, or a mask and gloves carried. The goods row is lane H's; until it lands the pack is read by these names, the way the forge found its field kit.",
+  "_protection_note": "What spares the alchemist a `toxic_to_handle` reagent (plan §8.4): a laboratory's fume hood, or a mask and gloves carried: the goods row `alchemist's mask and gloves` (rules/goods.py GEAR, content/rules/gear.json; sold by the alchemist and the laboratory), found in the pack by these names.",
   "protection_names": ["mask and gloves", "alchemist's mask and gloves", "alchemists mask and gloves", "mask & gloves", "fume mask"],
-  "_kit_note": "The alchemist's field kit (plan §14): common and uncommon work anywhere. Lane G's `places.has_alchemy_kit` decides when it lands; until then the kit folds out wherever the character stands, as the forge's did before lane G.",
+  "_kit_note": "The alchemist's field kit (plan §14): common and uncommon work anywhere. `places.has_alchemy_kit` decides, from the pack: the goods row `alchemist's field kit` (Ultimate Equipment's alchemy crafting kit, 25 gp, 5 lb), sold by the alchemist and the laboratory. Nobody is handed one: like the smith's field kit it is bought, and without it or a laboratory the bench says so in words.",
   "kit_names": ["alchemist's field kit", "alchemists field kit", "alchemy kit", "alchemy crafting kit", "alchemist's kit", "alchemists kit", "field laboratory"]
  },
  "_old_methods_note": "What a removed method became (plan §4.1, Q3.1), for an old recipe or chain naming it.",

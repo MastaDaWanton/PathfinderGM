@@ -1106,10 +1106,19 @@ def assay(actor, material_id: str, total: int, *, clock: int) -> dict:
 
 
 def apply_danger(engine, actor, material_id: str, effect: dict | None,
-                 because: str = "") -> list:
+                 because: str = "", *, origin: str = "", name: str = "") -> list:
     """Run an assay's danger through the engine, as the taste op runs a herb's raw effect:
-    the spec becomes ordinary intents (`consumables.plan`), validated with `origin
-    item:<material id>` so immunity and every other gate apply, and run. (The condition
+    the spec becomes ordinary intents (`consumables.document_intents`), validated with
+    `origin item:<material id>` (or the caller's `origin`: the alchemy bench stamps
+    `rule:mishap:<material>` and `rule:toxic:<material>`, contracts §7) so immunity and
+    every other gate apply, and run. The ONE door a handling hazard takes: the alchemy
+    bench's `alchemist.apply_rule` calls it rather than keeping a private copy (law 2).
+
+    Not the drink door. Until 2026-10-07 this went through `consumables.plan(how="drink")`,
+    which keeps only what works when swallowed, and a toxic document is a save gate whose
+    route is nobody's mouth: all 18 alchemy toxic documents came back "nothing in
+    Quicksilver works when swallowed" and applied nothing here, which is why lane F wrote
+    its own applicator beside this one. (The condition
     op stamps the intent's `because` as the condition's source and not yet its `origin`;
     that is the engine's, contract §5, and the herb taste shares it.) Dice in a
     duration ("1d4" hours) are left as dice: `Engine._duration_rounds` is the one place
@@ -1123,13 +1132,12 @@ def apply_danger(engine, actor, material_id: str, effect: dict | None,
 
     doc = material(material_id) or {}
     mid = doc_id(doc) if doc else str(material_id)
-    name = str(doc.get("name") or mid)
-    spec = dict(effect)
+    name = name or str(doc.get("name") or mid)
+    spec = {k: v for k, v in dict(effect).items() if k not in ("recipient", "note")}
     if str(spec.get("type") or "") == "suppress_magic":
         return [_suppress_magic(engine, actor, mid, name, spec, because)]
-    use = consumables.plan({"name": name, "specs": [spec], "count": 1}, how="drink",
-                           target=actor.ref, because=because or f"assaying {name}")
-    made = [dict(i, visibility="hidden") for i in use.intents]
+    made = [dict(i, visibility="hidden") for i in consumables.document_intents(
+        [spec], actor.ref, because or f"assaying {name}", name)]
     for m in made:
         # `consumables` writes a lifted condition as `remove`; the op's word is `ends`
         # (the taste op's own note says the same).
@@ -1140,7 +1148,8 @@ def apply_danger(engine, actor, material_id: str, effect: dict | None,
     if not made:
         return []
     try:
-        res = engine.run(engine.validate(made, origin=f"item:{mid}", origin_name=name))
+        res = engine.run(engine.validate(made, origin=origin or f"item:{mid}",
+                                         origin_name=name))
     except IntentError:
         return []
     return list(res.outcomes)

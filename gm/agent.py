@@ -1572,6 +1572,15 @@ class GMAgent:
                   for e in prompts.EXAMPLES],
                 *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
                   for e in prompts.NPC_EXAMPLES],
+                # The fight's examples and Continue's, which the narrator is shown in place
+                # of EXAMPLES in those turns (`prompts.build_messages`). Measured
+                # 2026-10-07 (lane C3): a night fight beat shipped "You break contact and
+                # the window is four running steps away..." word for word from
+                # COMBAT_EXAMPLES, because only EXAMPLES and NPC_EXAMPLES were indexed.
+                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
+                  for e in prompts.COMBAT_EXAMPLES],
+                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
+                  for e in prompts.CARRY_ON_EXAMPLES],
             # The companion examples too: a companion's turn is shown them in place of
             # the creature ones, and a copied line is as much a defect there.
             *[prompts.fill_companion(e["reply"]["narration"], self_ref="c1",
