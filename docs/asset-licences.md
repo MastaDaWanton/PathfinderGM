@@ -11,9 +11,16 @@ owner's approval. Licence: **Creative Commons Attribution 3.0** (CC BY 3.0,
 https://creativecommons.org/licenses/by/3.0/). Credit is due to each artist, and the app
 shows it in the manual's credits.
 
-Artists: Caro Asercion, Delapouite, Faithtoken, Lorc, Sbed, Willdabeast.
+Artists: Caro Asercion, DarkZaitzev, Delapouite, Faithtoken, Lorc, Sbed, Willdabeast.
 
 The forge's 35 icons were added 2026-10-04 the same way, with the owner's approval (docs/blacksmithing-contracts.md §13).
+
+The alchemy bench's 22 icons were added 2026-10-07 with the owner's approval (2026-10-06,
+docs/alchemy-questions.md, plan open point 11), by alchemy lane U1: each name was first
+confirmed on game-icons.net (its page answered, and carried the CC BY 3.0 notice), then its
+SVG was taken from game-icons.net's own export in black on a transparent ground, which is
+already the processed form below (no background square, the glyph black). The shapes are
+unchanged. They are the last 22 rows of the table.
 
 Change made: the full-bleed background square was removed and the glyph filled black, so each
 file works as a CSS mask; the shapes themselves are unchanged.
@@ -101,6 +108,28 @@ file works as a CSS mask; the shapes themselves are unchanged.
 | `play/static/img/icons/strengthen.svg` | [delapouite/stack](https://game-icons.net/1x1/delapouite/stack.html) | Delapouite |
 | `play/static/img/icons/temper.svg` | [lorc/small-fire](https://game-icons.net/1x1/lorc/small-fire.html) | Lorc |
 | `play/static/img/icons/treatment.svg` | [delapouite/paint-bucket](https://game-icons.net/1x1/delapouite/paint-bucket.html) | Delapouite |
+| `play/static/img/icons/bladder.svg` | [delapouite/water-flask](https://game-icons.net/1x1/delapouite/water-flask.html) | Delapouite |
+| `play/static/img/icons/bottle.svg` | [lorc/corked-tube](https://game-icons.net/1x1/lorc/corked-tube.html) | Lorc |
+| `play/static/img/icons/calcine.svg` | [lorc/fire-bowl](https://game-icons.net/1x1/lorc/fire-bowl.html) | Lorc |
+| `play/static/img/icons/calx.svg` | [lorc/powder](https://game-icons.net/1x1/lorc/powder.html) | Lorc |
+| `play/static/img/icons/catalyst.svg` | [lorc/floating-crystal](https://game-icons.net/1x1/lorc/floating-crystal.html) | Lorc |
+| `play/static/img/icons/cloud.svg` | [darkzaitzev/smoke-bomb](https://game-icons.net/1x1/darkzaitzev/smoke-bomb.html) | DarkZaitzev |
+| `play/static/img/icons/crystal.svg` | [lorc/crystal-growth](https://game-icons.net/1x1/lorc/crystal-growth.html) | Lorc |
+| `play/static/img/icons/dissolve.svg` | [lorc/fizzing-flask](https://game-icons.net/1x1/lorc/fizzing-flask.html) | Lorc |
+| `play/static/img/icons/distill.svg` | [lorc/dripping-tube](https://game-icons.net/1x1/lorc/dripping-tube.html) | Lorc |
+| `play/static/img/icons/filter.svg` | [delapouite/funnel](https://game-icons.net/1x1/delapouite/funnel.html) | Delapouite |
+| `play/static/img/icons/flask.svg` | [caro-asercion/round-potion](https://game-icons.net/1x1/caro-asercion/round-potion.html) | Caro Asercion |
+| `play/static/img/icons/mask.svg` | [lorc/gas-mask](https://game-icons.net/1x1/lorc/gas-mask.html) | Lorc |
+| `play/static/img/icons/potion.svg` | [lorc/standing-potion](https://game-icons.net/1x1/lorc/standing-potion.html) | Lorc |
+| `play/static/img/icons/react.svg` | [lorc/bubbling-flask](https://game-icons.net/1x1/lorc/bubbling-flask.html) | Lorc |
+| `play/static/img/icons/solvent.svg` | [lorc/chemical-drop](https://game-icons.net/1x1/lorc/chemical-drop.html) | Lorc |
+| `play/static/img/icons/spirit.svg` | [lorc/spiral-bottle](https://game-icons.net/1x1/lorc/spiral-bottle.html) | Lorc |
+| `play/static/img/icons/splash.svg` | [lorc/fire-bottle](https://game-icons.net/1x1/lorc/fire-bottle.html) | Lorc |
+| `play/static/img/icons/sublime.svg` | [lorc/bottle-vapors](https://game-icons.net/1x1/lorc/bottle-vapors.html) | Lorc |
+| `play/static/img/icons/tool.svg` | [lorc/crystal-wand](https://game-icons.net/1x1/lorc/crystal-wand.html) | Lorc |
+| `play/static/img/icons/toxic.svg` | [lorc/poison-bottle](https://game-icons.net/1x1/lorc/poison-bottle.html) | Lorc |
+| `play/static/img/icons/transmute.svg` | [lorc/crystalize](https://game-icons.net/1x1/lorc/crystalize.html) | Lorc |
+| `play/static/img/icons/vial.svg` | [sbed/vial](https://game-icons.net/1x1/sbed/vial.html) | Sbed |
 
 ## Music: the owner's soundtrack
 

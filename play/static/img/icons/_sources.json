@@ -484,5 +484,137 @@
   "url": "https://game-icons.net/1x1/delapouite/rule-book.html",
   "author": "delapouite",
   "bytes": 1989
+ },
+ "calcine": {
+  "source": "lorc/fire-bowl",
+  "url": "https://game-icons.net/1x1/lorc/fire-bowl.html",
+  "author": "lorc",
+  "bytes": 1347
+ },
+ "dissolve": {
+  "source": "lorc/fizzing-flask",
+  "url": "https://game-icons.net/1x1/lorc/fizzing-flask.html",
+  "author": "lorc",
+  "bytes": 2229
+ },
+ "filter": {
+  "source": "delapouite/funnel",
+  "url": "https://game-icons.net/1x1/delapouite/funnel.html",
+  "author": "delapouite",
+  "bytes": 784
+ },
+ "distill": {
+  "source": "lorc/dripping-tube",
+  "url": "https://game-icons.net/1x1/lorc/dripping-tube.html",
+  "author": "lorc",
+  "bytes": 2535
+ },
+ "react": {
+  "source": "lorc/bubbling-flask",
+  "url": "https://game-icons.net/1x1/lorc/bubbling-flask.html",
+  "author": "lorc",
+  "bytes": 2771
+ },
+ "sublime": {
+  "source": "lorc/bottle-vapors",
+  "url": "https://game-icons.net/1x1/lorc/bottle-vapors.html",
+  "author": "lorc",
+  "bytes": 1736
+ },
+ "bottle": {
+  "source": "lorc/corked-tube",
+  "url": "https://game-icons.net/1x1/lorc/corked-tube.html",
+  "author": "lorc",
+  "bytes": 1158
+ },
+ "transmute": {
+  "source": "lorc/crystalize",
+  "url": "https://game-icons.net/1x1/lorc/crystalize.html",
+  "author": "lorc",
+  "bytes": 2027
+ },
+ "vial": {
+  "source": "sbed/vial",
+  "url": "https://game-icons.net/1x1/sbed/vial.html",
+  "author": "sbed",
+  "bytes": 847
+ },
+ "flask": {
+  "source": "caro-asercion/round-potion",
+  "url": "https://game-icons.net/1x1/caro-asercion/round-potion.html",
+  "author": "caro-asercion",
+  "bytes": 935
+ },
+ "bladder": {
+  "source": "delapouite/water-flask",
+  "url": "https://game-icons.net/1x1/delapouite/water-flask.html",
+  "author": "delapouite",
+  "bytes": 1617
+ },
+ "potion": {
+  "source": "lorc/standing-potion",
+  "url": "https://game-icons.net/1x1/lorc/standing-potion.html",
+  "author": "lorc",
+  "bytes": 1731
+ },
+ "splash": {
+  "source": "lorc/fire-bottle",
+  "url": "https://game-icons.net/1x1/lorc/fire-bottle.html",
+  "author": "lorc",
+  "bytes": 1372
+ },
+ "cloud": {
+  "source": "darkzaitzev/smoke-bomb",
+  "url": "https://game-icons.net/1x1/darkzaitzev/smoke-bomb.html",
+  "author": "darkzaitzev",
+  "bytes": 4451
+ },
+ "tool": {
+  "source": "lorc/crystal-wand",
+  "url": "https://game-icons.net/1x1/lorc/crystal-wand.html",
+  "author": "lorc",
+  "bytes": 1013
+ },
+ "spirit": {
+  "source": "lorc/spiral-bottle",
+  "url": "https://game-icons.net/1x1/lorc/spiral-bottle.html",
+  "author": "lorc",
+  "bytes": 977
+ },
+ "calx": {
+  "source": "lorc/powder",
+  "url": "https://game-icons.net/1x1/lorc/powder.html",
+  "author": "lorc",
+  "bytes": 2887
+ },
+ "crystal": {
+  "source": "lorc/crystal-growth",
+  "url": "https://game-icons.net/1x1/lorc/crystal-growth.html",
+  "author": "lorc",
+  "bytes": 558
+ },
+ "solvent": {
+  "source": "lorc/chemical-drop",
+  "url": "https://game-icons.net/1x1/lorc/chemical-drop.html",
+  "author": "lorc",
+  "bytes": 1627
+ },
+ "toxic": {
+  "source": "lorc/poison-bottle",
+  "url": "https://game-icons.net/1x1/lorc/poison-bottle.html",
+  "author": "lorc",
+  "bytes": 2458
+ },
+ "catalyst": {
+  "source": "lorc/floating-crystal",
+  "url": "https://game-icons.net/1x1/lorc/floating-crystal.html",
+  "author": "lorc",
+  "bytes": 641
+ },
+ "mask": {
+  "source": "lorc/gas-mask",
+  "url": "https://game-icons.net/1x1/lorc/gas-mask.html",
+  "author": "lorc",
+  "bytes": 3422
  }
 }

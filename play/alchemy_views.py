@@ -128,6 +128,87 @@ def _pct(x: float) -> str:
     return f"{round(x * 100, 1):g}%"
 
 
+# --- what the page draws, said by the server (alchemy lane U1) ---------------------------------
+
+def _css(color) -> str | None:
+    """A material's or a mix's colour as the page's swatch, "#rrggbb" (UI plan §4: liquid
+    colour is content, the server's, shown only in the scene and as a swatch beside a
+    name). The page draws the string it is sent and never turns the server's three
+    fractions into a colour itself (contracts §8: "not even the count or the colour")."""
+    if not isinstance(color, (list, tuple)) or len(color) != 3:
+        return None
+    try:
+        return "#" + "".join(f"{max(0, min(255, round(float(x) * 255))):02x}" for x in color)
+    except (TypeError, ValueError):
+        return None
+
+
+def _liquid_words(s: dict) -> str:
+    """The flat stage's level bar in words (UI plan §6.3, "WebGL fallback: ... a CSS
+    liquid-level bar beside it (colour, level and the number)"): "44% full, cloudy"."""
+    try:
+        level, turbid = float(s.get("level") or 0), float(s.get("turbidity") or 0)
+    except (TypeError, ValueError):
+        return ""
+    look = "cloudy" if turbid >= 0.6 else "hazy" if turbid >= 0.25 else "clear"
+    return f"{round(level * 100)}% full, {look}"
+
+
+def _liquid_view(liquid) -> dict | None:
+    """`alchemist.liquid_for`'s two states, each with its swatch and its words added."""
+    if not isinstance(liquid, dict):
+        return None
+    out = {}
+    for k, s in liquid.items():
+        if isinstance(s, dict):
+            out[k] = dict(s, css=_css(s.get("color")), words=_liquid_words(s))
+        else:
+            out[k] = s
+    return out
+
+
+def _methods(level: int, where: dict) -> list[dict]:
+    """The method strip: lane F's nine (`alchemist.methods_view`), then the two single
+    requests the bench also offers, Identify (a potion held for a round, plan §11.3) and
+    Learn (a formula from a writing, a potion or a formulary, plan §10.4), so the strip is
+    the whole of what the bench does and every lock is the server's word, never the
+    page's. Neither needs the kit or a laboratory; Learn waits out a fight, as its route
+    refuses one."""
+    out = al.methods_view(level, where)
+    fight = bool(where.get("fight"))
+    out.append({"id": "identify", "name": "Identify", "level": 1, "where": "any",
+                "bulk": False, "locked": False, "lock_reason": "",
+                "takes": "a potion you carry", "makes": "what it is", "minigame": False,
+                "glyph": "", "single": True})
+    out.append({"id": "learn", "name": "Learn", "level": 1, "where": "any", "bulk": False,
+                "locked": fight, "lock_reason": "Not in a fight" if fight else "",
+                "takes": "a scroll, a potion or a formulary you carry",
+                "makes": "a formula in your book", "minigame": False, "glyph": "",
+                "single": True})
+    return out
+
+
+def _potions(pc) -> list[dict]:
+    """Everything carried that Identify can study (plan §11.3): a potion or a scroll that
+    holds a spell, and the alchemist's own bottled work. A bought potion is not on the
+    alchemy shelf (it is no material), so Identify had nothing to pick from without this."""
+    out = []
+    for sid, st in sorted((pc.stock or {}).items(), key=lambda kv: kv[1].name.lower()):
+        if int(getattr(st, "count", 0) or 0) <= 0:
+            continue
+        rec = getattr(st, "record", None)
+        family = str((rec or {}).get("family") or "") if isinstance(rec, dict) else ""
+        if not getattr(st, "holds_spell", None) and family not in ("potion", "oil"):
+            continue
+        try:
+            known = bool(knowledge.potion_known(pc, st))
+        except Exception:      # noqa: BLE001 - a row is never worth failing the state for
+            known = False
+        out.append({"key": f"stock:{sid}", "name": st.name, "count": int(st.count),
+                    "known": known})
+    return out
+
+
 def _track(track, progress) -> dict:
     """The track summary, and what the next pick of each perk does, in words."""
     out = dict(worldclass.track_summary(track, progress))
@@ -192,7 +273,7 @@ def _row(pc, it: al.Item) -> dict:
     out = {"key": it.key, "name": it.name, "material": it.material, "kind": it.kind,
            "group": it.group, "count": it.count, "amount": it.amount, "tier": it.tier,
            "rank": it.rank, "glyph": al.KIND_GLYPH.get(it.kind, "🜂"), "badges": badges,
-           "color": it.color(), "old": it.old, "work": it.work,
+           "color": it.color(), "swatch": _css(it.color()), "old": it.old, "work": it.work,
            "unknown": _unknown(pc, it.doc) if it.doc is not None else 0,
            "family": it.family or None, "form": it.form or None,
            "liquid": it.liquid}
@@ -273,8 +354,9 @@ def _state_body(c, pc) -> dict:
         "level": int(progress.level),
         "ceiling": worldclass.ceiling_index(progress),
         "picks_banked": worldclass.perk_picks_banked(progress),
-        "methods": al.methods_view(progress.level, where),
+        "methods": _methods(progress.level, where),
         "shelf": _shelf(c, pc),
+        "potions": _potions(pc),
         "works": _works(c, pc),
         "where": where,
         "clock": _clock(c),
@@ -413,6 +495,10 @@ def _check_body(c, pc, plan) -> dict:
         "need": plan.need, "impossible": plan.impossible,
         "units": plan.units, "minutes": plan.minutes, "waits": plan.waits,
         "rent_cp": rent,
+        # The rent before the step, in words (plan §14: the hours are paid as they are
+        # worked; the page states the cost before the roll and computes none of it).
+        "rent_line": (f"The laboratory charges {_coins(rent)} for the "
+                      f"{_hours(plan.minutes)}." if rent else ""),
         "stakes": al.stakes(plan),
         "could": plan.could or None,
         "match": match,
@@ -425,7 +511,7 @@ def _check_body(c, pc, plan) -> dict:
                   "drawbacks": [{k: v for k, v in r.items() if k != "raw"}
                                 for r in choice.get("drawback_rows") or ()]},
         "candidates": plan.candidates,
-        "liquid": al.liquid_for(plan),
+        "liquid": _liquid_view(al.liquid_for(plan)),
         "tuning": al.tuning_for(plan) if plan.units else None,
         "product": product,
         "tiers": tiers,
@@ -567,7 +653,7 @@ def alchemy_roll(request):
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll}
         out["token"] = token
         out["tuning"] = al.tuning_for(plan)
-        out["liquid"] = al.liquid_for(plan)
+        out["liquid"] = _liquid_view(al.liquid_for(plan))
     else:
         miss = -margin
         losses = al.failure_losses(plan, miss)
@@ -584,7 +670,14 @@ def alchemy_roll(request):
         else:
             said = f"Missed by {miss}. The time is lost; the materials are kept."
         if out["flare"]:
-            tells = [m["tell"] for m in out["mishap"] if m["tell"]]
+            # The mishap's own tells: an outcome that carries an effect, its full stop taken
+            # off before they are joined. Seen live (lane U1, 2026-10-07): the line read
+            # "It flares: Kesst Vayr takes 2 fire damage from Brimstone.; Kesst Vayr's
+            # Potion of Cure Light Wounds is ready to collect.; ...", a doubled stop after
+            # each tell and an In progress line the engine had queued from an earlier wait
+            # (`Scene.take_works_said` hands queued lines to the next run's outcomes).
+            tells = [m["tell"].rstrip(". ") for m in out["mishap"]
+                     if m["tell"] and m["effects"]]
             said += (" It flares: " + "; ".join(tells) + ".") if tells else " It flares."
         out["said"] = said
         got = worldclass.award_step(track, progress, method=plan.method,
@@ -735,10 +828,11 @@ def alchemy_finish(request):
         rec = x["record"]
         st = (pc.stock or {}).get(x["key"])
         b = items.build(rec)
+        color = al.mix_color([(m, 1) for m in items.record_materials(rec)])
         products.append({"key": f"stock:{x['key']}", "name": getattr(st, "name", rec["name"]),
                          "count": int(rec.get("count") or 1), "record": rec, "build": b,
                          "waits": x["waits"], "ready_at": x["ready_at"],
-                         "color": al.mix_color([(m, 1) for m in items.record_materials(rec)])})
+                         "color": color, "swatch": _css(color)})
     return JsonResponse({
         "tier": tier, "tier_name": tier_name, "score": score, "ceiling": plan.ceiling,
         "stopped": bool(body.get("stopped")),
@@ -1127,15 +1221,53 @@ def alchemy_collect(request):
     c, pc, refused = _ready(request)
     if refused:
         return refused
-    key = str(read_body(request).get("key") or "")
+    body = read_body(request)
+    key = str(body.get("key") or "")
     if not key:
         return _err("Say which work to collect (`key`).")
+    # "Wait for it" (lane U1): stay with the work until it is ready, then collect it. A
+    # potion sets two hours after it is bottled (plan §11.4), and the bench had no way to
+    # let those hours pass: the player closed the bench, found nothing at the table that
+    # passed time but the narrator, and came back to "Not ready yet". The wait goes through
+    # `Scene.advance`, the one clock door (hunger, thirst and every other timer move with
+    # it), exactly as the circle's Wait for it does (`enchant_wait`); it is refused in a
+    # fight, and refused in words for work that is not this craft's or not here.
+    waited = 0
+    if body.get("wait"):
+        if c.scene.in_encounter:
+            return _err("You are in a fight. The work will keep until it is over.", 409)
+        row = next((r for r in _works(c, pc) if str(r.get("key")) == key.split(":", 1)[-1]
+                    or str(r.get("key")) == key), None)
+        if row is None:
+            return _err("There is no such work in progress.", 404)
+        left = int(row.get("ready_in") or 0)
+        if left > 0:
+            from rules import sky
+
+            c.scene.advance(left)
+            waited = left
+            c.transcript.append({"who": "gm", "kind": "consequence", "text": (
+                f"{pc.name} waits {sky.span_words(left)} for the {row.get('name')}.")})
+        key = str(row["key"])
     got = inprogress.collect(pc, key, now=_now(c), here=getattr(pc, "at", None) or None)
+    if waited:
+        # The wait turned it ready, and the engine queued "<name> is ready to collect" for
+        # the next run's outcomes (`Scene.take_works_said`). Collected in the same breath,
+        # that line is stale: left queued, it surfaced inside the next step's mishap
+        # ("It flares: ...; Kesst Vayr's Potion of Cure Light Wounds is ready to
+        # collect.", seen live 2026-10-07). Other work's lines stay queued.
+        keep = [r for r in c.scene.take_works_said()
+                if not (got.get("ok") and str(r.get("ref")) == str(getattr(pc, "ref", ""))
+                        and str(r.get("what")) == str(row.get("name")))]
+        c.scene._works_said.extend(keep)
     if not got.get("ok"):
+        if waited:
+            c.save()
         return _err(str(got.get("why") or "It cannot be collected."), 409)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": got["said"]})
     c.save()
     return JsonResponse({"said": got["said"], "product": got.get("product"),
+                         "waited": waited, "clock": _clock(c),
                          "works": _works(c, pc), "shelf": _shelf(c, pc)})
 
 
