@@ -235,6 +235,7 @@
         html += '<p class="ac-match">This mix makes ' + esc(match.name) + ', a formula you know.</p>';
       }
     }
+    html += choices(c);
     // Could still become N (owner Q5.3). The server's line; never a name it did not send.
     if (c.could && c.could.line) html += '<p class="ac-could">' + esc(c.could.line) + '</p>';
     else if (c.could && c.could.count === 0) {
@@ -264,6 +265,50 @@
       }
     }
     formulaEl.innerHTML = html;
+  }
+
+  // --- what a vessel or a catalyst is told -------------------------------------------------------
+  // The server's `check.choices` (alchemy_views._choices), each a picker over options it
+  // sent and nothing else (the bench-shell lane, 2026-10-07: `as`, `aim` and `strip` were
+  // taken by the server and offered nowhere):
+  //   - what a vessel that bottles two families makes ("potion, drunk" or "oil, coated"),
+  //     while no formula has decided it;
+  //   - the formula orichalcum grains steer an experiment to: the whole table within
+  //     reach, never the mix's candidates, which stay a count;
+  //   - the drawback a unicorn horn shaving strips.
+  function choices(c) {
+    var ch = (c && c.choices) || {}, o = A.order, html = "";
+    var fam = ch.families;
+    if (fam && fam.open && (fam.options || []).length > 1) {
+      html += '<label class="ac-field" for="alchemy-as"><span>It becomes</span>' +
+        '<select id="alchemy-as" class="v2-well ac-select">' + fam.options.map(function (f) {
+          var how = (f.how || []).length ? " (" + f.how.join(", ") + ")" : "";
+          return '<option value="' + esc(f.id) + '"' + ((o.as || fam.chosen) === f.id ? " selected" : "") + '>' +
+            esc(cap(f.name) + how) + '</option>';
+        }).join("") + '</select></label>';
+    } else if (fam && !fam.open && fam.chosen) {
+      html += '<p class="ac-quiet">' + esc(cap(FAMILY[fam.chosen] || fam.chosen)) + ': the formula decides it.</p>';
+    }
+    var aim = ch.aim;
+    if (aim && (aim.options || []).length) {
+      html += '<label class="ac-field" for="alchemy-aim"><span>Name the formula</span>' +
+        '<select id="alchemy-aim" class="v2-well ac-select"><option value="">Name none</option>' +
+        aim.options.map(function (f) {
+          return '<option value="' + esc(f.id) + '"' + (o.aim === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>';
+        }).join("") + '</select></label>' +
+        '<p class="ac-quiet">' + esc(o.aim ? (aim.named ? "Your orichalcum steers it there: the mix meets it."
+          : "The mix does not meet the formula you name, so the orichalcum finds nothing.")
+          : "With orichalcum beside the work, an experiment that fits several formulae becomes the one you name, if the mix already meets it.") + '</p>';
+    }
+    var strip = ch.strip;
+    if (strip && (strip.options || []).length) {
+      html += '<label class="ac-field" for="alchemy-strip"><span>The catalyst strips</span>' +
+        '<select id="alchemy-strip" class="v2-well ac-select">' + strip.options.map(function (r) {
+          return '<option value="' + esc(r.key) + '"' + ((o.strip || strip.chosen) === r.key ? " selected" : "") + '>' +
+            esc(r.text || r.key) + '</option>';
+        }).join("") + '</select></label>';
+    }
+    return html;
   }
 
   // --- the DC, the stakes and the problems --------------------------------------------------------
@@ -506,6 +551,9 @@
     if (t.id === "alchemy-pick-formula") { A.set("formula", t.value); return; }
     if (t.id === "alchemy-target") { A.set("target", t.value); return; }
     if (t.id === "alchemy-potion") { A.set("item", t.value); return; }
+    if (t.id === "alchemy-as") { A.set("as", t.value); return; }
+    if (t.id === "alchemy-aim") { A.set("aim", t.value); return; }
+    if (t.id === "alchemy-strip") { A.set("strip", t.value); return; }
     if (t.matches && t.matches("input[data-trait]")) {
       if (t.getAttribute("aria-disabled") === "true") {
         // Refused here: the reason is beside it in words; the box goes back.

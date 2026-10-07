@@ -202,6 +202,17 @@ function renderMap(s) {
         : esc(a.name.slice(0, 1).toUpperCase())}</text>`);
   }
 
+  // A flask being aimed at a square (04's Throw…, CRB "Throw Splash Weapon": a grid
+  // intersection at AC 5): while it is, every square of the board is a target, drawn over
+  // the tokens so a corner beside somebody can be clicked too. The engine refuses one out
+  // of reach in its own words; nothing here decides which squares may be aimed at.
+  if (typeof COMBAT !== "undefined" && COMBAT.aim && !MAP_3D) {
+    for (let c = 0; c < g.width; c++) for (let r = 0; r < g.height; r++)
+      parts.push(`<rect class="aimsq" data-aimsq="${c},${r}" x="${c * CELL}" y="${r * CELL}"
+        width="${CELL}" height="${CELL}" fill="transparent"><title>the north-west corner of ${
+        c},${r}</title></rect>`);
+  }
+
   // The same board, drawn two ways. Both read the one geometry payload and both write
   // `data-sq`, so the combat builder cannot tell them apart — which is the whole reason
   // the flat one was built first.

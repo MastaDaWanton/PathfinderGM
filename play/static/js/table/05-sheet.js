@@ -2010,7 +2010,8 @@ function detailClosed() {
 let EQ_SHELF = "all";
 let EQ_FIT = null;          // a slot key ("hand", "ring", ...) while a slot is pressed
 let EQ_SAY = "";            // the last answer, written in the line kept for it
-let EQ_USE = null;          // the row whose Use menu is open (one at a time)
+let EQ_USE = null;          // the row whose Use (or Throw) menu is open (one at a time)
+let EQ_USE_ACT = 0;         // which of that row's acts the open menu is: Use, or Throw
 let EQ_USE_TO = "pc";       // who the jar goes on, chosen in that menu
 let EQ_SAY_BAD = false;
 let EQ_BEFORE = null;       // the numbers before the last act, to mark what moved
@@ -2074,7 +2075,10 @@ function eqFactsOf(s, r) {
   const where = r.fits && r.state === "worn" ? `worn at the ${eqSlotLabel(s, r.fits)}` : "";
   const fits = r.fits && r.state !== "worn" ? `goes at the ${eqSlotLabel(s, r.fits)}` : "";
   const bits = [said || (r.known ? "" : EQ_INERT), where || fits].filter(Boolean);
-  return esc(bits.join(", ")) + (r.poisons ? ` <span class="chip warn">poisons whoever drinks it</span>` : "");
+  // What using it does to whoever receives it that is harm, in the server's words
+  // (views._carried's `harm`: "Harm to whoever drinks it: causes sickened for 3 rounds"). It said
+  // "poisons whoever drinks it" of thrown alchemist's fire and of a sickening drawback.
+  return esc(bits.join(", ")) + (r.harm ? ` <span class="chip warn">${esc(r.harm)}</span>` : "");
 }
 
 // What is carried against what can be (the server's `equipment.load`: CRB Table 7-4 by
@@ -2136,7 +2140,7 @@ function pageEquipment(s) {
         r.note ? `<span class="facts eqnote">${esc(r.note)}</span>` : ""}</span>
       <span class="eqacts">${(r.acts || []).map((a, i) => a.menu ? `<button type="button"
         class="v2-btn is-small${i === 0 ? " is-go" : ""}" data-equse="${i}" data-eqid="${esc(r.id)}"
-        aria-expanded="${EQ_USE === r.id}" aria-controls="equse-${esc(r.id)}"
+        aria-expanded="${EQ_USE === r.id && EQ_USE_ACT === i}" aria-controls="equse-${esc(r.id)}"
         aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>` : `<button type="button"
         class="v2-btn is-small${i === 0 ? " is-go" : ""}" data-eqact="${i}" data-eqid="${esc(r.id)}"
         aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>`).join("")}${
@@ -2267,18 +2271,29 @@ function eqRedraw(focus) {
 // jar works and what it does in each (`views._use_menu`), and who it can go on
 // (`_use_targets`): Project Zomboid's health panel is the shape, the treatment menu
 // filtered to what the item and the place allow, and somebody else treatable too.
+// The Throw menu is the same shape (the bench-shell lane, 2026-10-07: Throw posted no
+// target and the engine refused every press): each line is somebody here to throw it at,
+// the server's list by ref (`views._throw_menu`), and a line the engine would refuse (out
+// of reach, behind total cover) is shown greyed with the engine's own reason.
+function eqMenuAct(r) {
+  const act = (r.acts || [])[EQ_USE_ACT];
+  return act && act.menu ? act : (r.acts || []).find(a => a.menu);
+}
+
 function eqUseMenu(r) {
-  const act = (r.acts || []).find(a => a.menu);
+  const act = eqMenuAct(r);
   if (!act) return "";
+  const throwing = act.label === "Throw";
   const targets = act.targets || [{ ref: "pc", name: "Yourself" }];
   if (!targets.some(t => t.ref === EQ_USE_TO)) EQ_USE_TO = "pc";
-  const who = targets.length > 1 ? `<label class="equse-to">On
+  const who = !throwing && targets.length > 1 ? `<label class="equse-to">On
       <select data-equseto>${targets.map(t => `<option value="${esc(t.ref)}"${
         t.ref === EQ_USE_TO ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : "";
-  return `<div class="equse" id="equse-${esc(r.id)}" role="group" aria-label="Where ${esc(r.name)} goes">
+  return `<div class="equse" id="equse-${esc(r.id)}" role="group" aria-label="${
+      throwing ? `Who to throw ${esc(r.name)} at` : `Where ${esc(r.name)} goes`}">
     ${who}
     <div class="equse-places">${act.menu.map((m, i) => `<button type="button" class="v2-btn equse-place"
-        data-equseroute="${i}" data-eqid="${esc(r.id)}">
+        data-equseroute="${i}" data-eqid="${esc(r.id)}"${m.disabled ? " disabled" : ""}>
         <b>${esc(m.label)}</b><span>${esc(m.line || "")}</span></button>`).join("")}</div>
   </div>`;
 }
@@ -2297,14 +2312,17 @@ document.addEventListener("keydown", e => {
 
 async function eqUse(rowId, index) {
   const row = eqRows(SHEET).find(r => r.id === rowId);
-  const act = row && (row.acts || []).find(a => a.menu);
+  const act = row && eqMenuAct(row);
   const m = act && act.menu[Number(index)];
-  if (!m) return;
+  if (!m || m.disabled) return;
   EQ_BEFORE = eqNumbers();
   busy(true);
   let said = "", bad = false;
   try {
-    const d = await post("/api/use", Object.assign({}, m.body, { to: EQ_USE_TO || "pc" }));
+    // A throw's line already names who (`to` in its body); the Use menu's "On" picker
+    // names who for a jar.
+    const d = await post("/api/use", m.body.to ? Object.assign({}, m.body)
+      : Object.assign({}, m.body, { to: EQ_USE_TO || "pc" }));
     said = d.tell || "";
     if (d.sheet) SHEET = d.sheet;
     EQ_USE = null;
@@ -2375,7 +2393,9 @@ document.addEventListener("click", e => {
   if (act && !act.disabled) { eqAct(act); return; }
   const use = e.target.closest("#sheetbody [data-equse]");
   if (use) {
-    EQ_USE = EQ_USE === use.dataset.eqid ? null : use.dataset.eqid;
+    const which = Number(use.dataset.equse) || 0;
+    EQ_USE = EQ_USE === use.dataset.eqid && EQ_USE_ACT === which ? null : use.dataset.eqid;
+    EQ_USE_ACT = which;
     eqRedraw({ sel: EQ_USE ? `#sheetbody [data-equseroute][data-eqid="${CSS.escape(EQ_USE)}"]`
                            : `#sheetbody [data-equse][data-eqid="${CSS.escape(use.dataset.eqid)}"]` });
     return;

@@ -401,7 +401,18 @@ class Item:
         return self.family == items.INTERMEDIATE
 
     @property
+    def opened(self) -> bool:
+        """A unit an assay opened (plan §13.2): the raw material, tracked in tenths, kept
+        on the stock only so its tenths have somewhere to live. Not a product."""
+        return self.family == "raw"
+
+    @property
     def finished(self) -> bool:
+        if self.opened:
+            # Measured 2026-10-07 (the bench-shell lane): an opened pinch of quicksilver
+            # was refused as "a finished product cannot go back into the glass", because
+            # any record that was not an intermediate read as a product.
+            return False
         if self.record:
             return not self.intermediate
         # A bought product (`goods.alchemy_stock`: a plain shelf row with the formula's
@@ -618,6 +629,14 @@ def fit_reason(method: str, role: str, it: Item) -> str:
         return "a finished product cannot go back into the glass"
     if it.spoiled:
         return f"it {it.spoiled}"
+    if it.count <= 0 and it.cut:
+        # The true reason, as the forge's cut bar has it ("bars track tenths", plan §9.2,
+        # mirrored by alchemy §13.2): a step takes whole units, and what an assay left of
+        # an opened one is kept for the next assay, which takes from it first
+        # (`assay_source`) so two assays never leave two part-units.
+        left = f"{(10 - int(it.cut)) / 10:g}"
+        return (f"an assay took a pinch of it: {left} of one is left, and a step takes "
+                f"whole ones; the rest is for assaying")
     if it.count <= 0:
         return "only part of one is left of it"
     t = it.traits
@@ -941,7 +960,7 @@ def _sources(plan: AlchemyPlan) -> list[dict]:
     """The pool's sources, one per distinct input (count is batch, not strength)."""
     out = []
     for it in [i for i, _ in plan.inputs] + ([plan.solvent] if plan.solvent else []):
-        if it.record is not None:
+        if it.record is not None and not it.opened:
             out.append({"record": it.live})
         elif it.material:
             out.append({"material": it.material, "wild": it.has("wild")})

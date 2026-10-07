@@ -2218,6 +2218,12 @@ class Outcome:
     code: str = ""
     for_a_person: str = ""
     fix: dict | None = None
+    # Which kind of attack this outcome is, where the verdict alone cannot say: "splash"
+    # for a thrown flask (`_splash_attack`). Empty on every ordinary swing. The log needs
+    # it to hear a flask shatter rather than a blade land (alchemy U5's `combat.shatter`):
+    # the outcome carried no verdict and no mark at all until 2026-10-07, so the sound bus
+    # could not tell a thrown flask from anything else.
+    mode: str = ""
 
     def as_dict(self) -> dict:
         d = {
@@ -2241,6 +2247,8 @@ class Outcome:
             d["for_a_person"] = self.for_a_person
         if self.fix is not None:
             d["fix"] = self.fix
+        if self.mode:
+            d["mode"] = self.mode
         return d
 
     def player_visible(self) -> dict:
@@ -14221,21 +14229,12 @@ class Engine:
         if how == "throw":
             # Asked before the flask leaves the hand: past five range increments, or
             # behind a wall, nothing is thrown and nothing is spent.
-            from . import position as position_mod
-
             struck = self.scene.actors[target] if target != intent.actor else None
-            if struck is None and aim_square is None:
-                return self._refuse(intent, f"Throw the {use.item} at somebody, or at a "
-                                            f"square: thrown at {actor.name}'s own feet it "
-                                            f"is a drink spilled.")
-            _, too_far = self._splash_reach(actor, struck, aim_square,
-                                            int((use.thrown or {}).get("range_ft") or 10))
-            if too_far:
-                return self._refuse(intent, too_far)
-            if struck is not None and position_mod.cover_of(
-                    self.scene, actor, struck) == "total":
-                return self._refuse(intent, f"{struck.name} is behind total cover: there "
-                                            f"is no line to throw along.")
+            refused = self.throw_refusal(actor, struck, aim_square,
+                                         int((use.thrown or {}).get("range_ft") or 10),
+                                         use.item)
+            if refused:
+                return self._refuse(intent, refused)
 
         # The dose is spent whichever way it was used, and spent before the effects
         # resolve. A poison that kills the drinker mid-resolution has still been drunk.
@@ -16882,6 +16881,24 @@ class Engine:
                           f"thrown.")
         return feet, ""
 
+    def throw_refusal(self, actor, struck, square, inc: int, name: str = "flask") -> str:
+        """Why a flask cannot be thrown at this creature (or this grid intersection) from
+        where the thrower stands, in words, or "" when it can. The ONE reader: `use_item
+        how=throw` asks it before the flask leaves the hand, and the Equipment tab's Throw
+        menu (play/views.py `_throw_menu`) asks it to grey a target the throw would refuse,
+        so the menu and the door cannot disagree."""
+        from . import position as position_mod
+
+        if struck is None and square is None:
+            return (f"Throw the {name} at somebody, or at a square: thrown at "
+                    f"{actor.name}'s own feet it is a drink spilled.")
+        _, too_far = self._splash_reach(actor, struck, square, int(inc or 10))
+        if too_far:
+            return too_far
+        if struck is not None and position_mod.cover_of(self.scene, actor, struck) == "total":
+            return f"{struck.name} is behind total cover: there is no line to throw along."
+        return ""
+
     def _splash_gate(self, actor, defender) -> str:
         """A throw at somebody not on the thrower's side opens the fight, as a first
         swing does (alchemy plan §16.2, "Attitude and the battle gate") — but the throw
@@ -17309,10 +17326,17 @@ class Engine:
         tells += said
         if defender is not None:
             self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
+        # Marked as an ordinary attack marks itself (`verdict` hit or miss, `dc` the AC it
+        # was rolled against), plus the `mode` the log needs to tell a thrown flask from a
+        # swing: measured 2026-10-07 by the bench-shell lane, this outcome carried neither,
+        # so the table's sound bus (04-combat-and-turns.js) skipped every throw and U5's
+        # `combat.shatter` could not be wired. A hit and a miss both shatter.
         return Outcome(
             intent_id=intent.id, op="attack",
             rolls=[_roll_from_dict(r) for r in state["rolls"]]
                   + [_roll_from_dict(r) for r in rolls if isinstance(r, dict)],
+            dc={"value": ac, "explain": note},
+            verdict="hit" if hit else "miss", mode="splash",
             effects=effects, tell=" ".join(t for t in tells if t),
             because=intent.because)
 
@@ -21635,7 +21659,7 @@ def _rehydrate(d: dict) -> Outcome:
         dc=d.get("dc"), verdict=d.get("verdict"), margin=d.get("margin"),
         effects=d.get("effects", []), tell=d.get("tell", ""), because=d.get("because", ""),
         code=str(d.get("code", "") or ""), for_a_person=str(d.get("for_a_person", "") or ""),
-        fix=d.get("fix"),
+        fix=d.get("fix"), mode=str(d.get("mode", "") or ""),
     )
 
 
