@@ -542,15 +542,15 @@ def test_a_village_shelf_never_holds_what_a_village_could_not_have():
     assert _dearest("market:armorer", "city") >= 1500
 
 
-def test_a_city_shelf_reaches_past_the_till_and_a_village_one_never_does():
+def test_the_alchemists_shelf_follows_the_settlement_and_not_the_till():
     """The base value is the shelf's ceiling where the settlement is known, the till only
     what the counter pays (the book's purchase limit is a separate number). Measured
-    2026-10-07: the alchemist's uncommon till (150-400 gp) held its shelf to 350 gp on
-    30 days in a city as in a village; with the ruling, 500, 2,000 and 8,000 gp."""
-    till_bound = _dearest("market:alchemist", "")
-    assert till_bound <= 400
+    2026-10-07 over 30 days, both ways the till bound failed: with the alchemist's
+    uncommon till its shelf topped out at 350 gp in a city as in a village; with lane H's
+    potions as staples its till went exotic and a VILLAGE alchemist shelved 3,000 gp.
+    With the ruling: 500, 2,000 and 8,000 gp."""
     assert _dearest("market:alchemist", "village") <= 500
-    assert till_bound < _dearest("market:alchemist", "town") <= 2000
+    assert 500 < _dearest("market:alchemist", "town") <= 2000
     assert 2000 < _dearest("market:alchemist", "city") <= 8000
 
 
