@@ -55,10 +55,12 @@ def test_the_equipment_tab_says_a_sword_is_broken_and_offers_to_mend_it(market):
 
     c, cm = market
     pc = c.scene.pc()
-    pc.damage_item("longsword", 26)
+    pc.damage_item("longsword", 13)
     rows = {r["key"]: r for r in views._carried(pc)}
     sword = rows["longsword"]
-    assert sword["damage"] == "broken: 14 of 30 hit points"
+    # CRB Table 7-12: a one-handed blade is hardness 10, 5 hit points (it was 30, an inch
+    # of steel, until 2026-10-07); 13 leaves 2.
+    assert sword["damage"] == "broken: 2 of 5 hit points"
     assert [a["label"] for a in sword["trade_acts"]] == ["Judge its make", "Mend"]
     # Whole things are judged, not mended; the wear doors are untouched.
     assert [a["label"] for a in rows["dagger"]["trade_acts"]] == ["Judge its make"]
@@ -67,7 +69,7 @@ def test_the_equipment_tab_says_a_sword_is_broken_and_offers_to_mend_it(market):
 
 def test_mend_by_button_asks_the_players_die_then_makes_it_whole(market):
     c, cm = market
-    c.scene.pc().damage_item("longsword", 26)
+    c.scene.pc().damage_item("longsword", 13)
     c.save()
     r = _post("/api/tradeskill", {"use": "mend", "item": "longsword"})
     assert r.status_code == 200

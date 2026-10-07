@@ -474,6 +474,44 @@ MATERIALS: dict[str, dict] = {
     "adamantine": {"hardness": 20, "hp_per_inch": 40},
 }
 
+# Core Rulebook Table 7-12, "Common Armor, Weapon, and Shield Hardness and Hit Points"
+# (p.175), read from the PDF 2026-10-07. A weapon, suit or shield has THESE numbers, not
+# an inch of its metal from Table 7-13 above: until 2026-10-07 every steel blade was given
+# 30 hit points (one inch of steel), so a longsword the book gives 5 took sixteen hours to
+# mend. The footnotes: hardness "+2 for each +1 enhancement bonus of magic items"; hit
+# points are "for Medium armor, weapons, and shields" and "add 10 hp for each +1
+# enhancement bonus"; armour's hardness "varies by material; see Table 7-13". Every row's
+# hardness is the hardness of what it is made of (steel 10, wood 5), which is why a
+# material can move it (rules/object_numbers.py). Keyed by Table 7-12's own row names.
+OBJECT_ROWS: dict[str, dict] = {
+    "light blade":                     {"hardness": 10, "hp": 2,  "substance": "steel"},
+    "one-handed blade":                {"hardness": 10, "hp": 5,  "substance": "steel"},
+    "two-handed blade":                {"hardness": 10, "hp": 10, "substance": "steel"},
+    "light metal-hafted weapon":       {"hardness": 10, "hp": 10, "substance": "steel"},
+    "one-handed metal-hafted weapon":  {"hardness": 10, "hp": 20, "substance": "steel"},
+    # The book prints no two-handed metal-hafted row. Doubled from the one-handed row, as
+    # every blade and hafted row doubles from one-handed to two-handed: HOUSE.
+    "two-handed metal-hafted weapon":  {"hardness": 10, "hp": 40, "substance": "steel"},
+    "light hafted weapon":             {"hardness": 5,  "hp": 2,  "substance": "wood"},
+    "one-handed hafted weapon":        {"hardness": 5,  "hp": 5,  "substance": "wood"},
+    "two-handed hafted weapon":        {"hardness": 5,  "hp": 10, "substance": "wood"},
+    "projectile weapon":               {"hardness": 5,  "hp": 5,  "substance": "wood"},
+    # "Armor: special, armor bonus x 5" — hardness is the body's substance (Table 7-13).
+    "armor":                           {"hardness": None, "hp_per_armour_bonus": 5},
+    "buckler":                         {"hardness": 10, "hp": 5,  "substance": "steel"},
+    "light wooden shield":             {"hardness": 5,  "hp": 7,  "substance": "wood"},
+    "heavy wooden shield":             {"hardness": 5,  "hp": 15, "substance": "wood"},
+    "light steel shield":              {"hardness": 10, "hp": 10, "substance": "steel"},
+    "heavy steel shield":              {"hardness": 10, "hp": 20, "substance": "steel"},
+    "tower shield":                    {"hardness": 5,  "hp": 20, "substance": "wood"},
+}
+
+# Table 7-12's footnotes 1 and 3, and "Magic Armor, Shields, and Weapons" (CRB p.174):
+# "Each +1 of enhancement bonus adds 2 to the hardness of armor, a weapon, or a shield,
+# and +10 to the item's hit points."
+HARDNESS_PER_ENHANCEMENT = 2
+HP_PER_ENHANCEMENT = 10
+
 # What a thing is made of, when nobody said. Guessed from the name because the alternative
 # is asking the GM, and a GM asked for a material will invent one.
 MATERIAL_HINTS = (

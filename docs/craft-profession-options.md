@@ -295,8 +295,23 @@ DCs were tuned without it and were not retuned (the paper's "retune or accept").
 
 `_op_buy`, `_op_sell` and `_sell_goods` read the haggle (`tradecraft.haggled`), and the
 trade window shows the moved prices and the result on its Haggle button. The Equipment
-tab offers Judge its make on every weapon, suit and shield, and Mend, with a "broken: 14
-of 30 hit points" chip, on anything damaged (`views._trade_acts`).
+tab offers Judge its make on every weapon, suit and shield, and Mend, with a "broken: 2
+of 5 hit points" chip, on anything damaged (`views._trade_acts`).
+
+**Object hit points come off the book (2026-10-07).** Until then every steel thing had an
+inch of steel from Table 7-13 — 30 hit points — so a broken longsword took 15 to 16 hours
+to mend, and a forged adamantine longsword read hardness 29 and 51 hit points (Table
+7-13's adamantine plus the material document's own step from steel, counted twice). The
+owner: "use the book but only as a base — the materials used when smithing should change
+that if they say so." `rules/object_numbers.py` is the one reader: Table 7-12's row
+(CRB p.175: one-handed blade 5, light blade 2, heavy steel shield 20, armour its bonus × 5,
+...), then the forge build's `hardness` / `hp_per_inch` numbers (or, for a bought
+"adamantine longsword", the material document's `book: true` numbers only), then +2
+hardness and +10 hit points per +1 (CRB p.174). A broken longsword now mends in 3 hours;
+a bought adamantine longsword is hardness 20, 6 hit points (the book's "one-third more");
+a +1 longsword hardness 12, 15 hit points. Saves are re-read on load, damage carried by
+proportion with whole, broken and ruined kept (`object_numbers.carry_damage`). Pinned by
+`tests/test_object_numbers.py`.
 
 **C. A day's paid work** (`work`): PF2e's Earn Income (Player Core p.228, Table 4-2)
 in PF1's coin. The task level is the lower of the character's level and the settlement's
@@ -304,16 +319,19 @@ in PF1's coin. The task level is the lower of the character's level and the sett
 band); training is read from ranks at the levels PF2e first allows each rank (trained 1,
 expert 3, master 7, legendary 15); the die only picks the column (critical success = the
 next task's pay, failure the Failed column, critical failure nothing and the work ends the
-first day). Amounts are PF2e's × 10 (`coin_scale`, HOUSE), anchored on the untrained wage
-(PF1 1 sp a day, PF2e's failed task 0 pays 1 cp) and a dagger (PF1 2 gp, PF2e 2 sp). No
+first day). Amounts are PF2e's × 5 (`coin_scale`, HOUSE): first set at × 10, anchored on
+the untrained wage (PF1 1 sp a day, PF2e's failed task 0 pays 1 cp) and a dagger (PF1 2 gp,
+PF2e 2 sp), then halved by the owner on 2026-10-07 (below). No
 ranks in either skill: the CRB's untrained 1 sp a day, no roll. Only inside a settlement.
 A day is 8 hours charged to the body, then fed, watered and slept, `_march`'s shape.
 
-**Measured against the book (what the owner may want to retune).** Kesst, Profession +6
-with 3 ranks at level 3 in a city: task 3, expert, DC 18, 5 gp a day on a success — 35 gp
-for a week, where the CRB's half-the-check wage taking 10 is 8 gp a week. Working pays
-about four times the PF1 wage at low level because PF2e's table is generous in
-purchasing power once converted; `coin_scale` is the one number to turn.
+**Measured against the book, and retuned.** Kesst, Profession +6 with 3 ranks at level 3
+in a city: task 3, expert, DC 18, 5 gp a day on a success at × 10 — 35 gp for a week,
+where the CRB's half-the-check wage taking 10 is 8 gp a week. Working paid about four
+times the PF1 wage at low level because PF2e's table is generous in purchasing power once
+converted. The owner, 2026-10-07: "Paid work: halve it." `coin_scale` is 5 now: 2 gp 5 sp
+a day on a success, 17 gp 5 sp a week (about twice the PF1 wage). The untrained 1 sp a day
+is the CRB's own and is not scaled. Pinned by `tests/test_trade_uses.py`.
 
 **The three defects of §1, fixed by folding a trade onto its base** (`tables.base_skill`):
 feat prerequisites (17 feats asked for a trade's ranks; all 18 conditions now read the
