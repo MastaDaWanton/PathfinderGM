@@ -16513,6 +16513,134 @@ class Engine:
                 out.append(ref)
         return out
 
+    # --- who a splash hurt, and what they do about it (owner's ruling, 2026-10-06) -------
+    #
+    # "if the bystander is a combatant they might fight the thrower but if they are a
+    # civilian assuming they did not die they should run away." Measured by lane C before
+    # it: a market master caught by a flask's splash swung at the struck creature, not the
+    # thrower — the splash moved nobody's attitude and drew nobody into the fight, so the
+    # bystander's turn (if it had one) was the model's guess.
+    #
+    # Prior art (searched 2026-10-06). RimWorld's trade caravans are the split the owner
+    # ruled: "When any member is harmed, the caravan temporarily changes to a defensive
+    # state"; the guards "defend", while losing the trader or a pack animal "makes the group
+    # leave immediately" (rimworldwiki.com/wiki/Trade). Baldur's Gate and Divinity: Original
+    # Sin 2 turn a neutral caught by an area effect hostile — and DOS2 turns the whole guard
+    # group "permanently hostile" for one guard clipped by a Whirlwind, which its players
+    # call "counterintuitive weirdness that makes you reload" (forums.larian.com, thread
+    # 638262); refused here: only the one who was hurt reacts, nobody rallies to them. DOS2's
+    # civilians mostly flee fights; BG3's run "screaming" from a zombie while its guards draw
+    # (Nexus mod 918's description of the vanilla behaviour). Pillars of Eternity II let
+    # Wall of Flame burn neutrals without turning them until one died (Obsidian forums) —
+    # not adopted: the sword door and the spell door already turn a creature the player
+    # harms (`attitude.harmed`), and a flask is not a third rule.
+    #
+    # Who is a combatant is read off what the creature IS, never its name: the law's own
+    # tag (`role.guard`), the fighting templates `rally` already reads, a martial class
+    # (full base attack — a PC-built sheet's class, or an imported stat block whose every
+    # Hit Die is a d10 or d12, the fighter's, warrior's, paladin's, ranger's and barbarian's
+    # dice), or somebody already hostile with something to hit with. Everyone else who
+    # lives is a civilian, and runs.
+
+    _MARTIAL_DIE = re.compile(r"\d*d(\d+)")
+
+    def fights_back(self, actor) -> bool:
+        """Whether a creature caught by somebody's harm turns and fights rather than runs.
+        Read off its data, never its name (the owner's ruling above)."""
+        if actor is None or actor.is_pc:
+            return False
+        if actor.has_state(states.GUARD):
+            return True
+        if str(getattr(actor, "from_template", "") or "") in self.FIGHTING_KINDS:
+            return True
+        cls = getattr(actor, "class_data", None) or {}
+        if cls and str(cls.get("bab") or "") == "full":       # tables.bab_for's word
+            return True
+        if not cls:
+            from . import bestiary
+
+            row = bestiary.imported().get(
+                str(getattr(actor, "from_template", "") or "").strip().lower()) or {}
+            dice = [int(d) for d in self._MARTIAL_DIE.findall(str(row.get("hit_dice") or ""))]
+            if dice and all(d >= 10 for d in dice):
+                return True
+        if states.attitude_of(actor) == "hostile":
+            held = str(getattr(actor, "equipped", "") or "").strip().lower()
+            printed = actor.stat_block_attacks() if hasattr(actor, "stat_block_attacks") \
+                else {}
+            if (held and held not in ("unarmed", "none")) or any(printed.values()):
+                return True
+        return False
+
+    def _splash_reactions(self, actor, defender, effects: list,
+                          origin: str) -> tuple[list, list]:
+        """What being hurt by a thrown flask does to everybody it hurt: how they feel
+        about the thrower (`attitude.harmed`, the one rule the sword and spell doors
+        share), and — for a bystander — whether they come into the fight against the
+        thrower or run from it. (effects, tells)."""
+        from . import attitude as attitude_mod
+
+        hurt: list[str] = []
+        for e in effects:
+            ref = str(e.get("ref") or "")
+            if not ref or ref == actor.ref or ref in hurt:
+                continue
+            kind = e.get("kind")
+            if ((kind == "damage" and int(e.get("amount") or 0) > 0)
+                    or kind == "burning"
+                    or (kind == "condition" and attitude_mod.harmful_condition(
+                        str(e.get("condition", ""))))):
+                hurt.append(ref)
+        out_fx: list = []
+        out_said: list = []
+        for ref in hurt:
+            b = self.scene.actors.get(ref)
+            if b is None or b.is_pc or b.has_state("state.down.dead"):
+                continue
+            # Who they were BEFORE the flask: the harm below turns a stallkeeper hostile,
+            # and his club then read him as an armed hostile — measured on the first run,
+            # "the stallkeeper, caught in the splash, turns on Kesst Vayr".
+            fights = self.fights_back(b)
+            felt = attitude_mod.harmed(self, b, actor, origin)
+            if felt:
+                out_fx.append(felt)
+                line = attitude_mod.harm_said(felt, b.name)
+                if line:
+                    out_said.append(line)
+            # The struck creature was the throw's aim and is in the fight already (the
+            # splash gate drew it); a companion is the party's, and a side already taken
+            # is kept; somebody down neither fights nor runs.
+            if (b is defender or b.has_state(states.TRAVELS_WITH_YOU) or b.is_down
+                    or any(ref in refs for refs in (self.scene.sides or {}).values())):
+                continue
+            if fights:
+                if not self.scene.in_encounter:
+                    continue        # hostile now (above); nothing to join
+                side = next((s for s, refs in self.scene.sides.items()
+                             if actor.ref not in refs), "them")
+                if self.join_fight(ref, side):
+                    out_fx.append({"ref": ref, "kind": "joins_fight", "against": actor.ref,
+                                   "why": "splashed", "origin": origin})
+                    out_said.append(f"{b.name}, caught in the splash, turns on "
+                                    f"{actor.name}.")
+            else:
+                out_fx.append(self._flee(b, origin))
+                out_said.append(f"{b.name}, caught in the splash, runs from the fight.")
+        return out_fx, out_said
+
+    def _flee(self, b, origin: str) -> dict:
+        """A civilian runs: off the board and out of the scene, home (`residency.offstage`),
+        through `Scene.move` — never `remove`, which would end a resident's life with
+        their stall. Their schedule brings them back when the party next arrives
+        (`settle_people`), and a keeper's counter takes them back when it opens."""
+        from . import places as places_mod
+        from . import residency
+
+        town = (str(getattr(self.scene, "location_id", "") or "")
+                or places_mod.location_of(self.scene.at) or str(self.scene.at or ""))
+        self.scene.move(b.ref, residency.offstage(town, f"home-{b.ref}"))
+        return {"ref": b.ref, "kind": "flees", "why": "splashed", "origin": origin}
+
     def _scatter(self, actor, aim: tuple[int, int], feet, inc: int,
                  rolls: list) -> tuple[tuple[int, int] | None, str]:
         """Where a missed flask lands: the d8 for direction (1 short, toward the thrower;
@@ -16740,6 +16868,9 @@ class Engine:
                     tells += said
         for spec in load.get("clouds") or []:
             tells.append(self._lay_cloud(spec, land, actor, name))
+        fx, said = self._splash_reactions(actor, defender, effects, origin or name)
+        effects += fx
+        tells += said
         if defender is not None:
             self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
         return Outcome(

@@ -398,7 +398,13 @@ SUBTYPE_REQUIRED: tuple[str, ...] = ("humanoid", "outsider")
 
 VOCAB: dict[str, list[dict]] = {
     "ability": [{"id": k, "name": v} for k, v in ABILITY_FULL.items()],
-    "skill": [{"id": k, "name": k.title()} for k in sorted(SKILLS)],
+    # `all` first (alchemy lane C3, 2026-10-06): `Actor.skill_modifiers` has always read a
+    # `skill_mod` aimed at `sheet.ALL_SKILLS`, and this list refused it — so lane D wrote
+    # heroism's "+2 morale bonus on ... skill checks" as 35 lines, one per skill, and any
+    # skill added later would have been left out of it. The pickers that choose ONE skill
+    # (`choice` of `skill`) read `SKILLS`, not this list, so `all` is never offered there.
+    "skill": [{"id": "all", "name": "All skills"}]
+             + [{"id": k, "name": k.title()} for k in sorted(SKILLS)],
     "save": [{"id": k, "name": v} for k, v in SAVES.items()],
     "condition": [{"id": k, "name": v.get("name", k.title())}
                   for k, v in sorted(CONDITIONS.items())]

@@ -62,6 +62,12 @@ function renderCombat(s) {
   if (!COMBAT.target && foes.length === 1) COMBAT.target = foes[0].ref;
   const aimed = foes.find(f => f.ref === COMBAT.target);
   $("#cb-coup").hidden = !(aimed && aimed.helpless);
+  // Fire on you, or goo holding you down: offered only while it is so (the engine's
+  // `burning` / `glued`, asked of the vocabulary server-side).
+  const me = (s.scene.actors || []).find(a => a.is_pc) || {};
+  const ext = $("#cb-extinguish"), tear = $("#cb-breakfree");
+  if (ext) ext.hidden = !me.burning;
+  if (tear) tear.hidden = !me.glued;
   $("#cb-targets").innerHTML = foes.map(f =>
     `<span class="cb-target ${COMBAT.target === f.ref ? "on" : ""}" data-target="${
       esc(f.ref)}">${esc(f.name)}<small>${
@@ -305,6 +311,31 @@ document.addEventListener("click", async e => {
     // for either, and the engine enforces no action economy for any op.
     COMBAT.standard = { label: `Coup de grâce on ${targetName()}`,
       actions: [{ op: "attack", target: COMBAT.target, params: { coup_de_grace: true } }] };
+    combatMenu(""); renderPlan(); return;
+  }
+  // Putting out clinging fire and tearing free of a tanglefoot bag's goo (alchemy lane
+  // C3): each the whole turn, filed in the standard slot as the coup de grâce is.
+  if (t.closest("#cb-extinguish")) {
+    combatMenu(`<button data-stuck="extinguish:roll">Roll on the ground</button>
+      <button data-stuck="extinguish:beat">Beat at the flames</button>
+      <span class="cb-note">The whole turn. Rolling on the ground helps.</span>`);
+    return;
+  }
+  if (t.closest("#cb-breakfree")) {
+    combatMenu(`<button data-stuck="break_free:strength">Heave free</button>
+      <button data-stuck="break_free:slash">Hack the goo off</button>
+      <span class="cb-note">Hacking needs a slashing weapon in hand.</span>`);
+    return;
+  }
+  const stuck = t.closest("[data-stuck]");
+  if (stuck) {
+    const [op, how] = stuck.dataset.stuck.split(":");
+    COMBAT.standard = op === "extinguish"
+      ? { label: how === "roll" ? "Roll on the ground to put out the flames"
+                                : "Beat at the flames",
+          actions: [{ op, params: { roll: how === "roll" } }] }
+      : { label: how === "slash" ? "Hack the goo off" : "Heave free of the goo",
+          actions: [{ op, params: { how } }] };
     combatMenu(""); renderPlan(); return;
   }
   if (t.closest("#cb-fullatk")) {

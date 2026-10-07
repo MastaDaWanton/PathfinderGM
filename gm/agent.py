@@ -3431,11 +3431,12 @@ class GMAgent:
         self.last_added = narration_mod.added_sentences(before, text)
         # And the body's authored lines, which the truth pass's backstop put on inside the
         # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
-        from .checks import body_shown, power_unbacked, sleep_kept
+        from .checks import body_shown, light_shown, power_unbacked, sleep_kept
 
         self.last_added += [s for s in (*body_shown.authored_in(text),
                                         *sleep_kept.authored_in(text),
-                                        *power_unbacked.authored_in(text))
+                                        *power_unbacked.authored_in(text),
+                                        *light_shown.authored_in(text))
                             if s not in self.last_added]
         # And the deeds backstop's opening built from the player's own line
         # (`_show_declared`): ours too.
@@ -3722,6 +3723,27 @@ class GMAgent:
         if pressed:
             repairs.append(f"a kill left off the page: wrote the death of "
                            f"{', '.join(pressed)}")
+        # The light held once more over the beat as it ships. Live, 2026-10-06: the truth
+        # pass rewrote the thug's miss into the gloom, and the wrong-actor rewrite that
+        # runs after it inside the groom (`_repair_wrong_actor`, whole passage) wrote the
+        # beat again without it — "passes harmlessly through the space where you would
+        # have been". Mechanical and free: the check's own backstop, no model call.
+        from dataclasses import replace as _replace
+
+        from .checks import light_shown
+
+        final = _replace(self._beat_context("outcome", player_input=player_input,
+                                            brief="", outcomes=outcomes, tells=tells),
+                         text=text)
+        if text and light_shown.find(final):
+            before_light = text
+            text, lit = light_shown.backstop(final, text, [])
+            repairs += lit
+            self.last_added += narration_mod.added_sentences(before_light, text)
+        # The light's authored lines (gm/checks/light_shown.py), put on inside the groom
+        # on somebody else's turn too: ours, so never shown back as the model's (D4).
+        self.last_added += [s for s in light_shown.authored_in(text)
+                            if s not in self.last_added]
         attempt = Attempt("consequence", reply.seconds, reply.model, reply.text,
                           note="; ".join(repairs))
         return text, attempt

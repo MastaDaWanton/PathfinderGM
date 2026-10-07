@@ -640,6 +640,12 @@ def _state(c) -> dict:
                  # are past finishing.
                  "helpless": bool(a.is_helpless
                                   and not a.has_state("state.down.dead")),
+                 # Whether the bar offers putting out the flames or tearing loose
+                 # (`extinguish`, `break_free`), asked of the vocabulary for the same
+                 # reason: `burning` is an effect, not a condition, and is in no list
+                 # the browser could read it from.
+                 "burning": bool(a.has_state("state.burning")),
+                 "glued": bool(a.has_state("state.held.glued")),
                  "conditions": _shown_conditions(a)}
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
@@ -2706,7 +2712,12 @@ def _put_back_free_actions(c, pending: list) -> None:
 # casting itself has worked all along — Magic Missile 1d4+1 x3, Burning Hands 5d4 at
 # Reflex DC 12, Fireball 5d6 at DC 14, damage applied, spell resistance and saves read
 # off the spell. Only the button was absent.
-_COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast"}
+#
+# `extinguish` and `break_free` (alchemy lane C3, 2026-10-06): lane C's two ops had no door
+# here, so a player on fire from a thrown flask, or glued by a tanglefoot bag, could only
+# type it and hope the planner sampled it. The bar offers each only while it applies.
+_COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast",
+               "extinguish", "break_free"}
 
 
 @require_POST
@@ -3852,7 +3863,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 # On Continue the standing action is a fact of the beat, last in the
                 # prompt with the scene as it stands (the ruling, 2026-09-18).
                 scene_now=(prompts.scene_now(
-                               c.scene, was_clock=getattr(resolution, "clock_before", None))
+                               c.scene, was_clock=getattr(resolution, "clock_before", None),
+                               outcomes=resolution.outcomes)
                            + (("\n\n" + judgement.standing_action(c.scene))
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
                               else "")
