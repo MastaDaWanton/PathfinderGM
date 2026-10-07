@@ -76,6 +76,7 @@
       parts.push(it.grades.map(function (g) { return g.essence + " " + g.grade; }).join(", "));
     }
     if (!parts.length && it.tier) parts.push(it.tier);
+    if (it.opened) parts.push("opened by an assay");
     if (it.keeps_until_day && !it.spoiled) parts.push("keeps until day " + it.keeps_until_day);
     if (it.old) parts.push(it.old);
     return parts.join(", ");
@@ -157,8 +158,16 @@
     var html = "";
     var m = A.order.method;
     if (!all.length) {
+      // An empty shelf points at where its things are bought (UI plan §6.2, "Buy at the
+      // market"): the server's `buy`, the counter of this settlement that sells the
+      // alchemist's staples, with a button straight to it when the party stands at the
+      // market. Nothing here decides which counter, or whether there is one.
+      var buy = (A.state && A.state.buy) || {};
       html = '<div class="bs-state"><p>Your shelf is empty. Reagents, solvents, vessels and herbs you carry ' +
-        'appear here; markets sell the common ones.</p></div>';
+        'appear here.</p>' + (buy.said ? '<p class="bs-detail">' + esc(buy.said) + '</p>' : "") +
+        (buy.here && buy.line ? '<div class="bs-acts"><button type="button" class="v2-btn is-small" ' +
+          'data-alchemy-buy="' + esc(buy.line) + '">Buy from ' + esc(buy.label) + '</button></div>' : "") +
+        '</div>';
     } else {
       var match = function (it) { return !find || String(it.name).toLowerCase().indexOf(find) >= 0; };
       var not = [];
@@ -244,6 +253,16 @@
   list.addEventListener("click", function (e) {
     if (e.target.closest("[data-alchemy-retry]")) { A.reload(); return; }
     if (e.target.closest("[data-alchemy-everything]")) { A.showEverything(); return; }
+    var buyBtn = e.target.closest("[data-alchemy-buy]");
+    if (buyBtn) {
+      // The table's Trade tab, opened on that counter, in place of the bench (the forge's
+      // "Buy at the market" does the same).
+      var line = buyBtn.dataset.alchemyBuy;
+      A.closeBench();
+      if (A.open) return;
+      if (typeof openTrade === "function") openTrade("", line);
+      return;
+    }
     var info = e.target.closest(".bt-info[data-material]");
     if (info) { A.openCard(info.dataset.material, info, A.item(info.dataset.for)); return; }
     var add = e.target.closest(".as-add[data-add]");

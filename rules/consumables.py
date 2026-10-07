@@ -912,6 +912,33 @@ def _light(stock, use: Use, specs: list[dict], target: str, potency: float,
     return use
 
 
+def is_raw_reagent(stock) -> bool:
+    """Whether this stock row is a raw alchemy reagent rather than a made thing: the unit
+    an assay opened (`alchemist.take_pinch`, record family "raw", plan §13.2), kept on the
+    stock only because it is tracked in tenths. Read off the live object's `record` or a
+    saved row's `alchemy`."""
+    rec = stock.get("alchemy") if isinstance(stock, dict) else _field(stock, "record", None)
+    return isinstance(rec, dict) and str(rec.get("family") or "") == "raw"
+
+
+def harm_lines(stock, route: str) -> list[str]:
+    """What using this thing through `route` does to whoever receives it that is harm, in
+    the engine's own words: each poison's save and what failing it costs, then each loose
+    penalty ("causes sickened for 3 rounds", "Fortitude DC 14 or 1 Constitution damage"). [] when
+    nothing on that route hurts.
+
+    The Equipment tab's warning chip. It said "poisons whoever drinks it" of anything with
+    a harmful effect anywhere (measured 2026-10-07 by the bench-shell lane): of alchemist's
+    fire, which is thrown and never drunk, and of an experimental Cure Light Wounds potion
+    whose drawback is being sickened, which is not a poison. Asked per route, of the
+    route's own documents, the way `plan` lands them."""
+    specs = _specs(stock)
+    if not specs:
+        return []
+    found = sort_harm(_on_route(specs, route))
+    return [p.body for p in found.poisons] + [effectspec.render(s) for s in found.penalties]
+
+
 def plan(stock, how: str = "drink", target: str = "pc",
          because: str = "", route: str = "") -> Use:
     """What using this item actually does, as intents the engine can validate.
@@ -931,6 +958,14 @@ def plan(stock, how: str = "drink", target: str = "pc",
     if how not in ("drink", "throw", "coat", "apply", "light"):
         use.problems.append(f"{how!r} is not a way to use something; "
                             f"drink, apply, throw, coat or light")
+        return use
+    # An opened reagent is the raw material, a pinch down, not a product: quicksilver is
+    # worked at the bench, never drunk. With no documents of its own it read as "a jar
+    # with nothing harmful in it" and the Equipment tab offered Drink (seen live
+    # 2026-10-07, the bench-shell lane, on an assayed pinch of quicksilver).
+    if is_raw_reagent(stock):
+        use.problems.append(f"{name} is a raw reagent, opened for an assay: it is worked "
+                            f"at the alchemy bench, not drunk, thrown or put on anything")
         return use
     # A spell potion with no documents of its own (alchemy plan §11.3): the spell's own
     # structured half resolves it, through the cast door, at the potion's caster level.

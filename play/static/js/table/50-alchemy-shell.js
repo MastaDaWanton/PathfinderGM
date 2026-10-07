@@ -90,8 +90,11 @@
     landed: null, dragKey: null,
   };
   function blank(method) {
+    // `aim` and `strip` are what a catalyst beside the work is told: the formula orichalcum
+    // steers an experiment to, the drawback a unicorn horn takes out (`check.choices`).
     return { method: method || null, inputs: [], solvent: "", vessel: "", catalysts: [],
-             formula: "", as: "", picks: null, target: "", batch: 1, assay: "", item: "" };
+             formula: "", as: "", picks: null, target: "", batch: 1, assay: "", item: "",
+             aim: "", strip: "" };
   }
   A.order = blank(null);
   var subs = {};
@@ -502,7 +505,9 @@
       if (o.vessel) body.vessel = o.vessel;
       body.formula = o.formula || "experiment";
       if (o.as) body.as = o.as;
+      if (o.aim && !o.formula) body.aim = o.aim;
     }
+    if (o.strip && o.catalysts.length) body.strip = o.strip;
     if (m === "transmute" && o.target) body.target = o.target;
     // Empty is not the same as absent (CLAUDE.md): an untouched slot list leaves the
     // server's own picks standing; once the player has touched one, the whole list is sent,
@@ -602,7 +607,11 @@
     if (what === "inputs") { o.inputs = o.inputs.filter(function (k) { return k !== key; }); o.picks = null; }
     else if (what === "solvent") o.solvent = "";
     else if (what === "vessel") { o.vessel = ""; o.formula = ""; o.as = ""; o.picks = null; }
-    else if (what === "catalysts") o.catalysts = o.catalysts.filter(function (k) { return k !== key; });
+    else if (what === "catalysts") {
+      o.catalysts = o.catalysts.filter(function (k) { return k !== key; });
+      // What the catalyst was told goes with it.
+      if (!o.catalysts.length) { o.aim = ""; o.strip = ""; }
+    }
     else if (what === "assay") o.assay = "";
     else if (what === "item") o.item = "";
     changed();
@@ -614,6 +623,8 @@
     var o = A.order;
     if (field === "formula") { o.formula = value || ""; o.picks = null; }
     else if (field === "as") { o.as = value || ""; o.picks = null; }
+    else if (field === "aim") { o.aim = value || ""; o.picks = null; }
+    else if (field === "strip") { o.strip = value || ""; o.picks = null; }
     else if (field === "target") o.target = value || "";
     else if (field === "batch") o.batch = Math.max(1, Math.round(Number(value) || 1));
     else if (field === "item") o.item = value || "";

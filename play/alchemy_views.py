@@ -114,6 +114,48 @@ def _where(c, pc) -> dict:
                        "minute": _now(c)})
 
 
+def _buy(c) -> dict:
+    """Where this settlement sells what the shelf holds (UI plan §6.2: the empty state's
+    "Buy at the market"), so an empty shelf is an invitation to act and never a dead end:
+    {"line": counter id, "label": "the alchemist", "here": whether the party stands at
+    the market, so the table's Trade tab can open on that counter, "said": a sentence}.
+    The counter is the market's own (`market.counters`) whose staples are the alchemist's
+    (`market.consumables_at`), the alchemist's shop before the general store. {} where no
+    market sells them, out of a settlement or in a fight."""
+    from rules import market
+
+    if getattr(c.scene, "in_encounter", False):
+        return {}
+    location = getattr(c, "location", None)
+    try:
+        lines = market.counters(location if location is not None else c.scene.location_id)
+    except Exception:      # noqa: BLE001 - a hint is never worth failing the state for
+        return {}
+    selling = [x for x in lines if "alchemist" in market.consumables_at(x.kind)]
+    if not selling:
+        return {}
+    pick = next((x for x in selling if x.id == "alchemist"), selling[0])
+    here = market.is_market(str(c.scene.at or ""), getattr(c.scene, "founded", None) or ())
+    where = ""
+    if not here:
+        try:
+            spot = next((p for p in _known_places(c)
+                         if market.is_market(p.id, getattr(c.scene, "founded", None) or ())),
+                        None)
+        except Exception:  # noqa: BLE001
+            spot = None
+        if spot is None:
+            # No market among the places known here (the road, the wilds): nothing to
+            # point at, rather than a counter the party cannot reach.
+            return {}
+        where = str(getattr(spot, "name", "") or "the market")
+    said =(f"Buy reagents, solvents and vessels from {pick.label} here at the market."
+            if here else
+            f"{pick.label[:1].upper()}{pick.label[1:]} at {where} sells reagents, solvents "
+            f"and vessels.")
+    return {"line": pick.id, "label": pick.label, "here": here, "said": said}
+
+
 def _reserved(c) -> dict:
     pend = _PENDING.get(c.id)
     if not pend:
@@ -294,13 +336,15 @@ def _row(pc, it: al.Item) -> dict:
            "unknown": _unknown(pc, it.doc) if it.doc is not None else 0,
            "family": it.family or None, "form": it.form or None,
            "liquid": it.liquid}
-    if rec and rec.get("family") == "raw" and it.doc is not None:
+    if it.opened and it.doc is not None:
         # A unit an assay opened is the raw material still, a tenth down (plan §13.2). Its
         # stock record made `Item.group` read it as a finished product, so after the first
-        # assay the brimstone sat under "Finished work" (lane U4's report, 2026-10-07).
-        import dataclasses
-
-        out["group"] = dataclasses.replace(it, stock=None).group
+        # assay the brimstone sat under "Finished work" (lane U4's report, 2026-10-07);
+        # `Item.finished` answers no for it now, so the group is the material's own. Sent
+        # as a raw material (no family), so the shelf offers it to Assay, which takes from
+        # it first, and says it is opened.
+        out["family"] = None
+        out["opened"] = True
         return out
     st = it.stock
     if st is not None and getattr(st, "holds_spell", None):
@@ -395,6 +439,7 @@ def _state_body(c, pc) -> dict:
         "potions": _potions(pc),
         "works": _works(c, pc),
         "where": where,
+        "buy": _buy(c),
         "clock": _clock(c),
         "formulae": [r for r in (_formula_row(pc, f, progress.level)
                                  for f in formulae.known(pc)) if r],
@@ -504,7 +549,51 @@ def _ladder(plan) -> list[dict]:
     return out
 
 
-def _check_body(c, pc, plan) -> dict:
+def _choices(plan, body) -> dict:
+    """The choices a step takes beyond what is on the bench, each from the server, so the
+    page never invents one (the bench-shell lane, 2026-10-07: the Bottle method's `as`, a
+    catalyst's `aim` and `strip` were taken by `alchemist.plan_step` and offered nowhere):
+
+    - `families`: what a vessel that bottles more than one family can make (a glass vial
+      is a potion or an oil), while no formula has decided it; `as` picks one.
+    - `aim`: with orichalcum grains beside an experiment (`names_formula`), the formulae
+      the alchemist could name. The whole fixed table within their reach for this vessel,
+      never the mix's candidates, which stay a count (owner Q5.3); a name the mix does not
+      already meet finds nothing (`formulae.match`).
+    - `strip`: with a unicorn horn shaving beside the work (`strip_one`), the pool's
+      drawbacks, one of which it takes out, as Filter does; the server's pick until the
+      player names another.
+    {} when the step has none of them."""
+    out: dict = {}
+    jobs = {j for cat in plan.catalysts for j in al._catalyst_jobs(cat.material)}
+    if plan.method == "bottle" and plan.vessel is not None:
+        fams = formulae.vessel_families(plan.vessel.material)
+        if len(fams) > 1:
+            out["families"] = {
+                "open": plan.formula is None,
+                "chosen": plan.family or None,
+                "options": [{"id": f, "name": items.FAMILY_WORDS.get(f, f),
+                             "how": list(items.family_row(f).get("how") or ())}
+                            for f in fams]}
+        if plan.experiment and "names_formula" in jobs:
+            rows = [r for r in formulae.all().values()
+                    if r.get("brewable", True) and formulae.within_reach(r, plan.level)
+                    and any(f in fams for f in (r.get("families") or [r.get("family")]))]
+            rows.sort(key=lambda r: (int(r.get("spell_level") or 0), str(r.get("name"))))
+            out["aim"] = {"chosen": str(body.get("aim") or "").strip().lower() or None,
+                          "named": bool((plan.match or {}).get("aimed")),
+                          "options": [{"id": r["id"], "name": r.get("name")} for r in rows]}
+    if "strip_one" in jobs:
+        bad = [r for r in (plan.pool or {}).get("drawbacks") or ()]
+        if bad:
+            out["strip"] = {"chosen": (plan.strip or [None])[0],
+                            "options": [{"key": r["key"],
+                                         "text": items._line(r, level=plan.level)}
+                                        for r in bad]}
+    return out
+
+
+def _check_body(c, pc, plan, body: dict | None = None) -> dict:
     secret = _secret(plan)
     shelf_items = al.shelf(pc, _now(c), _reserved(c))
     match = dict(plan.match or {})
@@ -577,6 +666,8 @@ def _check_body(c, pc, plan) -> dict:
         "tiers": tiers,
         "ceiling": plan.ceiling,
         "lab": plan.lab,
+        # The family, the formula a catalyst names, the drawback one strips (`_choices`).
+        "choices": _choices(plan, body or {}),
     }
 
 
@@ -597,10 +688,11 @@ def alchemy_check(request):
     c, pc, refused = _ready(request)
     if refused:
         return refused
-    plan, refused = _plan_from(c, pc, read_body(request), reserved=_reserved(c))
+    body = read_body(request)
+    plan, refused = _plan_from(c, pc, body, reserved=_reserved(c))
     if refused:
         return refused
-    return JsonResponse(_check_body(c, pc, plan))
+    return JsonResponse(_check_body(c, pc, plan, body))
 
 
 # --- roll --------------------------------------------------------------------------------------

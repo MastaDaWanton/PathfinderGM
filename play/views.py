@@ -494,6 +494,10 @@ def _attack_slots(pc) -> dict:
         "weapon": (pc.equipped or "unarmed"),
         "weapons": weapons,
         "replaceable": bool(getattr(pc, "paths", None)),
+        # The flasks a Throw on the combat panel may name (`_flasks`): the owner ruled
+        # alchemy's products work "also as thrown flasks", and the panel where attacks
+        # are picked offered none (the bench-shell lane, 2026-10-07).
+        "flasks": _flasks(pc),
     }
 
 
@@ -753,6 +757,9 @@ def _player_visible_entry(entry: dict) -> dict:
         secret = isinstance(dc, dict) and dc.get("value") in hidden
         outcomes.append({
             "op": o.get("op"),
+            # "splash" on a thrown flask's attack, "" on every other outcome: the one mark
+            # that lets the table hear a flask shatter instead of a blade land.
+            "mode": o.get("mode") or "",
             "verdict": o.get("verdict"),
             "margin": None if secret else o.get("margin"),
             "because": o.get("because"),
@@ -1242,6 +1249,115 @@ def _use_targets(pc) -> list[dict]:
     return out
 
 
+def _live_of(pc):
+    """The campaign in memory whose character this is, or None (a roster preview). Read off
+    the campaigns already loaded, never `current()`, which would load or even make one for
+    a sheet that only wants drawing."""
+    return next((c for c in list(getattr(campaign_mod, "_LIVE", {}).values())
+                 if getattr(c, "scene", None) is not None and c.scene.pc() is pc), None)
+
+
+def _throw_menu(pc, stock, item_id: str) -> list[dict]:
+    """The Throw button's targets for one flask: everybody here the player can see, but the
+    thrower and the dead, the fight's foes first, each with the body `/api/use` takes and,
+    where the engine would refuse the throw (past five range increments, behind total
+    cover), that refusal in its own words and the entry greyed (`Engine.throw_refusal`, the
+    one reader the door asks too).
+
+    The bench-shell lane, 2026-10-07: Equipment's Throw posted no target, so the engine
+    refused every press with "Throw the Alchemist's fire at somebody, or at a square", and
+    only typing "I throw my alchemist's fire at the thug" threw one. The targets are the
+    scene's people by ref, never a model's guess; a square is aimed from the combat panel's
+    map, where squares are (04-combat-and-turns.js)."""
+    from rules import consumables, states
+
+    c = _live_of(pc)
+    if c is None:
+        return []
+    scene = c.scene
+    foes = {r for side, refs in (scene.sides or {}).items() for r in refs
+            if pc.ref not in refs}
+    try:
+        engine = c.engine()
+    except Exception:  # noqa: BLE001 - a menu with no greying is still a menu
+        engine = None
+    inc = int(consumables.thrown_load(stock).get("range_ft") or consumables.SPLASH_RANGE_FT)
+    out = []
+    for ref, a in scene.actors.items():
+        if a is pc or getattr(a, "is_pc", False) or a.has_state("state.down.dead") \
+                or a.has_state("state.hidden"):
+            continue
+        why = ""
+        if engine is not None:
+            try:
+                why = engine.throw_refusal(pc, a, None, inc, stock.name)
+            except Exception:  # noqa: BLE001 - the door still asks when it is pressed
+                why = ""
+        # What the throw means for who they are, as the splash gate reads it
+        # (`Engine._splash_gate`): out of a fight, a throw at anybody but the party
+        # starts one.
+        ours = a.has_state(states.TRAVELS_WITH_YOU)
+        said = ("a foe in this fight" if ref in foes else
+                "travels with you" if ours else
+                "a throw at them starts a fight" if not scene.in_encounter else "")
+        out.append({"route": "throw", "label": f"At {a.name}", "line": why or said,
+                    "disabled": bool(why), "foe": ref in foes,
+                    "body": {"item": item_id, "how": "throw", "to": ref}})
+    out.sort(key=lambda m: (m["disabled"], not m["foe"]))
+    return out
+
+
+def _throwable(stock, d: dict, now) -> bool:
+    """Whether the Throw act stands on this jar: what it is for (`_stock_row`'s answer,
+    the planner's), not work still In progress, not gone off, and no gear row of its own
+    (a lantern is never thrown). One answer for the Equipment row and the combat panel's
+    flask list, so the two cannot disagree."""
+    from rules import gear as gear_mod
+    from rules import inprogress as inprogress_mod
+
+    if not d.get("throwable") or int(getattr(stock, "count", 0) or 0) < 1:
+        return False
+    if gear_mod.row_for(stock.base)[1]:
+        return False
+    if inprogress_mod.held_back(stock, now):
+        return False
+    rec = getattr(stock, "record", None)
+    if isinstance(rec, dict) and rec.get("craft") == "alchemist" and now is not None:
+        from rules import alchemy_items
+
+        if alchemy_items.gone_off(rec, now):
+            return False
+    return True
+
+
+def _flasks(pc) -> list[dict]:
+    """Every flask the character could throw this turn, for the combat panel's Throw menu:
+    the stock id `use_item` takes, its name and count, and what a hit does in the engine's
+    words. Throwing it goes through the same door as the Equipment tab's (`use_item
+    how=throw` -> consumables -> the engine's splash attack); this only lists."""
+    from rules import consumables, effectspec
+    from rules.sheet import _stock_row
+
+    if pc is None:
+        return []
+    c = _live_of(pc)
+    now = int(c.scene.clock_minutes or 0) if c is not None else None
+    out = []
+    for sid, s in sorted((pc.stock or {}).items(), key=lambda kv: kv[1].name.lower()):
+        try:
+            d = _stock_row(s)
+        except Exception:  # noqa: BLE001 - one unreadable jar never empties the panel
+            continue
+        if not _throwable(s, d, now):
+            continue
+        load = consumables.thrown_load(s)
+        hit = [effectspec.render(x) for x in load["struck"]
+               if str(x.get("type")) != "save_gate"]
+        out.append({"item": d["id"], "name": d["name"], "count": int(d.get("count") or 0),
+                    "line": "; ".join(hit), "range_ft": int(load["range_ft"])})
+    return out
+
+
 def _forged_weapon_line(rec: dict) -> list[str]:
     """A forged weapon's facts for its Equipment row: the base weapon's dice, type and crit,
     then each of the forge's own numbers by the piece it comes from ("+4 damage, forged iron
@@ -1306,6 +1422,7 @@ def _carried(pc) -> list[dict]:
     no drop op (a later batch, owner's ruling E6).
     """
     from rules import armour as armour_mod
+    from rules import consumables as consumables_mod
     from rules import forge_items as forge_items_mod
     from rules import gear as gear_mod
     from rules import goods, magicitem, weapons as weapons_mod
@@ -1533,8 +1650,21 @@ def _carried(pc) -> list[dict]:
             acts.append({"label": "Use", "api": "/api/use", "menu": menu,
                          "targets": _use_targets(pc),
                          "body": dict(menu[0]["body"])})
+        no_target = ""
         for how, label in (("drink", "Drink"), ("throw", "Throw"), ("coat", "Coat")):
             if menu and how == "drink":
+                continue
+            if how == "throw":
+                # Throw asks at whom, as Use asks where (`_throw_menu`): the engine
+                # refuses a throw with no target, and the button posted none.
+                if usable and _throwable(s, d, now):
+                    at = _throw_menu(pc, s, d["id"])
+                    if at:
+                        acts.append({"label": label, "api": "/api/use", "menu": at,
+                                     "body": dict(at[0]["body"])})
+                    else:
+                        no_target = (f"Thrown, it needs somebody to throw it at; there is "
+                                     f"nobody here.")
                 continue
             if usable and d.get(f"{how}able"):
                 acts.append({"label": label, "api": "/api/use",
@@ -1601,10 +1731,33 @@ def _carried(pc) -> list[dict]:
         # offered a Wield that could only fail. Seen in the final pass, 2026-10-06: the
         # longsword on the circle, two days from bound, read "Wield" on the Equipment tab
         # and the press answered "is still binding". The act goes; the reason is the note.
+        if no_target and not note and not any(a.get("menu") and a["label"] == "Throw"
+                                              for a in acts):
+            note = no_target
         busy = inprogress_mod.held_back(s, now)
         if busy:
             acts = []
             note = f"The {d['name']} is {busy}."
+        # A reagent an assay opened (plan §13.2) is the material, a pinch down: worked at
+        # the bench, never drunk (`consumables.plan` refuses it). It read "for show, no
+        # effect in play" with a Drink button until 2026-10-07.
+        if consumables_mod.is_raw_reagent(s):
+            cut = int((getattr(s, "record", None) or {}).get("cut") or 0)
+            effects = [f"opened for an assay: {round((10 - cut) / 10, 1):g} of one left"]
+            note = note or "A raw reagent: it is worked at the alchemy bench."
+        # What using it does to whoever receives it that is harm, in the engine's words, for
+        # each way this row offers to use it on somebody: drunk, or each place the Use menu
+        # puts it. "poisons whoever drinks it" was said of alchemist's fire, which is thrown,
+        # and of a sickening drawback, which is no poison (the bench-shell lane, 2026-10-07).
+        offered = ([m["route"] for a in acts if a["label"] == "Use" for m in a["menu"]]
+                   + (["ingest"] if any(a["label"] == "Drink" for a in acts) else []))
+        harm = []
+        for route in dict.fromkeys(offered):
+            lines = consumables_mod.harm_lines(s, route)
+            if lines:
+                where = ("Harm to whoever drinks it" if route == "ingest" else
+                         "Harm " + consumables_mod.ROUTE_USE[route][0].lower())
+                harm.append(f"{where}: {'; '.join(lines)}")
         rows.append({
             "id": f"stock:{d['id']}", "key": d["id"], "name": d["name"],
             "count": int(d.get("count") or 0), "unit": goods.unit_for(d["name"]),
@@ -1620,7 +1773,8 @@ def _carried(pc) -> list[dict]:
                      else "worn" if on else "",
             "line": "; ".join(effects),
             "known": bool(effects) or bool(s.specs) or bool(item) or bool(row) or layered,
-            "poisons": bool(d.get("poisons")),
+            # The harm in words, "" when using it hurts nobody it is used on.
+            "harm": ". ".join(harm),
             "acts": acts,
             "note": note,
             "in_progress": bool(busy),
@@ -5130,6 +5284,18 @@ def use_item(request):
     if refusal:
         return refusal
     target = str(body.get("to", "") or "pc").strip()
+    square = None
+    if how == "throw" and body.get("square") is not None:
+        try:
+            square = [int(body["square"][0]), int(body["square"][1])]
+        except (TypeError, ValueError, IndexError, KeyError):
+            return JsonResponse({"error": "A square is two numbers, across and down."},
+                                status=400)
+    # A die is owed on something already under way: nothing else is reached for until it
+    # is rolled. A throw is an attack that suspends for the player's d20, and a second one
+    # started over the first would freeze its queue over the other's.
+    if c.scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
     # One intent in, but a jar's authored effects fan out into several inside the
     # op, so a raise part-way can still leave the drink half-drunk: consumed off
     # the sheet, and no healing.
@@ -5143,7 +5309,10 @@ def use_item(request):
             "params": {"item": item, "how": how, "to": target,
                        # Where it goes (the Use menu): only `apply` takes one.
                        **({"route": str(body.get("route") or "").strip().lower()}
-                          if how == "apply" else {})}})
+                          if how == "apply" else {}),
+                       # A flask aimed at a grid intersection rather than a person
+                       # (CRB, Throw Splash Weapon: AC 5): the engine's `square`.
+                       **({"square": square} if square is not None else {})}})
     try:
         engine = c.engine()
         resolution = engine.run(engine.validate([raw]))
@@ -5568,7 +5737,9 @@ def _shelf_of(item) -> str:
     if isinstance(item, Stock):
         if item.holds_spell or item.enhancement or item.craft == "enchanter":
             return "magic"
-        if kind in ("ore", "intermediate"):
+        # "raw": a reagent an assay opened (rules/alchemist.py `take_pinch`), the material
+        # still, a tenth down; it went on the consumables shelf beside the potions.
+        if kind in ("ore", "intermediate", "raw"):
             return "materials"
         table = goods.kind_of(name)
         if table == "weapon":

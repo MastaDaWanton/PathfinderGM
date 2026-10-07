@@ -5,7 +5,8 @@
 // One turn, built then committed: the server runs the ops in order through the same
 // engine path as a spoken turn, and the NPCs answer through the machinery that already
 // existed. Buttons for the mechanical; the say box for everything else.
-const COMBAT = { target: null, move: null, standard: null, swift: null, frees: [] };
+const COMBAT = { target: null, move: null, standard: null, swift: null, frees: [],
+                 aim: null, picked: null };  // aim: a flask waiting for its square
 
 function actionKind(text) {
   const m = /^\s*(?:as an?|an?)?\s*(swift|free|immediate|move|standard|full[- ]round)\b/i
@@ -48,7 +49,7 @@ function renderCombat(s) {
   const on = s.scene && s.scene.in_encounter;
   bar.hidden = !on;
   if (!on) { COMBAT.target = COMBAT.move = COMBAT.standard = COMBAT.swift = null;
-             COMBAT.frees = []; return; }
+             COMBAT.frees = []; COMBAT.aim = COMBAT.picked = null; return; }
 
   $("#cb-round").textContent = `Round ${s.scene.round || 1}`;
   const up = s.scene.turn_ref === (s.pc && s.pc.ref || "pc");
@@ -68,6 +69,10 @@ function renderCombat(s) {
   const ext = $("#cb-extinguish"), tear = $("#cb-breakfree");
   if (ext) ext.hidden = !me.burning;
   if (tear) tear.hidden = !me.glued;
+  // A flask to throw: offered while one is carried (the server's `attacks.flasks`).
+  const thr = $("#cb-throw");
+  if (thr) thr.hidden = !flasksCarried().length;
+  if (COMBAT.aim && !flasksCarried().some(f => f.item === COMBAT.aim.item)) COMBAT.aim = null;
   $("#cb-targets").innerHTML = foes.map(f =>
     `<span class="cb-target ${COMBAT.target === f.ref ? "on" : ""}" data-target="${
       esc(f.ref)}">${esc(f.name)}<small>${
@@ -150,6 +155,42 @@ function stageCastInTurn(spell) {
   return true;
 }
 
+// --- a flask thrown in the turn -----------------------------------------------------------
+// The owner ruled alchemy's products work "also as thrown flasks", and the panel where
+// attacks are picked offered none: only typing "I throw my alchemist's fire at the thug"
+// threw one (the bench-shell lane, 2026-10-07). Throw… lists the flasks the server says
+// are carried (`attacks.flasks`); a flask is thrown at the target chip, or at a square
+// clicked on the map, which the Core Rulebook allows ("Throw Splash Weapon": a grid
+// intersection, AC 5; the engine's `square`). Either way it is the standard action
+// `use_item how=throw`, the Equipment tab's own door: consumables, then the engine's
+// splash attack, which rolls the player's d20.
+function flasksCarried() {
+  return ((STATE && STATE.attacks) || {}).flasks || [];
+}
+
+function throwStep(flask, square) {
+  const params = { item: flask.item, how: "throw" };
+  let label;
+  if (square) {
+    params.square = square;
+    label = `Throw ${flask.name} at the corner of square ${square.join(",")}`;
+  } else {
+    params.to = COMBAT.target;
+    label = `Throw ${flask.name} at ${targetName()}`;
+  }
+  return { label, actions: [{ op: "use_item", params }],
+           flask: { item: flask.item, name: flask.name, square: square || null } };
+}
+
+function throwMenu(flask) {
+  const at = COMBAT.target
+    ? `<button type="button" data-throwat="target">At ${esc(targetName())}</button>` : "";
+  combatMenu(`${at}<button type="button" data-throwat="square">At a square on the map</button>
+    <span class="cb-note">${esc(flask.name)}${flask.line ? `: ${esc(flask.line)}` : ""}. ${
+      COMBAT.target ? "" : "Pick a target, or "}a square's north-west corner takes the
+      splash on the four squares around it (AC 5, no direct hit).</span>`);
+}
+
 function combatMenu(html) {
   const m = $("#cb-menu");
   m.hidden = !html;
@@ -178,12 +219,18 @@ function newLogEntries(before, after) {
 // "Confirm critical" roll met the target, which is the engine's own test
 // (`confirm.total >= swing_ac`, rules/engine.py) and the only sign of it the log has.
 // A full attack's swings follow one another a beat apart rather than all at once.
+// A thrown flask is the engine's splash attack (`mode: "splash"`, rules/engine.py
+// `_splash_attack`): it shatters whether it hit or missed, since a miss still breaks in a
+// square nearby (CRB, Throw Splash Weapon), so it is `combat.shatter` and never a blade's
+// hit or miss (alchemy U5's sound; the outcome carried no mark to tell it by until
+// 2026-10-07).
 function attackSounds(before, after, wait) {
   if (!window.Sound) return;
   const strikes = [];
   for (const e of newLogEntries(before, after)) {
     for (const o of (e.outcomes || [])) {
       if (o.op !== "attack" || (o.verdict !== "hit" && o.verdict !== "miss")) continue;
+      if (o.mode === "splash") { strikes.push("combat.shatter"); continue; }
       const ac = o.dc && o.dc.value;
       const crit = o.verdict === "hit" && ac != null && (o.rolls || []).some(r =>
         /^Confirm critical/.test(r.label || "") && r.total >= ac);
@@ -234,6 +281,7 @@ async function commitTurn(endOnly) {
       label: endOnly ? "" : said.join("; ") || "",
     });
     COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
+    COMBAT.aim = COMBAT.picked = null;
     combatMenu("");
     render(d);
     attackSounds(logBefore, d && d.log, null);
@@ -251,8 +299,12 @@ document.addEventListener("click", async e => {
     // thug" must not stay aimed at the thug once the player has pointed at somebody else.
     const cast = COMBAT.standard && COMBAT.standard.cast;
     if (cast && !cast.self) COMBAT.standard = castStep(cast, false);
+    // A staged throw at a person follows the chip the same way; one at a square stays.
+    const flask = COMBAT.standard && COMBAT.standard.flask;
+    if (flask && !flask.square) COMBAT.standard = throwStep(flask, null);
     renderCombat(STATE);
     if (cast) castMenu(COMBAT.standard.cast);
+    else if (flask && !flask.square) renderPlan();
     return;
   }
   const castAim = t.closest("[data-castaim]");
@@ -277,10 +329,51 @@ document.addEventListener("click", async e => {
   const trn = t.closest("[data-mapturn]");
   if (trn) { MAP_TURN = (MAP_TURN + Number(trn.dataset.mapturn) + 4) % 4;
              renderMap(STATE); return; }
+  // Aiming a flask at a square (the map draws every square as a target while it is): this
+  // click is the aim, not the move.
+  const aimsq = t.closest("[data-aimsq]");
+  if (aimsq && COMBAT.aim) {
+    COMBAT.standard = throwStep(COMBAT.aim, aimsq.dataset.aimsq.split(",").map(Number));
+    COMBAT.aim = null;
+    combatMenu(""); renderPlan(); renderMap(STATE); return;
+  }
   const sq = t.closest("[data-sq]");
   if (sq && STATE.scene && STATE.scene.in_encounter) {
     COMBAT.move = sq.dataset.sq.split(",").map(Number);
     renderPlan(); return;
+  }
+
+  if (t.closest("#cb-throw")) {
+    const list = flasksCarried();
+    if (!list.length) { combatMenu(`<span class="cb-note">You carry nothing to throw.</span>`); return; }
+    combatMenu(list.map((f, i) => `<button type="button" data-throwflask="${i}"
+      title="${esc(f.line || "")}">${esc(f.name)}${f.count > 1 ? ` (${f.count})` : ""}</button>`).join("")
+      + `<span class="cb-note">A standard action: a ranged touch attack, ${
+        esc(String(list[0].range_ft || 10))} ft range increments.</span>`);
+    return;
+  }
+  const tf = t.closest("[data-throwflask]");
+  if (tf) {
+    const f = flasksCarried()[Number(tf.dataset.throwflask)];
+    if (!f) return;
+    COMBAT.aim = null;
+    if (COMBAT.target) { COMBAT.standard = throwStep(f, null); renderPlan(); }
+    COMBAT.picked = f;
+    throwMenu(f);
+    return;
+  }
+  const ta = t.closest("[data-throwat]");
+  if (ta && COMBAT.picked) {
+    if (ta.dataset.throwat === "square") {
+      COMBAT.aim = COMBAT.picked;
+      combatMenu(`<span class="cb-note">${MAP_3D ? "On the Flat board, click" : "Click"} the
+        square whose north-west corner ${esc(COMBAT.picked.name)} should break on.</span>`);
+      renderMap(STATE);
+      return;
+    }
+    if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
+    COMBAT.standard = throwStep(COMBAT.picked, null);
+    combatMenu(""); renderPlan(); return;
   }
 
   if (t.closest("#cb-strike")) {
@@ -416,8 +509,12 @@ document.addEventListener("click", async e => {
   }
 
   if (t.closest("#cb-clear")) {
+    const aiming = !!COMBAT.aim;
     COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
-    combatMenu(""); renderPlan(); return;
+    COMBAT.aim = COMBAT.picked = null;
+    combatMenu(""); renderPlan();
+    if (aiming) renderMap(STATE);
+    return;
   }
   if (t.closest("#cb-commit")) { commitTurn(false); return; }
   if (t.closest("#cb-end")) { commitTurn(true); return; }
