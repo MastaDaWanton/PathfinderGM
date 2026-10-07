@@ -304,9 +304,9 @@
       "book": "Live off the land, follow tracks, keep from getting lost, and read the weather.",
       "uses": [
         {"text": "Foraging: each hour is a Survival check against the land's difficulty, with your Herbalist level added. The better the roll, the more you find.",
-         "file": "rules/foraging.py", "find": "mods = list(actor.skill_modifiers(\"survival\"))"},
-        {"text": "Prospecting for ore uses the same roll, with your Blacksmith level added.",
-         "file": "rules/engine.py", "find": "level = actor.track(\"blacksmith\").level if hasattr(actor, \"track\") else 1"},
+         "file": "rules/foraging.py", "find": "mods = list(actor.skill_modifiers(skill))"},
+        {"text": "Every crafter's gathering trip (prospecting for ore, quarrying salts, gathering for any craft) is the same Survival roll each hour, with that craft's level added.",
+         "file": "rules/foraging.py", "find": "mods.append(Modifier(int(level), craft))"},
         {"text": "Say you track someone or follow a trail, and the engine rolls Survival.",
          "file": "gm/judgement.py", "find": "(\"survival\", r\"track"}
       ],
