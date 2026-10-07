@@ -327,8 +327,8 @@ function showPopup(p) {
 }
 
 // Everything that can be gone out and got, here, now — one list from every craft.
-// Foraging keeps its own button because it has the narrated hourly run behind it; the
-// rest share the plain excursion path.
+// Gathering on open ground — every trade's, foraging included — takes the narrated
+// hourly run (`data-gather`); carcasses and stalls keep the plain excursion path.
 async function loadCraftActions() {
   try {
     const d = await readJSON(await fetch("/api/craft/actions", { cache: "reload" }));
@@ -341,9 +341,13 @@ async function loadCraftActions() {
       `<option value="${esc(b)}" ${b === d.biome ? "selected" : ""}>${esc(b)}</option>`
     ).join("");
     $("#cp-actions").innerHTML = (d.actions || []).map(a => {
-      // Foraging goes through the narrated endpoint it always did.
-      const id = a.key === "herbalist:forage" ? "cp-forage" : "";
-      const attr = id ? `id="cp-forage"` :
+      // Every trade's gathering on open ground goes through the narrated endpoint
+      // foraging always had (the one gathering door, 2026-10-06): prose, the ground's
+      // encounter, the player's own check. Until then only the herbalist's did, and a
+      // prospect was one d20 and a tally line. The herbalist's keeps its old id.
+      const ground = a.requires === "biome";
+      const id = a.key === "herbalist:forage" ? ` id="cp-forage"` : "";
+      const attr = ground ? `data-gather="${esc(a.key)}" data-label="${esc(a.label)}"${id}` :
         `data-excursion="${esc(a.key)}" data-label="${esc(a.label)}"` +
         (a.targets && a.targets.length
           ? ` data-creature="${esc(a.targets[0].name)}"` : "");
@@ -398,13 +402,15 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  if (!e.target.closest("#cp-forage")) return;
+  const gather = e.target.closest("[data-gather]");
+  if (!gather) return;
+  const what = gather.dataset.label || "Foraging";
 
   const hours = Math.max(1, Math.min(48, Number($("#cp-h").value) || 1));
   $("#craftpanel").hidden = true;
   busy(true);
   try {
-    let d = await post("/api/craftaction", { action: "forage", hours });
+    let d = await post("/api/craftaction", { action: gather.dataset.gather || "forage", hours });
     busy(false);
     // The opening lands in the book at once, so the die falls inside the fiction
     // rather than in front of it.
@@ -470,7 +476,7 @@ document.addEventListener("click", async e => {
     }
     if (d.rolls && d.rolls.length) {
       await Dice3D.land({
-        title: "Foraging", why: `${d.hours} hour${d.hours === 1 ? "" : "s"} on the ground`,
+        title: what, why: `${d.hours} hour${d.hours === 1 ? "" : "s"} on the ground`,
         sides: 100, lo: 1, hi: 100, result: d.rolls[0],
         note: d.rolls.length > 1
           ? `The first of ${d.rolls.length} sweeps — the log has the rest.` : "",
@@ -479,7 +485,7 @@ document.addEventListener("click", async e => {
       // A barren day found nothing to pick, so there is no d100 — but the Survival
       // checks were real dice, and the first of them is what lands.
       await Dice3D.land({
-        title: "Foraging", why: `Survival check, DC ${d.checks[0].dc}`,
+        title: what, why: `Survival check, DC ${d.checks[0].dc}`,
         sides: 20, result: Math.min(20, Math.max(1, d.checks[0].roll)),
         note: d.checks.length > 1
           ? `The first of ${d.checks.length} hours — none of them found a thing.` : "",

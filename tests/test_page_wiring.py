@@ -34,7 +34,9 @@ WIRING = {
         "/api/use", 'closest("[data-use]")',            # the drink button, lost once
         "/api/say", "/api/roll",
         "/api/combat/act", "#cb-commit",                # the combat panel
-        "/api/craftaction", "#cp-forage",               # the foraging excursion
+        # Every trade's open-ground gathering (the shared door, 2026-10-06); the
+        # forage button is one `data-gather` among them.
+        "/api/craftaction", 'closest("[data-gather]")',
         "/api/level-up",
         "dice3d.js", "Dice3D.ask",                      # the dice
         "[data-gloss]",                                 # the glossary popover

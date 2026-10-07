@@ -1273,14 +1273,28 @@ def craft_excursion(request):
             {"error": "You are in a fight. This can wait until it is over."},
             status=409)
 
+    if str(spec.get("requires")) == "biome":
+        return _gather_unnarrated(c, key, read_int(body, "hours", 1, lo=1, hi=48))
+
     creature = str(body.get("creature", "")).strip()
     if spec.get("requires") in ("creature", "carcass") and not creature:
         creature = (spec["targets"][0]["name"] if spec["targets"] else "")
 
     track = spec["track"]
     level = pc.track(track).level
-    found = benches.obtainable(track, str(spec.get("obtain") or ""),
-                               biome=c.biome or None, creature=creature or None)
+    if spec.get("requires") in ("creature", "carcass"):
+        # The carcass's own harvest tags first (`gathering.harvest_tagged`; the owner's
+        # "a reader in skinning finds the tag"), its name against the shelf when it
+        # carries none.
+        from rules import gathering
+
+        body_of = next((a for a in c.scene.actors.values()
+                        if not a.is_pc and a.is_down and a.name == creature), None)
+        found = gathering.carcass_yield(track, str(spec.get("obtain") or ""), body_of,
+                                        creature)
+    else:
+        found = benches.obtainable(track, str(spec.get("obtain") or ""),
+                                   biome=c.biome or None, creature=creature or None)
     ceiling = worldclass.tier_rank(worldclass.get(track).at(level).max_tier)
     buying = str(spec.get("obtain") or "") == "bought"
     day = market.day_of(c.scene.clock_minutes)
@@ -1442,9 +1456,147 @@ def craft_excursion(request):
     })
 
 
+def _gather_unnarrated(c, key: str, hours: int) -> JsonResponse:
+    """Open-ground gathering asked of this endpoint: the one gathering door, unnarrated.
+
+    This endpoint ran its own formula for every excursion — one d20 for the whole trip,
+    a `take` that grew with the size of the pool, picks by `(face * (i + 3)) % len` — and
+    that formula is the one the owner measured: four hours on a mountain gave a level-1
+    smith 1.28 ore and a level-1 alchemist 1.50 (2026-10-06). The play page sends open
+    ground to `craft_action`, which narrates; anything still posting here gets the same
+    door with the engine rolling the player's die, so there is no second arithmetic.
+    """
+    from rules import gathering
+
+    op, extra = _gather_op(key)
+    spec = gathering.excursion(key)
+    if spec is None:
+        return JsonResponse({"error": f"{key!r} has no gathering table"}, status=404)
+    engine = c.engine()
+    try:
+        resolution = engine.run(engine.validate([{
+            "op": op, "actor": "pc", "because": f"{hours} hours {spec.get('verb')}",
+            "params": dict({"hours": hours}, **extra)}]))
+        face = None
+        if resolution.awaiting:
+            face = engine.dice.roll("1d20", label=spec.get("label") or "Excursion",
+                                    visibility="player").total
+            resolution = engine.resume(face)
+    except IntentError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    effects = [e for o in resolution.outcomes for e in o.effects
+               if e.get("kind") in _HAUL_KINDS]
+    found: dict[str, int] = {}
+    named: dict[str, str] = {}
+    first: dict = {}
+    for e in effects:
+        for iid, n in (e.get("found") or {}).items():
+            found[iid] = found.get(iid, 0) + n
+        named.update(e.get("names") or {})
+        first = first or next(iter(e.get("hourly") or []), {})
+    haul = [{"id": i, "name": named.get(i, i), "count": n} for i, n in sorted(found.items())]
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    c.save()
+    total = int(first.get("roll", 0) or 0)
+    dc = int(first.get("dc", 0) or 0)
+    return JsonResponse({
+        "action": key, "label": spec.get("label", ""), "found": haul,
+        "roll": face or 0, "bonus": total - int(face or 0) if face else 0, "dc": dc,
+        "total": total, "succeeded": bool(found), "spent_cp": 0,
+        "purse": dict(c.scene.pc().purse),
+        "hours": sum(len(e.get("hourly") or []) for e in effects),
+        "tell": tell, "clock_minutes": c.scene.clock_minutes,
+    })
+
+
+def _gather_op(key: str) -> tuple[str, dict]:
+    """The engine op and params one craft-panel gathering key runs through. Every one is
+    the same door (`Engine._gather`); forage and prospect keep their own op names because
+    the spoken path declares them by those names."""
+    key = str(key or "").strip().lower()
+    if key in ("forage", "herbalist:forage"):
+        return "forage", {}
+    if key == "blacksmith:prospect":
+        return "prospect", {}
+    return "gather", {"key": key}
+
+
+def _key_of(intent: dict) -> str:
+    """The gathering key a frozen intent was running, read back on the resume."""
+    op = str(intent.get("op") or "")
+    if op == "forage":
+        return "herbalist:forage"
+    if op == "prospect":
+        return "blacksmith:prospect"
+    return str((intent.get("params") or {}).get("key") or "")
+
+
+# The effect records the gathering door writes its haul on, one per op.
+_HAUL_KINDS = ("forage", "prospect", "gather")
+
+
+def _shelf_names(spec: dict) -> dict[str, str]:
+    """Every name this trade could have found anywhere, for the grounding check: a
+    closing that names one the ground did not give is the narrator inventing loot."""
+    if spec.get("source") == "ingredients":
+        return {i.id: i.name for i in ingredients.all_ingredients().values()}
+    try:
+        mod = benches.module_for(spec["track"])
+        return {m.id: m.name for m in mod.materials().values()}
+    except Exception:  # noqa: BLE001 - no shelf, no check; the floor still stands
+        return {}
+
+
+def invents_loot(text: str, given, shelf, told: str = "") -> bool:
+    """Whether a closing names something off the trade's shelf that the ground did not give.
+
+    By whole word, and never a name inside one given: the first live prospect
+    (2026-10-07) came back "a handful of copper and nickel ore" for a haul of Copper Ore
+    and Nickel Ore, and the shelf's own metal "Copper" — a word of the ore that was found —
+    threw the model's closing away for the floor. And never a name the tells themselves
+    said (`told`): the first live quarry's closing told of "the lead ore ... crumbled
+    into useless grit", which is the tell's own "an hour came to nothing but Lead Ore
+    broken up", and was thrown away for naming it.
+    """
+    import re
+
+    said = str(text or "").lower()
+    got = {str(g).lower() for g in given}
+    told = str(told or "").lower()
+    for name in shelf:
+        n = str(name or "").lower()
+        if not n or n in got or any(n in g for g in got) or n in told:
+            continue
+        if re.search(rf"\b{re.escape(n)}\b", said):
+            return True
+    return False
+
+
+def _narrate_outcome(c, opening: str, outcomes: list, line: str) -> str:
+    """The closing, from the table's own narrator: fed the engine's tells and nothing
+    else (law three), and groomed by every narrator check the spoken turns get — the
+    deed, the body, the land, the means (`GMAgent.narrate_outcome` → `_groom`). The
+    herbalist's closing used to be a call of its own that saw the haul list and one
+    invented-herb check; no other craft had a closing at all. "" when the model is down.
+    """
+    from gm.agent import GMAgent
+
+    try:
+        text, _attempt = GMAgent(c.world, c.engine()).narrate_outcome(
+            opening, outcomes, line)
+    except Exception:  # noqa: BLE001 - a model down costs colour, never the haul
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "the excursion's closing fell to its floor", exc_info=True)
+        return ""
+    return str(text or "").strip()
+
+
 @require_POST
 def craft_action(request):
-    """A crafting-related excursion, narrated into the scene it happens in.
+    """A gathering excursion, narrated into the scene it happens in — any craft's.
 
     Foraging lived only on the bench page, where it was a button and a table: no
     narration, no sense of time passing, no way back into the fiction. "crafting related
@@ -1453,10 +1605,18 @@ def craft_action(request):
     finding is told before the tally, and it ends the way every GM turn ends — what do
     you do, and three ways to answer.
 
-    The engine still decides everything. Both narration calls are decoration around the
-    same `forage` op the bench uses, and either call failing falls back to plain prose
-    built from the facts — a model being down costs colour, never the herbs.
+    Until 2026-10-06 only the herbalist came through here; every other trade's gathering
+    was a single d20 and a tally line on `craft_excursion` ("Herbalism is the only skill
+    that actually prompts the LLM for prose and runs encounter tables"). `action` is now
+    any open-ground excursion's hub key ("blacksmith:prospect", "alchemist:quarry"), or
+    "forage", and all of them run the one gathering door (`Engine._gather`).
+
+    The engine still decides everything. The narration calls are decoration around the
+    op, and either failing falls back to plain prose built from the facts — a model being
+    down costs colour, never the haul.
     """
+    from rules import gathering
+
     body = read_body(request)
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -1466,8 +1626,8 @@ def craft_action(request):
     face = body.get("face")
     if face is not None:
         # The second half of the round trip: the excursion suspended on the player's
-        # Survival check, and this is the face coming back. The hours are read off the
-        # engine's own frozen intent rather than trusted from the client twice.
+        # check, and this is the face coming back. The hours and the excursion are read
+        # off the engine's own frozen intent rather than trusted from the client twice.
         if not c.scene.awaiting:
             return JsonResponse({"error": "nothing is waiting on a roll"}, status=409)
         # Same door discipline as the bench: only the roll this endpoint opened.
@@ -1477,6 +1637,8 @@ def craft_action(request):
                 "dice popup has it.")}, status=409)
         pending = c.scene.pending_intents[0] if c.scene.pending_intents else {}
         hours = max(1, int((pending.get("params") or {}).get("hours", 1) or 1))
+        spec = gathering.excursion(_key_of(pending)) or gathering.excursion(
+            "herbalist:forage")
         if face == "auto":
             from rules.dice import Dice
 
@@ -1493,9 +1655,13 @@ def craft_action(request):
         cfg = modelcfg.for_role("narrator")
     else:
         action = str(body.get("action", "forage")).strip().lower()
-        if action != "forage":
+        op, extra = _gather_op(action)
+        spec = gathering.excursion("herbalist:forage" if op == "forage" else
+                                   "blacksmith:prospect" if op == "prospect" else
+                                   extra.get("key", ""))
+        if spec is None:
             return JsonResponse(
-                {"error": f"{action!r} is not a craft action yet — foraging only."},
+                {"error": f"{action!r} is not something you can go out and gather."},
                 status=400)
         if c.scene.awaiting:
             return JsonResponse({"error": "There is a roll waiting on you."},
@@ -1506,6 +1672,7 @@ def craft_action(request):
         from play import modelcfg
 
         cfg = modelcfg.for_role("narrator")
+        herbs = spec.get("source") == "ingredients"
 
         # 1. The setting out. Written to the transcript before the roll, because that is
         # the order it happens in at a table.
@@ -1515,10 +1682,10 @@ def craft_action(request):
                          "second person, present tense. Never invent named people or "
                          "places. Never ask a question. Stop before anything is found."},
             {"role": "user",
-             "content": f"{pc.name} sets out to forage for herbs. Terrain: {c.biome}. "
+             "content": f"{pc.name} sets out {spec['sets_out']}. Terrain: {c.biome}. "
                          f"At {place}. Time of day: {when}. They mean to spend "
-                         f"{'an hour' if hours == 1 else 'some hours'} searching. "
-                         f"Narrate them beginning the search."},
+                         f"{'an hour' if hours == 1 else 'some hours'} at it. "
+                         f"Narrate them beginning the work."},
         ], cfg, num_predict=160)
         if not opening or not str(opening).strip():
             # Where they STAND: "work away from Ledgerwarren" was printed while the party
@@ -1526,19 +1693,23 @@ def craft_action(request):
             opening = (f"You shoulder your satchel at {place} and start on the "
                        f"{c.biome} ground, eyes down. It is {when}, and "
                        f"{'an hour' if hours == 1 else 'hours'} of searching lie "
-                       f"ahead.")
+                       f"ahead." if herbs else
+                       f"You set out from {place} across the {c.biome} ground "
+                       f"{spec['sets_out']}. It is {when}, and "
+                       f"{'an hour' if hours == 1 else 'hours'} of work lie ahead.")
         opening = str(opening).strip()
         c.transcript.append({"who": "gm", "text": opening})
 
-        # 2. The dice decide. Same op as the bench, and the same suspend: the Survival
-        # check is the player's own, herbalism bonus in the breakdown. The opening stays
-        # in the book across the suspend — the character has set out; the roll is what
+        # 2. The dice decide. The same op as the bench, and the same suspend: the check
+        # is the player's own, the trade's bonus in the breakdown. The opening stays in
+        # the book across the suspend — the character has set out; the roll is what
         # happens next.
         try:
             resolution = c.engine().run(c.engine().validate([{
-                "op": "forage", "actor": "pc",
-                "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
-                "params": {"hours": hours},
+                "op": op, "actor": "pc",
+                "because": f"{hours} hour{'s' if hours != 1 else ''} spent "
+                           f"{spec.get('verb') or 'looking'}",
+                "params": dict({"hours": hours}, **extra),
             }]))
         except IntentError as exc:
             # The opening already happened in the fiction; take it back out rather than
@@ -1551,23 +1722,26 @@ def craft_action(request):
             return JsonResponse({"opening": opening, "roll": resolution.awaiting,
                                  "hours": hours})
 
+    herbs = spec.get("source") == "ingredients"
     tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
     effects = [e for o in resolution.outcomes for e in o.effects
-               if e.get("kind") == "forage"]
+               if e.get("kind") in _HAUL_KINDS]
     found: dict[str, int] = {}
+    named: dict[str, str] = {}
     rolls: list[int] = []
     checks: list[dict] = []
     for e in effects:
         for iid, n in (e.get("found") or {}).items():
             found[iid] = found.get(iid, 0) + n
+        named.update(e.get("names") or {})
         rolls.extend(int(r["roll"]) for r in e.get("rolls", []) if r.get("roll"))
-        # The d100 picks only exist for hours whose Survival check earned any. A barren
-        # day rolled real dice too — the checks themselves — and a die the player was
+        # The d100 picks only exist for hours whose check earned any. A barren day
+        # rolled real dice too — the checks themselves — and a die the player was
         # promised must land on *something* true, so the checks travel as the fallback.
         checks.extend({"roll": int(h["roll"]), "dc": int(h.get("dc", 0))}
                       for h in e.get("hourly", []) if h.get("roll") is not None)
-    names = {i.id: i.name for i in ingredients.all_ingredients().values()}
-    haul = [{"id": iid, "name": names.get(iid, iid), "count": n}
+    shelf = _shelf_names(spec)
+    haul = [{"id": iid, "name": named.get(iid) or shelf.get(iid, iid), "count": n}
             for iid, n in sorted(found.items())]
 
     # Where and when the excursion ENDS: the hours have passed.
@@ -1579,73 +1753,68 @@ def craft_action(request):
                 and e.get("encounter") in ("creature", "guarded")
                 and e.get("ref") in c.scene.actors), None)
 
-    # 3. The finding, told before the tally, ending in the question and three answers.
-    # The closing prompt used to know nothing of the encounter, and the tell glued on
-    # after it said the creature "has the ground you wanted" — under a haul already in
-    # the satchel (item 8). The engine rolls the encounter AFTER the haul is carried, so
-    # the order the fiction is told in is the same: the hours of work, then making for
-    # one last patch, where the creature is. The closing stops at the walk; the scene
-    # call below sets what is there.
-    listed = ", ".join(f"{h['count']}x {h['name']}" for h in haul) or "nothing"
-    if enc is not None:
-        heading = (f" When the work is done they make for one last {enc.get('spot') or 'patch'} "
-                   f"— end the narration as they head for it, before they see what is "
-                   f"there. A {enc.get('creature')} is there; the suggestions are three "
-                   f"things to do about it.")
-    else:
-        heading = ""
-    closing_json = _narrate([
-        {"role": "system",
-         "content": "You narrate a solo Pathfinder game. Answer as JSON: "
-                     '{"narration": "...", "suggestions": ["...", "...", "..."]}. '
-                     "The narration is two or three sentences, second person, of the "
-                     "character finding (or failing to find) exactly what is listed — "
-                     "name only things from the list, invent nothing else, no numbers. "
-                     "The suggestions are three short next actions a player might take, "
-                     "each under eight words, imperative."},
-        {"role": "user",
-         "content": f"{pc.name} spent {'an hour' if hours == 1 else 'some hours'} "
-                     f"foraging the {c.biome} at {place} and found: {listed}.{heading} "
-                     f"Narrate the finding, then suggest three next actions."},
-    ], cfg, as_json=True, num_predict=300)
+    # 3. The finding, told before the tally. The narrator is the table's own
+    # (`_narrate_outcome`): fed the tell of the work and the haul — not the mastery,
+    # which the tally line says, and not the encounter, which has its own scene call
+    # below — and groomed by the checks every spoken turn gets. When something is
+    # waiting, the engine's fact that they make for one last spot goes in as a tell of
+    # its own, so the closing ends on the walk and the scene call sets what is there.
+    from rules.engine import Outcome
 
-    closing, suggestions = "", []
-    if isinstance(closing_json, dict):
-        closing = str(closing_json.get("narration") or "").strip()
-        raw = closing_json.get("suggestions")
-        if isinstance(raw, list):
-            suggestions = [str(s).strip() for s in raw if str(s).strip()][:3]
-        # Checked, not trusted: a narration that names a herb the ground did not give
-        # is the GM inventing loot. Grounding is the same rule the main loop enforces.
-        said = closing.lower()
-        invented = [n for n in names.values()
-                    if n.lower() in said and n not in [h["name"] for h in haul]]
-        if invented:
+    haul_tell = " ".join(str(e.get("haul_tell") or "") for e in effects).strip()
+    closing = ""
+    if haul_tell:
+        told = [Outcome(intent_id="", op=str(effects[0].get("kind") or "gather"),
+                        effects=[], tell=haul_tell, because="")]
+        if enc is not None:
+            told.append(Outcome(
+                intent_id="", op="stance", effects=[], because="",
+                tell=f"When the work is done, {pc.name} makes for one last "
+                     f"{enc.get('spot') or 'patch'} of the same."))
+        line = (f"I go out {spec['sets_out']} for "
+                f"{'an hour' if hours == 1 else f'{hours} hours'}.")
+        closing = _narrate_outcome(c, opening, told, line)
+        # Checked, not trusted: a closing that names a thing the ground did not give is
+        # the GM inventing loot. Grounding is the same rule the main loop enforces.
+        #
+        if invents_loot(closing, [h["name"] for h in haul], shelf.values(),
+                        told=" ".join(o.tell for o in told)):
             closing = ""
-    if not closing:
-        closing = ("The hours pass in stooping and sifting. " if haul else
-                   "The hours pass in stooping and sifting, and the ground gives "
-                   "nothing back. ")
+    if not effects:
+        # Refused (somebody here, a fight): no hours passed, so there is no closing to
+        # tell — the refusal's own tell is the beat. Seen live 2026-10-07: a quarry
+        # refused for the Atomie still in the scene printed "The hours pass in digging
+        # and sorting, and the ground gives nothing back" over no time at all.
+        closing = ""
+    elif not closing:
+        stoop = ("stooping and sifting" if herbs else
+                 "digging and sorting" if spec.get("obtain") == "mined" else
+                 "gathering and sorting")
+        closing = (f"The hours pass in {stoop}. " if haul else
+                   f"The hours pass in {stoop}, and the ground gives nothing back. ")
         if haul:
             # A dash before the tail: "dawnpetal, power leaf earth still on the roots"
             # read as a herb called "power leaf earth" (item 8's transcript).
             closing += ("Piece by piece the satchel takes on weight: " +
                         ", ".join(h["name"].lower() for h in haul[:4]) +
                         (" and more" if len(haul) > 4 else "") +
-                        " — earth still on the roots.")
+                        (" — earth still on the roots." if herbs else
+                         " — grit still on every piece."))
     town = _town(c) or place
-    if enc is not None and len(suggestions) != 3:
+    if enc is not None:
         suggestions = [f"Approach the {enc.get('creature')}", "Wait and watch it",
                        f"Head back toward {town}"]
-    if len(suggestions) != 3:
-        suggestions = ["Keep foraging", f"Head back toward {town}",
-                       "Unpack the crafting bench"]
+    else:
+        keep = {"herbalist:forage": "Keep foraging", "blacksmith:prospect":
+                "Keep prospecting"}.get(spec["key"], f"Keep {spec.get('verb') or 'at it'}")
+        suggestions = [keep, f"Head back toward {town}", "Unpack the crafting bench"]
 
     # No full stop of its own: the line below adds one, and "Nothing gathered.." was
     # printed on the first live forage of 2026-09-30.
     tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "nothing"
     c.transcript.append({"who": "gm", "kind": "consequence",
-                         "text": f"{closing}\n\nGathered: {tally}. {tell}".strip()})
+                         "text": (f"{closing}\n\nGathered: {tally}. {tell}" if effects
+                                  else tell).strip()})
     # 4. What is there, when something is: one grounded scene call, checked, with a
     # floor written from the same facts.
     scene, scene_notes = "", []
@@ -1662,8 +1831,9 @@ def craft_action(request):
     # clockwork Spy" (item 8). Written the way `pending_free` writes a thing done off
     # the spoken path — the player's act as a bracketed user line, the table's answer as
     # the assistant's — and logged as a resolution row like any other turn.
+    doing = "forages" if herbs else f"goes out {spec['sets_out']}"
     c.history.append({"role": "user", "content": (
-        f"(From the craft panel: {pc.name} forages "
+        f"(From the craft panel: {pc.name} {doing} "
         f"{'for an hour' if hours == 1 else f'for {hours} hours'} at {place}.)")})
     c.history.append({"role": "assistant", "content": " ".join(
         x for x in (opening, closing, scene) if x).strip()})
@@ -1687,7 +1857,8 @@ def craft_action(request):
     return JsonResponse({
         "opening": opening, "closing": closing, "tell": tell, "scene": scene,
         "found": haul, "rolls": rolls, "checks": checks, "hours": hours,
-        "suggestions": suggestions,
+        "suggestions": suggestions, "excursion": spec["key"],
+        "label": spec.get("label") or "",
         "clock_minutes": c.scene.clock_minutes,
     })
 

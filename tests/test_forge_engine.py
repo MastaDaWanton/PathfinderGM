@@ -406,7 +406,7 @@ def test_prospected_ore_reaches_the_blacksmiths_bench():
     back 4 Calamine and 1 Copper Ore written as `craft: "smithing"`, and the bench's own
     filter (`play/craft_views._stock_of`, `craft == "blacksmith"`) saw none of it. The
     tell also read '2× Calamine, 2× Calamine'."""
-    from play import craft_views
+    from rules import blacksmith
     from tests._places import stand_on
 
     scene, engine = table(seed=11)
@@ -415,10 +415,11 @@ def test_prospected_ore_reaches_the_blacksmiths_bench():
                                  "params": {"hours": 3}}], origin="author:test"))
     out = engine.resume(20).outcomes[-1]
     pc = scene.pc()
-    track = next(d for d in craft_views.DISCIPLINES if d["id"] == "blacksmithing")["track"]
-    seen = [v for v in pc.stock.values() if v.craft == track]
-    assert seen, [(k, v.craft) for k, v in pc.stock.items()]
-    assert all(v.from_materials for v in seen)
+    # Since the gathering door was shared (2026-10-06) a dug haul is carried by material
+    # id, the one store every bench reads; the forge's own rack is what must see it.
+    seen = [p for p in blacksmith.rack(pc) if p.key.startswith("inv:")]
+    assert seen, dict(pc.inventory)
+    assert all(p.material for p in seen)
     names = [part.split("× ", 1)[1] for part in
              out.tell.split("comes back with ", 1)[1].split(".")[0].split(", ")]
     assert len(names) == len(set(names)), out.tell
@@ -428,13 +429,16 @@ def test_prospecting_yields_every_mined_material_and_never_out_of_reach():
     """`kind == "ore"` left the smith's mined metals, coal and limestone unfindable; the
     `or ores` fallback handed out ANY tier when none was in reach, so a bare success on
     ground whose only mined things were exotic dug up exotic metal."""
-    from rules import blacksmith
-    from rules.engine import PROSPECT_TIERS
+    from rules import blacksmith, gathering
 
     mined = blacksmith.obtainable("mined")
     assert any(m.kind != "ore" for m in mined)
-    assert PROSPECT_TIERS[:1 + 0 // 5] == ("common",)
-    assert PROSPECT_TIERS[:1 + min(4, 22 // 5)][-1] == "legendary"
+    # The seam is the shared gathering door's table since 2026-10-06 (`PROSPECT_TIERS`
+    # retired with the prospect's own loop): the smith's tier ceiling filters it, and a
+    # great hour lifts that ceiling a band or two, as it does a forager's.
+    spec = gathering.excursion("blacksmith:prospect")
+    assert {r.tier for r in gathering.material_table(spec, "mountain", 1).rows} == {"common"}
+    assert "legendary" in {r.tier for r in gathering.material_table(spec, "mountain", 5).rows}
 
 
 # --- the found door names a forge (lane G's word table) ----------------------------------

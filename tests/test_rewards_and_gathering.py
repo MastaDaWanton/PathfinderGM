@@ -324,4 +324,6 @@ def test_prospecting_in_the_hills_turns_up_ore_and_nothing_in_a_swamp_but_bog_ir
     # same ground — where the ore-only filter left 16 mined materials unreachable.
     hill_ores = {m.name for m in blacksmith.obtainable("mined", biome="hills")}
     assert {st["base"] for st in stock} <= hill_ores
-    assert any(x.base in hill_ores for x in s.pc().stock.values()), "the ore is carried"
+    # Carried by material id since the gathering door was shared (2026-10-06), where
+    # every bench reads it; the forge's own reader is the proof it arrived.
+    assert any(p.name in hill_ores for p in blacksmith.rack(s.pc())), "the ore is carried"

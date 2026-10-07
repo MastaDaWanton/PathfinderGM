@@ -124,7 +124,10 @@ def test_heading_into_the_hills_from_vormoor_is_the_ridgelines_and_its_ore():
             return getattr(real, name)
 
         def roll(self, notation, modifiers=None, label="", visibility="hidden"):
-            if notation == "1d100":
+            # Only the expedition's encounter d100. Since the gathering door was shared
+            # (2026-10-06) the seam's own picks are d100s too, and forcing every one of
+            # them to 100 landed each pick in the table's "nothing" band.
+            if notation == "1d100" and label == "the ground's own answer":
                 return real.given(100, modifiers, label, notation)
             return real.roll(notation, modifiers, label, visibility)
 

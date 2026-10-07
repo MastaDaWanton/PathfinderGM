@@ -1,0 +1,53 @@
+{
+  "_about": [
+    "Every craft's gathering on open ground, as one excursion shape (rules/gathering.py, the shared door; its module docstring is the design record).",
+    "The hour is herbalism's: a Survival check against the terrain's DC (rules/foraging.py FORAGE_DC), the band it reaches sets how many kinds and how many of each, and the expedition rolls the ground's encounter once. What differs per craft is only the table: which materials, and how much each counts.",
+    "own: the kinds this trade goes out for. They sit on the d100 table at own_weight times their rarity weight and come in full batches.",
+    "side: anything else the craft's shelf says turns up on this ground. It sits at side_weight and comes in side_batch of a full batch (Ultimate Campaign, Gaining Capital: earning with an unsuitable skill earns half). Overlap is allowed, the specialist simply gets more of its own (FFXIV's shared crystals, WoW's secondary drops, Albion's specialisation multiplier).",
+    "favour: a further multiplier on the table weight of one of the own kinds, so a prospector's seam is mostly ore and only sometimes coal.",
+    "Measured 2026-10-06 before this file: four hours on a mountain at level 1 brought a blacksmith 1.28 ore and an alchemist 1.50, because the alchemist's quarry drew on the whole shelf (34 rows, 19 of them the smith's ores and metals) and the hub's take grew with the size of the pool.",
+    "what / spot / sets_out are the words the tells and the opening use; never numbers.",
+    "abundance: the DC of an hour on this ground for a trade other than herbalism, by how many of the trade's own kinds the ground holds at any tier (most first). Ultimate Wilderness, Foraging: abundant ground DC 10, standard DC 15, barren DC 20 — the difficulty belongs to how much of the thing sought is there, so a mountain is barren ground for herbs (FORAGE_DC 17) and abundant ground for ore. Barren is ground holding none of the trade's own kinds (only side finds); abundant is six or more of them, a count that is this app's (proposed 2026-10-06), not the book's; everything between is standard. Herbs keep FORAGE_DC, which already reads each biome as herb ground."
+  ],
+  "defaults": {"own_weight": 3, "side_weight": 1, "side_batch": 0.5, "skill": "survival",
+               "abundance": [[6, 10], [1, 15], [0, 20]]},
+  "excursions": {
+    "herbalist:forage": {
+      "source": "ingredients", "what": "herbs", "spot": "patch",
+      "sets_out": "to forage for herbs", "verb": "looking", "fresh": true
+    },
+    "blacksmith:prospect": {
+      "what": "ore", "spot": "seam", "sets_out": "to prospect for ore", "verb": "digging",
+      "own": ["ore", "metal", "fuel", "flux"], "favour": {"ore": 3, "metal": 2}
+    },
+    "blacksmith:gather": {
+      "what": "the smith's supplies", "spot": "stand", "sets_out": "to gather what the land gives a smith",
+      "verb": "gathering", "own": ["fitting", "quenchant", "alloy", "fuel"]
+    },
+    "alchemist:quarry": {
+      "what": "salts and minerals", "spot": "seam", "sets_out": "to dig for salts and minerals",
+      "verb": "digging", "own": ["salt", "reagent", "catalyst", "solvent", "treatment", "chalk"],
+      "favour": {"salt": 2, "reagent": 2}
+    },
+    "alchemist:field-gathering": {
+      "what": "field reagents", "spot": "patch", "sets_out": "to gather field reagents",
+      "verb": "gathering", "own": ["reagent", "salt", "solvent"]
+    },
+    "leatherworker:gather": {
+      "what": "bark and tannins", "spot": "stand", "sets_out": "to strip bark and gather tannins",
+      "verb": "gathering", "own": ["tannin", "dye", "wax"]
+    },
+    "leatherworker:mine": {
+      "what": "curing salts", "spot": "seam", "sets_out": "to dig for curing salt and mineral colours",
+      "verb": "digging", "own": ["treatment", "dye", "wax"]
+    },
+    "enchanter:essence-hunt": {
+      "what": "essence", "spot": "thin place", "sets_out": "to skim essence where the world runs thin",
+      "verb": "searching", "own": ["essence"]
+    },
+    "enchanter:gem-cutting": {
+      "what": "stones for foci", "spot": "seam", "sets_out": "to mine stones to cut into foci",
+      "verb": "digging", "own": ["focus", "chalk"]
+    }
+  }
+}
