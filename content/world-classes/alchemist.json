@@ -1,153 +1,331 @@
 {
  "id": "alchemist",
  "name": "Alchemist",
- "summary": "A Universal World Class any character may take regardless of their class. It levels through the bench — dissolving, reacting and sealing — unlocking the laboratory's verbs and higher tiers of material, from brimstone and saltpetre to dragon bile and philosophic mercury.",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through the bench: dissolving, calcining and bottling at first, then distilling, filtering and reacting, then subliming and the Great Work of transmutation. Past level 3 the levels never stop, and each one grants two perks: potency, duration, quality, yield or containment.",
  "grantable_at_creation": true,
- "_namespace_note": "This is the alchemist WORLD CLASS (rules.worldclass.get / rules.alchemist), not the PF1e Alchemist character class in content/classes/ (rules.classes.get). They share a name and nothing else: a Rogue is an Alchemist here the way a Fighter is an Herbalist — by doing the work. The two namespaces never meet in code.",
- "_thresholds_note": "The Herbalist's curve, unchanged, because the two tracks pay mastery the same way (rules/worldclass.py MP_AWARDS is shared) and a chain here is worth what a chain there is worth. The dip at level 4 is the Herbalist's deliberate dip; see herbalist.json for the measured pacing that produced it — do not 'fix' it in one file and not the other.",
+ "_namespace_note": "This is the alchemist WORLD CLASS (rules.worldclass.get / rules.alchemist), not the PF1e Alchemist character class in content/classes/ (rules.classes.get). They share a name and nothing else: a Rogue is an Alchemist here the way a Fighter is an Herbalist, by doing the work. The two namespaces never meet in code.",
+ "_ruling_2026_10_05_note": "The owner's alchemy revamp rulings (docs/alchemy-questions.md, all ten rounds, and the plan's open points answered 2026-10-06; docs/alchemy-revamp-plan.md §4, §7). Three unlock levels replace five: level 1 dissolve, calcine, bottle and assay on common and uncommon material; level 2 distill, filter and react on rare and exotic; level 3 sublime and transmute on legendary. Seal became Bottle; Precipitate folded into Filter (the precipitate is Filter's solid end); Stabilize became an ingredient (any material with the `stabilizer` working trait); Catalyze became a working trait (`catalyst`, never spent). The old level 4 and 5 rows, the 25/65/50/100 curve and the `legendary-work` milestone and its deed are removed. Old saves keep their level: an old Alchemist 4 or 5 is an endless level 4 or 5 with its perk picks banked (the `alchemy_v2` migration, wave 2 lane I).",
+ "_thresholds_note": "Mastery to reach levels 2 and 3, herbalism's and the forge's numbers kept equal on purpose ('the two tracks are meant to pace the same', plan §4.1); every level after that is priced by `endless`. The bench pays each successful step (1, +1 per rarity band above common, +1 at Superior, +2 at Flawless or higher; every success pays, the owner's 2026-10-05 ruling), and firsts pay 3.",
  "thresholds": [
   25,
-  65,
-  50,
-  100
+  65
  ],
- "milestones": {
-  "5": "legendary-work"
- },
- "_deeds_note": "The same trap the Herbalist's deed walked into is avoided the same way: the deed is the MATERIAL, not the method. If the deed required catalyze — a Level 5 method — the gate could never open. Any successful craft at legendary tier is the great work, however it was reached, and catalyze is the mastery that follows it.",
- "deeds": {
-  "legendary-work": {
-   "min_tier": "legendary",
-   "note": "Any successful craft at legendary tier, however it was reached."
+ "_endless_note": "Plan §4.2: two picks a level, the same perk twice allowed, stored on Progress.perks and read live. Potency +5% to the benefits of everything made, duration +10%, quality +1 to the ceiling, yield +5% chance per Bottle of one more unit (the engine rolls it and shows the roll), containment -1 DC a pick on a volatile step and each mishap's dice one step smaller (1d6, 1d4, 1d3, 1; never below 1 point). All proposed numbers, tunable here.",
+ "endless": {
+  "base": 50,
+  "step": 10,
+  "picks_per_level": 2,
+  "perks": {
+   "potency": 0.05,
+   "duration": 0.1,
+   "quality": 1,
+   "yield": 0.05,
+   "containment": 1
   }
  },
+ "_ceiling_note": "`ceiling` is the highest quality index a level's hands reach (0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless): Fine, Superior, Flawless at 1 to 3 (plan §4.3), each Quality perk one step more.",
  "levels": [
   {
    "level": 1,
    "tools": [
-    "travelling alchemy kit",
-    "iron crucible"
+    "alchemist's field kit: a crucible, a spirit lamp, a rack of vials, a funnel and cloth"
    ],
    "methods": [
-    "calcine",
     "dissolve",
-    "seal"
+    "calcine",
+    "bottle",
+    "assay"
    ],
-   "max_tier": "common / mundane",
-   "note": "Roadside work: burning to ash, dissolving in a jar, corking the result."
+   "max_tier": "uncommon / volatile",
+   "ceiling": 2,
+   "note": "Roadside work: dissolving in a jar, burning to a calx, bottling the result, and assaying a pinch of what you carry. The four classics are known from the start."
   },
   {
    "level": 2,
    "tools": [
-    "glass alembic",
+    "glass alembic and receiver",
     "filter frames and papers"
    ],
    "methods": [
+    "distill",
     "filter",
-    "precipitate"
+    "react"
    ],
-   "max_tier": "uncommon / volatile",
-   "note": "Real glassware: separating a mixture into what it was hiding."
+   "max_tier": "exotic / planar",
+   "ceiling": 3,
+   "note": "Distilling (in a laboratory), filtering the drawbacks out of a solution, and the reaction that is the dangerous heart of the craft. Rare and exotic material, which needs a laboratory."
   },
   {
    "level": 3,
    "tools": [
-    "alchemical laboratory"
+    "athanor and aludel"
    ],
    "methods": [
-    "react",
-    "stabilize"
-   ],
-   "max_tier": "rare / magical",
-   "note": "The dangerous heart of the craft: making substances fight, and living through it."
-  },
-  {
-   "level": 4,
-   "tools": [
-    "athanor"
-   ],
-   "methods": [
-    "sublime"
-   ],
-   "max_tier": "exotic / planar",
-   "note": "The slow furnace: vapour to crystal, matter refined past what a flame can do."
-  },
-  {
-   "level": 5,
-   "tools": [
-    "philosopher's bench"
-   ],
-   "methods": [
-    "catalyze"
+    "sublime",
+    "transmute"
    ],
    "max_tier": "legendary / mythic",
-   "note": "The great work: catalysts that transform without being consumed."
+   "ceiling": 4,
+   "note": "The slow furnace and the Great Work: subliming a solid to its crystal, and turning a material into a rarer one of its kind. Both in a laboratory."
   }
  ],
  "method_descriptions": {
-  "calcine": "Roasts a material in the crucible until only its essential salt remains. Strips water and rot; the ash keeps indefinitely.",
-  "dissolve": "Takes a material up into a solvent so it can be worked as a liquid. Most chains start here — the bench works solutions, not lumps.",
-  "seal": "Closes the work into its vessel: flask, bladder or clay pot. The finishing method — nothing follows a seal, and an unsealed preparation is bench-work, not an item you can carry and throw.",
-  "filter": "Passes a solution through frame and paper, holding back what does not belong. Removes impurities, penalties and secondary toxicities while keeping the beneficial traits.",
-  "precipitate": "Drives a dissolved substance back out of its solvent as a concentrated solid. The reverse of dissolve, and the way a solution becomes a powder worth keeping.",
-  "react": "Sets two prepared substances against each other and keeps what the violence produces. The heart of the craft: +25% to the primary effect, and every classic of the trade — fire that clings, acid that eats, smoke that blinds — is a reaction. A reaction needs a solvent as its medium.",
-  "stabilize": "Buffers a reaction so it spends itself in the product instead of in your face. Required before two volatile materials may share a vessel, and the only answer to a material that attacks its own flask.",
-  "sublime": "Vaporises a substance in the athanor and recovers it as crystal, leaving everything gross behind. +25% to the primary effect; the exotic tiers are worked almost entirely as sublimates.",
-  "catalyze": "Uses legendary material to drive a transformation it does not take part in. Permanent works, philosophic salts, and preparations at 150% of base strength."
+  "dissolve": "Takes solids up into a solvent: a solution, which pours and can be bottled, reacted or filtered.",
+  "calcine": "Roasts a solid in the crucible to its calx. A combustible material burns away instead; it does not calcine.",
+  "bottle": "Pours the work into its vessel and stoppers it. The vessel decides what the product is: a vial is drunk or poured on, a clay flask thrown, a casing struck, a rod lit. Matches a known formula, or experiments.",
+  "assay": "Tests a pinch of a reagent against a drop on a glass slide: one benefit and one drawback learned. Volatile and toxic reagents make it dangerous.",
+  "distill": "Runs a liquid through the alembic and keeps the hearts of the run: two measures make one spirit, half again as strong. Needs a laboratory.",
+  "filter": "Passes a solution through cloth: every drawback stays on the cloth as a precipitate, and the filtrate runs clean at nine tenths of its strength.",
+  "react": "Sets two or more inputs against each other in a liquid medium, drop by drop: their traits merge, and the same trait from two materials adds its grades.",
+  "sublime": "Heats a solid in the aludel and scrapes the crystal crust that forms above: two measures make one sublimate, half again as strong. Needs a laboratory.",
+  "transmute": "The Great Work: two of a material (one, with a catalyst that names it) become one of a rarer material of the same kind that shares an essence. A day in progress. Needs a laboratory."
  },
- "_method_help_note": "`method_descriptions` is the prose a rulebook prints; `method_help` is what the bench shows beside the button — what the method DOES in numbers, what it NEEDS in the vessel to be legal, and what a player reaches FOR it to accomplish. Kept as three fields rather than one paragraph because those are three different questions and a player mid-chain is only ever asking one of them.",
+ "_method_help_note": "`method_help` is what the bench shows beside the button: what the method DOES, what it NEEDS to be legal, and what a player reaches FOR it to accomplish.",
  "method_help": {
-  "calcine": {
-   "does": "Burns a material down to its essential salt. No potency change; the calx keeps indefinitely and cannot spoil.",
-   "needs": "A material that survives fire — a solid. Nothing already in solution.",
-   "for": "Turning a perishable reagent into one that keeps, and the first step of any powder you mean to precipitate later."
-  },
   "dissolve": {
-   "does": "Takes a material up into a solvent. No potency change; it is the step that makes everything after it possible.",
-   "needs": "A solvent on the bench — the bench works solutions, not lumps.",
-   "for": "Starting almost every chain. React, filter and precipitate all assume a solution is already there."
+   "does": "Makes a solution carrying every trait of what went in, same-named traits adding their grades up to your level.",
+   "needs": "A solid and one solvent (water, spirits, vinegar, oil or acid).",
+   "for": "Starting almost every line: a solution can be bottled, reacted or filtered."
   },
-  "seal": {
-   "does": "Closes the work into its vessel. No potency change. Finishing method: nothing may follow it, and sealing before reacting is refused outright.",
-   "needs": "Nothing beyond the work itself, though a vessel material is what makes the result throwable rather than merely carried.",
-   "for": "Turning bench-work into an item you can put in a pack. An unsealed preparation is not a thing you own."
+  "calcine": {
+   "does": "Makes a calx (a salt) that keeps indefinitely and carries the solid's traits.",
+   "needs": "A solid that does not burn away.",
+   "for": "A powder you can bottle or sublime, and a way to keep a reagent that would spoil."
+  },
+  "bottle": {
+   "does": "Makes the finished product. A formula's core takes one slot; the rest are your picks. Drawbacks of what you used come along unless filtered.",
+   "needs": "A liquid or a powder, and a vessel. Bottling always comes last: a finished product is never an input.",
+   "for": "Every product: potions, oils, splash flasks, clouds and tools."
+  },
+  "assay": {
+   "does": "Reveals one benefit and one drawback of a reagent, and pays 1 mastery for each.",
+   "needs": "A pinch of the reagent: a tenth of one you carry.",
+   "for": "Knowing what a reagent does before you build with it."
+  },
+  "distill": {
+   "does": "Two measures of a liquid make one spirit at x1.5 potency and duration, one rarity band rarer. Each concentration step is harder.",
+   "needs": "A liquid, and a laboratory.",
+   "for": "Concentrating a solution or a solvent into something stronger than any one reagent."
   },
   "filter": {
-   "does": "Strips every poison and penalty out of the work — removed from the specs themselves, not merely hidden on the card. Refused when there is nothing harmful to remove.",
-   "needs": "Something harmful in the vessel, and a solution to pass through the frame.",
-   "for": "Antitoxin, antiplague, and any chain where a venom went in on purpose and must not come out."
-  },
-  "precipitate": {
-   "does": "Drives a dissolved substance back out as a solid. No potency change.",
-   "needs": "A solution — something must be dissolved before it can be driven out of solution.",
-   "for": "Powders and dusts: itching powder, flash powder, smelling salts. The way a liquid chain ends in something dry."
+   "does": "Strips every drawback; the filtrate keeps its benefits at x0.9, and the drawbacks stay on the cloth as a precipitate.",
+   "needs": "A solution, a spirit or an admixture.",
+   "for": "Antitoxin, antiplague, and any line where a reagent's cost must not reach the bottle."
   },
   "react": {
-   "does": "×1.25 potency. The dangerous heart of the craft, and the step that adds the volatile surcharge: +3 DC for each volatile material past the first.",
-   "needs": "A solvent or a herbalism intermediate that pours, as the medium. Two volatile materials also need Stabilize in the same chain.",
-   "for": "Every classic the trade sells — alchemist's fire, acid flasks, thunderstones — and every potion that holds a spell."
-  },
-  "stabilize": {
-   "does": "No potency change and no shape of its own. It legalises what would otherwise be refused: two volatiles in one vessel, or any material that attacks its own flask.",
-   "needs": "Nothing. It is always legal to add, and adding it costs a stage (+2 DC) whether it was required or not.",
-   "for": "Surviving the reaction. Alkahest, phlogiston and starfall cores cannot be worked at all without it."
+   "does": "Merges the inputs into an admixture; same-named traits add their grades, capped by your level.",
+   "needs": "Two or more inputs, one of them a liquid medium.",
+   "for": "Building a trait up to a higher grade, and mixing reagents that would not go into one solution."
   },
   "sublime": {
-   "does": "×1.25 potency. Vapour to crystal in the athanor, leaving everything gross behind.",
-   "needs": "The athanor, which is furniture — this is bench work, not roadside work.",
-   "for": "The exotic tiers, which are worked almost entirely as sublimates, and for stacking a second ×1.25 on top of a reaction."
+   "does": "Two measures of a solid make one sublimate at x1.5 potency and duration, one rarity band rarer.",
+   "needs": "A solid, and a laboratory.",
+   "for": "Concentrating a salt or a calx."
   },
-  "catalyze": {
-   "does": "×1.50 potency, the largest multiplier in the craft.",
-   "needs": "The philosopher's bench, and legendary material to be worth the stage at all.",
-   "for": "The great work: permanent preparations and anything that must be stronger than the trade can otherwise make."
+  "transmute": {
+   "does": "Two of a material (one, with philosopher's mercury) become one of the same kind, one band rarer, sharing an essence. You choose which.",
+   "needs": "A laboratory, and a day: the work waits In progress until you collect it.",
+   "for": "The rare reagent the market does not sell."
   }
  },
- "_portable_note": "The laboratory and athanor are furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split herbalist.json declares for its still and workbench.",
- "fixed_tools": [
-  "alchemical laboratory",
-  "athanor",
-  "philosopher's bench"
- ],
- "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
+ "_bench_note": "Every number the plan marks proposed, as rule rows (plan §7, §8, §9, §12; contracts §8). `order` is the method strip. Per method: `where` (kit or lab), `bulk` (every method batches, plan §15.2), `minutes` per unit of world time, `takes`/`makes` in words, `form` (the intermediate it makes), `per_unit` (inputs one unit consumes: Distill and Sublime take two measures for one, plan §7.2) and `tuning` (the minigame's numbers the check response carries; bands start generous, both earlier sweeps found every crafting minigame was softened after launch). `in_progress_after` is plan §12.3's threshold: a step longer than this waits In progress, with the clock moved only by its `hands_on` minutes. `lab_rank`: rare and above need a laboratory (plan §14). `lab_bonus` is the book's alchemist's lab, +2 circumstance (UE p.77). `lab_rate_cp_per_hour` is the fallback rent until lane G's `market.lab_rent` lands (plan §14, 2 sp an hour, proposed).",
+ "bench": {
+  "order": [
+   "dissolve",
+   "calcine",
+   "filter",
+   "distill",
+   "react",
+   "sublime",
+   "bottle",
+   "transmute",
+   "assay"
+  ],
+  "methods": {
+   "dissolve": {
+    "name": "Dissolve",
+    "where": "kit",
+    "bulk": true,
+    "minutes": 10,
+    "takes": "a solid and a solvent",
+    "makes": "a solution",
+    "form": "solution",
+    "tuning": {"game": "dissolve", "gauge": "reaction", "seconds": 6, "difficulty": 0.4,
+               "reaction": {"start": 10, "band": [35, 70], "rise": 12, "settle": 6, "flare_at": 88},
+               "liquid": {"start": {"turbidity": 0.85}, "end": {"turbidity": 0.1}}}
+   },
+   "calcine": {
+    "name": "Calcine",
+    "where": "kit",
+    "bulk": true,
+    "minutes": 60,
+    "takes": "a solid that does not burn away",
+    "makes": "a calx",
+    "form": "calx",
+    "tuning": {"game": "calcine", "gauge": "heat", "seconds": 7, "difficulty": 0.4,
+               "heat": {"unit": "C", "lo": 200, "hi": 1100, "start": 300,
+                        "bands": [{"name": "dull", "lo": 200, "hi": 600},
+                                  {"name": "calcining", "lo": 600, "hi": 900},
+                                  {"name": "fusing", "lo": 900, "hi": 1100}],
+                        "target": "calcining"},
+               "liquid": {"start": {"turbidity": 1.0}, "end": {"turbidity": 1.0}}}
+   },
+   "filter": {
+    "name": "Filter",
+    "where": "kit",
+    "bulk": true,
+    "minutes": 20,
+    "takes": "a solution, a spirit or an admixture",
+    "makes": "a filtrate, and a precipitate of what it held back",
+    "form": "filtrate",
+    "potency": 0.9,
+    "tuning": {"game": "filter", "gauge": "pour", "seconds": 6, "difficulty": 0.35,
+               "pour": {"band": [30, 65], "start": 0},
+               "liquid": {"start": {"turbidity": 0.6}, "end": {"turbidity": 0.05}}}
+   },
+   "distill": {
+    "name": "Distill",
+    "where": "lab",
+    "bulk": true,
+    "minutes": 120,
+    "takes": "two measures of a liquid",
+    "makes": "a spirit, concentrated",
+    "form": "spirit",
+    "per_unit": 2,
+    "concentrates": true,
+    "tuning": {"game": "distill", "gauge": "heat", "seconds": 7, "difficulty": 0.45,
+               "heat": {"unit": "C", "lo": 60, "hi": 100, "start": 65,
+                        "bands": [{"name": "heads", "lo": 70, "hi": 78},
+                                  {"name": "hearts", "lo": 78, "hi": 88},
+                                  {"name": "tails", "lo": 88, "hi": 100}],
+                        "target": "hearts"},
+               "liquid": {"start": {"turbidity": 0.4}, "end": {"turbidity": 0.0}}}
+   },
+   "react": {
+    "name": "React",
+    "where": "kit",
+    "bulk": true,
+    "minutes": 30,
+    "takes": "two or more inputs, one a liquid medium",
+    "makes": "an admixture",
+    "form": "admixture",
+    "tuning": {"game": "react", "gauge": "reaction", "seconds": 6, "difficulty": 0.45,
+               "reaction": {"start": 5, "band": [40, 72], "rise": 14, "settle": 5, "flare_at": 90},
+               "liquid": {"start": {"turbidity": 0.3}, "end": {"turbidity": 0.5}}}
+   },
+   "sublime": {
+    "name": "Sublime",
+    "where": "lab",
+    "bulk": true,
+    "minutes": 240,
+    "takes": "two measures of a solid",
+    "makes": "a sublimate, concentrated",
+    "form": "sublimate",
+    "per_unit": 2,
+    "concentrates": true,
+    "tuning": {"game": "sublime", "gauge": "heat", "seconds": 7, "difficulty": 0.5,
+               "heat": {"unit": "C", "lo": 150, "hi": 450, "start": 180,
+                        "bands": [{"name": "cold", "lo": 150, "hi": 280},
+                                  {"name": "subliming", "lo": 280, "hi": 330},
+                                  {"name": "melting", "lo": 330, "hi": 450}],
+                        "target": "subliming"},
+               "liquid": {"start": {"turbidity": 1.0}, "end": {"turbidity": 0.2}}}
+   },
+   "bottle": {
+    "name": "Bottle",
+    "where": "kit",
+    "bulk": true,
+    "minutes": 10,
+    "takes": "a liquid or a powder, and a vessel",
+    "makes": "the finished product; the vessel decides which kind",
+    "tuning": {"game": "bottle", "gauge": "reaction", "seconds": 6, "difficulty": 0.35,
+               "reaction": {"start": 60, "band": [0, 30], "rise": 0, "settle": 8, "flare_at": 95},
+               "liquid": {"start": {"turbidity": 0.2}, "end": {"turbidity": 0.1}}}
+   },
+   "transmute": {
+    "name": "Transmute",
+    "where": "lab",
+    "bulk": true,
+    "minutes": 1440,
+    "hands_on": 60,
+    "takes": "two of a material, or one with a catalyst that names Transmute",
+    "makes": "one of a rarer material of the same kind",
+    "per_unit": 2,
+    "tuning": {"game": "transmute", "gauge": "stages", "seconds": 8, "difficulty": 0.5,
+               "stages": ["nigredo", "albedo", "citrinitas", "rubedo"],
+               "liquid": {"start": {"turbidity": 1.0}, "end": {"turbidity": 0.0}}}
+   },
+   "assay": {
+    "name": "Assay",
+    "where": "kit",
+    "bulk": false,
+    "minutes": 10,
+    "takes": "a pinch of a reagent",
+    "makes": "knowledge"
+   }
+  },
+  "lab_rank": 3,
+  "lab_bonus": 2,
+  "lab_rate_cp_per_hour": 20,
+  "in_progress_after": 480,
+  "rarity_step": 0.05,
+  "volatile_dc_step": 3,
+  "concentration": {"potency": 1.5, "duration": 1.5, "dc_per_step": 2},
+  "_slots_note": "Plan §6.3 (proposed, Atelier's three and the Physick flask's two): what a finished product carries in benefits. A formula's core takes one. Intermediates carry everything in the pool up to `intermediate`; the player picks when there is more.",
+  "slots": {"potion": 3, "oil": 2, "splash": 2, "cloud": 2, "tool": 1, "intermediate": 6},
+  "_routes_note": "Plan §5.3, §12.1: the routes a family delivers a benefit through (`benefit`), and the routes on which a drawback reaches whoever uses it (`drawback`). A trait on any other route is shown dimmed with the reason and dropped, never silently kept. A tool carries only its function: light and smoke (`tool_types`).",
+  "routes": {
+   "potion": {"benefit": ["ingest"], "drawback": ["ingest", "carried"]},
+   "oil": {"benefit": ["skin", "external"], "drawback": ["skin", "carried"]},
+   "splash": {"benefit": ["struck", "splash"], "drawback": ["carried"]},
+   "cloud": {"benefit": ["area", "inhale"], "drawback": ["carried"]},
+   "tool": {"benefit": ["external", "area"], "drawback": ["carried"]}
+  },
+  "tool_types": ["light", "manifest"],
+  "_family_note": "How each family is used and what it keeps (plan §12.1). `how` is the use door's words (rules/consumables.py: drink, apply, throw, coat, light); `action` the book's; `keeps` minutes before it goes off (null: indefinitely). The book's potions do not spoil.",
+  "families": {
+   "potion": {"noun": "Draught", "how": ["drink"], "action": "standard, provokes", "keeps": null},
+   "oil": {"noun": "Oil", "how": ["coat", "apply"], "action": "standard, provokes", "keeps": null},
+   "splash": {"noun": "Flask", "how": ["throw"], "action": "standard", "keeps": 525600, "range_increment_ft": 10},
+   "cloud": {"noun": "Smoke Pot", "how": ["throw", "light"], "action": "standard", "keeps": 525600, "range_increment_ft": 10},
+   "tool": {"noun": "Stick", "how": ["light"], "action": "standard", "keeps": null}
+  },
+  "_forms_note": "The intermediates (plan §6.3, §12.1): what each method makes, whether it pours, and how long it keeps (solutions and admixtures 3 days, spirits a year, salts indefinitely). Sellable; a finished product is never an input.",
+  "forms": {
+   "solution": {"word": "Solution", "liquid": true, "keeps": 4320},
+   "admixture": {"word": "Admixture", "liquid": true, "keeps": 4320},
+   "filtrate": {"word": "Filtrate", "liquid": true, "keeps": 4320},
+   "spirit": {"word": "Spirit", "liquid": true, "keeps": 525600},
+   "calx": {"word": "Calx", "liquid": false, "keeps": null},
+   "precipitate": {"word": "Precipitate", "liquid": false, "keeps": null},
+   "sublimate": {"word": "Sublimate", "liquid": false, "keeps": null}
+  },
+  "_traits_note": "Working traits at the bench (plan §5.5). `band` scales the minigame's window (a catalyst or apparatus widens it 20%; slow to dissolve narrows Dissolve's 30%); `roll_twice` is Pathfinder Unchained's pure material, the check rolled twice and the better kept, as the forge reads it.",
+  "traits": {
+   "catalyst": {"band": 1.2},
+   "apparatus": {"band": 1.2},
+   "slow_to_dissolve": {"band": 0.7, "only": "dissolve"},
+   "pure": {"roll_twice": true}
+  },
+  "_transmute_note": "Plan §9 (proposed): DC 10 + 5 a band above common for the output (uncommon 15, rare 20, exotic 25, legendary 30); a catalyst whose job names Transmute (philosopher's mercury) makes it one for one.",
+  "transmute": {"dc_base": 10, "dc_per_band": 5, "one_for_one": ["philosophers-mercury"]},
+  "_catalyst_jobs_note": "The named jobs of catalysts that are never spent (plan §5.8; lane D's drafts in docs/alchemy-review.md). A catalyst set in the catalyst role is never spent and puts no trait in the pool; set as an ordinary input it is spent and its traits pool like any reagent's (a unicorn horn shaving's two). Built: one_for_one (Transmute), strip_one (a drawback, as Filter does), stabilizes (a stabilizer that is not spent), roll_twice (pure). Orichalcum's 'names the formula' is not built.",
+  "catalyst_jobs": {
+   "philosophers-mercury": ["one_for_one"],
+   "unicorn-horn-shaving": ["strip_one"],
+   "philosophers-wool": ["stabilizes"],
+   "mithral-dust": ["roll_twice"]
+  },
+  "_protection_note": "What spares the alchemist a `toxic_to_handle` reagent (plan §8.4): a laboratory's fume hood, or a mask and gloves carried. The goods row is lane H's; until it lands the pack is read by these names, the way the forge found its field kit.",
+  "protection_names": ["mask and gloves", "alchemist's mask and gloves", "alchemists mask and gloves", "mask & gloves", "fume mask"],
+  "_kit_note": "The alchemist's field kit (plan §14): common and uncommon work anywhere. Lane G's `places.has_alchemy_kit` decides when it lands; until then the kit folds out wherever the character stands, as the forge's did before lane G.",
+  "kit_names": ["alchemist's field kit", "alchemists field kit", "alchemy kit", "alchemy crafting kit", "alchemist's kit", "alchemists kit", "field laboratory"]
+ },
+ "_old_methods_note": "What a removed method became (plan §4.1, Q3.1), for an old recipe or chain naming it.",
+ "old_methods": {
+  "seal": "bottle",
+  "precipitate": "filter",
+  "stabilize": "a stabilizer ingredient",
+  "catalyze": "a catalyst, never spent"
+ }
 }

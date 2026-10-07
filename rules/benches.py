@@ -152,6 +152,14 @@ MOVED: dict[str, str] = {
     # "By the book" mode is a separate tab, left to the UI wave (U7) to retire.
     "enchanter": ("Enchanting is worked at the circle at the table now, one step at a "
                   "time: prepare, attune, bind. The chain bench no longer takes it."),
+    # The alchemy revamp (docs/alchemy-revamp-plan.md §15.4, owner Q9.1, 2026-10-06): the
+    # bench is its own (play/alchemy_views.py), one step at a time. The old chain read an
+    # exact material set and method sequence, scaled nothing it previewed into the stock
+    # (inv §0.1) and inferred drink, throw or coat from what happened to be harmful, which
+    # made the sunrod a blade coating; its methods (seal, precipitate, stabilize,
+    # catalyze) are gone from the track.
+    "alchemist": ("Alchemy is worked at the bench at the table now, one step at a time: "
+                  "dissolve, react, bottle. The chain bench no longer takes it."),
 }
 
 
@@ -249,10 +257,13 @@ METHOD_GLYPHS: dict[str, dict[str, str]] = {
         "dye": "🎨", "cut": "✂️", "tool": "🖋️", "stitch": "🧵", "harden": "🔥",
         "line": "🧶",
     },
+    # The alchemy revamp's nine (2026-10-06); `rules.alchemist.METHOD_GLYPH` is the
+    # module's own map and wins. Seal became Bottle; precipitate, stabilize and catalyze
+    # left the track, so their glyphs went with them.
     "alchemist": {
-        "calcine": "🔥", "dissolve": "💧", "filter": "🧫", "precipitate": "🧂",
-        "react": "💥", "stabilize": "⚖️", "sublime": "☁️", "catalyze": "💠",
-        "seal": "🧴",
+        "dissolve": "💧", "calcine": "🔥", "filter": "🧫", "distill": "⚗️",
+        "react": "💥", "sublime": "☁️", "bottle": "🧴", "transmute": "🜍",
+        "assay": "🔍",
     },
     # The circle's eight (enchanting revamp, 2026-10-05). The new bench draws icon masks
     # (UI plan §4); these serve only the old /craft/ page's station chips.

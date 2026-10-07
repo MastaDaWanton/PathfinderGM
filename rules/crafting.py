@@ -376,6 +376,14 @@ def backfill_specs(d: dict) -> list[dict]:
 
 
 def from_stock_dict(d: dict) -> Stock:
+    # An alchemist's product (docs/alchemy-contracts.md §6) keeps its record whole under
+    # "alchemy" — ids and grades, never numbers — and is rebuilt from it on every load, so
+    # a corrected material document fixes every bottle on the next one. Read here, the one
+    # loader every saved row passes through, as the forge's record is read in `sheet._stock`.
+    if isinstance(d.get("alchemy"), dict):
+        from . import alchemy_items
+
+        return alchemy_items.stock_item(d)
     # `specs` absent is not the same as `specs` empty. Absent means the jar predates the
     # field and its structure has to be rebuilt; empty means a jar whose every effect was
     # prose, or one the chain purified down to nothing, and rebuilding *that* would hand

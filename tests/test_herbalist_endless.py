@@ -21,7 +21,9 @@ from rules.sheet import from_dict, load_pc, to_dict
 # is three levels then endless now, pinned by tests/test_forge_bench.py. The Enchanter
 # left with its own (docs/enchanting-revamp-plan.md §5, 2026-10-05), pinned by
 # tests/test_enchanter.py.
-OTHERS = ("alchemist", "leatherworker")
+# The Alchemist left with its own (docs/alchemy-revamp-plan.md §4, 2026-10-06), pinned by
+# tests/test_alchemist.py.
+OTHERS = ("leatherworker",)
 
 
 @pytest.fixture

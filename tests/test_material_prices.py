@@ -217,11 +217,13 @@ def test_the_alchemists_counter_charges_the_checked_price_and_pays_half_back():
 def test_a_copper_price_survives_every_loader():
     """Water is 0.01 gp (1 cp). The alchemist and enchanter loaders read `price_gp` with
     `int()`, so through them water cost 0, free, while the counter (the blacksmith
-    loader) said 1 cp: found by the pricing lane, 2026-10-05."""
+    loader) said 1 cp: found by the pricing lane, 2026-10-05. The alchemist's shelf reads
+    through the one door since alchemy lane F, and its own copper row (the wooden rod)
+    survives it too."""
     from rules import alchemist, enchanter
 
-    water = alchemist.materials()["water"]
-    assert water.price_gp == 0.01
+    assert alchemist.materials()["water"].price_gp == 0.01
+    assert alchemist.materials()["wooden-rod"].price_gp == 0.01
     assert alchemist.materials()["distilled-water"].price_gp == 1
     assert isinstance(alchemist.materials()["distilled-water"].price_gp, int)
     assert enchanter.from_dict({"id": "probe", "name": "Probe", "price_gp": 0.05}).price_gp == 0.05

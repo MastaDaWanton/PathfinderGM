@@ -72,9 +72,10 @@ def test_apparatus_is_exactly_the_vessels_catalysts_media_and_the_wild():
     named = {m for m in bare if _docs()[m]["kind"] not in ("vessel", "catalyst")}
     assert named == {"distilled-water", "rectified-spirits", "oilcloth-wrap",
                      "prima-materia"}
-    # The 13 vessels, 8 of the 9 catalysts (unicorn horn carries the purity lane E's
+    # The 14 vessels (lane F added the wooden rod, the tool family's: no material had the
+    # `stick` trait), 8 of the 9 catalysts (unicorn horn carries the purity lane E's
     # formulae read), and the four named.
-    assert len(bare) == 13 + 8 + 4
+    assert len(bare) == 14 + 8 + 4
 
 
 def test_every_product_trait_names_essence_and_route_and_is_never_narrative():

@@ -1456,7 +1456,8 @@
    "materials": [
     "azoth",
     "unicorn-horn-shaving",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -1487,7 +1488,8 @@
    "materials": [
     "azoth",
     "eagle-feathers",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -1532,7 +1534,8 @@
    "materials": [
     "azoth",
     "licorice-root",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -1598,7 +1601,8 @@
    "materials": [
     "azoth",
     "sunmetal-filings",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -2014,7 +2018,8 @@
    "materials": [
     "azoth",
     "river-reed",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -2050,7 +2055,8 @@
     "azoth",
     "fine-gauze",
     "smoke-resin",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -2095,7 +2101,8 @@
     "azoth",
     "bitter-aloes",
     "willow-charcoal",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -2129,7 +2136,8 @@
    "materials": [
     "azoth",
     "everfrost-salt",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",
@@ -2164,7 +2172,8 @@
    "materials": [
     "azoth",
     "star-iron-dust",
-    "crystal-retort"
+    "crystal-retort",
+    "warded-phial"
    ],
    "methods": [
     "dissolve",

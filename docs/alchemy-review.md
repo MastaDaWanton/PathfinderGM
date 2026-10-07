@@ -28,11 +28,11 @@ How to read it:
 
 ## The counts
 
-- **138 materials**: 113 carry product traits (210 traits, 44 of them drawbacks); 25 are apparatus, media or wild.
+- **139 materials**: 113 carry product traits (210 traits, 44 of them drawbacks); 26 are apparatus, media or wild.
 - Every material has at least 3 properties (fewest: 3); 29 carry a mishap, 18 a toxic document, 7 a book trait.
 - **By essence** (product traits): fire 21, frost 7, acid 13, storm 2, thunder 4, light 7, shadow 5, vigour 12, purity 18, ward 17, might 13, grace 14, mind 15, lightness 7, sight 5, binding 5, decay 35, change 10.
 - **By route**: area 9, external 7, eyes 2, ingest 100, inhale 10, skin 29, struck 53.
-- **Working traits**: apparatus 3, bursts 1, catalyst 9, combustible 36, corrosive 14, drinkable 4, fireproof 7, lead_lined 2, light_sensitive 9, liquid 45, pure 5, shatters 2, slow_to_dissolve 11, solid 89, solvent:acid 4, solvent:alcohol 3, solvent:oil 4, solvent:vinegar 1, solvent:water 4, stabilizer 5, struck 3, toxic_to_handle 18, volatile 29, warded 5, wild 1.
+- **Working traits**: apparatus 3, bursts 1, catalyst 9, combustible 37, corrosive 14, drinkable 4, fireproof 7, lead_lined 2, light_sensitive 9, liquid 45, pure 5, shatters 2, slow_to_dissolve 11, solid 90, solvent:acid 4, solvent:alcohol 3, solvent:oil 4, solvent:vinegar 1, solvent:water 4, stabilizer 5, stick 1, struck 3, toxic_to_handle 18, volatile 29, warded 5, wild 1.
 - **Hybrid herbs**: 63 on the shelf, 201 effects, each given an essence by the same rule: fire 6, light 1, shadow 2, vigour 21, purity 15, ward 42, might 20, grace 6, mind 54, lightness 6, sight 11, binding 3, decay 12, change 2.
 
 ## The fences
@@ -120,7 +120,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 
 ## The materials
 
-### Common (55)
+### Common (56)
 
 | Material | Kind | Price | Product traits | Working | Mishap / toxic |
 |---|---|---|---|---|---|
@@ -179,6 +179,7 @@ Every material whose pre-revamp effects differ from what it puts in a bottle now
 | Glass Vial | vessel | 1 gp | (apparatus) | drinkable, solid, light_sensitive | - |
 | Stoneware Pot | vessel | 2 gp | (apparatus) | struck, fireproof, solid | - |
 | Waxed Bladder | vessel | 1 gp | (apparatus) | bursts, solid, combustible | - |
+| Wooden rod | vessel | 0.01 gp | (apparatus) | stick, combustible, solid | - |
 
 ### Uncommon (34)
 
@@ -404,15 +405,15 @@ The book: raw materials cost a third of an alchemical item's price (Craft) and h
 | Potion of False Life | 300 gp | 150 gp | 6 gp | within | ghost-salt | CRB potions: 50 × SL 2 × CL 3 |
 | Potion of Remove Paralysis | 300 gp | 150 gp | 46 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
 | Oil of Align Weapon (Good) | 300 gp | 150 gp | 56 gp | within | - | CRB potions: 50 × SL 2 × CL 3 |
-| Potion of Cure Serious Wounds | 750 gp | 375 gp | 1,500 gp | **over** | - | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Fly | 750 gp | 375 gp | 1,500 gp | **over** | eagle-feathers | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Haste | 750 gp | 375 gp | 1,500 gp | **over** | licorice-root | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Heroism | 750 gp | 375 gp | 1,750 gp | **over** | - | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Water Breathing | 750 gp | 375 gp | 1,500 gp | **over** | river-reed | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Gaseous Form | 750 gp | 375 gp | 1,501 gp | **over** | smoke-resin | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Neutralize Poison | 750 gp | 375 gp | 1,505 gp | **over** | bitter-aloes | CRB potions: 50 × SL 3 × CL 5 |
-| Potion of Protection from Energy | 750 gp | 375 gp | 1,500 gp | **over** | everfrost-salt | CRB potions: 50 × SL 3 × CL 5 |
-| Oil of Keen Edge | 750 gp | 375 gp | 1,500 gp | **over** | star-iron-dust | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Cure Serious Wounds | 750 gp | 375 gp | 1,850 gp | **over** | - | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Fly | 750 gp | 375 gp | 1,850 gp | **over** | eagle-feathers | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Haste | 750 gp | 375 gp | 1,850 gp | **over** | licorice-root | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Heroism | 750 gp | 375 gp | 2,100 gp | **over** | - | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Water Breathing | 750 gp | 375 gp | 1,850 gp | **over** | river-reed | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Gaseous Form | 750 gp | 375 gp | 1,851 gp | **over** | smoke-resin | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Neutralize Poison | 750 gp | 375 gp | 1,855 gp | **over** | bitter-aloes | CRB potions: 50 × SL 3 × CL 5 |
+| Potion of Protection from Energy | 750 gp | 375 gp | 1,850 gp | **over** | everfrost-salt | CRB potions: 50 × SL 3 × CL 5 |
+| Oil of Keen Edge | 750 gp | 375 gp | 1,850 gp | **over** | star-iron-dust | CRB potions: 50 × SL 3 × CL 5 |
 
 ## Transmute pairs worth more than 3× their inputs (open point 10)
 
