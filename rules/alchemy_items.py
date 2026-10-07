@@ -223,7 +223,14 @@ def _merge_rows(rows: list[dict], cap: int) -> list[dict]:
             out[k] = {"key": k, "essence": r.get("essence", ""), "raw": 0, "from": [],
                       "drawback": bool(r.get("drawback"))}
         m = out[k]
-        m["raw"] += int(r.get("grade") or 1)
+        g = int(r.get("grade") or 1)
+        # The quality of the steps a trait came through (`steps`) is the strongest
+        # contributor's: two solutions merged into one admixture carry the better-made
+        # one's work, the first seen on a tie.
+        if g > int(m.get("_lead", 0)):
+            m["_lead"] = g
+            m["steps"] = [int(q) for q in r.get("steps") or ()]
+        m["raw"] += g
         m["essence"] = m["essence"] or r.get("essence", "")
         for src in r.get("from") or ():
             if src not in m["from"]:
@@ -233,6 +240,9 @@ def _merge_rows(rows: list[dict], cap: int) -> list[dict]:
             if via not in m["via"]:
                 m["via"].append(via)
     for m in out.values():
+        m.pop("_lead", None)
+        if not m.get("steps"):
+            m.pop("steps", None)
         m["grade"] = max(1, min(int(cap), m["raw"])) if cap else m["raw"]
         m["capped"] = m["raw"] > m["grade"]
     return list(out.values())
@@ -260,10 +270,19 @@ def pool(sources, *, level: int, wild: str | None = None) -> dict:
             rows += material_rows(mid)
         elif isinstance(s.get("record"), dict):
             rec = s["record"]
+            # An intermediate's quality travels with what it carries (plan §6.1, "grades
+            # and all"; herbalism's running potency, crafting `strength_at`): each of its
+            # traits remembers the tier of the step that made it, and the build multiplies
+            # it in. Before this a Flawless solution bottled at Sound came out exactly as
+            # a Crude one did: only the last step's hands counted.
+            own = rec.get("quality_index")
+            tail = [int(own)] if own is not None else []
             for r in rec.get("traits") or ():
-                rows.append(dict(r, drawback=False))
+                rows.append(dict(r, drawback=False,
+                                 steps=[int(q) for q in r.get("steps") or ()] + tail))
             for r in rec.get("drawbacks") or ():
-                rows.append(dict(r, drawback=True))
+                rows.append(dict(r, drawback=True,
+                                 steps=[int(q) for q in r.get("steps") or ()] + tail))
             for mid in record_materials(rec):
                 if mid not in mats:
                     mats.append(mid)
@@ -507,16 +526,10 @@ def choose(p: dict, *, family: str, formula: dict | None = None, picks=None,
     free = max(0, slots - core)
     ben = list(p.get("traits") or ())
     deliver = {r["key"]: deliver_reason(family, r) for r in ben}
-    # A spell bottled through the spell door holds the bottle alone. `consumables.spell_of`
-    # (lane C) resolves `holds_spell` at the potion's caster level only when the potion has
-    # NO documents of its own: one inherited trait or drawback beside it would turn the
-    # spell off. So a derived spell row takes every slot, and says why, until that door
-    # can carry documents beside a spell (asked of the lead in lane F's report).
-    alone = bool(formula and formula.get("kind") == "spell" and formula.get("core") is None)
-    if alone:
-        free = 0
-        why_alone = "the spell holds the bottle alone: nothing else goes in beside it"
-        deliver = {k: (v or why_alone) for k, v in deliver.items()}
+    # A derived spell takes the core's one slot and the rest are free, as any formula's
+    # (plan §6.3: "a spell potion its spell plus two"). Until 2026-10-07 it held the
+    # bottle alone, because `consumables.spell_of` turned the spell off for any potion
+    # with documents; the drink door now reads `spell_beside` and lands both.
     ok = [r for r in ben if not deliver[r["key"]]]
     if picks is None:
         ok_sorted = sorted(ok, key=lambda r: -int(r["grade"]))
@@ -549,9 +562,7 @@ def choose(p: dict, *, family: str, formula: dict | None = None, picks=None,
     stripped = set(strip or ())
     for r in p.get("drawbacks") or ():
         reason = ""
-        if alone:
-            reason = "the spell holds the bottle alone: no drawback goes in beside it"
-        elif family != INTERMEDIATE and not (set(r["from"]) & used):
+        if family != INTERMEDIATE and not (set(r["from"]) & used):
             reason = "nothing you carry into the bottle comes from what it is a cost of"
         elif r["key"] in stripped:
             reason = "a catalyst stripped it"
@@ -574,6 +585,8 @@ def _slim(r: dict) -> dict:
         out["essence"] = r["essence"]
     if r.get("via"):
         out["via"] = list(r["via"])
+    if r.get("steps"):
+        out["steps"] = [int(q) for q in r["steps"]]
     return out
 
 
@@ -683,6 +696,91 @@ def new_record(*, family: str, traits=(), drawbacks=(), formula: str | None = No
     return rec
 
 
+# --- time on the shelf: keeping and the light (plan §5.5, §12.1) ---------------------------------
+#
+# Both are read when the thing is reached for — the bench taking an input, the use door
+# opening a flask — from the minute it was made and the clock, never by a ticker walking
+# the shelf (law 2: no second ticker). Nothing is rewritten: the record keeps the grades it
+# was made with, and what time has done is derived each time it is asked.
+
+def keeps_for(record: dict) -> int | None:
+    """Minutes this record keeps (plan §12.1's Keeps column, alchemist.json `families` and
+    `forms`): a solution, filtrate or admixture 3 days, a spirit or a splash flask or a
+    cloud a year; None for what keeps indefinitely (potions, oils, tools, salts)."""
+    family = str((record or {}).get("family") or "")
+    if family == INTERMEDIATE:
+        keeps = form_row(str(record.get("form") or "")).get("keeps")
+    else:
+        keeps = family_row(family).get("keeps")
+    return int(keeps) if keeps else None
+
+
+def gone_off(record: dict, now: int | None) -> str:
+    """Why this record can no longer be used or worked, finishing "it ...", or "" while it
+    keeps. Measured before it was read (2026-10-07): the Keeps column was data and a shelf
+    label (`keeps_until_day`) and nothing asked it, so a three-day solution reacted as
+    well on day 40 as on day 1, and a flask kept past its year still burned."""
+    keeps = keeps_for(record)
+    if not keeps or now is None or (record or {}).get("made_minute") is None:
+        return ""
+    if int(now) < int(record.get("made_minute") or 0) + keeps:
+        return ""
+    noun = (form_row(str(record.get("form") or "")).get("word") if record.get("family")
+            == INTERMEDIATE else family_row(str(record.get("family") or "")).get("noun"))
+    from . import sky
+
+    return (f"has gone off: {_a(str(noun or 'preparation').lower())} keeps "
+            f"{sky.span_words(keeps)}")
+
+
+def light_sensitive(record: dict) -> bool:
+    """Whether anything in this record carries the `light_sensitive` working trait."""
+    from . import materials
+
+    mats = list(record_materials(record or {}))
+    for mid in mats:
+        doc = materials.alchemy_doc(mid) or {}
+        for w in doc.get("working") or ():
+            if (w.get("trait") if isinstance(w, dict) else w) == "light_sensitive":
+                return True
+    return False
+
+
+def aged(record: dict, now: int | None) -> dict:
+    """The record as time has left it (plan §5.5: `light_sensitive`, "an intermediate left
+    unsealed loses one grade a day"): every benefit an unsealed intermediate carries one
+    grade lower for each whole day since it was made, gone at nought. Bottling seals it:
+    a finished product never fades. Drawbacks do not fade — what the light takes is the
+    virtue, not the harm. The stored record is never touched; a copy comes back."""
+    rec = record or {}
+    if rec.get("family") != INTERMEDIATE or now is None or rec.get("made_minute") is None:
+        return rec
+    days = (int(now) - int(rec.get("made_minute") or 0)) // 1440
+    if days <= 0 or not light_sensitive(rec):
+        return rec
+    out = copy.deepcopy(rec)
+    kept = []
+    for r in out.get("traits") or ():
+        g = int(r.get("grade") or 1) - days
+        if g >= 1:
+            kept.append(dict(r, grade=g))
+    out["traits"] = kept
+    out["faded"] = days
+    return out
+
+
+def spell_beside(record: dict) -> bool:
+    """Whether this record's documents sit beside its spell rather than being it: its
+    formula is a DERIVED spell row (`kind: spell` with no authored core), so the spell is
+    resolved by the drink door and every document is a trait or drawback carried with it.
+    One of the 44 authored potions is not: its documents ARE the spell (Q10.2)."""
+    from . import formulae
+
+    fid = (record or {}).get("formula")
+    row = formulae.get(fid) if fid else None
+    return bool(row is not None and row.get("kind") == "spell" and row.get("core") is None)
+
+
 def record_for_formula(fid: str, *, vessel: str | None = None, count: int = 1,
                        bought: bool = False) -> dict | None:
     """A formula's product at Sound quality with no inherited traits, as the bench would
@@ -733,6 +831,20 @@ def multipliers(record: dict) -> dict:
             "price": quality_mult("price", q)}
 
 
+def carried(row: dict) -> tuple[float, float, float]:
+    """(potency, duration, drawback) a trait brings from the steps it came through: the
+    quality ladder's columns at each earlier step's tier, multiplied (crafting
+    `strength_at`'s running product). (1, 1, 1) for a trait straight off a material."""
+    from .crafting import quality_mult
+
+    p = d = b = 1.0
+    for q in row.get("steps") or ():
+        p *= quality_mult("potency", int(q))
+        d *= quality_mult("duration", int(q))
+        b *= quality_mult("drawback", int(q))
+    return p, d, b
+
+
 def _clean(spec: dict) -> dict:
     return {k: v for k, v in spec.items() if not str(k).startswith("_")}
 
@@ -781,8 +893,9 @@ def build(record: dict) -> dict:
                 for spec in row.get("core") or []:
                     specs.append(dict(_clean(spec), origin=origin,
                                       source=str(row.get("name"))))
-            # A derived row carries no documents: the spell door resolves it at the potion's
-            # caster level (`consumables.spell_of`), which a document here would bypass.
+            # A derived row carries no documents of the spell's own: the spell door
+            # resolves it at the potion's caster level (`consumables.spell_of`), and the
+            # traits below ride beside it (`spell_beside`).
             lines.append({"trait": "spell", "core": True, "text":
                           f"{row.get('name')}: the spell at caster level {caster_level}"})
         else:
@@ -807,7 +920,9 @@ def build(record: dict) -> dict:
             missing.append(r.get("key", "?"))
             continue
         src = t.pop("_source", "")
-        s = scaled(graded(t, int(r.get("grade") or 1)), m["potency"], m["duration"], True)
+        cp, cd, _cb = carried(r)
+        s = scaled(graded(t, int(r.get("grade") or 1)), m["potency"] * cp,
+                   m["duration"] * cd, True)
         names = [str((doc_of(x) or {}).get("name") or x) for x in r.get("from") or ()]
         specs.append(dict(s, origin=origin, **{"from": ", ".join(names) or src}))
         lines.append({"trait": r.get("essence") or r["key"], "key": r["key"],
@@ -819,7 +934,9 @@ def build(record: dict) -> dict:
             missing.append(r.get("key", "?"))
             continue
         src = t.pop("_source", "")
-        s = scaled(graded(t, int(r.get("grade") or 1)), m["drawback"], m["drawback"], False)
+        _cp, _cd, cb = carried(r)
+        s = scaled(graded(t, int(r.get("grade") or 1)), m["drawback"] * cb,
+                   m["drawback"] * cb, False)
         s["drawback"] = True
         names = [str((doc_of(x) or {}).get("name") or x) for x in r.get("from") or ()]
         specs.append(dict(s, origin=origin, **{"from": ", ".join(names) or src}))
@@ -924,6 +1041,11 @@ class AlchemyStock(Stock):
     @property
     def bought(self) -> bool:
         return bool(self.record.get("bought"))
+
+    @property
+    def spell_beside(self) -> bool:
+        """Read by `consumables.spell_of`: the documents ride beside the spell."""
+        return spell_beside(self.record)
 
     def as_dict(self) -> dict:
         d = super().as_dict()
@@ -1043,4 +1165,5 @@ __all__ = ["AlchemyStock", "BUILD_VERSION", "INTERMEDIATE", "SCHEMA", "build", "
            "deliver_reason", "digest", "graded", "is_alchemy_record", "material_rows",
            "mix_of", "multipliers", "new_record", "pool", "preview", "product_name",
            "product_specs", "put", "record_for_formula", "record_materials", "records",
-           "refresh", "scaled", "stock_item", "template", "to_stock", "trait_key"]
+           "refresh", "scaled", "spell_beside", "stock_item", "template", "to_stock",
+           "trait_key"]

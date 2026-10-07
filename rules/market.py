@@ -364,10 +364,11 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
         if str(counter_kind).lower().removeprefix("the ") in _GOODS_ONLY:
             return staples
     # A place that names its benches (the smithy, the tannery) draws from them alone; any
-    # other counter keeps the general draw.
+    # other counter keeps the general draw — less the enchanter's magic, which only a
+    # counter that names the enchanter's bench sells (`general_draw`).
     tracks = place_draw(counter_kind)
     held = {str(getattr(g, "id", "")) for g in staples}
-    affordable = [m for m in (priced_from(tracks) if tracks else everything_priced())
+    affordable = [m for m in (priced_from(tracks) if tracks else general_draw())
                   if pricing.worth(m) <= till and str(getattr(m, "id", "")) not in held]
     shelf = stock(affordable, place=place, stall=stall, day=day)
     return staples + remaining(shelf, taken or {}, place, stall, day)
@@ -672,6 +673,63 @@ def draw_of(kind: str) -> tuple[str, ...]:
 
 POTION_DRAW = "potions"
 
+# The bench whose catalogue is magic: its essences, blanks and phials are what an
+# enchanter makes magic items from, and a counter sells them only when its row names the
+# enchanter's bench in `draw` (the curio stall does, on purpose).
+MAGIC_BENCH = "enchanter"
+
+
+def _catalogue_of(mid: str) -> str:
+    """Which shipped catalogue a material row comes from ("alchemist-materials", ...), ""
+    for homebrew and for anything the door does not hold."""
+    from . import materials
+
+    doc = materials.get(mid)
+    return str((doc or {}).get("catalogue") or "")
+
+
+def is_own(track: str, item) -> bool:
+    """Whether a material the bench `track` lists is that bench's OWN — its catalogue's
+    row (or homebrew, which has none) — rather than another craft's that its shelf-wide
+    excursion list also reaches.
+
+    Measured 2026-10-07 on the alchemist's counter in a city: of the 238 materials its
+    draw pool held, 164 were other crafts' (83 the enchanter's, 54 the blacksmith's, 27
+    the leatherworker's), because `alchemist.obtainable` is shelf-wide for the
+    acquisition hub ("a market sells what it sells whichever bench wanted it") and
+    `priced_from` took it whole. With the base value capping a city shelf at 8,000 gp,
+    the alchemist shelved Flaming Burst Essence, Warding Essence IV, Amulet Blanks and
+    Wand Blanks — the enchanter's magic on an alchemist's counter. A counter's `draw`
+    names the benches whose work it buys; it draws their own work and nothing else.
+    The alchemist's own is its shelf (`materials.alchemy_doc`: its catalogue and the
+    hybrid herbs)."""
+    from . import materials
+
+    mid = str(getattr(item, "id", "") or "")
+    if not mid:
+        return False
+    if track == "alchemist":
+        return materials.alchemy_doc(mid) is not None
+    cat = _catalogue_of(mid)
+    return cat in ("", f"{track}-materials")
+
+
+def general_draw() -> list:
+    """The daily draw of a counter that names no benches (a merchants' row, a counting
+    house, a warehouse): every priced material but the enchanter's magic, which no such
+    counter was designed to sell. Measured 2026-10-07: a city laboratory's keeper, then
+    on this draw, shelved Amulet Blanks, Wand Blanks and a Masterwork Cloak vessel on 9 of
+    20 days. Cached beside `everything_priced`, whose list it narrows."""
+    global _GENERAL
+    if _GENERAL is None:
+        _GENERAL = [m for m in everything_priced()
+                    if _catalogue_of(str(getattr(m, "id", "") or ""))
+                    != f"{MAGIC_BENCH}-materials"]
+    return _GENERAL
+
+
+_GENERAL: list | None = None
+
 
 def priced_from(tracks) -> list:
     """Every material the named benches sell, once each (`everything_priced`, narrowed)."""
@@ -700,7 +758,8 @@ def priced_from(tracks) -> list:
                 continue
             for m in found:
                 mid = str(getattr(m, "id", ""))
-                if mid and mid not in seen and getattr(m, "price_gp", None):
+                if mid and mid not in seen and getattr(m, "price_gp", None) \
+                        and is_own(track, m):
                     seen[mid] = m
         _POOLS[key] = list(seen.values())
     return _POOLS[key]

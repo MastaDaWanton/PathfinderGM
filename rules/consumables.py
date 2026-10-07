@@ -736,19 +736,45 @@ def _on_route(specs: list[dict], route: str) -> list[dict]:
 def spell_of(stock) -> dict | None:
     """The spell a potion holds and resolves through, or None.
 
-    Only a potion with `holds_spell` and NO authored documents: the 44 shipped potions
-    (and every old one, plan §18) carry their own and keep them, which is the contract
+    A potion with `holds_spell` and NO authored documents; or one whose documents sit
+    BESIDE its spell (`spell_beside`: a bench potion of a derived spell formula, whose
+    documents are the traits and drawbacks the alchemist put in with it, never the
+    spell's own). The 44 shipped potions (and every old one, plan §18) carry the spell's
+    effects as their own documents and keep them, which is the contract
     `tests/test_magicitem.py` pins for the enchanter's stand-in. The caster level is the
     stock's own (`caster_level`, written by the bench); missing, the engine uses the
-    book's minimum for the spell's level."""
+    book's minimum for the spell's level.
+
+    Measured 2026-10-07 (lane F's report): one inherited trait beside a derived spell
+    turned the spell off, because "has documents" read as "is one of the 44", so the
+    bench had to make every derived spell fill the bottle alone (plan §6.3 promises "a
+    spell potion its spell plus two")."""
     sid = str(_field(stock, "holds_spell", "") or "").strip()
-    if not sid or _specs(stock):
+    if not sid:
+        return None
+    if _specs(stock) and not spell_beside(stock):
         return None
     try:
         cl = int(_field(stock, "caster_level", 0) or 0)
     except (TypeError, ValueError):
         cl = 0
     return {"spell": sid, "cl": cl or None}
+
+
+def spell_beside(stock) -> bool:
+    """Whether a potion's documents are carried BESIDE its spell rather than being it: a
+    bench record whose formula is a derived spell row (no authored core). Read off the
+    record the stock carries — the live object's `record`, or a saved row's `alchemy` —
+    so nothing new is stored."""
+    flag = _field(stock, "spell_beside", None)
+    if flag is not None and not isinstance(stock, dict):
+        return bool(flag)
+    rec = stock.get("alchemy") if isinstance(stock, dict) else _field(stock, "record", None)
+    if not isinstance(rec, dict) or not rec.get("formula"):
+        return False
+    from . import alchemy_items
+
+    return alchemy_items.spell_beside(rec)
 
 
 def spell_specs(info: dict, dice=None) -> list[dict]:
@@ -840,6 +866,19 @@ def thrown_load(stock, specs: list[dict] | None = None) -> dict:
             "potency": float(_field(stock, "potency", 1.0) or 1.0)}
 
 
+def document_intents(specs: list[dict], target: str, because: str, name: str = "") -> list[dict]:
+    """Effect documents as intents on one creature, whatever their route, each save before
+    what it gates: what something does to whoever HANDLES it (an assay's danger, a bench
+    mishap, a reagent toxic to handle). Not the drink door — a hazard reaches the hands
+    and the lungs, never a swallow — which is why `knowledge.apply_danger` stopped using
+    `plan(how="drink")`: measured 2026-10-07, all 18 of 18 alchemy toxic documents (a
+    Fortitude save gating Constitution damage) came back "nothing in Quicksilver works
+    when swallowed" and applied nothing."""
+    use = Use(item=name, how="apply")
+    _documents([dict(s) for s in specs or ()], target, 1.0, because, use, name)
+    return use.intents
+
+
 def splash_intents(splash: list[dict], target: str, potency: float, because: str) -> list[dict]:
     """The splash (or a burst's) documents as intents for one creature caught by them,
     each save gate before what it gates. Never scaled by potency: the book's 1 point is
@@ -902,6 +941,13 @@ def plan(stock, how: str = "drink", target: str = "pc",
             use.problems.append(f"no {name} left")
             return use
         use.spell = spell
+        # The traits and drawbacks bottled beside the spell land too, as any potion's
+        # swallowed documents do; the engine adds the spell's own after them
+        # (`Engine._op_use_item`, `spell_intents` into the same `use`).
+        swallowed = _on_route(specs, "ingest") if specs else []
+        if swallowed:
+            _documents(swallowed, target, potency, because or f"{name}, drink", use,
+                       str(name))
         return use
     if how == "light":
         return _light(stock, use, specs, target, potency, because or f"{name}, lit")

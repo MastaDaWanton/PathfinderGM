@@ -424,7 +424,13 @@
      "type": "situational_mod",
      "amount": -2,
      "bonus_type": "untyped",
-     "target": "ability checks and skill checks"
+     "target": "ability checks"
+    },
+    {
+     "type": "skill_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "all"
     },
     {
      "type": "narrative",
@@ -438,7 +444,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The -3 is a temporary replacement for the -2, not an additional penalty, so it stays in prose rather than becoming a second spec."
+   "notes": "The -3 is a temporary replacement for the -2, not an additional penalty, so it stays in prose rather than becoming a second spec. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "petulengro-s-validation": {
    "effects": [
@@ -2053,10 +2059,10 @@
      "target": "will"
     },
     {
-     "type": "situational_mod",
+     "type": "skill_mod",
      "amount": 1,
      "bonus_type": "luck",
-     "target": "skill checks"
+     "target": "all"
     },
     {
      "type": "narrative",
@@ -2070,7 +2076,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The specs carry the ally side, which is what the caster's party will have applied. The foe penalty lands on different creatures in the same burst and no spec type can say which side of the burst it applies to, so it is stated in prose."
+   "notes": "The specs carry the ally side, which is what the caster's party will have applied. The foe penalty lands on different creatures in the same burst and no spec type can say which side of the burst it applies to, so it is stated in prose. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "prediction-of-failure": {
    "effects": [

@@ -842,8 +842,11 @@ def is_null(value) -> bool:
 
 
 # The params that are a yes or a no, wherever they appear.
+# `roll` is `extinguish`'s "I roll on the ground" (the +2 smother bonus): written as the
+# word "false" it was truthy to `bool()`, so beating at the flames got the roll's +2
+# (lane C3's report, 2026-10-07). Every other op's `roll` is engine-owned and popped.
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
-                         "thrown", "quoted", "own"})
+                         "thrown", "quoted", "own", "roll"})
 
 
 def _flag(value) -> bool:

@@ -135,7 +135,12 @@ def test_quality_reaches_the_stock_and_the_record_keeps_no_numbers():
     core = lambda b: next(s for s in b["specs"] if s["type"] == "damage" and s.get("book"))
     assert core(sound)["dice"] == "1d6" and core(fine)["dice"] == "1d6+1"
     rec = al.make(plan, 2)[0]
-    assert all(set(t) <= {"key", "grade", "from", "essence", "via"} for t in rec["traits"])
+    # `steps` is the quality index of each earlier step a trait came through (the
+    # solution's tier here): an index on the ladder, like `quality_index`, never a number
+    # to run — the build turns it into a multiplier on read.
+    assert all(set(t) <= {"key", "grade", "from", "essence", "via", "steps"}
+               for t in rec["traits"])
+    assert all(isinstance(q, int) for t in rec["traits"] for q in t.get("steps") or ())
     st = items.to_stock(rec, 1)
     assert st.specs == fine["specs"]
 

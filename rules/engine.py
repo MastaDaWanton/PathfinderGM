@@ -13784,6 +13784,15 @@ class Engine:
         why = inprogress.held_back(held, now)
         if why:
             return self._refuse(intent, f"The {held.base} is {why}. Nothing is opened.")
+        # Kept past its keeping (alchemy plan §12.1): a splash flask or a smoke pot a year,
+        # a spirit a year. Read off the record and the clock, never stored.
+        rec = getattr(held, "record", None)
+        if isinstance(rec, dict) and rec.get("craft") == "alchemist":
+            from . import alchemy_items
+
+            off = alchemy_items.gone_off(rec, now)
+            if off:
+                return self._refuse(intent, f"The {held.base} {off}. Nothing comes of it.")
 
         route = str(intent.params.get("route") or "").strip().lower()
         if how == "light":

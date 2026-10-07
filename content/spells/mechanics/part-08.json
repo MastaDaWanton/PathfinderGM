@@ -1820,7 +1820,13 @@
      "type": "situational_mod",
      "amount": 2,
      "bonus_type": "morale",
-     "target": "ability checks and skill checks"
+     "target": "ability checks"
+    },
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "all"
     },
     {
      "type": "narrative",
@@ -1834,7 +1840,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "Skill checks are covered by a single situational_mod rather than 35 skill_mod specs; the bonus applies to every skill."
+   "notes": "Skill checks are covered by a single situational_mod rather than 35 skill_mod specs; the bonus applies to every skill. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
   "goodberry": {
    "effects": [

@@ -972,7 +972,8 @@ def _form(row: dict, fams: tuple[str, ...]) -> str | None:
     return None
 
 
-def match(actor, mix: dict, vessel_id: str | None, formula_id: str | None = None) -> dict:
+def match(actor, mix: dict, vessel_id: str | None, formula_id: str | None = None,
+          aim: str | None = None) -> dict:
     """What bottling this mix in this vessel makes (plan §10.2, contracts §5).
 
     With a chosen formula (one the character knows): the mix is checked against its
@@ -1030,6 +1031,19 @@ def match(actor, mix: dict, vessel_id: str | None, formula_id: str | None = None
     out["weak"] = len(candidates) - len(met)
     if len(candidates) > 1:
         out["ambiguous"] = len(candidates)
+        # Orichalcum's job (plan §5.8; lane D's proposal, docs/alchemy-review.md item 4):
+        # "an experiment that fits several formulae is the one the alchemist names, if it
+        # is within reach". `aim` is what they name — a formula id or the spell it holds —
+        # and it must be one of the candidates this mix already meets. A wrong name finds
+        # nothing, and nothing is said about which of the candidates exist.
+        if aim:
+            want = str(aim).strip().lower()
+            for row, form in met:
+                if want in (row["id"], str(row.get("spell") or "")):
+                    out.update(formula=row["id"], found=True, new=not knows(actor, row["id"]),
+                               core=core(row["id"]), family=form, aimed=True,
+                               target=(row.get("delivers") or {}).get(form))
+                    break
         return out
     if len(met) == 1:
         row, form = met[0]

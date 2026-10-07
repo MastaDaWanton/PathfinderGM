@@ -139,6 +139,23 @@
       "source": "No book prints this kit. The owner's ruling (docs/blacksmithing-revamp-plan.md §2, 'Field kit + smithy'): the kit does common and uncommon work anywhere.",
       "house_rule": "PROPOSED price and weight (rules/goods.py GEAR): Ultimate Equipment's farrier's anvil (50 lb) plus artisan's tools (5 gp, 5 lb) and a whetstone, rounded to 15 gp and 55 lb.",
       "not_yet": ["the forge asks for the kit by name (rules/places.py has_field_kit); it grants no standing tag"]
+    },
+    "alchemist's field kit": {
+      "names": ["alchemist's field kit", "alchemists field kit", "alchemist's kit",
+                "alchemists kit", "alchemy kit", "alchemy crafting kit",
+                "travelling alchemy kit", "traveling alchemy kit"],
+      "does": "A crucible, a spirit lamp, a rack of vials, a funnel and cloth: Dissolve, Calcine, Filter, React, Bottle and Assay on common and uncommon reagents, anywhere, without a laboratory. Distill, Sublime, Transmute and rare reagents still need a laboratory.",
+      "source": "Ultimate Equipment p.77, 'Alchemy crafting kit': price 25 gp, weight 5 lbs (aonprd EquipmentMiscDisplay 'Alchemy crafting kit', read 2026-10-07). The book's kit supplies an alchemist's extract components and 'provides no bonuses on Craft (alchemy) checks'; this kit gives no bonus either.",
+      "house_rule": "What it opens is the owner's ruling (alchemy questions Q6.3, 'Field kit plus a laboratory'; docs/alchemy-revamp-plan.md §14): the book's kit at the book's price, made the field bench.",
+      "not_yet": ["the bench asks for the kit by name (rules/places.py has_alchemy_kit); it grants no standing tag"]
+    },
+    "alchemist's mask and gloves": {
+      "names": ["alchemist's mask and gloves", "alchemists mask and gloves", "mask and gloves",
+                "mask & gloves", "fume mask"],
+      "does": "A waxed-linen mask and gauntlet gloves: a reagent that is toxic to handle (quicksilver, lead dust and the rest) does not hurt you at the bench.",
+      "source": "No book prints it. The alchemy plan §8.4 (owner Q3.4, 'toxic to handle'): protection is a laboratory's fume hood or a mask and gloves carried.",
+      "house_rule": "PROPOSED price 5 gp (docs/alchemy-revamp-plan.md §8.4) and 1 lb; the owner may tune both.",
+      "not_yet": ["the bench asks for it by name (rules/alchemist.py protected); it grants no standing tag"]
     }
   },
   "camp": {

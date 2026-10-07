@@ -30,9 +30,9 @@ never through a private applicator.
 **Where you work** (plan §14): a field kit anywhere for common and uncommon work; a
 laboratory for rare and above and for Distill, Sublime and Transmute, +2 circumstance (the
 book's alchemist's lab) and a fume hood. Lane G's `places.laboratory_here`,
-`places.has_alchemy_kit` and `market.lab_rent` (contracts §9) are asked when they exist;
-until they land there is no laboratory anywhere and the kit folds out wherever the
-character stands, as the forge's did before its lane G (`where_here`).
+`places.has_alchemy_kit` and `market.lab_rent` (contracts §9) decide (`where_here`): the
+kit is the goods row `alchemist's field kit`, bought like the smith's, and a town
+laboratory's hours are paid at the roll beside `Scene.advance`.
 
 **Mastery** (plan §4.4; owner 2026-10-05 and 2026-10-06): every successful step pays,
 through `worldclass.award_step` (a batch of N is N steps; `MISHAP_LIMIT` still caps what
@@ -218,8 +218,11 @@ def laboratory_here(scene, known=()) -> dict | None:
 
 
 def has_kit(actor) -> bool:
-    """Lane G's `places.has_alchemy_kit(actor)`; until it lands the field kit folds out
-    wherever the character stands (the forge's own fallback before its lane G)."""
+    """Lane G's `places.has_alchemy_kit(actor)`: the `alchemist's field kit` carried (or
+    one of the rule row's `kit_names`). The fallback below — the kit everywhere — only
+    runs with no places module at all; it is what lane F tested against before lane G
+    merged, and 8 API tests went red the day the real rule arrived, because their
+    character carried no kit. They now carry one bought through `goods.deliver`."""
     places = _lane("places")
     fn = getattr(places, "has_alchemy_kit", None) if places is not None else None
     if fn is None:
@@ -342,11 +345,26 @@ class Item:
     cut: int = 0
     old: str = ""
     work: str = ""
+    # The clock the shelf was read at: what time has done to a record (its keeping, the
+    # light on an unsealed intermediate) is derived against it, never stored.
+    now: int | None = None
 
     @property
     def record(self) -> dict | None:
         rec = getattr(self.stock, "record", None)
         return rec if isinstance(rec, dict) else None
+
+    @property
+    def live(self) -> dict | None:
+        """The record as time has left it (`alchemy_items.aged`): what a step pools."""
+        rec = self.record
+        return items.aged(rec, self.now) if rec is not None else None
+
+    @property
+    def spoiled(self) -> str:
+        """"has gone off: ..." past its keeping (plan §12.1), else ""."""
+        rec = self.record
+        return items.gone_off(rec, self.now) if rec is not None else ""
 
     @property
     def rank(self) -> int:
@@ -503,7 +521,7 @@ def shelf(actor, now: int = 0, reserved: dict | None = None) -> list[Item]:
             out.append(Item(key=key, name=st.name, kind="intermediate" if
                             rec.get("family") == items.INTERMEDIATE else "product",
                             tier=str(st.tier or "common"), count=max(0, count), stock=st,
-                            work=work))
+                            work=work, now=now))
             continue
         if count <= 0:
             continue
@@ -576,6 +594,8 @@ def fit_reason(method: str, role: str, it: Item) -> str:
         return it.old
     if it.finished:
         return "a finished product cannot go back into the glass"
+    if it.spoiled:
+        return f"it {it.spoiled}"
     if it.count <= 0:
         return "only part of one is left of it"
     t = it.traits
@@ -900,7 +920,7 @@ def _sources(plan: AlchemyPlan) -> list[dict]:
     out = []
     for it in [i for i, _ in plan.inputs] + ([plan.solvent] if plan.solvent else []):
         if it.record is not None:
-            out.append({"record": it.record})
+            out.append({"record": it.live})
         elif it.material:
             out.append({"material": it.material, "wild": it.has("wild")})
     return out
@@ -1102,7 +1122,13 @@ def _common(plan: AlchemyPlan, actor, body: dict, row: dict) -> None:
         fid = body.get("formula")
         fid = None if fid in (None, "", "experiment") else str(fid)
         plan.experiment = fid is None
-        plan.match = formulae.match(actor, plan.mix, vid, fid)
+        # A catalyst whose job is to name the formula (orichalcum grains) lets an
+        # experiment that fits several be the one the alchemist names (`aim`).
+        aim = None
+        if plan.experiment and any("names_formula" in _catalyst_jobs(c.material)
+                                   for c in plan.catalysts):
+            aim = str(body.get("aim") or "").strip().lower() or None
+        plan.match = formulae.match(actor, plan.mix, vid, fid, aim=aim)
         plan.could = formulae.could_become(actor, plan.mix, vid)
         for r in plan.match.get("refused") or ():
             plan.problems.append(r)
@@ -1115,9 +1141,12 @@ def _common(plan: AlchemyPlan, actor, body: dict, row: dict) -> None:
             want = str(body.get("as") or "")
             plan.family = want if want in fams else (fams[0] if fams else "")
             if plan.experiment and plan.match.get("ambiguous"):
+                steer = (" Your orichalcum would steer it to the one you name, if that one "
+                         "is among them." if any("names_formula" in _catalyst_jobs(
+                             c.material) for c in plan.catalysts) else "")
                 plan.notes.append(f"This fits {plan.match['ambiguous']} formulae. A writing "
                                   f"would tell you which; bottled now it is your own "
-                                  f"compound.")
+                                  f"compound.{steer}")
         if not plan.family:
             plan.problems.append(f"The {plan.vessel.name} decides no product.")
             return
@@ -1339,42 +1368,26 @@ def liquid_for(plan: AlchemyPlan) -> dict:
 # The roll's consequences
 # =============================================================================================
 
-def rule_intents(effects, *, kind: str, actor_ref: str) -> list[tuple[str, str, list[dict]]]:
-    """Mishap or toxic documents as intents on the alchemist (contracts §7: "the bench's
-    mishap and toxic effects arrive as ordinary intents with origin rule:<kind>:<material>,
-    through validate and run. There is no private applicator."). `effects` are
-    (material, name, spec). Each becomes intents for one creature — the alchemist — with
-    a save before what it gates; every die is the engine's (`visibility: hidden`), as an
-    assay's danger is."""
-    from . import consumables
+def apply_rule(engine, actor, effects, *, kind: str) -> list:
+    """Run the mishap or toxic documents on the alchemist through the ONE door a handling
+    hazard takes, `knowledge.apply_danger` (contracts §4, §7: "the bench's mishap and
+    toxic effects arrive as ordinary intents with origin rule:<kind>:<material>, through
+    validate and run. There is no private applicator."). `effects` are (material, name,
+    spec). Returns the outcomes; a document the engine cannot stand up does nothing this
+    time and never crashes the step.
+
+    Lane F kept a private copy here (`rule_intents`) because `apply_danger` read a toxic
+    document through the drink door and dropped all 18 of them ("nothing works when
+    swallowed"); with that door fixed the copy went, so the assay and the bench cannot
+    apply one hazard two ways (law 2)."""
+    from . import knowledge
 
     out = []
     for mid, name, spec in effects:
         why = (f"{name.lower()} flares at the bench" if kind == "mishap"
                else f"{name.lower()}, handled bare")
-        doc = {k: v for k, v in spec.items() if k not in ("recipient", "note")}
-        made = [dict(i, visibility="hidden")
-                for i in consumables.splash_intents([doc], actor_ref, 1.0, why)]
-        out.append((mid, name, made))
-    return out
-
-
-def apply_rule(engine, actor, effects, *, kind: str) -> list:
-    """Run the mishap or toxic intents through the engine (`validate`, then `run`), stamped
-    `rule:<kind>:<material>`. Returns the outcomes; a document the engine cannot stand up
-    does nothing this time and never crashes the step."""
-    from .engine import IntentError
-
-    out = []
-    for mid, name, made in rule_intents(effects, kind=kind, actor_ref=actor.ref):
-        if not made:
-            continue
-        try:
-            res = engine.run(engine.validate(made, origin=f"rule:{kind}:{mid}",
-                                             origin_name=name))
-        except IntentError:
-            continue
-        out.extend(res.outcomes)
+        out.extend(knowledge.apply_danger(engine, actor, mid, spec, why,
+                                          origin=f"rule:{kind}:{mid}", name=name))
     return out
 
 

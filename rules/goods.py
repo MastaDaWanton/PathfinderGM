@@ -475,6 +475,18 @@ GEAR: dict[str, dict] = {
     # anvil (50 lb) plus artisan's tools (5 gp, 5 lb) and a whetstone, rounded to 15 gp
     # and 55 lb. The owner may tune both; what carrying it does is content/rules/gear.json.
     "smith's field kit": {"name": "smith's field kit", "cost_gp": 15.0, "lb": 55},
+    # The alchemist's field kit (docs/alchemy-revamp-plan.md §14; `places.ALCHEMY_KIT`
+    # names it): Dissolve, Calcine, Filter, React, Bottle and Assay on common and uncommon
+    # reagents anywhere. The BOOK's price and weight: Ultimate Equipment p.77's alchemy
+    # crafting kit, 25 gp and 5 lb (aonprd, read 2026-10-07). Before this row the bench
+    # asked for a kit nobody sold, so lane G's real `has_alchemy_kit` refused every step
+    # of a new alchemist with "Needs a field kit or a laboratory" and no counter could
+    # end the refusal.
+    "alchemist's field kit": {"name": "alchemist's field kit", "cost_gp": 25.0, "lb": 5},
+    # The plan §8.4's protection from a reagent that is toxic to handle, the fume hood's
+    # carried half. PROPOSED 5 gp (the plan's number) and 1 lb: no book prints it.
+    "alchemist's mask and gloves": {"name": "alchemist's mask and gloves", "cost_gp": 5.0,
+                                    "lb": 1},
     # Food and drink, Core Rulebook Table 6-9 ("Food, Drink, and Lodging"), read from the
     # PRD's own table 2026-09-27 (legacy.aonprd.com/coreRulebook/equipment.html). Open
     # Game Content; the book is in OGL-NOTICE.md's section 15. Provisions a market sells
@@ -524,6 +536,15 @@ def stocked_at(counter_kind: str) -> list[str]:
         return [k for k in GEAR if _category(k) in ("food", "provisions")] + ["rations"]
     if kind in ("smithy", "workshops"):
         return [k for k in GEAR if k in _SMITH_GOODS]
+    if kind == "laboratory":
+        # The laboratory's keeper is the alchemist (places.STAFFED), and sells what the
+        # market's alchemist sells over the counter: the book's alchemical goods, the
+        # field kit, the mask and gloves. One list, the alchemist shop's own row in
+        # stall-lines.json, so the two counters cannot drift. Before this the laboratory
+        # fell to the "everything else" branch and sold rope, tents and a crowbar.
+        from . import market
+
+        return list(market.gear_of("market:alchemist"))
     if kind.startswith("market:") or kind == "stables":
         from . import market
 
