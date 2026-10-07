@@ -166,6 +166,36 @@ for _k in ("arcana", "dungeoneering", "engineering", "geography", "history", "lo
            "nature", "nobility", "planes", "religion"):
     SKILLS[f"knowledge ({_k})"] = ("int", True, False)
 
+# The three skills the book splits by trade — Craft (alchemy), Profession (sailor),
+# Perform (sing). This game keeps ONE id each (the owner's 2026-10-07 choice: options A, B
+# and C of docs/craft-profession-options.md, not D's named trades), so a trade-named skill
+# folds onto its base wherever a name arrives from outside the sheet. Measured before the
+# fold (2026-10-07): 17 feats in content/feats/feats.json asked for "craft (alchemy)",
+# "profession (sailor)" or "perform (dance)" ranks — ranks only ever land on the bare id,
+# so not one of them could be taken; 2,208 printed NPC totals in the bestiary sat under a
+# trade name (855 craft, 675 profession, 678 perform) where `skill_modifiers("profession")`
+# never looked, and a printed sailor was refused at the helm as untrained; and a GM check
+# naming "craft (alchemy)" was refused as "not a Pathfinder 1e skill".
+TRADE_SKILLS = ("craft", "profession", "perform")
+
+
+def base_skill(name) -> str:
+    """The skill id a trade-named skill is, or the name itself lower-cased.
+
+    "Craft (alchemy)", "profession: sailor", "Perform (oratory or sing)" and "craft (any)"
+    all fold onto their base; "knowledge (arcana)" is its own id and is left alone. Only
+    the three `TRADE_SKILLS` fold — a Knowledge is a different skill per subject in the
+    book and in this table.
+    """
+    key = " ".join(str(name or "").strip().lower().split())
+    if key in SKILLS:
+        return key
+    for base in TRADE_SKILLS:
+        if key.startswith(base) and key[len(base):len(base) + 1] in (" ", "(", ":"):
+            return base
+    return key
+
+
 SAVES = {"fort": "Fortitude", "ref": "Reflex", "will": "Will"}
 SAVE_ABILITY = {"fort": "con", "ref": "dex", "will": "wis"}
 

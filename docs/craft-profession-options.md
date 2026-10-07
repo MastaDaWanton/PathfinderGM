@@ -3,9 +3,12 @@
 The owner, 2026-10-06: *"the craft skill and the profession skill seem pretty useless what
 can we do to make them more viable"*. This paper measures the current state, sets out what
 the tabletop and the CRPGs did about the same complaint (and what they abandoned), and
-offers five options with a recommendation. **Nothing here is built.** The skill hover
-shipped the same day (`content/rules/skills-explained.json`) already tells the player the
-truth below, card by card.
+offers five options with a recommendation. The skill hover shipped the same day
+(`content/rules/skills-explained.json`) told the player the truth below, card by card.
+
+**The owner chose A, B and C on 2026-10-07 (not D, not E), and they are built** on
+`feature/craft-profession`: see §5 for what each does, the numbers' sources and what is
+left. Sections 1 to 4 are the paper as written, before the build.
 
 ## 1. What the code does today (measured 2026-10-06, master 067e516)
 
@@ -263,3 +266,64 @@ toggle only once enough background skills do something.**
 - **E** waits: it is Paizo's answer to "the ranks cost too much", and the owner's
   complaint is "they do too little". Turn it on only after A to D give the background
   skills something to do.
+
+## 5. What was built (2026-10-07, branch `feature/craft-profession`)
+
+The owner chose **A, B and C**; not D (named trades) and not E (background skills). The
+rules live in `content/rules/trade-uses.json` (each row cites its source and marks every
+HOUSE departure) and `rules/tradecraft.py`; the engine's five new ops are in
+`rules/engine.py` beside `_op_item_damage`.
+
+**A. Craft at the benches.** `tradecraft.bench_terms(actor, bench)` returns one itemised
+term, half the ranks rounded down, built as a `Modifier` and passed through `dice.stack`:
+"Craft ranks ½ (3)" +1. Called from `check_terms` in `rules/crafting.py` (herbalist: the
+better of Craft and Profession), `rules/blacksmith.py`, `rules/enchanter.py` (and so
+`magicitem.py`, which reuses it) and `rules/leatherworker.py`; the excursions read
+`check_bonus`, so they carry it too. No ranks, no term. The alchemy bench being rebuilt on
+`build/alchemy` needs one call in its `check_terms`, before the laboratory term:
+`from . import tradecraft` and `out += tradecraft.bench_terms(actor, "alchemist")`. The bench
+DCs were tuned without it and were not retuned (the paper's "retune or accept").
+
+**B. Everyday uses**, each an op with the player's own die and a tell:
+
+| Op | Skill | The rule | Source |
+|---|---|---|---|
+| `judge` | Craft | DC 15 masterwork on sight; at 20 (trained) hardness and hit points; the same day's look again says the same | Unchained p.51; CRB Appraise |
+| `mend` | Craft | the making DC (CRB table: simple 12, martial 15, exotic 18, armour 10 + AC; masterwork 20), a fifth of the price in materials, an hour a point; fail by 5 and half the materials are ruined; magic and ruined things refused | CRB Craft; CRB Broken |
+| `trade_lore` | Profession | basic DC 10, complex 15; a success names the places here where the trade works, from the engine's place list | CRB Profession |
+| `haggle` | Profession vs the keeper's Sense Motive | 2% + 1% a point, at most 25%, both ways, for that counter for the day; once a counter a day | Ultimate Campaign, Bargaining (Profession for Bluff is HOUSE) |
+
+`_op_buy`, `_op_sell` and `_sell_goods` read the haggle (`tradecraft.haggled`), and the
+trade window shows the moved prices and the result on its Haggle button. The Equipment
+tab offers Judge its make on every weapon, suit and shield, and Mend, with a "broken: 14
+of 30 hit points" chip, on anything damaged (`views._trade_acts`).
+
+**C. A day's paid work** (`work`): PF2e's Earn Income (Player Core p.228, Table 4-2)
+in PF1's coin. The task level is the lower of the character's level and the settlement's
+(village 1, town 4, city 7: GM Core's "the level of the settlement", at the top of each
+band); training is read from ranks at the levels PF2e first allows each rank (trained 1,
+expert 3, master 7, legendary 15); the die only picks the column (critical success = the
+next task's pay, failure the Failed column, critical failure nothing and the work ends the
+first day). Amounts are PF2e's × 10 (`coin_scale`, HOUSE), anchored on the untrained wage
+(PF1 1 sp a day, PF2e's failed task 0 pays 1 cp) and a dagger (PF1 2 gp, PF2e 2 sp). No
+ranks in either skill: the CRB's untrained 1 sp a day, no roll. Only inside a settlement.
+A day is 8 hours charged to the body, then fed, watered and slept, `_march`'s shape.
+
+**Measured against the book (what the owner may want to retune).** Kesst, Profession +6
+with 3 ranks at level 3 in a city: task 3, expert, DC 18, 5 gp a day on a success — 35 gp
+for a week, where the CRB's half-the-check wage taking 10 is 8 gp a week. Working pays
+about four times the PF1 wage at low level because PF2e's table is generous in
+purchasing power once converted; `coin_scale` is the one number to turn.
+
+**The three defects of §1, fixed by folding a trade onto its base** (`tables.base_skill`):
+feat prerequisites (17 feats asked for a trade's ranks; all 18 conditions now read the
+base), printed NPC trades (`Actor.printed_skill`: the best printed total under a trade
+name; Caulky Tarroon's Profession (sailor) +6 now reaches the helm), and the GM's checks
+(`intents.normalise_skill` folds "craft (alchemy)" to Craft).
+
+**Left:** making items by the week from the CRB's Craft rules; a sailor's navigation, a
+soldier's reading of a force and the rest of Unchained's per-trade rows (they need D's
+named trades); the employer's regard moving with good work; a question of the trade has no
+button (it needs the question, so it comes through a spoken turn); World Bible exports
+nothing new for any of this (settlement scale was already exported), though a world that
+said what a town's trades are (a port raises sailing tasks, GM Core p.53) would sharpen C.

@@ -54,6 +54,7 @@ function pageSheet(s) {
     ${combatCard(s)}
     ${defenceCard(s)}
     ${skillsCard(s)}
+    ${workCard(s)}
     ${featsCard(s)}
     ${classCard(s)}
     ${backgroundCard(s)}
@@ -204,6 +205,54 @@ function skillsCard(s) {
           k.usable && k.terms.length ? `: ${esc(k.terms.map(m => `${sign(m.value)} ${m.source}`).join(", "))}` : ""}</span>
       </div>`).join("")}</dl>`);
 }
+// --- Earn a living ---
+// A day's or a week's paid work at the trade (the engine's `work` op; the owner's option
+// C, 2026-10-07): the pay is the row's, by task level and training, and the card says it
+// before the die so the player can see what the roll moves (/api/tradeskill/offer).
+function workCard(s) {
+  setTimeout(fillWorkOffer, 0);
+  return sheetCard("sc-work", "Earn a living", `
+    <p class="cardline" id="workoffer"><span class="why">Asking what work there is here…</span></p>
+    <p class="cardline"><button type="button" class="v2-btn is-small" data-work="1">Work a day</button>
+      <button type="button" class="v2-btn is-small" data-work="7">Work a week</button></p>
+    <p class="cardline" id="worksaid" role="status" aria-live="polite"></p>`);
+}
+
+async function fillWorkOffer() {
+  const box = document.getElementById("workoffer");
+  if (!box) return;
+  let o;
+  try { o = await readJSON(await fetch("/api/tradeskill/offer")); }
+  catch (e) { box.innerHTML = `<span class="why">${esc(e.message || String(e))}</span>`; return; }
+  if (!o.here) {
+    box.innerHTML = `<span class="why">${esc(o.why || "")}</span>`;
+    document.querySelectorAll("[data-work]").forEach(b => { b.disabled = true; });
+    return;
+  }
+  const p = o.pay || {};
+  box.innerHTML = o.skill
+    ? `<span class="why">In ${esc(o.town)}, a ${esc(o.scale)}: task level ${o.task}, your
+        ${esc(title(o.skill))} (${o.ranks} ranks, ${esc(o.proficiency)}) against DC ${o.dc}.
+        A day pays ${esc(p.success)}; beat it by 10 for ${esc(p["critical success"])};
+        miss it and ${esc(p.failure)}; miss by 10 and nothing.</span>`
+    : `<span class="why">In ${esc(o.town)}, with no ranks in Craft or Profession: untrained
+        labour, ${esc(p.untrained)} a day.</span>`;
+}
+
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-work]");
+  if (!b) return;
+  const said = document.getElementById("worksaid");
+  b.disabled = true;
+  try {
+    const d = await post("/api/tradeskill", { use: "work", days: b.dataset.work });
+    if (said) said.textContent = d.trade_tell || "";
+    render(d);
+  } catch (err) {
+    if (said) said.textContent = err.message || String(err);
+  } finally { b.disabled = false; }
+});
+
 document.addEventListener("click", e => {
   const b = e.target.closest("#skillterms");
   if (!b) return;
@@ -1983,7 +2032,13 @@ const eqSlotLabel = (s, key) => (key === "hand" ? "hand"
 // What the engine says about a thing, in the row's second line. A weapon's numbers are
 // its Combat row's; armour's are the armour table's; anything else is the engine's own
 // sentence (`goods.describe`, a jar's effects), or the owner's words for "no rules".
+// How hurt a thing is, when it has been (views._trade_acts, `damage`): its own chip after
+// the facts, so a broken sword never reads like a whole one.
 function eqFacts(s, r) {
+  return eqFactsOf(s, r) + (r.damage ? ` <span class="chip warn">${esc(r.damage)}</span>` : "");
+}
+
+function eqFactsOf(s, r) {
   if (r.kind === "weapon") {
     const a = (s.offense.attacks || []).find(x => x.key === r.key);
     // A forged weapon not in hand has no attack line yet: its row carries its own facts
@@ -2084,7 +2139,12 @@ function pageEquipment(s) {
         aria-expanded="${EQ_USE === r.id}" aria-controls="equse-${esc(r.id)}"
         aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>` : `<button type="button"
         class="v2-btn is-small${i === 0 ? " is-go" : ""}" data-eqact="${i}" data-eqid="${esc(r.id)}"
-        aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>`).join("")}</span>${
+        aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>`).join("")}${
+        // The trade's own uses (views._trade_acts): a look at its make, a mend. Quiet
+        // buttons after the wear and use doors, never the row's main one.
+        (r.trade_acts || []).map((a, i) => `<button type="button" class="v2-btn is-quiet is-small"
+        data-eqact="t${i}" data-eqid="${esc(r.id)}"
+        aria-label="${esc(a.label)}: ${esc(r.name)}">${esc(a.label)}</button>`).join("")}</span>${
         EQ_USE === r.id ? eqUseMenu(r) : ""}
     </li>`;
   }).join("");
@@ -2260,7 +2320,9 @@ async function eqUse(rowId, index) {
 
 async function eqAct(btn) {
   const row = eqRows(SHEET).find(r => r.id === btn.dataset.eqid);
-  const act = row && (row.acts || [])[Number(btn.dataset.eqact)];
+  const at = String(btn.dataset.eqact || "");
+  const act = row && (at.startsWith("t") ? (row.trade_acts || [])[Number(at.slice(1))]
+                                         : (row.acts || [])[Number(at)]);
   if (!act) return;
   EQ_BEFORE = eqNumbers();
   btn.disabled = true;
@@ -2277,7 +2339,9 @@ async function eqAct(btn) {
       said = `${row.name} is worn at the ${eqSlotLabel(SHEET, act.body.slot)} now.`;
       render(await getState());
     } else {
-      said = d.wear_tell || "";
+      // A trade use (Judge its make, Mend) answers with the engine's own sentence; one
+      // still waiting on the player's die answers with none, and the popup takes it.
+      said = d.wear_tell || d.trade_tell || "";
       render(d);
     }
     if (act.api !== "/api/use" && act.api !== "/api/slots") SHEET = await readJSON(await fetch("/api/sheet"));

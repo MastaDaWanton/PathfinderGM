@@ -30,7 +30,7 @@ from .tables import (
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
     is_physical, iterative_attacks, maneuver_text, material_for, normalise_damage_type,
-    save_for,
+    save_for, base_skill,
 )
 
 
@@ -2355,6 +2355,27 @@ class Actor:
 
     # --- skills --------------------------------------------------------------------
 
+    def printed_skill(self, skill: str) -> tuple[str, int] | None:
+        """(the printed name, its total) a stat block gives for this skill, or None.
+
+        Exact first; then, for the three trade skills, the best total printed under a
+        trade name — "profession (sailor)" answers `profession`. Before this the lookup
+        was exact only, and 2,208 printed trade totals in the bestiary were invisible: a
+        printed sailor (Profession (sailor) +6) was refused at the helm as untrained
+        (measured 2026-10-07, tests/test_trade_names.py). The best of several trades, not
+        a chosen one, because this game keeps one id per trade skill (docs/craft-
+        profession-options.md: option D, the named trades, was not chosen).
+        """
+        skill = str(skill or "").strip().lower()
+        if skill in self.flat_skills:
+            return skill, int(self.flat_skills[skill])
+        best = None
+        for name, total in self.flat_skills.items():
+            if name != skill and base_skill(name) == skill:
+                if best is None or int(total) > best[1]:
+                    best = (name, int(total))
+        return best
+
     def skill_modifiers(self, skill: str) -> list[Modifier]:
         skill = skill.strip().lower()
         if skill not in SKILLS:
@@ -2362,8 +2383,9 @@ class Actor:
         ability, trained_only, acp_applies = SKILLS[skill]
         mods: list[Modifier] = []
 
-        if skill in self.flat_skills:
-            mods.append(Modifier(self.flat_skills[skill], skill.title()))
+        printed = self.printed_skill(skill)
+        if printed is not None:
+            mods.append(Modifier(printed[1], printed[0].title()))
         else:
             rank = self.ranks.get(skill, 0)
             if trained_only and rank == 0:
@@ -4202,7 +4224,7 @@ class Actor:
         """
         t = str(target).lower()
         if kind == "skill_mod":
-            return t in self.flat_skills
+            return self.printed_skill(t) is not None
         if kind == "save_mod":
             return t in self.flat_saves
         if kind == "combat_mod":
@@ -5534,7 +5556,7 @@ def full_sheet(actor: Actor) -> dict:
     for name in sorted(SKILLS):
         ability, trained_only, acp = SKILLS[name]
         rank = actor.ranks.get(name, 0)
-        if trained_only and rank == 0 and name not in actor.flat_skills:
+        if trained_only and rank == 0 and actor.printed_skill(name) is None:
             # Cannot be attempted at all; listed so the absence is visible, not silent.
             skills.append({"name": name, "ability": ability, "rank": 0,
                            "class_skill": name in actor.class_skills,

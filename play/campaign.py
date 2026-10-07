@@ -344,6 +344,9 @@ class Campaign:
             # Places somebody named that the town does not have yet (2026-10-03,
             # rules/heard_places.py): a conversation made them, so nothing derives them.
             "heard_places": ([dict(h) for h in self.scene.heard_places], []),
+            # The trade uses spent today (2026-10-07, rules/tradecraft.py): a counter
+            # talked round keeps its price, and a thing judged its look, across a save.
+            "dealings": ({k: dict(v) for k, v in self.scene.dealings.items()}, {}),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -429,6 +432,8 @@ class Campaign:
             spawn_feet={str(k): int(v)
                         for k, v in (s.get("spawn_feet") or {}).items()},
             rewarded={str(k): int(v) for k, v in (s.get("rewarded") or {}).items()},
+            dealings={str(k): dict(v) for k, v in (s.get("dealings") or {}).items()
+                      if isinstance(v, dict)},
             guarded_finds=[dict(g) for g in (s.get("guarded_finds") or [])],
             cards=[dict(c) for c in (s.get("cards") or [])],
             # Absent in saves written before the pools were walked: an empty record
