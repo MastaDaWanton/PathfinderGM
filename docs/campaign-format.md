@@ -278,6 +278,7 @@ not parse an id.
 | `footing` | `firm`, `broken`, `bad` |
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — how the place is shaped upward |
 | `storeys` | `{up, down}`, counts of floors. Omit outdoors |
+| `kind` | *optional* — what the place IS when its name does not say: one of the consumer's settlement kinds (`docs/place-vocabulary.json`, the `settlement_places` names without "the"), or a word folded to one ("forge" → `smithy`, "alchemist's lab" → `laboratory`). Read since 2026-10-06 (alchemy lane G; lane I owns this file in wave 2): "the Glasshouse" with `"kind": "laboratory"` is a laboratory, kept by an alchemist, and its city gets no second one appended. A kind the consumer does not know is dropped and the name reads as before |
 | `keeper` | *optional* — `{"name": str, "known": "publicly"}` for a keeper everybody knows by name (the name over the shop). Without `known: "publicly"` the consumer keeps the name back until it is given in play, as it does for every keeper it mints (owner ruling F1, 2026-09-30; `keepers.publicly_known`). A `play.cast[]` row may say the same with `"keeps": "<place id>", "known": "publicly"` |
 
 All five of the tier-2 fields are **read** as of 2026-09-16 (`rules/floorplan.from_world`,

@@ -349,6 +349,7 @@ settlement's facts today:
 | shrine, temple, cathedral, priests, prayers, faith | **the shrine** |
 | `the well`, `a well`, wells, wellhead, cistern, fountain | **the well** |
 | smith, smiths, smithy, smithies, blacksmith, blacksmiths, `a forge`, `the forge`, `the forges`, `its forges`, anvil, anvils, ironworks, farrier, farriers, foundry, foundries, metalworking, metalworkers, armourer, armourers, armorer, armorers, weaponsmith, weaponsmiths, bladesmith, bladesmiths | **the smithy** |
+| alchemist, alchemists, alchemical, laboratory, laboratories, alembic, alembics, chymist, chymists, `of alchemy`, `its alchemy`, `in alchemy` | **the laboratory** |
 
 If your generator authors a place list, **it must cover at least these** — a town whose
 paragraphs say "port access" and then has no docks is the exact complaint that built this
@@ -582,7 +583,21 @@ amount of data to keep stable across exports for very little gain.
   only when its own words name its smiths (the `the smithy` cue row above), so an author
   who wants a smith in a town should list the place. Any name works — a forge, an
   armoury, "the Anvil" with `"kind": "smithy"` — as long as its kind is one whose keeper
-  is a smith.
+  is a smith. (`kind` on an authored place is read since 2026-10-06; before that this
+  sentence promised something the consumer did not do.)
+- **Every city needs a laboratory, and please author it.** The owner's ruling of
+  2026-10-06: "every city has a laboratory to rent". Alchemy's Distill, Sublime and
+  Transmute and its rare reagents need one, and measured the same day a laboratory was in
+  **0 of the 82 settlements** of the three shipped exports. The consumer now appends "the
+  laboratory" to any authored city that lists none, beside the smithy. A town or village
+  gets one only when its own words name its alchemists (the `the laboratory` cue row
+  above): Aurvantis says "a black-market alchemist collective" of nine settlements, and
+  "its trade in alchemical explosives" and "alchemical curiosities" of Pilfnook and
+  Sparburrow, and lists no laboratory in any of the eleven, so `check_places.py` now
+  notes each (27 laboratory notes on Aurvantis: those 11 and its 16 cities). Any name works — "the Glasshouse", "the
+  Chymists' Hall" with `"kind": "laboratory"` — and its keeper is an alchemist. Bare
+  "alchemy" is not a cue ("the strange alchemy of trade" is a metaphor), and "apothecary"
+  is not one either: it is the herbal healer's shop.
 - **Size a settlement by its own `scale`** — a village of six rooms, a town of nine, a
   city of eighteen. One ceiling for every settlement is what this app did until
   2026-09-15, and it was wrong in the way that matters: Aurvantis ships 16 villages, 32

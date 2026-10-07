@@ -1110,6 +1110,25 @@
     "lass",
     "youngster"
    ]
+  },
+  {
+   "id": "alchemist",
+   "name": "alchemist",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "alchemy",
+    "letters"
+   ],
+   "objects": [
+    "a stoppered phial of something cloudy",
+    "a glass stirring rod",
+    "a burn-spotted leather apron"
+   ],
+   "match": [
+    "alchemist",
+    "chymist"
+   ]
   }
  ]
 }

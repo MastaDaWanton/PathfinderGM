@@ -74,7 +74,10 @@ def test_every_authored_place_carries_its_own_shape():
     # 957 since 2026-10-04: every city gets a smithy when its author listed none (the
     # owner's ruling, blacksmithing contracts §13.3) — 12 of Aurvantis's 16 cities and all
     # 6 of Pangrella's, 18 more places, each laid out like the rest.
-    assert len(got) == 957, len(got)
+    #
+    # 979 since 2026-10-06: every city gets a laboratory too (the owner, alchemy plan §21
+    # open point 7) — none of the 22 authored cities lists one, so 22 more places.
+    assert len(got) == 979, len(got)
     assert all(p.shape is not None for p in got), [
         p.id for p in got if p.shape is None][:5]
 

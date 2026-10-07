@@ -113,6 +113,7 @@ four categories a player always reaches for.
 |---|---|---|---|
 | the market | village | market | where the stalls are |
 | the smithy | village | crafting | a hearth, an anvil, and the noise of both |
+| the laboratory | village | crafting | glass on every shelf, a still, and a hood over the fires |
 | the mill | village | **nothing yet** | the wheel, and the sacks stacked against it |
 | the workshops | town | crafting | where the trades are |
 | the tannery | town | **nothing yet** | the smell reaches the next street |
@@ -140,10 +141,10 @@ four categories a player always reaches for.
 | the midden | town | **nothing yet** | where it all ends up |
 | the cistern | city | **nothing yet** | under the street, and older than it |
 
-## The ledger: 34 of 43 have no rule behind them
+## The ledger: 34 of 44 have no rule behind them
 
-8 are read by something today — the market and the merchants row by the trade
-rules, the smithy and the workshops by crafting, the gate and the way in by travel, the guardhouse, the
+10 are read by something today — the market and the merchants row by the trade
+rules, the smithy, the laboratory and the workshops by crafting, the gate and the way in by travel, the guardhouse, the
 gaol and the barracks by the wanted state. The other 34 are rooms with names,
 shapes and floor plans, which a scene can happen in and no rule consults.
 
@@ -156,7 +157,7 @@ fight in the other. It is a promise, and this is where it is written down.
 
 > "any place that offers services or merchandise needs an NPC to man it"
 
-25 of these places sell something or do something for money, and `rules/places.STAFFED`
+26 of these places sell something or do something for money, and `rules/places.STAFFED`
 names three things for each: who ought to be there, the one person the engine stands
 behind the counter, and the words the NPC codex is asked for. **`rules/keepers.py` builds
 them**, since 2026-09-16.
