@@ -200,13 +200,30 @@ def _potions(pc) -> list[dict]:
         family = str((rec or {}).get("family") or "") if isinstance(rec, dict) else ""
         if not getattr(st, "holds_spell", None) and family not in ("potion", "oil"):
             continue
-        try:
-            known = bool(knowledge.potion_known(pc, st))
-        except Exception:      # noqa: BLE001 - a row is never worth failing the state for
-            known = False
+        known = _potion_known(pc, st)
         out.append({"key": f"stock:{sid}", "name": st.name, "count": int(st.count),
-                    "known": known})
+                    "known": known,
+                    "caster_level": getattr(st, "caster_level", None) if known else None})
     return out
+
+
+def _own_brew(rec) -> bool:
+    """The alchemist's own bottling: they know what they made without identifying it."""
+    return bool(isinstance(rec, dict) and rec.get("craft") == TRACK_ID
+                and not rec.get("bought") and rec.get("schema"))
+
+
+def _potion_known(pc, st) -> bool:
+    """Whether this potion is identified for this character (`knowledge.potion_known`), or
+    is their own bottling. Until then nothing that names what it holds leaves the server:
+    not its formula, not its spell (lane U4's report: the formulary sent a carried
+    potion's formula name before it was identified)."""
+    try:
+        if knowledge.potion_known(pc, st):
+            return True
+    except Exception:      # noqa: BLE001
+        pass
+    return _own_brew(getattr(st, "record", None))
 
 
 def _track(track, progress) -> dict:
@@ -277,6 +294,25 @@ def _row(pc, it: al.Item) -> dict:
            "unknown": _unknown(pc, it.doc) if it.doc is not None else 0,
            "family": it.family or None, "form": it.form or None,
            "liquid": it.liquid}
+    if rec and rec.get("family") == "raw" and it.doc is not None:
+        # A unit an assay opened is the raw material still, a tenth down (plan §13.2). Its
+        # stock record made `Item.group` read it as a finished product, so after the first
+        # assay the brimstone sat under "Finished work" (lane U4's report, 2026-10-07).
+        import dataclasses
+
+        out["group"] = dataclasses.replace(it, stock=None).group
+        return out
+    st = it.stock
+    if st is not None and getattr(st, "holds_spell", None):
+        # Whether this potion has been identified, and then its caster level, so the page
+        # remembers what Identify taught (lane U4's ask). Nothing about it before then.
+        try:
+            known = bool(knowledge.potion_known(pc, st))
+        except Exception:      # noqa: BLE001
+            known = False
+        known = known or _own_brew(rec)
+        out["identified"] = known
+        out["caster_level"] = getattr(st, "caster_level", None) if known else None
     if rec:
         q = rec.get("quality_index")
         out["quality_name"] = worldclass.quality_name(int(q)) if q is not None else None
@@ -363,7 +399,31 @@ def _state_body(c, pc) -> dict:
         "formulae": [r for r in (_formula_row(pc, f, progress.level)
                                  for f in formulae.known(pc)) if r],
         "recipes": _recipes(c),
+        "conversions": _conversions(pc),
     }
+
+
+def _migration():
+    """Lane I's old-save conversion (`rules/alchemy_migration.py`), or None on a tree that
+    does not have it yet (the circle's `_lane_h` pattern)."""
+    try:
+        from rules import alchemy_migration
+    except ImportError:
+        return None
+    return alchemy_migration
+
+
+def _conversions(pc) -> list:
+    """The one-time notice of what lane I's conversion did to this character's old alchemy
+    (owner Q10.1 "Convert"): [] when there is nothing to tell, or no conversion here."""
+    mig = _migration()
+    fn = getattr(mig, "conversions", None) if mig is not None else None
+    if not callable(fn):
+        return []
+    try:
+        return list(fn(pc) or [])
+    except Exception:      # noqa: BLE001 - a notice is never worth failing the state for
+        return []
 
 
 def _ready(request):
@@ -1046,10 +1106,13 @@ def alchemy_learn(request):
     now = _now(c)
     teacher = None
     fee_cp = 0
+    hidden = False
     if source == "potion":
         if st is None or not getattr(st, "holds_spell", None):
             return _err("Hold a potion that holds a spell to take it apart.", 409)
         fid = formulae.potion_formula(st) or ""
+        hidden = not _potion_known(pc, st)
+        potion_name = st.name
     elif source == "scroll":
         if st is None or not getattr(st, "holds_spell", None) or "drink" in (st.how or []):
             return _err("Hold a scroll to copy from.", 409)
@@ -1129,15 +1192,24 @@ def alchemy_learn(request):
                                      why=f"first formula written: {row.get('name', fid)}")
         lines.extend(res.get("reasons") or [])
     name = (formulae.get(fid) or {}).get("name", fid)
-    said = (f"{pc.name} learns the formula for {name}." if got.get("learned")
-            else f"{pc.name} cannot make out the formula for {name}.")
+    # A potion taken apart and NOT understood keeps its formula unsaid (lane U4's report:
+    # the failed take-apart's response and its transcript line named it, so the page and
+    # the narrator learned what the roll had refused). It is named once it is learned.
+    secret = hidden and not got.get("learned")
+    if secret:
+        said = f"{pc.name} takes the {potion_name} apart and cannot make out its formula."
+    else:
+        said = (f"{pc.name} learns the formula for {name}." if got.get("learned")
+                else f"{pc.name} cannot make out the formula for {name}.")
     c.transcript.append({"who": "gm", "kind": "consequence", "text": said})
     c.save()
-    return JsonResponse({"fid": fid, "name": name, "route": plan, "result": got,
+    return JsonResponse({"fid": "" if secret else fid, "name": None if secret else name,
+                         "route": plan, "result": got,
                          "face": face, "terms": terms if plan["check"] else [],
+                         "bonus": sum(t["value"] for t in terms) if plan["check"] else None,
                          "total": total, "paid": _coins(cost_cp) if cost_cp else "",
                          "minutes": minutes, "said": said,
-                         "formula": _formula_row(pc, fid, progress.level),
+                         "formula": None if secret else _formula_row(pc, fid, progress.level),
                          "mastery": {"lines": lines, "total": progress.mp,
                                      "level": progress.level},
                          "clock": _clock(c)})
@@ -1272,6 +1344,30 @@ def alchemy_collect(request):
 
 
 @require_POST
+def alchemy_seen(request):
+    """Mark one line of the conversion notice seen (`alchemy_migration.conversion_seen`), so
+    the notice is shown once. 501 in words on a tree without lane I's conversion, rather
+    than pretending to have marked it."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    mig = _migration()
+    fn = getattr(mig, "conversion_seen", None) if mig is not None else None
+    if not callable(fn):
+        return _err("The old-save notice is marked once lane I's conversion is in this build.",
+                    501)
+    key = str(read_body(request).get("key") or "")
+    if not key:
+        return _err("Say which line of the notice was seen (`key`).")
+    try:
+        fn(pc, key)
+    except (KeyError, ValueError) as exc:
+        return _err(str(exc) or "There is no such line in the notice.")
+    c.save()
+    return JsonResponse({"conversions": _conversions(pc)})
+
+
+@require_POST
 def alchemy_perks(request):
     c, pc, refused = _ready(request)
     if refused:
@@ -1376,9 +1472,33 @@ def alchemy_formulary(request):
             (formulae.for_spell(st.holds_spell) or {}).get("id")
         if not fid:
             continue
+        hidden = route == "potion" and not _potion_known(pc, st)
+        if not hidden and formulae.knows(pc, fid):
+            continue
+        # An unidentified potion's formula stays the server's (lane U4's report): the row
+        # offers "take it apart" by the potion's own name, and the route is planned
+        # without naming what it would teach. The learn request finds the formula from
+        # the potion itself (`formulae.potion_formula`), so no id need reach the page.
         writings.append({"item": f"stock:{sid}", "name": st.name, "route": route,
-                         "fid": fid, "formula": (formulae.get(fid) or {}).get("name"),
+                         "fid": "" if hidden else fid,
+                         "formula": None if hidden else (formulae.get(fid) or {}).get("name"),
                          "plan": formulae.learn_route(pc, fid, route, clock=_now(c))})
+    # The alchemist's own spellbook (plan §10.4): a spell they know is theirs to name, so its
+    # potion's formula is offered by that name. Nothing unknown is listed: only spells the
+    # character already casts.
+    from rules import casting, spells
+
+    for fid, row in sorted(formulae.all().items()):
+        if row.get("kind") != "spell" or not row.get("spell") or formulae.knows(pc, fid):
+            continue
+        try:
+            if not casting.knows(pc, spells.get(row["spell"])):
+                continue
+        except Exception:      # noqa: BLE001 - a spell the engine cannot read is not known
+            continue
+        writings.append({"item": "", "name": "your spellbook", "route": "spellbook",
+                         "fid": fid, "formula": row.get("name"),
+                         "plan": formulae.learn_route(pc, fid, "spellbook", clock=_now(c))})
     for mid_, m in sorted(knowledge.manuals(knowledge.ALCHEMIST).items()):
         if not m.get("formulae") or not knowledge.holds_manual(pc, m):
             continue
@@ -1389,8 +1509,20 @@ def alchemy_formulary(request):
                              "fid": fid, "formula": (formulae.get(fid) or {}).get("name"),
                              "plan": formulae.learn_route(pc, fid, "formulary",
                                                           clock=_now(c))})
+    # What a teacher here offers to teach, by the lesson's own title: the book's classics the
+    # alchemist does not know yet. They are the trade's common knowledge, sold in every
+    # market under these names, so naming them leaks nothing a formula found by experiment
+    # would hide (owner Q5.3 is about the count of what a MIX could become). A teacher's
+    # spell potions wait on a model of what each teacher knows (lane U1's report).
+    teachers = alchemists_here(c, pc)
+    lessons = [{"fid": fid, "formula": row.get("name"),
+                "plan": formulae.learn_route(pc, fid, "teacher", clock=_now(c))}
+               for fid, row in sorted(formulae.all().items())
+               if row.get("kind") == "classic" and not formulae.knows(pc, fid)]
+    for t in teachers:
+        t["teaches"] = lessons
     return JsonResponse({"formulae": known, "writings": writings,
-                         "teachers": alchemists_here(c, pc),
+                         "teachers": teachers,
                          "spell_level_cap": formulae.spell_level_cap(progress.level)})
 
 
@@ -1414,9 +1546,25 @@ def alchemy_material(request, material_id: str):
     if doc is None:
         return _err("There is no such reagent.", 404)
     _t, progress = _progress(pc)
-    props = knowledge.properties(pc, doc)
-    for p in props:
-        p["where"] = "in the bottle" if str(p["key"]).startswith("p") else "at the bench"
+    from rules import materials
+
+    product = list(materials.product_traits(doc) or [])
+    props = []
+    n_unknown = 0
+    for p in knowledge.properties(pc, doc):
+        if not p["known"]:
+            # An unknown row says nothing at all (lane U4's report: it carried `group`,
+            # "toxic" or "mishap", and its key's letter said the same, so the card told
+            # the page what an assay had not yet found). Only that it exists.
+            props.append({"key": f"unknown-{n_unknown}", "known": False, "text": None,
+                          "drawback": None, "how": None})
+            n_unknown += 1
+            continue
+        k = str(p["key"])
+        row = dict(p, where="in the bottle" if k.startswith("p") else "at the bench")
+        if k.startswith("p") and k[1:].isdigit() and int(k[1:]) < len(product):
+            row["essence"] = (product[int(k[1:])] or {}).get("essence")
+        props.append(row)
     carried = sum(it.amount for it in al.shelf(pc, _now(c)) if it.material == doc["id"])
     card = {"id": doc["id"], "name": doc.get("name"), "kind": doc.get("kind"),
             "tier": doc.get("tier"), "color": doc.get("color"), "text": doc.get("text"),
@@ -1425,6 +1573,10 @@ def alchemy_material(request, material_id: str):
             "properties": props,
             "unknown": sum(1 for p in props if not p["known"]),
             "danger_known": knowledge.danger_known(pc, doc),
+            # The hazards the shelf always names (volatile, toxic to handle, and the
+            # roles), known or not: the stakes are said before every roll and every assay
+            # (plan §8.1, §8.4), so the card says them too (lane U4's ask).
+            "hazards": [w.replace("_", " ") for w in al._working(doc) if w in _ALWAYS],
             "carried": round(carried, 1),
             "assay": {"dc": knowledge.assay_dc(doc, pc), "minutes":
                       int((al.method_row("assay") or {}).get("minutes", 10)),

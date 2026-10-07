@@ -363,6 +363,58 @@
   }
   A.adopt = adopt;
 
+  // --- old alchemy, converted (lane I, owner Q10.1 "Convert") ---------------------------------
+  // The first time the bench opens after the revamp, a notice says what the conversion did,
+  // in the server's words (`state.conversions`): the level kept and the perk picks banked,
+  // the formulae learned, the materials now known, what was kept as old work, the chains
+  // that were dropped, and each converted thing's "Now called X (it was Y)". "Got it" marks
+  // each seen (POST api/alchemy/seen), so it is shown once. The circle's notice is the
+  // pattern (45-enchant-shell.js `showConversions`); nothing here is decided by the page.
+  var noticeUp = false;
+  function lineList(x) {
+    if (typeof x === "string") return [x];
+    return [].concat(x.changes || [], x.lines || [], x.words ? [x.words] : []).map(String);
+  }
+  function showConversions() {
+    var list = ((A.state && A.state.conversions) || []).filter(function (x) { return x && !x.seen; });
+    if (!list.length || noticeUp) return;
+    noticeUp = true;
+    var pops = $id("alchemy-pops");
+    var back = document.activeElement;
+    var wrap = document.createElement("div");
+    wrap.className = "bench-modal al-convert";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-labelledby", "al-convert-t");
+    wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog v2-framed v2-card-leather al-book-d">' +
+      '<i class="v2-rim" aria-hidden="true"></i>' +
+      '<h3 id="al-convert-t">Your alchemy, brought over</h3>' +
+      '<p>Alchemy is worked one step at a time at this bench now. What changed:</p>' +
+      '<ul class="al-book-list">' + list.map(function (x) {
+        var lines = lineList(x);
+        var title = typeof x === "string" ? "" : (x.name || x.title || "");
+        return '<li>' + (title ? '<b>' + esc(title) + '</b>' : "") +
+          lines.map(function (l) { return '<span>' + esc(l) + '</span>'; }).join("") + '</li>';
+      }).join("") + '</ul>' +
+      '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-go" data-convert-ok>Got it</button></div></div>';
+    pops.appendChild(wrap);
+    var close = function () {
+      core.dropEsc(close);
+      wrap.remove();
+      noticeUp = false;
+      list.forEach(function (x) {
+        if (x && x.key) A.api("/api/alchemy/seen", { key: x.key }).catch(function () { /* shown again next time */ });
+      });
+      if (!back || !document.contains(back) || back === document.body || back.id === "alchemy-close") core.focusFirst();
+      else if (back.focus) back.focus();
+    };
+    core.pushEsc(close);
+    wrap.querySelector("[data-convert-ok]").addEventListener("click", close);
+    wrap.querySelector("[data-convert-ok]").focus();
+  }
+  A.showConversions = showConversions;
+  A.on("state", function () { if (A.open) showConversions(); });
+
   A.refresh = function () {
     return A.api("/api/alchemy/state").then(function (s) { adopt(s); return A.runCheck(); })
       .catch(function (err) { A.say(err.message); });
@@ -652,10 +704,11 @@
     if (!stageMounted) return;
     var c = A.check || {}, liq = c.liquid && c.liquid.start;
     var v = A.order.vessel ? A.item(A.order.vessel) : null;
-    stageCall("setVessel", A.order.method ? {
-      id: v ? (v.material || v.key) : A.order.method, kind: v ? "vessel" : A.order.method,
-      liquid: liq ? { color: liq.color, level: liq.level, turbidity: liq.turbidity } : null,
-    } : null);
+    // Lane U3's contract: Bottle names the shelf vessel by `id`; every other method stands
+    // on its own apparatus, named by `kind`.
+    var liquid = liq ? { color: liq.color, level: liq.level, turbidity: liq.turbidity } : null;
+    stageCall("setVessel", !A.order.method ? null : v && A.order.method === "bottle"
+      ? { id: v.material || v.key, liquid: liquid } : { kind: A.order.method, liquid: liquid });
   }
 
   // The flat stand-in (UI plan §6.3, "WebGL fallback"): the method's engraved icon at 160px on
@@ -977,13 +1030,17 @@
     var games = A.gameFor(method);
     var game;
     if (games) {
-      var view = stageCall("game", method) || null;
+      // The stage eases the liquid toward the server's end state as the game progresses.
+      var view = stageCall("game", method, { end: (r.liquid || {}).end || null }) || null;
       var rose = tierWatch(tuning);
       game = Promise.resolve(games.play({
         method: method, tuning: tuning,
         heat: tuning.heat || null, reaction: tuning.reaction || null,
         stages: tuning.stages || null, pour: tuning.pour || null,
         liquid: r.liquid || null,
+        // The flame under the work (lane U2): the athanor in a laboratory, the spirit lamp
+        // at the field kit.
+        burner: A.state && A.state.where && A.state.where.lab ? "athanor" : "lamp",
         mount: strip, stage: view,
         steady: A.steady(), reducedMotion: A.reduced(),
         onScore: function (s) {
@@ -1101,7 +1158,8 @@
     if (kind === "tier") { if (!staged) A.sound("alchemy.tier.up"); return; }
     if (!staged) {
       A.sound(kind === "flare" ? "alchemy.flare" : kind === "fail" ? "alchemy.fail" :
-              kind === "flawless" ? "alchemy.flawless" : kind === "assay" ? "alchemy.assay" : "alchemy.land");
+              kind === "flawless" ? "alchemy.flawless" : kind === "assay" ? "alchemy.assay" :
+              kind === "found" ? "alchemy.found" : "alchemy.land");
     }
     var tool = document.querySelector("#alchemy-tool .alchemy-flat .bicon") || $id("alchemy-tool");
     if (kind === "fail" || kind === "flare") {
@@ -1229,13 +1287,14 @@
       A.busy = true;
       renderStage();
       var body = { from: w.route, fid: w.fid, item: w.item };
+      if (w.who) body.who = w.who;
       var send = function (face) {
         if (face != null) body.face = face;
         return A.api("/api/alchemy/learn", body);
       };
       var t = rolled("identify") || {};
       var go = plan.check ? C.rollD20({
-        shown: { title: "Alchemy", why: "Learn: " + (w.formula || w.fid), sides: 20, lo: 1, hi: 20, die: "1d20",
+        shown: { title: "Alchemy", why: "Learn: " + (w.formula || "the " + w.name), sides: 20, lo: 1, hi: 20, die: "1d20",
                  terms: C.rollTerms({ terms: t.terms || [], bonus: t.bonus, dc: plan.dc }) },
         post: send,
         landed: function (r) { tickClock(r.clock); },
@@ -1393,7 +1452,8 @@
   A.book = function (which, from) {
     var B = window.AlchemyBooks;
     if (B && typeof B[which] === "function") {
-      try { B[which]($id("alchemy-pops"), from); return; } catch (err) { console.error("alchemy " + which + " failed:", err); }
+      try { B[which]($id("alchemy-pops"), { after: afterBook, from: from }); return; }
+      catch (err) { console.error("alchemy " + which + " failed:", err); }
     }
     var url = which === "formulary" ? "/api/alchemy/formulary" : "/api/alchemy/codex";
     A.api(url).then(function (d) { flatBook(which, d, from); })
@@ -1433,11 +1493,23 @@
   }
 
   // A reagent's card (lane U4's `.card(materialId, anchorEl)`), from the shelf's "?".
-  A.openCard = function (materialId, el) {
+  // Lane U4's options: the row's hazards (always named), where the alchemist stands (for the
+  // dangerous-assay confirm: a fume hood or a mask), the bench's popover host, and `after`,
+  // run when the card's assay or lesson changed what is known, to read the shelf again.
+  A.openCard = function (materialId, el, row) {
     var B = window.AlchemyBooks;
     if (!B || typeof B.card !== "function" || !materialId) return false;
-    try { B.card(materialId, el); return true; } catch (err) { console.error("alchemy card failed:", err); return false; }
+    try {
+      B.card(materialId, el, { hazards: (row && row.badges) || [], where: (A.state && A.state.where) || {},
+                               pops: $id("alchemy-pops"), after: afterBook });
+      return true;
+    } catch (err) { console.error("alchemy card failed:", err); return false; }
   };
+  function afterBook(detail) {
+    var r = detail && (detail.response || detail);
+    if (r && r.clock) tickClock(r.clock);
+    if (A.open) A.refresh();
+  }
 
   // Lane U4's books fire `alchemy:learned` (an assay, a lesson, a formula copied) and
   // `alchemy:recipe` ({recipe}); each changed what the shelf may show, so it is read again.

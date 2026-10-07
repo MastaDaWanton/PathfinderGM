@@ -245,7 +245,7 @@
     if (e.target.closest("[data-alchemy-retry]")) { A.reload(); return; }
     if (e.target.closest("[data-alchemy-everything]")) { A.showEverything(); return; }
     var info = e.target.closest(".bt-info[data-material]");
-    if (info) { A.openCard(info.dataset.material, info); return; }
+    if (info) { A.openCard(info.dataset.material, info, A.item(info.dataset.for)); return; }
     var add = e.target.closest(".as-add[data-add]");
     if (!add) return;
     if (!A.addItem(add.dataset.add)) {

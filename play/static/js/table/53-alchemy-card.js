@@ -181,8 +181,17 @@
   function writings() {
     if (bookErr) return '<p class="ac-quiet">' + esc(bookErr) + '</p>';
     if (!book) return '<p class="ac-quiet">Reading what you carry.</p>';
-    var list = book.writings || [];
-    var html = '<h3 class="ac-h">Writings you carry</h3>';
+    // Writings first, then each teacher's lessons (by the lesson's own title, the server's
+    // list), one list so one index finds the row.
+    var list = (book.writings || []).slice();
+    (book.teachers || []).forEach(function (t) {
+      (t.teaches || []).forEach(function (l) {
+        list.push({ route: "teacher", who: t.ref, name: t.name + (t.price ? ", " + t.price : ""),
+                    fid: l.fid, formula: l.formula, plan: l.plan, item: "" });
+      });
+    });
+    book.rows = list;
+    var html = '<h3 class="ac-h">Writings you carry, and teachers here</h3>';
     if (!list.length) {
       html += '<p class="ac-quiet">Nothing you carry teaches a formula you do not know. A scroll, a potion or a ' +
         'formulary does.</p>';
@@ -190,8 +199,10 @@
       html += '<ul class="ac-writings">' + list.map(function (w, i) {
         var p = w.plan || {};
         var refused = (p.refused || []).join(" ");
-        return '<li class="ac-writ"><span class="ac-name">' + esc(w.formula || w.fid) +
-          '<small>' + esc((w.route === "potion" ? "take apart " : "from ") + w.name) + '</small>' +
+        // An unidentified potion's formula is not sent (it would be the secret): the row
+        // says so in words.
+        return '<li class="ac-writ"><span class="ac-name">' + esc(w.formula || "Its formula, unknown until you understand it") +
+          '<small>' + esc((w.route === "potion" ? "take apart the " : w.route === "teacher" ? "taught by " : "from ") + w.name) + '</small>' +
           '<small>' + esc(refused || routeWords(p)) + '</small></span>' +
           '<button type="button" class="v2-btn is-small' + (refused ? "" : " is-go") + '" data-learn="' + i + '"' +
           (refused ? ' aria-disabled="true"' : "") + '>' + (w.route === "potion" ? "Take it apart" : "Learn") + '</button></li>';
@@ -288,8 +299,8 @@
     for (var i = rungs.length - 1; i >= 0; i--) {
       var r = rungs[i];
       var here = at != null && r.tier === at;
-      var extra = r.caster_level != null ? "CL " + r.caster_level + (r.price_gp != null ? ", " + r.price_gp + " gp" : "")
-                : r.price_gp != null ? r.price_gp + " gp" : "";
+      var extra = [r.caster_level != null ? "CL " + r.caster_level : "",
+                   r.price_gp != null ? r.price_gp + " gp" : ""].filter(Boolean).join(", ");
       out.push('<li class="rung t' + Math.min(4, r.tier) + (r.tier === ceiling ? " is-ceiling" : "") + (here ? " is-at" : "") + '"' +
         (here ? ' aria-current="true"' : "") + '><span class="rung-name">' + esc(r.name) + (extra ? '<small>' + esc(extra) + '</small>' : "") + '</span>' +
         (r.tier === ceiling ? '<span class="rung-ceil">your ceiling</span>' : "") + '</li>');
@@ -463,7 +474,7 @@
     var lb = e.target.closest("[data-learn]");
     if (lb) {
       if (lb.getAttribute("aria-disabled") === "true") return;
-      var writ = book && (book.writings || [])[Number(lb.dataset.learn)];
+      var writ = book && (book.rows || [])[Number(lb.dataset.learn)];
       if (writ) A.learn(writ);
       return;
     }
