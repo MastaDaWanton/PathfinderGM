@@ -5287,7 +5287,8 @@ def _counter_pick(c, want: str = "", line: str = ""):
     if chosen is None and want:
         chosen, _found = market.counter_for_want(
             want, choices, str(c.scene.location_id or "nowhere"),
-            market.day_of(c.scene.clock_minutes), c.scene.market_taken)
+            market.day_of(c.scene.clock_minutes), c.scene.market_taken,
+            scale=market.scale_here(c.world, c.scene.location_id))
     if chosen is None:
         for a in c.scene.actors.values():
             cid = keepers.counter_of(getattr(a, "world_entity_id", "") or "")
@@ -5606,7 +5607,8 @@ def trade(request):
 
     till = market.purse(place, stall, day, tier)
     left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
-    shelf = market.on_sale(place, stall, day, c.scene.market_taken, tier, counter_kind=kind)
+    shelf = market.on_sale(place, stall, day, c.scene.market_taken, tier, counter_kind=kind,
+                           scale=market.scale_here(c.world, c.scene.location_id))
     # What the player's words asked for, picked on the counter if it is there — and if
     # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
     # and nothing is guessed in its place.

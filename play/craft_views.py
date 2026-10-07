@@ -1301,6 +1301,13 @@ def craft_excursion(request):
         # contain nothing but nails.
         priced = [m for m in found if _price_cp(m) > 0]
         priced = _sells_its_own_trade(track, priced)
+        # Nothing dearer than the settlement's base value (the owner's ruling of
+        # 2026-10-07, `market.base_value`): this errand draws its own shelf rather than
+        # going through `market.on_sale`, so the cap is applied here too, or a village
+        # supplier would still stock what no village shop may.
+        cap = market.base_value(market.scale_here(c.world, c.scene.location_id))
+        if cap is not None:
+            priced = [m for m in priced if _price_cp(m) <= cap * 100]
         # The craft's consumables first, always there and never sold out — the same
         # list the counters carry (`market.consumables_of`), so the collier's charcoal is
         # one fact whether it is reached through this errand or across the smithy's

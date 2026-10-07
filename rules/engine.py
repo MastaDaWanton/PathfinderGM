@@ -14171,7 +14171,9 @@ class Engine:
         # the armorer's shelf, not the whole market's.
         counter = market_mod.on_sale(place, stall, day, self.scene.market_taken,
                                      counter_kind=market_mod.counter_kind_here(self.scene,
-                                                                               stall))
+                                                                               stall),
+                                     scale=market_mod.scale_here(self.world,
+                                                                 self.scene.location_id))
         found = next((m for m in counter if str(getattr(m, "id", "")).lower() == item_id),
                      None)
         if found is None:

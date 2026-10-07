@@ -508,3 +508,77 @@ def test_a_town_without_one_says_so():
 def test_standing_in_one_needs_no_line():
     scene, engine, _lab = _at_the_city_lab()
     assert places.laboratory_line(scene, engine.places(), _caddonbury()) == ""
+
+
+# --- what a settlement's shops may hold: the book's base values (owner, 2026-10-07) ---------
+
+def _dearest(kind: str, scale: str, days: int = 30) -> float:
+    from rules import pricing
+
+    worst = 0.0
+    for day in range(days):
+        shelf = market.on_sale("aaaabbbbcccc", kind, day, {}, counter_kind=kind, scale=scale)
+        worst = max([worst, *(pricing.worth(g) for g in shelf)])
+    return worst
+
+
+def test_the_base_values_are_the_books():
+    """GameMastery Guide p.204 (aonprd Rules ID 844): thorp 50, hamlet 200, village 500,
+    small town 1,000, large town 2,000, small city 4,000, large city 8,000, metropolis
+    16,000 gp. The app's three scales are the owner's three numbers (village 500, town
+    2,000, city 8,000); a world's finer word keeps the book's own value."""
+    assert [market.base_value(s) for s in ("village", "town", "city")] == [500, 2000, 8000]
+    assert market.base_value("hamlet") == 200 and market.base_value("metropolis") == 16000
+    assert market.base_value("outpost") == 500, "an outpost folds to a village"
+    assert market.base_value("") is None, "no settlement known: nothing capped"
+
+
+def test_a_village_shelf_never_holds_what_a_village_could_not_have():
+    """Lane H measured it: `on_sale` was never told the settlement, so a counter's shelf
+    was bounded by its till alone. The armorer's 1,500 gp full plate is a staple, and on
+    30 days of a village shelf it is never there; a town's and a city's carry it daily."""
+    assert _dearest("market:armorer", "village") <= 500
+    assert _dearest("market:armorer", "town") >= 1500
+    assert _dearest("market:armorer", "city") >= 1500
+
+
+def test_a_city_shelf_reaches_past_the_till_and_a_village_one_never_does():
+    """The base value is the shelf's ceiling where the settlement is known, the till only
+    what the counter pays (the book's purchase limit is a separate number). Measured
+    2026-10-07: the alchemist's uncommon till (150-400 gp) held its shelf to 350 gp on
+    30 days in a city as in a village; with the ruling, 500, 2,000 and 8,000 gp."""
+    till_bound = _dearest("market:alchemist", "")
+    assert till_bound <= 400
+    assert _dearest("market:alchemist", "village") <= 500
+    assert till_bound < _dearest("market:alchemist", "town") <= 2000
+    assert 2000 < _dearest("market:alchemist", "city") <= 8000
+
+
+def test_the_scale_comes_from_the_settlement():
+    """Every caller with a world passes `scale_here`; a world's own word wins when the book
+    has it, else the app's three."""
+    city = _caddonbury()
+    assert market.scale_here(SYNTHETIC, city.id) == "city"
+    assert market.scale_here(PANGRELLA, VYRAKON) == "town"
+    assert market.scale_here(None, VYRAKON) == ""
+
+
+def test_a_village_alchemist_never_offers_a_750_gp_potion_and_a_city_one_does():
+    """The owner's own test (2026-10-07). While the till bounded the shelf, no potion dearer
+    than the alchemist's uncommon till (at most 400 gp) was on any counter in any city;
+    with the base value as the shelf's ceiling a city's alchemist shelves the 750 gp
+    potions on the days the draw brings them, and a village's never does."""
+    if not hasattr(market, "POTION_DRAW"):
+        pytest.skip("lane H's spell potions (market.POTION_DRAW) are not on this branch")
+    from rules import pricing
+
+    def potions(scale: str) -> list[float]:
+        seen = []
+        for day in range(60):
+            shelf = market.on_sale("aaaabbbbcccc", "market:alchemist", day, {},
+                                   counter_kind="market:alchemist", scale=scale)
+            seen += [pricing.worth(g) for g in shelf if "potion" in str(g.name).lower()]
+        return seen
+
+    assert not [p for p in potions("village") if p >= 750]
+    assert [p for p in potions("city") if p >= 750]

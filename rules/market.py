@@ -138,6 +138,74 @@ def purse(place: str, stall: str, day: int, tier: str = DEFAULT_STALL_TIER) -> i
     return random.Random("purse|" + key(place, stall, day)).randint(lo, hi)
 
 
+# --- what a settlement of a size can have on a shelf at all -----------------------------------
+#
+# The owner's ruling of 2026-10-07: a shop's stock scales with the settlement, at the book's
+# base values — village 500 gp, town 2,000 gp, city 8,000 gp. The GameMastery Guide's
+# settlement stat block (p.204; aonprd "The Settlement Stat Block", Rules ID 844) gives the
+# base value as "the community's base value for available magic items in gp", with a 75%
+# chance that anything at or below it is for sale, and a table of eight sizes. The app's
+# three scales are the ruling's three numbers: a village is the book's village, a town its
+# large town, a city its large city. The other five rows stand for the words a world may
+# write (World Bible sends six: metropolis, city, town, village, hamlet, outpost), so a
+# metropolis's shops reach 16,000 gp and a hamlet's stop at 200 — the book's values, not
+# guesses; "outpost" is not a book size and reads as the village it folds to.
+#
+# The book's 75% roll for items under the value is NOT applied: this module's own daily
+# draw and rarity quota already decide what is on a shelf today (`stock`), and the book's
+# own nonmagical goods are "generally available" (CRB, aonprd Rules ID 374). Nor are the
+# book's few minor/medium/major items ABOVE the value: the ruling is a cap. What is capped
+# is the ceiling of the shelf, never the till, which sizes what a counter can PAY for what
+# the party sells (the book's separate purchase limit) and is left as it was.
+BASE_VALUE_GP: dict[str, int] = {"village": 500, "town": 2_000, "city": 8_000}
+BASE_VALUE_BY_WORD: dict[str, int] = {
+    "thorp": 50, "hamlet": 200, "village": 500, "small town": 1_000, "town": 2_000,
+    "large town": 2_000, "small city": 4_000, "city": 8_000, "large city": 8_000,
+    "metropolis": 16_000,
+}
+
+
+def scale_word(location) -> str:
+    """The size a settlement says it is, in the most exact word the base values know: the
+    world's own word when it is one of the book's eight ("hamlet", "metropolis"), else the
+    app's three (`places.scale_of`). "" for no location — a caller with no world caps
+    nothing, which is how the shelf behaved before the ruling."""
+    if location is None:
+        return ""
+    said = " ".join(str(getattr(location, "scale", "") or "").lower().split())
+    if said in BASE_VALUE_BY_WORD:
+        return said
+    from . import places as places_mod
+
+    return places_mod.scale_of(location)
+
+
+def scale_here(world, location_id) -> str:
+    """`scale_word` for the settlement a scene is in — what every caller of `on_sale` with
+    a world passes as `scale`. "" when there is no world to ask."""
+    if world is None or not location_id:
+        return ""
+    try:
+        ent = world.get(str(location_id))
+    except Exception:  # noqa: BLE001 - a world that cannot answer caps nothing
+        return ""
+    return scale_word(ent)
+
+
+def base_value(scale: str) -> int | None:
+    """The dearest thing a shelf in a settlement of this size may hold, in gp; None when no
+    size is known (no cap)."""
+    said = " ".join(str(scale or "").lower().split())
+    if not said:
+        return None
+    if said in BASE_VALUE_BY_WORD:
+        return BASE_VALUE_BY_WORD[said]
+    from . import places as places_mod
+
+    return BASE_VALUE_GP[places_mod.SCALE_ALIASES.get(said, "town")
+                         if said not in BASE_VALUE_GP else said]
+
+
 def spent_today(taken: dict, place: str, stall: str, day: int) -> float:
     """What this stall has already paid out today. Same shape as `mark_sold`."""
     return float((taken or {}).get(f"spent|{key(place, stall, day)}", 0) or 0)
@@ -228,7 +296,8 @@ def counter_kind_here(scene, stall: str = "") -> str:
 
 
 def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
-            tier: str = DEFAULT_STALL_TIER, counter_kind: str = "") -> list:
+            tier: str = DEFAULT_STALL_TIER, counter_kind: str = "",
+            scale: str = "") -> list:
     """What this stall has on the counter right now — today's shelf minus what has gone.
 
     **A stall does not stock what it could not buy.** The rarity quota alone put a
@@ -241,8 +310,26 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
     The till is the bound, and it is a bound this module already knows. One rule, no
     content re-tiering, and it makes the two halves of a shop agree: what a stallholder
     can pay out and what they have on the shelf are the same fact seen from both sides.
+
+    **Superseded where the settlement is known, by the book's own answer.** The owner's
+    ruling of 2026-10-07: a shop's stock scales with its settlement, at the base values
+    (`BASE_VALUE_GP`: village 500 gp, town 2,000, city 8,000). `scale` is the settlement's
+    size (`scale_word`), and with it the shelf's ceiling is the base value — staples and
+    the daily draw alike — and no longer the till. Lane H measured why: `on_sale` was
+    never told where it was, so the alchemist's uncommon till (150-400 gp) kept every
+    potion dearer than 400 gp off every counter in every city, and a village counter with
+    a rich till could shelve a 1,200 gp thing. The book keeps the two numbers apart too:
+    the base value is what a community has for sale, the purchase limit what a shop can
+    pay (GameMastery Guide p.204). The till goes on doing the second job — what the
+    counter pays for what the party sells (`can_pay`) — untouched. Without a scale (a
+    caller with no world, and the older tests) the till stays the bound, as before.
     """
     from . import pricing
+
+    cap = base_value(scale)
+
+    def ceiling(till: float) -> float:
+        return till if cap is None else float(cap)
 
     # One of the market's own counters, or the stables: its staples, and the daily draw
     # from the benches its trade buys from. The till is sized to the counter (`till_tier`)
@@ -251,7 +338,7 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
     kind = str(counter_kind or "").lower().removeprefix("the ")
     if is_counter_kind(kind):
         tier = till_tier(kind, tier)
-        till = purse(place, stall, day, tier)
+        till = ceiling(purse(place, stall, day, tier))
         staples = [g for g in staples_of(kind) if pricing.worth(g) <= till]
         tracks = draw_of(kind)
         if not tracks:
@@ -265,7 +352,7 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
         shelf = stock(affordable, place=place, stall=stall, day=day)
         return staples + remaining(shelf, taken or {}, place, stall, day)
 
-    till = purse(place, stall, day, tier)
+    till = ceiling(purse(place, stall, day, tier))
     # The goods this counter always carries (`goods.goods_at`): staples, first on the
     # shelf and never sold out. A counter named by no kind (the old callers, the tests of
     # the material draw) keeps the draw alone.
@@ -850,7 +937,8 @@ def till_tier(kind: str, tier: str = DEFAULT_STALL_TIER) -> str:
     return order[-1]
 
 
-def counter_for_want(want: str, choices, place: str, day: int, taken: dict | None = None):
+def counter_for_want(want: str, choices, place: str, day: int, taken: dict | None = None,
+                     scale: str = ""):
     """(counter, good) for the thing the player asked for, across every counter here, or
     (None, None). The best fit wins (`goods.fit_rank`: the thing that IS the want, then
     the cheaper), as a shopkeeper reaches for the ordinary coil: "a coil of rope" is the
@@ -859,7 +947,7 @@ def counter_for_want(want: str, choices, place: str, day: int, taken: dict | Non
 
     best = (None, None, None)
     for c in choices:
-        shelf = on_sale(place, c.kind, day, taken or {}, counter_kind=c.kind)
+        shelf = on_sale(place, c.kind, day, taken or {}, counter_kind=c.kind, scale=scale)
         found, _ = goods_mod.match_want(want, shelf)
         if found is None:
             continue
