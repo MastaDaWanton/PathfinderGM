@@ -1,0 +1,44 @@
+/* The alchemist's minigames in the bench strip (play/static/js/alchemy-games/, the FLAME,
+   REACTION and STAGES parts of play/static/js/table/33-bench-games.js), alchemy UI plan §6.4
+   and §9.
+
+   Loaded after bench-games.css (and forge-games.css, whose heat number and heat-* rules the
+   alchemist's fire reuses), and only adds to them: the strip keeps its shape (meter left, hint
+   centre, band right, time thread on top). Tokens only (tests/test_alchemy_games.py refuses a
+   raw colour): a liquid's colour, a stage's colour and the gauges' scales are content, drawn on
+   the canvas, never here (UI plan §4).
+
+   What an alchemy game adds to the hint column: the gauge's number above the hint, "312 °C"
+   for the fire (the forge's `bench-game__heat-num`) or "Fizz 56" for a reaction (below). The
+   hint turns from --dim to --ink while the gauge is out of its band, because that is when its
+   words ("Calm: add a drop", "Splashing: let it settle") matter; the words carry it, the
+   brighter ink only helps them be seen. */
+
+.bench-game.has-react .bench-game__hint { gap: 6px; }
+
+.bench-game__react-num {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+.bench-game.react-low .bench-game__hint-text,
+.bench-game.react-high .bench-game__hint-text,
+.bench-game.react-flare .bench-game__hint-text { color: var(--ink); }
+
+/* Over the flare line reads by its words and by the gauge's cross-hatched saw edge; the number
+   takes the alarm colour as a third cue, never the only one. */
+.bench-game.react-flare .bench-game__react-num { color: var(--alarm); }
+
+/* An alchemy game's hint says the next thing to do (swap, scrape, seal), so it reads a step
+   brighter than a timing game's fixed instruction, as the enchant games' do. */
+.bench-game--alchemy .bench-game__hint-text { color: var(--ink); }
+
+/* A narrow strip: the number steps down with the band word (bench-games.css's container). */
+@container (max-width: 640px) {
+  .bench-game__react-num { font-size: 15px; }
+}
