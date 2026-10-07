@@ -856,8 +856,14 @@ def run_checks(http: Http, repo: Path) -> None:
         note("the face comes back through the same door", faults)
     elif s == 200 and "tell" in d:
         # The opening scene has company, and a busy forage refuses in the fiction.
-        note("forage refused for company, in one readable sentence",
-             [] if "alone" in d["tell"].lower() or "with" in d["tell"].lower()
+        # A fight is the other thing that stops foraging, in its own whole sentence
+        # (`Engine._forage_refusal`). Measured 2026-10-07: one packaged run of three had
+        # an encounter running when it got here ("You are in a fight. Foraging is an
+        # hour..."), a correct refusal this check called a fault; the other two and 26
+        # dev runs of the same steps had none. Where that fight came from was not traced.
+        told = d["tell"].lower()
+        note("forage refused for company or a fight, in one readable sentence",
+             [] if "alone" in told or "with" in told or "in a fight" in told
              else [f"tell: {d['tell'][:80]}"])
     else:
         note("forage round trip", [f"{s}: {d}"])
