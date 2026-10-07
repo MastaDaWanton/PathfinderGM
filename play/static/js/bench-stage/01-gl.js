@@ -96,6 +96,12 @@
     "uniform vec3 uBg;",
     "uniform vec2 uRes;",
     "uniform vec2 uFade;",
+    // The alchemy bench's live liquid (docs/alchemy-ui-plan.md §7.3). Herb, forge and
+    // enchanting materials never set these, so they keep their defaults and the branch that
+    // reads them is never taken: their pixels are what they were.
+    "uniform float uFillY;",
+    "uniform vec3 uSurf;",
+    "uniform float uTurbid;",
     "float hash(vec3 p) {",
     "  p = fract(p * 0.3183099 + vec3(0.11, 0.17, 0.13));",
     "  p *= 17.0;",
@@ -169,6 +175,25 @@
     "  }",
     "  float a = uAlpha;",
     "  if (uRadial > 0.0) a *= pow(clamp(1.0 - length(vUv), 0.0, 1.0), uRadial);",
+    // LIVE LIQUID, the standard bottle-liquid technique without a fluid simulation (the
+    // Minions Art liquid shader and its ports; steveimm.id/posts/liquid-wobble): the liquid
+    // is the vessel's closed inner lathe, every fragment above a world-space fill height is
+    // discarded, and the BACK faces seen through the cut are painted as the flat top of the
+    // liquid, so no cap mesh has to follow the level. gl_FrontFacing is core WebGL 1.
+    // Turbidity takes the body from a clear tint to a cloudy, fine-grained, nearly opaque
+    // body. The sentinel is 1e4, not the plan's 1e9: mediump is only guaranteed to 2^14,
+    // and a scene here is a few metres across.
+    "  if (uFillY < 5000.0) {",
+    "    if (vW.y > uFillY) discard;",
+    "    if (gl_FrontFacing) {",
+    "      base *= mix(1.0, 0.8 + 0.4 * vnoise(vObj * 70.0), uTurbid);",
+    "      a = mix(a, 0.95, uTurbid);",
+    "    } else {",
+    "      base = uSurf;",
+    "      N = vec3(0.0, 1.0, 0.0);",
+    "      a = mix(0.8, 0.97, uTurbid);",
+    "    }",
+    "  }",
     "  vec3 col;",
     "  if (uUnlit > 0.5) {",
     "    col = base + uEmit;",
@@ -462,7 +487,7 @@
 
   var DEF = { color: [1, 1, 1], alpha: 1, spec: 0.2, shin: 16, metal: 0, emit: [0, 0, 0],
               pattern: 0, patScale: 1, bump: 0, fresnel: 0, unlit: 0, radial: 0, ground: 0,
-              uvScale: [1, 1] };
+              uvScale: [1, 1], fillY: 1e4, surf: [0, 0, 0], turbid: 0 };
 
   function pick(m, k) { return m[k] === undefined ? DEF[k] : m[k]; }
 
@@ -488,6 +513,11 @@
     gl.uniform1f(u.uRadial, pick(mat, "radial"));
     gl.uniform1f(u.uGround, pick(mat, "ground"));
     gl.uniform1f(u.uGlint, glint || 0);
+    // Set on every draw, defaults included, so a liquid's fill height never leaks into the
+    // next mesh drawn (the alchemy bench; every other bench leaves these at their defaults).
+    gl.uniform1f(u.uFillY, pick(mat, "fillY"));
+    gl.uniform3fv(u.uSurf, pick(mat, "surf"));
+    gl.uniform1f(u.uTurbid, pick(mat, "turbid"));
     if (mat.tex) {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.texture(mat.tex));
