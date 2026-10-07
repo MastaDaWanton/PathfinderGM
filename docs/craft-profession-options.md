@@ -1,0 +1,265 @@
+# Craft and Profession: what they do here, and how to make them worth a rank
+
+The owner, 2026-10-06: *"the craft skill and the profession skill seem pretty useless what
+can we do to make them more viable"*. This paper measures the current state, sets out what
+the tabletop and the CRPGs did about the same complaint (and what they abandoned), and
+offers five options with a recommendation. **Nothing here is built.** The skill hover
+shipped the same day (`content/rules/skills-explained.json`) already tells the player the
+truth below, card by card.
+
+## 1. What the code does today (measured 2026-10-06, master 067e516)
+
+A grep of `rules/`, `gm/`, `play/` and `content/` for every read of the two skills, with
+reads of the *skill modifier* told apart from the word "craft" used as a label.
+
+**One id each, no trade.** `rules/tables.py` carries `"craft": ("int", False, False)` and
+`"profession": ("wis", True, False)` (Profession is trained only). Ranks can be placed only
+on those ids (`rules/creation.py` "is not a skill.", `rules/leveling.py` `rank_problems`).
+`content/rules/repairs.json` is the one place that says so in words: the sheet carries one
+Craft, so Craft (clockwork), Craft (weapons) and the rest are all it.
+
+**Where Craft ranks change anything: one place.**
+
+| Use | How | Where |
+|---|---|---|
+| Mending a construct (house rule) | better of Craft and Knowledge (engineering), DC = construct's crafting DC − 5, 10 minutes, 1d6 per HD | `content/rules/repairs.json`, `rules/repair.py` `best_skill`, `rules/engine.py` `_op_repair` |
+| The GM's ordinary `check` | any skill, d20 + bonus against a band DC | `rules/engine.py` `_op_check` |
+
+**Where Profession ranks change anything: two places.**
+
+| Use | How | Where |
+|---|---|---|
+| Studying a herb | better of Knowledge (nature) and Profession (any trade), DC 10 + 5 per rarity, a property per 5 of margin | `content/rules/herb-lore.json`, `rules/herbknowledge.py` `study_skill` |
+| Ramming a ship | Profession against the target's AC; no ranks, no ram ("is no sailor") | `rules/engine.py` sea op |
+| The GM's ordinary `check` | as above, refused untrained | `rules/engine.py` `_op_check` |
+
+**What does NOT read them:**
+
+- **None of the five world-class benches.** Herbalist, Blacksmith, Alchemist,
+  Leatherworker and Enchanter all roll d20 + track level + ½ character level + an ability
+  modifier (`check_terms` in `rules/crafting.py`, `blacksmith.py`, `alchemist.py`,
+  `leatherworker.py`, `enchanter.py`; `magicitem.py` reuses the enchanter's). Their comments
+  cite Craft only to justify choosing Intelligence. The excursions (mining, skinning,
+  buying) use the same formula (`play/craft_views.py`). The engine's `craft` op rolls
+  nothing: it records a world-class session and awards mastery.
+- **No item-making by the week** (the CRB's check × DC in silver), no mending of ordinary
+  gear, no Appraise-like use, no identifying items of your trade. Identify is the Enchanter
+  check or Spellcraft; the forge's assay is the Blacksmith formula.
+- **No earning.** There is no downtime, wage or day-job code. "Downtime" appears once, as a
+  price-ratio citation in `rules/pricing.py`. Paid work is a narrative errand card
+  (`rules/cards.py` `MEANS_KEYS`).
+- **No prices.** `rules/pricing.py` and `rules/market.py` price from tables; haggling is
+  an alias to Diplomacy.
+- **The means gate** (`gm/means.py`) has nothing specific to either: a skill use is
+  `ordinary`, which anybody may attempt.
+
+So a Craft rank buys one house-rule repair of constructs, and a Profession rank buys herb
+study (which Knowledge (nature) already covers) and ramming at sea. For a skill that costs
+the same rank as Perception, that is the complaint, confirmed.
+
+**Three defects found on the way (not fixed here; each is a separate change):**
+
+1. **Feat prerequisites naming a trade can never be met.** `rules/feats.py` reads
+   `actor.ranks.get("craft (alchemy)")`, but ranks only ever land on `craft`. 9 feats in
+   `content/feats/feats.json` require a `craft (...)` and 3 a `profession (...)`.
+2. **Printed NPC trades are unreachable.** `content/bestiary/creatures.json` prints 854
+   `craft (...)` and 673 `profession (...)` totals. `Actor.skill_modifiers("profession")`
+   looks the bare id up in `flat_skills` (`rules/sheet.py`, exact key), misses
+   "profession (sailor)", and refuses the roll as untrained. A printed sailor cannot ram.
+   (Reported by the code survey from those two lines and the loader's lower-casing at
+   `sheet.py` `from_dict`; I did not replay a ship fight to watch it.)
+3. **The GM cannot ask for a trade.** A `check` naming "craft (alchemy)" fails validation
+   ("is not a Pathfinder 1e skill", `rules/intents.py`), and nothing folds a subtype into
+   the base id.
+
+## 2. Prior art
+
+Sources were read by a research pass and checked by a second, critic pass; confidence is
+marked where it is less than a primary rules page.
+
+**The book (CRB, via Archives of Nethys).** Craft: materials cost ⅓ of the price; each week
+check × DC in silver accrues until it reaches the price; fail by 5 and half the materials
+are lost; masterwork is a separate DC 20 component; repairs use the creation DC at ⅕ of the
+price; and Craft earns half the check in gold a week, the same rate as Profession.
+Profession: half the check in gp a week (no retry that week), plus the trade's know-how at
+DC 10, 15 and up. Craft (armor/weapons/jewelry) can stand in for Spellcraft when making
+magic items, and Master Craftsman lets 5 Craft or Profession ranks count as caster level.
+https://www.aonprd.com/Skills.aspx?ItemName=Craft,
+https://www.aonprd.com/Skills.aspx?ItemName=Profession,
+https://www.d20pfsrd.com/magic-items/magic-item-creation/
+
+**Ultimate Combat, vehicles.** A sailing ship is driven with Profession (sailor) or
+Knowledge (nature); an alchemical vehicle with Craft (alchemy). Official precedent for a
+trade replacing a check in play. https://aonprd.com/Rules.aspx?ID=1106
+
+**Ultimate Campaign, downtime.** Skilled work earns check ÷ 10 gp a day, or capital
+(Goods, Influence, Labor, Magic); Craft and Profession qualify for all four. Rooms such as
+the Forge, Alchemy Lab and Artisan's Workshop roll their own daily earnings and count as
+masterwork tools. Its bargaining rules use Appraise, Sense Motive, Bluff and Diplomacy;
+**Profession (merchant) appears nowhere in them**, so "merchant haggles" is a house rule.
+https://www.aonprd.com/Rules.aspx?Name=Downtime%20Activities&Category=Downtime,
+https://aonprd.com/Rules.aspx?ID=1341 (capital table read through a summary: medium
+confidence).
+
+**Pathfinder Unchained, Background Skills.** Two free ranks per level for background
+skills only: Appraise, Artistry, Craft, Handle Animal, Knowledge (engineering, geography,
+history, nobility), Linguistics, Lore, Perform, Profession, Sleight of Hand. The stated
+reason is that skills do not give characters equal benefit, so nobody should have to
+trade "the knowledge to understand the world and the ability to survive in it"
+(Unchained, via https://www.aonprd.com/Rules.aspx?Name=Background%20Skills&Category=Skills%20in%20Unchained).
+I could not find Paizo saying in so many words that players never spent ranks on these
+skills; that is the forums' reading, not a sourced quote.
+
+**Unchained, Expanded Craft and Profession.** Everyday uses beyond money: identify a maker's
+mark or the culture an item came from, spot masterwork on sight (DC 15), smelt ore, skin and
+tan, mend a sail; a sailor navigates (DC 20), a herbalist identifies herbs (10/15), a
+merchant knows where a good sells higher (15), a soldier estimates a force (15), a miner
+identifies metals. https://www.aonprd.com/Rules.aspx?ID=1742,
+https://www.aonprd.com/Rules.aspx?ID=1744
+
+**Unchained, Consolidated Skills.** Thirty-five skills become twelve, and Craft, Profession
+and Appraise are simply dropped, with a pointer back to background skills to restore them.
+Paizo's own consolidation could not absorb these two.
+https://www.aonprd.com/Rules.aspx?Name=Consolidated%20Skills&Category=Skills%20in%20Unchained
+
+**Pathfinder Society (1e), Day Job.** One Craft, Perform or Profession roll after each
+scenario for a small payout from a table; mundane crafting itself was banned. Players
+judged it worth ranks only "with spare points". (Forum reproductions of the Guide; medium
+to low confidence.) https://paizo.com/threads/rzs2pk2o
+
+**PF2e and PFS2.** Earn Income pays by **task level and proficiency**, not by the raw d20
+total; Profession became Lore, granted free by backgrounds; Crafting stayed a full skill
+with Repair and Identify Alchemy. https://2e.aonprd.com/Skills.aspx?ID=21&General=true,
+https://2e.aonprd.com/Skills.aspx?ID=41. No Paizo statement explaining *why* Profession
+became Lore was found.
+
+**CRPGs.** Pathfinder: Kingmaker and Wrath of the Righteous have no Craft, Profession or
+Appraise at all (WotR list confirmed; Kingmaker from snippets); Kingmaker's crafting goes
+through kingdom artisans. NWN1/2's Appraise silently shifted shop prices by an opposed roll
+players found opaque. BG3 crafting needs no skill and its tool proficiencies were left out
+(secondary sources). 5e's tools (Xanathar's) give each tool concrete uses: smith's tools
+repair metal objects, a herbalism kit finds and identifies plants, and a skill plus a tool
+together roll with advantage. https://www.dndbeyond.com/sources/dnd/basic-rules-2014/equipment#Tools
+
+**What was abandoned, and why it matters here.**
+
+- **The pure payout roll** (PFS1 Day Job): kept the skill alive on paper, judged not
+  worth a rank. A wage alone will not fix "useless".
+- **The raw d20-total-to-gold formula**: PF2e replaced it with a level-and-proficiency
+  table, so stacked bonuses stop inflating income.
+- **Folding the skills away** (Unchained Consolidated, Owlcat): it worked only by
+  deleting them, and Paizo had to bolt them back on.
+- **Opaque price rolls** (NWN Appraise): a number the player cannot see moving is not a
+  reward.
+
+Every tradition that kept these skills worthwhile did at least one of three things: made
+the ranks free, gave the skill uses in play, or tied its income to level and training.
+
+## 3. Options
+
+### A. Craft ranks count at the benches
+
+Add one term to every world-class bench check: **Craft ranks ÷ 2** (rounded down), itemised
+like the others ("Craft 4 ranks +2"). Herbalism takes the better of Craft and Profession
+ranks, after the book's own herbalist route (Profession (herbalist) can prepare herbs) and
+the herb study that already accepts Profession.
+
+- **What it takes:** a term in five `check_terms` functions and the excursion bonus; the
+  bench dice popups already list terms. Tests that name the measurement (today 0 of 5
+  benches read a Craft rank).
+- **World classes:** they keep their own levels; the track level is earned by doing, ranks
+  by choosing, and a character who does both is the better smith. Half ranks keep it below
+  the track (a level-10 smith with 10 ranks gains +5, against track and half level).
+- **Means gate:** untouched; the benches are their own screens.
+- **Cost:** the bench DCs were tuned without it; +5 at level 10 moves every chance. Retune
+  or accept, the owner's call.
+- **Single Craft:** with one id, a rank in "Craft" helps every bench. Defensible while
+  there is one Craft; option D is where trades would split.
+
+### B. Craft and Profession get the everyday uses (Unchained Expanded)
+
+Teach the engine a short list of uses, each a closed rule the GM cites rather than a DC it
+invents: Craft spots masterwork (DC 15) and tells a forged item's maker and origin; Craft
+mends ordinary broken gear at the creation DC for ⅕ of the price (the `item_damage` op
+already breaks things, and `rules/repair.py` already has the shape for constructs);
+Profession answers a trade question (DC 10/15); Profession (herbalist) identifies a herb at
+DC 10/15 as a cheaper study.
+
+- **What it takes:** rows in a rule document like `repairs.json`, one op or two (`mend`,
+  `inspect`), the declaration-verb entries, and a card line each.
+- **World classes:** Craft's mend and identify sit beside the forge's assay rather than
+  replacing it; masterwork spotting reads the item's own `masterwork` flag.
+- **Means gate:** ordinary deeds, so nothing changes; the rule supplies the DC.
+
+### C. Profession earns: a day's work
+
+A `work` deed: the character spends a day (or a week) at their trade and is paid. Pay from
+a **table by level and Profession ranks**, PF2e-shaped, not half the d20 total; a natural
+roll decides poor, fair or good pay. Craft and Perform qualify too, as in the book.
+
+- **What it takes:** one op that advances the clock by the day, a pay table in content,
+  and the player's route to it (a "Work" action where there is an employer, or the
+  declaration "I work at the docks for a week").
+- **World classes:** a smith with a forge already earns by selling what she makes; the
+  work deed is for the rest. It must never pay more per day than the benches, or it
+  becomes the only thing worth doing.
+- **Interactions:** the day passes for hunger, thirst and sleep clocks (`rules/survival.py`),
+  the world agent ticks, and the employer's regard can move a step for good work, giving
+  Profession a social face.
+- **Means gate:** an ordinary deed.
+- **Warning from the record:** on its own this is PFS1's Day Job, which players judged not
+  worth a rank. Ship it with A or B, not instead of them.
+
+### D. Name the trade: Craft (x) and Profession (x)
+
+Ranks keyed by trade, picked when the rank is placed ("Profession: sailor"). Each trade
+lights its own scenes: sailor at sea (ramming today; navigation and piloting from Ultimate
+Combat), herbalist at the herbarium, miner on a prospecting run, soldier reading a force,
+merchant knowing where a good sells higher (Unchained). Bench terms from option A then read
+the matching Craft (weapons/armor for the forge, alchemy for the alchemist, leather for the
+leatherworker).
+
+- **What it takes:** the largest change. Ranks keyed `craft (weapons)`; the forge and the
+  level-up picker ask which trade; `normalise_skill` folds a subtype onto its base for every
+  generic read; the GM may name a trade in a check. It also **fixes all three defects** in
+  section 1 (feat prerequisites, 1,527 printed NPC trade totals, the GM's trade checks).
+- **World Bible:** NPC occupations (`content/people/occupations.json`, `rules/roster.py`)
+  already carry trades; a world's people could arrive with their trades as Profession
+  totals. Per the standing instruction that fixes are world-agnostic, the export format
+  would name the trade per NPC.
+- **Means gate:** a trade the sheet holds becomes something the gate can see ("as a sailor,
+  I read the swell"), the way it now reads spells and feats.
+
+### E. House rule: Unchained Background Skills
+
+A toggle on the Rulesets bench: two free ranks a level, for background skills only
+(Appraise, Craft, Handle Animal, Knowledge (engineering, geography, history, nobility),
+Linguistics, Perform, Profession, Sleight of Hand). Off by default.
+
+- **What it takes:** a second rank budget in `leveling.skill_ranks` and the forge, and the
+  picker showing which ranks are which.
+- **The catch, measured above:** of those eleven skills, seven are read by nothing in play
+  today (Appraise, Handle Animal, Knowledge (geography, history, nobility), Linguistics,
+  Perform), and Sleight of Hand only by the player's pickpocket roll. Free ranks in skills that do
+  nothing are still nothing. This removes the cost; it does not add the point.
+
+## 4. Recommendation
+
+**A, then C, with B's mend-and-spot pair alongside; D when the defects are fixed; E as a
+toggle only once enough background skills do something.**
+
+- **A first** because it is small, it puts a Craft rank on the screen the player already
+  uses most, and the benches' itemised terms make the payoff visible at every roll (the
+  opposite of NWN's hidden Appraise).
+- **C next**, with pay by level and training rather than by the raw d20 (PF2e's correction
+  of PF1), so Profession has a loop of its own. Alone it repeats the Day Job; with A it
+  is the half of the pair that serves the character who does not craft.
+- **B's two Craft uses** (spot masterwork, mend ordinary gear) are cheap once A lands and
+  give Craft a use away from a bench.
+- **D is the right end state** and the only one that fixes the three defects, but it
+  changes how ranks are keyed everywhere. The defects themselves (feat prerequisites,
+  printed NPC trades, the GM's trade checks) can be fixed before it by folding a
+  subtype onto its base id at read time, which costs little and keeps D open.
+- **E** waits: it is Paizo's answer to "the ranks cost too much", and the owner's
+  complaint is "they do too little". Turn it on only after A to D give the background
+  skills something to do.
