@@ -162,6 +162,13 @@ BY_SPOT: dict[str, Shape] = {
     # buying, selling, making
     "the-smithy": Shape(10, 10, LOW, clumps=5, clump_max=1, rise=2,
                         vertical="scatter", about="a hearth, an anvil, and what is stacked round them"),
+    # The alchemist's laboratory (alchemy plan §14): a low room crowded with benches,
+    # shelving and the hooded hearth — raised things to get behind or up on, no rail, as
+    # the smithy. The Ultimate Campaign's Alchemy Lab room is 8-16 squares of work space
+    # for up to three people (aonprd Rules ID 1291); this is that, plus the room round it.
+    "the-laboratory": Shape(10, 10, LOW, clumps=6, clump_max=1, rise=2,
+                            vertical="scatter",
+                            about="benches of glass, a still, and the hood over the fires"),
     "the-mill": Shape(12, 12, HALL, clumps=5, clump_max=2, rise=3, rise_to=2,
                       about="the wheel, the sacks, and a floor above them"),
     "the-tannery": Shape(14, 12, LOW, clumps=7, clump_max=2, rough=10,

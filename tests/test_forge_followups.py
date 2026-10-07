@@ -501,7 +501,9 @@ def test_every_authored_city_has_a_smithy(export, cities, before):
 def test_the_appended_smithy_is_published_for_world_bible():
     vocab = json.loads(Path(settings.BASE_DIR, "docs", "place-vocabulary.json")
                        .read_text(encoding="utf-8"))
-    assert vocab["appended_to_authored"] == {"city": ["the smithy"]}
+    # The laboratory joined 2026-10-06 (alchemy lane G: "every city has a laboratory").
+    assert vocab["appended_to_authored"]["city"][0] == "the smithy"
+    assert vocab["appended_to_authored"] == {"city": list(places.APPENDED_TO_AUTHORED["city"])}
 
 
 # --- 8. the World Bible contract names the material fields ----------------------------------------

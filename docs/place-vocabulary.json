@@ -52,8 +52,8 @@
   "the-way-in"
  ],
  "vertical_balance": {
-  "consumer_tables": "64 of 81",
-  "ratio": 0.79,
+  "consumer_tables": "65 of 82",
+  "ratio": 0.793,
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {
@@ -142,12 +142,14 @@
    "the barracks",
    "the well",
    "the guildhall",
-   "the smithy"
+   "the smithy",
+   "the laboratory"
   ]
  },
  "appended_to_authored": {
   "city": [
-   "the smithy"
+   "the smithy",
+   "the laboratory"
   ]
  },
  "junctions_by_scale": {
@@ -216,6 +218,15 @@
    "read_by": "crafting",
    "staffed": "a smith",
    "keeper": "the smith"
+  },
+  {
+   "name": "the laboratory",
+   "about": "glass on every shelf, a still, and a hood over the fires",
+   "smallest": "village",
+   "category": "trade",
+   "read_by": "crafting",
+   "staffed": "an alchemist, and whoever is paying for the hood",
+   "keeper": "the alchemist"
   },
   {
    "name": "the mill",
@@ -726,6 +737,25 @@
     "bladesmith",
     "bladesmiths"
    ]
+  },
+  {
+   "place": "the laboratory",
+   "slug": "the-laboratory",
+   "about": "glass on every shelf, a still, and a hood over the fires",
+   "words": [
+    "alchemist",
+    "alchemists",
+    "alchemical",
+    "laboratory",
+    "laboratories",
+    "alembic",
+    "alembics",
+    "chymist",
+    "chymists",
+    "of alchemy",
+    "its alchemy",
+    "in alchemy"
+   ]
   }
  ],
  "ventures": {
@@ -779,6 +809,7 @@
   "the-house",
   "the-inn",
   "the-keep",
+  "the-laboratory",
   "the-lane",
   "the-library",
   "the-market",

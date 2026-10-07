@@ -905,9 +905,16 @@ def forge_rent(scene, hours: float, known=()) -> int:
     `known` is passed through to `smithy_here` (`Engine.places()`), for an authored
     place whose id does not spell its name.
     """
-    import math
-
     from . import places as places_mod
+
+    return _rent(hours, lambda: places_mod.smithy_here(scene, known))
+
+
+def _rent(hours, here) -> int:
+    """Copper for `hours` at the bench `here()` names (a `*_here` dict, or None): every
+    copper's worth of time begun, rounded to a millionth first. One arithmetic for every
+    rented bench, so the forge and the laboratory cannot round two ways."""
+    import math
 
     try:
         h = float(hours or 0)
@@ -915,10 +922,46 @@ def forge_rent(scene, hours: float, known=()) -> int:
         return 0
     if not h > 0 or math.isinf(h):
         return 0
-    here = places_mod.smithy_here(scene, known)
-    if here is None:
+    bench = here()
+    if bench is None:
         return 0
-    return int(math.ceil(round(int(here["rate_cp_per_hour"]) * h, 6)))
+    return int(math.ceil(round(int(bench["rate_cp_per_hour"]) * h, 6)))
+
+
+# --- the town laboratory, by the hour (alchemy plan §14, contracts §9) ---------------------
+#
+# Two silver an hour: the forge's one silver doubled for the glassware (the plan's proposal,
+# which the owner's answers to the plan left standing). The book prints no rent for a lab —
+# the Core Rulebook sells the alchemist's lab outright at 200 gp, and Ultimate Campaign's
+# Alchemy Lab room is built (390 gp) by its owner, never let (aonprd Rules ID 1291) — so
+# this is a house rate, set against the same yardstick as the forge's: a trained hireling
+# is 3 sp a DAY, and an hour in somebody else's laboratory, hood, still and glass
+# included, is dear on purpose. A week of eight-hour days is 11 gp 2 sp, and the book's
+# 200 gp lab is a thousand rented hours — renting is for the traveller, owning for the
+# alchemist who settles. Flat across scales, as the forge's.
+LAB_RENT_CP_PER_HOUR = 20
+
+
+def lab_rate(*, owned_by_party: bool = False) -> int:
+    """Copper an hour at a laboratory: nothing at the party's own, the town rate
+    elsewhere. The one answer `places.laboratory_here` puts in its `rate_cp_per_hour`."""
+    return 0 if owned_by_party else LAB_RENT_CP_PER_HOUR
+
+
+def lab_rent(scene, hours: float, known=()) -> int:
+    """What `hours` in the laboratory the party is standing in costs, in copper
+    (alchemy contracts §9).
+
+    Read off where the party is (`places.laboratory_here`), never passed a rate, for the
+    forge's reason: a caller that names its own rate is a second answer to what the
+    alchemist charges. Nothing when there is no laboratory here, or it is the party's
+    own. A coin begun is a coin paid (`_rent`). The bench charges it beside the one clock
+    door (`Scene.advance`), for the minutes the step actually takes, as the forge's roll
+    does with `forge_rent`.
+    """
+    from . import places as places_mod
+
+    return _rent(hours, lambda: places_mod.laboratory_here(scene, known))
 
 
 def is_market(place_id: str, founded=()) -> bool:

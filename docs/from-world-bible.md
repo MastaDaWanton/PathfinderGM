@@ -288,6 +288,24 @@ says so in two places, both words, never prices.
 | `play.materials[]` rows of a consumed kind | Absent (the whole of `play.materials[]` is proposed, above) | A world's own fuel or quench as a `play.materials[]` row with `kind` `fuel`, `flux`, `quenchant` (or for the other crafts `solvent`, `salt`, `catalyst`, `vessel`, `tannin`, `oil`, `wax`, `thread`, `ink`, `chalk`, `treatment`) and `tier` `common`. Such a row is a staple on every counter that sells that craft's supplies the day `play.materials[]` has a reader, and it must carry `price_gp` or it is on no counter: the app refuses an unpriced common consumable in its own catalogues for exactly that reason (0 days of 60 for curing salt, measured) |
 | `play.materials[].price_gp`, any kind | Absent | A number World Bible can check before it exports, by the app's one price rule (`rules/pricing.py`, `material_floor`; `campaign-format.md`, the `price_gp` row): at least the rung's floor — common 1, uncommon 5, rare 25, exotic 125, legendary 625 gp — ×5 for an essence, catalyst, ink, chalk, focus or neutralizer, × the row's strength above its rung; a rarer row never cheaper than a commoner one of its kind, a stronger one dearer than a weaker one. A world's "fen-salt neutralizer" priced like its water would be refused with the floor named. 1 cp is "free", for a plain common thing only. Leave `price_gp` out for a thing the world does not sell; never write a guess to fill the field |
 
+### Where an alchemist works (alchemy revamp, lane G)
+
+Added 2026-10-06 by the alchemy places lane; lane I owns this file in wave 2 and may fold it
+into the sections above. The owner ruled that **every city has an alchemist's laboratory to
+rent**. Distill, Sublime, Transmute and rare reagents need one (`places.laboratory_here`);
+the field kit does the rest anywhere. Measured the same day: a laboratory in **0 of the 82
+settlements** of the three shipped exports. So the app appends "the laboratory" to every
+authored city that lists none, as it does the smithy, and a town or village has one only
+when its own words name its alchemists or play founds one. The full vocabulary is in
+`docs/places-and-races-for-world-bible.md` and `docs/place-vocabulary.json`
+(`appended_to_authored`, the `the laboratory` cue row).
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.places[].kind` | Read since 2026-10-06, when it is a settlement kind the app knows (`places.KINDS`, folded through `places.KIND_WORDS`); anything else is dropped and the name reads as before. No shipped export writes it | `"kind": "laboratory"` on a world's own laboratory by any name ("the Glasshouse", "the Chymists' Hall"): it is then a laboratory, its keeper an alchemist, and no second one is appended to its city. The same field makes "the Anvil" a smithy. Write it only for what the place IS; never to dress a shrine as a laboratory |
+| a laboratory in a town whose words name alchemists | Not written: Aurvantis's nine "black-market alchemist collective" settlements and Pilfnook and Sparburrow ("alchemical explosives", "alchemical curiosities") list none, and `tools/check_places.py` notes each | Author the place in that settlement's `places`, with `kind: "laboratory"`. The app never appends one to an authored town: an author who listed the rooms has said what the town has |
+| people whose work is alchemy | The app's own occupation `alchemist` (`content/people/occupations.json`, tag `alchemy`); a laboratory's keeper is one, and a person described as an alchemist or chymist is one | Nothing new: describe the person's work in words ("an alchemist", "a chymist"). A world's own word for the trade needs a row in the occupation table here, with the `alchemy` tag, and then its workroom counts as a laboratory with nothing else changed |
+
 ## Things worth stealing
 
 Patterns from World Bible that solved problems this app will hit too:
