@@ -109,7 +109,14 @@
      "tables": ["herbal-manuals", "alchemy-manuals", "alchemy-classics"],
      "draw": ["alchemist", "herbalist", "potions"],
      "consumables": ["alchemist"],
-     "_alchemy": "The alchemy plan §12.5 (lane H, 2026-10-06): the CRB's eight alchemical goods and the alchemy-classics table (the other classics) are the bench's own products at Sound quality and the book price (rules/goods.py CLASSIC_GEAR, alchemy_stock); the alchemy manuals are sold here and nowhere else; `potions` draws the spell potions under the rarity quota and inside the till (rules/goods.py potion_goods)."}
+     "_alchemy": "The alchemy plan §12.5 (lane H, 2026-10-06): the CRB's eight alchemical goods and the alchemy-classics table (the other classics) are the bench's own products at Sound quality and the book price (rules/goods.py CLASSIC_GEAR, alchemy_stock); the alchemy manuals are sold here and nowhere else; `potions` draws the spell potions under the rarity quota and inside the till (rules/goods.py potion_goods)."},
+    {"id": "leatherworker", "label": "the leatherworker", "title": "the leatherworker",
+     "words": ["leatherworker", "artisan", "craftsman"], "smallest": "village",
+     "gear": ["leatherworker's field kit"],
+     "draw": ["leatherworker"],
+     "consumables": ["leatherworker"],
+     "staple_kinds": {"leatherworker": ["hide", "dye"]},
+     "_leather": "The owner, 2026-10-08 (leatherworking plan open point 9): \"every town has a leatherworker and that person does not necessarily have a tannery but every town should have access to leatherworking supplies and the things needed to use the craft\" — read as every settlement, village up. The keeper's title reads through the occupation table as the `tanner` row (content/people/occupations.json, tags leather and animals). `consumables` is the craft's salt, tannins, oils, waxes and threads; `staple_kinds` its common hides and dyes, on the counter once the catalogue prices them (rules/market.py kind_staples); `draw` the uncommon-and-up rows under the rarity quota and the settlement's base value; the field kit is sold the day its goods row exists (rules/goods.py GEAR). The tannery is a separate place, where the settlement's words imply one (rules/places.py tannery_here)."}
   ],
   "stalls": [
     {"id": "provisions", "noun": "provisions", "says": "bread, cheese and meat",

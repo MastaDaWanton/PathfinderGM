@@ -2189,6 +2189,32 @@ FORGE_WORK = "forge"
 LAB = "place.laboratory"
 ALCHEMY_WORK = "alchemy"
 
+# --- where the leatherworker works (leatherworking plan §10, contracts §8) -------------------
+#
+# The same kit-and-workroom rule a third time. The leatherworker's field kit does the
+# common and uncommon work anywhere — including Harden, since the owner's answer of
+# 2026-10-08 put "a small kettle" in it. A TANNERY adds the lime pit, the vats (bark,
+# mineral and planar tannages) and the hardening kettle for rare-and-above hides. It is
+# the town's (a place whose keeper is a tanner by occupation: `content/people/
+# occupations.json`'s `tanner` row carries the `leather` tag), rented by the hour with its
+# vats by the day, or the player's own (founded with kind `tannery`, held as
+# `holds.place.<slug>`).
+#
+# Where a town's tannery is: where its author put it, else on its OUTSKIRTS when its own
+# words name the trade (`TANNERY_CUES`, placed by `outskirts.ring`). Medieval towns put
+# the tanners outside the walls, downwind and downstream, for the smell and the runoff —
+# fifteenth-century Coventry's stood just outside the city walls by the Sherbourne
+# (Coventry's tanning reconstruction, researchgate 320616343; leatherworking prior art
+# §3.7). A tannery is rarer than a smithy, so no scale guarantees one. Never read from the
+# player's words.
+#
+# The leatherworker who SELLS the craft's supplies is a different person and is in every
+# settlement: the market's `leatherworker` counter (`content/rules/stall-lines.json`,
+# `rules/market.py`). The owner, 2026-10-08: "every town has a leatherworker and that
+# person does not necessarily have a tannery".
+TANNERY = "place.tannery"
+LEATHER_WORK = "leather"
+
 
 # Origins whose NAME somebody in play chose: the plan's `found`, the page's old door, and
 # ground gone into. Their kind is the engine's validated `kind` field and nothing else.
@@ -2238,10 +2264,15 @@ def kind_works_alchemy(kind: str) -> bool:
     return _kind_works(kind, ALCHEMY_WORK)
 
 
+def kind_works_leather(kind: str) -> bool:
+    """Whether the keeper of a place of this kind is a tanner by occupation."""
+    return _kind_works(kind, LEATHER_WORK)
+
+
 # The place tags a keeper's trade derives, one row per craft that has a fixed bench: the
 # occupation tag on the left, the place tag it makes on the right. A third craft's
 # workroom is one row here and one occupation tag, nothing else.
-_WORK_TAGS = ((FORGE_WORK, SMITHY), (ALCHEMY_WORK, LAB))
+_WORK_TAGS = ((FORGE_WORK, SMITHY), (ALCHEMY_WORK, LAB), (LEATHER_WORK, TANNERY))
 
 
 def place_tags(place) -> frozenset[str]:
@@ -2285,7 +2316,10 @@ def _place_at(scene, known=()) -> Place | None:
     head, _sep, spot = at.partition(":")
     if not spot or SEP not in head or "/" in spot:
         return None
-    return Place(id=at, name=spot.replace("-", " "), terrain=terrain_of(at))
+    # A ring place's spot carries the `@` that marks it outside (`RING`): the tannery on
+    # the outskirts is `…~grassland:@the-tannery`, and its name is "the tannery".
+    return Place(id=at, name=spot.removeprefix(RING).replace("-", " "), terrain=terrain_of(at),
+                 origin="generated" if spot.startswith(RING) else "")
 
 
 def _actor(scene, ref: str):
@@ -2320,14 +2354,17 @@ def _keeper_works_forge(scene, place, keeper) -> bool:
     return _keeper_works(scene, place, keeper, FORGE_WORK, SMITHY)
 
 
-def _workroom_here(scene, known, place_tag: str, work_tag: str, rate) -> dict | None:
+def _workroom_here(scene, known, place_tag: str, work_tag: str, rate,
+                   outside: bool = False) -> dict | None:
     """The fixed bench the party is standing in, or None — the one reading behind
-    `smithy_here` and `laboratory_here`, so the two benches cannot answer "is this one
-    yours" two ways. `rate(owned_by_party=...)` is the market's answer for the craft.
+    `smithy_here`, `laboratory_here` and `tannery_here`, so the benches cannot answer "is
+    this one yours" two ways. `rate(owned_by_party=...)` is the market's answer for the
+    craft.
 
     **Owned** first: a founded place carrying `place_tag` whose holder — the place's
     `owner` — answers `has_state("holds.place.<slug>")`. **Town** otherwise: urban ground
-    whose keeper works at `work_tag` by occupation."""
+    whose keeper works at `work_tag` by occupation — or, with `outside`, a settlement's
+    ground outside its edge too (the tannery on the outskirts), never somewhere UNDER it."""
     place = _place_at(scene, known)
     if place is None or not has_place_tag(place, place_tag):
         return None
@@ -2346,7 +2383,7 @@ def _workroom_here(scene, known, place_tag: str, work_tag: str, rate) -> dict | 
         return {"kind": "owned", "place": place.id,
                 "keeper": keeper_ref if ours else (getattr(holder, "ref", None) or keeper_ref),
                 "rate_cp_per_hour": rate(owned_by_party=ours)}
-    if terrain_of(place.id) != URBAN:
+    if terrain_of(place.id) != URBAN and not (outside and setting_of(place.id) == "outside"):
         return None
     if not _keeper_works(scene, place, keeper, work_tag, place_tag):
         return None
@@ -2483,8 +2520,10 @@ def _carries(actor, names: frozenset, gear_key: str) -> bool:
         return False
 
 
-def has_field_kit(actor) -> bool:
-    """Whether this actor carries the smith's field kit (contracts §8).
+def has_field_kit(actor, craft: str = "blacksmith") -> bool:
+    """Whether this actor carries `craft`'s field kit — the smith's when no craft is named,
+    which is every caller from before the leatherworker's kit (contracts §8; leatherworking
+    contracts §8 names `craft="leatherworker"`). An unknown craft has no kit: False.
 
     Both stores a carried thing can be in, as `gear.carried` reads them: a counter's
     purchases in `stock` (`goods.deliver` files bought gear there under its name) and the
@@ -2492,7 +2531,8 @@ def has_field_kit(actor) -> bool:
     deletes an empty entry, but a `goods` row can sit at zero. Once the goods row exists
     with a `gear.json` entry, `gear.holds` answers too.
     """
-    return _carries(actor, FIELD_KIT_NAMES, FIELD_KIT)
+    kit = _KITS.get(str(craft or "blacksmith").strip().lower())
+    return _carries(actor, kit[0], kit[1]) if kit else False
 
 
 # The alchemist's field kit (alchemy plan §14: crucible, spirit lamp, a rack of vials, a
@@ -2516,3 +2556,246 @@ def has_alchemy_kit(actor) -> bool:
     """Whether this actor carries the alchemist's field kit (alchemy contracts §9): read
     from the pack exactly as `has_field_kit` reads the smith's."""
     return _carries(actor, ALCHEMY_KIT_NAMES, ALCHEMY_KIT)
+
+
+# --- the tannery and the leatherworker's kit (leatherworking plan §10, contracts §8) ---------
+
+# The words that say a settlement works hides. Its OWN words, facts and paragraphs, read as
+# `implied_spots` reads them, never the player's. Trade nouns only: "leather" alone
+# describes what people WEAR ("leather-clad guards", "iron-studded leather armor" — the
+# second is Pangrella's, said of a person), and a description earns no building; it cues
+# as a phrase, "the leather trade", "leather goods". "hides" and "pelts" alone are not
+# cues either: Aurvantis's otter-herders sell "their pelts to the local market", which is
+# trapping, not tanning. Measured 2026-10-08 across the three shipped exports' settlement
+# words: none of these fires anywhere (their twelve tanneries are all authored rooms), so
+# the cue mints nothing in a shipped world today; it is the rule a world's words meet.
+TANNERY_CUES = ("tanner", "tanners", "tannery", "tanneries", "tanning", "tanyard",
+                "tanyards", "tan pits", "tan-pits", "currier", "curriers", "leatherworker",
+                "leatherworkers", "leatherworking", "the leather trade", "its leather trade",
+                "leather goods", "leather-workers", "the hide trade")
+TANNERY_LABEL = "the tannery"
+TANNERY_ABOUT = "vats sunk in a yard, a lime pit, and the smell, downwind of the last houses"
+
+
+def tannery_implied(location) -> bool:
+    """Whether a settlement's own words name its tanners (`TANNERY_CUES`) — read by
+    `outskirts.ring`, which puts the tannery on the outskirts when the settlement's own
+    places have none."""
+    facts = getattr(location, "facts", None) or {}
+    prose = getattr(location, "prose", "") or ""
+    text = " ".join([*(str(v) for v in facts.values()), str(prose)]).lower()
+    words = set(_WORDS.findall(text))
+    return any(_cue_fires(c, text, words) for c in TANNERY_CUES)
+
+
+def has_a_tannery(home) -> bool:
+    """Whether any of these places is a tannery (`place.tannery`): an author's, the fill's,
+    or one founded in play. The ring adds none beside one the settlement already has."""
+    return any(has_place_tag(p, TANNERY) for p in home or ())
+
+
+# A vat's size and how many a tannery lets out: the plan's proposals (§8.2: "up to 4 hide
+# units of one tannage", "2 sp a day per vat"). How many vats a tannery HAS is not in the
+# plan; four is proposed here, one batch of a large beast or four of a small one, and both
+# kinds of tannery have the same. The UI plan's refusal "the vats here are full" is what
+# the number is for. No book prints a tannery room (Ultimate Campaign's downtime rooms have
+# an alchemy lab and an artisan's workshop and no tannery, checked 2026-10-08), so these
+# are house numbers for the owner to tune.
+VAT_UNITS = 4
+TOWN_TANNERY_VATS = 4
+OWNED_TANNERY_VATS = 4
+
+# What the leatherworker's In-progress entries say about a vat (lane E writes them through
+# `inprogress.begin(..., where="place:<id>", result={...})`). `result["vats"]` is how many
+# vats the batch fills (`vats_for`); an entry at a tannery that says nothing is one vat.
+# `result["vat"] is False` marks work left at a tannery that is NOT in a vat (a hide on the
+# drying rack), which fills none.
+LEATHER_CRAFT = "leatherworker"
+
+
+def vats_for(units) -> int:
+    """How many vats a batch of `units` hide units fills: one per `VAT_UNITS`, begun.
+    Nought for nothing."""
+    import math
+
+    try:
+        u = float(units or 0)
+    except (TypeError, ValueError):
+        return 0
+    return int(math.ceil(round(u, 6) / VAT_UNITS)) if u > 0 else 0
+
+
+def vats_in_use(scene, place_id: str) -> int:
+    """How many of this tannery's vats the party's work fills: every leatherworker entry In
+    progress left at this place, until it is collected — a hide that is ready still sits in
+    the vat. Read off everybody the scene holds (a companion's batch is in the vat too),
+    from the one In-progress store; nothing here keeps a list."""
+    from . import inprogress
+
+    where = f"place:{place_id}"
+    now = int(getattr(scene, "clock_minutes", 0) or 0)
+    used = 0
+    for actor in (getattr(scene, "people", None) or {}).values():
+        for item in (getattr(actor, "stock", None) or {}).values():
+            block = inprogress.work_of(item, now)
+            if not block or str(block.get("where") or "") != where:
+                continue
+            if str(block.get("craft") or "") != LEATHER_CRAFT:
+                continue
+            result = block.get("result") or {}
+            if result.get("vat") is False:
+                continue
+            try:
+                used += max(1, int(result.get("vats") or 1))
+            except (TypeError, ValueError):
+                used += 1
+    return used
+
+
+def tannery_here(scene, known=()) -> dict | None:
+    """The tannery the party is standing in, or None (leatherworking contracts §8).
+
+    {"kind": "town" | "owned", "place": id, "keeper": ref | None,
+     "rate_cp_per_hour": int, "vat_rate_cp_per_day": int, "vats": int, "vats_free": int,
+     "vat_units": int}
+
+    Read exactly as `smithy_here` reads a forge (`_workroom_here`): **owned** when the
+    place was founded (kind `tannery`) and its holder carries `holds.place.<slug>` — its
+    hours and its vats free to the party; **town** when its keeper is a tanner by
+    occupation (`LEATHER_WORK`), the work rented by the hour (`market.tannery_rate`) and
+    each vat by the day (`market.vat_rate`). A town tannery may stand on the settlement's
+    outskirts (`outskirts.ring`), so outside ground counts as the town's; under it (the
+    sewers) never does. A tannery is where the lime pit, the vats and the hardening kettle
+    are: Flense for thick hides, the bark, mineral and planar tannages, and Harden for
+    rare-and-above hides (plan §10, the owner's 2026-10-08 answer 3).
+
+    `vats_free` is `vats` less what the party's own work already fills here
+    (`vats_in_use`), never below nought. The scene's coordinate decides, never the
+    player's words — "I take it to the tannery" said in a meadow is a meadow.
+    """
+    from . import market
+
+    here = _workroom_here(scene, known, TANNERY, LEATHER_WORK, market.tannery_rate,
+                          outside=True)
+    if here is None:
+        return None
+    owned = here["kind"] == "owned"
+    ours = owned and here["rate_cp_per_hour"] == 0
+    vats = OWNED_TANNERY_VATS if owned else TOWN_TANNERY_VATS
+    here["vat_rate_cp_per_day"] = market.vat_rate(owned_by_party=ours)
+    here["vats"] = vats
+    here["vats_free"] = max(0, vats - vats_in_use(scene, here["place"]))
+    here["vat_units"] = VAT_UNITS
+    return here
+
+
+def tannery_in(known) -> Place | None:
+    """The settlement's tannery among `known` (`Engine.places()`), or None: the first
+    ground-floor tannery, in town or on its outskirts, that nobody holds — the one a
+    stranger can rent. For saying where to go, never for deciding the bench, which is
+    `tannery_here`'s and asks where the party stands."""
+    for p in known or ():
+        pid = getattr(p, "id", "") or ""
+        if storey_of(pid) or setting_of(pid) == "under":
+            continue
+        if getattr(p, "owner", "") or not has_place_tag(p, TANNERY):
+            continue
+        return p
+    return None
+
+
+def tannery_line(scene, known=(), location=None) -> str:
+    """Where the leatherworker can tan, in one sentence for the bench to show — "" when
+    the party is standing in a tannery already (the bench says that itself).
+
+    Never claims a tannery a settlement does not have: it names the one among `known`, or
+    says there is none and what still works — the field kit, and a tannery of their own
+    through the `found` door. `location` is the settlement entity when the caller has the
+    world, for its name."""
+    if tannery_here(scene, known) is not None:
+        return ""
+    name = str(getattr(location, "name", "") or "").strip()
+    found = tannery_in(known)
+    if found is not None:
+        where = ""
+        if name:
+            where = (" outside " if setting_of(found.id) == "outside" else " in ") + name
+        return (f"There is a tannery to rent here: {found.name}{where}, its vats by the "
+                f"day and its yard by the hour.")
+    if location is not None and not _settled(location, ""):
+        return ("There is no tannery out here. The field kit works common and uncommon "
+                "hides anywhere; the vats, the lime pit and rare hides wait for a tannery.")
+    where = name or "This place"
+    return (f"{where} has no tannery. The field kit works common and uncommon hides "
+            f"anywhere; bark tanning, the lime pit and rare hides need a tannery — another "
+            f"town's, or one of your own.")
+
+
+# The leatherworker's field kit (plan §10: skinning knife, fleshing beam, round knife, awl
+# and needles, mallet, a small pot; and "a small kettle", the owner's 2026-10-08 answer 3,
+# so it Hardens common and uncommon hides). Its goods row (`rules/goods.py` GEAR,
+# `content/rules/gear.json`) belongs to another lane this wave; until it lands the kit is
+# found by its name in the pack, as the smith's and the alchemist's were, and the market's
+# leatherworker names it on the counter so it is sold the day the row exists.
+LEATHER_KIT = "leatherworker's field kit"
+# Never "kit" or "field kit" alone, for the smith's reason. "leatherworking kit" and
+# "leatherworker's kit" are how people say it; "tanner's kit" is the trade's other name.
+LEATHER_KIT_NAMES = frozenset({
+    LEATHER_KIT, "leatherworkers field kit", "leatherworker's kit", "leatherworkers kit",
+    "leatherworking kit", "tanner's kit", "tanners kit",
+})
+
+# The tiers the field kit reaches (plan §10 and Q6.4: common and uncommon hides anywhere;
+# rare and above need a tannery). The kit's reach is a fact about the KIT, so it lives
+# with the kit; which method needs what is lane E's rule rows.
+KIT_TIERS = ("common", "uncommon")
+
+# Every craft with a field kit: (the names it goes by, its goods key). One table, so
+# `has_field_kit(actor, craft)` cannot answer for one craft the way another does.
+_KITS = {
+    "blacksmith": (FIELD_KIT_NAMES, FIELD_KIT),
+    "alchemist": (ALCHEMY_KIT_NAMES, ALCHEMY_KIT),
+    "leatherworker": (LEATHER_KIT_NAMES, LEATHER_KIT),
+}
+
+
+def has_leather_kit(actor) -> bool:
+    """Whether this actor carries the leatherworker's field kit: read from the pack exactly
+    as `has_field_kit` reads the smith's."""
+    return _carries(actor, LEATHER_KIT_NAMES, LEATHER_KIT)
+
+
+def kit_reaches(tier: str) -> bool:
+    """Whether the field kit alone works (and Hardens) a hide of this tier: common and
+    uncommon."""
+    return str(tier or "common").strip().lower() in KIT_TIERS
+
+
+def leather_bench_here(scene, actor, known=()) -> dict:
+    """Where the leatherworker stands, in one answer for the bench (lane E):
+
+    {"at": "tannery" | "field" | None,   # None: no tannery and no kit, nothing works
+     "tannery": tannery_here(...) | None,
+     "field_kit": bool,
+     "tiers": the hide tiers workable here, Harden included:
+              every tier at a tannery, `KIT_TIERS` with the kit alone, () with neither,
+     "vats": bool}                       # a vat tannage can start here
+
+    The kit's kettle Hardens what the kit reaches (the owner's 2026-10-08 answer 3), so
+    one list answers both. Which METHOD needs which is lane E's rule rows; this only says
+    what the place and the pack give. Read from the scene's coordinate and the pack, never
+    from the player's words.
+    """
+    from . import market
+
+    tannery = tannery_here(scene, known)
+    kit = has_leather_kit(actor)
+    if tannery is not None:
+        tiers = tuple(market.QUOTA)
+    elif kit:
+        tiers = KIT_TIERS
+    else:
+        tiers = ()
+    return {"at": "tannery" if tannery is not None else "field" if kit else None,
+            "tannery": tannery, "field_kit": kit, "tiers": tiers,
+            "vats": tannery is not None}
