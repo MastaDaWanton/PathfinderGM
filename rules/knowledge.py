@@ -66,6 +66,7 @@ _HARM_TYPES = frozenset({"vulnerability", "ability_drain", "bleed"})
 
 HERBALIST, BLACKSMITH, ENCHANTER = "herbalist", "blacksmith", "enchanter"
 ALCHEMIST = "alchemist"
+LEATHERWORKER = "leatherworker"
 
 # A material's lists, in the order their properties are keyed and shown, with the prefix
 # each key carries. "p" sorts first, so an ingredient's key order is untouched.
@@ -74,10 +75,21 @@ ALCHEMIST = "alchemist"
 # forge's lists. Measured before they did: `property_keys` was 0 for all 139 alchemist
 # materials, because this tuple knew only the forge's fields, so nothing about a reagent
 # could ever be learned, taught or shown.
-MATERIAL_LISTS = (("product", "p"), ("weapon", "w"), ("armour", "a"), ("working", "t"),
-                  ("quench_mark", "q"), ("mishap", "m"), ("toxic", "x"))
+#
+# The leatherworker's two (leatherworking contracts §3): a hide's own `shield` list ("s"),
+# and a consumable's one `mark` ("k"). Measured before they joined (lane D's finding,
+# 2026-10-08): `materials.properties` counted both and this tuple neither, so a hide written
+# with a shield list would have had properties the card could never show nor a Grade
+# reveal. Marks are ON HOLD (`materials.MARKS_HELD`, the owner's open point 13): the "k"
+# list is skipped while the door says so, so no mark is ever learned, shown or taught, and
+# enabling marks is that one flag. New letters only: no existing key moves.
+MATERIAL_LISTS = (("product", "p"), ("weapon", "w"), ("armour", "a"), ("shield", "s"),
+                  ("working", "t"), ("quench_mark", "q"), ("mark", "k"), ("mishap", "m"),
+                  ("toxic", "x"))
 # The lists that hold one document rather than a list of them.
-_SINGLE_LISTS = frozenset({"quench_mark", "mishap", "toxic"})
+_SINGLE_LISTS = frozenset({"quench_mark", "mark", "mishap", "toxic"})
+# Lists a rule holds back (`_held_lists`): read by nobody while the hold stands.
+_HOLDABLE = {"mark": "MARKS_HELD"}
 _PREFIX_ORDER = {p: i for i, (_, p) in enumerate(MATERIAL_LISTS)}
 GROUP_OF_PREFIX = {p: g for g, p in MATERIAL_LISTS}
 # Routes on which a product trait lands on whoever the product is used AGAINST (alchemy
@@ -108,7 +120,15 @@ _BAD_TRAITS = frozenset({"slaggy", "sulfurous", "quench_sensitive", "narrow_wind
                          # in a metal vessel, and harm to whoever works it. `volatile` is
                          # the circle's word too, and means a mishap here.
                          "combustible", "slow_to_dissolve", "light_sensitive",
-                         "corrosive", "toxic_to_handle"})
+                         "corrosive", "toxic_to_handle",
+                         # The leatherworker's (rules/effectspec.py LEATHER_WORKING_TRAITS):
+                         # a tannage half again as long, a step off the best result, a dye
+                         # that runs when soaked, an oil that spoils. Measured before: all
+                         # four read as benefits, so a Grade of willow bark could "reveal one
+                         # positive and one negative" with the negative missing and its
+                         # coarse tannage shown as a virtue. `thick` is not here: it is what
+                         # makes hide armour possible, at the price of a lime pit.
+                         "slow_tan", "ceiling_down", "fugitive", "rancid"})
 
 # An essence's discoverable traits (enchanting plan §7.2; lane D's
 # `materials.essence_traits`): what it binds, each house top-up, its phase, its polarity,
@@ -132,9 +152,11 @@ _FOE_TRIGGERS = frozenset({"hit", "crit", "first_wound_daily"})
 # CAMPAIGN_DIR can change what these files say mid-run.
 
 _LORE_FILES = {HERBALIST: "herb-lore.json", BLACKSMITH: "smithing-lore.json",
-               ENCHANTER: "enchanting-lore.json", ALCHEMIST: "alchemy-lore.json"}
+               ENCHANTER: "enchanting-lore.json", ALCHEMIST: "alchemy-lore.json",
+               LEATHERWORKER: "leatherworking-lore.json"}
 _MANUAL_FILES = {HERBALIST: "herbal-manuals.json", BLACKSMITH: "smithing-manuals.json",
-                 ENCHANTER: "enchanting-manuals.json", ALCHEMIST: "alchemy-manuals.json"}
+                 ENCHANTER: "enchanting-manuals.json", ALCHEMIST: "alchemy-manuals.json",
+                 LEATHERWORKER: "leatherworking-manuals.json"}
 # The alchemist's rule rows are not all written yet (alchemy contracts §1: the manuals
 # are lane H's file; no lane owns an alchemy-lore.json in wave 1). Until a file is
 # shipped, its craft reads the herbalist's rows — the plan's own fallback for reagents
@@ -170,10 +192,16 @@ def craft_of(doc_or_craft) -> str:
     alchemy lane F, 2026-10-06): an alchemist is its teacher and a library its record.
     Until then it answered to the smith's (lane A left the switch for the bench lane with
     this file), so a blacksmith taught camphor once lane D's pass gave it properties. A
-    hybrid herb on the alchemy shelf is still a herb, and a healer still teaches it."""
+    hybrid herb on the alchemy shelf is still a herb, and a healer still teaches it.
+
+    A hide, tannin, oil, wax, thread or dye answers to the LEATHERWORKER's rows
+    (content/rules/leatherworking-lore.json, leather lane F, 2026-10-08). Measured before:
+    every one of the 140 leather materials answered to the smith's, so a blacksmith taught
+    deer hide, a guildhall shelved it, and its Grade was the forge's assay (a tenth of a
+    bar, compared against every known material of kind `hide`)."""
     if isinstance(doc_or_craft, str):
-        return doc_or_craft if doc_or_craft in (BLACKSMITH, ENCHANTER, ALCHEMIST) \
-            else HERBALIST
+        return doc_or_craft if doc_or_craft in (BLACKSMITH, ENCHANTER, ALCHEMIST,
+                                                LEATHERWORKER) else HERBALIST
     if is_essence(doc_or_craft):
         return ENCHANTER
     if not is_material(doc_or_craft) or _is_herb_view(doc_or_craft):
@@ -182,7 +210,17 @@ def craft_of(doc_or_craft) -> str:
     fn = getattr(door, "is_alchemy", None) if door is not None else None
     if callable(fn) and isinstance(doc_or_craft, dict) and fn(doc_or_craft):
         return ALCHEMIST
+    if is_leather(doc_or_craft):
+        return LEATHERWORKER
     return BLACKSMITH
+
+
+def is_leather(doc) -> bool:
+    """A leatherworker's material, as the door judges it (`materials.is_leather`): the
+    leather catalogue, or homebrew in one of the leather-only kinds."""
+    door = _door()
+    fn = getattr(door, "is_leather", None) if door is not None else None
+    return bool(isinstance(doc, dict) and callable(fn) and fn(doc))
 
 
 def lore(doc_or_craft=HERBALIST) -> dict:
@@ -404,12 +442,24 @@ def _essence_specs(doc: dict) -> list[tuple[str, dict, str]]:
     return out
 
 
+def _held_lists() -> frozenset:
+    """The lists a standing rule holds back, read off the door each time (so a test, or
+    the owner's decision, flips it in one place): `mark` while `materials.MARKS_HELD`.
+    A door that does not say holds it: a mark is never shown by default."""
+    door = _door()
+    return frozenset(group for group, flag in _HOLDABLE.items()
+                     if door is None or bool(getattr(door, flag, True)))
+
+
 def _material_specs(doc: dict) -> list[tuple[str, dict, str]]:
     """(key, spec, group) per property, in key order."""
     if is_essence(doc):
         return _essence_specs(doc)
     out: list[tuple[str, dict, str]] = []
+    held = _held_lists()
     for group, prefix in MATERIAL_LISTS:
+        if group in held:
+            continue
         raw = doc.get(group)
         if group in _SINGLE_LISTS:
             raw = [raw] if isinstance(raw, dict) else []
@@ -937,6 +987,34 @@ def manual_keys(manual: dict) -> dict[str, list[str]]:
     return out
 
 
+def read_manual(actor, manual: dict, *, clock: int) -> dict:
+    """Read a manual the character holds (any craft's): what it teaches is learned, and a
+    first reading is worth the craft's `manual.mastery` once (`Actor.manuals_read` keeps
+    the record, as the herb bench's reader does). Returns {"revealed": {id: [new keys]},
+    "minutes": the reading's hours, "first": bool, "mp": the mastery owed, "craft"}.
+    The caller passes the minutes and pays the mastery on the craft's own track; this
+    refuses nothing — whether the book is in hand is `holds_manual`, asked first.
+
+    Written for the leatherworker's manuals (plan §16) so the leather bench's reader is
+    one call: before it, only `play/herb_views.herb_manual` read a manual at all, and it
+    reads herbal ones only (`herbknowledge.manual_named` is the herbalist's shelf)."""
+    craft = str(manual.get("craft") or "") or next(
+        (c for c in _MANUAL_FILES if str(manual.get("id")) in manuals(c)), HERBALIST)
+    how = f"read in {manual.get('name') or manual.get('id')}"
+    revealed: dict[str, list[str]] = {}
+    for did, keys in manual_keys(manual).items():
+        new = reveal(actor, did, keys, how)
+        if new:
+            revealed[did] = new
+    read = getattr(actor, "manuals_read", None)
+    first = isinstance(read, list) and str(manual.get("id")) not in read
+    if first:
+        read.append(str(manual.get("id")))
+    mp = int(lore(craft).get("manual", {}).get("mastery", 0)) if first else 0
+    return {"revealed": revealed, "minutes": int(manual.get("hours", 1) or 1) * 60,
+            "first": first, "mp": mp, "craft": craft}
+
+
 def manual_named(said: str, craft: str | None = None) -> dict | None:
     """A manual by id or by name, as the browser or a shelf calls it."""
     said_l = " ".join(str(said or "").lower().split())
@@ -969,19 +1047,106 @@ def known_material(actor, material_id: str) -> bool:
     return bool(entry and entry.get("keys"))
 
 
-def assay_dc(doc, actor) -> int:
+def _assay_rules(doc) -> dict:
+    """The assay's rule rows for this document's craft: the leatherworker's Grade
+    (leatherworking-lore.json `grade`) for a leather material, the forge's `assay` for
+    everything else, as it always was (the alchemist's assay is the forge's rows)."""
+    if is_leather(doc):
+        return lore(LEATHERWORKER)["grade"]
+    return lore(BLACKSMITH)["assay"]
+
+
+def _type_word(raw) -> str | None:
+    """A stat block's creature type as the vocabulary spells it (`effectspec.
+    CREATURE_TYPES`: "magical-beast"), or None. The two bestiary files spell it three
+    ways: "magical beast", "advanced magical beast", and core.json's truncated "magical"
+    (107 blocks) and "monstrous" (55) — measured 2026-10-08. A type contained in the words
+    wins (longest first), then a type the words begin; anything else is no type."""
+    from .effectspec import CREATURE_TYPES
+
+    words = " ".join(re.findall(r"[a-z]+", str(raw or "").lower()))
+    if not words:
+        return None
+    for t in sorted(CREATURE_TYPES, key=len, reverse=True):
+        if f" {t.replace('-', ' ')} " in f" {words} ":
+            return t
+    for t in CREATURE_TYPES:
+        if t.replace("-", " ").startswith(words):
+            return t
+    return None
+
+
+def creature_type_of(creature) -> str | None:
+    """A creature's type from its stat block, by bestiary id or name (`bestiary.
+    raw_block`, the one resolver), or from a block or actor handed in. None when nothing
+    names one."""
+    if creature is None or creature == "":
+        return None
+    if isinstance(creature, dict):
+        return _type_word(creature.get("creature_type"))
+    if not isinstance(creature, str):
+        tid = getattr(creature, "from_template", "") or getattr(creature, "template", "")
+        return creature_type_of(str(tid or "")) if tid else None
+    from . import bestiary
+
+    said = creature.strip().lower()
+    block = bestiary.raw_block(said) or bestiary.raw_block(
+        "-".join(re.findall(r"[a-z0-9]+", said)))
+    return _type_word((block or {}).get("creature_type"))
+
+
+def hide_type(doc, creature=None) -> str | None:
+    """The creature type a hide is compared under (plan §16: "−1 DC for each known hide
+    of the same creature type"), or None.
+
+    The hide's own `creature_type` first (the document's fact, as a World Bible hide
+    states it); then the creature it was taken from, when the caller has one (a generic
+    hide's stock record names its `creature`, contracts §4.1); then the first of its
+    `from_creatures` the bestiary resolves. A generic hide with no creature named has no
+    type: the catalogue's fur hide is every furred beast at once, so it is no reference
+    for any one of them."""
+    doc = resolve(doc)
+    stated = _type_word(_field(doc, "creature_type", None))
+    if stated:
+        return stated
+    got = creature_type_of(creature)
+    if got:
+        return got
+    for name in _field(doc, "from_creatures", None) or ():
+        got = creature_type_of(str(name))
+        if got:
+            return got
+    return None
+
+
+def _comparison_key(doc, creature=None) -> tuple[str, str | None]:
+    """What an assay compares a document against: a hide by its creature type (plan §16,
+    "keyed on type rather than kind"), anything else by its kind (the forge's touchstone
+    rule, which a leather tannin or dye keeps: a known oak bark helps place a hemlock)."""
+    if is_leather(doc) and str(_field(doc, "kind", "")) == "hide":
+        return ("type", hide_type(doc, creature))
+    return ("kind", str(_field(doc, "kind", "") or ""))
+
+
+def assay_dc(doc, actor, creature=None) -> int:
     """The rarity DC (study's: 10 + 5 a band), less 1 for each OTHER material of the same
-    kind the character knows, at most 4 off.
+    kind the character knows, at most 4 off — a hide's of the same creature TYPE.
 
     Assaying is comparison (docs/blacksmithing-prior-art.md §3.8): a touchstone streak is
     read against needles of known fineness, and a spark against sparks you have seen, so
     every metal you know makes the next one easier to place. The cut is by kind (metal
     against metal, ore against ore) because a known fuel says nothing about a new alloy.
+    A hide is graded against hides of its creature type (plan §16): a known wolf pelt
+    says something about a dog's hide and nothing about a basilisk's. A hide with no type
+    (`hide_type` None) is compared with nothing, never with every other untyped hide.
+    `creature` is the creature a harvested hide came from, when the caller has it.
     """
     doc = resolve(doc)
-    rules = lore(BLACKSMITH)["assay"]
+    rules = _assay_rules(doc)
     base = study_dc(doc)
-    kind = str(_field(doc, "kind", "") or "")
+    sort, key = _comparison_key(doc, creature)
+    if key is None:
+        return base
     me = doc_id(doc)
     everything = all_materials()
     same = 0
@@ -989,14 +1154,25 @@ def assay_dc(doc, actor) -> int:
         if mid.startswith("_") or mid == me or not (isinstance(entry, dict) and entry.get("keys")):
             continue
         other = everything.get(mid) or material(mid)
-        if other is not None and str(_field(other, "kind", "")) == kind:
+        if other is None:
+            continue
+        if sort == "type":
+            if str(_field(other, "kind", "")) == "hide" and is_leather(other) \
+                    and hide_type(other) == key:
+                same += 1
+        elif str(_field(other, "kind", "")) == key:
             same += 1
     cut = min(int(rules["comparison_max"]), int(rules["comparison_per_known"]) * same)
     return max(0, base - cut)
 
 
 def assay_cost(doc) -> dict:
-    """A sliver: one ore, or a tenth of a bar (bars track tenths), the owner's ruling."""
+    """A sliver: one ore, or a tenth of a bar (bars track tenths), the owner's ruling. A
+    leather material's is a scrap: a quarter unit of hide (hides track quarters,
+    contracts §4.1), or a quarter measure of a tannin, oil, wax, thread or dye (plan §16:
+    "a quarter unit, or an offcut from any earlier step")."""
+    if is_leather(doc):
+        return {"units": float(lore(LEATHERWORKER)["grade"]["scrap_units"])}
     rules = lore(BLACKSMITH)["assay"]
     kind = str(_field(doc, "kind", "") or "")
     form = str(_field(doc, "form", "") or "")
@@ -1046,7 +1222,10 @@ def danger_of(doc) -> tuple[str, dict] | None:
     carrier effect states no length (it lasts while carried), so the assay's comes from
     the rule row (the book's abysium: 1d4 hours after it is put down).
     """
-    if not is_reactive(doc):
+    if not is_reactive(doc) or is_leather(doc):
+        # No hide bites back when it is graded (the owner, 2026-10-08, open point 10:
+        # "dangerous hides should not bite they should force another round of checks ...
+        # while skinning"): a dangerous body is the harvest's second check, never Grade's.
         return None
     # A danger the material states for the assay itself, when its harm is not a carrier
     # effect: noqual's "magic recoils" (the owner's house rule, 2026-10-04). Its key is
@@ -1068,7 +1247,7 @@ def danger_of(doc) -> tuple[str, dict] | None:
     return None
 
 
-def assay(actor, material_id: str, total: int, *, clock: int) -> dict:
+def assay(actor, material_id: str, total: int, *, clock: int, creature=None) -> dict:
     """Resolve an assay on a Craft total already rolled (the player's die, the smith's
     bonus: `blacksmith.check_terms`).
 
@@ -1088,8 +1267,8 @@ def assay(actor, material_id: str, total: int, *, clock: int) -> dict:
     if doc is None:
         raise KeyError(f"no material called {material_id!r}")
     mid = doc_id(doc)
-    rules = lore(BLACKSMITH)["assay"]
-    dc = assay_dc(doc, actor)
+    rules = _assay_rules(doc)
+    dc = assay_dc(doc, actor, creature)
     margin = int(total) - dc
     success = margin >= 0
     found = danger_of(doc)
@@ -1097,12 +1276,44 @@ def assay(actor, material_id: str, total: int, *, clock: int) -> dict:
     revealed: list[str] = []
     if success:
         landed = {found[0]} if found else set()
+        verb = "graded" if is_leather(doc) else "assayed"
         revealed = reveal(actor, mid, reveal_picks(actor, doc, landed=landed),
-                          f"assayed, day {day_of(clock)}")
+                          f"{verb}, day {day_of(clock)}")
     return {"material": mid, "dc": dc, "total": int(total), "success": success,
             "margin": margin, "revealed": revealed, "cost": assay_cost(doc),
             "minutes": int(rules["minutes"]),
-            "danger": found[1] if found else None}
+            "danger": found[1] if found else None,
+            # What the bench pays for it (`worldclass.STUDY_MP` a property found, 0 for
+            # none: the owner, 2026-10-06), said here so every bench pays one number.
+            "mp": _study_mp() * len(revealed)}
+
+
+def _study_mp() -> int:
+    from . import worldclass
+
+    return int(getattr(worldclass, "STUDY_MP", 1))
+
+
+def grade(actor, material_id: str, total: int, *, clock: int, creature=None) -> dict:
+    """The leatherworker's Grade (plan §16): the assay in leather words. A scrap (a
+    quarter unit) and ten minutes, a Craft roll at the material's rarity DC less 1 for
+    each known hide of the same creature type (at most 4), and a success reveals one
+    benefit and one drawback. No danger: no hide bites back when graded (the owner's
+    answer 10). `creature` is the creature the graded hide came from, when the bench
+    knows it (a generic hide's stock record carries it).
+
+    Resolves on a total already rolled, as `assay` does; the bench takes the scrap
+    (`cost`), passes the minutes and pays `mp` — `worldclass.STUDY_MP` for each property
+    found, 0 when nothing was. Raises KeyError for an id no shelf holds, and ValueError
+    for a material that is not the leatherworker's (an iron bar is assayed at the forge,
+    never graded)."""
+    doc = _assay_doc(material_id)
+    if doc is None:
+        raise KeyError(f"no material called {material_id!r}")
+    if not is_leather(doc):
+        raise ValueError(f"{_field(doc, 'name', material_id)} is not a leatherworker's "
+                         f"material: assay it at the forge instead.")
+    return assay(actor, material_id, total, clock=clock, creature=creature)
 
 
 def apply_danger(engine, actor, material_id: str, effect: dict | None,

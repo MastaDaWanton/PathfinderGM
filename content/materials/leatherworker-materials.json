@@ -10,6 +10,7 @@
    "tier": "common",
    "text": "Thin, close-grained and forgiving. It cuts quiet and stays soft through tanning, so a finished piece moves with the wearer instead of against them.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#b08a5e",
    "pieces": {
     "armour": [
@@ -75,6 +76,7 @@
    "tier": "common",
    "text": "Thick, bristled and dense enough to turn a glancing blade. It never fully softens: worked into armour it is proof but stubborn.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#6b4a32",
    "pieces": {
     "armour": [
@@ -148,6 +150,7 @@
    "tier": "common",
    "text": "A working winter coat. Cloaks and mitts of it keep a traveller moving through weather that stops lesser gear.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#8a8478",
    "pieces": {
     "armour": [
@@ -218,6 +221,7 @@
    "tier": "common",
    "text": "Everyday leather, even-tempered on the rack. The first hide an apprentice ruins, and the second one they do not.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#9a7b5a",
    "pieces": {
     "armour": [
@@ -283,6 +287,7 @@
    "tier": "common",
    "text": "Soft enough to line gloves and boot-tops; goods of it make no sound against each other.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#c2a272",
    "pieces": {
     "armour": [
@@ -353,6 +358,7 @@
    "tier": "common",
    "text": "Broad, unblemished panels — the only common hide that comes off the beast big enough to cut barding from without a seam.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#5a3a26",
    "pieces": {
     "armour": [
@@ -414,6 +420,7 @@
    "tier": "common",
    "text": "Fine-pored and thirsty for the vat. Colours come out of goatskin true, where other leathers go muddy.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#c8ae86",
    "pieces": {
     "armour": [
@@ -479,6 +486,7 @@
    "tier": "common",
    "text": "Supple, patterned and near frictionless once oiled. Sheaths of it draw silent; sleeves of it slide out of a grip.",
    "surface": "scale",
+   "creature_type": "animal",
    "color": "#6f7a3a",
    "pieces": {
     "armour": [
@@ -571,6 +579,7 @@
    "tier": "common",
    "text": "Scaled ridge-plates down the back, soft belly leather beneath — two leathers off one carcass. The back turns a knife; the belly takes tooling.",
    "surface": "scale",
+   "creature_type": "animal",
    "color": "#4f5a38",
    "pieces": {
     "armour": [
@@ -667,6 +676,7 @@
    "tier": "common",
    "text": "A cave-and-crag lizard's hide that keeps its suppleness through tanning where mammal hide stiffens. Armour of it bends where the wearer bends.",
    "surface": "scale",
+   "creature_type": "animal",
    "color": "#7a6a4a",
    "pieces": {
     "armour": [
@@ -760,6 +770,7 @@
    "tier": "common",
    "text": "Clammy in the hand and waterproof on the bench. Satchels of it carry powder and paper dry through a river crossing.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#7d7a4e",
    "pieces": {
     "armour": [
@@ -823,6 +834,7 @@
    "tier": "common",
    "text": "Thin as good parchment and nearly as light. Too weak for armour, perfect for fine tooling, map cases and bellows.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#3e3436",
    "pieces": {
     "armour": [
@@ -883,6 +895,7 @@
    "tier": "common",
    "text": "A trim fur, worth more as border than body. An edging of weasel marks a garment as bought, not bartered.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#8c6a44",
    "pieces": {
     "armour": [
@@ -945,6 +958,7 @@
    "tier": "common",
    "text": "Dense winter hide over large panels. Cloaks of it shrug off sleet, and the wearer's blood stays where it belongs.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#9a7048",
    "pieces": {
     "armour": [
@@ -1020,6 +1034,7 @@
    "tier": "uncommon",
    "text": "Everything boar hide is, doubled. Plates of gristle under the shoulder turn spear-points that would have gone through the beast's lesser cousin.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#4a3424",
    "pieces": {
     "armour": [
@@ -1099,6 +1114,7 @@
    "tier": "uncommon",
    "text": "The frost never quite leaves the fur. A cloak of it is cold on the outside and warm within, whatever the weather is doing.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#d8dde2",
    "pieces": {
     "armour": [
@@ -1166,6 +1182,7 @@
    "tier": "uncommon",
    "text": "Longer-haired than the common wolf and oilier — weather runs off it. The pelt of choice for anyone who works outdoors in the white months.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#b9b4a8",
    "pieces": {
     "armour": [
@@ -1235,6 +1252,7 @@
    "tier": "uncommon",
    "text": "Deep-pile warmth. Bedrolls and sleeping furs of it turn a bare camp into a warm one.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#2e2622",
    "pieces": {
     "armour": [
@@ -1300,6 +1318,7 @@
    "tier": "uncommon",
    "text": "Worn as a mantle with the head and claws attached, it makes the wearer something other than a person to the people looking at them.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#5a4030",
    "pieces": {
     "armour": [
@@ -1374,6 +1393,7 @@
    "tier": "uncommon",
    "text": "White cold-water fur over thick fat-backed leather. It hides a hunter on the ice and keeps the sea's chill out.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#e8e2d4",
    "pieces": {
     "armour": [
@@ -1452,6 +1472,7 @@
    "tier": "uncommon",
    "text": "A wall of a hide. One beast covers a warhorse in barding or a family in tent-leather, and the cold stays on the correct side of both.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#6e5844",
    "pieces": {
     "armour": [
@@ -1521,6 +1542,7 @@
    "tier": "uncommon",
    "text": "A faint mothlight lingers in the scales for a year after the skinning — enough to read by, too little to be seen by.",
    "surface": "scale",
+   "creature_type": "animal",
    "color": "#9ad0a0",
    "pieces": {
     "armour": [
@@ -1582,6 +1604,7 @@
    "tier": "uncommon",
    "text": "The frill, worked into a collar, snaps open when the wearer squares up. People step back before they decide to.",
    "surface": "scale",
+   "creature_type": "animal",
    "color": "#8a6a3a",
    "pieces": {
     "armour": [
@@ -1674,6 +1697,7 @@
    "tier": "uncommon",
    "text": "Eel hide: hagfish-thin strips sewn edge to edge into a sheet that flexes like skin. By the book a suit of it is always masterwork, lighter on the limbs (check penalty one better, Dexterity one higher) and turns 2 points of every lightning strike; it makes only leather, hide or studded leather.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#4a5a6a",
    "pieces": {
     "armour": [
@@ -1755,6 +1779,7 @@
    "tier": "uncommon",
    "text": "Chitin plates on a leather backing, the acid-etched channels still visible. It turns blades well and remembers the burrow poorly.",
    "surface": "chitin",
+   "creature_type": "magical-beast",
    "color": "#8a7a4a",
    "pieces": {
     "armour": [
@@ -1822,6 +1847,7 @@
    "tier": "uncommon",
    "text": "Smoke-grey rosettes that were built for exactly one job. In snow or broken shadow the wearer is a rumour.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#d6d0c4",
    "pieces": {
     "armour": [
@@ -1892,6 +1918,7 @@
    "tier": "uncommon",
    "text": "It stinks faintly forever, and it carries the animal's refusal in the grain. Wearers report a stubbornness that is probably their own.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#3a2a20",
    "pieces": {
     "armour": [
@@ -1961,6 +1988,7 @@
    "tier": "uncommon",
    "text": "Half plumage, half pelt, all argument. Cloaks of it shed rain like a roof and are impossible to mistake for anyone else's cloak.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#6a5038",
    "pieces": {
     "armour": [
@@ -2022,6 +2050,7 @@
    "tier": "uncommon",
    "text": "Feathered forequarters over lion-hide hindquarters. Falconers pay rare-work prices for common-work gloves of it.",
    "surface": "feather",
+   "creature_type": "magical-beast",
    "color": "#b08a4a",
    "pieces": {
     "armour": [
@@ -2091,6 +2120,7 @@
    "tier": "rare",
    "text": "It drinks lamplight. Seams vanish in shadow, and so, very nearly, does the wearer.",
    "surface": "fur",
+   "creature_type": "outsider",
    "color": "#1e1c22",
    "pieces": {
     "armour": [
@@ -2161,6 +2191,7 @@
    "tier": "rare",
    "text": "Warm to the touch years after the beast died. Fire treats garments of it as a professional courtesy.",
    "surface": "scale",
+   "creature_type": "outsider",
    "color": "#c0502a",
    "pieces": {
     "armour": [
@@ -2227,6 +2258,7 @@
    "tier": "rare",
    "text": "Char-black with a brimstone smell no tannin removes. It keeps fire off and puts the fear of somewhere else into onlookers.",
    "surface": "fur",
+   "creature_type": "outsider",
    "color": "#5a2a20",
    "pieces": {
     "armour": [
@@ -2301,6 +2333,7 @@
    "tier": "rare",
    "text": "The biggest bear leather there is, thick enough that arrows read as rain. Armour of it is a wall the wearer carries.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#4a3a2e",
    "pieces": {
     "armour": [
@@ -2378,6 +2411,7 @@
    "tier": "rare",
    "text": "The fangs, mounted at the collar, do the talking. The striped hide behind them confirms it was not bought.",
    "surface": "fur",
+   "creature_type": "animal",
    "color": "#b08040",
    "pieces": {
     "armour": [
@@ -2448,6 +2482,7 @@
    "tier": "rare",
    "text": "Stone-grained scale that takes a polish like marble. Heavy, handsome, and harder than leather has any right to be.",
    "surface": "scale",
+   "creature_type": "magical-beast",
    "color": "#6a7058",
    "pieces": {
     "armour": [
@@ -2538,6 +2573,7 @@
    "tier": "rare",
    "text": "The bulette's back plates, boiled and laced into a coat. By its source a suit of bulette leather has the same numbers as studded leather with no metal in it, so a druid may wear what a smith would otherwise have to stud.",
    "surface": "shell",
+   "creature_type": "magical-beast",
    "color": "#7a6a5a",
    "pieces": {
     "armour": [
@@ -2602,6 +2638,7 @@
    "tier": "rare",
    "text": "Spike-pocked, every scar a socket. Tooled, the pocking patterns into relief work of unusual depth.",
    "surface": "smooth",
+   "creature_type": "magical-beast",
    "color": "#8a5a3a",
    "pieces": {
     "armour": [
@@ -2663,6 +2700,7 @@
    "tier": "rare",
    "text": "Three beasts in one hide — mane, scale and goat-shag — and no two panels match. A patchwork that arrives pre-assembled.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#8a6040",
    "pieces": {
     "armour": [
@@ -2729,6 +2767,7 @@
    "tier": "rare",
    "text": "The beast ran a furnace under polar plating, and the hide keeps both opinions: it insulates against ice and shrugs at flame.",
    "surface": "chitin",
+   "creature_type": "magical-beast",
    "color": "#c86a3a",
    "pieces": {
     "armour": [
@@ -2800,6 +2839,7 @@
    "tier": "rare",
    "text": "Iron-scaled and smelling faintly of rust. It takes metal polish rather than oil, and rings when struck.",
    "surface": "scale",
+   "creature_type": "magical-beast",
    "color": "#6a7a7a",
    "pieces": {
     "armour": [
@@ -2870,6 +2910,7 @@
    "tier": "rare",
    "text": "Four-armed climber's fur out of the dark places. It grips stone and swallows light in the same motion.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#2a2a30",
    "pieces": {
     "armour": [
@@ -2946,6 +2987,7 @@
    "tier": "rare",
    "text": "It smoulders. Whatever colour the vat held, the leather comes out black, and warm, and slightly ashamed of nothing.",
    "surface": "smooth",
+   "creature_type": "outsider",
    "color": "#1a1414",
    "pieces": {
     "armour": [
@@ -3013,6 +3055,7 @@
    "tier": "exotic",
    "text": "Wing leather broad enough to cut a full cloak from a single panel, over body-scale dense enough for armour. The sting scars run through everything.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#5a6a4a",
    "pieces": {
     "armour": [
@@ -3111,6 +3154,7 @@
    "tier": "exotic",
    "text": "Storm-blue scale off a beast that breathed lightning. Current refuses to cross it, which the beast never appreciated and the wearer will.",
    "surface": "scale",
+   "creature_type": "magical-beast",
    "color": "#3a5a8a",
    "pieces": {
     "armour": [
@@ -3199,6 +3243,7 @@
    "tier": "exotic",
    "text": "Ring-segments the size of doors. Armour of it is tunnel-tested against rock, acid and everything the deep places threw at the worm first.",
    "surface": "chitin",
+   "creature_type": "magical-beast",
    "color": "#5a3a6a",
    "pieces": {
     "armour": [
@@ -3269,6 +3314,7 @@
    "tier": "exotic",
    "text": "Shell-margin leather from the beast that boils harbours. It keeps out steam, sea and swords with equal indifference.",
    "surface": "shell",
+   "creature_type": "dragon",
    "color": "#3a5a4a",
    "pieces": {
     "armour": [
@@ -3340,6 +3386,7 @@
    "tier": "exotic",
    "text": "Iridescent plumage over serpent leather, from a creature that was mostly made of goodness. Working it feels like being watched, kindly.",
    "surface": "feather",
+   "creature_type": "outsider",
    "color": "#4ab0a0",
    "pieces": {
     "armour": [
@@ -3410,6 +3457,7 @@
    "tier": "exotic",
    "text": "Scar tissue that remembers regrowing. A rent piece knits itself closed over a week — the garment heals, though the wearer must manage on their own.",
    "surface": "scale",
+   "creature_type": "magical-beast",
    "color": "#4a6a3a",
    "pieces": {
     "armour": [
@@ -3479,6 +3527,7 @@
    "tier": "exotic",
    "text": "What salamander hide wishes it was. It has opinions about fire, and fire has learned to respect them.",
    "surface": "scale",
+   "creature_type": "outsider",
    "color": "#d0402a",
    "pieces": {
     "armour": [
@@ -3546,6 +3595,7 @@
    "tier": "exotic",
    "text": "Feathers that ember at the edges without consuming. A cloak of it warms the dying and has, twice in the histories, refused to let them finish.",
    "surface": "feather",
+   "creature_type": "magical-beast",
    "color": "#f08a2a",
    "pieces": {
     "armour": [
@@ -3613,6 +3663,7 @@
    "tier": "exotic",
    "text": "Taking it is a crime the forest remembers. White past whiteness, warm as a living flank, and quietly good at keeping people alive.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#f2f0ea",
    "pieces": {
     "armour": [
@@ -3683,6 +3734,7 @@
    "tier": "exotic",
    "text": "Brass-maned lion-scale from the deep desert. The roar lives somewhere in it still: the mane bristles when the wearer raises their voice.",
    "surface": "fur",
+   "creature_type": "magical-beast",
    "color": "#c8a050",
    "pieces": {
     "armour": [
@@ -3757,6 +3809,7 @@
    "tier": "legendary",
    "text": "Red dragonhide, the tyrant's scale. By the book the armour itself is immune to fire and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#a8281e",
    "pieces": {
     "armour": [
@@ -3890,6 +3943,7 @@
    "tier": "legendary",
    "text": "Gold dragonhide, a gift, not a kill. By the book the armour itself is immune to fire and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#d4a838",
    "pieces": {
     "armour": [
@@ -4023,6 +4077,7 @@
    "tier": "legendary",
    "text": "Brass dragonhide, the talkative desert dragon. By the book the armour itself is immune to fire and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#c89a48",
    "pieces": {
     "armour": [
@@ -4156,6 +4211,7 @@
    "tier": "legendary",
    "text": "White dragonhide, the ice-hunter. By the book the armour itself is immune to cold and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#e4ecf0",
    "pieces": {
     "armour": [
@@ -4289,6 +4345,7 @@
    "tier": "legendary",
    "text": "Silver dragonhide, the cloud-bright judge. By the book the armour itself is immune to cold and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#c8ccd4",
    "pieces": {
     "armour": [
@@ -4422,6 +4479,7 @@
    "tier": "legendary",
    "text": "Blue dragonhide, the desert-storm watcher. By the book the armour itself is immune to electricity and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#2a58a8",
    "pieces": {
     "armour": [
@@ -4555,6 +4613,7 @@
    "tier": "legendary",
    "text": "Bronze dragonhide, the sea-cliff dragon. By the book the armour itself is immune to electricity and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#8a6a2a",
    "pieces": {
     "armour": [
@@ -4688,6 +4747,7 @@
    "tier": "legendary",
    "text": "Black dragonhide, the swamp ambusher. By the book the armour itself is immune to acid and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#1a1a1e",
    "pieces": {
     "armour": [
@@ -4821,6 +4881,7 @@
    "tier": "legendary",
    "text": "Copper dragonhide, the cliff-climbing trickster. By the book the armour itself is immune to acid and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#b0683a",
    "pieces": {
     "armour": [
@@ -4954,6 +5015,7 @@
    "tier": "legendary",
    "text": "Green dragonhide, the forest liar. By the book the armour itself is immune to acid and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#3a6a3a",
    "pieces": {
     "armour": [
@@ -5087,6 +5149,7 @@
    "tier": "legendary",
    "text": "Umbral dragonhide, the shadow dragon. By the book the armour itself is immune to cold and the wearer is not; energy resistance laid on it later costs a quarter less, it is always masterwork, a druid may wear it, and it is hardness 10. It usually makes hide armour for a wearer one size smaller than the dragon, and its best scales go to the forge.",
    "surface": "scale",
+   "creature_type": "dragon",
    "color": "#2a2433",
    "pieces": {
     "armour": [
@@ -5220,6 +5283,7 @@
    "tier": "legendary",
    "text": "A fragment of the armour of the thing that cannot be killed. Working it blunts tools; wearing it blunts everything else.",
    "surface": "shell",
+   "creature_type": "magical-beast",
    "color": "#5a4a3a",
    "pieces": {
     "armour": [
@@ -5291,6 +5355,7 @@
    "tier": "legendary",
    "text": "Deep-water mantle leather, cold as the trench it ruled. It never dries out, never cracks, and remembers pressure no diver will meet.",
    "surface": "smooth",
+   "creature_type": "magical-beast",
    "color": "#3a2a4a",
    "pieces": {
     "armour": [
@@ -7297,6 +7362,7 @@
    "tier": "common",
    "text": "Plain leather off the farm and the butcher's yard, the tannery's daily bread and every town's. Firm, even and dull, it takes any method and makes anything, and it is what a grip is wrapped in when nobody asks for better.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#8b5a3c",
    "pieces": {
     "armour": [
@@ -7377,6 +7443,7 @@
    "tier": "uncommon",
    "text": "Shark hide, rough as a file in one direction and smooth in the other. Untanned and dried it is shagreen, the grip that never slips wet or bloody; tanned it makes a hard, abrasive coat that swims well.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#7a8a8e",
    "pieces": {
     "armour": [
@@ -7459,6 +7526,7 @@
    "tier": "uncommon",
    "text": "Shagreen proper: a ray's skin, its denticles ground smooth into a pebbled surface hard as horn. Prized for grips and scabbards, and too stiff for much else.",
    "surface": "smooth",
+   "creature_type": "animal",
    "color": "#c9c2b0",
    "pieces": {
     "armour": [
@@ -7539,6 +7607,7 @@
    "tier": "uncommon",
    "text": "The feathered ruff of a griffon, woven into padded cloth. By the book it gives its wearer +2 on Fly checks, and it makes only cloaks, robes, padded or quilted armour; the house adds that the stiff quills turn a blow, at a little weight.",
    "surface": "feather",
+   "creature_type": "magical-beast",
    "color": "#c8a060",
    "pieces": {
     "armour": [
@@ -7604,6 +7673,7 @@
    "tier": "exotic",
    "text": "The skin of a celestial, pale and faintly luminous. By the book a suit of it is always masterwork, hardness 5, makes only leather, hide or studded leather, and hides its wearer's evil from those who look for it; that last the app does not yet model. Taking it is a deed the world remembers.",
    "surface": "smooth",
+   "creature_type": "outsider",
    "color": "#f4ecdc",
    "pieces": {
     "armour": [
@@ -7681,6 +7751,7 @@
    "tier": "rare",
    "text": "Leaves of the darkleaf tree, pressed and woven into a cloth as tough as hide. By the book a suit of it is always masterwork, half the weight, lighter on the limbs (spell failure 10% lower, check penalty 3 better, Dexterity 2 higher) and hardness 10; it makes padded, leather, studded leather or hide armour. It crackles faintly when it moves.",
    "surface": "smooth",
+   "creature_type": "plant",
    "color": "#2e4a2a",
    "pieces": {
     "armour": [

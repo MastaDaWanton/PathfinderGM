@@ -861,7 +861,8 @@ def build_leather(raw: dict, forge_by_id: dict[str, dict]) -> dict:
 
 # Field order in the written file: identity first, the pass's fields next, the old fields
 # last, so a reader of the JSON sees what a material is before what it was.
-_ORDER = ("id", "name", "kind", "tier", "material", "text", "surface", "color", "pieces",
+_ORDER = ("id", "name", "kind", "tier", "material", "text", "surface", "creature_type",
+          "color", "pieces",
           "armour", "weapon", "shield", "working", "book", "always_masterwork",
           "druid_permitted", "allowed_bases", "not_yet", "tannage", "salt", "mark",
           "sold_as", "forms", "price_gp", "obtain", "biomes", "size", "fresh_hours",
