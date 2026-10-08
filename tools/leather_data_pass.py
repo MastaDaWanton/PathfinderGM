@@ -97,7 +97,11 @@ def res(energy, n, **kw):
 
 def dr(n, bypass="", **kw):
     """Damage reduction in the owner's reduced shape (2026-10-08): the creature's DR N/x
-    gives a hide max(1, N/5)/x, rare and up, counted as a house modifier."""
+    gives a hide max(1, N/5)/x, rare and up, counted as a house modifier. Marked
+    `from_creature`, so the build applies it whole from the suit's body and never scales
+    it (the lead's ruling, leatherworking questions: at Crude the forge's sum rounded a
+    DR 1 to 0, breaking the owner's "at least 1")."""
+    kw.setdefault("from_creature", True)
     return _with({"type": "damage_reduction", "amount": n, "bypass": bypass}, kw)
 
 

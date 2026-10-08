@@ -147,8 +147,7 @@ SALT_IDS = ("curing-salt",)
 # have yet: leather lane B adds them (contracts §4.2). `allowed_bases` may name them now so the
 # book restriction is written once; drop a row from here when it lands in the tables
 # (tests/test_leather_materials.py refuses one that already has).
-PENDING_BASES = ("quilted cloth", "leather lamellar", "horn lamellar", "armored coat",
-                 "steel lamellar", "madu")
+PENDING_BASES = ()  # emptied 2026-10-08: lane B added all six table rows
 
 # **Marks are on hold** (the owner, 2026-10-08, leatherworking questions "Plan open points"
 # 13: "explain before deciding"). A consumable carries working traits only until then; the

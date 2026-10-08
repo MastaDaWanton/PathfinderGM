@@ -2185,7 +2185,8 @@
     {
      "type": "damage_reduction",
      "amount": 2,
-     "bypass": "magic"
+     "bypass": "magic",
+     "from_creature": true
     },
     {
      "type": "gear_mod",
@@ -3502,7 +3503,8 @@
     {
      "type": "damage_reduction",
      "amount": 3,
-     "bypass": "magic"
+     "bypass": "magic",
+     "from_creature": true
     },
     {
      "type": "gear_mod",
@@ -3568,7 +3570,8 @@
     {
      "type": "damage_reduction",
      "amount": 3,
-     "bypass": "evil"
+     "bypass": "evil",
+     "from_creature": true
     },
     {
      "type": "skill_mod",
@@ -5236,7 +5239,8 @@
     {
      "type": "damage_reduction",
      "amount": 3,
-     "bypass": "epic"
+     "bypass": "epic",
+     "from_creature": true
     },
     {
      "type": "gear_mod",
