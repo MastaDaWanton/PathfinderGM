@@ -40,7 +40,14 @@ DISCIPLINES = [
     {"id": "blacksmithing", "name": "Blacksmithing", "track": "blacksmith",
      "blurb": "Forge work: weapons, armour, and the tools every other craft needs."},
     {"id": "leatherworking", "name": "Leatherworking", "track": "leatherworker",
-     "blurb": "Hides into armour, straps, cases and bindings."},
+     "blurb": "Hides into armour, straps, cases and bindings.",
+     # The chain bench retired for leatherworking on 2026-10-08: the tanner's own bench
+     # works one step at a time at the table (docs/leatherworking-ui-plan.md §13,
+     # play/leather_views.py). The old chain spent every input on any failure and carried
+     # the tannin's prose onto the finished suit (leatherworking inventory §0.6, §1). The
+     # acquisition hub keeps its leather excursions until the harvest lane replaces Skin.
+     "moved": "Leatherworking is at the table now: open the bench from the table to work "
+              "one step at a time."},
     {"id": "enchanting", "name": "Enchanting", "track": "enchanter",
      "blurb": "Binding lasting magic into objects that will hold it."},
 ]
@@ -434,8 +441,9 @@ def _moved(disc: dict) -> JsonResponse:
     """A discipline whose chains are worked elsewhere now, refused in plain words.
 
     409 rather than 404: the craft exists and the request was well formed; the bench it
-    asked has stopped taking that work. Only herbalism today, retired from this page
-    when it moved to the table's step bench (docs/herbalism-revamp-plan.md).
+    asked has stopped taking that work. Herbalism (docs/herbalism-revamp-plan.md) and
+    leatherworking (docs/leatherworking-ui-plan.md §13), each retired from this page when it
+    moved to its own step bench at the table.
     """
     return JsonResponse({"error": disc["moved"], "moved": True}, status=409)
 
@@ -1099,6 +1107,15 @@ def _fallen(c) -> list[dict]:
             if not a.is_pc and a.is_down]
 
 
+def _is_hide(material_id: str) -> bool:
+    """Whether a material is a hide on the leatherworker's shelf, which spoils green from
+    the minute it is taken (rules/leatherworker.py `freshness`)."""
+    from rules import leatherworker
+
+    doc = leatherworker.material(material_id)
+    return bool(doc) and str(doc.get("kind") or "") == "hide"
+
+
 def _at_market(c) -> bool:
     """Whether there is anybody here to buy from.
 
@@ -1427,8 +1444,17 @@ def craft_excursion(request):
             # at what the roll already earned.
             batch = max(1, 1 + margin // 5)
             counted = {mid: n * batch for mid, n in counted.items()}
+        # A hide taken off a carcass is GREEN, and its clock starts now (contracts §9:
+        # "`craft_excursion` never passes `at_minute`"). Without the minute the leather
+        # bench reads a bare count of hide as a counter's purchase, sold tanned
+        # (`leatherworker._bought_hide`): measured 2026-10-08, a wolf pelt carried the way
+        # this loop carried it reached the rack as "Wolf Fur (oak bark)", form fur, with no
+        # flense, salt or tan ever done; with the minute it is "Green Wolf Pelt", form
+        # green. Only hides: a gathered bark or a bought one keeps no clock.
+        carcass = spec.get("requires") in ("creature", "carcass")
+        skinned_at = c.scene.clock_minutes
         for mid, n in counted.items():
-            pc.carry(mid, n)
+            pc.carry(mid, n, at_minute=skinned_at if carcass and _is_hide(mid) else None)
         names = {m.id: m.name for m in pool}
         haul = [{"id": mid, "name": names.get(mid, mid), "count": n}
                 for mid, n in sorted(counted.items())]
