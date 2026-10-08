@@ -1338,9 +1338,17 @@
     return A.api("/api/alchemy/collect", { key: key, wait: true }).then(function (r) {
       A.busy = false;
       if (before != null && r.clock) C.turnClock(before, r.clock.minute);
+      // What the wait cost the body (the food and water out of the pack, the nights) and,
+      // when the pack ran out first, why the wait stopped short: the server's own words
+      // (`Scene.wait`, survival.lived_said / stopped_said). A stopped wait collected nothing.
+      if (r.stopped) {
+        A.say((r.waited ? "You wait " + A.minutes(r.waited) + ". " : "") + (r.body || []).join(" "));
+        return A.refresh();
+      }
       A.result = { collected: r, method: A.order.method };
       A.emit("result", A.result);
-      A.say((r.waited ? "You wait " + A.minutes(r.waited) + ". " : "") + (r.said || ""));
+      A.say((r.waited ? "You wait " + A.minutes(r.waited) + ". " : "")
+        + ((r.body || []).length ? r.body.join(" ") + " " : "") + (r.said || ""));
       try { document.dispatchEvent(new CustomEvent("works:collected", { detail: { key: key, said: r.said } })); } catch (err) { /* */ }
       return A.refresh();
     }).then(function () {

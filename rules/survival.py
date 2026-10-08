@@ -101,6 +101,40 @@ COLLAPSE_SLEEP_MINUTES = 8 * MINUTES_PER_HOUR
 # act that meets it: (third person, as the tells say it; the bare verb).
 WITHHELD_NEEDS = {"thirst": ("drinks", "drink"), "hunger": ("eats", "eat")}
 
+# What a day of living costs, from the pack (CRB p.444, Starvation and Thirst): "Characters
+# need at least a gallon of fluids and about a pound of decent food per day to avoid
+# starvation. (Small characters need half as much.) In very hot climates, characters need
+# two or three times as much water to avoid dehydration." Gallons and pounds because those
+# are the book's units, and a waterskin "holds about 1/2 gallon of liquid" (CRB p.158,
+# Ultimate Equipment p.58), so a day is two of them. The hot climate is read as the desert
+# biome at the book's lower figure, two.
+WATER_GALLONS_PER_DAY = 1.0
+FOOD_LB_PER_DAY = 1.0
+HOT_WATER = {"desert": 2.0}
+HALF_RATIONS = frozenset({"small", "tiny", "diminutive", "fine"})
+
+# The shortest stretch of time a body LIVES through rather than merely spends: a day, the
+# interval a meal is due on. A wait the player asked for that long eats, drinks and sleeps
+# from what is carried (`charge`'s `live`); anything shorter behaves exactly as it always
+# did, so "I wait an hour" never empties a waterskin.
+#
+# Measured 2026-10-08 (the leatherworking bench lane), in the released game: a 21-day bark
+# tannage's Wait for it killed a scratch character of thirst — twice, the second time
+# carrying 40 waterskins — and the bench said only "You waited 21 days. You take the
+# leather out"; an 8-day enchanting binding wait had killed an unfed character the same
+# way. `Scene.advance` charged the body every hour of it and nothing in the clock's door
+# ever ate or drank: only a march's camp did, and a wait has no camp. Fallout: New Vegas's
+# hardcore mode is the cautionary tradition — its needs rise through the Wait and Sleep
+# menus with nothing eaten, characters died in their sleep, and the community answered
+# with mods ("NO Dying on rest in Hardcore Mode"). RimWorld's caravans are the shape kept
+# here: members eat from the caravan's own inventory as they need to, and the forming
+# screen says how many days the food lasts before anyone leaves.
+LIVED_MINUTES = HOURS_PER_DAY * MINUTES_PER_HOUR
+DAY_MINUTES = HOURS_PER_DAY * MINUTES_PER_HOUR
+
+# Which pack verb meets which need, and the counter the meal resets.
+PROVISIONS = {"water": ("watered_minutes", NO_WATER), "food": ("fed_minutes", NO_FOOD)}
+
 
 @dataclass
 class Toll:
@@ -129,6 +163,17 @@ class Toll:
     # The night's own sentences when the sleep ended in waking (`Actor.sleep_through`):
     # pools and slots back, the morning's preparation, a level settled.
     rested: list[str] = None
+    # A stretch lived through (`live`): what was eaten and drunk from the pack, one record
+    # per thing spent ({"need", "name", "count", "amount"}), the nights slept inside it,
+    # and the needs that came due with nothing carried to meet them.
+    meals: list[dict] = None
+    nights: int = 0
+    ran_out: list[str] = None
+    # A wait cut short because the pack ran out (`Scene.wait`): the need that stopped it,
+    # the minutes waited and the minutes not.
+    stopped: str = ""
+    waited: int = 0
+    unwaited: int = 0
 
     def __post_init__(self):
         if self.checks is None:
@@ -137,6 +182,10 @@ class Toll:
             self.conditions = []
         if self.rested is None:
             self.rested = []
+        if self.meals is None:
+            self.meals = []
+        if self.ran_out is None:
+            self.ran_out = []
 
     @classmethod
     def from_record(cls, r: dict) -> "Toll":
@@ -151,7 +200,13 @@ class Toll:
                    lethal=int(r.get("lethal") or 0),
                    withheld=int(r.get("withheld") or 0),
                    unmended=int(r.get("unmended") or 0),
-                   rested=list(r.get("rested") or []))
+                   rested=list(r.get("rested") or []),
+                   meals=[dict(m) for m in r.get("meals") or []],
+                   nights=int(r.get("nights") or 0),
+                   ran_out=list(r.get("ran_out") or []),
+                   stopped=str(r.get("stopped") or ""),
+                   waited=int(r.get("waited") or 0),
+                   unwaited=int(r.get("unwaited") or 0))
 
     @property
     def ok(self) -> bool:
@@ -161,11 +216,19 @@ class Toll:
     def happened(self) -> bool:
         """Anything the player is owed a sentence about."""
         return bool(self.checks or self.fell_asleep or self.woke or self.knocked_out
-                    or self.came_round or self.unmended)
+                    or self.came_round or self.unmended or self.meals or self.nights
+                    or self.ran_out or self.stopped)
 
     def absorb(self, other: "Toll") -> None:
         """Fold one hour's toll into the stretch's."""
         self.checks.extend(other.checks)
+        self.meals.extend(other.meals)
+        self.nights += other.nights
+        self.ran_out.extend(n for n in other.ran_out if n not in self.ran_out)
+        if other.stopped:
+            self.stopped = other.stopped
+        self.waited += other.waited
+        self.unwaited = max(self.unwaited, other.unwaited)
         self.nonlethal += other.nonlethal
         self.lethal += other.lethal
         self.withheld += other.withheld
@@ -183,7 +246,10 @@ class Toll:
                 "woke": self.woke, "knocked_out": self.knocked_out,
                 "came_round": self.came_round, "lethal": self.lethal,
                 "withheld": self.withheld, "unmended": self.unmended,
-                "rested": list(self.rested)}
+                "rested": list(self.rested), "meals": [dict(m) for m in self.meals],
+                "nights": self.nights, "ran_out": list(self.ran_out),
+                "stopped": self.stopped, "waited": self.waited,
+                "unwaited": self.unwaited}
 
 
 def exempt(actor, rule: str) -> bool:
@@ -418,8 +484,104 @@ def _wake(actor, toll: Toll, dice=None) -> None:
                            + (f", {grants}" if grants else "") + ".")
 
 
+def daily_need(actor, need: str, biome: str = "") -> float:
+    """A day's water in gallons or a day's food in pounds for this body (CRB p.444)."""
+    small = str(getattr(actor, "size", "medium") or "medium").lower() in HALF_RATIONS
+    base = WATER_GALLONS_PER_DAY if need == "water" else FOOD_LB_PER_DAY
+    if need == "water":
+        base *= HOT_WATER.get((biome or "").strip().lower(), 1.0)
+    return base * (0.5 if small else 1.0)
+
+
+def _due(actor, toll: Toll) -> bool:
+    """Anything `_provide` would see to now — counters only, so the hourly step asks the
+    sheet nothing until a day's mark comes round."""
+    for need, (counter, rule) in PROVISIONS.items():
+        if need not in toll.ran_out and int(getattr(actor, counter, 0) or 0) >= DAY_MINUTES \
+                and not exempt(actor, rule):
+            return True
+    return (int(getattr(actor, "awake_minutes", 0) or 0)
+            >= AWAKE_GRACE_HOURS * MINUTES_PER_HOUR and not exempt(actor, NO_SLEEP))
+
+
+def _up(actor) -> bool:
+    """Whether the body can see to itself: eat, drink, lie down. Not out cold, not in the
+    sleep a failed night took them into, not dead, and free to act."""
+    return asleep(actor) is None and not actor.is_down and actor.can_act()
+
+
+def _provide(actor, toll: Toll, biome: str) -> None:
+    """A body living through a stretch sees to itself as each need comes due: a day's
+    water once a day since the last drink, a day's food once a day since the last meal,
+    out of the pack (`gear.provide`, the reader of the pack's `eat`/`drink` verbs), and a
+    night's sleep once it has been up a day.
+
+    Due at a day, not at the grace: the book's rate is a gallon and a pound "per day", and
+    a character who waits until thirst bites before drinking is not living through a wait,
+    they are rationing. The meal goes through `eat` and `drink`, the same reset `_op_eat`
+    and a march's camp use, and the night through `sleep`, the camp's own — so nothing
+    here is a second ticker (law 2): the counters move only in `charge`, and only those
+    three doors put them back. A need due with too little carried is noted once in
+    `ran_out` and left to the ordinary checks, which tell the rest; `Scene.wait` stops the
+    wait before those checks begin.
+    """
+    from . import gear as gear_mod
+
+    for need, (counter, rule) in PROVISIONS.items():
+        if need in toll.ran_out or exempt(actor, rule) \
+                or int(getattr(actor, counter, 0) or 0) < DAY_MINUTES:
+            continue
+        spent = gear_mod.provide(actor, need, daily_need(actor, need, biome))
+        if spent is None:
+            toll.ran_out.append(need)
+            continue
+        toll.meals.extend(spent)
+        freed = drink(actor) if need == "water" else eat(actor)
+        if freed:
+            toll.rested.append(released_said(actor, "thirst" if need == "water"
+                                             else "hunger", freed))
+    if not exempt(actor, NO_SLEEP) \
+            and int(getattr(actor, "awake_minutes", 0) or 0) >= AWAKE_GRACE_HOURS * MINUTES_PER_HOUR:
+        sleep(actor)
+        toll.nights += 1
+
+
+def lasts(actor, minutes: int, biome: str = "") -> tuple[int, str]:
+    """How many of `minutes` a body living through them (`_provide`) is carried by its
+    pack, and the need that ends it sooner ("" when the pack lasts the whole stretch).
+
+    The end is the hour the book's grace runs out after the last meal or drink the pack
+    can pay for — the hour before the first check of thirst or hunger would be rolled — so
+    a wait stopped here has cost the body nothing it will not get back by eating. Worked
+    from the same counters, the same daily need and the same greedy spend (`gear.portions`)
+    `_provide` uses, so the two cannot disagree about what the pack holds.
+    """
+    from . import gear as gear_mod
+
+    minutes = max(0, int(minutes))
+    best, why = minutes, ""
+    for need, (counter, rule) in PROVISIONS.items():
+        if exempt(actor, rule):
+            continue
+        grace = (hours_until_thirsty(actor) if need == "water"
+                 else hours_until_hungry(actor)) * MINUTES_PER_HOUR
+        now = int(getattr(actor, counter, 0) or 0)
+        portions = gear_mod.portions(actor, need, daily_need(actor, need, biome))
+        first = max(0, DAY_MINUTES - now)
+        if portions:
+            last = first + (portions - 1) * DAY_MINUTES
+            if last >= minutes:
+                continue
+            ends = last + grace
+        else:
+            ends = max(0, grace - now)
+        if ends < best:
+            best, why = ends, need
+    return best, why
+
+
 def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = None,
-           roll: bool = True) -> Toll:
+           roll: bool = True, live: bool = False) -> Toll:
     """Spend `minutes` of a body's time, and roll every check those minutes owe.
 
     The one place a body's hour is spent. Each counter's hour boundaries are walked in
@@ -482,6 +644,11 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
         if nap is not None and sleep_left(actor) <= 0:
             _wake(actor, toll, dice)
             woke = True
+
+        # Living through it: the meal, the drink and the night come before the hour's
+        # checks, so a body that eats at the day's mark is never asked about hunger.
+        if live and _due(actor, toll) and _up(actor):
+            _provide(actor, toll, biome)
 
         watered = int(actor.watered_minutes)
         if (watered % MINUTES_PER_HOUR == 0 and not exempt(actor, NO_WATER)
@@ -576,7 +743,7 @@ def pass_hours(actor, hours: int, dice, biome: str = "") -> Toll:
     return toll
 
 
-def said(actor, toll: Toll) -> list[str]:
+def said(actor, toll: Toll, biome: str = "") -> list[str]:
     """The body's stretch, as the tells the narrator is fed (law 3).
 
     One sentence per failed check — each one changed a number or a state — and one for
@@ -616,7 +783,16 @@ def said(actor, toll: Toll) -> list[str]:
         out.append(f"{name} comes round.")
     if toll.woke:
         out.append(f"{name} wakes after eight hours' sleep where they dropped.")
-        out.extend(toll.rested)
+    out.extend(toll.rested)
+    lived = lived_said(actor, toll)
+    if lived:
+        out.append(lived)
+    for need in toll.ran_out:
+        if need != toll.stopped:
+            out.append(f"{name} has no {_NEED_WORDS[need][0]} in the pack to "
+                       f"{'drink' if need == 'water' else 'eat'} when the day comes round.")
+    if toll.stopped:
+        out.append(stopped_said(actor, toll, biome))
     # What thirst and hunger hold is said where the healing met it, not where it was
     # dealt: "It costs Sammy 4 non-lethal damage" already told the blow, and the reader
     # learns the rule the first time an hour's rest does not take it off.
@@ -625,6 +801,80 @@ def said(actor, toll: Toll) -> list[str]:
         if line:
             out.append(line)
     return out
+
+
+_NEED_WORDS = {"water": ("water", "drink", "gallon"), "food": ("food", "meal", "pound")}
+
+
+def _span(minutes: int) -> str:
+    """Exact days and hours, never rounded up: "2 days 6 hours", "5 hours"."""
+    m = max(0, int(minutes))
+    d, rest = divmod(m, DAY_MINUTES)
+    h = rest // MINUTES_PER_HOUR
+    bits = []
+    if d:
+        bits.append(f"{d} day{'s' if d != 1 else ''}")
+    if h or not d:
+        bits.append(f"{h} hour{'s' if h != 1 else ''}")
+    return " ".join(bits)
+
+
+def _amount(x: float) -> str:
+    return str(int(x)) if float(x).is_integer() else f"{x:g}"
+
+
+def lived_said(actor, toll: Toll) -> str:
+    """What living through the stretch cost, in one sentence for the narrator (law 3):
+    the food and water spent out of the pack, by what was spent, and the nights slept.
+    The brief's own example: "ate 21 rations, drank 21 gallons of water"."""
+    if not (toll.meals or toll.nights):
+        return ""
+    name = getattr(actor, "name", "") or "They"
+    parts: list[str] = []
+    for need, verb, unit in (("food", "eats", "pound"), ("water", "drinks", "gallon")):
+        rows = [m for m in toll.meals if m.get("need") == need]
+        if not rows:
+            continue
+        total = sum(float(m.get("amount") or 0) for m in rows)
+        by: dict[str, int] = {}
+        for m in rows:
+            by[str(m.get("name"))] = by.get(str(m.get("name")), 0) + int(m.get("count") or 0)
+        # "42 of their waterskins", not "...waterskin" (seen live 2026-10-08): the pack
+        # keeps a thing under its singular name, the sentence counts them.
+        what = ", ".join(f"{n} of their {k}{'' if n == 1 or k.endswith('s') else 's'}"
+                         for k, n in by.items())
+        noun = "food" if need == "food" else "water"
+        parts.append(f"{verb} {_amount(total)} {unit}{'s' if total != 1 else ''} of {noun} "
+                     f"({what})")
+    if toll.nights:
+        parts.append(f"sleeps {toll.nights} night{'s' if toll.nights != 1 else ''}")
+    joined = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    return f"Through the wait {name} {joined}."
+
+
+def stopped_said(actor, toll: Toll, biome: str = "") -> str:
+    """Why a wait the player asked for ended short, or never began — said in words, with
+    what a day needs, because the alternative the tradition shows is a corpse."""
+    name = getattr(actor, "name", "") or "They"
+    what, act, unit = _NEED_WORDS.get(toll.stopped, ("supplies", "meal", ""))
+    need = daily_need(actor, toll.stopped, biome) if toll.stopped in PROVISIONS else 0
+    hint = (f" A day needs {_amount(need)} {unit}{'s' if need != 1 else ''} of {what}"
+            + ("; a waterskin holds half a gallon." if toll.stopped == "water" else ".")
+            if need else "")
+    if toll.waited:
+        return (f"{name} stops waiting after {_span(toll.waited)}, with "
+                f"{_span(toll.unwaited)} still to go: there is no {what} in the pack, "
+                f"and they cannot go longer without a {act}.{hint}")
+    return (f"{name} cannot wait {_span(toll.unwaited)}: there is no {what} in the pack, "
+            f"and they cannot go longer without a {act}.{hint}")
+
+
+def wait_lines(passed: dict, ref: str) -> list[str]:
+    """The body's sentences for one creature out of a `Scene.wait`/`advance` result, for a
+    bench page to show beside its own words. The record stays queued for the narrator
+    (`Scene.take_body_said`): the page reads it, it does not take it."""
+    return [str(s) for r in (passed or {}).get("body") or ()
+            if str(r.get("ref")) == str(ref) for s in r.get("said") or ()]
 
 
 def refused(actor, wanted: int, had: int) -> int:
@@ -780,9 +1030,9 @@ def released_said(actor, need: str, points: int) -> str:
     return f"The {need} damage on {name} ({points}) can mend now."
 
 
-__all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "NO_FOOD", "NO_SLEEP", "NO_WATER",
-           "SLEEP_SOURCE", "Strain", "Toll", "WITHHELD_NEEDS", "asleep", "awake_dc",
-           "charge", "drink", "eat", "exempt", "hardship", "hours_until_hungry",
-           "hours_until_thirsty", "hunger_dc", "pass_hours", "refused", "released_said",
-           "said", "sleep", "sleep_left", "state", "strains", "thirst_dc", "unmended",
-           "unmended_said"]
+__all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "LIVED_MINUTES", "NO_FOOD", "NO_SLEEP",
+           "NO_WATER", "SLEEP_SOURCE", "Strain", "Toll", "WITHHELD_NEEDS", "asleep",
+           "awake_dc", "charge", "daily_need", "drink", "eat", "exempt", "hardship",
+           "hours_until_hungry", "hours_until_thirsty", "hunger_dc", "lasts", "lived_said",
+           "pass_hours", "refused", "released_said", "said", "sleep", "sleep_left", "state",
+           "stopped_said", "strains", "thirst_dc", "unmended", "unmended_said"]

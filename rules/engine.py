@@ -1272,7 +1272,7 @@ class Scene:
     ROUNDS_PER_MINUTE = 10
 
     def advance(self, minutes: int = 0, rounds: int | None = None,
-                charge_body: bool = True) -> dict:
+                charge_body: bool = True, live: bool | None = None) -> dict:
         """Move the world clock, and expire what that much time expires.
 
         The one door. Six places moved `clock_minutes` and two of them expired anything:
@@ -1287,8 +1287,16 @@ class Scene:
         under-resolve. Time passing ends things; it does not make them happen again.
 
         Returns what ended, so the caller can say so — four of the six threw that away.
+
+        `live`: the player's body lives through the stretch — eats and drinks from the pack
+        and sleeps as each comes due (`survival._provide`). `None` decides by length: a
+        stretch of a day or more (`survival.LIVED_MINUTES`) is lived through, anything
+        shorter is spent exactly as before. A chosen wait goes through `wait`, which also
+        stops it where the pack runs out.
         """
         minutes = max(0, int(minutes))
+        if live is None:
+            live = minutes >= survival.LIVED_MINUTES
         # Rounds may be stated directly, because a round is finer than a minute and
         # the conversion floors. `advance_time` may be asked for five rounds, and
         # deriving rounds from `minutes` alone made that five-round advance tick
@@ -1332,10 +1340,11 @@ class Scene:
             rolls = bool(charge_body and minutes and a.is_pc and self._dice is not None)
             if charge_body and minutes:
                 toll = survival.charge(a, minutes, self._dice, biome=self.biome,
-                                       clock=started if rolls else None, roll=rolls)
+                                       clock=started if rolls else None, roll=rolls,
+                                       live=bool(live and rolls))
                 if toll.happened:
                     record = {"ref": a.ref, "kind": "body", **toll.as_dict(),
-                              "said": survival.said(a, toll)}
+                              "said": survival.said(a, toll, self.biome)}
                     body.append(record)
                     self._body_said.append(record)
             # A class's prohibition settled BEFORE the tick (`classfeatures.settle`): a suit
@@ -1435,6 +1444,46 @@ class Scene:
                     self._works_said.append(record)
         return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body,
                 "ready": ready}
+
+    def wait(self, minutes: int, rounds: int | None = None) -> dict:
+        """A wait the player chose — the benches' Wait for it, "I wait three days" — lived
+        through, and stopped where the pack runs out.
+
+        Short of a day it is `advance` exactly, and costs what it always cost. A day or
+        more, the player's body eats, drinks and sleeps from what it carries
+        (`advance(live=True)`), and when the pack cannot carry it the whole way the wait
+        ends at the hour the book's grace would run out after the last meal or drink
+        (`survival.lasts`) — before a single check of thirst or hunger — and says so: a
+        `stopped` body record, told like every other body toll (law 3), and handed back
+        here as `stopped`/`unwaited` so a bench can say it on its own page. Measured
+        2026-10-08 before this door: a 21-day bark tannage waited through `advance` killed
+        a character carrying 40 waterskins, and the bench said "You waited 21 days."
+
+        Returns `advance`'s dict, plus `asked` (the minutes asked for), `stopped` (the need
+        that cut it short, or "") and `unwaited`.
+        """
+        minutes = max(0, int(minutes))
+        pc = self.pc()
+        if (pc is None or minutes < survival.LIVED_MINUTES or self._dice is None
+                or pc.has_state("state.down.dead")):
+            passed = self.advance(minutes, rounds=rounds)
+            return {**passed, "asked": minutes, "stopped": "", "unwaited": 0}
+        covered, short = survival.lasts(pc, minutes, biome=self.biome)
+        if not short:
+            passed = self.advance(minutes, rounds=rounds, live=True)
+            return {**passed, "asked": minutes, "stopped": "", "unwaited": 0}
+        passed = (self.advance(covered, live=True) if covered
+                  else {"minutes": 0, "rounds": 0, "ended": [], "body": [], "ready": []})
+        # The stop rides on the player's own body record for the stretch, so the narrator
+        # hears one toll — what the wait cost, then why it ended — and not two.
+        record = next((r for r in passed["body"] if r.get("ref") == pc.ref), None)
+        if record is None:
+            record = {"ref": pc.ref, "kind": "body", **survival.Toll().as_dict()}
+            passed["body"].append(record)
+            self._body_said.append(record)
+        record.update(stopped=short, waited=covered, unwaited=minutes - covered)
+        record["said"] = survival.said(pc, survival.Toll.from_record(record), self.biome)
+        return {**passed, "asked": minutes, "stopped": short, "unwaited": minutes - covered}
 
     def _settle_curse_days(self, a: "Actor", days: int) -> list[str]:
         """Each requirement-cursed item this creature carries, settled for the day that
@@ -3721,7 +3770,7 @@ class Engine:
                 # the night a collapse woke into) was dropped here in silence.
                 for r in rows:
                     toll.absorb(survival.Toll.from_record(r))
-                said = survival.said(who, toll)
+                said = survival.said(who, toll, self.scene.biome)
             else:
                 said = [s for r in rows for s in r.get("said") or []]
             tell = " ".join(said)
@@ -16784,9 +16833,18 @@ class Engine:
         # Both, because they are not interchangeable here: the clock moves in whole
         # minutes and the tick is in rounds, and "five rounds pass" must expire a
         # five-round buff even though it moves the clock by nothing.
-        passed = self.scene.advance(minutes, rounds=rounds)
+        # A wait the player chose (`Scene.wait`): a day or more is lived through on what
+        # the pack carries, and stops where it runs out — the stop is told with the body's
+        # toll at the end of the batch (`_body_settles`), so here it is only the hours.
+        passed = self.scene.wait(minutes, rounds=rounds)
         ended: list[str] = list(passed["ended"])
         tell = f"{amount} {unit}{'s' if amount != 1 else ''} pass."
+        if passed.get("stopped"):
+            minutes = int(passed["minutes"])
+            rounds = int(passed["rounds"])
+            asked = f"{amount} {unit}{'s' if amount != 1 else ''}"
+            tell = (f"The wait ends after {survival._span(minutes)} of the {asked} asked."
+                    if minutes else f"The wait of {asked} does not begin.")
         if ended:
             tell += " Ended: " + ", ".join(ended) + "."
         return Outcome(

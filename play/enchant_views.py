@@ -32,7 +32,7 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import crafting, effectspec, sky, worldclass
+from rules import crafting, effectspec, sky, survival, worldclass
 from rules import enchanter as en
 
 from . import campaign as campaign_mod
@@ -703,15 +703,24 @@ def enchant_wait(request):
     now = _now(c)
     minutes = sky.next_phase(phase, now)
     ended = {}
+    lived: list[str] = []
     if minutes > 0:
-        ended = c.scene.advance(minutes) or {}
-        c.transcript.append({"who": "gm", "kind": "consequence", "text": (
-            f"{pc.name} waits {sky.span_words(minutes)} for {phase}.")})
+        # `Scene.wait`, the player's chosen wait: under a day (a phase is always under a
+        # day) it is `advance` exactly; the door is shared so a longer one cannot forget
+        # the pack (measured 2026-10-08: long waits through `advance` killed characters
+        # carrying food and water).
+        ended = c.scene.wait(minutes) or {}
+        minutes = int(ended.get("minutes", minutes))
+        lived = survival.wait_lines(ended, pc.ref)
+        c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
+            [f"{pc.name} waits {sky.span_words(minutes)} for {phase}."] + lived)})
         c.save()
     said = [str(x) for x in (ended.get("ended") or [])] if isinstance(ended, dict) else []
     return JsonResponse({"waited": minutes, "phase": phase,
                          "words": sky.words(_now(c), phase), "clock": _clock(c),
-                         "hour": _hour(c), "ended": said, "works": _works(c, pc)})
+                         "hour": _hour(c), "ended": said, "body": lived,
+                         "stopped": str(ended.get("stopped") or ""),
+                         "works": _works(c, pc)})
 
 
 # --- perks -------------------------------------------------------------------------------
