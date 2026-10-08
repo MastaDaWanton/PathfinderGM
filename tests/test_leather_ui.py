@@ -433,6 +433,14 @@ def test_the_conversion_notice_is_shown_once_through_the_bench(bench, monkeypatc
         assert post(bench, "/api/leather/seen", {"key": "x"}).status_code == 501
     seen = []
     fake = types.ModuleType("rules.leather_migration")
+    # The rest of the real module stays: lanes I+W hook it into every save
+    # (`sheet.to_dict` -> `stamp_save`), so a fake with only the two notice functions made
+    # the seen POST answer 500 once they were merged (measured 2026-10-08).
+    if importlib.util.find_spec("rules.leather_migration") is not None:
+        import importlib as _il
+
+        fake.__dict__.update({k: v for k, v in vars(_il.import_module(
+            "rules.leather_migration")).items() if not k.startswith("__")})
     fake.conversions = lambda pc: [{"key": "note", "name": "Your leatherwork, on the new bench",
                                     "seen": "note" in seen, "changes": ["Now Leatherworker 2"]}]
     fake.conversion_seen = lambda pc, key=None: seen.append(key)
