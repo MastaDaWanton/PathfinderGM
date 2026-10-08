@@ -692,3 +692,16 @@ proposal stands. These override the plan and the contracts wherever they differ.
   show, no effect in play" on crafted leather armour; the bench clasps overflow every layer by
   6px (shared bench). The long-wait death (Scene.advance never eats or drinks) is being fixed on
   master by its own lane (fix/long-waits-eat-and-drink).
+
+## Deeds and marks, answered 2026-10-08 (docs/deeds-plan.md §14)
+
+| # | Point | Answer |
+|---|---|---|
+| 1 | Murder's weight | **Keep −5 in all** (−2 violence, −3 kill). |
+| 2 | Evil/good spells | **Yes, −1 / +1, each kind once per game day.** |
+| 3 | Which outsiders are good | **Either the good subtype or a printed good alignment** (58). |
+| 3b | Native outsiders (aasimar, tieflings, sylphs…) | **Banned from skinning like humanoids** (the harvest is never offered). |
+| 4 | Does the narrator hear deeds | **No.** The narrator describes the act, never a verdict; deeds show on the sheet only. |
+| 5 | The words | **The plan's seven** (Cruel, Callous, Rough-handed, Unremarkable, Decent, Kind, Selfless) and cut-offs, as rule rows, **tuned after play**. |
+| 6 | Dangerous skinning | **Exposed only on a fail by 5 or more** (the book's harvesting-poison rule). |
+| 13 | Marks | **Keep as planned**: at most one mark per consumable kind (up to five per item); same-type marks do not stack. `materials.MARKS_HELD` comes off. |
