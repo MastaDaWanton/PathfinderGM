@@ -49,6 +49,9 @@
     // The Alchemy bench's glassware, bubbles and flame (sound.js's `alchemy` bus, alchemy
     // UI plan §11), at the other benches' level.
     "sound.alchemy": 0.8,
+    // The Leatherworking bench's knife, vat and kettle (sound.js's `leather` bus,
+    // leatherworking UI plan §11), at the other benches' level.
+    "sound.leather": 0.8,
     "sound.ambience": 0.4,
     "sound.combat": 0.7,
     "sound.mute": false,

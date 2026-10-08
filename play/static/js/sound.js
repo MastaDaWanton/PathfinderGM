@@ -3,7 +3,8 @@
  *   Sound.play(name, {volume, rate, delay})   one-shot; unknown names are a silent no-op
  *                                             (forge sounds also read {hardness, bath},
  *                                             enchant sounds {phase}, alchemy sounds
- *                                             {pitch, stage, heat, level, seal})
+ *                                             {pitch, stage, heat, level, seal}, leather
+ *                                             sounds {surface, casing, heat, level, pitch})
  *   Sound.loop(name)                          -> {stop()}, for the ambience beds
  *   Sound.burner({kind, liquid})              -> {heat(0..1), stop()}, the alchemy games'
  *                                             flame, whose roar and hiss follow the heat
@@ -17,7 +18,7 @@
  * took for its clack ("a dozen lines of Web Audio and no asset in the installer").
  *
  * NAMES are `<bus>.<what>[.<which>]`; the first segment picks the bus. Buses (ui, dice,
- * bench, forge, enchant, alchemy, works, ambience, combat, verdict) feed one master gain, then a
+ * bench, forge, enchant, alchemy, leather, works, ambience, combat, verdict) feed one master gain, then a
  * makeup gain, then a gentle limiter, then the
  * speakers. Each bus gain follows its PGMPrefs volume live, so a Settings slider moved in
  * another window changes this one's mix too. `verdict` has no slider of its own in the
@@ -50,14 +51,18 @@
   // player who turns the circle down has not asked for a quieter "your work is ready".
   // `alchemy` is the Alchemy bench's (alchemy UI plan §11), beside the others for the same
   // reason: glassware heard louder or quieter than the anvil or the bowls.
-  var BUSES = ["ui", "dice", "bench", "forge", "enchant", "alchemy", "works", "ambience",
-               "combat", "verdict"];
+  // `leather` is the Leatherworking bench's (leatherworking UI plan §11), beside the others
+  // for the same reason: the knife and the vat heard louder or quieter than the anvil.
+  var BUSES = ["ui", "dice", "bench", "forge", "enchant", "alchemy", "leather", "works",
+               "ambience", "combat", "verdict"];
   var BUS_PREF = {
     ui: "sound.ui", dice: "sound.dice", bench: "sound.bench", forge: "sound.forge",
-    enchant: "sound.enchant", alchemy: "sound.alchemy", works: "sound.ui",
+    enchant: "sound.enchant", alchemy: "sound.alchemy", leather: "sound.leather",
+    works: "sound.ui",
     ambience: "sound.ambience", combat: "sound.combat", verdict: "sound.dice",
   };
   var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, forge: 0.8, enchant: 0.8, alchemy: 0.8,
+                      leather: 0.8,
                       works: 0.6, ambience: 0.4, combat: 0.7, verdict: 0.8 };
   // Simultaneous one-shots allowed before new ones are dropped. A grind game at full tilt
   // plus a verdict plus ambience events is well under this; a runaway caller is not.
@@ -1790,6 +1795,341 @@
     return glass(c, { at: 0.4, f: f * 1.4983, peak: 0.037, d: 0.9 });
   }));
 
+  /* --- leather: the Leatherworking bench (leatherworking UI plan §11, contracts §11.1) -- *
+   * `Sound.play("leather.<event>", {surface, casing, heat, level, pitch})`. Synthesised like
+   * every bank here; no recorded asset, nothing downloaded. Grounded in:
+   *
+   * THE CREAK. Leather creaks by stick-slip friction, the creaking door's mechanism: the
+   * surfaces stick, load builds, they slip, and each slip is an impulse that rings the
+   * body's resonances; the slip RATE follows the force (Farnell, "Designing Sound", MIT
+   * Press 2010, Practical 9 "Creaking door", as ported in the Wikibooks "Designing Sound in
+   * SuperCollider": force mapped to 1-333 impulses a second through bandpass formants at
+   * 62.5-790 Hz). So creak() here is a train of short noise impulses through two low
+   * formants, its rate rising as the pull builds. A hide is softer and smaller than a door
+   * panel, so the formants sit higher (300-900 Hz) and the train is short.
+   *
+   * SCRAPING AND CUTTING. Scraping is a source-filter sound: a noise source shaped by the
+   * surface's roughness passing under the contact at the stroke's speed, through the
+   * object's resonance ("Object-based synthesis of scraping and rolling sounds based on
+   * non-linear physical constraints", DAFx 2021, arXiv 2112.08984; and Rocchesso and
+   * Fontana, "The Sounding Object", 2003, for the impact and friction families). So a knife
+   * through FUR is soft low noise with no ticks (hair damps it), through SMOOTH grain a
+   * mid band, and over SCALE a run of bright ticks at the scales' spacing: `{surface}` picks
+   * the source, the material's own word (lane D's `surface`: fur, smooth, scale, feather,
+   * chitin, shell). A scrape at the fleshing beam keeps under 2 kHz: the enchant bank's
+   * chalk rule (Reuter and Oehler: the 2000-4000 Hz band is the unpleasant one).
+   *
+   * THE KETTLE. Hardening is leather plunged in hot water, so the kettle is the alchemy
+   * bank's: loudest just under the boil (Aljishi and Tatarkiewicz, cited above), `{heat}`
+   * through simmer(). The VAT is cold liquor: a slosh of low noise and the big bubbles it
+   * traps, Minnaert-pitched as bubble() is (a 6-9 mm bubble rings at 360-540 Hz).
+   *
+   * THE STAMP. A mallet on a tooling stamp into cased (damp) leather: a dull knock whose
+   * body is the stone slab under it. `{casing}` (0 dry to 1 wet, the casing the game
+   * reports) lowers and dulls it, as damp leather takes the stamp without the dry crack.
+   * This one is our judgement from the craft's own descriptions, not a measurement.
+   *
+   * Web research for this lane ran on 2026-10-08; the scraping paper and the creak's
+   * figures were read in summary (the Wikibooks port), not in the primary text.
+   *
+   * LEVELS. Every peak literal stays under combat.hit's body (0.24), as the other benches'
+   * banks do; a game's good beat sits near the forge's strike and the alchemy hit. */
+
+  // Stick-slip (see the header): `n` impulses over `dur` seconds, spaced closer as the pull
+  // builds (`accel` above 1 bunches them toward the end), each through the formant `f`
+  // and, quieter, its fifth.
+  function creak(c, o) {
+    var end = c.t, at0 = o.at || 0, n = o.n || 12, dur = o.dur || 0.2;
+    for (var i = 0; i < n; i++) {
+      var u = n > 1 ? i / (n - 1) : 0;
+      var when = at0 + dur * (1 - Math.pow(1 - u, o.accel || 1.6));
+      var p = o.peak * (0.65 + 0.35 * Math.sin(Math.PI * u)) * (0.8 + Math.random() * 0.2);
+      noise(c, { at: when, f: o.f * 1.5, q: 5, peak: p * 0.4, a: 0.001, d: 0.007 });
+      end = Math.max(end, noise(c, { at: when, f: o.f, q: o.q || 6, peak: p, a: 0.001,
+                                     d: o.d || 0.012 }));
+    }
+    return end;
+  }
+  function surfaceOf(c) {
+    var s = String((c.o || {}).surface || "").trim().toLowerCase();
+    return s === "fur" || s === "feather" ? "soft"
+      : s === "scale" || s === "chitin" || s === "shell" ? "hard" : "grain";
+  }
+  function casingOf(c) {
+    var v = Number((c.o || {}).casing);
+    return isFinite(v) && (c.o || {}).casing != null ? clamp(v, 0, 1) : 0.5;
+  }
+  // A blade drawn through a hide (see the header): the source by surface.
+  function blade(c, o) {
+    var s = surfaceOf(c), at = o.at || 0, dur = o.dur || 0.22, p = o.peak;
+    if (s === "soft") {
+      // Through fur: hair damps the edge, a soft low hush and no ticks.
+      return noise(c, { at: at, src: "pink", f: k(c, [900, 1000, 820]), f2: 650, q: 0.9,
+                        peak: p * 0.8, a: 0.03, hold: dur * 0.5, d: dur * 0.5 });
+    }
+    if (s === "hard") {
+      // Over scale: the edge catches each plate, a run of bright ticks on a thin rasp.
+      noise(c, { at: at, f: 1700, q: 1.4, peak: p * 0.35, a: 0.01, hold: dur * 0.6, d: 0.06 });
+      return grains(c, { at: at, n: k(c, [9, 11, 10]), span: dur, f: 3300, q: 3,
+                         peak: p * 0.9, d: 0.008, even: true, fade: false });
+    }
+    // Through smooth grain: a firm mid band, a slight rise as the edge bites.
+    return noise(c, { at: at, f: k(c, [1300, 1450, 1200]), f2: 1700, q: 1.3, peak: p,
+                      a: 0.012, hold: dur * 0.55, d: dur * 0.45 });
+  }
+
+  def("leather.open", 3, function (c) {
+    // The kit roll undone (UI plan §10): the flap swept back, the tools inside shifting
+    // against each other, and the hide laid over the beam with a soft flop.
+    noise(c, { src: "pink", f: 700, f2: k(c, [1800, 2000, 1600]), q: 1, peak: 0.07, a: 0.06,
+               d: 0.18 });
+    grains(c, { at: 0.12, n: 3, span: 0.1, f: 2600, q: 5, peak: 0.03, d: 0.02 });
+    return knock(c, { at: 0.3, f: k(c, [150, 140, 165]), peak: 0.07, lp: 500, d: 0.07,
+                      wave: "sine" });
+  });
+
+  // Choosing a method: its tool taken up from the kit (UI plan §10, "tools swap on the kit
+  // roll"), one per method in rules/leatherworker.py METHODS.
+  var LEATHER_METHOD = {
+    flense: function (c) {       // the fleshing knife drawn once across the whetstone
+      return noise(c, { f: k(c, [1500, 1650, 1400]), f2: 1900, q: 2.4, peak: 0.045,
+                        a: 0.03, d: 0.16 });
+    },
+    salt: function (c) {         // the salt sack hefted: coarse grains shifting inside
+      return grains(c, { n: k(c, [10, 12, 11]), span: 0.18, f: 2800, q: 1.2,
+                         type: "highpass", peak: 0.04, d: 0.006 });
+    },
+    tan: function (c) {          // the vat's board lid lifted: wood, then the liquor's lap
+      knock(c, { f: k(c, [190, 175, 205]), peak: 0.06, lp: 700, d: 0.05 });
+      return bubble(c, { at: 0.1, mm: k(c, [7, 8, 6.5]), rise: 1.3, peak: 0.03, d: 0.1 });
+    },
+    curry: function (c) {        // the slicker set on the table, the oil flask's soft knock
+      knock(c, { f: k(c, [240, 225, 255]), peak: 0.05, lp: 900, d: 0.04 });
+      return knock(c, { at: 0.09, f: k(c, [320, 300, 340]), peak: 0.03, lp: 1100, d: 0.03,
+                        wave: "sine" });
+    },
+    cut: function (c) {          // the round knife tapped on the cutting board
+      knock(c, { f: k(c, [260, 245, 280]), peak: 0.05, lp: 1400, d: 0.03 });
+      return bell(c, { at: 0.004, f: k(c, [2900, 3100, 2750]), peak: 0.008, d: 0.12 });
+    },
+    stitch: function (c) {       // the awl's point set to the leather: a small dry click
+      return creak(c, { n: 4, dur: 0.06, f: 900, peak: 0.05, accel: 1 });
+    },
+    harden: function (c) {       // the kettle's lid lifted: a tin tink and a breath of steam
+      bell(c, { f: k(c, [1400, 1500, 1320]), peak: 0.012, d: 0.25 });
+      return noise(c, { at: 0.05, type: "highpass", f: 3200, q: 0.6, peak: 0.02, a: 0.06,
+                        d: 0.3 });
+    },
+    tool: function (c) {         // the mallet taken up and the stamp tapped on the slab
+      return knock(c, { f: k(c, [210, 195, 225]), peak: 0.06, lp: 900, d: 0.04, wave: "sine" });
+    },
+    dye: function (c) {         // the dauber knocked against the pot's rim
+      knock(c, { f: k(c, [380, 360, 400]), peak: 0.04, lp: 1600, d: 0.03, wave: "sine" });
+      return bubble(c, { at: 0.06, mm: 4, peak: 0.016 });
+    },
+    laminate: function (c) {     // the sheets squared on the table: two flat slaps
+      knock(c, { f: k(c, [170, 160, 185]), peak: 0.05, lp: 600, d: 0.05 });
+      return knock(c, { at: 0.11, f: k(c, [180, 170, 195]), peak: 0.04, lp: 600, d: 0.05 });
+    },
+    assemble: function (c) {     // the fittings tipped out: two small metal clinks
+      bell(c, { f: k(c, [2600, 2750, 2450]), peak: 0.01, d: 0.18 });
+      return bell(c, { at: 0.07, f: k(c, [3100, 3300, 2950]), peak: 0.008, d: 0.15 });
+    },
+    grade: function (c) {        // a scrap bent between finger and thumb: a short creak
+      return creak(c, { n: 7, dur: 0.12, f: 520, peak: 0.05 });
+    },
+  };
+  Object.keys(LEATHER_METHOD).forEach(function (m) {
+    def("leather.method." + m, 3, LEATHER_METHOD[m]);
+  });
+
+  // A piece landing in a slot (UI plan §11, `leather.drop.<form>`), by its weight and
+  // stiffness: a heavy hide flops, tanned leather slaps, rawhide and hardened plate click,
+  // salt sifts, a liquor or oil splashes, thread or wax lands soft, a fitting clinks.
+  var LEATHER_DROP = {
+    hide: function (c) {         // a green or salted hide: heavy, wet and limp
+      noise(c, { src: "pink", type: "lowpass", f: 500, q: 0.7, peak: 0.11, a: 0.008,
+                 d: 0.12 });
+      return knock(c, { at: 0.01, f: k(c, [110, 100, 120]), peak: 0.06, lp: 350, d: 0.08,
+                        wave: "sine" });
+    },
+    leather: function (c) {      // tanned leather or fur: a supple slap
+      noise(c, { src: "pink", f: k(c, [1100, 1200, 1000]), q: 0.9, peak: 0.07, a: 0.004,
+                 d: 0.07 });
+      return knock(c, { f: k(c, [180, 170, 195]), peak: 0.045, lp: 600, d: 0.05 });
+    },
+    hard: function (c) {         // rawhide or a hardened plate: a dry, hollow click
+      return knock(c, { f: k(c, [420, 400, 450]), peak: 0.06, lp: 2200, d: 0.03,
+                        wave: "triangle" });
+    },
+    grain: function (c) {        // curing salt or a mineral: tipped in, a coarse sift
+      return grains(c, { n: k(c, [12, 14, 13]), span: 0.16, f: 3200, q: 1,
+                         type: "highpass", peak: 0.045, d: 0.006, bunch: 0.7 });
+    },
+    liquid: function (c) {       // a tannin liquor, an oil or a dye: a short splash
+      noise(c, { f: 1300, f2: 700, q: 0.8, peak: 0.05, a: 0.004, d: 0.1 });
+      return bubble(c, { at: 0.03, mm: k(c, [4, 4.5, 3.6]), peak: 0.03 });
+    },
+    soft: function (c) {         // thread, lacing, wax: barely a sound
+      return noise(c, { src: "pink", f: 900, q: 0.8, peak: 0.04, a: 0.006, d: 0.05 });
+    },
+    metal: function (c) {        // a fitting, a buckle, studs: small metal on leather
+      knock(c, { f: 240, peak: 0.03, lp: 900, d: 0.02 });
+      return bell(c, { at: 0.004, f: k(c, [2700, 2900, 2550]), peak: 0.016, d: 0.2 });
+    },
+  };
+  // Every form the rack holds (rules/leatherworker.py FORMS) and every kind on the shelf
+  // (content/materials/leatherworker-materials.json), onto its drop.
+  var LEATHER_DROP_ALIAS = {
+    green: "hide", salted: "hide", pelt: "hide", fur: "leather", panel: "leather",
+    grip: "leather", item: "leather", scrap: "leather", rawhide: "hard", plate: "hard", scales: "hard",
+    hardened: "hard", lacing: "soft", thread: "soft", wax: "soft", salt: "grain",
+    treatment: "grain", mineral: "grain", tannin: "liquid", oil: "liquid", dye: "liquid",
+    fitting: "metal",
+  };
+  Object.keys(LEATHER_DROP).forEach(function (f) {
+    def("leather.drop." + f, 3, LEATHER_DROP[f]);
+  });
+  Object.keys(LEATHER_DROP_ALIAS).forEach(function (f) {
+    def("leather.drop." + f, 3, LEATHER_DROP[LEATHER_DROP_ALIAS[f]]);
+  });
+
+  def("leather.roll", 3, function (c) {        // the step's d20, rattled in a horn cup
+    knock(c, { f: 260, peak: 0.045, lp: 900, d: 0.04 });
+    return rattle(c, k(c, [2200, 2500, 2350]), k(c, [6, 7, 8]), 0.12);
+  });
+
+  // --- the work's own sounds, heard in the games and on the stage.
+  def("leather.knife", 4, function (c) {       // the harvest and Cut: pitch by surface
+    return blade(c, { peak: 0.09, dur: k(c, [0.22, 0.26, 0.2, 0.24]) });
+  });
+  def("leather.tear", 3, function (c) {
+    // The hide gives: a fast rising run of slips, then the torn flap falling back.
+    creak(c, { n: k(c, [22, 26, 24]), dur: 0.16, f: k(c, [700, 760, 650]), q: 3,
+               peak: 0.09, accel: 2.4 });
+    return knock(c, { at: 0.18, f: 130, peak: 0.05, lp: 400, d: 0.06, wave: "sine" });
+  });
+  def("leather.scrape", 4, function (c) {
+    // The fleshing knife over the beam: a damp, ribbed scrape kept under 2 kHz.
+    noise(c, { src: "pink", f: k(c, [700, 780, 640, 720]), f2: 950, q: 1.2, peak: 0.07,
+               a: 0.03, hold: 0.12, d: 0.1 });
+    return grains(c, { at: 0.02, n: 7, span: 0.2, f: 1100, q: 2, peak: 0.035, d: 0.01,
+                       even: true });
+  });
+  def("leather.salt", 4, function (c) {        // a handful rubbed into the flesh side
+    noise(c, { src: "pink", f: 1500, q: 0.8, peak: 0.035, a: 0.02, hold: 0.1, d: 0.1 });
+    return grains(c, { n: k(c, [16, 18, 14, 20]), span: 0.28, f: 3400, q: 1,
+                       type: "highpass", peak: 0.05, d: 0.005 });
+  });
+  def("leather.slosh", 4, function (c) {
+    // The hide worked in the vat: liquor lapping, and the big bubbles it traps. `level`
+    // (0..1, how deep the hide sits) deepens the lap.
+    var lv = levelOf(c, 0.5);
+    noise(c, { src: "brown", type: "lowpass", f: 380 + 260 * (1 - lv), q: 0.8, peak: 0.1,
+               a: 0.05, d: 0.25 });
+    bubble(c, { at: 0.06, mm: k(c, [8, 9, 7, 8.5]), rise: 1.3, peak: 0.04, d: 0.12 });
+    return bubble(c, { at: 0.17, mm: k(c, [6, 6.5, 5.5, 7]), rise: 1.3, peak: 0.03, d: 0.1 });
+  });
+  def("leather.cut-test", 3, function (c) {
+    // The cut test at Collect: a corner snipped to read the cross-section, then the cut
+    // edge flexed (a short creak).
+    noise(c, { f: k(c, [2200, 2400, 2050]), q: 2, peak: 0.06, a: 0.002, d: 0.03 });
+    return creak(c, { at: 0.08, n: 6, dur: 0.1, f: 480, peak: 0.045 });
+  });
+  def("leather.steam", 3, function (c) {
+    // The piece plunged in the hardening kettle: a hiss whose level follows the kettle's
+    // curve (see the header) and a bubble rising off the leather.
+    var h = simmer(heatOf(c, 0.85));
+    noise(c, { type: "highpass", f: k(c, [3000, 3300, 2800]), q: 0.6, peak: 0.01 + 0.05 * h,
+               a: 0.04, hold: 0.2, d: 0.35 });
+    noise(c, { src: "pink", f: 900, q: 0.7, peak: 0.015 + 0.03 * h, a: 0.05, d: 0.3 });
+    return bubble(c, { at: 0.05, mm: 5, peak: 0.01 + 0.02 * h });
+  });
+  def("leather.stitch.pull", 4, function (c) {
+    // Waxed thread drawn through the hole: a quick rising hiss of the thread, and the
+    // stick-slip of it binding at the end as the stitch is set.
+    noise(c, { f: k(c, [1200, 1350, 1100, 1250]), f2: 2100, q: 3, peak: 0.05, a: 0.02,
+               d: 0.12 });
+    return creak(c, { at: 0.1, n: k(c, [6, 7, 5, 6]), dur: 0.08, f: 640, peak: 0.05 });
+  });
+  def("leather.stamp", 4, function (c) {
+    // The mallet on the stamp (see the header): wetter casing, lower and duller.
+    var w = casingOf(c);
+    knock(c, { f: k(c, [240, 225, 255, 232]) * (1.25 - 0.4 * w), peak: 0.12,
+               lp: 2200 - 1400 * w, d: 0.035 + 0.02 * w, wave: "triangle" });
+    return noise(c, { f: 2600 - 1200 * w, q: 1.5, peak: 0.04 * (1 - 0.6 * w), a: 0.001,
+                      d: 0.015 });
+  });
+  def("leather.brush", 4, function (c) {       // a stroke of the dauber, wet with dye
+    return noise(c, { src: "pink", f: k(c, [1800, 2000, 1650, 1900]), f2: 1300, q: 0.9,
+                      peak: 0.045, a: 0.04, hold: 0.08, d: 0.12 });
+  });
+  def("leather.clamp", 3, function (c) {
+    // A wooden clamp screwed down on the stack: the thread creaking, then the jaw seating.
+    creak(c, { n: k(c, [9, 10, 8]), dur: 0.22, f: 340, q: 5, peak: 0.05, accel: 1.2 });
+    return knock(c, { at: 0.24, f: 200, peak: 0.06, lp: 800, d: 0.04 });
+  });
+  def("leather.buckle", 3, function (c) {
+    // The tongue through the strap and the frame settling: two small metal notes.
+    bell(c, { f: k(c, [2300, 2450, 2200]), peak: 0.016, d: 0.2 });
+    return bell(c, { at: 0.06, f: k(c, [3400, 3600, 3250]), peak: 0.01, d: 0.15 });
+  });
+  def("leather.creak", 4, function (c) {       // leather flexed: the pure stick-slip
+    return creak(c, { n: k(c, [10, 12, 9, 11]), dur: k(c, [0.18, 0.22, 0.16, 0.2]),
+                      f: k(c, [420, 460, 390, 440]), peak: 0.06 });
+  });
+  // A game's good beat and its miss (UI plan §10: "a clean curl, a pull of thread, a soft
+  // creak"; "a nick, a dull scrape"), for the games to call on every stroke.
+  def("leather.hit", 4, pitched(function (c) {
+    noise(c, { f: 1500, f2: 1900, q: 2.2, peak: 0.05, a: 0.01, d: 0.08 });
+    creak(c, { at: 0.04, n: 6, dur: 0.09, f: 560, peak: 0.07 });
+    return bell(c, { at: 0.06, f: k(c, [1568, 1661, 1480, 1600]), peak: 0.012, d: 0.45 });
+  }));
+  def("leather.miss", 4, function (c) {
+    // A nick, then a dull drag: low and short, nothing that rings.
+    knock(c, { f: k(c, [140, 130, 150, 135]), peak: 0.08, lp: 380, d: 0.05, wave: "sine" });
+    return noise(c, { at: 0.03, src: "brown", type: "lowpass", f: 380, q: 0.7, peak: 0.07,
+                      a: 0.02, d: 0.14 });
+  });
+
+  // --- the verdicts.
+  def("leather.tier.up", 3, pitched(function (c) {      // the leather sheens: two notes
+    var root = k(c, [1175, 1245, 1109]);
+    bell(c, { f: root, peak: 0.03, d: 0.5 });
+    return bell(c, { at: 0.09, f: root * 1.4983, peak: 0.032, d: 0.65 });
+  }));
+  def("leather.flawless", 3, pitched(function (c) {
+    // The brass word over the work: a pentatonic stack and the gilt glint.
+    var root = k(c, [880, 932, 831]);
+    var steps = [1, 1.1225, 1.2599, 1.4983, 2], end = c.t;
+    for (var i = 0; i < steps.length; i++) {
+      end = Math.max(end, bell(c, { at: i * 0.07, f: root * steps[i], peak: 0.034,
+                                    d: 0.9 + i * 0.1 }));
+    }
+    noise(c, { at: 0.1, type: "highpass", f: 7500, q: 0.5, peak: 0.006, a: 0.12, d: 0.7 });
+    return end;
+  }));
+  def("leather.fail", 3, function (c) {
+    // The work tears or dulls (UI plan §10): a short rip and the hide's dead thump.
+    creak(c, { n: 16, dur: 0.12, f: 600, q: 3, peak: 0.07, accel: 2.2 });
+    knock(c, { at: 0.13, f: k(c, [78, 72, 84]), peak: 0.12, lp: 300, d: 0.14, drop: 0.6,
+               wave: "sine" });
+    return noise(c, { at: 0.16, src: "pink", type: "lowpass", f: 600, q: 0.7, peak: 0.03,
+                      a: 0.04, d: 0.4 });
+  });
+  def("leather.land", 3, function (c) {
+    // The product to its rack row: a folded piece set down, a strap's buckle ticking.
+    noise(c, { src: "pink", f: 1000, q: 0.9, peak: 0.05, a: 0.005, d: 0.06 });
+    knock(c, { f: k(c, [175, 165, 190]), peak: 0.05, lp: 600, d: 0.05 });
+    return bell(c, { at: 0.05, f: k(c, [2900, 3050, 2750]), peak: 0.006, d: 0.15 });
+  });
+  def("leather.grade", 3, function (c) {
+    // Grade (the ledger card): the scrap cut free, bent and rubbed between the fingers.
+    noise(c, { f: k(c, [2300, 2450, 2150]), q: 2, peak: 0.05, a: 0.002, d: 0.03 });
+    creak(c, { at: 0.07, n: 8, dur: 0.14, f: 500, peak: 0.05 });
+    return noise(c, { at: 0.25, src: "pink", f: 1400, q: 1, peak: 0.03, a: 0.04, d: 0.12 });
+  });
+
   /* --- ambience: beds that loop ----------------------------------------------------- *
    * A bed is continuous noise through a filter whose level breathes on a slow LFO (wind
    * gusts), plus scheduled one-shots (a bird, a cricket's chirp, a crackle, a drip) at
@@ -1884,6 +2224,13 @@
     glasstick: function (c) {    // a flask on the shelf ticking as the room's heat moves
       glass(c, { f: 2200 + Math.random() * 1200, peak: 0.012, d: 0.12 });
     },
+    vat: function (c) {          // a hide turned in a vat across the yard: a lap, a bubble
+      noise(c, { src: "brown", type: "lowpass", f: 420, q: 0.8, peak: 0.02, a: 0.06, d: 0.3 });
+      bubble(c, { at: 0.08, mm: 7 + Math.random() * 3, rise: 1.3, peak: 0.01, d: 0.1 });
+    },
+    flog: function (c) {         // a hide slapped over a beam somewhere in the yard
+      knock(c, { f: 120 + Math.random() * 30, peak: 0.016, lp: 400, d: 0.07, wave: "sine" });
+    },
     blub: function (c) {         // the bain-marie at a slow simmer: one or two big bubbles
       var n = 1 + (Math.random() * 2 | 0);
       for (var i = 0; i < n; i++) {
@@ -1959,6 +2306,16 @@
                          { f: 380, q: 1.0, level: 0.014, gust: 2.4, gustDepth: 0.5 },
                          { type: "highpass", f: 4000, level: 0.0025, gust: 0.15 }],
                   events: [["glasstick", 5, 14], ["blub", 4, 11], ["coals", 10, 25]] },
+    // The tannery (leatherworking UI plan §11): "water, a distant yard". Running water in
+    // the channel that feeds the vats is a steady band of pink noise breathing a little; a
+    // low brown bed is the yard's distance; the events are the yard's own work: a hide
+    // turned in a vat, one slapped over a beam, a drip off the hides hung to drain, and the
+    // rare creak of the drying racks. On the ambience bus. At the field kit there is no
+    // tannery: the bench plays the biome's bed instead, as the alchemy kit does.
+    tannery: { beds: [{ f: 1100, q: 0.8, level: 0.03, gust: 0.25, gustDepth: 0.3 },
+                      { src: "brown", type: "lowpass", f: 220, level: 0.045 },
+                      { type: "highpass", f: 4500, level: 0.003, gust: 0.15 }],
+               events: [["vat", 5, 14], ["flog", 9, 22], ["drip", 1.5, 5], ["creak", 15, 40]] },
   };
   // The app's canonical biomes (rules/biomes.py BIOMES) onto the nearest bed, so
   // `ambience.<biome>` for any ground the bench reports is never silent by accident.
@@ -1966,6 +2323,7 @@
     urban: "road", farmland: "grassland", jungle: "swamp", hills: "grassland",
     mountain: "tundra", water: "coast", deck: "coast", underwater: "cave",
     underground: "cave", ruins: "night", planar: "night", lab: "laboratory",
+    yard: "tannery",
   };
 
   function startAmbience(spec) {
