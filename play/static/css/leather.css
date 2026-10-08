@@ -120,6 +120,10 @@
 .lw-book-list li > b:first-child { grid-column: 1 / -1; }
 .lw-book-list li > .fr-swatch + b { grid-column: 2; }
 .lw-convert-list li span { grid-column: 1 / -1; }
+.lw-manuals li { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+.lw-manuals li > b:first-child { grid-column: 1; }
+.lw-manuals li span { grid-column: 1; }
+.lw-manuals li .v2-btn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .lw-card-head { display: flex; align-items: center; gap: 8px; color: var(--bench-quiet); }
 .lw-card-unknown { color: var(--bench-quiet); }
 .lw-card-acts { display: flex; flex-wrap: wrap; gap: 8px; }

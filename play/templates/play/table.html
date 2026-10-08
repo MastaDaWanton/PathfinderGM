@@ -3962,7 +3962,7 @@
 
   <div class="bench-frame leather-frame">
     <section class="bench-panel bench-satchel leather-rack v2-framed v2-tooled-leather" id="leather-rack"
-             aria-label="Your rack">
+             data-leather-rack aria-label="Your rack">
       <i class="v2-rim" aria-hidden="true"></i>
       <div class="bench-satchel-in" id="leather-rack-in"></div>
     </section>
@@ -4131,12 +4131,16 @@ build; 50-alchemy-shell.js finishes a step flat without them.{% endcomment %}
 {% asset 'js/alchemy-games/sublime.js' as ag_sublime %}{% if '?v=' in ag_sublime %}<script src="{% asset 'js/alchemy-games/sublime.js' %}"></script>{% endif %}
 {% asset 'js/alchemy-games/bottle.js' as ag_bottle %}{% if '?v=' in ag_bottle %}<script src="{% asset 'js/alchemy-games/bottle.js' %}"></script>{% endif %}
 {% asset 'js/alchemy-games/transmute.js' as ag_transmute %}{% if '?v=' in ag_transmute %}<script src="{% asset 'js/alchemy-games/transmute.js' %}"></script>{% endif %}
-{% comment %}The leather bench's games (leatherworking lane U3, contracts §11.1), one file per
-method plus the harvest's and the tan's cut test, each registering on BenchGameDefs with track
-"leather". Named only once in the build; 55-leather-shell.js finishes a step flat without them.{% endcomment %}
+{% comment %}The leather bench's games (leatherworking lane U3, contracts §11.1): the kit first
+(window.LeatherGames: `key(method)` is "leather.<method>", since the forge owns "assemble" on
+the shared registry; `cutTest` is the tan's second half), then one file per method, each
+registering on BenchGameDefs with track "leather". Named only once in the build;
+55-leather-shell.js finishes a step flat without them.{% endcomment %}
+{% asset 'js/leather-games/00-kit.js' as lg_kit %}{% if '?v=' in lg_kit %}<script src="{% asset 'js/leather-games/00-kit.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/flense.js' as lg_flense %}{% if '?v=' in lg_flense %}<script src="{% asset 'js/leather-games/flense.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/salt.js' as lg_salt %}{% if '?v=' in lg_salt %}<script src="{% asset 'js/leather-games/salt.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/tan.js' as lg_tan %}{% if '?v=' in lg_tan %}<script src="{% asset 'js/leather-games/tan.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/cut-test.js' as lg_cut_test %}{% if '?v=' in lg_cut_test %}<script src="{% asset 'js/leather-games/cut-test.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/curry.js' as lg_curry %}{% if '?v=' in lg_curry %}<script src="{% asset 'js/leather-games/curry.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/cut.js' as lg_cut %}{% if '?v=' in lg_cut %}<script src="{% asset 'js/leather-games/cut.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/stitch.js' as lg_stitch %}{% if '?v=' in lg_stitch %}<script src="{% asset 'js/leather-games/stitch.js' %}"></script>{% endif %}
@@ -4146,7 +4150,6 @@ method plus the harvest's and the tan's cut test, each registering on BenchGameD
 {% asset 'js/leather-games/laminate.js' as lg_laminate %}{% if '?v=' in lg_laminate %}<script src="{% asset 'js/leather-games/laminate.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/assemble.js' as lg_assemble %}{% if '?v=' in lg_assemble %}<script src="{% asset 'js/leather-games/assemble.js' %}"></script>{% endif %}
 {% asset 'js/leather-games/harvest.js' as lg_harvest %}{% if '?v=' in lg_harvest %}<script src="{% asset 'js/leather-games/harvest.js' %}"></script>{% endif %}
-{% asset 'js/leather-games/cut-test.js' as lg_cut_test %}{% if '?v=' in lg_cut_test %}<script src="{% asset 'js/leather-games/cut-test.js' %}"></script>{% endif %}
 {% comment %}The stage's renderer (Lane F), in its own load order: maths, the GL layer,
 meshes, the procedural grounds, particles, props, then the nine tools. 32 below is its
 API. A comment block, not {# #}: Django's hash comment is one line only, and the two-line

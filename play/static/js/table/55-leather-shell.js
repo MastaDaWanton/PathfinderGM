@@ -249,10 +249,10 @@
     catch (err) { return null; }
   };
   var stageMounted = false, stageMounting = null;
-  function stageCall(name, arg) {
+  function stageCall(name, arg, more) {
     var st = L.stage();
     if (!st || !stageMounted || typeof st[name] !== "function") return undefined;
-    try { return st[name](arg); } catch (err) { return undefined; }
+    try { return st[name](arg, more); } catch (err) { return undefined; }
   }
   L.stageCall = stageCall;
 
@@ -669,21 +669,22 @@
     stageCall("setScene", { kind: t ? (t.kind === "owned" ? "owned" : "town") : "kit",
                             biome: w.biome || "", roofed: !!t, minute: s.clock ? s.clock.minute : 720 });
   }
-  // What is on the beam for the stage (UI plan §12 `setWork`): each slot's material with its
-  // colour and surface (the server's), its grade and laminations; the product the check named.
+  // What is on the beam for the stage (UI plan §12 `setWork`, lane U4's shape): each slot,
+  // by lane E's METHOD_SLOTS ids, carries its whole rack row (the stage keeps only its own
+  // keys: material, colour, surface, grade, passes, form...); the product the check named, its
+  // table base, the tannage of a Tan and the quality of the main piece.
   function stageWork() {
     if (!stageMounted) return;
     var o = L.order, c = L.check || {}, pieces = {};
     Object.keys(o.slots).forEach(function (slot) {
       var it = L.item(o.slots[slot]);
-      if (!it) return;
-      pieces[slot] = { material: it.material, color: it.color, surface: it.surface || "",
-                       grade: it.grade != null ? it.grade : null, passes: it.passes || 0,
-                       defects: it.defects || null, form: it.form };
+      if (it) pieces[slot] = it;
     });
     var p = L.product(c.product || o.product);
+    var main = pieces.body || pieces.hide || pieces.piece || null;
     stageCall("setWork", { product: c.product || o.product || "", base: p ? p.base : "",
-                           pieces: pieces, quality_index: null });
+                           tannage: c.tannage || null, pieces: pieces,
+                           quality_index: main && main.quality != null ? main.quality : null });
   }
 
   // The flat stand-in (UI plan §6.3, "WebGL fallback"): the method's engraved icon at 160px on
@@ -901,11 +902,16 @@
   // Lane U3's game for the method, on the shared strip, when one is registered for THIS craft
   // (`track: "leather"`). BenchGameDefs is one registry keyed by method for every bench, and the
   // forge already holds "assemble": a leather game registered there would replace the smith's,
-  // so lane U3 may register under "leather-<method>" instead, and either is found here.
+  // so lane U3 registers under "leather.<method>" (its `LeatherGames.key(method)`; the cut
+  // test is `LeatherGames.cutTest`). The method's own name is accepted too, track permitting.
   L.gameKey = function (method) {
     var games = window.BenchGames, defs = window.BenchGameDefs || {};
     if (!games || typeof games.play !== "function") return null;
-    var keys = ["leather-" + method, "leather." + method, method];
+    var LG = window.LeatherGames;
+    var keys = [];
+    if (LG && method === "cut-test" && LG.cutTest) keys.push(LG.cutTest);
+    if (LG && typeof LG.key === "function") keys.push(LG.key(method));
+    keys.push("leather." + method, "leather-" + method, method);
     for (var i = 0; i < keys.length; i++) {
       var def = defs[keys[i]];
       if (def && def.track === "leather" && typeof def.create === "function") return keys[i];
@@ -939,7 +945,9 @@
     var key = L.gameKey(method);
     var game;
     if (key) {
-      var view = stageCall("game", method) || null;
+      // The stage's view of the game (lane U4: `game(method, {band})`, whose update, hit, miss
+      // and end the frame calls when they are there).
+      var view = stageCall("game", method, { band: r.band || tuning.band || null }) || null;
       var rose = tierWatch(tuning);
       game = Promise.resolve(BenchGames.play({
         method: key, tuning: tuning, band: r.band || tuning.band || null,
@@ -1021,7 +1029,10 @@
   // anything else to its row on the rack.
   function land(f, from) {
     var made = (f.products || [])[0];
-    flourish(f.tier_name === "Flawless" ? "flawless" : "land", f.tier_name);
+    // A tannage that waits sinks into the vat (lane U4's "sink"); anything else lands.
+    var sinks = made && Number(made.waits) > 0;
+    flourish(f.tier_name === "Flawless" ? "flawless" : sinks ? "sink" : "land", f.tier_name);
+    if ((f.discoveries || []).length) L.sound("leather.found");
     if (!made) return;
     L.say("Made " + made.name + (made.count > 1 ? ", " + made.count + " of them" : "") +
           (f.tier_name ? ", " + f.tier_name : "") + ".");
@@ -1056,6 +1067,8 @@
       try { st.reducedMotion(L.reduced()); st.flourish(kind); staged = true; } catch (err) { staged = false; }
     }
     if (kind === "tier") { if (!staged) L.sound("leather.tier.up"); return; }
+    // Mounted, the stage rings its own flourishes (leather.tier.up, .flawless, .fail, .land,
+    // .grade): rung here as well they would sound twice.
     if (!staged) {
       L.sound(kind === "fail" ? "leather.fail" : kind === "flawless" ? "leather.flawless" :
               kind === "grade" ? "leather.grade" : "leather.land");
@@ -1106,6 +1119,7 @@
       L.busy = false;
       L.result = { graded: r, method: "grade" };
       flourish("grade");
+      if (r.revealed && r.revealed.length) L.sound("leather.found");
       if (window.MaterialLedger && typeof MaterialLedger.forget === "function") {
         try { MaterialLedger.forget(); } catch (err) { /* */ }
       }
@@ -1282,7 +1296,9 @@
       track: t ? { title: "Leatherworker", level: t.level, mp: t.mp,
                    need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
       picks: t && t.picks_banked,
-      buttons: '<button type="button" class="bf-btn" data-leather-ledger aria-haspopup="dialog">Ledger</button>',
+      buttons: ((s && s.manuals && s.manuals.length)
+        ? '<button type="button" class="bf-btn" data-leather-manuals aria-haspopup="dialog">Manuals</button>' : "") +
+        '<button type="button" class="bf-btn" data-leather-ledger aria-haspopup="dialog">Ledger</button>',
     };
   }
   function renderFoot() { core.renderFoot(); }
@@ -1292,6 +1308,8 @@
     footEl.addEventListener("click", function (e) {
       var b = e.target.closest("[data-leather-ledger]");
       if (b) { L.ledger(b); return; }
+      var mb = e.target.closest("[data-leather-manuals]");
+      if (mb) { L.manuals(mb); return; }
       if (e.target.closest("[data-bench-perks]")) L.openPerks();
     });
   }
@@ -1327,9 +1345,17 @@
   L.ledger = function (from) {
     var M = window.MaterialLedger;
     if (M && typeof M.journal === "function") {
-      var m = modal("Tanner's ledger", '<div id="lw-journal"></div>', from);
-      try { M.journal(m.wrap.querySelector("#lw-journal"), "leatherworker"); return; }
-      catch (err) { console.error("leather journal failed:", err); m.close(); }
+      // Lane U5's ledger lives in the Journal ("Tanner's ledger", #jr-hides): the bench
+      // closes and the Journal opens on it, as the forge's and the herb bench's Ledger do.
+      L.closeBench();
+      if (L.open) return;
+      if (typeof Shell === "object" && Shell && Shell.show) Shell.show("journal");
+      try { document.dispatchEvent(new CustomEvent("leather:ledger")); } catch (err) { /* */ }
+      setTimeout(function () {
+        var at = $id("jr-hides");
+        if (at && at.scrollIntoView) at.scrollIntoView({ block: "start" });
+      }, 120);
+      return;
     }
     L.api("/api/leather/ledger").then(function (d) {
       var rows = (d.ledger || []).map(function (r) {
@@ -1340,10 +1366,44 @@
                                            : "<p>No hide or tanner's store met yet.</p>", from);
     }).catch(function (err) { L.say(err.message || String(err)); });
   };
+  // The manuals carried (the server's `state.manuals`), each read by one press through lane
+  // E's POST api/leather/manual: the hours pass through the server's clock door and a first
+  // reading pays its mastery. Nobody else's lane gave the reader a door.
+  L.manuals = function (from) {
+    var list = (L.state && L.state.manuals) || [];
+    var rows = list.map(function (m) {
+      var hrs = m.hours === 1 ? "1 hour" : m.hours + " hours";
+      return '<li><b>' + esc(m.name) + '</b><span>' + esc(m.read ? "Read before. " + hrs + " again." : hrs + " to read.") +
+        '</span><button type="button" class="v2-btn is-small" data-read="' + esc(m.id) + '">Read</button></li>';
+    });
+    var md = modal("Manuals", (rows.length ? '<ul class="lw-book-list lw-manuals">' + rows.join("") + '</ul>'
+      : "<p>You carry no leatherworking manual.</p>") + '<p class="lw-card-said" role="status" aria-live="polite"></p>', from);
+    md.wrap.addEventListener("click", function (e) {
+      var r = e.target.closest("[data-read]");
+      if (!r || r.disabled) return;
+      r.disabled = true;
+      L.api("/api/leather/manual", { item: r.dataset.read }).then(function (got) {
+        var learned = (got.revealed || []).length;
+        md.wrap.querySelector(".lw-card-said").textContent = "You read it for " + L.minutes(got.minutes) + ". " +
+          (learned ? "You learn " + learned + (learned === 1 ? " thing" : " things") + " about hides and the tanner's stores." :
+           "There is nothing new in it for you.");
+        if (got.clock) tickClock(got.clock);
+        if (learned && window.MaterialLedger && typeof MaterialLedger.forget === "function") {
+          try { MaterialLedger.forget(); } catch (err) { /* */ }
+        }
+        L.refresh();
+      }).catch(function (err) {
+        r.disabled = false;
+        md.wrap.querySelector(".lw-card-said").textContent = err.message || String(err);
+      });
+    });
+  };
   L.openCard = function (mid, el) {
     var M = window.MaterialLedger;
     if (M && typeof M.card === "function") {
-      try { M.card("leatherworker", mid, el); return; }
+      // From the "?" only, pinned (lane U5's `card(track, id, anchor, opts)`); its grade and
+      // lessons fire `leather:learned`, heard below.
+      try { M.card("leatherworker", mid, el, { pops: $id("leather-pops") }); return; }
       catch (err) { console.error("leather card failed:", err); }
     }
     L.api("/api/leather/material/" + encodeURIComponent(mid)).then(function (c) { flatCard(c, el); })

@@ -308,7 +308,28 @@ def _state_body(c, pc) -> dict:
         "grade": {"terms": lw.check_terms(pc, progress.level) + lw.kit_terms(pc),
                   "minutes": int((lw.method_row("grade") or {}).get("minutes", 10))},
         "conversions": _conversions(pc),
+        "manuals": _manuals(pc),
     }
+
+
+def _manuals(pc) -> list[dict]:
+    """The leatherworking manuals the character has with them, for the bench's Manuals button
+    (POST api/leather/manual reads one): before it nothing on the page could read one, since
+    the reader route had no door. [] on a tree without lane F's leatherworker rows."""
+    kn = lw._lane("knowledge")
+    craft = _craft(kn)
+    if craft is None or not hasattr(kn, "manuals") or not hasattr(kn, "holds_manual"):
+        return []
+    read = set(getattr(pc, "manuals_read", None) or [])
+    out = []
+    try:
+        for mid, m in kn.manuals(craft).items():
+            if kn.holds_manual(pc, m):
+                out.append({"id": mid, "name": str(m.get("name") or mid),
+                            "hours": int(m.get("hours", 1) or 1), "read": mid in read})
+    except Exception:      # noqa: BLE001 - a list of books is never worth failing the state
+        return []
+    return out
 
 
 def _migration():

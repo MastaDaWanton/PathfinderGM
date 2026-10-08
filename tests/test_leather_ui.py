@@ -47,7 +47,7 @@ TABLE = ROOT / "play" / "templates" / "play" / "table.html"
 ICONS = STATIC / "img" / "icons"
 LICENCES = ROOT / "docs" / "asset-licences.md"
 
-GAMES = ("flense", "salt", "tan", "curry", "cut", "stitch", "harden", "tool", "dye", "laminate",
+GAMES = ("00-kit", "flense", "salt", "tan", "curry", "cut", "stitch", "harden", "tool", "dye", "laminate",
          "assemble", "harvest", "cut-test")
 STAGE = ("00-hide", "01-props", "02-pieces", "03-yard", "04-fx")
 # Other lanes' files the table names only once they are in the build (contracts §11).
@@ -132,7 +132,8 @@ def test_another_lanes_leather_file_is_named_only_once_it_exists(table_html):
     assert (html.index("js/tannery-stage/00-hide.js") < html.index("js/table/55-leather-shell.js")
             < html.index("js/table/56-leather-rack.js") < html.index("js/table/57-leather-stage.js")
             < html.index("js/table/58-leather-order.js") < html.index("js/table/59-harvest.js"))
-    assert html.index("js/leather-games/flense.js") < html.index("js/table/33-bench-games.js")
+    assert (html.index("js/leather-games/00-kit.js") < html.index("js/leather-games/flense.js")
+            < html.index("js/table/33-bench-games.js"))
 
 
 # --- the icons (game-icons.net, CC BY 3.0, approved for these benches) -------------------------
@@ -161,11 +162,13 @@ def test_every_leather_icon_is_on_disk_credited_and_from_game_icons():
 def test_a_game_runs_only_when_it_is_registered_for_this_craft():
     """BenchGameDefs is one registry keyed by method for every bench, and the forge already
     holds "assemble": a leather Assemble registered under the same key would have replaced the
-    smith's. The shell runs a game only with `track: "leather"`, under "leather-<method>" or
-    the method's own name, hands it the server's band as `opts.band` (contracts §11.1), and
-    otherwise finishes the step flat at the middle of the range, saying so in words."""
+    smith's. Lane U3 registers under "leather.<method>" (`LeatherGames.key`, the cut test
+    `LeatherGames.cutTest`); the shell runs a game only with `track: "leather"`, hands it the
+    server's band as `opts.band` (contracts §11.1) and the stage's view of it, and otherwise
+    finishes the step flat at the middle of the range, saying so in words."""
     code = _code(_src(SHELL))
-    assert 'def.track === "leather"' in code and '"leather-" + method' in code
+    assert 'def.track === "leather"' in code and "LG.key(method)" in code and "LG.cutTest" in code
+    assert 'stageCall("game", method, { band:' in code
     assert "band: r.band || tuning.band" in code
     assert "score: 0.5" in code and "flat: true" in code
     assert "No game for this step in this build" in _src(ORDER)
@@ -192,7 +195,8 @@ def test_the_ledger_and_card_are_lane_u5s_with_flat_stand_ins_without_them():
     known, Grade, Ask a tanner) and the footer's Ledger a flat list, so Grade is never out of
     reach; the forge's assay without its ledger had no way in at all."""
     code = _code(_src(SHELL))
-    assert 'M.card("leatherworker", mid, el)' in code and 'M.journal(' in code
+    assert 'M.card("leatherworker", mid, el, {' in code and "M.journal" in code
+    assert '$id("jr-hides")' in code
     assert '"/api/leather/ledger"' in code and '"/api/leather/material/"' in code
     assert '"/api/leather/grade"' in code and '"/api/leather/ask"' in code
 
@@ -392,6 +396,25 @@ def test_the_check_sends_the_band_the_flat_gauge_draws(bench):
     salt = next(r["key"] for r in st["rack"] if r["form"] == "salt")
     ch = post(bench, "/api/leather/check", {"method": "salt", "slots": {"hide": hide, "salt": salt}}).json()
     assert ch["can_roll"] and ch["band"]["unit"] == "percent" and ch["band"]["target"] == [25, 100]
+
+
+def test_a_carried_manual_has_a_door_on_the_bench(bench):
+    """Lane E's POST api/leather/manual read a leatherworking manual, and nothing on any page
+    called it: a manual bought at the leatherworker's counter could not be read at all. The
+    state lists the leatherworking manuals carried and the footer's Manuals button reads one."""
+    pc = cm.current().scene.pc()
+    pc.goods["The Tanner's Yard Book"] = 1          # as a handover leaves it (`holds_manual`)
+    cm.current().save()
+    st = bench.get("/api/leather/state").json()
+    if not st["manuals"]:
+        pytest.skip("no leatherworking manual rows in this build")
+    book = st["manuals"][0]
+    assert book["read"] is False and book["hours"] >= 1
+    r = post(bench, "/api/leather/manual", {"item": book["id"]})
+    assert r.status_code == 200, r.content[:300]
+    assert bench.get("/api/leather/state").json()["manuals"][0]["read"] is True
+    code = _code(_src(SHELL))
+    assert "data-leather-manuals" in code and '"/api/leather/manual"' in code
 
 
 def test_the_conversion_notice_is_shown_once_through_the_bench(bench, monkeypatch):
