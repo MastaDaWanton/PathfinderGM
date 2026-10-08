@@ -231,10 +231,38 @@ function codexMount() {
   window.AlchemyBooks.codex(document.getElementById("jr-codex-list"));
 }
 
+// --- The tanner's ledger (docs/leatherworking-ui-plan.md §6.7) ---------------------------
+// Every hide and supply met, "3 of 7 known" as the server counts it, an "Unknowns first"
+// toggle, and what is known of each and how, right after the smith's ledger. 44 draws it
+// (`MaterialLedger.journal(host, "leatherworker")`, leatherworking contracts §11.1) from
+// `/api/leather/ledger`, the same renderer as the leather bench's card, so the two cannot
+// drift. It mounts LAST in the observer below and places itself after the smith's ledger:
+// the essences and the codex each insert themselves straight after the smith's ledger
+// too, so mounting earlier would push it down under them. A page without 44 draws no
+// section. The list's id is "jr-hides-list", never the heading's "jr-hides".
+function hidesMount() {
+  const body = document.getElementById("sheetbody");
+  const journal = body && body.querySelector(".journal");
+  if (!journal || document.getElementById("jr-hides")) return;
+  if (!window.MaterialLedger || typeof window.MaterialLedger.journal !== "function") return;
+  const host = document.createElement("div");
+  host.innerHTML = sheetCard("jr-hides", "Tanner's ledger", `<div id="jr-hides-list"></div>`, "jr-hides");
+  const card = host.firstElementChild;
+  card.style.gridColumn = "1 / -1";
+  const prev = ["jr-ledger", "jr-herbarium"].map(id => document.getElementById(id))
+    .filter(Boolean).map(h => h.closest("section")).filter(s => s && s.parentElement === journal)[0];
+  const history = document.getElementById("jr-history");
+  const before = history && history.closest("section");
+  if (prev) prev.insertAdjacentElement("afterend", card);
+  else if (before && before.parentElement === journal) before.insertAdjacentElement("beforebegin", card);
+  else journal.appendChild(card);
+  window.MaterialLedger.journal(document.getElementById("jr-hides-list"), "leatherworker");
+}
+
 (function watchTheJournal() {
   const body = document.getElementById("sheetbody");
   if (!body || typeof MutationObserver !== "function") return;
-  new MutationObserver(() => { herbariumMount(); ledgerMount(); essencesMount(); codexMount(); }).observe(body, { childList: true });
+  new MutationObserver(() => { herbariumMount(); ledgerMount(); essencesMount(); codexMount(); hidesMount(); }).observe(body, { childList: true });
 })();
 
 document.addEventListener("click", e => {
