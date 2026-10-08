@@ -201,12 +201,13 @@ def worn_rows(actor) -> tuple[dict, dict]:
     return a, s
 
 
-def worn_things(actor) -> list:
-    """What this creature has on its body and arm, as things `item_tags` can read: the
-    forged record when the suit (or shield) is one, else the crafted record in the slot
-    whose base is the suit being worn (a tanner's studded leather, which knows its own
-    studs), else the table key. Nothing for "none"."""
-    out: list = []
+def worn_by_kind(actor) -> dict:
+    """`{"armour": thing, "shield": thing}` for what this creature has on its body and
+    arm, as things `item_tags` can read: the forged record when the suit (or shield) is
+    one, else the crafted record in the slot whose base is the suit being worn (a tanner's
+    studded leather, which knows its own studs), else the table key. A kind with nothing
+    on is absent."""
+    out: dict = {}
     for kind, slot, record_of in (("armour", "armor", "armour_record"),
                                   ("shield", "shield", "shield_record")):
         key = str(getattr(actor, kind, "none") or "none")
@@ -219,8 +220,13 @@ def worn_things(actor) -> list:
                 if isinstance(cand, dict) and key_for(str(cand.get("armour") or ""))[1] == key:
                     rec = cand
                     break
-        out.append(rec if rec is not None else key)
+        out[kind] = rec if rec is not None else key
     return out
+
+
+def worn_things(actor) -> list:
+    """What this creature has on its body and arm (`worn_by_kind`), as a list."""
+    return list(worn_by_kind(actor).values())
 
 
 def wears_metal(actor) -> bool:
@@ -233,7 +239,12 @@ def wears_metal(actor) -> bool:
     Asked of the material tag (`item_tags`, enchanting plan §16), never of a name. It was
     two name lists here, `METAL_ARMOUR` and `METAL_SHIELDS`, which made a forged shield
     metal by its base's name whatever it was made of, and a forged noqual breastplate
-    metal only because "breastplate" was on the list."""
+    metal only because "breastplate" was on the list.
+
+    The creature's standing tags (`wears.armour.metal`, `wears.shield.metal`,
+    `item_tags.bearer_tags`) are read off the same `worn_by_kind` and the same material
+    tag, so this and `has_state` cannot disagree; this stays a direct read because the
+    inubrix clause asks it on every blow and the standing tags walk the whole pack."""
     if getattr(actor, "flat_ac", None) is not None:
         return False
     from . import item_tags
@@ -310,4 +321,4 @@ def spell_failure(actor, spell) -> tuple[int, str]:
 
 __all__ = ["key_for", "row", "change_cost", "proficiency_tags", "is_armour_token",
            "proficient_with", "attack_penalties", "is_arcane", "spell_failure",
-           "ARCANE_LISTS", "worn_rows", "wears_metal", "worn_things"]
+           "ARCANE_LISTS", "worn_rows", "wears_metal", "worn_things", "worn_by_kind"]

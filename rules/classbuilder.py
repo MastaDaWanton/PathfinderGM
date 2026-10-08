@@ -503,6 +503,15 @@ CLASS_SCHEMA: list[Section] = [
                        consumer="rules/classes.py:overrides_for → Actor.allows()",
                        help="Only the six rules listed are real. An unknown one is "
                             "collected and reported, never granted."),
+            # Leatherworking plan §18.5: what the class may not wear, and what that
+            # suspends. Validated by `classfeatures.validate_prohibits`.
+            ClassField("prohibits", "Prohibited gear", type="object", advanced=True,
+                       consumer="rules/classfeatures.py:settle, refusal → the cast door "
+                                "and the class ability door",
+                       help="What wearing it suspends (casting.class, ability.su.class, "
+                            "ability.sp.class) and for how many hours after it comes off. "
+                            "The druid's: metal armour and shields, 24 hours, dragonhide "
+                            "exempt."),
             ClassField("ability_growth", "Permanent ability growth", type="group",
                        of=GROWTH_ROW, advanced=True,
                        consumer="rules/leveling.py:level_up",
@@ -1497,6 +1506,11 @@ def validate_class(d: dict) -> list[str]:
     from . import classes as _classes
 
     problems.extend(_classes.validate_choices(d))
+
+    # --- what the class may not wear (leatherworking plan §18.5) --------------------
+    from . import classfeatures as _classfeatures
+
+    problems.extend(_classfeatures.validate_prohibits(d.get("prohibits")))
 
     return problems
 

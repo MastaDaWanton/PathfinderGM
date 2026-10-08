@@ -1338,6 +1338,15 @@ class Scene:
                               "said": survival.said(a, toll)}
                     body.append(record)
                     self._body_said.append(record)
+            # A class's prohibition settled BEFORE the tick (`classfeatures.settle`): a suit
+            # taken off before a day's wait starts its 24 hours before the wait, and the
+            # `sync_carried` below this runs only after the tick has spent the stretch, so a
+            # lapse it started would begin at the END of the wait.
+            # Settled here and told at the batch's end (`tell=False`: most doors that move
+            # the clock drop this method's return, `classfeatures.settle`).
+            from . import classfeatures as _classfeatures
+
+            _classfeatures.settle(a, tell=False)
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
@@ -3733,9 +3742,13 @@ class Engine:
         through the one applicator (`Actor.sync_carried`) and comes back as an outcome
         whose tell the narrator is fed (law 3).
         """
+        from . import classfeatures
+
         out = []
         for a in list(self.scene.actors.values()):
-            recs = a.sync_carried(self.dice)
+            # A class's prohibition settled and its owed sentence taken here, the one door
+            # that is sure to be told (`classfeatures.settle`).
+            recs = classfeatures.settle(a) + a.sync_carried(self.dice)
             if not recs:
                 continue
             tell = " ".join(t for t in (_ward_tell(self.scene, r) for r in recs) if t)
@@ -14749,6 +14762,14 @@ class Engine:
                     intent, (f"{actor.name} reaches for {spell.name} and the magic will not "
                              f"come. Nothing is spent. " + found).strip(),
                     code="cursed")
+            # A class's prohibition (the druid in metal, and for a day after: the class
+            # document's `prohibits`, `classfeatures.refusal`). Class casting only — an
+            # item's power came through `item` above and is not "her" spell.
+            from . import classfeatures
+
+            why = classfeatures.refusal(actor, "casting.class", spell.name)
+            if why:
+                return self._refuse(intent, why, code="prohibited")
         if item:
             source = {"pool": "", "key": "", "cost": 0, "level": level}
         else:
@@ -14987,6 +15008,20 @@ class Engine:
             if resisted:
                 live = [r for r in live if r not in resisted]
                 cast_effect["resisted"] = sorted(resisted)
+        # A touch spell's attack roll (the spell's `touch_attack` document; leatherworking
+        # plan §18.5): before it, shocking grasp landed on whoever it was aimed at and its
+        # +3 against metal was read by nothing. The caster's roll, once per target, kept in
+        # the state across the popup; a miss is struck from `live`, so neither the dice nor
+        # a rider reaches it.
+        touch = casting.touch_attack(spell)
+        if touch is not None:
+            for ref in list(live):
+                self._touches(intent, actor, self.scene.actors[ref], spell, touch,
+                              partial, state)
+            missed = {r for r, hit in (state.get("touch") or {}).items() if not hit}
+            if missed:
+                live = [r for r in live if r not in missed]
+                cast_effect["missed"] = sorted(missed)
         if dice and live and state["stage"] == "dice":
             roll = self._roll_or_suspend_stage(
                 intent, actor, [],
@@ -15199,6 +15234,42 @@ class Engine:
             f"{spell.name} breaks on {target.name}'s spell resistance ({roll.total} "
             f"against SR {sr}{held}): it does not touch them.")
         return not beat
+
+    def _touches(self, intent: Intent, actor: Actor, target: Actor, spell, touch: dict,
+                 partial: dict, state: dict) -> bool:
+        """Whether a touch spell's attack reaches `target` (CRB, Aiming a Spell: a touch
+        attack against touch AC), rolled once per target and kept in `state["touch"]`, as
+        `_resists` keeps the spell resistance check. The spell's own terms ride on it
+        (`casting.touch_terms`: shocking grasp's +3 against metal). Touching yourself
+        needs no roll."""
+        from .dice import stack as _stack
+
+        done = state.setdefault("touch", {})
+        if target.ref in done:
+            return bool(done[target.ref])
+        if target is actor:
+            done[target.ref] = True
+            return True
+        ranged = str(touch.get("touch") or "melee") == "ranged"
+        mods = _stack(self._touch_mods(actor, target, ranged)
+                      + casting.touch_terms(touch, target))
+        ac = target.touch_ac(self._flat_footed(target), attacker=actor)
+        kind = "ranged" if ranged else "melee"
+        roll = self._roll_or_suspend_stage(
+            intent, actor, mods, f"{spell.name}: {kind} touch attack on {target.name}", ac,
+            partial, state, "1d20", state_key="cast_state")
+        state["rolls"].append(roll.as_dict())
+        hit = d20_succeeds(roll, ac)
+        self._judge(roll, hit)
+        done[target.ref] = hit
+        nat = natural_said(roll, ac)
+        against = [m.value for m in mods if m.source == "against metal"]
+        metal = f", {against[0]:+d} against metal" if against else ""
+        state["tells"].append(
+            f"{actor.name}'s {kind} touch {'reaches' if hit else 'misses'} {target.name} "
+            f"({nat + ', ' if nat else ''}{roll.total} against touch AC {ac}{metal})"
+            + ("." if hit else f": {spell.name} touches nobody."))
+        return hit
 
     def _cast_aim(self, intent: Intent, actor: Actor):
         """The cast's aim: the `aim` param, else the legacy `at` or `square`, else the
@@ -15479,7 +15550,11 @@ class Engine:
     # family. Nothing that used to be narrated silently starts happening.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
-                 "choose_one", "bundle", "attitude", "spell_resistance")
+                 "choose_one", "bundle", "attitude", "spell_resistance",
+                 # The spells that affect metal (leatherworking plan §18.5). `touch_attack`
+                 # is rolled before the dice (`_touches`) and does nothing as a rider; it is
+                 # listed so the cast does not also print it for the GM as unexecuted.
+                 "metal_temperature", "rust", "touch_attack")
 
     def _executes(self, spec: dict) -> bool:
         # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
@@ -15529,6 +15604,12 @@ class Engine:
             return self._attitude(spec, ctx)
         if kind == "spell_resistance":
             return self._grant_sr(spec, ctx)
+        if kind == "metal_temperature":
+            return self._metal_temperature(spec, ctx)
+        if kind == "rust":
+            return self._rust(spec, ctx)
+        if kind == "touch_attack":
+            return [], []              # rolled before anything landed (`_touches`)
         if _ac_grant(spec) is not None:
             return self._grant_ac(spec, ctx)
         return self._stand_by(spec, ctx)
@@ -15663,6 +15744,154 @@ class Engine:
             effects.append({"ref": who.ref, "kind": "condition", "condition": key,
                             "rounds_left": cond.rounds_left})
             tells.append(attitude_mod.said(who.name, was, key))
+        return effects, tells
+
+    def _metal_temperature(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Heat metal and chill metal (leatherworking plan §18.5): per creature, what
+        metal it has on it (`casting.metal_contact`, read off its standing tags), the gear's
+        save, round 1 of the curve now, and the rest as one ActiveEffect the periodic
+        executor spends a round at a time.
+
+        Before this the spell was a save gate with a paragraph inside: cast, a slot spent,
+        and nothing on anybody's sheet — a knight in chainmail and a monk in a robe came
+        out of it the same.
+
+        The gear's save is rolled here by the engine for whoever is targeted, the player
+        too: the cast's own save loop runs only for a spell with dice to roll, and this one
+        has a curve. "(object)": gear a creature has on uses the creature's bonus (CRB,
+        Saving Throw)."""
+        from .dice import d20_succeeds as _d20_succeeds
+
+        dtype = str(spec.get("damage_type") or "fire")
+        save = str(spec.get("save") or "")
+        dc = int(ctx.get("dc") or 0)
+        source = str(ctx.get("source") or "the spell")
+        origin = str(ctx.get("origin") or "")
+        hot = dtype == "fire"
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in ctx.get("targets") or []:
+            who = self.scene.actors.get(str(ref))
+            if who is None:
+                continue
+            contact = casting.metal_contact(who)
+            if not contact:
+                effects.append({"kind": "metal_untouched", "ref": who.ref, "origin": origin})
+                tells.append(f"{who.name} has no metal on them for {source} to find.")
+                continue
+            if save in SAVES and dc:
+                roll = self.dice.d20(who.save_modifiers(save, {"against": "spell"}),
+                                     label=f"{SAVES[save]} save for {who.name}'s gear "
+                                           f"against {source}", visibility="hidden")
+                saved = _d20_succeeds(roll, dc)
+                effects.append({"kind": "save", "ref": who.ref, "save": save,
+                                "saved": bool(saved), "for": "gear"})
+                nat = natural_said(roll, dc)
+                tells.append(f"{who.name}'s gear {'resists' if saved else 'does not resist'}"
+                             f" ({SAVES[save]} save, {nat + ', ' if nat else ''}"
+                             f"{roll.total} against DC {dc}).")
+                if saved:
+                    continue
+            curve = casting.metal_curve(spec, contact)
+            first = curve[0] if curve else "0"
+            try:
+                n = int(first)
+            except ValueError:
+                n = max(0, self.dice.roll(first, label=f"{source}: round 1",
+                                          visibility="hidden").total)
+            how = ("worn or wielded: full damage" if contact == "full"
+                   else "only carried: the least of it")
+            if n > 0:
+                hit = self._apply_damage(who, n, dtype)
+                hit["origin"] = origin
+                effects.append(hit)
+                tells.append(f"The metal on {who.name} ({how}) burns: {hit['amount']} "
+                             f"{hit['type']}" + (f" ({hit['note']})." if hit["note"] else "."))
+            else:
+                tells.append(f"The metal on {who.name} ({how}) grows "
+                             f"{'warm' if hot else 'cold'}; it does no harm yet.")
+            eff = casting.metal_effect(spec, who, contact, source=source, origin=origin)
+            if eff is not None:
+                who.apply_effect(eff)
+                effects.append({"kind": "effect", "ref": who.ref, "what": eff.name,
+                                "rounds": eff.rounds_left, "contact": contact,
+                                "origin": origin})
+                tells.append(f"It will {'heat' if hot else 'chill'} for "
+                             f"{len(curve) - 1} rounds more, round by round "
+                             f"({', '.join(curve[1:])}).")
+        return effects, tells
+
+    def _rust(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Rusting grasp's touch (leatherworking plan §18.5), on whoever the touch reached
+        (`_touches` struck the misses from the targets).
+
+        - An iron creature (`body.metal.ferrous`) takes the creature damage. No stat block
+          carries that tag yet (the bestiary pass, plan §5.3), so today none does.
+        - Otherwise its worn iron armour loses the rolled armour class, capped at what its
+          metal gives (`casting.rust_reach`; the owner's answer 7: studded leather loses at
+          most 1), landed as one ActiveEffect on the wearer — `bonus_type` armour, so touch
+          AC never felt it — refreshed as later touches eat more, never past the cap.
+          Taken off, the suit's rust goes with it (`casting.settle_rust`, through
+          `Actor.sync_carried`): the effect is the wearer's, and nothing yet stores damage
+          to a suit's armour class on the suit itself, so a rusted suit put back on is
+          whole again. Said plainly rather than hidden: a gap, not a rule.
+        - A weapon aimed at (the book's second use) needs a touch aimed at an item, which no
+          op says yet: not built.
+
+        Before this rusting grasp was a plain 3d6 untyped to whatever it touched, flesh or
+        iron."""
+        source = str(ctx.get("source") or "the spell")
+        origin = str(ctx.get("origin") or "")
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in ctx.get("targets") or []:
+            who = self.scene.actors.get(str(ref))
+            if who is None:
+                continue
+            if who.has_state(f"{states.BODY_METAL}.{states.FERROUS_LEAF}"):
+                rolled = max(0, self.dice.roll(
+                    effectspec.resolve_dice(spec.get("creature_damage") or "3d6",
+                                            ctx.get("caster_level", 1)),
+                    label=f"{source}: an iron body", visibility="hidden").total)
+                bonus = spec.get("creature_bonus")
+                if bonus not in (None, ""):
+                    rolled += int(effectspec.evaluate(bonus, ctx.get("vars") or {})
+                                  if effectspec.is_formula(bonus) else int(bonus))
+                hit = self._apply_damage(who, rolled, "untyped")
+                hit["origin"] = origin
+                effects.append(hit)
+                tells.append(f"{source} eats into {who.name}'s iron body: {hit['amount']} "
+                             f"damage.")
+                continue
+            reach = casting.rust_reach(who)
+            if reach.get("why"):
+                effects.append({"kind": "rust_untouched", "ref": who.ref, "origin": origin})
+                tells.append(f"{source} finds nothing to rust on {who.name}: they "
+                             f"{reach['why']}.")
+                continue
+            if reach["cap"] <= 0:
+                tells.append(f"The {reach['name'].lower()} on {who.name} has lost all the "
+                             f"rust can take ({reach['share']} armour class).")
+                continue
+            rolled = max(0, self.dice.roll(str(spec.get("armour_ac") or "1d6"),
+                                           label=f"{source}: armour class rusted away",
+                                           visibility="hidden").total)
+            n = min(rolled, reach["cap"])
+            lost = casting.rusted_already(who, reach["suit"]) + n
+            before = who.ac()
+            who.apply_effect(ActiveEffect(
+                name=f"rusted {reach['name'].lower()}", kind="rust", key="rust",
+                source=f"rust:{reach['suit']}", origin=origin, duration="until-dismissed",
+                modifiers=[{"kind": "combat_mod", "target": "ac", "amount": -lost,
+                            "bonus_type": "armour", "note": "rusted armour"}],
+                payload={"rusted": reach["suit"], "lost": lost, "share": reach["share"]}))
+            effects.append({"kind": "rust", "ref": who.ref, "item": reach["suit"],
+                            "rolled": rolled, "lost": n, "total_lost": lost,
+                            "share": reach["share"], "ac": who.ac(), "origin": origin})
+            capped = (f" (rolled {rolled}; the metal gives only {reach['share']})"
+                      if rolled > n else "")
+            tells.append(f"Rust blooms across {who.name}'s {reach['name'].lower()}: armour "
+                         f"class {before} to {who.ac()}{capped}.")
         return effects, tells
 
     def _choose(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
@@ -18885,6 +19114,16 @@ class Engine:
         refused = self._ability_refusal(actor, name, doc)
         if refused:
             return self._refuse(intent, f"Nothing takes hold. {refused}", code="ability_refused")
+        # A class's prohibition suspends its supernatural and spell-like abilities (the
+        # druid in metal: CRB). The document says which kind it is (`ability_type`); an
+        # extraordinary one, or one that says nothing, is not held (`classfeatures`).
+        kind = str(doc.get("ability_type") or "").strip().lower()
+        if kind in ("su", "sp"):
+            from . import classfeatures
+
+            why = classfeatures.refusal(actor, f"ability.{kind}.class", name)
+            if why:
+                return self._refuse(intent, why, code="prohibited")
 
         # 3. Who it reaches — a shaped area laid on the map, or the grammar's `affects`.
         area = None
@@ -19383,16 +19622,13 @@ class Engine:
                   f"{shown} is still to come."),
             because=intent.because)
 
-    def _class_touch_attack(self, intent: Intent, actor: Actor, target: Actor, doc: dict,
-                            shown: str) -> tuple[bool, Roll, str]:
-        """A touch attack: base attack, Dexterity (ranged) or Strength (melee), size, and
-        whatever the funnel holds for an attack — against touch AC. 1e treats a ray or a
-        touch spell this way; the domain bolts and lay on hands on the undead are the same
-        roll."""
-        from .dice import stack
+    def _touch_mods(self, actor: Actor, target: Actor, ranged: bool) -> list[Modifier]:
+        """A touch attack's terms before stacking: base attack, Dexterity (ranged) or
+        Strength (melee), size, conditions and whatever the funnel holds for an attack.
+        One copy for the class abilities' touch (`_class_touch_attack`) and a touch
+        spell's (`_touches`)."""
         from .tables import SIZES
 
-        ranged = str(doc.get("attack")) == "ranged touch"
         mods = [Modifier(actor.bab, "BAB")]
         ab = "dex" if ranged else "str"
         if actor.ability_mod(ab):
@@ -19408,7 +19644,18 @@ class Engine:
                           "hands": 0, "light": False, "finessable": False},
                "target_actor": target}
         mods.extend(actor._buff_mods("combat_mod", "attack", ctx))
-        mods = stack(mods)
+        return mods
+
+    def _class_touch_attack(self, intent: Intent, actor: Actor, target: Actor, doc: dict,
+                            shown: str) -> tuple[bool, Roll, str]:
+        """A touch attack: base attack, Dexterity (ranged) or Strength (melee), size, and
+        whatever the funnel holds for an attack — against touch AC. 1e treats a ray or a
+        touch spell this way; the domain bolts and lay on hands on the undead are the same
+        roll."""
+        from .dice import stack
+
+        ranged = str(doc.get("attack")) == "ranged touch"
+        mods = stack(self._touch_mods(actor, target, ranged))
         ac = target.touch_ac(self._flat_footed(target), attacker=actor)
         roll = self.dice.d20(mods, label=f"{shown}: {doc.get('attack')} attack",
                              visibility="player")
@@ -21908,6 +22155,10 @@ def _ward_tell(scene: Scene, e: dict) -> str:
         return f"The {e.get('what', 'thing')} {name} wears grants {e.get('grants', 'its power')}."
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
+    if kind == "prohibition":
+        # A class's prohibition taking hold or starting its lapse (`classfeatures.settle`):
+        # the sentence is the class document's own (`tell_on`, `tell_lapse`).
+        return str(e.get("said") or "")
     return ""
 
 

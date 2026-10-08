@@ -1625,7 +1625,191 @@ def swap(actor, old_id: str, new_id: str) -> tuple[bool, list[str]]:
     return True, []
 
 
+# --- the spells that affect metal (leatherworking plan §18.5) ---------------------------------
+#
+# The owner's Q7.3: "armor and weapons both need a metal tag because there are spells that
+# affect metal". The tag is `item_tags`' and the creature's standing tags carry it
+# (`wears.armour.metal`, `wields.metal`, `carries.metal`, `body.metal`, each with
+# `.ferrous`); these are its spell readers, asked by prefix (law 1). The engine's cast door
+# runs them (`Engine._metal_temperature`, `_rust`, `_touches`); the numbers are the
+# spell documents' (`content/spells/mechanics`), never these functions'.
+
+# Heat metal and chill metal (CRB): "a creature takes full damage if its armor, shield, or
+# weapon is affected. The creature takes minimum damage (1 point or 2 points, depending on
+# the round) if it's not wearing or wielding such an item."
+METAL_FULL = ("wears.armour.metal", "wears.shield.metal", "wields.metal")
+METAL_ANY = "carries.metal"
+
+# Shocking grasp (CRB): "+3 bonus on the attack roll if the opponent is wearing metal armor
+# (or is carrying a metal weapon or is made of metal)". Carrying read as wielding (the
+# plan's §18.5 reading): a sword in its scabbard is not what the spark arcs to. `body.metal`
+# answers nothing until the bestiary pass tags iron golems and their kin (plan §5.3).
+METAL_TARGET = ("wears.armour.metal", "wields.metal", "body.metal")
+
+
+def metal_contact(target) -> str:
+    """"full" when `target` wears or wields metal, "minimum" when it only carries some,
+    "" when it has none on it for heat or chill metal to find."""
+    if any(target.has_state(q) for q in METAL_FULL):
+        return "full"
+    if target.has_state(METAL_ANY):
+        return "minimum"
+    return ""
+
+
+def metal_curve(spec: dict, contact: str) -> list[str]:
+    """The round-by-round curve this creature takes, round 1 first: the spec's `schedule`
+    for "full", its `minimum` for "minimum", [] for no contact."""
+    from .effectspec import metal_curve as _curve
+
+    if contact == "full":
+        return _curve(spec.get("schedule"))
+    if contact == "minimum":
+        return _curve(spec.get("minimum"))
+    return []
+
+
+def metal_effect(spec: dict, target, contact: str, *, source: str, origin: str):
+    """The ActiveEffect that carries rounds 2 onward of the curve, or None when there are
+    none: one `periodic` entry whose `schedule` the one executor spends a round at a time
+    (`Actor.run_periodic`), so there is no second ticker. Its clock is the curve's length,
+    so out of a fight (where rounds are not played) the world's clock still ends it."""
+    from .activeeffect import ActiveEffect
+
+    curve = metal_curve(spec, contact)
+    if len(curve) < 2:
+        return None
+    dtype = str(spec.get("damage_type") or "fire")
+    return ActiveEffect(
+        name=f"{source} ({'heated' if dtype == 'fire' else 'chilled'} metal)",
+        kind="effect", key="metal-temperature", source=source, origin=origin,
+        duration="rounds", rounds_left=len(curve),
+        payload={"contact": contact, "damage_type": dtype},
+        periodic=[{"per": "round", "damage": "0", "damage_type": dtype,
+                   "schedule": list(curve[1:])}])
+
+
+def touch_attack(spell) -> dict | None:
+    """The spell's `touch_attack` document, or None (most spells roll no attack)."""
+    for spec in getattr(spell, "effects", None) or ():
+        if isinstance(spec, dict) and spec.get("type") == "touch_attack":
+            return spec
+    return None
+
+
+def touch_terms(spec: dict, target) -> list:
+    """The spell's own terms on its touch attack against `target`: shocking grasp's +3
+    when the target answers `METAL_TARGET`. Named, so the dice popup says why."""
+    from .dice import Modifier
+
+    bonus = int((spec or {}).get("bonus_vs_metal") or 0)
+    if bonus and any(target.has_state(q) for q in METAL_TARGET):
+        return [Modifier(bonus, "against metal")]
+    return []
+
+
+def rusted_already(actor, suit_id: str) -> int:
+    """How much armour class rust has already taken from this suit on this wearer."""
+    return sum(int((e.payload or {}).get("lost") or 0) for e in actor.effects
+               if e.key == "rust" and (e.payload or {}).get("rusted") == suit_id)
+
+
+def settle_rust(actor) -> list[dict]:
+    """Rust on a suit that is no longer worn leaves its wearer, through the applicator
+    (`remove_effects`). Returns `effect_ended` records. The suit does not keep it: no store
+    holds damage to a suit's armour class on the suit (a gap, named in `Engine._rust`)."""
+    from . import armour as armour_mod
+
+    rust = [e for e in actor.effects if e.key == "rust" and e.origin]
+    if not rust:
+        return []
+    suit = armour_mod.worn_by_kind(actor).get("armour")
+    key = str(getattr(actor, "armour", "") or "")
+    worn = (str(suit.get("id") or suit.get("name") or key) if isinstance(suit, dict)
+            else key).strip().lower() if suit is not None else ""
+    out: list[dict] = []
+    for e in rust:
+        if (e.payload or {}).get("rusted") != worn:
+            actor.remove_effects(match=lambda x, e=e: x is e)
+            out.append({"kind": "effect_ended", "ref": actor.ref, "what": e.name,
+                        "origin": e.origin})
+    return out
+
+
+def _magic(thing) -> bool:
+    if not isinstance(thing, dict):
+        return False
+    if thing.get("magic"):
+        return True
+    try:
+        return int(thing.get("enhancement") or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def rust_reach(actor) -> dict:
+    """What rusting grasp can take from `actor`'s worn suit: `{"suit": id, "name": shown,
+    "cap": AC still to lose, "share": the metal's whole share}` — or `{"why": ...}` when it
+    can take nothing.
+
+    CRB: "destroys 1d6 points of Armor Class gained from metal armor (up to the maximum
+    amount of protection the armor offered)"; "magic items made of metal are immune". The
+    owner's answer 7 (2026-10-08) on a suit whose body is not metal: only the metal
+    pieces' share, the suit's book armour bonus less the plainest suit of its body's own
+    substance with no metal in it (studded leather 3 − leather 2 = 1; armoured coat
+    4 − 2 = 2), so the leather survives the rust. A suit whose body is metal gives all of
+    its armour bonus."""
+    from . import armour as armour_mod
+    from . import item_tags, states
+    from .tables import ARMOUR
+
+    suit = armour_mod.worn_by_kind(actor).get("armour")
+    if suit is None:
+        return {"why": "wears no armour"}
+    if not item_tags.has_material(suit, states.METAL_FERROUS):
+        return {"why": "wears no iron"}
+    if _magic(suit):
+        return {"why": "wears magic armour, which the rust cannot touch"}
+    key = str(getattr(actor, "armour", "") or "")
+    name = (str(suit.get("name") or key) if isinstance(suit, dict)
+            else ARMOUR.get(key, {}).get("name", key))
+    suit_id = (str(suit.get("id") or suit.get("name") or key) if isinstance(suit, dict)
+               else key).strip().lower()
+    main = item_tags.main_material(suit)
+    whole = int(actor.armour_stats().get("ac") or 0)
+    if main and item_tags.substance_of(main) == "metal":
+        share = whole
+    else:
+        book = int(ARMOUR.get(key, {}).get("ac") or 0)
+        share = max(0, min(whole, book - _plainest(item_tags.substance_of(main or ""))))
+    cap = max(0, share - rusted_already(actor, suit_id))
+    return {"suit": suit_id, "name": name, "share": share, "cap": cap}
+
+
+def _plainest(substance: str) -> int:
+    """The armour bonus of the plainest table suit whose body is `substance` and which has
+    no metal in it: what a leather-bodied suit keeps when its metal is gone."""
+    from . import item_tags, states
+    from .tables import ARMOUR
+
+    best = None
+    for key, row in ARMOUR.items():
+        if key == "none":
+            continue
+        pieces = item_tags.default_pieces(key, "armour") or {}
+        body = pieces.get("body")
+        if not body or item_tags.substance_of(body) != substance:
+            continue
+        if item_tags.has_material(key, states.METAL):
+            continue
+        ac = int(row.get("ac") or 0)
+        best = ac if best is None else min(best, ac)
+    return best or 0
+
+
 __all__ = [
+    "metal_contact", "metal_curve", "metal_effect", "touch_attack", "touch_terms",
+    "rust_reach", "rusted_already", "METAL_FULL", "METAL_ANY", "METAL_TARGET",
     "CASTERS", "FULL_CASTER", "PROGRESSIONS", "at_will", "bonus_slots", "can_cast_level",
     "caster_data", "caster_level", "casting_ability", "define_slots", "empty_slots",
     "ensure_prepared", "held_at", "highest_spell_level", "is_caster", "knows",

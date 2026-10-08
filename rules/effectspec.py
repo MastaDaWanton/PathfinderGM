@@ -717,6 +717,10 @@ VOCAB: dict[str, list[dict]] = {
         ("area", "On everyone in the cloud"),
         ("carried", "On whoever carries it"))],
     "permission": [{"id": k, "name": v["name"]} for k, v in PERMISSIONS.items()],
+    # A touch spell's attack (leatherworking plan §18.5): shocking grasp and rusting grasp
+    # are melee touch attacks, a ray is a ranged one (CRB, Aiming a Spell).
+    "touch": [{"id": "melee", "name": "A melee touch attack"},
+              {"id": "ranged", "name": "A ranged touch attack"}],
 }
 # The route dropdown's ids are the herb corpus's plus the alchemist's, in that order; a
 # route added to `ingredients.ROUTES` without a name here fails tests/test_alchemy_vocabulary.
@@ -1083,6 +1087,55 @@ CATEGORIES: list[Category] = [
                 Field("item", "Which item", "text", required=False,
                       hint="By name. Empty means everything the target carries."),
             ]),
+            # The spells that affect metal (leatherworking plan §18.5; the owner's Q7.3:
+            # "there are spells that affect metal"). Before these, heat metal and chill
+            # metal were a save gate with only a paragraph inside, rusting grasp a plain
+            # 3d6 to whoever it touched (iron or flesh), and shocking grasp's +3 against
+            # metal was implemented nowhere. Each reads the metal standing tags
+            # (`item_tags.bearer_tags`) through `rules/casting.py`, never a name.
+            #
+            # Heat and chill metal: a round-by-round curve, round 1 first (CRB: warm, hot
+            # 1d4, searing 2d4 x3, hot 1d4, warm), full on a creature wearing or wielding
+            # the metal and the minimum (1 or 2) on one only carrying it. The first entry
+            # lands on the cast; the rest ride one ActiveEffect whose `schedule` the one
+            # periodic executor spends (`Actor.run_periodic`).
+            EffectType("metal_temperature", "Heats or chills metal",
+                       "Metal worn hot for 7 rounds: 0, 1d4, 2d4, 2d4, 2d4, 1d4, 0 fire", [
+                Field("damage_type", "Damage type", "choice", vocab="energy"),
+                Field("schedule", "Each round, worn or wielded", "text",
+                      hint="Round 1 first, commas between: 0, 1d4, 2d4, 2d4, 2d4, 1d4, 0."),
+                Field("minimum", "Each round, only carried", "text",
+                      hint="The book's minimum, same rounds: 0, 1, 2, 2, 2, 1, 0."),
+                Field("save", "Gear saves with", "choice", vocab="save", required=False,
+                      hint="Will negates (object): gear on a creature saves with the "
+                           "creature's own bonus (CRB, Saving Throw)."),
+            ], blocked="Run by the cast (`Engine._metal_temperature`): a Will save per "
+                       "creature for its gear, then the curve through the periodic "
+                       "executor. A creature carrying no metal is untouched."),
+            # Rusting grasp (CRB): a nonmagical iron item touched is ruined; worn metal
+            # armour loses 1d6 of the AC its metal gives — for a suit with a leather body,
+            # at most the metal pieces' share (studded leather 1, armoured coat 2: the
+            # owner's answer 7, 2026-10-08); a ferrous creature takes 3d6 + 1 a level
+            # (max +15).
+            EffectType("rust", "Rusts iron", "1d6 AC from iron armour, 3d6 to an iron body", [
+                Field("armour_ac", "Armour class it eats", "dice"),
+                Field("creature_damage", "Damage to an iron creature", "dice"),
+                Field("creature_bonus", "Plus", "signed_formula", required=False,
+                      hint="min(caster_level, 15) for rusting grasp."),
+            ], blocked="Run by the cast (`Engine._rust`): the armour's loss lands on its "
+                       "wearer as one effect while the suit is worn; a weapon struck is "
+                       "not yet aimed at (no op names a weapon as a touch's target)."),
+            # A touch spell's attack roll (CRB, Aiming a Spell: "touch spells ... you must
+            # succeed on a touch attack"). The cast never rolled one: shocking grasp
+            # landed on whoever it was aimed at. `bonus_vs_metal` is shocking grasp's +3
+            # "if the opponent is wearing metal armor (or is carrying a metal weapon or is
+            # made of metal)".
+            EffectType("touch_attack", "Touch attack", "A melee touch attack, +3 against metal", [
+                Field("touch", "Attack", "choice", vocab="touch"),
+                Field("bonus_vs_metal", "Bonus against metal", "int", required=False,
+                      default=0),
+            ], blocked="Rolled by the cast before anything lands (`Engine._touches`); a "
+                       "miss reaches nobody."),
             # The item's own numbers, and the first of the forge's two types. Here rather
             # than under "Modifier" because it is not a modifier in that category's sense:
             # it has no bonus type (a heavier suit is not a "penalty" that stacks with
@@ -2004,6 +2057,17 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
         problems.append(
             f"{path}: applies_to belongs to the enchanting cost (a gear_mod on "
             f"enchant_cost_pct) and nothing else reads it. Remove it.")
+    if type_id == "metal_temperature":
+        curve, least = metal_curve(spec.get("schedule")), metal_curve(spec.get("minimum"))
+        if not curve or any(not _is_dice(x) for x in curve):
+            problems.append(f"{path}: the schedule is round 1 first, commas between, each "
+                            f"a number or dice: \"0, 1d4, 2d4, 2d4, 2d4, 1d4, 0\".")
+        if not least or any(not x.isdigit() for x in least):
+            problems.append(f"{path}: the minimum is whole numbers, round 1 first: "
+                            f"\"0, 1, 2, 2, 2, 1, 0\".")
+        elif curve and len(least) != len(curve):
+            problems.append(f"{path}: the schedule has {len(curve)} rounds and the minimum "
+                            f"{len(least)}; give both the same rounds.")
     if type_id == "as_base" and str(spec.get("target") or "") == "none":
         problems.append(
             f"{path}: 'none' is no armour to take statistics from. Name the row the "
@@ -2457,6 +2521,14 @@ def _vocab_name(vocab: str, value) -> str:
     return str(value)
 
 
+def metal_curve(text) -> list[str]:
+    """A `metal_temperature` curve, "0, 1d4, 2d4" -> ["0", "1d4", "2d4"] (a list is taken
+    as it is). Written as text because the generated form has no list-of-dice widget."""
+    if isinstance(text, list):
+        return [str(x).strip() for x in text if str(x).strip()]
+    return [x.strip() for x in str(text or "").split(",") if x.strip()]
+
+
 def _is_dice(s: str) -> bool:
     """`1d4`, `2d6+2`, a flat number, the corpus's own `1-4`, or `10/level`.
 
@@ -2646,6 +2718,22 @@ def render(spec: dict, *, against: bool = False) -> str:
     elif t == "object_damage":
         what = str(spec.get("item") or "").strip() or "everything carried"
         body = f"{dice} {spec.get('damage_type', 'untyped')} damage to {what}"
+    elif t == "metal_temperature":
+        curve = metal_curve(spec.get("schedule"))
+        body = (f"Metal worn or wielded deals {spec.get('damage_type') or 'fire'} damage "
+                f"each round for {len(curve)} rounds ({', '.join(curve)}); only carried, "
+                f"the minimum ({', '.join(metal_curve(spec.get('minimum')))})")
+    elif t == "rust":
+        bonus = spec.get("creature_bonus")
+        body = (f"Rusts iron: ruins a nonmagical iron item, takes {spec.get('armour_ac')} "
+                f"armour class from iron armour (never more than its metal gives), "
+                f"{spec.get('creature_damage')}" + (f" + {bonus}" if bonus else "")
+                + " to an iron creature")
+    elif t == "touch_attack":
+        body = f"A {spec.get('touch') or 'melee'} touch attack"
+        if int(spec.get("bonus_vs_metal") or 0):
+            body += (f", {int(spec['bonus_vs_metal']):+d} against a foe in metal armour, "
+                     f"wielding metal or made of metal")
     elif t == "gear_mod" and str(target or "") in COST_TARGETS:
         body = _cost_line(spec)
     elif t == "gear_mod":

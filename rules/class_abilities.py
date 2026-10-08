@@ -65,6 +65,8 @@ The grammar, one ability:
 - `addons`: `[{"choice": "rage power", "pick": ..., "modifiers": [...],
   "natural_weapons": [...]}]` — what a chosen rage power adds to the stance it rides.
 - `not_yet`: what the book says that nothing here does yet, said out loud.
+- `ability_type`: `"ex"`, `"su"` or `"sp"` (CRB, Special Abilities) — what a class's
+  prohibition suspends (`classfeatures.refusal`; the druid in metal loses `su` and `sp`).
 
 The fields added 2026-10-05 for the powers lane 2 wrote and could not run (each read by
 the one executor, each validated below). Prior art, read before any of it was written:
@@ -767,6 +769,16 @@ def validate_documents(docs: dict | None = None) -> list[str]:
             for a in (act.values() if isinstance(act, dict) else [act]):
                 if a not in ACTIONS:
                     problems.append(f"{at}: action {a!r} is not one of {', '.join(ACTIONS)}.")
+            # The book's kind of special ability (CRB, Special Abilities). Read by a class
+            # prohibition (`classfeatures.refusal`): a druid in metal loses her
+            # supernatural and spell-like abilities, never an extraordinary one.
+            from .states import ABILITY_TYPES
+
+            kind = doc.get("ability_type")
+            if kind is not None and str(kind) not in ABILITY_TYPES:
+                problems.append(f"{at}: ability_type {doc.get('ability_type')!r} is not one "
+                                f"of {', '.join(ABILITY_TYPES)} (extraordinary, "
+                                f"supernatural, spell-like).")
             if (doc.get("affects") or "self") not in AFFECTS:
                 problems.append(f"{at}: affects {doc.get('affects')!r} is not one of "
                                 f"{', '.join(AFFECTS)}.")

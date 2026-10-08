@@ -24,6 +24,23 @@
   "shields",
   "no metal armour"
  ],
+ "prohibits": {
+  "source": "Core Rulebook, Druid, Weapon and Armor Proficiency: prohibited from wearing metal armor and from using metal shields; a druid who does is unable to cast druid spells or use any of her supernatural or spell-like class abilities while doing so and for 24 hours thereafter. Dragonhide (Core, Special Materials) is armour druids may wear.",
+  "tags": [
+   "wears.armour.metal",
+   "wears.shield.metal"
+  ],
+  "suspends": [
+   "casting.class",
+   "ability.su.class",
+   "ability.sp.class"
+  ],
+  "lapse_hours": 24,
+  "exempt": "druid_permitted",
+  "name": "Prohibited metal",
+  "tell_on": "The iron on {name}'s body stands between them and the green: their druid spells and powers will not answer while it is worn, and for a day after.",
+  "tell_lapse": "{name} is free of the metal; the land's voice will return a full day from now."
+ },
  "class_skills": [
   "climb",
   "craft",

@@ -2686,8 +2686,16 @@
   "chill-metal": {
    "effects": [
     {
+     "type": "metal_temperature",
+     "damage_type": "cold",
+     "schedule": "0, 1d4, 2d4, 2d4, 2d4, 1d4, 0",
+     "minimum": "0, 1, 2, 2, 2, 1, 0",
+     "save": "will",
+     "note": "Round 1 cold, round 2 icy (1d4), rounds 3-5 freezing (2d4), round 6 icy (1d4), round 7 cold. Full damage to a creature wearing or wielding the metal, the minimum (1 or 2) to one only carrying it. Unattended nonmagical metal gets no save; an item in a creature's possession uses the creature's save bonus."
+    },
+    {
      "type": "narrative",
-     "target": "Metal equipment or 25 pounds of metal per level becomes extremely cold over 7 rounds. Round 1 it is merely cold and deals no damage, and the same is true on round 7. On rounds 2 and 6 it is icy and deals 1d4 points of cold damage; on rounds 3, 4 and 5 it is freezing and deals 2d4. A creature takes full damage if its armor, shield or weapon is affected, and minimum damage (1 or 2 points) if it is wearing or wielding no such item. Unattended nonmagical metal gets no save; magical metal saves, and an item in a creature's possession uses that creature's save bonus unless its own is higher. Any heat intense enough to damage the creature negates this cold damage point for point, and vice versa. Underwater it deals no damage but ice forms around the metal, making it float if unattended. Chill metal counters and dispels heat metal."
+     "target": "Any heat intense enough to damage the creature negates this cold damage point for point, and vice versa. Underwater it deals no damage but ice forms around the metal, making it float if unattended. Chill metal counters and dispels heat metal."
     }
    ],
    "duration": {
@@ -2696,7 +2704,7 @@
     "unit": "round"
    },
    "converted_by": "read",
-   "notes": "The damage is on a per-round schedule that rises and falls (none, 1d4, 2d4, 2d4, 2d4, 1d4, none) and is taken by whoever WEARS the metal, while the spell's targets are the metal items themselves. Emitted as a damage spec it would deal one fixed amount, once, to the equipment. Element cold already derived."
+   "notes": "Executable since the leatherworking revamp's metal readers (plan §18.5): the curve is a `metal_temperature` spec, as heat metal's, in cold."
   },
   "circle-of-clarity": {
    "effects": [

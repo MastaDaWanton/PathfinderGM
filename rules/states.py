@@ -197,6 +197,53 @@ BYSTANDER_KEY = "bystander"
 MATERIAL = "material"
 MATERIAL_MAIN = "material.main"
 METAL = "material.metal"
+# Iron and its alloys, beside the piece's own leaf: `material.metal.ferrous` is a flag on
+# the family, read off the metal document's `ferrous: true` (lane D set it on the eleven
+# iron and steel metals), so "is it iron?" is one prefix question whatever the iron is
+# called. Rusting grasp's target ("any iron or iron alloy item", CRB). No material is
+# called "ferrous", so the leaf cannot collide with a piece's own.
+METAL_FERROUS = "material.metal.ferrous"
+
+# What a creature has on it that is metal (leatherworking plan §18.5; the owner's Q7.3,
+# "armor and weapons both need a metal tag because there are spells that affect metal").
+# Standing tags, live-read off what is worn, wielded and carried (`item_tags.bearer_tags`
+# through `Actor.standing_tags`), so the druid's rule, heat and chill metal and shocking
+# grasp all ask `has_state` by prefix (law 1) and taking the suit off is the tag gone.
+#
+#   wears.armour.metal[.ferrous]   the suit on the body has a metal piece (iron among them)
+#   wears.shield.metal[.ferrous]   the shield on the arm does
+#   wields.metal[.ferrous]         the weapon in hand does
+#   carries.metal[.ferrous]        anything at all on them does — worn, wielded or packed
+#                                  (heat metal's "minimum damage" for a creature that is
+#                                  only carrying metal)
+#   body.metal[.ferrous]           the creature IS metal (an iron golem): shocking grasp's
+#                                  third clause and rusting grasp's ferrous creature. Asked
+#                                  here; no stat block grants it yet (plan §5.3's bestiary
+#                                  pass), so today nothing answers it.
+WEARS_ARMOUR_METAL = "wears.armour.metal"
+WEARS_SHIELD_METAL = "wears.shield.metal"
+WIELDS_METAL = "wields.metal"
+CARRIES_METAL = "carries.metal"
+BODY_METAL = "body.metal"
+FERROUS_LEAF = "ferrous"
+# The roots `Actor.bearer_tags` writes under. `has_state` walks what is worn and packed
+# only for a query under one of these, because the walk is the costly part of the answer.
+# `body` is not among them: `body.metal` is a creature's own tag (its stat block's, read by
+# `standing_tags` already), never something it wears.
+BEARER_ROOTS = frozenset({"wears", "wields", "carries"})
+
+# What a class's prohibition suspends while it holds (a class document's `prohibits`
+# block, `rules/classfeatures.py`): CRB Druid, "unable to cast druid spells or use any of
+# her supernatural or spell-like class abilities while doing so and for 24 hours
+# thereafter". Laid on the creature as `suspended.<entry>` by one ActiveEffect with origin
+# `rule:prohibited-metal`; the cast door asks `suspended.casting.class` and the class
+# ability door `suspended.ability.<su|sp>.class`. Class casting only: a wand or a scroll
+# is not "her" spell, and an item's power goes through its own door.
+SUSPENDED = "suspended"
+SUSPENDS: tuple[str, ...] = ("casting.class", "ability.su.class", "ability.sp.class")
+# The book's three kinds of special ability (CRB, Special Abilities): extraordinary,
+# supernatural, spell-like. A class ability document says which it is (`ability_type`).
+ABILITY_TYPES: tuple[str, ...] = ("ex", "su", "sp")
 
 # What a cursed item is and what it does to whoever bears it (enchanting plan §11; lane F,
 # `rules/curses.py`, `content/rules/curses.json`). Two kinds of tag under one root:
@@ -241,6 +288,11 @@ def material_tag(substance: str, material_id) -> str:
 
 def main_material_tag(material_id) -> str:
     return f"{MATERIAL_MAIN}.{material_leaf(material_id)}"
+
+
+def suspended_tag(entry: str) -> str:
+    """`suspended.<entry>` — the one writer of the tag a prohibition lays."""
+    return f"{SUSPENDED}.{str(entry or '').strip().lower()}"
 
 TAGS: dict[str, tuple[str, ...]] = {
     # Not under `state.*`: a bystander is stopped from nothing and impaired in

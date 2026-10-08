@@ -896,7 +896,12 @@ def test_a_rebuild_does_not_destroy_what_a_person_corrected():
                json.loads(path.read_text(encoding="utf-8"))["spells"]}
 
     by_hand = [s for s in shipped.values() if not s.get("effects_converted")]
-    assert len(by_hand) == 14, f"{len(by_hand)} hand-written entries, expected 14"
+    # 16 since the leatherworking metal readers (lane M, 2026-10-08): rusting grasp and
+    # shocking grasp were rewritten by hand (a touch attack, rust on iron armour) and must
+    # survive a rebuild like the fourteen before them.
+    assert len(by_hand) == 16, f"{len(by_hand)} hand-written entries, expected 16"
+    for sid in ("rusting-grasp", "shocking-grasp"):
+        assert "touch_attack" in [e.get("type") for e in shipped[sid]["effects"]], sid
 
     # And the two the rebuild actually broke are among them, still narrative.
     for sid in ("fly", "binding-earth"):
