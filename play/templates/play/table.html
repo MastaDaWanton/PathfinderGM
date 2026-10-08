@@ -3201,6 +3201,11 @@
      bench's own. The games' sheet is lane U2's, named only once it is in the build. -->
 <link rel="stylesheet" href="{% asset 'css/alchemy.css' %}">
 {% asset 'css/alchemy-games.css' as alchemy_games_css %}{% if '?v=' in alchemy_games_css %}<link rel="stylesheet" href="{% asset 'css/alchemy-games.css' %}">{% endif %}
+<!-- The leather bench (docs/leatherworking-ui-plan.md §12, leatherworking lane U1), after
+     bench.css, forge.css (whose slots, swatch and build card it reuses), enchant.css and
+     alchemy.css. The games' sheet is lane U3's, named only once it is in the build. -->
+<link rel="stylesheet" href="{% asset 'css/leather.css' %}">
+{% asset 'css/leather-games.css' as leather_games_css %}{% if '?v=' in leather_games_css %}<link rel="stylesheet" href="{% asset 'css/leather-games.css' %}">{% endif %}
 <script src="{% static 'js/dice3d.js' %}"></script>
 <!-- App-wide preferences and sound (Lane G), early and after the dice, so every later
      script can read them. Guarded the same way as bench-games.css above. -->
@@ -3519,6 +3524,11 @@
            37's In progress door after this one: 37 places it after the doors it knows). -->
       <button type="button" class="v2-btn door" id="open-alchemy" data-alchemy-open
               aria-haspopup="dialog" aria-controls="alchemy">Alchemy</button>
+      <!-- Leatherwork opens the leather bench over the table the same way (55-leather-shell.js,
+           docs/leatherworking-ui-plan.md §5.1), after Alchemy; 55 moves In progress's door
+           after this one, so the craft doors stay together. -->
+      <button type="button" class="v2-btn door" id="open-leather" data-leather-open
+              aria-haspopup="dialog" aria-controls="leather">Leatherwork</button>
       <a class="v2-btn door" href="/craft/">Crafting bench</a>
       <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
       <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
@@ -3933,6 +3943,59 @@
   <div class="vh" id="alchemy-say" role="status" aria-live="polite"></div>
 </div>
 
+<!-- The leather bench (docs/leatherworking-ui-plan.md §5): the fifth bench, mounted on the same
+     core (29-bench-core.js) at the same z-index, so it carries the bench's classes and its own
+     ids. The rack on the left (only what you carry, green hides with their spoil clock), the
+     beam in the middle with the step's line under it, the work order on the right (the piece
+     slots, the pattern, the paper tag with the grade cap, the build). 55 opens it; 56 fills the
+     rack, 58 the work order; 57 (lane U4's stage) is an optional provider. -->
+<div id="leather" class="bench leather" role="dialog" aria-modal="true" aria-labelledby="leather-title"
+     hidden>
+  <header class="bench-strip v2-card-leather">
+    <div class="bench-cap bench-strip-in">
+      <h2 class="bench-title" id="leather-title">Leatherwork</h2>
+      <div class="bench-methods" id="leather-methods" role="radiogroup"
+           aria-label="Method"></div>
+      <button type="button" class="v2-btn is-quiet bench-close" id="leather-close">Close</button>
+    </div>
+  </header>
+
+  <div class="bench-frame leather-frame">
+    <section class="bench-panel bench-satchel leather-rack v2-framed v2-tooled-leather" id="leather-rack"
+             data-leather-rack aria-label="Your rack">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-satchel-in" id="leather-rack-in"></div>
+    </section>
+
+    <section class="bench-stage leather-stage" id="leather-stage" aria-label="The beam">
+      <div class="bench-tool" id="leather-tool"></div>
+      <ul class="bench-chips" id="leather-chips" aria-label="On the work" hidden></ul>
+      <p class="bench-info" id="leather-info"></p>
+      <div class="bench-rollrow">
+        <button type="button" class="v2-btn is-go bench-roll" id="leather-roll" disabled
+                aria-describedby="leather-why">Roll Craft</button>
+        <span class="bench-why" id="leather-why"></span>
+      </div>
+      <!-- Where the minigame rises (contracts §11.1). -->
+      <div class="bench-gamebay" id="leather-game" hidden></div>
+    </section>
+
+    <section class="bench-panel bench-tagcol leather-order v2-framed v2-tooled-leather" id="leather-order"
+             aria-label="The work order">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-tagcol-in" id="leather-order-in"></div>
+    </section>
+  </div>
+
+  <footer class="bench-foot v2-card-leather" id="leather-foot">
+    <div class="bench-cap bench-foot-in" id="leather-foot-in"></div>
+  </footer>
+  <!-- The bench's own popovers: the build card, the confirms, the perk picker, a material's
+       card and the ledger (lane U5's or the flat stand-ins). -->
+  <div class="bench-pops" id="leather-pops"></div>
+  <div class="vh" id="leather-say" role="status" aria-live="polite"></div>
+</div>
+
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
@@ -4068,6 +4131,25 @@ build; 50-alchemy-shell.js finishes a step flat without them.{% endcomment %}
 {% asset 'js/alchemy-games/sublime.js' as ag_sublime %}{% if '?v=' in ag_sublime %}<script src="{% asset 'js/alchemy-games/sublime.js' %}"></script>{% endif %}
 {% asset 'js/alchemy-games/bottle.js' as ag_bottle %}{% if '?v=' in ag_bottle %}<script src="{% asset 'js/alchemy-games/bottle.js' %}"></script>{% endif %}
 {% asset 'js/alchemy-games/transmute.js' as ag_transmute %}{% if '?v=' in ag_transmute %}<script src="{% asset 'js/alchemy-games/transmute.js' %}"></script>{% endif %}
+{% comment %}The leather bench's games (leatherworking lane U3, contracts §11.1): the kit first
+(window.LeatherGames: `key(method)` is "leather.<method>", since the forge owns "assemble" on
+the shared registry; `cutTest` is the tan's second half), then one file per method, each
+registering on BenchGameDefs with track "leather". Named only once in the build;
+55-leather-shell.js finishes a step flat without them.{% endcomment %}
+{% asset 'js/leather-games/00-kit.js' as lg_kit %}{% if '?v=' in lg_kit %}<script src="{% asset 'js/leather-games/00-kit.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/flense.js' as lg_flense %}{% if '?v=' in lg_flense %}<script src="{% asset 'js/leather-games/flense.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/salt.js' as lg_salt %}{% if '?v=' in lg_salt %}<script src="{% asset 'js/leather-games/salt.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/tan.js' as lg_tan %}{% if '?v=' in lg_tan %}<script src="{% asset 'js/leather-games/tan.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/cut-test.js' as lg_cut_test %}{% if '?v=' in lg_cut_test %}<script src="{% asset 'js/leather-games/cut-test.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/curry.js' as lg_curry %}{% if '?v=' in lg_curry %}<script src="{% asset 'js/leather-games/curry.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/cut.js' as lg_cut %}{% if '?v=' in lg_cut %}<script src="{% asset 'js/leather-games/cut.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/stitch.js' as lg_stitch %}{% if '?v=' in lg_stitch %}<script src="{% asset 'js/leather-games/stitch.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/harden.js' as lg_harden %}{% if '?v=' in lg_harden %}<script src="{% asset 'js/leather-games/harden.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/tool.js' as lg_tool %}{% if '?v=' in lg_tool %}<script src="{% asset 'js/leather-games/tool.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/dye.js' as lg_dye %}{% if '?v=' in lg_dye %}<script src="{% asset 'js/leather-games/dye.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/laminate.js' as lg_laminate %}{% if '?v=' in lg_laminate %}<script src="{% asset 'js/leather-games/laminate.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/assemble.js' as lg_assemble %}{% if '?v=' in lg_assemble %}<script src="{% asset 'js/leather-games/assemble.js' %}"></script>{% endif %}
+{% asset 'js/leather-games/harvest.js' as lg_harvest %}{% if '?v=' in lg_harvest %}<script src="{% asset 'js/leather-games/harvest.js' %}"></script>{% endif %}
 {% comment %}The stage's renderer (Lane F), in its own load order: maths, the GL layer,
 meshes, the procedural grounds, particles, props, then the nine tools. 32 below is its
 API. A comment block, not {# #}: Django's hash comment is one line only, and the two-line
@@ -4176,6 +4258,37 @@ window.ALCHEMY_ICON_URLS = {
 {% asset 'js/table/52-alchemy-stage.js' as alchemy_stage_js %}{% if '?v=' in alchemy_stage_js %}<script src="{% asset 'js/table/52-alchemy-stage.js' %}"></script>{% endif %}
 <script src="{% asset 'js/table/53-alchemy-card.js' %}"></script>
 {% asset 'js/table/54-alchemy-books.js' as alchemy_books_js %}{% if '?v=' in alchemy_books_js %}<script src="{% asset 'js/table/54-alchemy-books.js' %}"></script>{% endif %}
+<!-- The leather bench (docs/leatherworking-contracts.md §11): its icon art with the content
+     stamp, a registry of its own named by file (game-icons.net, CC BY 3.0,
+     docs/asset-licences.md); lane U4's stage parts (after the bench and forge stage kits they
+     reuse); then 55 to 59 in number order. The contracts' 45-48 and 50 were taken by the
+     enchanting circle and the alchemy bench, so this bench took the next free numbers: 55, 56
+     and 58 are lane U1's and always named; 57 (lane U4's adapter, window.TanneryStage) and 59
+     (lane U2's harvest sheet) are optional providers named only once they are in the build. -->
+<script>
+window.LEATHER_ICON_URLS = {
+  flense: "{% asset 'img/icons/flense.svg' %}", salt: "{% asset 'img/icons/salt.svg' %}",
+  tan: "{% asset 'img/icons/tan.svg' %}", curry: "{% asset 'img/icons/curry.svg' %}",
+  cut: "{% asset 'img/icons/cut.svg' %}", stitch: "{% asset 'img/icons/stitch.svg' %}",
+  harden: "{% asset 'img/icons/harden.svg' %}", stamp: "{% asset 'img/icons/stamp.svg' %}",
+  dye: "{% asset 'img/icons/dye.svg' %}", "dye-pot": "{% asset 'img/icons/dye-pot.svg' %}",
+  laminate: "{% asset 'img/icons/laminate.svg' %}", grade: "{% asset 'img/icons/grade.svg' %}",
+  "leather-armour": "{% asset 'img/icons/leather-armour.svg' %}", hide: "{% asset 'img/icons/hide.svg' %}",
+  "leather-roll": "{% asset 'img/icons/leather-roll.svg' %}", panel: "{% asset 'img/icons/panel.svg' %}",
+  lacing: "{% asset 'img/icons/lacing.svg' %}", thread: "{% asset 'img/icons/thread.svg' %}",
+  cloak: "{% asset 'img/icons/cloak.svg' %}", boots: "{% asset 'img/icons/boots.svg' %}",
+};
+</script>
+{% asset 'js/tannery-stage/00-hide.js' as ts_00_hide %}{% if '?v=' in ts_00_hide %}<script src="{% asset 'js/tannery-stage/00-hide.js' %}"></script>{% endif %}
+{% asset 'js/tannery-stage/01-props.js' as ts_01_props %}{% if '?v=' in ts_01_props %}<script src="{% asset 'js/tannery-stage/01-props.js' %}"></script>{% endif %}
+{% asset 'js/tannery-stage/02-pieces.js' as ts_02_pieces %}{% if '?v=' in ts_02_pieces %}<script src="{% asset 'js/tannery-stage/02-pieces.js' %}"></script>{% endif %}
+{% asset 'js/tannery-stage/03-yard.js' as ts_03_yard %}{% if '?v=' in ts_03_yard %}<script src="{% asset 'js/tannery-stage/03-yard.js' %}"></script>{% endif %}
+{% asset 'js/tannery-stage/04-fx.js' as ts_04_fx %}{% if '?v=' in ts_04_fx %}<script src="{% asset 'js/tannery-stage/04-fx.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/55-leather-shell.js' %}"></script>
+<script src="{% asset 'js/table/56-leather-rack.js' %}"></script>
+{% asset 'js/table/57-leather-stage.js' as leather_stage_js %}{% if '?v=' in leather_stage_js %}<script src="{% asset 'js/table/57-leather-stage.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/58-leather-order.js' %}"></script>
+{% asset 'js/table/59-harvest.js' as harvest_js %}{% if '?v=' in harvest_js %}<script src="{% asset 'js/table/59-harvest.js' %}"></script>{% endif %}
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>

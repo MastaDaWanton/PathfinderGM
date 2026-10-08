@@ -173,6 +173,7 @@ urlpatterns = [
     path("api/leather/ask", leather_views.leather_ask, name="leather_ask"),
     path("api/leather/manual", leather_views.leather_manual, name="leather_manual"),
     path("api/leather/ledger", leather_views.leather_ledger, name="leather_ledger"),
+    path("api/leather/seen", leather_views.leather_seen, name="leather_seen"),
     path("api/leather/material/<str:material_id>", leather_views.leather_material,
          name="leather_material"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
