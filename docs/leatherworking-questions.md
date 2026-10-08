@@ -659,3 +659,7 @@ proposal stands. These override the plan and the contracts wherever they differ.
 - **Steel studs carry forge steel's house numbers** (lane D): a crafted studded leather with
   steel studs is AC +1 over the table row (the fastening counts half of steel's +2 material
   AC). Consistent with the forge's house steel; for the owner's review alongside it.
+- **Bought leather is oak-bark tanned** (lanes D and E): oak bark's `ceiling_up` makes a
+  bought hide's ceiling one rung above the crafter's own hands (Superior from Leatherworker
+  1's Fine, still under the grade cap). Kept: a town tanner's best traditional tan beating a
+  novice's is plausible. For the owner's review.

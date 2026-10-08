@@ -298,6 +298,11 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         # green hide, which "cannot be bought or sold in most settlements", Harvest Parts).
         # Its `price_gp` is the price of that form. "" on everything that is sold as itself.
         "sold_as": str(raw.get("sold_as") or ""),
+        # A hide's size (its units, plan §5.5) and how long it keeps green (§6). Kept since
+        # 2026-10-08: lane E measured `get` dropping both, so every reader but the bench saw
+        # a Large hide as one Medium unit with no clock of its own.
+        "size": (str(raw.get("size") or "").strip().lower() or None),
+        "fresh_hours": _int(raw.get("fresh_hours")),
         # Printed clauses no effect type can say yet (angelskin's aura, griffon mane's
         # cheaper flight): kept as words so the card can say "book effect, not yet in
         # play" rather than staying silent (the forge's honest pattern, plan §14.5).

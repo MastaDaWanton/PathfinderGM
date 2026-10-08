@@ -584,3 +584,12 @@ def test_pending_bases_are_still_pending():
     landed = [b for b in materials.PENDING_BASES
               if b in tables.ARMOUR or b in tables.SHIELDS]
     assert not landed, f"{landed} are in the tables now: drop them from PENDING_BASES"
+
+
+def test_a_hides_size_and_green_clock_survive_the_reader():
+    """Measured 2026-10-08 by lane E: `materials.get` dropped `size` and `fresh_hours`, so
+    every reader but the bench saw a Large hide as one Medium unit with no clock."""
+    from rules import materials
+
+    doc = materials.get("deer-hide")
+    assert doc["size"] == "medium" and doc["fresh_hours"] == 48

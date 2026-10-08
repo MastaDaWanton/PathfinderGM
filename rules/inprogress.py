@@ -109,6 +109,9 @@ def _registry() -> dict[str, _Craft]:
     # And the alchemist (alchemy lane F): its spell potions, transmutes and long steps.
     if "alchemist" not in _CRAFTS:
         from . import alchemist  # noqa: F401  — registers `alchemist`
+    # And the leatherworker (leather lane E): tannages in a vat or in the pack.
+    if "leatherworker" not in _CRAFTS:
+        from . import leatherworker  # noqa: F401  — registers `leatherworker`
     return _CRAFTS
 
 
