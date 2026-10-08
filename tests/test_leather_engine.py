@@ -47,6 +47,12 @@ DOCS = {
                                     "book": True},
                                    {"type": "skill_mod", "target": "survival", "amount": 2,
                                     "bonus_type": "material"}]},
+    # Studs with no house numbers of their own, so the tests below measure the table row
+    # alone. The shipped steel studs carry steel's house numbers (lane D, 2026-10-08:
+    # +2 material AC, scaled 0.5 as a fastening) — pinned on their own in
+    # `test_shipped_steel_studs_add_steels_house_ac_on_top_of_the_row`.
+    "plain-studs": {"id": "plain-studs", "name": "Plain studs", "kind": "fitting",
+                    "armour": []},
     "werewolf-pelt": {"id": "werewolf-pelt", "name": "Werewolf pelt", "kind": "hide",
                       "armour": [{"type": "damage_reduction", "amount": 1, "bypass": "silver",
                                   "from_creature": True}]},
@@ -62,7 +68,7 @@ def documents(monkeypatch):
 
 def record(body="plain-hide", *, rid="hide-studded-leather", name="Hide Studded Leather",
            base="studded leather", gear="armour", slot="armor", q=1,
-           fastenings="steel-studs", **over) -> dict:
+           fastenings="plain-studs", **over) -> dict:
     pieces = {"body": {"material": body, "passes": 0}}
     if fastenings:
         pieces["fastenings"] = {"material": fastenings, "passes": 0}
@@ -348,3 +354,16 @@ def test_a_bulette_suit_is_worn_as_studded_leather_with_no_metal():
     assert pc.armour == "leather" and pc.ac() == 16
     assert pc.armour_stats()["as_base"] == "studded leather"
     assert not armour_mod.wears_metal(pc)
+
+
+def test_shipped_steel_studs_add_steels_house_ac_on_top_of_the_row():
+    """Measured 2026-10-08 when lanes B and D met: the same suit with the shipped steel
+    studs read AC 15 -> 17, not 16. Lane D gave steel studs forge steel's house numbers
+    (+2 material AC), and a fastening counts half: +1 over studded leather's row. That is
+    the forge's own house rule for steel (docs/blacksmithing-review.md), kept consistent,
+    and listed for the owner in docs/leatherworking-review.md."""
+    scene, engine = table()
+    pc = scene.pc()
+    pc.add_stock(forge_items.stock_item(record(fastenings="steel-studs")))
+    out = run(engine, "wear", "hide-studded-leather")
+    assert "Armour class 15 to 17" in out.tell and pc.ac() == 17

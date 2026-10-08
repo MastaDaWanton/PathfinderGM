@@ -656,3 +656,6 @@ proposal stands. These override the plan and the contracts wherever they differ.
   body or a worn good's whole, and never from a lining; the forge's quality scaling would
   round DR 1 to 0 at Crude, breaking the owner's "at least 1". House modifiers keep the
   forge maths.
+- **Steel studs carry forge steel's house numbers** (lane D): a crafted studded leather with
+  steel studs is AC +1 over the table row (the fastening counts half of steel's +2 material
+  AC). Consistent with the forge's house steel; for the owner's review alongside it.

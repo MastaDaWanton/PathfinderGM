@@ -149,6 +149,9 @@ def test_common_hides_and_dyes_are_staples_once_the_catalogue_prices_them(monkey
         "leatherworker": ("hide", "dye")}
     rows = [dict(r) for r in market._catalogue_rows("leatherworker")]
     for r in rows:
+        # Lane D priced every common hide and dye (2026-10-08); strip them to replay the
+        # unpriced catalogue this test was written against.
+        r.pop("price_gp", None)
         if r["id"] in ("deer-hide", "madder-red"):
             r["price_gp"] = 2
     monkeypatch.setattr(market, "_catalogue_rows",
@@ -432,3 +435,12 @@ def test_an_outskirts_place_reads_its_name_without_the_ring_mark():
 
     assert keepers.label_of("abc123~forest:@the-tannery") == "the tannery"
     assert keepers.label_of("abc123~urban:the-market") == "the market"
+
+
+def test_the_shipped_catalogue_leaves_no_common_hide_or_dye_unsold():
+    """Lane G measured 0 of 14 common hides and 0 of 5 common dyes priced, so none could
+    be on a counter; lane D priced them. None may slip back to unpriced. The six generic
+    hides are the exception by design: each is only ever a particular beast's, read from
+    its stat block at the harvest, so no counter sells one."""
+    unpriced = list(market.unpriced_staples("leatherworker", ["hide", "dye"]))
+    assert all(m.startswith("generic-") for m in unpriced), unpriced
