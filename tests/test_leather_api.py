@@ -400,3 +400,31 @@ def test_an_unknown_property_row_carries_nothing_but_its_blankness(client):
                      "drawback": None, "how": None}, p
     if not any(p.get("known") for p in card["properties"]):
         assert card["not_yet"] == []
+
+
+def test_a_long_tannage_wait_stops_where_the_pack_runs_out(client):
+    """Measured 2026-10-08 by lane U1: "Wait for it" on a 21-day bark tannage went through
+    `Scene.advance`, which never ate or drank, and killed the character twice, the second
+    time carrying 40 waterskins. The leather collect route now waits through `Scene.wait`:
+    with an empty pack it stops before thirst can hurt and says so."""
+    from play import campaign as cm
+    from rules import inprogress
+
+    c = cm.current()
+    pc = c.scene.pc()
+    pc.goods.clear()
+    # One 21-day piece of work, begun the way the bench begins a tannage.
+    from rules.crafting import Stock
+
+    sid = "test-tannage"
+    pc.stock[sid] = Stock(base="Deer Hide (in the vat)", count=1, craft="leatherworker",
+                          kind="crafted")
+    inprogress.begin(pc, sid, craft="leatherworker", minutes=21 * 24 * 60,
+                     now=c.scene.clock_minutes, label="bark tannage", where="",
+                     where_name="", doing="tanning", result={"vat": False})
+    c.save()
+    r = post(client, "/api/leather/collect", {"key": "stock:test-tannage", "wait": True})
+    assert r.status_code == 200, r.content[:300]
+    d = r.json()
+    assert d.get("stopped") and d["waited"] < 21 * 24 * 60
+    assert not cm.current().scene.pc().is_down

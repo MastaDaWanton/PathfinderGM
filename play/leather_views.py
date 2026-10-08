@@ -976,12 +976,27 @@ def leather_collect(request):
             return _err("You are in a fight. The vat will keep until it is over.", 409)
         left = max(0, int(inprogress.end_of(item, _now(c)) or 0) - _now(c))
         if left > 0:
-            from rules import sky
+            from rules import sky, survival
 
-            c.scene.advance(left)
-            waited = left
-            c.transcript.append({"who": "gm", "kind": "consequence", "text": (
-                f"{pc.name} waits {sky.span_words(left)} for the {item.name}.")})
+            # `Scene.wait`, not `advance`: a wait of a day or more is lived through on what
+            # the pack carries and stops where it runs out. Measured 2026-10-08 by lane U1:
+            # a 21-day bark tannage through `advance` killed the character twice, the
+            # second time carrying 40 waterskins, and this route said only "You waited 21
+            # days" (master's fix/long-waits-eat-and-drink; alchemy_collect's shape).
+            passed = c.scene.wait(left)
+            waited = int(passed["minutes"])
+            lived = survival.wait_lines(passed, pc.ref)
+            if waited:
+                c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
+                    [f"{pc.name} waits {sky.span_words(waited)} for the {item.name}."]
+                    + lived)})
+            if passed.get("stopped"):
+                if not waited:
+                    c.transcript.append({"who": "gm", "kind": "consequence",
+                                         "text": " ".join(lived)})
+                c.save()
+                return JsonResponse({"said": " ".join(lived), "stopped": passed["stopped"],
+                                     "body": lived, "waited": waited})
     if body.get("score") is not None and inprogress.state_of(item, _now(c)) == "ready":
         _, cut = crafting.tier_from_score(body.get("score"), 1)
         (block.setdefault("result", {}))["cut_score"] = cut
