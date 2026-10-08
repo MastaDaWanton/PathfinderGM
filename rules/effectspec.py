@@ -70,6 +70,53 @@ GEAR_TARGETS: dict[str, dict] = {
     "throw_range_ft": {"name": "Thrown range increment (feet)", "better": +1},
 }
 
+# What it costs to work the item later, rather than how it performs: dragonhide's "energy
+# resistance enchantments cost 25% less" (CRB/UE special materials; leatherworking plan §15,
+# contracts §2, §6.3). A `gear_mod` target, as the contract names it, but kept OUT of
+# `GEAR_TARGETS` on purpose: `forge_items.build` gives every key of that dict a slot in the
+# build's `gear` numbers and sums every same-target row into it, which would fold the
+# discount into one bare number and lose `applies_to` — a −25% on energy resistance and a
+# hypothetical −10% on flight would add to −35% on everything. Out of that dict, the build
+# leaves the document whole in its `book` list (the main piece's printed effects, unscaled,
+# with every field kept), which is where the Enchanting cost reader looks for it.
+# Measured on build/leatherworking before this: no material, property or reader named an
+# enchanting cost anywhere in the app.
+COST_TARGETS: dict[str, dict] = {
+    # A percentage of the enchanting cost. Negative is cheaper, so better is -1.
+    "enchant_cost_pct": {"name": "Enchanting cost (percent)", "better": -1},
+}
+
+# Which properties a cost target's `applies_to` reaches, by family. Small on purpose and
+# meant to grow (contracts §2: "a small list the Enchanting lanes extend"): a family is a
+# name the material document can say and the cost reader can test with one lookup, never a
+# free-text phrase it would have to parse. Every id is a `magic-properties.json` entry
+# (tests/test_leather_vocabulary.py checks them against the table).
+ENCHANT_COST_FAMILIES: dict[str, dict] = {
+    "energy_resistance": {
+        "name": "energy resistance",
+        "properties": ("energy-resistance", "energy-resistance-improved",
+                       "energy-resistance-greater"),
+    },
+}
+
+
+def gear_target_row(target) -> dict:
+    """The row for any `gear_mod` target — the item's own numbers or its working cost — or
+    {} for one that is neither. One lookup, so `is_drawback` and the card ask the same
+    table the validator does."""
+    t = str(target or "")
+    return GEAR_TARGETS.get(t) or COST_TARGETS.get(t) or {}
+
+
+def cost_family_of(property_id) -> str:
+    """The `ENCHANT_COST_FAMILIES` key a magic property belongs to, or "" — the one
+    question the Enchanting cost reader asks before applying a vessel's discount."""
+    pid = str(property_id or "").strip()
+    for family, row in ENCHANT_COST_FAMILIES.items():
+        if pid in row["properties"]:
+            return family
+    return ""
+
 # What a weapon counts as against damage reduction and hardness. A list, and meant to grow:
 # `Reduction.bypassed_by` has existed on the sheet since stage 2 and nothing ever passed it a
 # trait, because there was no way to say a blade *was* cold iron.
@@ -110,6 +157,47 @@ ENHANCEMENT_STRIKES_AS: tuple[tuple[int, tuple[str, ...]], ...] = (
 )
 
 
+# What a `damage_reduction`'s `bypass` may name, word by word: the Bestiary's universal
+# rule lists adamantine, cold iron and silver, magic, epic, the four alignments and the
+# three physical damage types, joined by "and" (a weapon must be both) or "or" (either
+# will do); "DR x/—" means no weapon gets past it
+# (https://www.aonprd.com/UMR.aspx?ItemName=Damage%20Reduction). Compared as
+# `Reduction.bypassed_by` compares them (`sheet._trait_word`: "cold_iron", "cold-iron" and
+# "cold iron" are one word). Checked only where a document is made by hand for this app
+# (`leather_effect_problems`); the imported corpus carries stat-block debris in the field
+# ("cold iron OFFENSE Speed 30 ft.", 140-odd rows) that is the bestiary's to clean.
+DR_BYPASS_WORDS: tuple[str, ...] = (
+    "adamantine", "cold iron", "silver", "magic", "epic",
+    "good", "evil", "lawful", "chaotic", "bludgeoning", "piercing", "slashing")
+
+
+def dr_bypass_problems(bypass, path: str = "bypass") -> list[str]:
+    """Everything wrong with one damage reduction's bypass, named with the fix.
+
+    A misspelt bypass is worse than none: "sliver" is a word no blow ever carries, so
+    `Reduction.bypassed_by` never matches it and DR 1/sliver silently becomes DR 1/—, the
+    strongest kind there is. And "—" written into the field is a second spelling of the
+    empty bypass every reader already takes as "/—" (`Reduction.label`).
+    """
+    text = str(bypass if bypass is not None else "").strip().lower()
+    if not text:
+        return []
+    if text.strip("—–- ") == "":
+        return [f"{path}: leave bypass empty for DR/— (nothing gets past it); "
+                f"{bypass!r} is a second spelling of the same thing."]
+    words = " ".join(re.split(r"[\s_\-]+", text)).strip()
+    bad = []
+    for part in words.split(" and "):
+        for alt in part.split(" or "):
+            if alt.strip() not in DR_BYPASS_WORDS:
+                bad.append(alt.strip())
+    if bad:
+        return [f"{path}: {', '.join(map(repr, bad))} is not something a blow can be made "
+                f"of. One of: {', '.join(DR_BYPASS_WORDS)}, joined by \"and\" or \"or\" "
+                f"(\"cold iron and good\")."]
+    return []
+
+
 def strikes_as_for_enhancement(enhancement: int) -> tuple[str, ...]:
     """The DR traits a weapon of this enhancement bonus carries, by the glossary's rule.
 
@@ -138,6 +226,8 @@ WORKING_TRAITS: list[str] = [
     "night_only", "eager", "skittish", "heavy", "volatile",
     # The alchemist's bench (alchemy plan §5.5, contracts §2.4), appended below; see
     # ALCHEMY_WORKING_TRAITS for what each one means at the bench.
+    # The leatherworker's (leatherworking contracts §2), appended below; see
+    # LEATHER_WORKING_TRAITS.
 ]
 
 # --- the alchemist's words (alchemy lane B: contracts §2, plan §5.3, §5.5, §16) --------------
@@ -164,6 +254,47 @@ ALCHEMY_WORKING_TRAITS: tuple[str, ...] = (
     "slow_to_dissolve", "light_sensitive", "corrosive", "toxic_to_handle", "wild",
 ) + VESSEL_TRAITS + tuple(f"solvent:{k}" for k in SOLVENT_KINDS)
 WORKING_TRAITS.extend(t for t in ALCHEMY_WORKING_TRAITS if t not in WORKING_TRAITS)
+
+# --- the leatherworker's words (leather lane A: contracts §2, plan §7, §8.1, §14.4, §14.6) ---
+#
+# Measured before (plan §14.1, inventory §2): 127 leather materials, 96 of their 171 effect
+# specs `narrative`, and not one working trait among them — a tannin that "halves tanning
+# time" said so in prose the bench never read. These are what the hide and consumable
+# documents (lane D) carry and the bench (lane E) reads:
+#   thick          a hide that can be the body of hide armour; flensing it needs a
+#                  tannery's lime pit (§14.4)
+#   fast_tan       the tannage takes half as long (hemlock's prose, made real; §8.1)
+#   slow_tan       the tannage takes half again as long
+#   ceiling_up     the tannin lifts the best result a step (tara, ironbark)
+#   ceiling_down   the tannin lowers it a step (willow)
+#   salt_proof     a salted hide needs no desalting soak before it tans (mangrove)
+#   tans_white     the leather comes out pale, and a dye takes its true colour (sumac)
+#   supple         an oil that widens Curry's working band
+#   fills_tooling  a wax that widens Tool's working band
+#   strong_seam    a thread whose seams hold firm
+#   weatherproof   a thread that sheds water (sinew)
+#   fine_pitch     a thread that widens Stitch's working band
+#   fast_colour    a dye set with a mordant: it survives a soaking
+#   fugitive       a dye without one: it runs the first time the piece is soaked
+#   rancid         an oil that spoils within a year
+# The band sizes and times are the bench's and are still proposed (plan §24 point 14), so
+# the card says what the leatherworker notices, never a percentage.
+LEATHER_WORKING_TRAITS: tuple[str, ...] = (
+    "thick", "fast_tan", "slow_tan", "ceiling_up", "ceiling_down", "salt_proof",
+    "tans_white", "supple", "fills_tooling", "strong_seam", "weatherproof", "fine_pitch",
+    "fast_colour", "fugitive", "rancid",
+)
+WORKING_TRAITS.extend(t for t in LEATHER_WORKING_TRAITS if t not in WORKING_TRAITS)
+
+# The forge's traits whose meaning carries to the leather bench unchanged, so a hide may
+# carry them: `flawless` is Pathfinder Unchained's material trait, which the plan's
+# masterwork rule reads ("unless the main material is `flawless`", plan §7), and
+# `forgiving` is the plan's own worked hide (§14.2, winter-wolf pelt). The rest of the
+# forge's and the alchemist's speak of heat, slag and solvents, and on a hide they would be
+# a trait the leather bench does not read — which is a trait that does nothing. Lane D asks
+# the lead to widen this rather than writing around it.
+LEATHER_SHARED_TRAITS: tuple[str, ...] = ("flawless", "forgiving")
+LEATHER_TRAITS: tuple[str, ...] = LEATHER_WORKING_TRAITS + LEATHER_SHARED_TRAITS
 
 # **Essences** (plan §5.3; the owner kept the 18, open point 1, 2026-10-06): the tags a
 # formula keys on, one per product trait, asked by prefix as `essence.<id>` (law 1). Noita's
@@ -355,7 +486,10 @@ WORN_TYPES: tuple[str, ...] = CARRIED_TYPES + (
 # The magic item types below join them: keen does not "fire", it is how the blade is.
 _STANDING_TYPES = ("gear_mod", "strikes_as", "working",
                    "crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
-                   "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality")
+                   "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality",
+                   # The leatherworker's two: a dragonhide suit does not burn, and a
+                   # bulette suit IS studded leather, for as long as either exists.
+                   "object_immunity", "as_base")
 
 # Booleans an effect may carry with no field on the form (the form has no checkbox, and a
 # "yes" typed into a text box would put two spellings of one fact into the data for every
@@ -513,7 +647,14 @@ VOCAB: dict[str, list[dict]] = {
 
     # The forge's three lists, as dropdowns. Built from the constants above so the editor
     # and the validator cannot offer different sets.
-    "gear_target": [{"id": k, "name": v["name"]} for k, v in GEAR_TARGETS.items()],
+    # The item's own numbers, then what it costs to work later (`COST_TARGETS`).
+    "gear_target": [{"id": k, "name": v["name"]}
+                    for k, v in {**GEAR_TARGETS, **COST_TARGETS}.items()],
+    "cost_family": [{"id": k, "name": v["name"].capitalize()}
+                    for k, v in ENCHANT_COST_FAMILIES.items()],
+    # The five energies, for what an OBJECT can be immune to (dragonhide). Not
+    # `damage_type`: a suit immune to slashing or to poison is no book rule.
+    "energy": [{"id": d, "name": d.title()} for d in ENERGY_DAMAGE],
     "strikes_as": [{"id": k, "name": k.replace("_", " ").capitalize()} for k in STRIKES_AS],
     "working_trait": [{"id": k, "name": k.replace("_", " ").capitalize()}
                       for k in WORKING_TRAITS],
@@ -954,9 +1095,35 @@ CATEGORIES: list[Category] = [
                       hint="Added to the number as the armour table keeps it. Armour "
                            "check penalty is negative there, so +3 is lighter and -2 "
                            "heavier; spell failure is a percentage, so -10 is better."),
+                # Only with the enchanting cost (dragonhide's −25% on energy
+                # resistance): which family of properties the discount reaches.
+                Field("applies_to", "Applies to", "choice", vocab="cost_family",
+                      required=False,
+                      hint="Enchanting cost only: which enchantments it makes cheaper."),
             ], blocked="Read from a forged item's build while it is worn or wielded. "
                        "Drunk or cast it changes nothing, and the card says so rather "
                        "than pretending."),
+            # Dragonhide's book power (leatherworking plan §15, §18.4): "if the dragon was
+            # immune to an energy type, the armour is immune too, although this does not
+            # confer any protection to the wearer". About the OBJECT, which is why it is
+            # not `immunity`: that one lands on a creature, and 11 of the old catalogue's
+            # dragonhides gave the wearer resistance 5 as if it were this rule.
+            EffectType("object_immunity", "The item itself is immune",
+                       "The armour itself takes no fire damage", [
+                Field("target", "Energy type", "choice", vocab="energy"),
+            ], blocked="Read where an object takes damage (Item.take_damage, "
+                       "Engine._object_damage): the item loses nothing to that energy. "
+                       "Its wearer is not protected."),
+            # Bulette leather "has the same statistics as studded leather" (Dungeon
+            # Denizens Revisited, prior art §1.3): the suit takes that table row's AC,
+            # check penalty, maximum Dexterity, spell failure and weight, with no metal in
+            # it. A row of `tables.ARMOUR`, never a free name — a name the table does not
+            # know is the defect that left bench suits "not built on any suit the rules
+            # know" (inventory §0.1).
+            EffectType("as_base", "Has the statistics of", "Same statistics as studded leather", [
+                Field("target", "Armour row", "choice", vocab="armour"),
+            ], blocked="Read by the build: the named row replaces the suit's base for its "
+                       "statistics, and its metal is not carried over."),
             # What a weapon counts as for damage reduction and hardness. The DR on the
             # sheet has carried a `bypassed_by` since stage 2 with nothing ever passing it
             # a trait; this is the trait.
@@ -1437,7 +1604,17 @@ CATEGORIES: list[Category] = [
 #               radii); read by Scene.light_at, and so by Actor.concealment's miss chance
 #   burning     Engine._op_burn (state.burning, a periodic fire counted by `times_left`
 #               in Actor.run_periodic) and Engine._op_extinguish
-AWAITING_READER: dict[str, str] = {}
+#
+# Refilled by leather lane A (2026-10-08) with the leatherworker's two, each waiting on
+# leather lane B (contracts §1, §4.3; plan §18.1, §18.4). The contract fixed `executable()`
+# True for them; the honesty ratchet refuses that while nothing reads them, exactly as it
+# refused the enchanting ten. Lane B deletes a line when its reader lands, and lists the
+# type in tests/test_effectspec_extensions.py's `already` (or `Engine._EXECUTES`).
+AWAITING_READER: dict[str, str] = {
+    "object_immunity": "Item.take_damage (rules/sheet.py) and Engine._object_damage "
+                       "(rules/engine.py), leather lane B",
+    "as_base": "forge_items.build and armour_row (rules/forge_items.py), leather lane B",
+}
 # A type whose reader runs some targets and not others (contracts §2.2: speed "targets land,
 # climb, swim, fly, jump. Lane C wires the readers"). `executable` asks per spec, so a
 # potion of longstrider runs and a potion of fly is narrated with the reason named. Lane C
@@ -1449,10 +1626,20 @@ AWAITING_READER: dict[str, str] = {}
 # a granted climb, swim or fly speed through the funnel, and the move op's permission to
 # leave the ground (`can_move_vertically`) and the water rules (`water.swim_speed`, through
 # `Actor.speeds`) read it. Nothing in the app moves a body through earth, so burrow waits.
+#
+# The enchanting cost (leather lane A, 2026-10-08): a gear_mod the forge's readers do not
+# read and must not (see `COST_TARGETS`). Its reader is the Enchanting price
+# (`magic_layer._price`, beside the material surcharges of `_surcharges`), which takes a
+# vessel's book `enchant_cost_pct` whose `applies_to` is the property's family
+# (`cost_family_of`); contracts §6.3 puts it with the Enchanting lanes, not this craft.
 TARGETS_AWAITING_READER: dict[str, dict[str, str]] = {
     "speed": {
         "burrow": "a burrow speed read by movement (nothing moves a body through earth "
                   "yet)",
+    },
+    "gear_mod": {
+        "enchant_cost_pct": "the Enchanting price (magic_layer._price), applying the "
+                            "discount to properties of its applies_to family",
     },
 }
 for _cat in CATEGORIES:
@@ -1815,6 +2002,14 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
 
     if type_id == "gear_mod":
         problems.extend(_gear_problems(spec, path))
+    elif "applies_to" in spec:
+        problems.append(
+            f"{path}: applies_to belongs to the enchanting cost (a gear_mod on "
+            f"enchant_cost_pct) and nothing else reads it. Remove it.")
+    if type_id == "as_base" and str(spec.get("target") or "") == "none":
+        problems.append(
+            f"{path}: 'none' is no armour to take statistics from. Name the row the "
+            f"book gives: bulette leather is \"studded leather\".")
 
     if type_id == "choose_one":
         options = spec.get("options") or []
@@ -1847,6 +2042,12 @@ def _gear_problems(spec: dict, path: str) -> list[str]:
         # An effect that is authored and does nothing — the failure this module's header
         # exists for, arriving as a zero.
         return [f"{path}: a gear change of 0 changes nothing. Give it a size or remove it."]
+    if target in COST_TARGETS:
+        return _cost_problems(spec, amount, path)
+    if "applies_to" in spec:
+        return [f"{path}: applies_to says which enchantments a cost change reaches, and "
+                f"{target!r} is the item's own number, not a cost. Remove it, or use "
+                f"enchant_cost_pct."]
     if target == "category" and abs(amount) > 2:
         return [f"{path}: armour has three weight classes, so a shift of {amount} is "
                 f"more than there are. Use -2 to +2."]
@@ -1857,6 +2058,30 @@ def _gear_problems(spec: dict, path: str) -> list[str]:
         return [f"{path}: spell failure is a percentage; {amount} is past it. Use -100 "
                 f"to +100."]
     return []
+
+
+def _cost_problems(spec: dict, amount: int, path: str) -> list[str]:
+    """The limits of the enchanting cost (`COST_TARGETS`).
+
+    It must say which enchantments it reaches: a discount with no family is a discount on
+    everything, which no book material gives. It must be the book's: the build sums house
+    numbers by target and would strip `applies_to` from one (see `COST_TARGETS`), so a
+    house discount would be authored, accepted and read by nobody. And it is a
+    percentage that cannot make the work free.
+    """
+    out: list[str] = []
+    if not str(spec.get("applies_to") or "").strip():
+        out.append(f"{path}: an enchanting cost says which enchantments it reaches — "
+                   f"\"applies_to\": one of {', '.join(ENCHANT_COST_FAMILIES)} "
+                   f"(dragonhide: \"energy_resistance\").")
+    if spec.get("book") is not True:
+        out.append(f"{path}: an enchanting cost is the book's (dragonhide's -25%): add "
+                   f"\"book\": true. A house one would be summed by the build and lose "
+                   f"its applies_to.")
+    if amount <= -100 or amount > 100:
+        out.append(f"{path}: {amount}% is past the cost itself. Use -99 to +100 "
+                   f"(dragonhide: -25).")
+    return out
 
 
 _AREA_SHAPES = ("cone", "line", "burst")
@@ -2153,6 +2378,44 @@ def product_trait_problems(spec: dict, path: str = "trait") -> list[str]:
     return out
 
 
+def leather_effect_problems(spec: dict, path: str = "effect") -> list[str]:
+    """What an effect on a leather material must be beyond a valid effect (leatherworking
+    contracts §2, plan §14.2): the alchemist's `product_trait_problems` pattern — the
+    vocabulary keeps `narrative` legal, and the leather catalogue's own validator (lane D,
+    `materials.validate`) calls this beside its counting rules and refuses it there.
+
+    Measured before the pass (plan §14.1): 96 of the catalogue's 171 effect specs were
+    narrative, and no material carried a working trait at all. Refused here, each with the
+    fix named:
+      - a narrative effect;
+      - a working trait the leather bench does not read (`LEATHER_TRAITS`) — a forge
+        trait such as `slaggy` on a hide is a trait that does nothing;
+      - a damage reduction whose bypass no blow can carry, or that is not a whole number
+        of 1 or more (the owner's "reduced DR", 2026-10-08: DR max(1, N/5)/x — the
+        smallest DR a hide gives is 1).
+    """
+    out = list(validate(spec, path))
+    t = str(spec.get("type") or "")
+    if t == "narrative":
+        out.append(f"{path}: a leather material's effect is never narrative. Write it as a "
+                   f"typed effect the engine runs, or leave it out.")
+    elif t == "working":
+        trait = str(spec.get("trait") or "")
+        if trait and trait not in LEATHER_TRAITS:
+            out.append(f"{path}: {trait!r} is not read at the leather bench. One of: "
+                       f"{', '.join(LEATHER_TRAITS)}.")
+    elif t == "damage_reduction":
+        try:
+            n = int(spec.get("amount"))
+        except (TypeError, ValueError):
+            n = None
+        if n is None or isinstance(spec.get("amount"), bool) or n < 1:
+            out.append(f"{path}: damage reduction is a whole number of points, 1 or more "
+                       f"(a creature's DR N gives a hide max(1, N/5)).")
+        out.extend(dr_bypass_problems(spec.get("bypass"), f"{path}: bypass"))
+    return out
+
+
 def is_drawback(spec: dict) -> bool:
     """Whether this effect leaves its holder worse off.
 
@@ -2169,7 +2432,7 @@ def is_drawback(spec: dict) -> bool:
     except (TypeError, ValueError):
         return False
     if t == "gear_mod":
-        better = GEAR_TARGETS.get(str(spec.get("target") or ""), {}).get("better", 0)
+        better = gear_target_row(spec.get("target")).get("better", 0)
         return amount * better < 0
     if t in ("ability_mod", "skill_mod", "save_mod", "combat_mod", "situational_mod",
              "speed"):
@@ -2385,8 +2648,16 @@ def render(spec: dict, *, against: bool = False) -> str:
     elif t == "object_damage":
         what = str(spec.get("item") or "").strip() or "everything carried"
         body = f"{dice} {spec.get('damage_type', 'untyped')} damage to {what}"
+    elif t == "gear_mod" and str(target or "") in COST_TARGETS:
+        body = _cost_line(spec)
     elif t == "gear_mod":
         body = _gear_line(str(target or ""), amount)
+    elif t == "object_immunity":
+        # About the item, and the line says so: "Immune to fire" on a suit's card reads as
+        # the wearer's, which is the exact misreading 11 dragonhides shipped.
+        body = f"The item itself takes no {target or 'energy'} damage"
+    elif t == "as_base":
+        body = f"Has the statistics of {_label(etype, target).lower() or target}, with no metal"
     elif t == "strikes_as":
         body = f"Strikes as {_label(etype, target).lower()}"
     elif t == "working":
@@ -2467,6 +2738,17 @@ _TRIGGER_PHRASE = {
     "first_wound_daily": "on the first wound it deals each day",
     "carried": "while carried", "wielded": "while held", "worn": "while worn",
 }
+
+
+def _cost_line(spec: dict) -> str:
+    """"Energy resistance enchantments on it cost 25% less" — dragonhide's book line."""
+    family = ENCHANT_COST_FAMILIES.get(str(spec.get("applies_to") or ""), {})
+    what = f"{family['name'].capitalize()} enchantments" if family else "Enchantments"
+    try:
+        n = int(spec.get("amount"))
+    except (TypeError, ValueError):
+        return f"{what} on it cost {spec.get('amount')}%"
+    return f"{what} on it cost {abs(n)}% {'less' if n < 0 else 'more'}"
 
 
 def _gear_line(target: str, amount) -> str:
@@ -2560,6 +2842,23 @@ _WORKING_PHRASE = {
     "solvent:vinegar": "a solvent: dissolves what vinegar dissolves",
     "solvent:oil": "a solvent: dissolves what oil dissolves",
     "solvent:acid": "a solvent: dissolves what acid dissolves",
+    # The leatherworker's (leatherworking plan §7, §8.1, §14.4, §14.6). Plain words; the
+    # times and band sizes are the bench's and still proposed.
+    "thick": "thick: it can be the body of hide armour, and needs a lime pit to flense",
+    "fast_tan": "tans quickly: the tannage takes half the time",
+    "slow_tan": "tans slowly: the tannage takes longer",
+    "ceiling_up": "a fine tannage: the leather can come out a step better",
+    "ceiling_down": "a coarse tannage: the leather comes out a step worse at best",
+    "salt_proof": "salt-proof: a salted hide needs no soaking out before it tans",
+    "tans_white": "tans white: a dye takes its true colour on it",
+    "supple": "supple: currying with it is forgiving",
+    "fills_tooling": "fills the tooling: tooling with it is forgiving",
+    "strong_seam": "strong-seamed: the seams it sews hold firm",
+    "weatherproof": "weatherproof: its seams shed water",
+    "fine_pitch": "fine: it stitches a close, even seam with less effort",
+    "fast_colour": "colour-fast: set with a mordant, it survives a soaking",
+    "fugitive": "fugitive: the colour runs the first time the piece is soaked",
+    "rancid": "turns rancid: it spoils within a year",
 }
 
 

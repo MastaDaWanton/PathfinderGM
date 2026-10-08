@@ -160,6 +160,8 @@ NEW_TYPES = ["crit_range", "extra_attack", "enhancement_raise", "enhancement_to_
              "item_power"]
 # The alchemist's types waiting on alchemy lane C (rules/effectspec.py AWAITING_READER).
 ALCHEMY_WAITING = {"sense", "permission", "light", "burning"}
+# The leatherworker's two waiting on leather lane B (tests/test_leather_vocabulary.py).
+LEATHER_WAITING = {"object_immunity", "as_base"}
 
 
 def test_every_property_document_is_executable_or_waits_on_a_named_reader():
@@ -195,7 +197,7 @@ def test_the_new_types_are_in_the_catalogue_and_honest_about_what_runs_them():
     ids = [t["id"] for c in es.catalogue()["categories"] for t in c["types"]]
     # The ledger is shared with the alchemist's types since alchemy lane B (2026-10-06);
     # what is asked of it here is that nothing else hides in it.
-    assert set(es.AWAITING_READER) <= set(NEW_TYPES) | ALCHEMY_WAITING
+    assert set(es.AWAITING_READER) <= set(NEW_TYPES) | ALCHEMY_WAITING | LEATHER_WAITING
     for t in NEW_TYPES:
         assert ids.count(t) == 1, t
         _, etype = es.find(t)

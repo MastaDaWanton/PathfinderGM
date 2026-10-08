@@ -233,7 +233,9 @@ def test_what_waits_on_a_reader_says_which_and_does_not_run():
     engine runs it when nothing does. Each waits in AWAITING_READER with its reader's
     site, and the builder's warning says so. Alchemy lane C landed all four readers
     (2026-10-06), so the ledger is empty and each now claims the engine runs it."""
-    assert set(es.AWAITING_READER) == set()
+    # The ledger is shared: the leatherworker's two wait in it on leather lane B
+    # (tests/test_leather_vocabulary.py). None of the alchemist's four may.
+    assert not set(es.AWAITING_READER) & {"sense", "permission", "light", "burning"}
     for t in ("sense", "permission", "light", "burning"):
         assert es.find(t)[1].engine, t
     for t, where in es.AWAITING_READER.items():

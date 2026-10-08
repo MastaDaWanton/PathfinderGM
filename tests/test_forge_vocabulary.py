@@ -39,7 +39,9 @@ def test_every_dropdown_the_forge_types_use_is_built_from_the_constants():
     from its copy. The editor's dropdowns and the module's lists must be the same set, so a
     target the validator accepts is a target the form offers, and the reverse."""
     vocab = lambda name: [o["id"] for o in es.VOCAB[name]]   # noqa: E731
-    assert vocab("gear_target") == list(es.GEAR_TARGETS)
+    # The leatherworker's enchanting cost (`es.COST_TARGETS`, leather lane A) is offered
+    # after the item's own numbers and kept out of `GEAR_TARGETS`, whose keys the build sums.
+    assert vocab("gear_target") == list(es.GEAR_TARGETS) + list(es.COST_TARGETS)
     assert vocab("strikes_as") == es.STRIKES_AS
     assert vocab("working_trait") == es.WORKING_TRAITS
     for t in ("gear_mod", "strikes_as", "working"):
@@ -73,7 +75,11 @@ def test_the_lists_are_exactly_what_the_contract_names():
         "slow_to_dissolve", "light_sensitive", "corrosive", "toxic_to_handle", "wild",
         "drinkable", "shatters", "bursts", "struck", "stick", "fireproof", "warded",
         "lead_lined", "solvent:water", "solvent:alcohol", "solvent:vinegar", "solvent:oil",
-        "solvent:acid"]
+        "solvent:acid",
+        # The leatherworker's (leather lane A, leatherworking contracts §2), appended.
+        "thick", "fast_tan", "slow_tan", "ceiling_up", "ceiling_down", "salt_proof",
+        "tans_white", "supple", "fills_tooling", "strong_seam", "weatherproof", "fine_pitch",
+        "fast_colour", "fugitive", "rancid"]
 
 
 # --- mithral, written as documents --------------------------------------------------------

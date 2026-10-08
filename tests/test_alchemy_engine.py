@@ -289,7 +289,8 @@ def test_thrown_itching_powder_rolls_its_fortitude_save():
 # --- the ledger -----------------------------------------------------------------------------------
 
 def test_the_four_waiting_types_are_executable_now():
-    assert es.AWAITING_READER == {}
+    # Shared with the leatherworker's two, which wait on leather lane B.
+    assert not set(es.AWAITING_READER) & {"sense", "permission", "light", "burning"}
     for spec in ({"type": "sense", "target": "darkvision"},
                  {"type": "permission", "target": "x", "tag": "breathe_water"},
                  {"type": "light", "radius_ft": 30, "raised_ft": 60},
