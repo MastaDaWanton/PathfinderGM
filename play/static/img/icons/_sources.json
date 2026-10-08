@@ -616,5 +616,125 @@
   "url": "https://game-icons.net/1x1/lorc/gas-mask.html",
   "author": "lorc",
   "bytes": 3422
+ },
+ "flense": {
+  "source": "lorc/curvy-knife",
+  "url": "https://game-icons.net/1x1/lorc/curvy-knife.html",
+  "author": "lorc",
+  "bytes": 1090
+ },
+ "salt": {
+  "source": "delapouite/powder-bag",
+  "url": "https://game-icons.net/1x1/delapouite/powder-bag.html",
+  "author": "delapouite",
+  "bytes": 2293
+ },
+ "tan": {
+  "source": "delapouite/barrel",
+  "url": "https://game-icons.net/1x1/delapouite/barrel.html",
+  "author": "delapouite",
+  "bytes": 2867
+ },
+ "curry": {
+  "source": "delapouite/oil-can",
+  "url": "https://game-icons.net/1x1/delapouite/oil-can.html",
+  "author": "delapouite",
+  "bytes": 1968
+ },
+ "cut": {
+  "source": "lorc/scissors",
+  "url": "https://game-icons.net/1x1/lorc/scissors.html",
+  "author": "lorc",
+  "bytes": 1805
+ },
+ "stitch": {
+  "source": "lorc/sewing-needle",
+  "url": "https://game-icons.net/1x1/lorc/sewing-needle.html",
+  "author": "lorc",
+  "bytes": 2358
+ },
+ "harden": {
+  "source": "lorc/cauldron",
+  "url": "https://game-icons.net/1x1/lorc/cauldron.html",
+  "author": "lorc",
+  "bytes": 1946
+ },
+ "stamp": {
+  "source": "delapouite/stamper",
+  "url": "https://game-icons.net/1x1/delapouite/stamper.html",
+  "author": "delapouite",
+  "bytes": 526
+ },
+ "dye": {
+  "source": "delapouite/paint-brush",
+  "url": "https://game-icons.net/1x1/delapouite/paint-brush.html",
+  "author": "delapouite",
+  "bytes": 1225
+ },
+ "dye-pot": {
+  "source": "delapouite/paint-bucket",
+  "url": "https://game-icons.net/1x1/delapouite/paint-bucket.html",
+  "author": "delapouite",
+  "bytes": 2625
+ },
+ "laminate": {
+  "source": "lorc/layered-armor",
+  "url": "https://game-icons.net/1x1/lorc/layered-armor.html",
+  "author": "lorc",
+  "bytes": 1049
+ },
+ "leather-armour": {
+  "source": "delapouite/leather-armor",
+  "url": "https://game-icons.net/1x1/delapouite/leather-armor.html",
+  "author": "delapouite",
+  "bytes": 1941
+ },
+ "grade": {
+  "source": "lorc/magnifying-glass",
+  "url": "https://game-icons.net/1x1/lorc/magnifying-glass.html",
+  "author": "lorc",
+  "bytes": 1208
+ },
+ "hide": {
+  "source": "delapouite/animal-hide",
+  "url": "https://game-icons.net/1x1/delapouite/animal-hide.html",
+  "author": "delapouite",
+  "bytes": 1965
+ },
+ "leather-roll": {
+  "source": "delapouite/rolled-cloth",
+  "url": "https://game-icons.net/1x1/delapouite/rolled-cloth.html",
+  "author": "delapouite",
+  "bytes": 1988
+ },
+ "panel": {
+  "source": "lorc/leather-vest",
+  "url": "https://game-icons.net/1x1/lorc/leather-vest.html",
+  "author": "lorc",
+  "bytes": 2987
+ },
+ "lacing": {
+  "source": "delapouite/rope-coil",
+  "url": "https://game-icons.net/1x1/delapouite/rope-coil.html",
+  "author": "delapouite",
+  "bytes": 4893
+ },
+ "thread": {
+  "source": "delapouite/sewing-string",
+  "url": "https://game-icons.net/1x1/delapouite/sewing-string.html",
+  "author": "delapouite",
+  "bytes": 2658
+ },
+ "cloak": {
+  "source": "delapouite/cape",
+  "url": "https://game-icons.net/1x1/delapouite/cape.html",
+  "author": "delapouite",
+  "bytes": 765
+ },
+ "boots": {
+  "source": "lorc/boots",
+  "url": "https://game-icons.net/1x1/lorc/boots.html",
+  "author": "lorc",
+  "bytes": 2310
  }
 }

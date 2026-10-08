@@ -309,8 +309,29 @@
 
   // The build card, a modal of the layer's own: Esc and Close shut it and give focus back
   // to "Show the sum". The core's trap holds Tab inside it (`.bench-modal`).
-  F.showCard = function (card, back) {
-    var pops = document.getElementById("forge-pops");
+  //
+  // ONE CARD FOR EVERY BENCH (leatherworking contracts §11.1, lane U1): the leather bench's
+  // "Show the sum" draws this same card from the same server shape (play/leather_views.py
+  // `_card` mirrors play/forge_views.py's), so it is exported as `window.BuildCard.open(card,
+  // anchorEl)`. It opens in the popover host of whichever bench the anchor is in, and takes
+  // its Esc from that bench's stack (BenchCore.current); a second copy in the leather files
+  // would have been the two drifting cards the contract exists to prevent.
+  function benchOf(back) {
+    var layer = back && back.closest ? back.closest(".bench") : null;
+    return layer && !layer.hidden ? layer : document.getElementById("forge");
+  }
+  F.showCard = function (card, back) { openCard(card, back, document.getElementById("forge-pops"), F.pushEsc, F.dropEsc); };
+  window.BuildCard = {
+    open: function (card, anchor) {
+      var layer = benchOf(anchor);
+      var pops = layer ? layer.querySelector(".bench-pops") : null;
+      var core = window.BenchCore && BenchCore.current;
+      if (!pops || !core) return false;
+      openCard(card, anchor, pops, core.pushEsc, core.dropEsc);
+      return true;
+    },
+  };
+  function openCard(card, back, pops, pushEsc, dropEsc) {
     if (!pops || !card) return;
     var cols = card.columns || [];
     var head = '<tr><th scope="col">Target</th>' + cols.map(function (k) {
@@ -334,20 +355,24 @@
       '<p class="fc-round">Final numbers are rounded toward zero.</p>' +
       (card.powers && card.powers.length ? '<p class="fc-book"><span class="fx-k">By the book, from the main piece:</span> ' +
         esc(card.powers.join(", ")) + '</p>' : "") +
-      (card.masterwork ? '<p class="fc-book">Masterwork: the book\'s +1 to attack, apart from this sum.</p>' : "") +
+      // The leather card (it carries `by_nature`) is armour and worn goods, where the book's
+      // masterwork is not +1 to attack: it says only that the book's masterwork applies.
+      (card.masterwork ? '<p class="fc-book">' + ("by_nature" in card
+        ? (card.by_nature ? "Masterwork by its nature, by the book, apart from this sum." : "Masterwork, by the book, apart from this sum.")
+        : "Masterwork: the book's +1 to attack, apart from this sum.") + '</p>' : "") +
       '<p class="fc-how">' + esc(card.how || "") + '</p>' +
       '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-close>Close</button></div></div>';
     pops.appendChild(wrap);
     var done = function () {
-      F.dropEsc(done);
+      dropEsc(done);
       wrap.remove();
       if (back && document.contains(back)) back.focus();
     };
-    F.pushEsc(done);
+    pushEsc(done);
     wrap.querySelector("[data-close]").addEventListener("click", done);
     wrap.querySelector(".bench-scrim").addEventListener("click", done);
     wrap.querySelector("[data-close]").focus();
-  };
+  }
 
   // --- what came of it ---------------------------------------------------------------------------
   function drawResult() {

@@ -20,7 +20,13 @@ docs/alchemy-questions.md, plan open point 11), by alchemy lane U1: each name wa
 confirmed on game-icons.net (its page answered, and carried the CC BY 3.0 notice), then its
 SVG was taken from game-icons.net's own export in black on a transparent ground, which is
 already the processed form below (no background square, the glyph black). The shapes are
-unchanged. They are the last 22 rows of the table.
+unchanged. They follow the forge's rows in the table.
+
+The leather bench's 20 icons were added 2026-10-08 the same way, with the owner's approval of
+game-icons.net downloads for these benches (docs/leatherworking-ui-plan.md §4), by
+leatherworking lane U1: each name confirmed on game-icons.net (its page answered), then its
+SVG taken from game-icons.net's own export in black on a transparent ground. All 20 are by Lorc
+or Delapouite, who were credited already. They are the last 20 rows of the table.
 
 Change made: the full-bleed background square was removed and the glyph filled black, so each
 file works as a CSS mask; the shapes themselves are unchanged.
@@ -130,6 +136,26 @@ file works as a CSS mask; the shapes themselves are unchanged.
 | `play/static/img/icons/toxic.svg` | [lorc/poison-bottle](https://game-icons.net/1x1/lorc/poison-bottle.html) | Lorc |
 | `play/static/img/icons/transmute.svg` | [lorc/crystalize](https://game-icons.net/1x1/lorc/crystalize.html) | Lorc |
 | `play/static/img/icons/vial.svg` | [sbed/vial](https://game-icons.net/1x1/sbed/vial.html) | Sbed |
+| `play/static/img/icons/boots.svg` | [lorc/boots](https://game-icons.net/1x1/lorc/boots.html) | Lorc |
+| `play/static/img/icons/cloak.svg` | [delapouite/cape](https://game-icons.net/1x1/delapouite/cape.html) | Delapouite |
+| `play/static/img/icons/curry.svg` | [delapouite/oil-can](https://game-icons.net/1x1/delapouite/oil-can.html) | Delapouite |
+| `play/static/img/icons/cut.svg` | [lorc/scissors](https://game-icons.net/1x1/lorc/scissors.html) | Lorc |
+| `play/static/img/icons/dye-pot.svg` | [delapouite/paint-bucket](https://game-icons.net/1x1/delapouite/paint-bucket.html) | Delapouite |
+| `play/static/img/icons/dye.svg` | [delapouite/paint-brush](https://game-icons.net/1x1/delapouite/paint-brush.html) | Delapouite |
+| `play/static/img/icons/flense.svg` | [lorc/curvy-knife](https://game-icons.net/1x1/lorc/curvy-knife.html) | Lorc |
+| `play/static/img/icons/grade.svg` | [lorc/magnifying-glass](https://game-icons.net/1x1/lorc/magnifying-glass.html) | Lorc |
+| `play/static/img/icons/harden.svg` | [lorc/cauldron](https://game-icons.net/1x1/lorc/cauldron.html) | Lorc |
+| `play/static/img/icons/hide.svg` | [delapouite/animal-hide](https://game-icons.net/1x1/delapouite/animal-hide.html) | Delapouite |
+| `play/static/img/icons/lacing.svg` | [delapouite/rope-coil](https://game-icons.net/1x1/delapouite/rope-coil.html) | Delapouite |
+| `play/static/img/icons/laminate.svg` | [lorc/layered-armor](https://game-icons.net/1x1/lorc/layered-armor.html) | Lorc |
+| `play/static/img/icons/leather-armour.svg` | [delapouite/leather-armor](https://game-icons.net/1x1/delapouite/leather-armor.html) | Delapouite |
+| `play/static/img/icons/leather-roll.svg` | [delapouite/rolled-cloth](https://game-icons.net/1x1/delapouite/rolled-cloth.html) | Delapouite |
+| `play/static/img/icons/panel.svg` | [lorc/leather-vest](https://game-icons.net/1x1/lorc/leather-vest.html) | Lorc |
+| `play/static/img/icons/salt.svg` | [delapouite/powder-bag](https://game-icons.net/1x1/delapouite/powder-bag.html) | Delapouite |
+| `play/static/img/icons/stamp.svg` | [delapouite/stamper](https://game-icons.net/1x1/delapouite/stamper.html) | Delapouite |
+| `play/static/img/icons/stitch.svg` | [lorc/sewing-needle](https://game-icons.net/1x1/lorc/sewing-needle.html) | Lorc |
+| `play/static/img/icons/tan.svg` | [delapouite/barrel](https://game-icons.net/1x1/delapouite/barrel.html) | Delapouite |
+| `play/static/img/icons/thread.svg` | [delapouite/sewing-string](https://game-icons.net/1x1/delapouite/sewing-string.html) | Delapouite |
 
 ## Music: the owner's soundtrack
 

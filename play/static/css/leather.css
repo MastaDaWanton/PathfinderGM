@@ -1,0 +1,157 @@
+/* The leather bench (docs/leatherworking-ui-plan.md), over the play table, after bench.css,
+   forge.css, enchant.css and alchemy.css.
+
+   THE SAME BENCH, LAID OUT FOR HIDES. The layer carries both classes, `bench leather`, so
+   every rule of bench.css (the layer at z 35, the leather strip and footer, the tooled panels,
+   the method strip, the rack rows, the paper tag and its ladder, the confirms, the reduced-
+   motion block, the 1180px and 768px collapses with their 16px gutters) is the bench's too,
+   and the work order reuses forge.css's slots, swatch and build card (`.fo-*`, `.fr-swatch`,
+   `.fc-*`), whose `.forge`-scoped rules are given to `.leather` here. This sheet holds only
+   what is the leather bench's own: the grid (UI plan §5.2: 280px, the stage, 340px), twelve
+   methods on the strip, the grade notches and the spoil clock on a rack row, the flat
+   stand-in's band gauge, and the tag's ceiling reasons.
+
+   NO NEW COLOUR, FONT OR TEXTURE (UI plan §4). Every value is a theme-v2.css token or the
+   bench's semantic layer over them. The one exception is content, not chrome: a material's
+   own colour (`--sw`, sent by the server as "#rrggbb") on its 8px swatch. The spoil clock and
+   the grade read by words and shape: the clock is segmented with no filled track, "soon" is
+   a word as well as --alarm, the grade is notches as well as words.
+
+   LAYERS. Only the bench's own: 1 to 9 inside the layer's stacking context. MOTION.
+   Transform and opacity only, 200ms at most; the reduced-motion block in bench.css reaches
+   every element here. */
+
+.leather {
+  --bench-satchel-w: 280px;
+  --bench-tag-w: 340px;
+}
+.leather .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(620px, 1fr) var(--bench-tag-w); }
+
+/* Twelve methods: locked ones keep their reason under the name, as the forge's strip does.
+   The row never wraps: wrapped, a second row of twelve locks hung under the 56px strip over
+   the rack and the work order (seen live at 1600x900, 2026-10-08, with no kit and no tannery).
+   It scrolls sideways inside itself instead, and a lock every method shares is said once by
+   55 rather than twelve times. */
+/* At 1280 to 1439 the strip is icons only and fits; its names show as tips under the strip,
+   which a scrolling row would clip, so the scroll is for the wide band only. */
+@media (min-width: 1440px) {
+  .leather .bench-methods { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+  .leather .bm { flex: none; }
+}
+.leather .bm.is-locked {
+  display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  column-gap: 7px; row-gap: 1px; align-content: center; justify-items: start;
+}
+.leather .bm.is-locked .bicon { grid-row: 1 / span 2; align-self: center; }
+.leather .bm.is-locked .bm-lock { font-size: 12px; line-height: 1.1; }
+.leather .bm.is-locked .bm-name { line-height: 1; }
+.leather .bicon-l.is-two { font-size: calc(var(--bi) * .42); letter-spacing: -.02em; }
+
+/* --- the rack (UI plan §6.2) ----------------------------------------------------------------- */
+.leather .lr .bt-name { white-space: normal; overflow: visible; }
+.lr-meta { font-size: 13px; line-height: 1.3; color: var(--bench-quiet); }
+/* Grade notches on the icon: four for grade 1 down to one for grade 4, in the gilt of the
+   icon, the empty ones a hairline ring. Shape, never hue. */
+.lr-notches { position: absolute; left: -3px; top: 1px; z-index: 1; display: grid; gap: 2px; }
+.lr-notches i { width: 4px; height: 4px; border-radius: 50%; box-shadow: 0 0 0 1px var(--edge); }
+.lr-notches i.is-on { background: var(--bench-accent); box-shadow: 0 0 0 1px rgba(8, 6, 4, .85); }
+/* The spoil clock: the words first, then eight segments of six hours each, no track. */
+.lr-clock { display: grid; gap: 3px; font-size: 13px; line-height: 1.3; color: var(--bench-quiet); }
+.lr-clock.is-soon { color: var(--bench-warn); }
+.lr-clock.is-soon .lr-clock-words { border-left: 2px solid var(--bench-warn); padding-left: 6px; }
+.lr-strip { display: flex; gap: 2px; }
+.lr-strip i { width: 9px; height: 4px; border-radius: 1px; box-shadow: inset 0 0 0 1px var(--edge); }
+.lr-strip i.is-on { background: var(--bench-quiet); box-shadow: none; }
+.lr-clock.is-soon .lr-strip i.is-on { background: var(--bench-warn); }
+
+/* --- the stage (UI plan §6.3) ---------------------------------------------------------------- */
+.leather .bench-info { display: grid; gap: 2px; max-width: 64ch; }
+#leather-game {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4;
+  transform: translateY(calc(100% + 12px)); opacity: 0;
+  transition: transform .2s ease-out, opacity .2s ease-out;
+}
+#leather-game.is-up { transform: none; opacity: 1; }
+#leather-game[hidden] { display: none; }
+
+/* The flat stand-in's band gauge: the step's real variable, the server's band (contracts
+   §11.1). The bar has no filled track: an outline, the target band outlined in gilt, the
+   failing band hatched (a shape as well as a colour), and a tick where it starts. Every
+   position is the server's number laid out by calc() over the gauge's top (`--max`). */
+.lw-flatrow { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; justify-content: center; }
+.lw-gauge { display: grid; gap: 6px; width: 220px; }
+.lw-gauge-cap { color: var(--bench-accent); font: 400 15px/1.1 var(--display); letter-spacing: .05em; font-variant: small-caps;
+                text-shadow: var(--engraved); }
+.lw-gauge-bar { position: relative; display: block; height: 18px; border-radius: var(--bench-radius);
+                box-shadow: inset 0 0 0 1px var(--edge); }
+.lw-gauge-bar i { position: absolute; top: 0; bottom: 0; display: block; }
+.lw-g-target { left: calc(var(--lo) / var(--max) * 100%); width: calc((var(--hi) - var(--lo)) / var(--max) * 100%);
+               box-shadow: inset 0 0 0 2px var(--bench-accent); border-radius: var(--bench-radius); }
+.lw-g-fail { left: calc(var(--flo) / var(--max) * 100%); width: calc((var(--fhi) - var(--flo)) / var(--max) * 100%);
+             background: repeating-linear-gradient(135deg, var(--bench-warn) 0 2px, transparent 2px 6px); opacity: .8; }
+.lw-g-at { left: calc(var(--at) / var(--max) * 100%); width: 2px; margin-left: -1px; top: -4px !important; bottom: -4px !important;
+           background: var(--bench-ink); }
+.lw-gauge-words { font-size: 13px; line-height: 1.35; color: var(--bench-quiet); }
+
+/* --- the work order (UI plan §6.5): forge.css's slots, scoped for this layer --------------- */
+.leather .bench-tagcol-in { gap: 16px; }
+.leather .fo-x { width: 28px; height: 28px; display: grid; place-items: center; color: var(--bench-quiet); font-size: 17px; }
+.leather .fo-x:hover { color: var(--bench-ink); }
+.leather .fo-slot-b {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; width: 100%;
+  min-height: 52px; padding: 6px 10px; text-align: left; border: 1px dashed var(--edge); border-radius: var(--bench-radius);
+}
+.leather .fo-slot-b:hover { border-color: var(--gold-dim); }
+.leather .fo-shape { width: 100%; min-height: 36px; padding: 6px 26px 6px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink); }
+.leather .fo-shape optgroup { background: var(--panel); color: var(--bench-quiet); font-style: normal; }
+.lo-pickbox, .lo-rest { display: grid; gap: 10px; }
+.lo-pickbox:empty, .lo-rest:empty { display: none; }
+.lo-why { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; font-size: 13px; line-height: 1.3; }
+.lo-base { margin: 8px 0 0; font-size: 13px; line-height: 1.35; }
+
+/* --- the flat card and ledger (lane U5's stand-ins) ------------------------------------------ */
+.lw-book-d { width: min(560px, 100%); }
+.lw-book-body { display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.lw-book-body p { margin: 0; }
+.lw-book-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lw-book-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: baseline; }
+.lw-book-list li span { grid-column: 2; color: var(--bench-quiet); font-size: 13px; }
+.lw-book-list li b { font-weight: 400; color: var(--bench-ink); }
+.lw-book-list li > b:first-child { grid-column: 1 / -1; }
+.lw-book-list li > .fr-swatch + b { grid-column: 2; }
+.lw-convert-list li span { grid-column: 1 / -1; }
+.lw-card-head { display: flex; align-items: center; gap: 8px; color: var(--bench-quiet); }
+.lw-card-unknown { color: var(--bench-quiet); }
+.lw-card-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.lw-card-acts:empty { display: none; }
+
+/* --- the footer's place line ----------------------------------------------------------------- */
+/* The place line is long ("At the field kit: common and uncommon hides, and its small
+   kettle"); nowrap, it was the footer's min-content and the layer's grid track grew to fit it:
+   1354px of layer at 1280 wide, the work order and Close pushed 74px off the window (measured
+   live, 2026-10-08: 1286 with the footer hidden). min-width 0 on the footer lets the track
+   stay the window's width and the line ellipsise. */
+.leather .bench-foot { min-width: 0; }
+.leather .bf-place { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.leather .bf-track { min-width: 0; flex: 0 1 auto; }
+
+/* --- other sizes (UI plan §5.3) ----------------------------------------------------------------- */
+/* 1280 to 1439: the rack to 240px, the work order to 300px (the strip goes to icons by
+   bench.css's own rule for this band). */
+@media (max-width: 1439px) and (min-width: 1180px) {
+  .leather { --bench-satchel-w: 240px; --bench-tag-w: 300px; --bench-gap: 28px; }
+  /* The stage takes what is left: a 520px floor made the layer 1354px wide at 1280 and it
+     scrolled sideways 74px (measured live, 2026-10-08, layer scrollWidth). */
+  .leather .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(0, 1fr) var(--bench-tag-w); }
+  .leather .bm.is-locked { display: inline-flex; }
+  .leather .fo-slot.is-full, .leather .fo-slot-b { grid-template-columns: 78px minmax(0, 1fr) auto; }
+  .leather .fo-label { font-size: 13px; letter-spacing: .03em; }
+}
+@media (max-width: 1179px) {
+  .leather .bench-frame { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .leather .fo-slot.is-full, .leather .fo-slot-b { grid-template-columns: 68px minmax(0, 1fr) auto; }
+  .lw-flatrow { gap: 14px; }
+  .lw-gauge { width: 100%; max-width: 260px; }
+}
