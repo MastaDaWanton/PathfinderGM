@@ -756,3 +756,18 @@ def test_the_shipped_passages_parse_whole_and_clean():
     assert len(ps) >= 5 and skipped == []
     assert intimate.warnings_for(ps) == []
     assert len({p.player for p in ps}) == len(ps)
+
+
+def test_a_word_that_opens_speech_is_not_taken_for_a_name():
+    """Measured 2026-10-08: the owner's revised passages named nobody and were still warned
+    of "names recurring across passages: Again, Fuck, Please", each the first word inside
+    a quote. A real name recurring mid-sentence is still caught."""
+    def passage(n, text):
+        return intimate.Passage(n=n, player="I go on", narration=text)
+
+    clean = [passage(1, '"Again," you say. She laughs. "Please," she breathes.'),
+             passage(2, '"Again," she whispers. "Please—" and then nothing.')]
+    assert intimate.warnings_for(clean) == []
+    named = [passage(1, "You kiss her and Kara laughs."),
+             passage(2, "You hold her while Kara sleeps.")]
+    assert any("Kara" in w for w in intimate.warnings_for(named))

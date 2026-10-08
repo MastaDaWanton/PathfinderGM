@@ -190,7 +190,13 @@ def ensure_file() -> Path:
 _SEPARATOR = re.compile(r"(?m)^\s*(?:\d+[.)]+|-{3,})\s*$")
 # A capitalised word not at the start of a sentence: a name, most likely. Shown to the
 # model, a name becomes "a person who does not exist" in play (`invented-name`).
-_CAPITAL = re.compile(r"(?<![.!?]\s)(?<![.!?][\"'”’]\s)(?<!^)\b([A-Z][a-z]{2,})\b")
+# A word that opens a line of speech starts a sentence too: measured 2026-10-08, the
+# owner's revised file had no names left and was still warned of "Again, Fuck, Please",
+# each the first word inside a quote. A name that opens speech ("Kara, wait") is still
+# caught wherever else it appears.
+_CAPITAL = re.compile(
+    r"(?<![.!?]\s)(?<![.!?][\"'”’]\s)(?<![\"“‘—–-])(?<!^)\b([A-Z][a-z]{2,})\b",
+    re.MULTILINE)
 _NOT_NAMES = {"You", "Your", "Yours", "She", "Her", "Hers", "He", "His", "Him", "They",
               "Their", "Them", "The", "And", "But", "Then", "When", "What", "Yes", "Not",
               "God", "Gods", "Oh"}
