@@ -14,15 +14,17 @@
  *                                 aria-describedby on the row's own controls
  *
  * Hover alone fails keyboard and touch players (Inclusive Components, "Tooltips &
- * Toggletips", Pickering 2016), so the same card opens three ways: the pointer over the
- * row, keyboard focus on any control in the row, and a tap on the row's "?" (a toggletip,
- * pinned until tapped again, Escape, or a tap elsewhere). WCAG 2.1 SC 1.4.13 asks custom
+ * Toggletips", Pickering 2016), so the same card opens three ways, all from the row's
+ * "?" and never from the row itself (2026-10-08: a card opened by the row covered the
+ * next rows and made skills impossible to pick): the pointer over the "?", keyboard focus
+ * on the "?", and a tap on it (a toggletip, pinned until tapped again, Escape, or a tap
+ * elsewhere). WCAG 2.1 SC 1.4.13 asks custom
  * hover content to be dismissible (Escape), hoverable (the pointer may cross onto the card
  * without it vanishing) and persistent; all three are kept below. A screen reader hears
  * the words through aria-describedby on the row's controls, which is why the floating
- * card itself is aria-hidden: read twice is read once too many. The "?" is out of the
- * tab order (tabindex -1): a keyboard player already gets the card on the checkbox or the
- * +/- button, and 35 extra stops would make the list a chore to cross.
+ * card itself is aria-hidden: read twice is read once too many. The "?" is in the tab
+ * order: it is the keyboard's only way to the card now that the row's own controls no
+ * longer open it.
  *
  * Not the title attribute: a browser tooltip never shows on touch or keyboard focus, and
  * SC 1.4.13 leaves it to the browser, which is to say to nobody.
@@ -73,7 +75,7 @@
   function info(id) {
     var e = entry(id);
     if (!e) return "";
-    return '<button type="button" class="skh-info" tabindex="-1" data-skillinfo="' + esc(id) +
+    return '<button type="button" class="skh-info" data-skillinfo="' + esc(id) +
       '" aria-label="What ' + esc(e.name) + ' does in this game" aria-describedby="' +
       slug(id) + '">?</button><span class="skh-vh" id="' + slug(id) + '">' +
       esc(plain(id)) + "</span>";
@@ -139,27 +141,38 @@
   // Long enough to cross the gap onto the card (SC 1.4.13 "hoverable").
   function later() { clearTimeout(hideTimer); hideTimer = setTimeout(hide, 220); }
 
+  // Only the "?" opens the card (the owner, 2026-10-08, an emergency: "the information on
+  // the skills in the character creator pops up when you just hover on the skill and not
+  // when you click or hover on the ? bubble this is making it impossible to select
+  // skills"). The first cut opened it from anywhere on the row and from focus on the
+  // row's own checkbox and +/- buttons, so the card sat over the next rows the player was
+  // reaching for. A screen reader still hears the words through aria-describedby on
+  // those controls; the card is for the eye and opens on the "?" alone.
+  function infoRow(t) {
+    var b = t && t.closest && t.closest("[data-skillinfo]");
+    return b ? b.closest("[data-skillhelp]") : null;
+  }
   document.addEventListener("mouseover", function (ev) {
-    var el = ev.target.closest && ev.target.closest("[data-skillhelp]");
+    var el = infoRow(ev.target);
     if (el && el !== owner && !pinned) show(el, false);
     else if (el && el === owner) clearTimeout(hideTimer);
   });
   document.addEventListener("mouseout", function (ev) {
-    var el = ev.target.closest && ev.target.closest("[data-skillhelp]");
+    var el = infoRow(ev.target);
     if (!el || el !== owner || pinned) return;
-    if (ev.relatedTarget && (el.contains(ev.relatedTarget) ||
-        (card && card.contains(ev.relatedTarget)))) return;
+    if (ev.relatedTarget && card && card.contains(ev.relatedTarget)) return;
     later();
   });
+  // Keyboard: the "?" is in the tab order and its focus opens the card; focus on the
+  // row's checkbox or +/- never does (that was the card covering the next row).
   document.addEventListener("focusin", function (ev) {
-    var el = ev.target.closest && ev.target.closest("[data-skillhelp]");
+    var el = infoRow(ev.target);
     if (el) show(el, false);
     else if (owner && !pinned) hide();
   });
   document.addEventListener("focusout", function (ev) {
-    var el = ev.target.closest && ev.target.closest("[data-skillhelp]");
-    if (el && el === owner && !pinned &&
-        !(ev.relatedTarget && el.contains(ev.relatedTarget))) later();
+    var el = infoRow(ev.target);
+    if (el && el === owner && !pinned) later();
   });
   document.addEventListener("click", function (ev) {
     var b = ev.target.closest && ev.target.closest("[data-skillinfo]");
