@@ -621,3 +621,27 @@ catalogue or code, whatever the owner rules above.
 | Q9.4 Licensing | **Mechanics now, names wait** for the bestiary licensing decision (recommended). |
 
 All nine rounds answered (2026-10-05). The plan can be written.
+
+---
+
+## Plan open points (revamp plan §24), answered 2026-10-08
+
+The owner's words are quoted where they changed the plan; "as recommended" means the plan's
+proposal stands. These override the plan and the contracts wherever they differ.
+
+| # | Point | Answer |
+|---|---|---|
+| 1 | Steel lamellar | As recommended: leather lamellar is the leatherworker's whole; the forge's lamellar is **steel lamellar** with the leatherworker's lacing set. |
+| 2 | Quality across two crafts | As recommended: the **lower** of the base's tier and the forge's Assemble tier. |
+| 3 | Harden at the tannery | **"add a small kettle to the field kit."** The field kit Hardens **common and uncommon** hides (the kit's own tier reach, §10); rare and above still need the tannery's hardening kettle. Plain leather armour is therefore makeable at level 1 in the field. |
+| 4 | The craft's level on the harvest roll | **"add leatherworking level to the survival check."** The harvest roll is Survival (or Heal for internal parts) **+ Leatherworker level** + the skinning kit's +2. The DC stays 15 + CR (the "no DC creep" rule is unchanged: the level goes on the roll, never the DC). |
+| 5 | How long a carcass waits | As recommended: 24 hours after death. |
+| 6 | DR from the stat block | **"add the reduced DR."** A generic hide from a creature with DR N/x gives **DR max(1, N ÷ 5)/x** on a **rare-and-up** hide, capped by the tier ceiling, counted as one of the hide's house modifiers (the energy-resistance rule's shape, §5.4). Only the highest DR is inherited. |
+| 7 | Rusting grasp on mixed suits | As recommended: the metal pieces' share of the AC (studded leather loses at most 1). |
+| 8 | Salt costs salt | As recommended: one measure per hide unit at the harvest, **and herbalism's animal parts cost salt too**, through the one salt reader. |
+| 9 | Which settlements have a tannery | **"every town has a leatherworker and that person does not necessarily have a tannery but every town should have access to leatherworking supplies and the things needed to use the craft."** Every town and city (and village? — towns per the owner's word; villages follow the smithy's rule) has a **leatherworker keeper** whose counter sells the craft's supplies: curing salt, tannins, oils, waxes, threads, dyes, a field kit, common hides. A **tannery** (vats, lime pit, hardening kettle for rare-and-up) stays where the settlement's own words imply one, on the outskirts, per the plan. |
+| 10 | A dangerous grade | **"dangerous hides should not bite they should force another round of checks to avoid poison, acid or elemental dmg while skinning."** No Grade hazard. Instead, skinning a creature whose body is dangerous (a poison special attack or poisonous flesh, an acid or energy subtype, a breath weapon, a body that burns or shocks to the touch — read from the stat block's tags, never a name list) forces a **second check** during the harvest; a failure deals that creature's hazard: poison through the one poison door (its save and track), acid or energy as damage of that type, small and by the book's scale. |
+| 11 | Deeds store | **"Build out a deeds system that tracks good or bad things you do, most actions should only have a small impact, otherwise people will not mean to do certain things and it goes from a funny accident to a source of frustration very quickly if they are punished too heavily. for now just track this as a number positive for good deed and -negative for bad deeds. you should be able to look at this number in your sheet but i dont want it to affect anything yet."** A deeds system of its own (not a leatherworking detail): an append-only record of deeds with a signed value from rule rows (small for most acts), a running total shown on the sheet, read by nothing else yet. Research first (karma and reputation systems, what they tried and abandoned). |
+| 12 | Good dragons | As recommended: harvesting a good-aligned dragon (by kind; alignment is not tracked) is a deed too, recorded the same way, with a negative value. |
+| 13 | Marks per item | **Owner asked for an explanation before deciding** (2026-10-08). Hold marks until answered: lanes build without them, and the data pass keeps mark rows separable. |
+| 14 | Numbers to tune | As recommended: the proposed numbers, all in rule rows, tuned in play. |
