@@ -1,0 +1,46 @@
+/* The leatherworker's minigames in the bench strip (play/static/js/leather-games/, the BAND part
+   of play/static/js/table/33-bench-games.js), leather UI plan §6.4 and §9.
+
+   Loaded after bench-games.css and only adds to it: the strip keeps its shape (meter left, hint
+   centre, band right, time thread on top). Tokens only (tests/test_leather_games.py refuses a
+   raw colour): a hide's, a tannage's and a dye's colours are the stage's content, and the band
+   gauge's scale is drawn on the canvas, never here (UI plan §4).
+
+   What a leather game adds to the hint column: the gauge's reading in its real unit above the
+   hint ("Pressure 0.42 of thickness", "Water 62 °C", "Pitch 11 SPI", "14 min since wetting").
+   The hint turns from --dim to --ink while the reading is out of its band, because that is
+   when its words ("Deep: ease off", "Too wet: wait for the colour to come back") matter; the
+   words carry it, the brighter ink only helps them be seen. */
+
+.bench-game.has-band .bench-game__hint { gap: 6px; }
+
+.bench-game__band-num {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 14px;
+  line-height: 1.15;
+  color: var(--ink);
+  font-variant-numeric: lining-nums tabular-nums;
+  /* The longest reading ("14 min since wetting") wraps onto two lines in the 128px column
+     rather than spilling out of it. Measured 2026-10-08 in a 590px strip: "Pressure 0.31 of
+     thickness" over a three-line hint and the ? ran past the strip's 120px and lost its top
+     line, so the readings carry no label where the unit says what it is. */
+  overflow-wrap: anywhere;
+}
+
+.bench-game.band-low .bench-game__hint-text,
+.bench-game.band-high .bench-game__hint-text,
+.bench-game.band-fail .bench-game__hint-text { color: var(--ink); }
+
+/* The failing band reads by its words and by the gauge's cross-hatched saw edge; the number
+   takes the alarm colour as a third cue, never the only one. */
+.bench-game.band-fail .bench-game__band-num { color: var(--alarm); }
+
+/* A leather game's hint says the next thing to do (wait, strike, lift, clamp), so it reads a
+   step brighter than a fixed instruction, as the enchant and alchemy games' do. */
+.bench-game--leather .bench-game__hint-text { color: var(--ink); }
+
+/* A narrow strip: the reading steps down with the band word (bench-games.css's container). */
+@container (max-width: 640px) {
+  .bench-game__band-num { font-size: 13px; }
+}
