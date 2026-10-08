@@ -685,3 +685,10 @@ proposal stands. These override the plan and the contracts wherever they differ.
 - Lane M's not-yet list: rust on the wearer not the suit; shields take no rust; `body.metal`
   granted by nothing; domain powers carry no `ability_type`; gear saves vs heat/chill metal
   rolled by the engine even for the player.
+- From lane U1 (live): Assemble shows a Fastenings slot for boots and worn goods; the footer
+  reads "the tanner's tannery" (`_keeper_name` misses the keeper); `where.advice` (lane G) has
+  an em-dash and says "no tannery" at a tannery; the build card's `from_creature` lines name
+  creature-derived properties before Grade (server should hold them back); Equipment says "for
+  show, no effect in play" on crafted leather armour; the bench clasps overflow every layer by
+  6px (shared bench). The long-wait death (Scene.advance never eats or drinks) is being fixed on
+  master by its own lane (fix/long-waits-eat-and-drink).
