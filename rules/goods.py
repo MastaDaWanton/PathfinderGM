@@ -487,6 +487,19 @@ GEAR: dict[str, dict] = {
     # carried half. PROPOSED 5 gp (the plan's number) and 1 lb: no book prints it.
     "alchemist's mask and gloves": {"name": "alchemist's mask and gloves", "cost_gp": 5.0,
                                     "lb": 1},
+    # The leatherworker's field kit (docs/leatherworking-revamp-plan.md §10; `places.
+    # LEATHER_KIT` names it, and the leatherworker's counter in stall-lines.json): skinning
+    # knife, fleshing beam, round knife, awl and needles, mallet, and the small kettle the
+    # owner added on 2026-10-08 (open point 3), so it Hardens common and uncommon hides.
+    # No book prints this kit, so it is priced BY THE BOOK'S PARTS (legacy.aonprd.com,
+    # read 2026-10-08): the Core Rulebook's artisan's tools, 5 gp and 5 lb ("the items
+    # needed to pursue any craft": the knives, awl, needles and mallet), plus Ultimate
+    # Equipment's common iron pot, 8 sp and 4 lb, as the kettle. The fleshing beam has no
+    # printed price; a beam is a sloped log or plank found where the work is, and the
+    # kit's part of it is the two-handled knife the artisan's tools already hold. Lane G
+    # had proposed 10 gp and 20 lb; the parts come to 5.8 gp and 9 lb.
+    "leatherworker's field kit": {"name": "leatherworker's field kit", "cost_gp": 5.8,
+                                  "lb": 9},
     # Food and drink, Core Rulebook Table 6-9 ("Food, Drink, and Lodging"), read from the
     # PRD's own table 2026-09-27 (legacy.aonprd.com/coreRulebook/equipment.html). Open
     # Game Content; the book is in OGL-NOTICE.md's section 15. Provisions a market sells
@@ -545,6 +558,16 @@ def stocked_at(counter_kind: str) -> list[str]:
         from . import market
 
         return list(market.gear_of("market:alchemist"))
+    if kind == "tannery":
+        # The tannery's keeper is a tanner, and sells what the market's leatherworker sells
+        # over the counter: the field kit (lane G's outskirts tanner keeps a counter,
+        # 2026-10-08). Measured before: the tannery fell to the "everything else" branch
+        # below and sold a tent, a crowbar and fifty feet of rope beside its curing salt,
+        # and no kit. One list, the leatherworker shop's row in stall-lines.json, so the
+        # two counters cannot drift — the laboratory's rule.
+        from . import market
+
+        return list(market.gear_of("market:leatherworker"))
     if kind.startswith("market:") or kind == "stables":
         from . import market
 
@@ -716,7 +739,8 @@ def table_goods(table: str) -> list[Good]:
 # counter. The alchemist's shop names this table (stall-lines.json), and a test holds every
 # manual of every craft to some counter.
 MANUAL_TABLES = {"herbal-manuals": "herbalist", "smithing-manuals": "blacksmith",
-                 "enchanting-manuals": "enchanter", "alchemy-manuals": "alchemist"}
+                 "enchanting-manuals": "enchanter", "alchemy-manuals": "alchemist",
+                 "leatherworking-manuals": "leatherworker"}
 
 
 # --- the alchemist's goods are the bench's own products (alchemy plan §12.5, owner Q8.3) -----

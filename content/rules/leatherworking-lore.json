@@ -1,0 +1,53 @@
+{
+  "_about": [
+    "How a character learns what a hide, tannin, oil, wax, thread or dye does",
+    "(docs/leatherworking-revamp-plan.md §16; contracts §1 lane F). Read by rules/knowledge.py",
+    "beside herb-lore.json, smithing-lore.json and alchemy-lore.json, whose shape this mirrors,",
+    "so one module answers every craft. Words, prices and times only: every number is the",
+    "rules' own, so no model ever authors one, and every one can be tuned in play.",
+    "",
+    "Before this file (leather lane F, 2026-10-08) every leather material answered to the",
+    "SMITH's rows (knowledge.craft_of): a blacksmith taught deer hide, a guildhall shelved it,",
+    "and grading a hide was the forge's assay, a tenth of a bar compared against every known",
+    "material of kind `hide`. Prices are in copper (Core Rulebook Table 6-1); a lesson is",
+    "priced as a healer's and a smith's are, a skilled hireling's hour."
+  ],
+  "grade": {
+    "minutes": 10,
+    "_scrap": "Plan §16: Grade 'costs a scrap (a quarter unit, or an offcut from any earlier step)'. Hides track quarter units (contracts §4.1); a tannin, oil, wax, thread or dye loses a quarter measure, the forge's sliver in leather units.",
+    "scrap_units": 0.25,
+    "_comparison": "Plan §16: -1 DC for each known hide of the same CREATURE TYPE, at most -4: the forge's touchstone rule (smithing-lore.json `assay`) keyed on type rather than kind. A tannin, oil, wax, thread or dye keeps the forge's by-kind comparison (knowledge._comparison_key).",
+    "comparison_per_known": 1,
+    "comparison_max": 4,
+    "_danger": "None. The owner, 2026-10-08 (open point 10): 'dangerous hides should not bite they should force another round of checks to avoid poison, acid or elemental dmg while skinning.' A dangerous body is the harvest's second check, never Grade's (knowledge.danger_of)."
+  },
+  "study": {
+    "minutes": 10,
+    "_dc": "10 + 5 per rarity band, as herbs, metals and reagents: Grade's DC before comparison (plan §16, 'a Craft roll at the material's DC').",
+    "dc_base": 10,
+    "dc_per_band": 5,
+    "reveal_per_margin": 5
+  },
+  "teacher": {
+    "price_cp": 20,
+    "minutes": 10,
+    "_works": "Occupation ids (content/people/occupations.json) whose people know hides: the occupations tagged `leather` (plan §16, 'a keeper with the leather occupation tag'); today that is the tanner alone, whose match words already take leatherworker, cobbler and saddler. The words name the trade when no population record carries one. A word must stand alone: 'skinner' never matches inside another word.",
+    "works": ["tanner"],
+    "words": ["tanner", "leatherworker", "leather-worker", "currier", "cobbler", "saddler",
+              "cordwainer", "furrier", "skinner", "glover", "harness-maker", "bootmaker"],
+    "_teaches": "Properties taught per lesson by attitude step (rules/attitude.py), the herb teacher's rows: below indifferent they refuse in words.",
+    "teaches": {"indifferent": 1, "friendly": 2, "helpful": 2}
+  },
+  "library": {
+    "price_cp": 50,
+    "minutes": 60,
+    "words": ["library", "scriptorium", "archive", "archives", "guildhall"],
+    "_common": "What the world writes down about hides: the benefits of common and uncommon ones. A rare hide's secrets and every drawback stay unwritten, as for herbs and metals.",
+    "tiers": ["common", "uncommon"],
+    "reveals": ["benefit", "neutral"]
+  },
+  "manual": {
+    "_mastery": "Plan §17.3: 'an unread leatherworking manual (+5 once)', worldclass.MANUAL_MP.",
+    "mastery": 5
+  }
+}

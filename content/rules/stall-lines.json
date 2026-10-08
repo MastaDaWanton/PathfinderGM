@@ -113,6 +113,7 @@
     {"id": "leatherworker", "label": "the leatherworker", "title": "the leatherworker",
      "words": ["leatherworker", "artisan", "craftsman"], "smallest": "village",
      "gear": ["leatherworker's field kit"],
+     "tables": ["leatherworking-manuals"],
      "draw": ["leatherworker"],
      "consumables": ["leatherworker"],
      "staple_kinds": {"leatherworker": ["hide", "dye"]},

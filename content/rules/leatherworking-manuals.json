@@ -1,0 +1,123 @@
+{
+  "_about": [
+    "Leatherworking manuals (docs/leatherworking-revamp-plan.md §16; contracts §1 lane F):",
+    "books that teach what hides and the tanner's stores do, the herbal, smithing, enchanting",
+    "and alchemy manuals' counterpart. Reading one takes hours of world time and teaches the",
+    "properties it lists; the bench pays its mastery once (leatherworking-lore.json `manual`,",
+    "rules/knowledge.py `read_manual`). Read by rules/knowledge.py; sold at every settlement's",
+    "leatherworker (content/rules/stall-lines.json `tables`, rules/goods.py",
+    "`table_goods('leatherworking-manuals')`).",
+    "",
+    "Original writing for Pathfinder GM (2026-10-08). Prices in gold, in the other crafts'",
+    "range (6 to 25 gp for the common books, the monster-hide book dearer as the deep-metals",
+    "book is). `teaches` names materials by id and says which of each one's properties the",
+    "book holds: \"all\", \"benefits\", \"drawbacks\", \"working\", or a list of property",
+    "keys. The words are preferred over keys: keys are positions in a material's lists, and",
+    "a data pass can move them. An id the materials do not hold is skipped, never invented."
+  ],
+  "manuals": [
+    {
+      "id": "the-tanners-yard-book",
+      "name": "The Tanner's Yard Book",
+      "price_gp": 8,
+      "hours": 4,
+      "about": "A village tanner's account of the hides that come over the yard wall every season, and what each one makes.",
+      "teaches": [
+        {"material": "deer-hide", "keys": "all"},
+        {"material": "cowhide", "keys": "all"},
+        {"material": "goat-hide", "keys": "all"},
+        {"material": "horse-hide", "keys": "all"},
+        {"material": "boar-hide", "keys": "all"},
+        {"material": "dog-hide", "keys": "all"},
+        {"material": "wolf-pelt", "keys": "all"},
+        {"material": "cat-pelt", "keys": "all"}
+      ]
+    },
+    {
+      "id": "bark-brine-and-brains",
+      "name": "Bark, Brine and Brains",
+      "price_gp": 10,
+      "hours": 4,
+      "about": "The country tannages, pit by pit: which bark, how much salt, and why the old way with brains still works.",
+      "teaches": [
+        {"material": "curing-salt", "keys": "all"},
+        {"material": "liming-quicklime", "keys": "all"},
+        {"material": "brain-paste", "keys": "all"},
+        {"material": "tawing-alum", "keys": "all"},
+        {"material": "oak-bark", "keys": "all"},
+        {"material": "hemlock-bark", "keys": "all"},
+        {"material": "willow-bark", "keys": "all"},
+        {"material": "sumac-leaf", "keys": "all"}
+      ]
+    },
+    {
+      "id": "needle-awl-and-wax",
+      "name": "Needle, Awl and Wax",
+      "price_gp": 6,
+      "hours": 3,
+      "about": "A saddler's pocket book of threads, waxes and dressings, with a note on each one's failings.",
+      "teaches": [
+        {"material": "linen-thread", "keys": "all"},
+        {"material": "sinew-thread", "keys": "all"},
+        {"material": "gut-cord", "keys": "all"},
+        {"material": "horsehair-cord", "keys": "all"},
+        {"material": "waxed-flax", "keys": "all"},
+        {"material": "thread-wax", "keys": "all"},
+        {"material": "seam-pitch", "keys": "all"},
+        {"material": "neatsfoot-oil", "keys": "all"},
+        {"material": "currier-tallow", "keys": "all"},
+        {"material": "fish-oil", "keys": "all"}
+      ]
+    },
+    {
+      "id": "the-dyers-card",
+      "name": "The Dyer's Card",
+      "price_gp": 8,
+      "hours": 3,
+      "about": "A swatch book: every colour pinned beside the same colour after a month of rain.",
+      "teaches": [
+        {"material": "madder-red", "keys": "all"},
+        {"material": "weld-yellow", "keys": "all"},
+        {"material": "woad-blue", "keys": "all"},
+        {"material": "walnut-brown", "keys": "all"},
+        {"material": "iron-gall-black", "keys": "all"},
+        {"material": "mordant-salts", "keys": "all"},
+        {"material": "murex-purple", "keys": "benefits"},
+        {"material": "vermilion", "keys": "all"}
+      ]
+    },
+    {
+      "id": "furs-of-the-hard-country",
+      "name": "Furs of the Hard Country",
+      "price_gp": 25,
+      "hours": 6,
+      "about": "A trapper's book of the big pelts from cold and wild places, written for the buyer who means to wear them.",
+      "teaches": [
+        {"material": "dire-boar-hide", "keys": "all"},
+        {"material": "winter-wolf-pelt", "keys": "all"},
+        {"material": "boreal-wolf-pelt", "keys": "all"},
+        {"material": "black-bear-hide", "keys": "all"},
+        {"material": "grizzly-hide", "keys": "all"},
+        {"material": "polar-bear-hide", "keys": "all"},
+        {"material": "snow-leopard-pelt", "keys": "all"},
+        {"material": "dire-wolverine-hide", "keys": "benefits"}
+      ]
+    },
+    {
+      "id": "the-monster-skinners-ledger",
+      "name": "The Monster-Skinner's Ledger",
+      "price_gp": 120,
+      "hours": 8,
+      "about": "Notes on the hides of beasts that kill people, kept by someone who sold them, with the warnings the author learned at the flensing beam.",
+      "teaches": [
+        {"material": "owlbear-hide", "keys": "all"},
+        {"material": "griffon-hide", "keys": "all"},
+        {"material": "manticore-hide", "keys": "benefits"},
+        {"material": "basilisk-hide", "keys": "benefits"},
+        {"material": "bulette-plate", "keys": "benefits"},
+        {"material": "wyvern-hide", "keys": "drawbacks"},
+        {"material": "behir-hide", "keys": "drawbacks"}
+      ]
+    }
+  ]
+}
