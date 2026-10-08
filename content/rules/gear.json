@@ -12,7 +12,11 @@
     "             pack is the store, nothing is copied onto the sheet, and selling the",
     "             blanket takes its term away (rules/sheet.py:_gear_mods)",
     "  tags       standing tags held while carried (gear.*), asked with has_state",
-    "  eat        eating one resets hunger through rules/survival.py (the `eat` op, item=)",
+    "  eat        eating one resets hunger through rules/survival.py (the `eat` op, item=);",
+    "             `lb` is the pounds of food it is, which a wait of a day or more draws on",
+    "             at the book's pound a day (survival._provide, gear.provide)",
+    "  drink      {spends, gallons, leaves}: water a wait of a day or more drinks at the",
+    "             book's gallon a day; `leaves` is what stays in the pack once it is drunk",
     "  carry      {str: N}: Strength counts N higher for carrying capacity only",
     "  camp       {night_check_scale: x}: the night's encounter chance is multiplied by x",
     "  writes     writing a note or drawing a map needs it in the pack",
@@ -31,31 +35,38 @@
       "names": ["trail rations", "trail ration", "rations", "ration", "rations, trail"],
       "does": "A day's food: eating one puts hunger back to nothing.",
       "source": "CRB p.158 / UE p.75: 'The listed price is for a day's worth of food ... As long as it stays dry, it can go for months without spoiling.' CRB Environment, Starvation and Thirst: a character needs one pound of food a day.",
-      "eat": {"spends": 1}
+      "eat": {"spends": 1, "lb": 1}
     },
     "bread": {
       "names": ["loaf of bread", "bread"],
       "does": "Food: eating it puts hunger back to nothing.",
-      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
-      "eat": {"spends": 1}
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging): half a pound.",
+      "eat": {"spends": 1, "lb": 0.5}
     },
     "cheese": {
       "names": ["hunk of cheese", "cheese"],
       "does": "Food: eating it puts hunger back to nothing.",
-      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
-      "eat": {"spends": 1}
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging): half a pound.",
+      "eat": {"spends": 1, "lb": 0.5}
     },
     "meat": {
       "names": ["chunk of meat", "meat"],
       "does": "Food: eating it puts hunger back to nothing.",
-      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
-      "eat": {"spends": 1}
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging): half a pound.",
+      "eat": {"spends": 1, "lb": 0.5}
     },
     "meal": {
       "names": ["good meal", "common meal", "poor meal"],
       "does": "A meal: eating it puts hunger back to nothing.",
-      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
-      "eat": {"spends": 1}
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging): meals are priced per day, so one is a day's food.",
+      "eat": {"spends": 1, "lb": 1}
+    },
+    "waterskin": {
+      "names": ["waterskin", "waterskins", "water skin", "full waterskin"],
+      "does": "Half a gallon of water. A day needs a gallon (two skins); a wait of a day or more drinks from it, and the empty skin stays in the pack.",
+      "source": "CRB p.158 / UE p.58: 'It is watertight and holds about 1/2 gallon of liquid.' CRB Environment, Starvation and Thirst: 'at least a gallon of fluids ... per day'.",
+      "drink": {"spends": 1, "gallons": 0.5, "leaves": "empty waterskin"},
+      "not_yet": ["nothing refills an empty skin yet; buy another, or drink at the table"]
     },
     "bedroll": {
       "names": ["bedroll"],

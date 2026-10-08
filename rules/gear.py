@@ -49,7 +49,9 @@ _DOC: dict | None = None
 # The verbs a row may carry beside the feat grammar. Anything else is refused by
 # `validate`, because the reader would ignore it and the row would be a promise.
 ROW_KEYS = frozenset({"names", "does", "source", "house_rule", "modifiers", "tags", "eat",
-                      "carry", "camp", "writes", "not_yet"})
+                      "drink", "carry", "camp", "writes", "not_yet"})
+EAT_KEYS = frozenset({"spends", "lb"})
+DRINK_KEYS = frozenset({"spends", "gallons", "leaves"})
 MOD_KEYS = frozenset({"type", "target", "amount", "bonus_type", "when", "note"})
 CAMP_KEYS = frozenset({"night_check_scale"})
 
@@ -214,6 +216,82 @@ def food(actor, said: str = "") -> dict | None:
         return hit[0] if len(hit) == 1 else None
     pool.sort(key=lambda c: (c["key"] != "trail rations", c["name"]))
     return pool[0]
+
+
+# --- a day's provisions out of the pack (survival's `_provide`) --------------------------------
+#
+# The two verbs a wait lives on: `eat` (`lb`, the pounds of food one spent unit is) and
+# `drink` (`gallons`, the water one spent unit holds, and `leaves`, what is left in the pack
+# when it is drunk — an empty waterskin is still a waterskin, at 2 lb instead of 4). Units
+# because the book states the daily need in them (CRB p.444: a gallon and a pound a day).
+_VERB = {"food": ("eat", "lb"), "water": ("drink", "gallons")}
+
+
+def _pantry(actor, need: str) -> list[dict]:
+    """The carried things that meet `need`, in the order a day draws on them: what a pack is
+    provisioned with first (trail rations, waterskins), then by name — `food`'s order."""
+    verb, unit = _VERB[need]
+    pool = [c for c in carried(actor) if isinstance(c["row"].get(verb), dict)]
+    first = "trail rations" if need == "food" else "waterskin"
+    pool.sort(key=lambda c: (c["key"] != first, c["name"]))
+    return pool
+
+
+def _each(c: dict, need: str) -> float:
+    verb, unit = _VERB[need]
+    v = c["row"][verb]
+    return float(v.get(unit, 1) or 0) / max(1, int(v.get("spends", 1) or 1))
+
+
+def _draw(pool: list[dict], counts: list[int], need: str, amount: float) -> list[int] | None:
+    """How many of each pool entry one day takes (greedy, whole units), or None when the
+    pool cannot make `amount`. Pure: the caller's `counts` are what is left."""
+    took = [0] * len(pool)
+    got = 0.0
+    for i, c in enumerate(pool):
+        each = _each(c, need)
+        while got + 1e-9 < amount and counts[i] - took[i] > 0 and each > 0:
+            took[i] += 1
+            got += each
+        if got + 1e-9 >= amount:
+            return took
+    return None
+
+
+def portions(actor, need: str, amount: float, cap: int = 3650) -> int:
+    """How many whole days of `need` (each `amount`) the pack holds — the same greedy draw
+    `provide` makes, run on the counts without spending them."""
+    pool = _pantry(actor, need)
+    counts = [int(c["count"]) for c in pool]
+    days = 0
+    while days < cap:
+        took = _draw(pool, counts, need, amount)
+        if took is None:
+            break
+        counts = [n - t for n, t in zip(counts, took)]
+        days += 1
+    return days
+
+
+def provide(actor, need: str, amount: float) -> list[dict] | None:
+    """Take one day's `need` out of the pack and say what was spent: [{"need", "name",
+    "count", "amount"}], or None (nothing spent) when the pack holds less than a day."""
+    pool = _pantry(actor, need)
+    took = _draw(pool, [int(c["count"]) for c in pool], need, amount)
+    if took is None:
+        return None
+    out = []
+    for c, n in zip(pool, took):
+        if not n:
+            continue
+        spend(actor, c, n)
+        leaves = str((c["row"].get("drink") or {}).get("leaves") or "") if need == "water" \
+            else ""
+        if leaves:
+            actor.goods[leaves] = int(actor.goods.get(leaves, 0) or 0) + n
+        out.append({"need": need, "name": c["name"], "count": n,
+                    "amount": round(_each(c, need) * n, 3), "item": c["id"]})
+    return out
 
 
 def spend(actor, c: dict, n: int = 1) -> int:
@@ -437,9 +515,21 @@ def validate(d: dict | None = None) -> list[str]:
                                   or not isinstance(carry.get("str"), int)):
             problems.append(f"{at}.carry: {{\"str\": a whole number}}.")
         eat = row.get("eat")
-        if eat is not None and (not isinstance(eat, dict)
-                                or not isinstance(eat.get("spends", 1), int)):
-            problems.append(f"{at}.eat: {{\"spends\": a whole number}}.")
+        if eat is not None and (not isinstance(eat, dict) or set(eat) - EAT_KEYS
+                                or not isinstance(eat.get("spends", 1), int)
+                                or not isinstance(eat.get("lb", 1), (int, float))
+                                or eat.get("lb", 1) <= 0):
+            problems.append(f"{at}.eat: {{\"spends\": a whole number, \"lb\": the pounds of "
+                            f"food it is (CRB p.444: a pound a day)}}.")
+        drink = row.get("drink")
+        if drink is not None and (not isinstance(drink, dict) or set(drink) - DRINK_KEYS
+                                  or not isinstance(drink.get("spends", 1), int)
+                                  or not isinstance(drink.get("gallons"), (int, float))
+                                  or drink.get("gallons", 0) <= 0
+                                  or not isinstance(drink.get("leaves", ""), str)):
+            problems.append(f"{at}.drink: {{\"spends\": a whole number, \"gallons\": the water "
+                            f"it holds (CRB p.444: a gallon a day), \"leaves\": what is left "
+                            f"in the pack once it is drunk}}.")
     names: dict[str, str] = {}
     for key, row in (d.get("items") or {}).items():
         for n in [key, *((row or {}).get("names") or ())]:
@@ -453,4 +543,5 @@ def validate(d: dict | None = None) -> list[str]:
 
 __all__ = ["CAPACITY", "SIZE_FACTOR", "camp_rule", "can_write", "capacity", "carried",
            "carry_bonus", "doc", "does", "food", "holds", "items", "load",
-           "modifier_specs", "night_scale", "row_for", "spend", "tags", "validate"]
+           "modifier_specs", "night_scale", "portions", "provide", "row_for", "spend",
+           "tags", "validate"]

@@ -894,6 +894,8 @@
         if (before != null && w.clock) C.turnClock(before, w.clock.minute);
         E.say(w.waited ? "You wait " + E.minutes(w.waited) + ". " + w.words + "." : w.words + ".");
         (w.ended || []).forEach(function (t) { E.say(t); });
+        // What the wait cost the body, in the server's words (`Scene.wait`).
+        (w.body || []).forEach(function (t) { E.say(t); });
         return E.refresh();
       }).then(function () {
         core.refocus(["enchant-roll", ".bm[aria-checked='true']"]);

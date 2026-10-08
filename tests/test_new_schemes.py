@@ -59,6 +59,11 @@ def _alone(monkeypatch, sid: str):
     monkeypatch.setattr(schemes, "all_schemes", lambda: {sid: doc})
     s = Scene(location_id=TOWN)
     s.add(load_pc("fixtures/pc-kesst.json"))
+    # A fortnight's water and food in the pack. These schemes are told across days of
+    # `advance_time`, and since 2026-10-08 a wait of a day or more is lived through on
+    # what is carried and stops where the pack runs out (`Scene.wait`): with nothing
+    # carried the second 26-hour wait stopped ten hours in, and the courier never came.
+    s.pc().goods.update({"waterskin": 28, "trail rations": 14})
     e = Engine(s, Dice(seed=3), world=WORLD)
     e.place_party(MARKET)
     inst = schemes.open_scheme(e, doc, turn=1)

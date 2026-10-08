@@ -35,7 +35,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from rules import alchemist as al
 from rules import alchemy_items as items
-from rules import crafting, effectspec, formulae, knowledge, worldclass
+from rules import crafting, effectspec, formulae, knowledge, survival, worldclass
 
 from . import campaign as campaign_mod
 from .apiutil import read_body
@@ -1397,6 +1397,7 @@ def alchemy_collect(request):
     # it), exactly as the circle's Wait for it does (`enchant_wait`); it is refused in a
     # fight, and refused in words for work that is not this craft's or not here.
     waited = 0
+    lived: list[str] = []
     if body.get("wait"):
         if c.scene.in_encounter:
             return _err("You are in a fight. The work will keep until it is over.", 409)
@@ -1408,10 +1409,25 @@ def alchemy_collect(request):
         if left > 0:
             from rules import sky
 
-            c.scene.advance(left)
-            waited = left
-            c.transcript.append({"who": "gm", "kind": "consequence", "text": (
-                f"{pc.name} waits {sky.span_words(left)} for the {row.get('name')}.")})
+            # `Scene.wait`, not `advance`: a wait of a day or more is lived through on
+            # what the pack carries and stops where it runs out (measured 2026-10-08: a
+            # 21-day tannage through `advance` killed a character carrying 40 waterskins,
+            # and this page said only how long they had waited).
+            passed = c.scene.wait(left)
+            waited = int(passed["minutes"])
+            lived = survival.wait_lines(passed, pc.ref)
+            if waited:
+                c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
+                    [f"{pc.name} waits {sky.span_words(waited)} for the {row.get('name')}."]
+                    + lived)})
+            if passed.get("stopped"):
+                if not waited:
+                    c.transcript.append({"who": "gm", "kind": "consequence",
+                                         "text": " ".join(lived)})
+                c.save()
+                return JsonResponse({"said": "", "stopped": passed["stopped"],
+                                     "body": lived, "waited": waited, "clock": _clock(c),
+                                     "works": _works(c, pc), "shelf": _shelf(c, pc)})
         key = str(row["key"])
     got = inprogress.collect(pc, key, now=_now(c), here=getattr(pc, "at", None) or None)
     if waited:
@@ -1431,7 +1447,7 @@ def alchemy_collect(request):
     c.transcript.append({"who": "gm", "kind": "consequence", "text": got["said"]})
     c.save()
     return JsonResponse({"said": got["said"], "product": got.get("product"),
-                         "waited": waited, "clock": _clock(c),
+                         "waited": waited, "body": lived, "clock": _clock(c),
                          "works": _works(c, pc), "shelf": _shelf(c, pc)})
 
 
