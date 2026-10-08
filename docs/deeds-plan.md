@@ -43,14 +43,14 @@ The full sweep is `docs/deeds-prior-art.md`. The decisions it drives:
 |---|---|
 | Ultima IV ran a whole moral system on values of 1 to 5 out of 99 (PA §5); RDR2 shrank petty acts to −1 (PA §6); the book ranks acts as a warning, 1 step, 2 steps, or extreme (PA §11) | **Values from −5 to +5, most of them ±1.** The validator refuses anything outside that fence (§8). |
 | Fallout 3's +50 water bottle erases ten thefts and its −1000 Megaton swamps everything (PA §2) | **No quest-sized value in this counter.** Quests are not deeds here. |
-| Ultima IV judges only the fights the player starts (PA §5); GTA VI's stated rule exempts self-defence and "what a mission demands" (PA §6); atonement makes an unwitting misdeed free and a deliberate one dear (PA §11) | **Intent is read in code, three ways: meant, careless, accident** (§5.3). An accident costs 0 or −1, never more. Fighting back is never a deed. |
+| Ultima IV judges only the fights the player starts (PA §5); GTA VI's rule, as reported, exempts self-defence and what a mission demands (PA §6); atonement makes an unwitting misdeed cheap (the spell, no 2,500 gp) and a deliberate one dear (PA §11) | **Intent is read in code, three ways: meant, careless, accident** (§5.3). An accident costs 0 or −1, never more. Fighting back is never a deed. |
 | RDR2 has no accident rule and its players complain of exactly the owner's "funny accident" (PA §6) | The splash flask's spill and a missed throw's scatter are **accidents**, recorded at 0 (§5.3). |
 | Fallout 2 counts only `source_obj == dude_obj` (PA §1) | **Only the player character's own acts.** A companion's acts are theirs. |
-| Ultima IV's beggar was farmed through a time-only gate; KOTOR had no cooldown; Fallout 4 cools per action (PA §4, §5, §8) | **One counted deed per kind per person per game day**, good and bad alike (§8.2). Repeats are still listed, at 0. |
-| New Vegas cut "killing evil" from 100 to 5 and set ghouls neutral (PA §3); the book never calls killing evil good (PA §11); the MUDs do (PA §12) | **Killing a foe is never a deed**, whatever its alignment. |
+| Ultima IV's beggar was farmed through one shared time-only gate; KOTOR had no cooldown; Fallout 4 cools per action; Horror Adventures counts the time between evil castings (PA §4, §5, §8, §11) | **One counted deed per kind per person per game day**, good and bad alike (§8.2). Repeats are still listed, at 0. |
+| The book never calls killing evil good (PA §11); the MUDs and Fallout do, and Sawyer's New Vegas retune kept it (evil +5, very evil +30, PA §1, §3, §12) | **Killing a foe is never a deed**, whatever its alignment. |
 | RDR2 honor moves unseen; KCD's hidden witness rule reads as a bug; New Vegas keeps witnessed reputation on a separate track (PA §3, §6, §10) | **Witnesses are recorded and never change the value.** What the world knows is the renown system's job (the owner's "renown is a world system"). |
-| Every documented failure in PA §7–9 and §11 came from a meter that gated something | **Nothing reads the total**, and a test holds that line (§8.5). |
-| Sawyer championed visible +1/−1 changes (PA §3) | The sheet shows the number, words, and the list of rows it is the sum of (§9). |
+| The gating failures in PA §7, §8 and §11 (ME2 Charm, KOTOR mastery, Wrath's paladin drift) came from a meter something read; the rest had other causes (PA, "What the sweep says", item 7) | **Nothing reads the total**, and a test holds that line (§8.5). |
+| Sawyer championed visible +1/−1 changes, while saying he was not championing karma (PA §3) | The sheet shows the number, words, and the list of rows it is the sum of (§9). |
 
 ## 3. What exists today (measured)
 
@@ -286,7 +286,7 @@ Every row is a rule row in `content/rules/deeds.json`. The value is **(proposed)
 |---|---|---|---|---|
 | `deed.violence.unprovoked` | **−2** | The player starts violence against a sapient creature that was not hostile: `battle_joined` at such a target, or a harm record (`attitude`, `why: harmed`, `from` not hostile) on one who is meant. | `_op_attack` battle gate (`:5668`); `attitude.harmed` records from the attack, spell and ability doors | Ultima IV's −5 of 99 for attacking a non-hostile (PA §5); the book's 1 step for an execution (PA §11). Started by the player and meant, so it is more than the petty −1. |
 | `deed.violence.careless` | **−1** | The same, but caught by an area aimed at somebody else | spell / ability harm records whose victim is not in `intent.targets()` | Collateral harm is the player's doing but not their aim |
-| `deed.violence.accident` | **0** | The same, by the splash spill or a scattered throw | `_splash_reactions` records with `b is not defender` | The owner's "funny accident". Listed so the player sees it was noticed and forgiven, and costs nothing (atonement's unwitting misdeed, PA §11) |
+| `deed.violence.accident` | **0** | The same, by the splash spill or a scattered throw | `_splash_reactions` records with `b is not defender` | The owner's "funny accident". Listed so the player sees it was noticed and forgiven, and costs nothing (atonement's unwitting misdeed, which skips the 2,500 gp, PA §11) |
 | `deed.kill.unprovoked` | **−3** (with the violence row: **−5** in all) | A sapient creature dies by the player's meant act when it was not hostile, or when the player's `deed.violence.unprovoked` row names it today (§5.2) | `dead` condition records on the player's outcome, or any outcome's for a subject the ledger names | Murder is the gravest act the engine can see. −5 in all is five thefts. Fallout 3 makes it twenty (PA §2), and open point 1 asks. Written on top of the violence row, so one blow and ten blows weigh the same |
 | `deed.kill.careless` | **−1** (−2 in all) | Death from a careless harm | as above | Collateral death weighs more than collateral harm, and much less than murder |
 | `deed.kill.accident` | **−1** | Death from the spill or the scatter | as above | A death is never nothing. The owner's "small" for an accident is −1 |
@@ -306,7 +306,7 @@ Every row is a rule row in `content/rules/deeds.json`. The value is **(proposed)
 | `deed.mercy.subdued` | **+1** | A hostile sapient creature brought down by the player's **nonlethal** damage instead of killed | a `damage` record with `lethality: "nonlethal"` and an `unconscious` condition record on the same ref | Choosing not to kill. RDR1's alive-bounty reward, Ultima's letting a foe go (PA §5, §6). A later execution (`kill.captive` −2) outweighs it |
 | `deed.charity.alms` | **+1** | Coin given freely (`a_gift`, a coin denomination) to a person whose life is tagged `poor` | `_op_give` (`:18055`, `:18432`) | Ultima's beggar: +2 of 99, whatever the amount (PA §5). +1 here, and **per beggar per day**: the gate Ultima lacked |
 | `deed.restitution` | **+1** | The player hands an item to the person the props ledger names as its owner when the record is `stolen` | `_op_give` with `how: "handed"` and the prop's `owner == taker` | Undoing a theft. A player who stole and returns it nets 0 |
-| `deed.spell.good` | **+1** | The player casts a spell with the `[good]` descriptor | `_op_cast` | The book's sidebar: "the same advice applies" to the other descriptors (PA §11). Once a day. Open point 2 |
+| `deed.spell.good` | **+1** | The player casts a spell with the `[good]` descriptor | `_op_cast` | Horror Adventures' sidebar applies its advice to the other alignment descriptors too (PA §11). Once a day. Open point 2 |
 
 **Eighteen rows: twelve bad (one of them always 0) and six good.** The asymmetry is the engine's,
 not a judgement. It sees harm in four doors and kindness in three (heal, first aid, give).
@@ -332,7 +332,7 @@ None of these is read from prose. Each waits on the named engine fact:
   counted once, and corpse-looting is every adventurer's trade (Fallout and the book are silent).
 - **Insults and provocation.** Not deeds. Regard already answers them (`rules/provocation.py`).
 - **Lying (Bluff).** Not a deed. Deception is a skill in 1e; the paladin's code is a class rule,
-  and a class reading this number is the Owlcat defect (PA §11).
+  and a class reading this number is Wrath's paladin drift (PA §11).
 - **Poison use, animate dead's minions acting, curses.** Counted through the cast where the spell
   is `[evil]`; nothing further.
 
@@ -392,8 +392,9 @@ pulled back from dying make you kind.
 - the save (`actor_to_dict`/`from_dict`)
 - the harvest's call to `deeds.record`
 
-Any other reader fails the test. Its docstring names the defect it prevents: every meter in PA
-§7–9 and §11 failed when something read it. It also asserts that `gm/` never names `deeds`, so the
+Any other reader fails the test. Its docstring names the defect it prevents: ME2's Charm options,
+KOTOR's mastery and Wrath's paladin drift all failed because something read the meter (PA §7, §8,
+§11). It also asserts that `gm/` never names `deeds`, so the
 narrator never hears the number.
 
 ## 9. The sheet, the history, the API
@@ -548,27 +549,38 @@ The owner (leatherworking open point 10, 2026-10-08): *"dangerous hides should n
 should force another round of checks to avoid poison, acid or elemental dmg while skinning."*
 
 **What 1e prints** (PA §11's sweep, Part B; the critic pass at the end of the prior-art doc):
-- **Ultimate Wilderness, Harvesting Poisons (p.142)** is the one 1e harvesting rule with a risk
-  to the harvester (https://aonprd.com/Rules.aspx?Name=Harvesting+Poisons&Category=Mastering+the+Wild,
+- **Ultimate Wilderness, Harvesting Poisons (p.142)** is the one 1e rule found for harvesting a
+  *dead* creature with a risk to the harvester (the same section's Milking Venom risks a bite from
+  the *living* donor on a Handle Animal failure by 5) (https://aonprd.com/Rules.aspx?Name=Harvesting+Poisons&Category=Mastering+the+Wild,
   read 2026-10-08). The terms:
   - the check is "Survival check (DC = 15 + the dead creature's CR)", over 10 minutes with
     surgical tools;
   - "Failing the check causes all of the venom to be lost";
   - failing by 5 or more "exposes the harvester to 1d3 doses of the creature's venom unless she
     has the poison use class feature".
-- **Multiple doses** (CRB, Poison, https://www.aonprd.com/Rules.aspx?Name=Poison&Category=Afflictions):
-  "each dose of poison increases the DC to resist the poison by +2. This increase is cumulative,"
-  and each extra dose extends the duration by half.
-- **Ultimate Wilderness's Trophies and Treasures (p.162)** and **the Monster Hunter's Handbook's
-  Harvest Parts** have no hazard rule at all.
-- **Burn (Ex)** hurts whoever strikes the creature with a natural weapon or unarmed attack, with a
-  Reflex save at DC 10 + ½ racial HD + Con (https://www.aonprd.com/UMR.aspx?ItemName=Burn).
+- **Multiple doses** (CRB p.557, Poison, https://www.aonprd.com/Rules.aspx?Name=Poison&Category=Afflictions):
+  "Each additional dose extends the total duration of the poison (as noted under frequency) by
+  half its total duration. In addition, each dose of poison increases the DC to resist the poison
+  by +2." The same paragraph says injury and contact poisons "cannot inflict more than one dose of
+  poison at a time"; Harvesting Poisons' 1d3 doses is the specific rule that overrides it. (The
+  d20pfsrd text of this rule reads differently, with "These increases are cumulative" and stacking
+  only while an earlier dose is still active and the new save failed; its source printing could
+  not be identified. For 1d3 doses arriving at once, both readings give one save at +2 per dose
+  past the first.)
+- **Ultimate Wilderness's Trophies and Treasures (p.162)** (Survival or Heal, DC 15 + CR) and
+  **the Monster Hunter's Handbook's Harvest Parts feat (p.24)** (Craft or Heal) have no hazard rule
+  at all.
+- **Burn (Ex)**: whoever hits the creature with a natural weapon or unarmed attack takes its fire
+  damage automatically, and makes a Reflex save, DC 10 + ½ racial HD + Con, only to avoid catching
+  fire (https://www.aonprd.com/UMR.aspx?ItemName=Burn).
 - **Heat (Ex)**: "its mere touch deals additional fire damage"
   (https://www.aonprd.com/UMR.aspx?ItemName=Heat).
 - **Acid**: the CRB's acid effects deal 1d6 per round of exposure and 10d6 immersed. A flask of
-  acid is 1d6.
-- **No 1e rule speaks of a dead creature's acid or fire.** Extending Burn, Heat and acid to
-  skinning is a house extension, and is said so on the card.
+  acid is 1d6 on a direct hit (Ultimate Equipment p.107,
+  https://www.aonprd.com/EquipmentMiscDisplay.aspx?ItemName=Acid).
+- **No 1e rule found speaks of a dead creature's acid or fire** (none in the three harvesting
+  texts above; a negative across the whole line could not be confirmed). Extending Burn, Heat and
+  acid to skinning is a house extension, and is said so on the card.
 
 ### 13.2 What makes a body dangerous: tags, derived from fields
 
@@ -608,6 +620,9 @@ generic hides are (leatherworking plan §5.3). **It reads stat-block fields, nev
   paragraph's "save Fort DC N", or burn's "(1d8, DC 16)". Otherwise use the universal monster rule
   DC, **10 + ½ HD + Con modifier** (`Engine._rider_dc` already uses this shape with Str,
   `rules/engine.py:12773-12776`; Con is the book's for poison and burn). No DC is authored.
+  Using a saving-throw DC (Fort for poison, burn's Reflex-to-avoid-ignition) as a skill check's DC
+  is **this plan's extension, not the book's**: Harvesting Poisons has no second round, and its
+  one check is Survival at 15 + CR with exposure on failing that check by 5.
 - **Failure exposes. Success is told** ("You work the hide off around the venom sac"). This is
   Harvesting Poisons' shape. The owner asked for a round whose whole purpose is avoidance, so any
   failure exposes, rather than failure by 5 or more **(proposed)**.
@@ -689,8 +704,9 @@ in `content/rules/hazards.json`:
 1. **How heavy is murder?** Proposed: killing somebody who was not hostile is −5 in all (the
    assault −2 plus the death −3), the weight of five thefts. Fallout 3 makes it twenty thefts
    (PA §2). Keep −5, or make it heavier?
-2. **Do evil and good spells count?** The book says casting an `[evil]` spell is an evil act, and
-   one cast is not enough to change anyone (PA §11). Proposed: `[evil]` −1 and `[good]` +1, each
+2. **Do evil and good spells count?** The book (Horror Adventures) says casting an `[evil]` spell
+   is an evil act, one cast is not enough to change anyone, but two typically make a good creature
+   nongood and three make it evil, less so the longer between castings (PA §11). Proposed: `[evil]` −1 and `[good]` +1, each
    at most once a day. This covers 138 and 74 spells. Yes, or leave spells out?
 3. **Which outsiders are "good", and the peoples who are outsiders.**
    - Proposed: either the good subtype or a printed good alignment counts. That is 58 blocks; the
