@@ -245,6 +245,12 @@
    "cold-iron-blanching": {"gear": ["weapon"]},
    "lead-lining": {"gear": ["armour", "shield"]}
   },
+  "_leather_note": "The hand-off with the leather bench (leatherworking plan §4, contracts §11 lane H; owner Q1.3 and the 2026-10-08 answers 1 and 2). `from_base`: suits the forge finishes from a leatherworker's base and from nothing else, the slot the forge fills and what fills it: `studs` (the leather bench's `forge_fittings`, one list for both benches) or `plate` (a plate forged for that suit at Forge). The base is the main piece and keeps its body and whatever slot the forge does not fill; the finished suit's quality is the LOWER of the base's and this Assemble's (owner, answer 2). `laced`: forge suits whose fastenings must be a leatherworker's lacing set (steel lamellar, owner answer 1). Leather stock reaches the forge's rack only in a form that fills a piece: a grip (a weapon's haft), a lacing set (fastenings) or a base (a body); never a raw hide.",
+  "from_base": {
+   "studded leather": {"slot": "fastenings", "takes": "studs"},
+   "armored coat": {"slot": "lining", "takes": "plate"}
+  },
+  "laced": ["steel lamellar"],
   "_alloys_note": "The alloy recipe table (plan §7, Vintage Story's model: a window per component, no quality gradient inside it). Each component is a material id or {\"any\": [...], \"as\": label} for an additive any of several things can supply (carbon for steel). Shares are percent by count across everything in the crucible. Windows are wider than Vintage Story's (bronze 88-92 / 8-12) because a charge here is a handful of bars, not a hundred nuggets; the sweep's strongest finding was 'start generous'. `via: fold` marks an alloy made by folding, not melting. `house: true` marks a recipe with no printed source, borrowed from the material's own text; singing steel follows the PF1e precedent (gold and mithral). A recipe that names a solitary metal is the one way it enters a crucible.",
   "alloys": {
    "steel": {"parts": [{"id": "iron", "min": 75, "max": 90}, {"any": ["charcoal", "coke", "bone-char"], "as": "carbon", "min": 10, "max": 25}]},

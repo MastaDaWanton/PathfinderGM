@@ -101,6 +101,21 @@ FLAWS: dict[str, list[dict]] = {
 # term of its own.
 _FOLDS_INTO_ARMOUR = frozenset({"", "material", "armour", "armor", "untyped"})
 _WEIGHT_CLASSES = ("light", "medium", "heavy")
+# Suits the book names by a piece that is not the body, whose book effects are therefore
+# the suit's (leatherworking plan §4.2, §18.5): the book's bone-studded leather is
+# studded leather whose STUDS are bone — "1 less AC than metal and 1 less check penalty".
+# Measured before (lanes D and E, 2026-10-08): book effects were read from the main piece
+# only, so bone studs' −1 AC and +1 check penalty sat in the fastenings and never applied,
+# and a bone-studded leather suit came out AC 3 and ACP −1, studded leather's own numbers.
+# Keyed by the suit, not by the material: mithral fittings and adamantine buckles carry
+# their metal's whole book too, and on a breastplate's fastenings that book is not the
+# suit's (the forge's main-piece rule, §6.3, stands everywhere else).
+BOOK_PIECES: dict[str, tuple[str, ...]] = {"studded leather": ("fastenings",)}
+# Item numbers a book effect may floor (`"minimum"` on a gear_mod): the book's darkleaf
+# cloth lowers spell failure by 10% "to a minimum of 5%" (Ultimate Equipment; prior art
+# §1.3). Never below what the suit already had: a floor is a limit on the reduction, not
+# a penalty on a suit that started under it.
+_FLOORED = ("asf", "max_dex")
 
 
 # --- the one door to material documents -----------------------------------------------------
@@ -326,6 +341,8 @@ def build(record: dict) -> dict:
     always_masterwork = False
     as_base = ""
     inherited: list[tuple[dict, str]] = []
+    book_slots = (BOOK_PIECES.get(_armour_key_of(base_key)[1] or base_key.strip().lower(), ())
+                  if gear == "armour" and base_key else ())
     for slot in order:
         spec = pieces.get(slot)
         if isinstance(spec, str):
@@ -392,8 +409,9 @@ def build(record: dict) -> dict:
                 inherited.append((eff, slot))
                 continue
             if eff.get("book"):
-                # The book is the main piece's alone, and never scaled (§6.3).
-                if slot == main:
+                # The book is the main piece's alone, and never scaled (§6.3) — save on a
+                # suit the book names by another piece (`BOOK_PIECES`: bone studs).
+                if slot == main or slot in book_slots:
                     book.append(dict(eff, origin=origin, source=mid))
                 continue
             if eff.get("trigger"):
@@ -456,12 +474,16 @@ def build(record: dict) -> dict:
         specs.append(out)
 
     # The book's own numbers: gear deltas join the item's numbers, a strike joins the list.
+    floors: dict[str, int] = {}
     for eff in book:
         kind = str(eff.get("type") or "")
         if kind == "gear_mod":
             target = str(eff.get("target") or "")
             if target in gear_out:
                 gear_out[target] += int(_number(eff.get("amount")) or 0)
+            low = _number(eff.get("minimum"))
+            if target in _FLOORED and low is not None:
+                floors[target] = max(floors.get(target, 0), int(low))
         elif kind == "strikes_as":
             strikes.append(str(eff.get("target") or ""))
 
@@ -561,6 +583,7 @@ def build(record: dict) -> dict:
         "strikes_as": sorted({s for s in strikes if s}),
         "gear": gear_out, "riders": riders, "sum": sums, "masterwork": masterwork,
         "always_masterwork": always_masterwork, "as_base": as_base,
+        "floors": floors,
         "quality_index": quality_index,
         "multipliers": {"quality": round(q_mult, 4), "negative_cut": round(cut, 4)},
         "problems": problems,
@@ -799,6 +822,13 @@ def armour_row(base: dict, b: dict) -> dict:
     row["acp"] = min(0, int(base.get("acp", 0) or 0) + int(g.get("acp", 0) or 0))
     row["max_dex"] = max(0, int(base.get("max_dex", 99) or 0) + int(g.get("max_dex", 0) or 0))
     row["asf"] = max(0, int(base.get("asf", 0) or 0) + int(g.get("asf", 0) or 0))
+    for target, low in (b.get("floors") or {}).items():
+        # A book floor (darkleaf: spell failure "to a minimum of 5%"), never above what
+        # the suit had before the material: padded's 5% stays 5%, leather's 10% stops at
+        # 5%. Measured before: a darkleaf leather suit computed 10 - 10 = 0%.
+        if target in _FLOORED and target in row:
+            had = int(base.get(target, 0) or 0)
+            row[target] = max(int(row[target]), min(had, int(low)))
     row["lb"] = round(float(base.get("lb", 0) or 0)
                       * max(0.0, 1 + int(g.get("weight_pct", 0) or 0) / 100), 2)
     weight = str(base.get("weight") or "light")

@@ -384,7 +384,8 @@ _SLOT_EMPTY = {"ore": "Drop ore here, or press Enter on it in the rack",
                "head": "Drop a blank here, or press Enter on one in the rack",
                "haft": "Drop a haft or grip here, or press Enter on one in the rack",
                "fittings": "Optional: a guard, studs or fittings",
-               "body": "Drop a plate here, or press Enter on one in the rack",
+               "body": "Drop a plate or a leather base here, or press Enter on one in the "
+                       "rack",
                "fastenings": "Drop fastenings here, or press Enter on them in the rack",
                "lining": "Optional: a lining or binding"}
 
@@ -976,9 +977,12 @@ def forge_finish(request):
     for _key, w, _n in landed:
         if _first(progress, f"made:{w.form}"):
             bonus(f"first {w.form}")
+    # The smith's own materials: a leather base, grip or lacing set is the tanner's work,
+    # learned at the leather bench (lane F's Grade), so fitting it pays no "first work
+    # with Deer Hide" and reveals none of the hide's traits as the smith's discovery.
     worked = []
     for p, _ in plan.consumes:
-        if p.material and p.material not in worked:
+        if p.material and p.material not in worked and not p.from_leather:
             worked.append(p.material)
     for mid in worked:
         if _first(progress, f"metal:{mid}"):
@@ -1187,7 +1191,10 @@ def forge_material(request, material_id: str):
             "biomes": list(m.doc.get("biomes") or []),
             "assay_minutes": int((bs.method_row("assay") or {}).get("minutes", 10)),
             "assay_cost": None,
-            "smiths_here": smiths_here(c, pc)}
+            # Nobody at the forge teaches a hide (`_not_the_smiths`): the card offers no
+            # smith for it, and says where to ask instead.
+            "smiths_here": [] if _not_the_smiths(kn, m) else smiths_here(c, pc),
+            "ask_elsewhere": _not_the_smiths(kn, m)}
     if kn is not None:
         try:
             card["properties"] = list(kn.properties(pc, m.doc))
@@ -1223,6 +1230,29 @@ def _danger_words(effect: dict | None) -> str:
     if " " not in line.strip():
         return note
     return f"{line}: {note}" if note else line
+
+
+def _not_the_smiths(kn, m) -> str:
+    """Why a smith will not teach this material, in words, or "" when they will.
+
+    Each material answers to one craft's rows (`knowledge.craft_of`): a hide, a tannin,
+    an oil, a wax, a thread or a dye to the LEATHERWORKER's, whose teacher is a tanner at
+    the leather bench (play/leather_views.py `leather_ask`). Measured before (lane F,
+    2026-10-08): this route always used the smith's rows whatever was asked about, so a
+    blacksmith took the smith's price, taught deer hide from the smith's lesson table and
+    paid Blacksmith mastery for it."""
+    if kn is None or not hasattr(kn, "craft_of"):
+        return ""
+    try:
+        craft = kn.craft_of(m.doc)
+    except Exception:      # noqa: BLE001 - an odd document is the smith's, as before
+        return ""
+    if craft == getattr(kn, "BLACKSMITH", "blacksmith"):
+        return ""
+    if craft == getattr(kn, "LEATHERWORKER", "leatherworker"):
+        return (f"{m.name} is a tanner's material, not a smith's: show it to a "
+                f"leatherworker at the leather bench.")
+    return f"{m.name} is not a smith's material: a smith cannot teach it."
 
 
 def smiths_here(c, pc) -> list[dict]:
@@ -1269,6 +1299,9 @@ def forge_ask(request):
     m = bs.metal(str(body.get("material") or "").strip().lower())
     if m is None:
         return _err("There is no such material.", 404)
+    elsewhere = _not_the_smiths(kn, m)
+    if elsewhere:
+        return _err(elsewhere, 400)
     ref = str(body.get("ref") or "")
     if not any(t["ref"] == ref for t in smiths_here(c, pc)):
         return _err("Nobody here by that name knows metals.", 400)
