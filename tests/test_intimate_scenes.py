@@ -311,7 +311,17 @@ def test_the_path_is_the_data_folders_not_the_bundles(data):
     assert not intimate.demonstrations_path().is_relative_to(Path(intimate.__file__).parent.parent)
 
 
-def test_the_file_is_created_holding_only_a_header(data):
+def _no_shipped(monkeypatch, tmp_path):
+    """The app ships passages of its own since 2026-10-08 (content/style/intimate.txt), so
+    a test of "nothing on file anywhere" has to say so: before then the shipped file was a
+    header, and these tests passed by accident of that."""
+    empty = tmp_path / "shipped-empty.txt"
+    empty.write_text("# nothing shipped\n", encoding="utf-8")
+    monkeypatch.setattr(intimate, "shipped_path", lambda: empty)
+
+
+def test_the_file_is_created_holding_only_a_header(data, monkeypatch, tmp_path):
+    _no_shipped(monkeypatch, tmp_path)
     d = intimate.read_demonstrations()
     path = intimate.demonstrations_path()
     assert path.exists() and d.examples == [] and d.chars == 0
@@ -610,7 +620,8 @@ def test_an_ordinary_beat_through_the_view_injects_nothing(live, monkeypatch):
     assert _prose_row(cm)["intimate"]["fired"] is False
 
 
-def test_an_empty_file_is_logged_and_the_briefing_still_fires(live, monkeypatch):
+def test_an_empty_file_is_logged_and_the_briefing_still_fires(live, monkeypatch, tmp_path):
+    _no_shipped(monkeypatch, tmp_path)
     cm, c = live
     beat = "Mira answers you without a word, and the two of you go on. " * 12 + "What?"
     r, seen = _say(monkeypatch, beat, "We go all the way")
@@ -735,3 +746,13 @@ def test_the_shipped_file_is_in_the_bundle_and_never_on_file():
     assert intimate.shipped_path().exists()
     spec = (Path(settings.BASE_DIR) / "pathfindergm.spec").read_text(encoding="utf-8")
     assert '"style"' in spec
+
+
+def test_the_shipped_passages_parse_whole_and_clean():
+    """The app's own passages (written 2026-10-08): every one under the narrator's 3,000
+    characters, none naming a person that would leak into play, each answering a line of
+    its own so no two teach the same opening."""
+    ps, skipped = intimate.parse(intimate.shipped_path().read_text(encoding="utf-8"))
+    assert len(ps) >= 5 and skipped == []
+    assert intimate.warnings_for(ps) == []
+    assert len({p.player for p in ps}) == len(ps)
