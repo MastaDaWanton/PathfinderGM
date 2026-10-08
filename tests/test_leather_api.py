@@ -138,6 +138,8 @@ def test_every_leather_route_reaches_the_leather_views():
                        ("/api/leather/collect", "leather_collect"),
                        ("/api/leather/grade", "leather_grade"),
                        ("/api/leather/perks", "leather_perks"),
+                       ("/api/leather/ask", "leather_ask"),
+                       ("/api/leather/manual", "leather_manual"),
                        ("/api/leather/ledger", "leather_ledger"),
                        ("/api/leather/material/deer-hide", "leather_material")):
         assert resolve(path).func.__name__ == view, path
@@ -322,3 +324,64 @@ def test_hostile_bodies_never_500(client):
                      {"key": {"a": 1}}, {"batch": "many", "method": "salt"}):
             r = client.post(url, data=json.dumps(body), content_type="application/json")
             assert r.status_code < 500, (url, body, r.content[:200])
+
+
+# --- lane F's rows: the tanner's lesson and the manuals ------------------------------------------
+
+def _lane_f():
+    from rules import knowledge
+
+    if not getattr(knowledge, "LEATHERWORKER", None) or not hasattr(knowledge, "read_manual"):
+        pytest.skip("lane F (rules/knowledge.py LEATHERWORKER) is not merged on this tree")
+    return knowledge
+
+
+def test_grade_compares_a_hide_by_its_creature_type_through_lane_f(client):
+    """Plan §16: Grade is lane F's `knowledge.grade` (a quarter unit, -1 DC for each known
+    hide of the same creature type), called by the bench and never duplicated. Measured
+    before lane F: grading a hide was the forge's assay, a tenth of a bar."""
+    kn = _lane_f()
+    _carry(deer_hide=1)
+    r = post(client, "/api/leather/grade", {"material": "deer-hide", "face": 20})
+    assert r.status_code == 200, r.content[:300]
+    assert r.json()["dc"] == kn.study_dc(kn.material("deer-hide"))
+
+
+def test_a_tanner_teaches_on_the_leatherworkers_rows(client, monkeypatch):
+    """Lane F's finding: every leather material answered to the SMITH's rows, so a
+    blacksmith taught deer hide. The leather bench asks a tanner, at the tanner's price,
+    and nobody who is not one."""
+    kn = _lane_f()
+    from rules.bestiary import instantiate
+
+    c = cm.current()
+    tanner = instantiate("thug", scene=c.scene, name="Hollin")
+    c.scene.add(tanner)
+    c.save()
+    assert post(client, "/api/leather/ask",
+                {"material": "deer-hide", "ref": tanner.ref}).status_code == 400
+    monkeypatch.setattr(kn, "teaches", lambda person, rec=None, craft=None:
+                        craft == kn.LEATHERWORKER and person.name == "Hollin")
+    rows = client.get("/api/leather/material/deer-hide").json()["tanners_here"]
+    assert [r["name"] for r in rows] == ["Hollin"]
+    r = post(client, "/api/leather/ask", {"material": "deer-hide", "ref": tanner.ref})
+    assert r.status_code == 200, r.content[:300]
+    price = int(kn.lore(kn.LEATHERWORKER)["teacher"]["price_cp"])
+    assert r.json()["refused"] or r.json()["paid"] == leather_views._coins(price)
+
+
+def test_a_leatherworking_manual_teaches_and_pays_its_mastery_once(client):
+    """Plan §16-17.3: an unread leatherworking manual pays +5 once (lane F's
+    `knowledge.read_manual`). Before it, only the herb bench read a manual at all."""
+    kn = _lane_f()
+    manual = next(iter(kn.manuals(kn.LEATHERWORKER).values()))
+    _pc().goods[manual["name"]] = 1
+    cm.current().save()
+    first = post(client, "/api/leather/manual", {"item": manual["id"]})
+    assert first.status_code == 200, first.content[:300]
+    assert first.json()["first"] and first.json()["revealed"]
+    assert sum(l["mp"] for l in first.json()["mastery"]["lines"]) == 5
+    again = post(client, "/api/leather/manual", {"item": manual["id"]})
+    assert again.status_code == 200 and not again.json()["first"]
+    assert not again.json()["mastery"]["lines"]
+    assert post(client, "/api/leather/manual", {"item": "no such book"}).status_code == 400

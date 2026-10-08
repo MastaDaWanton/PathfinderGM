@@ -18,8 +18,9 @@ One step is three requests, as at the forge:
           the materials are spent, a vat's rent is paid as the hides go in, a tannage that
           waits goes In progress (rules/inprogress.py), mastery and discoveries are paid.
 
-Collect (a tannage's cut test, plan §8.3), grade (the leather assay, plan §16), perks, the
-ledger and a material's card are single requests. Nothing is spent between roll and finish:
+Collect (a tannage's cut test, plan §8.3), grade (lane F's `knowledge.grade`, plan §16),
+ask a tanner and read a manual (lane F's leatherworker rows), perks, the ledger and a
+material's card are single requests. Nothing is spent between roll and finish:
 the token holds a reservation in this process's memory, and a reload, a crash or a second
 roll lets it go with the materials untouched.
 """
@@ -1000,9 +1001,20 @@ def leather_grade(request):
                                visibility="player").faces[0]
     total = face + bonus_v
     now = _now(c)
-    got = dict(kn.assay(pc, mid, total, clock=now) or {})
+    creature = (src.hide.creature if src.hide is not None else "") or None
+    # Lane F's `knowledge.grade` (plan §16): the leather assay — a quarter unit, ten
+    # minutes, one benefit and one drawback, -1 DC for each known hide of the same CREATURE
+    # TYPE (the creature a generic hide came from passed in). Called, never duplicated;
+    # the forge's assay answers only on a tree where lane F is not merged yet.
+    try:
+        if hasattr(kn, "grade"):
+            got = dict(kn.grade(pc, mid, total, clock=now, creature=creature) or {})
+        else:
+            got = dict(kn.assay(pc, mid, total, clock=now) or {})
+    except ValueError as exc:
+        return _err(str(exc))
     paid = lw.pay_grade(pc, src, now)
-    minutes = int((lw.method_row("grade") or {}).get("minutes", 10))
+    minutes = int(got.get("minutes") or (lw.method_row("grade") or {}).get("minutes", 10))
     c.scene.advance(minutes)
     revealed = list(got.get("revealed") or [])
     lines: list[dict] = []
@@ -1118,4 +1130,172 @@ def leather_material(request, material_id: str):
             card["grade_dc"] = int(kn.assay_dc(doc, pc))
         except Exception:      # noqa: BLE001 - the card shows what it can
             pass
+    card["tanners_here"] = tanners_here(c, pc)
     return JsonResponse(card)
+
+
+# --- teachers and manuals (plan §16; lane F's knowledge rows) ----------------------------------
+
+def _craft(kn) -> str | None:
+    """Lane F's `knowledge.LEATHERWORKER`: the tanner's own rule rows (leatherworking-
+    lore.json: tanner teachers, libraries, Grade, manual mastery). None on a tree without
+    them, and then the routes below say so rather than teach with the smith's rows — the
+    forge's teacher route reads only the smith's (`forge_views.forge_ask`), which is what
+    lane F found taught deer hide at the forge."""
+    craft = getattr(kn, "LEATHERWORKER", None) if kn is not None else None
+    if not craft:
+        return None
+    try:
+        kn.lore(craft)
+    except Exception:          # noqa: BLE001 - no rule file: not in this build
+        return None
+    return craft
+
+
+def tanners_here(c, pc) -> list[dict]:
+    """Everybody standing here who knows hides (UI plan §6.7, "Ask a tanner"): a tanner by
+    trade, or somebody whose own words say so (lane F's `knowledge.teaches` with the
+    leatherworker's rows). Named, never reffed on the page; the ref is what is posted back."""
+    kn = lw._lane("knowledge")
+    craft = _craft(kn)
+    if craft is None or not hasattr(kn, "teaches"):
+        return []
+    from rules import population
+
+    try:
+        price = _coins(int(kn.lore(craft)["teacher"]["price_cp"]))
+    except Exception:      # noqa: BLE001
+        price = ""
+    out = []
+    for ref, a in (getattr(c.scene, "actors", None) or {}).items():
+        if a is pc or getattr(a, "is_pc", False) or getattr(a, "is_down", False):
+            continue
+        try:
+            if kn.teaches(a, population.of_ref(c.scene, ref), craft):
+                out.append({"ref": ref, "name": a.name, "price": price})
+        except Exception:      # noqa: BLE001 - one odd record is no reason to lose the card
+            continue
+    return out
+
+
+@require_POST
+def leather_ask(request):
+    """Show a material to a tanner and pay them to tell you about it (UI plan §6.7), the
+    forge's Ask on the LEATHERWORKER's rows (price, minutes, how much each attitude step
+    tells). Below indifferent they refuse in words. A point for each property taught
+    (`worldclass.STUDY_MP`: a lesson is a study)."""
+    from rules import attitude, goods
+
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    kn = lw._lane("knowledge")
+    craft = _craft(kn)
+    if craft is None or not hasattr(kn, "lesson_order"):
+        return _err("Asking a tanner is not available in this build yet.", 501)
+    body = read_body(request)
+    doc = lw.material(str(body.get("material") or "").strip().lower())
+    if doc is None:
+        return _err("There is no such material.", 404)
+    name = str(doc.get("name") or doc.get("id"))
+    ref = str(body.get("ref") or "")
+    if not any(t["ref"] == ref for t in tanners_here(c, pc)):
+        return _err("Nobody here by that name knows hides.", 400)
+    person = c.scene.actors[ref]
+    who = person.name[:1].upper() + person.name[1:]
+    rules = kn.lore(craft)["teacher"]
+    size = kn.lesson_size(person, craft)
+    if not size:
+        hostile = attitude.of(person) == attitude.HOSTILE
+        said = (f"{who} wants nothing to do with you and will not say a word about {name}."
+                if hostile else
+                f"{who} has no wish to help you, and keeps what they know of {name} to "
+                f"themselves.")
+        c.transcript.append({"who": "gm", "kind": "consequence", "text": said})
+        c.save()
+        return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})
+    order = kn.lesson_order(pc, doc)[:size]
+    if not order:
+        return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
+                             "refused": f"{who} has nothing to tell you about {name} you "
+                                        f"do not know."})
+    cp = int(rules["price_cp"])
+    purse, ok = goods.spend(pc.purse, cp)
+    if not ok:
+        return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
+                             "refused": f"{who} asks {_coins(cp)}, and you cannot pay it."})
+    pc.purse = purse
+    person.purse = goods.credit(getattr(person, "purse", None) or {}, cp)
+    minutes = int(rules["minutes"])
+    c.scene.advance(minutes)
+    keys = kn.reveal(pc, doc["id"], kn.with_gates(doc, order),
+                     f"taught by {person.name}, day {kn.day_of(c.scene.clock_minutes)}")
+    rows = {r.get("key"): r for r in kn.properties(pc, doc)}
+    revealed = [{"key": k, "text": str((rows.get(k) or {}).get("text") or ""),
+                 "row": rows.get(k)} for k in keys]
+    track, progress = _progress(pc)
+    lines: list[dict] = []
+    levelled: list[int] = []
+    for f in revealed:
+        res = worldclass.award_bonus(track, progress, mp=worldclass.STUDY_MP,
+                                     why=f"studied {name}: {f['text']}" if f["text"]
+                                     else f"studied {name}")
+        lines.extend(res.get("reasons") or [])
+        levelled.extend(res.get("levelled") or [])
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": (
+        f"{who} looks over the {name} and tells you: "
+        + "; ".join(f["text"] or f["key"] for f in revealed) + f". ({_coins(cp)} paid.)")})
+    c.save()
+    return JsonResponse({"revealed": revealed, "paid": _coins(cp), "minutes": minutes,
+                         "refused": "", "clock": _clock(c),
+                         "mastery": {"lines": lines, "total": progress.mp,
+                                     "level": progress.level, "levelled": levelled}})
+
+
+@require_POST
+def leather_manual(request):
+    """Read a leatherworking manual the character has with them (plan §16): lane F's
+    `knowledge.read_manual` learns what it teaches and says the mastery a first reading is
+    worth (`manual.mastery`, 5, once); this view passes the hours through the one clock door
+    and pays that mastery on the Leatherworker track. Before it, only the herb bench read a
+    manual at all, and only herbal ones."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    if c.scene.in_encounter:
+        return _err("You are in a fight. The book waits until it is over.", 409)
+    kn = lw._lane("knowledge")
+    craft = _craft(kn)
+    if craft is None or not hasattr(kn, "read_manual"):
+        return _err("Reading a leatherworking manual is not available in this build yet.",
+                    501)
+    body = read_body(request)
+    manual = kn.manual_named(str(body.get("item") or body.get("manual") or ""), craft)
+    if manual is None:
+        return _err("There is no such leatherworking manual.", 400)
+    if not kn.holds_manual(pc, manual):
+        return _err(f"{pc.name} does not have {manual.get('name')}.", 400)
+    got = dict(kn.read_manual(pc, manual, clock=_now(c)) or {})
+    minutes = int(got.get("minutes") or 60)
+    c.scene.advance(minutes)
+    revealed = []
+    for mid, keys in (got.get("revealed") or {}).items():
+        doc = lw.material(mid)
+        rows = {r.get("key"): r for r in kn.properties(pc, doc)} if doc else {}
+        for k in keys:
+            revealed.append({"material": mid, "name": lw.doc_name(mid), "key": k,
+                             "text": str((rows.get(k) or {}).get("text") or "")})
+    track, progress = _progress(pc)
+    mastery = {"lines": [], "total": progress.mp, "level": progress.level, "levelled": []}
+    if int(got.get("mp") or 0):
+        res = worldclass.award_bonus(track, progress, why=f"read {manual.get('name')}",
+                                     mp=int(got["mp"]))
+        mastery = {"lines": res.get("reasons") or [], "total": res.get("total"),
+                   "level": res.get("level"), "levelled": res.get("levelled") or []}
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": (
+        f"{pc.name} reads {manual.get('name')} ({minutes // 60} hours)"
+        + (f" and learns {len(revealed)} thing{'s' if len(revealed) != 1 else ''} about "
+           f"hides and the tanner's stores." if revealed else ", and finds nothing new in it."))})
+    c.save()
+    return JsonResponse({"revealed": revealed, "first": bool(got.get("first")),
+                         "mastery": mastery, "minutes": minutes, "clock": _clock(c)})

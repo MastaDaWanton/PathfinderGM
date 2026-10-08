@@ -170,6 +170,8 @@ urlpatterns = [
     path("api/leather/collect", leather_views.leather_collect, name="leather_collect"),
     path("api/leather/grade", leather_views.leather_grade, name="leather_grade"),
     path("api/leather/perks", leather_views.leather_perks, name="leather_perks"),
+    path("api/leather/ask", leather_views.leather_ask, name="leather_ask"),
+    path("api/leather/manual", leather_views.leather_manual, name="leather_manual"),
     path("api/leather/ledger", leather_views.leather_ledger, name="leather_ledger"),
     path("api/leather/material/<str:material_id>", leather_views.leather_material,
          name="leather_material"),
