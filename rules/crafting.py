@@ -384,6 +384,17 @@ def from_stock_dict(d: dict) -> Stock:
         from . import alchemy_items
 
         return alchemy_items.stock_item(d)
+    # A forge-shape record (pieces and a gear kind: the forge's, and every leatherworker
+    # product since the leather revamp, plan §13.1) keeps its record whole, its `base` the
+    # TABLE key. Read here as `sheet._stock` reads it on load, because the bench's output
+    # door (`play/craft_views.py`) comes through this function and not that one. Measured
+    # (leatherworking inventory §0.1): a crafted suit through here became a plain Stock
+    # whose `base` is its name — the field the engine's wear reads first — so the suit was
+    # "not built on any suit the rules know ('Deer Armour')".
+    from . import forge_items
+
+    if forge_items.is_forged(d):
+        return forge_items.stock_item(d)
     # `specs` absent is not the same as `specs` empty. Absent means the jar predates the
     # field and its structure has to be rebuilt; empty means a jar whose every effect was
     # prose, or one the chain purified down to nothing, and rebuilding *that* would hand

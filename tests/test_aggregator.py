@@ -318,21 +318,29 @@ def test_an_authored_touch_ac_bonus_reaches_touch_ac():
     assert a.touch_ac() == before + 2
 
 
-def test_a_crafted_hide_that_says_armour_is_typed_armour():
-    """Thirteen leatherworker specs carried notes reading "worked into armour" and a
-    potion's note read "as an armour bonus — it does not stack with worn armour", and
-    every one of them was typed `untyped`. The note and the type disagreed, and the
-    type is what the stacking rule reads."""
-    import json
-    from pathlib import Path
+def test_a_hides_ac_folds_into_the_suit_it_is_worked_into(monkeypatch):
+    """Re-pinned by leather lane B (leatherworking plan §18.3). It pinned that thirteen
+    hide specs noted "worked into armour" were typed `armour` — which made them a second
+    armour bonus beside the suit's, and best-of-type swallowed them: measured (inventory
+    §0.2), a bulette-plate suit at +5 armour-typed AC came out as leather's 2, and the 13
+    did nothing on any suit. Under the forge's model a hide's AC is a `material` modifier
+    in its `armour` list, and the build folds it INTO the suit's armour bonus: one term,
+    the table row plus the build's AC line. (`armour` still folds too, so the legacy
+    typing is harmless while lane D rewrites the documents.)"""
+    from rules import forge_items
 
-    raw = Path("content/materials/leatherworker-materials.json").read_text(
-        encoding="utf-8")
-    specs = [spec for entry in json.loads(raw).get("materials", [])
-             for spec in (entry.get("effects") or [])
-             if spec.get("type") == "combat_mod" and spec.get("target") == "ac"
-             and "armour" in str(spec.get("note") or "").lower()]
-    assert specs, "the crafted hides moved; update this test"
-    assert all(s.get("bonus_type") == "armour" for s in specs), (
-        "a hide worked into armour grants an armour bonus, and armour bonuses do not "
-        "stack with the armour it is worked into")
+    doc = {"id": "test-hide", "name": "Test hide", "kind": "hide",
+           "armour": [{"type": "combat_mod", "target": "ac", "amount": 2,
+                       "bonus_type": "material"}]}
+    monkeypatch.setattr(forge_items, "material", lambda mid: doc if mid == "test-hide" else None)
+    a = _plain("leather")
+    rec = {"id": "test-suit", "name": "Test Suit", "gear": "armour", "base": "leather",
+           "slot": "armor", "craft": "leatherworker", "quality_index": 1,
+           "pieces": {"body": {"material": "test-hide"}}, "smith": {"level": 1}}
+    a.slot_list("armor")[0] = "Test Suit"
+    a.worn["test suit"] = rec
+    armour_terms = [m for m in a.ac_modifiers() if m.type == "armour"]
+    assert [(m.source, m.value) for m in armour_terms] == [("Test Suit", 2 + 2)]
+    for typed in ("material", "armour", "untyped", ""):
+        assert forge_items._folds_into_armour(
+            {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": typed})

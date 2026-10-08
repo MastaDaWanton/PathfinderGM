@@ -1610,11 +1610,12 @@ CATEGORIES: list[Category] = [
 # True for them; the honesty ratchet refuses that while nothing reads them, exactly as it
 # refused the enchanting ten. Lane B deletes a line when its reader lands, and lists the
 # type in tests/test_effectspec_extensions.py's `already` (or `Engine._EXECUTES`).
-AWAITING_READER: dict[str, str] = {
-    "object_immunity": "Item.take_damage (rules/sheet.py) and Engine._object_damage "
-                       "(rules/engine.py), leather lane B",
-    "as_base": "forge_items.build and armour_row (rules/forge_items.py), leather lane B",
-}
+#
+# Emptied again by leather lane B (2026-10-08): `object_immunity` is read by
+# `forge_items.object_immunities` into `Actor.damage_item` -> `Item.take_damage` (so every
+# sunder, acid splash and `Engine._object_damage` meets it), and `as_base` by
+# `forge_items.build` and `armour_row` (and `object_numbers` for the suit's hit points).
+AWAITING_READER: dict[str, str] = {}
 # A type whose reader runs some targets and not others (contracts §2.2: speed "targets land,
 # climb, swim, fly, jump. Lane C wires the readers"). `executable` asks per spec, so a
 # potion of longstrider runs and a potion of fly is narrated with the reason named. Lane C
@@ -1632,14 +1633,11 @@ AWAITING_READER: dict[str, str] = {
 # (`magic_layer._price`, beside the material surcharges of `_surcharges`), which takes a
 # vessel's book `enchant_cost_pct` whose `applies_to` is the property's family
 # (`cost_family_of`); contracts §6.3 puts it with the Enchanting lanes, not this craft.
+# Wired by leather lane B (2026-10-08): `magic_layer._discounts`, beside `_surcharges`.
 TARGETS_AWAITING_READER: dict[str, dict[str, str]] = {
     "speed": {
         "burrow": "a burrow speed read by movement (nothing moves a body through earth "
                   "yet)",
-    },
-    "gear_mod": {
-        "enchant_cost_pct": "the Enchanting price (magic_layer._price), applying the "
-                            "discount to properties of its applies_to family",
     },
 }
 for _cat in CATEGORIES:

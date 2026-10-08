@@ -30,7 +30,10 @@ How the numbers are found, in order:
    change of N per inch is N/30 of the row's hit points, rounded toward zero like every
    forge number (the owner's ruling of 2026-10-03): adamantine's +10 is the book's "one-
    third more hit points than normal" (CRB p.154), and a house ±2 leaves a 5-hit-point
-   blade alone.
+   blade alone. A HIDE's documents state theirs as a change from leather's own row
+   (hardness 2, 5 per inch): a thing whose body is leather reads its per-inch step against
+   5 (leatherworking plan §15, dragonhide's 10 per inch is +5), and a worn good or a madu,
+   which Table 7-12 has no row for, still takes its build's numbers on its inch of leather.
 3. **Its enhancement.** "+2 hardness and +10 hit points for each +1" (CRB p.174).
 
 Anything Table 7-12 has no row for — a cloak, a rope, a ring, a whip, arrows — keeps the
@@ -117,6 +120,10 @@ def _gear_and_base(name: str, rec: dict | None) -> tuple[str, str]:
     if forge_items.is_forged(rec):
         gear = str(rec.get("gear") or "weapon")
         base = str(rec.get("base") or rec.get(gear) or "")
+        if gear == "worn":
+            # A leatherworker's cloak or boots: no Table 7-12 row, so an inch of what its
+            # body is made of (`numbers` reads the pieces for it).
+            return "worn", base
         if gear in ("armour", "shield"):
             kind, key = armour_mod.key_for(base)
             return (gear, key) if key else ("", "")
@@ -237,6 +244,23 @@ def _named_material_deltas(name: str, gear: str, base: str) -> tuple[int, int, l
     return 0, 0, []
 
 
+def _made_deltas(rec: dict, material: str, hard: int, hp: int) -> tuple[int, int, list[str]]:
+    """(hardness, hit points, the reasons) of a forged thing with no Table 7-12 row — a
+    worn good, a madu — moved by its build's own numbers, its per-inch step read against
+    the inch of `material` it is (a hide's from leather's 5, a metal's from steel's 30)."""
+    from . import forge_items
+
+    made = forge_items.build(rec).get("gear") or {}
+    d_hard = int(made.get("hardness", 0) or 0)
+    d_inch = int(made.get("hp_per_inch", 0) or 0)
+    said = []
+    if d_hard or d_inch:
+        said.append(f"its making: hardness {d_hard:+d}, hit points {d_inch:+d} per inch")
+    per_inch = substance_numbers(material)[1] if material in ("leather", "hide") \
+        else DOCUMENT_BASE_HP_PER_INCH
+    return hard + d_hard, hp + _toward_zero(hp * d_inch / per_inch), said
+
+
 def numbers(name: str, record: dict | None = None) -> Numbers:
     """The object numbers of a thing called `name`, read from `record` when it has one."""
     from . import forge_items
@@ -262,13 +286,25 @@ def numbers(name: str, record: dict | None = None) -> Numbers:
         material = (named or _table_material(pieces, main, name) if pieces
                     else named or material_for(str((rec or {}).get("name") or name)))
         hard, hp = substance_numbers(material)
-        return Numbers(hardness=hard, hp_max=hp, material=material, row="",
-                       why=(f"an inch of {material} (CRB Table 7-13)",))
+        why = [f"an inch of {material} (CRB Table 7-13)"]
+        if gear in ("worn", "shield", "armour") and forge_items.is_forged(rec):
+            # A leatherworker's cloak or madu has no Table 7-12 row, but its hide still says
+            # what it does to the thing, as it says it for a suit (`_made_deltas`).
+            hard, hp, said = _made_deltas(rec, material, hard, hp)
+            why += said
+        return Numbers(hardness=max(0, hard), hp_max=max(1, hp), material=material, row="",
+                       why=tuple(why))
 
     material = named or _table_material(pieces, main, name)
     why: list[str] = []
+    per_inch_base = DOCUMENT_BASE_HP_PER_INCH
     if row_name == "armor":
-        bonus = int(ARMOUR[base].get("ac") or 0)
+        # Bulette leather "has the same statistics as studded leather" (`as_base`), its
+        # hit points among them: armour bonus 3 x 5, not leather's 2 x 5.
+        stats = base
+        if forge_items.is_forged(rec):
+            stats = str(forge_items.build(rec).get("as_base") or base)
+        bonus = int(ARMOUR[stats].get("ac") or 0)
         hp = bonus * int(row["hp_per_armour_bonus"])
         # The body's SUBSTANCE, not its special metal: the material documents state their
         # hardness as a step from steel (mithral +5), so reading mithral's own 15 here and
@@ -276,6 +312,13 @@ def numbers(name: str, record: dict | None = None) -> Numbers:
         # had (an adamantine blade at 29 hardness).
         plain = _SUBSTANCE_ROW.get(_substance(pieces.get(main, ""))) or material_for(name)
         hardness = substance_numbers(plain)[0]
+        # A hide's documents state their steps from LEATHER (Table 7-13: hardness 2, 5 hit
+        # points per inch), as a metal's state them from steel: dragonhide's book hardness
+        # 10 and 10 per inch are +8 and +5 (leatherworking plan §15). So a leather body's
+        # per-inch step is a fraction of leather's 5, not of steel's 30 — read off steel, a
+        # +5 would have moved a 10-hit-point leather suit by one.
+        if plain in ("leather", "hide"):
+            per_inch_base = substance_numbers(plain)[1]
         why.append(f"armour: its armour bonus {bonus} x 5 hit points, hardness of "
                    f"{plain} (CRB Tables 7-12, 7-13)")
     else:
@@ -292,7 +335,7 @@ def numbers(name: str, record: dict | None = None) -> Numbers:
         d_hard, d_inch, said = _named_material_deltas(name, gear, base)
         why += said
     hardness += d_hard
-    hp += _toward_zero(hp * d_inch / DOCUMENT_BASE_HP_PER_INCH)
+    hp += _toward_zero(hp * d_inch / per_inch_base)
 
     plus = _enhancement(name, rec, gear)
     if plus:

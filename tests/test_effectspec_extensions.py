@@ -681,6 +681,12 @@ def test_every_executable_type_has_something_that_executes_it():
         # `Actor.concealment`), and clinging fire through `Engine._op_burn` and
         # `_op_extinguish`. tests/test_alchemy_engine.py drinks and throws each.
         "sense", "permission", "light", "burning",
+        # The leatherworker's two (leather lane B, 2026-10-08; effectspec's comment above
+        # the emptied `AWAITING_READER` names each reader): an item immune to one energy
+        # (`forge_items.object_immunities` -> `Actor.damage_item` -> `Item.take_damage`), and
+        # a suit that takes another row's statistics (`forge_items.armour_row`).
+        # tests/test_leather_items.py burns a red dragonhide suit and wears a bulette one.
+        "object_immunity", "as_base",
     }
     claimed = {t.id for c in fx.CATEGORIES for t in c.types if t.engine}
     assert claimed - runs - already == set(), \

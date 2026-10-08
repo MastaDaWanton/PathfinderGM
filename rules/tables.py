@@ -640,6 +640,26 @@ ARMOUR: dict[str, dict] = {
                    "weight": "heavy", "lb": 50, "asf": 40, "don": "plate"},
     "full plate": {"name": "full plate", "cost_gp": 1500, "ac": 9, "max_dex": 1, "acp": -6,
                    "weight": "heavy", "lb": 50, "asf": 35, "don": "plate"},
+    # The leatherworker's suits beyond Table 6-6 (leatherworking plan §4.2, §13.2; contracts
+    # §4.2), read 2026-10-08 off the Archives of Nethys armour tables
+    # (aonprd.com/EquipmentArmor.aspx?Category=Light and =Medium; Advanced Player's Guide and
+    # Ultimate Equipment). Before them the bench could emit only `leather` or `studded
+    # leather`, and a suit the book prints had no row to be worn by (questions doc, "Book
+    # versus catalogue" 9). Leather lamellar is light in AoN's table and "Medium" on its own
+    # item page; the table is followed (prior art §1.2). Not modelled: quilted cloth's DR
+    # against small ranged piercing and the armoured coat's move-action don over other armour
+    # (both book riders; the coat is timed with the light suits, HOUSE, until a donning rule
+    # can say "a move action" for a suit).
+    "quilted cloth": {"name": "quilted cloth", "cost_gp": 100, "ac": 1, "max_dex": 8,
+                      "acp": 0, "weight": "light", "lb": 15, "asf": 10, "don": "light"},
+    "leather lamellar": {"name": "leather lamellar", "cost_gp": 60, "ac": 4, "max_dex": 3,
+                         "acp": -2, "weight": "light", "lb": 25, "asf": 20, "don": "light"},
+    "armored coat": {"name": "armored coat", "cost_gp": 50, "ac": 4, "max_dex": 3, "acp": -2,
+                     "weight": "medium", "lb": 20, "asf": 20, "don": "light"},
+    "horn lamellar": {"name": "horn lamellar", "cost_gp": 100, "ac": 5, "max_dex": 3,
+                      "acp": -4, "weight": "medium", "lb": 30, "asf": 25, "don": "medium"},
+    "steel lamellar": {"name": "steel lamellar", "cost_gp": 150, "ac": 6, "max_dex": 3,
+                       "acp": -5, "weight": "medium", "lb": 35, "asf": 25, "don": "medium"},
 }
 
 # Core Rulebook Table 6-8, "Donning Armor", by its own three armour rows (hide is timed with
@@ -742,6 +762,11 @@ SHIELDS: dict[str, dict] = {
                      "lb": 15, "asf": 15},
     "tower shield": {"name": "tower shield", "cost_gp": 30, "ac": 4, "acp": -10, "lb": 45,
                      "asf": 50, "max_dex": 2, "attack": -2, "tower": True},
+    # The madu, the book's leather shield (Ultimate Equipment p.9; aonprd.com
+    # EquipmentArmorDisplay.aspx?ItemName=Madu (leather), read 2026-10-08): the
+    # leatherworker's whole (plan §4.2). Its horns as a weapon and its defensive-fighting
+    # rider are not modelled.
+    "madu": {"name": "madu", "cost_gp": 40, "ac": 1, "acp": -2, "lb": 5, "asf": 5},
 }
 
 # --- Combat manoeuvres ------------------------------------------------------------

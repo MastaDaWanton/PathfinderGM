@@ -184,7 +184,16 @@ def quality_index(record) -> int:
 
 def _is_masterwork(record) -> bool:
     rec = record if isinstance(record, dict) else {}
-    return bool(rec.get("masterwork")) or quality_index(rec) >= SUPERIOR
+    if bool(rec.get("masterwork")) or quality_index(rec) >= SUPERIOR:
+        return True
+    # The book's always-masterwork hides (dragonhide, eel hide, angelskin, darkleaf;
+    # leatherworking plan §13.4): a Sound dragonhide suit is masterwork by its nature, and
+    # the build says so (`forge_items.build`'s `always_masterwork`). Without this the
+    # enchanter refused it "Only a masterwork armour can carry magic".
+    from . import forge_items
+
+    return forge_items.is_forged(rec) and bool(
+        forge_items.build(_strip_layer(rec)).get("always_masterwork"))
 
 
 def _base_key(record) -> str:
@@ -664,6 +673,55 @@ def _surcharges(record, before: dict, gear: str) -> list[dict]:
     return out
 
 
+def _discounts(record, before: dict, after: dict) -> list[dict]:
+    """What the vessel itself takes off the making of some enchantments: dragonhide's
+    "adding energy resistance to dragonhide armor costs 25% less" (CRB/UE special
+    materials; leatherworking plan §15, contracts §6.3). The main piece's BOOK
+    `gear_mod enchant_cost_pct` (`effectspec.COST_TARGETS`; the build keeps it whole in
+    `book`, `applies_to` and all), applied to the making cost of each entry this working
+    ADDS whose property is of the `applies_to` family (`effectspec.cost_family_of`), never
+    to the enhancement or another family. A negative `gp` line beside the surcharges, so
+    the bench shows it as the surcharges are shown. Measured before (lane A, 2026-10-08): no
+    material, property or reader named an enchanting cost anywhere in the app."""
+    from . import forge_items
+
+    rec = forge_items.record_of(record) if not forge_items.is_forged(record) else record
+    if not forge_items.is_forged(rec):
+        return []
+    rows = [e for e in forge_items.build(_strip_layer(rec)).get("book") or ()
+            if e.get("type") == "gear_mod" and e.get("target") == "enchant_cost_pct"
+            and str(e.get("applies_to") or "")]
+    if not rows:
+        return []
+    added = list(after["properties"]) + list(after["flat"])
+    for old in list(before["properties"]) + list(before["flat"]):
+        for i, e in enumerate(added):
+            if _same(e, old):
+                del added[i]
+                break
+    out: list[dict] = []
+    for row in rows:
+        family = str(row["applies_to"])
+        pct = int(row.get("amount") or 0)
+        gp = sum(_entry_gp(e) for e in added
+                 if effectspec.cost_family_of(str(e.get("id") or "")) == family)
+        off = int(gp * MAKING_FRACTION * pct / 100)
+        if off:
+            name = str((forge_items.material(str(row.get("source") or "")) or {}).get("name")
+                       or row.get("source") or "the vessel")
+            fam = effectspec.ENCHANT_COST_FAMILIES.get(family, {}).get("name", family)
+            out.append({"why": f"{name}: {fam} costs {abs(pct)}% "
+                               f"{'less' if pct < 0 else 'more'} to work into it, "
+                               f"{off:+,} gp", "gp": off,
+                        "motes": -_motes(-off) if off < 0 else _motes(off)})
+    return out
+
+
+def _strip_layer(rec: dict) -> dict:
+    """The record without its magic, for reading the vessel's own book."""
+    return {k: v for k, v in rec.items() if k != "magic"}
+
+
 def _motes(gp: int) -> int:
     return int(math.ceil(max(0, gp) / GP_PER_MOTE - 1e-9))
 
@@ -674,8 +732,8 @@ def _price(record, before: dict, after: dict, gear: str, *, hurry: bool) -> dict
     now = market_price(after, gear, slot)
     increment = max(0, now - was)
     making = int(increment * MAKING_FRACTION)
-    extra = _surcharges(record, before, gear)
-    making_total = making + sum(s["gp"] for s in extra)
+    extra = _surcharges(record, before, gear) + _discounts(record, before, after)
+    making_total = max(0, making + sum(s["gp"] for s in extra))
     thousands = int(math.ceil(increment / 1000 - 1e-9))
     hours = max(MIN_HOURS, thousands * HOURS_PER_1000_GP)
     if hurry:
