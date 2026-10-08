@@ -280,6 +280,13 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         # asks which shelf a document came from. Meaningless (and at their defaults) on a
         # metal, except `ferrous`, which is the metal's.
         "surface": str(raw.get("surface") or "smooth"),
+        # The creature type a hide is graded against (plan §16: "-1 DC for each known hide
+        # of the same creature type", read by `knowledge.hide_type`), in
+        # `effectspec.CREATURE_TYPES` spelling. A fact about the hide, stated, because the
+        # bestiary resolves only 45 of the 71 named hides' `from_creatures` (no dragon of
+        # any colour is in it): measured 2026-10-08. None on a generic hide, whose type is
+        # the creature it was taken from. Added by leather lane F for the lead's review.
+        "creature_type": (str(raw.get("creature_type") or "").strip().lower() or None),
         "allowed_bases": [str(b) for b in _list(raw.get("allowed_bases"))],
         "always_masterwork": bool(raw.get("always_masterwork", False)),
         "druid_permitted": bool(raw.get("druid_permitted", False)),
