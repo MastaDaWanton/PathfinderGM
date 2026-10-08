@@ -276,10 +276,11 @@ def test_a_card_opens_from_the_question_mark_only():
 
 def test_an_unknown_property_is_a_count_and_the_creature_lines_are_not_drawn():
     """A hidden secret never reaches the page through this lane's files: the flat card draws
-    the KNOWN properties and only a count of the rest (lane E's unknown rows still carry a
-    `group`, "armour" or "working", which says what Grade has not found: reported to the
-    lead), and the build card's "from the creature" lines (a generic hide's inherited
-    resistance, learned by Grade) are never drawn."""
+    the KNOWN properties and only a count of the rest (lane E's unknown rows carried a
+    `group`, "armour" or "working", which said what Grade had not found; lane U5 blanked them
+    on build/leatherworking, and this page never read it either way), and the build card's
+    "from the creature" lines (a generic hide's inherited resistance, learned by Grade) are
+    never drawn."""
     shell, order = _code(_src(SHELL)), _code(_src(ORDER))
     assert "filter(function (p) { return p.known; })" in shell
     assert ".group" not in shell.replace("it.group", "").replace("s.group", "")
