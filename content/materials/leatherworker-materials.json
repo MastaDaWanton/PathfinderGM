@@ -7772,6 +7772,7 @@
      "type": "gear_mod",
      "target": "asf",
      "amount": -10,
+     "minimum": 5,
      "book": true
     },
     {

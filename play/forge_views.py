@@ -384,7 +384,8 @@ _SLOT_EMPTY = {"ore": "Drop ore here, or press Enter on it in the rack",
                "head": "Drop a blank here, or press Enter on one in the rack",
                "haft": "Drop a haft or grip here, or press Enter on one in the rack",
                "fittings": "Optional: a guard, studs or fittings",
-               "body": "Drop a plate here, or press Enter on one in the rack",
+               "body": "Drop a plate or a leather base here, or press Enter on one in the "
+                       "rack",
                "fastenings": "Drop fastenings here, or press Enter on them in the rack",
                "lining": "Optional: a lining or binding"}
 
@@ -572,7 +573,7 @@ def _ready(request):
     return c, pc, None
 
 
-def _slots(body, items) -> tuple[dict, JsonResponse | None]:
+def _slots(body, items, pc=None) -> tuple[dict, JsonResponse | None]:
     """`slots` as {slot: (rack Piece, count)}. A slot's value is a rack key, or
     {"key", "count"} where the count matters (the alloy's ratio)."""
     raw = body.get("slots", {})
@@ -593,6 +594,9 @@ def _slots(body, items) -> tuple[dict, JsonResponse | None]:
         else:
             return {}, _err(f"The {slot} slot holds something that is not a rack key.")
         if key not in by_key:
+            why = bs.off_rack_reason(pc, key) if pc is not None else ""
+            if why:
+                return {}, _err(why, 400)
             return {}, _err("Something on the anvil is no longer on your rack. Take it "
                             "off and look again.", 409)
         out[str(slot).strip().lower()] = (by_key[key], count)
@@ -604,7 +608,7 @@ def _plan_from(c, pc, body):
     if not method:
         return None, [], None, _err("Choose a method first.")
     items = _rack(c, pc)
-    slots, refused = _slots(body, items)
+    slots, refused = _slots(body, items, pc)
     if refused:
         return None, items, None, refused
     batch = read_int(body, "batch", 1, lo=1, hi=MAX_BATCH)
@@ -976,9 +980,12 @@ def forge_finish(request):
     for _key, w, _n in landed:
         if _first(progress, f"made:{w.form}"):
             bonus(f"first {w.form}")
+    # The smith's own materials: a leather base, grip or lacing set is the tanner's work,
+    # learned at the leather bench (lane F's Grade), so fitting it pays no "first work
+    # with Deer Hide" and reveals none of the hide's traits as the smith's discovery.
     worked = []
     for p, _ in plan.consumes:
-        if p.material and p.material not in worked:
+        if p.material and p.material not in worked and not p.from_leather:
             worked.append(p.material)
     for mid in worked:
         if _first(progress, f"metal:{mid}"):
@@ -1159,7 +1166,28 @@ def forge_ledger(request):
     kn = bs._lane("knowledge")
     if kn is None or not hasattr(kn, "ledger"):
         return _err("The smith's ledger is not available in this build yet.", 501)
-    return JsonResponse({"ledger": list(kn.ledger(pc) or [])})
+    # The tanner's materials are the Tanner's ledger's (play/leather_views.py
+    # `leather_ledger`, lane U5's MaterialLedger on the "leatherworker" track). Measured
+    # before (lane U5, live, 2026-10-08): `knowledge.ledger` lists every material met, so
+    # hides and tannins filled the Smith's ledger, each opening a forge card in steel grey
+    # with an Assay button.
+    rows = []
+    for row in kn.ledger(pc) or []:
+        m = bs.metal(str(row.get("id") or ""))
+        if m is not None and _tanners(kn, m):
+            continue
+        rows.append(row)
+    return JsonResponse({"ledger": rows})
+
+
+def _tanners(kn, m) -> bool:
+    """Whether this material answers to the leatherworker's rows (`knowledge.craft_of`)."""
+    if kn is None or not hasattr(kn, "craft_of"):
+        return False
+    try:
+        return kn.craft_of(m.doc) == getattr(kn, "LEATHERWORKER", "leatherworker")
+    except Exception:      # noqa: BLE001 - an odd document stays the smith's, as before
+        return False
 
 
 @require_GET
@@ -1173,6 +1201,15 @@ def forge_material(request, material_id: str):
     if m is None:
         return _err("There is no such material.", 404)
     kn = bs._lane("knowledge")
+    if _tanners(kn, m):
+        # A hide's card is the Tanner's ledger's: graded at the leather bench (lane F's
+        # Grade), coloured from its own document. Before (lane U5, live): the forge served
+        # it in the steel swatch with an Assay that would cut a sliver of hide as if a bar.
+        # `track` and `card` let the page open the right ledger instead.
+        return JsonResponse({"error": f"{m.name} is a tanner's material: its card is in "
+                                      f"the Tanner's ledger at the leather bench.",
+                             "track": "leatherworker",
+                             "card": f"/api/leather/material/{m.id}"}, status=409)
     carried = sum(p.amount for p in _rack(c, pc) if p.material == m.id and not p.old)
     card = {"id": m.id, "name": m.name, "kind": m.kind, "tier": m.tier,
             "form": m.rack_form, "text": str(m.doc.get("text") or ""),
@@ -1187,7 +1224,10 @@ def forge_material(request, material_id: str):
             "biomes": list(m.doc.get("biomes") or []),
             "assay_minutes": int((bs.method_row("assay") or {}).get("minutes", 10)),
             "assay_cost": None,
-            "smiths_here": smiths_here(c, pc)}
+            # Nobody at the forge teaches a hide (`_not_the_smiths`): the card offers no
+            # smith for it, and says where to ask instead.
+            "smiths_here": [] if _not_the_smiths(kn, m) else smiths_here(c, pc),
+            "ask_elsewhere": _not_the_smiths(kn, m)}
     if kn is not None:
         try:
             card["properties"] = list(kn.properties(pc, m.doc))
@@ -1223,6 +1263,29 @@ def _danger_words(effect: dict | None) -> str:
     if " " not in line.strip():
         return note
     return f"{line}: {note}" if note else line
+
+
+def _not_the_smiths(kn, m) -> str:
+    """Why a smith will not teach this material, in words, or "" when they will.
+
+    Each material answers to one craft's rows (`knowledge.craft_of`): a hide, a tannin,
+    an oil, a wax, a thread or a dye to the LEATHERWORKER's, whose teacher is a tanner at
+    the leather bench (play/leather_views.py `leather_ask`). Measured before (lane F,
+    2026-10-08): this route always used the smith's rows whatever was asked about, so a
+    blacksmith took the smith's price, taught deer hide from the smith's lesson table and
+    paid Blacksmith mastery for it."""
+    if kn is None or not hasattr(kn, "craft_of"):
+        return ""
+    try:
+        craft = kn.craft_of(m.doc)
+    except Exception:      # noqa: BLE001 - an odd document is the smith's, as before
+        return ""
+    if craft == getattr(kn, "BLACKSMITH", "blacksmith"):
+        return ""
+    if craft == getattr(kn, "LEATHERWORKER", "leatherworker"):
+        return (f"{m.name} is a tanner's material, not a smith's: show it to a "
+                f"leatherworker at the leather bench.")
+    return f"{m.name} is not a smith's material: a smith cannot teach it."
 
 
 def smiths_here(c, pc) -> list[dict]:
@@ -1269,6 +1332,9 @@ def forge_ask(request):
     m = bs.metal(str(body.get("material") or "").strip().lower())
     if m is None:
         return _err("There is no such material.", 404)
+    elsewhere = _not_the_smiths(kn, m)
+    if elsewhere:
+        return _err(elsewhere, 400)
     ref = str(body.get("ref") or "")
     if not any(t["ref"] == ref for t in smiths_here(c, pc)):
         return _err("Nobody here by that name knows metals.", 400)

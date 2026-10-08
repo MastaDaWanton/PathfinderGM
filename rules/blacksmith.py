@@ -968,9 +968,15 @@ WORKED_FORMS = BAR_FORMS + PIECE_FORMS + ("item",)
 BENCH_CRAFTS = (TRACK_ID, "smithing")
 
 # Armour and shields a smith makes: the metal suits and shields of CRB Table 6-6. Leather,
-# hide and padded are the tanner's; the wooden shields are a carpenter's.
+# hide and padded are the tanner's; the wooden shields are a carpenter's. Three more are
+# the hand-off with the leather bench (leatherworking plan §4.2, §4.5; owner Q1.3 and the
+# 2026-10-08 answer 1): studded leather and the armored coat are finished from a
+# leatherworker's base and from nothing else (`FROM_BASE`, the rule rows' `from_base`), and
+# steel lamellar is the forge's own steel plates laced with the leatherworker's lacing set
+# (the rule rows' `laced`).
 FORGED_ARMOUR = ("chain shirt", "scale mail", "breastplate", "chainmail", "splint mail",
-                 "banded mail", "half-plate", "full plate")
+                 "banded mail", "half-plate", "full plate", "studded leather",
+                 "armored coat", "steel lamellar")
 FORGED_SHIELDS = ("buckler", "light shield", "heavy shield")
 # Weapon families a forge shapes: the melee sections of the weapons table. Bows, firearms,
 # siege engines and ammunition are other trades.
@@ -982,6 +988,23 @@ GROUPS = {"ore": "Ore", "ingot": "Ingots", "bar": "Bars", "blank": "Blanks and p
           "plate": "Blanks and plates", "fitting": "Hafts, grips and fittings",
           "fuel": "Fuel", "flux": "Flux", "quenchant": "Quenchants",
           "treatment": "Treatments", "item": "Finished work", "old": "Old work"}
+# The leather forms' rack groups, kept out of GROUPS: GROUPS' keys are the forge's own form
+# vocabulary, which the sound bank voices one `forge.drop.<form>` each
+# (tests/test_forge_sound.py). A lacing set or a base dropped on the anvil is silent until
+# the sound lane gives them a voice ("unknown events are silent", contracts §11).
+LEATHER_GROUPS = {"grip": "Hafts, grips and fittings", "lacing": "Hafts, grips and fittings",
+                  "base": "Leather bases"}
+
+# Leather stock the forge's rack takes (leatherworking plan §4.4-4.5): only a form that
+# fills a piece, and the piece it fills. A grip is wrapped over a weapon's haft, a lacing
+# set fastens a suit; a leather base is the body of a suit the forge finishes. Measured
+# before (lane D, 2026-10-08, live): the rack read every carried material whose document
+# listed a piece, so once the hides listed theirs a RAW deer hide went on the rack and
+# "FITS a breastplate's lining and fastenings" untanned. Raw hides, tannins, oils, waxes,
+# threads and dyes are the leather bench's alone (`LEATHER_ONLY_KINDS`).
+LEATHER_FILLS = {"grip": {("weapon", "haft")},
+                 "lacing": {("armour", "fastenings"), ("shield", "fastenings")}}
+LEATHER_ONLY_KINDS = ("hide", "tannin", "oil", "wax", "thread", "dye")
 
 
 def _lane(name: str):
@@ -1000,6 +1023,33 @@ def bench_rules() -> dict:
 
 def method_row(method: str) -> dict | None:
     return (bench_rules().get("methods") or {}).get(str(method or "").strip().lower())
+
+
+def from_base(shape: str) -> dict | None:
+    """The rule row for a suit the forge finishes only from a leatherworker's base
+    (`bench.from_base`): `{"slot": the slot the forge fills, "takes": "studs" | "plate"}`,
+    or None for every other shape."""
+    row = (bench_rules().get("from_base") or {}).get(str(shape or "").strip().lower())
+    return dict(row) if isinstance(row, dict) else None
+
+
+def laced(shape: str) -> bool:
+    """Whether this forge suit's fastenings must be a leatherworker's lacing set (steel
+    lamellar: the owner's answer 1 of 2026-10-08)."""
+    return str(shape or "").strip().lower() in (bench_rules().get("laced") or ())
+
+
+def stud_ids() -> tuple[str, ...]:
+    """The studs that make studded leather: the leather bench's `forge_fittings`, the one
+    list both benches read (the leather bench refuses them as "studs make a forge suit";
+    the forge takes exactly these). Never a second copy here: two lists of what a stud is
+    are two answers that drift."""
+    lw = _lane("leatherworker")
+    try:
+        got = (lw.bench_rules().get("forge_fittings") or ()) if lw is not None else ()
+    except Exception:          # noqa: BLE001 - no leather rules, no studs
+        got = ()
+    return tuple(str(x) for x in got)
 
 
 def method_level(method: str) -> int:
@@ -1322,6 +1372,16 @@ def unknown_count(actor, m: Metal | None) -> int:
 # of contracts §4 is rebuilt from the tags (`record`), so it stores ids and passes and
 # never a computed number.
 
+# What a leather piece carries besides its material and passes (leatherworking contracts
+# §4.2, the leather bench's `_piece_spec`): its form, its grade, its tannin, and a generic
+# hide's beast, which `forge_items.build` reads through the harvest for the hide's inherited
+# DR and resistance. Kept through the forge's tags, or a generic wolf-hide base studded at
+# the forge would come out without the wolf.
+PIECE_EXTRAS = ("form", "grade", "tannage", "creature")
+BASE_KEYS = ("id", "name", "craft", "quality", "level")
+_INT_EXTRAS = ("grade", "quality", "level")
+
+
 def _enc(text: str) -> str:
     return str(text).replace(" ", "_")
 
@@ -1350,6 +1410,9 @@ class Work:
     rid: str = ""
     name: str = ""
     tier: str = "common"
+    # A suit finished from a leatherworker's base (plan §4.3): the base's id, name, craft,
+    # quality index and maker's level, for provenance. Never read for a number.
+    from_base: dict = field(default_factory=dict)
 
     def copy(self) -> "Work":
         return _copy.deepcopy(self)
@@ -1373,6 +1436,12 @@ class Work:
             t.append(f"forge.piece.{slot}.{p['material']}.{int(p.get('passes', 0))}"
                      + (".folded" if p.get("folded") else ""))
             t += [f"forge.piecealloy.{slot}.{a}" for a in p.get("alloy_of") or []]
+            for k in PIECE_EXTRAS:
+                if p.get(k) not in (None, ""):
+                    t.append(f"forge.pieceinfo.{slot}.{k}.{_enc(p[k])}")
+        for k in BASE_KEYS:
+            if self.from_base.get(k) not in (None, ""):
+                t.append(f"forge.base.{k}.{_enc(self.from_base[k])}")
         t += [f"forge.finish.{f}" for f in self.finish]
         if self.smith:
             t.append(f"forge.smith.level.{int(self.smith.get('level', 1))}")
@@ -1427,6 +1496,14 @@ class Work:
             elif head == "piecealloy" and len(rest) >= 2:
                 w.pieces.setdefault(rest[0], {}).setdefault("alloy_of", []).append(
                     ".".join(rest[1:]))
+            elif head == "pieceinfo" and len(rest) >= 3 and rest[1] in PIECE_EXTRAS:
+                v = _dec(".".join(rest[2:]))
+                w.pieces.setdefault(rest[0], {})[rest[1]] = (
+                    int(v) if rest[1] in _INT_EXTRAS and v.lstrip("-").isdigit() else v)
+            elif head == "base" and len(rest) >= 2 and rest[0] in BASE_KEYS:
+                v = _dec(".".join(rest[1:]))
+                w.from_base[rest[0]] = (int(v) if rest[0] in _INT_EXTRAS
+                                        and v.lstrip("-").isdigit() else v)
             elif head == "finish":
                 w.finish.append(val)
             elif head == "smith" and rest:
@@ -1561,6 +1638,16 @@ def work_name(w: Work) -> str:
     "Fine Iron Longsword" (contracts §4's example). The rack shows quality on its own
     badge, so only a finished item carries it in its name."""
     metal_name = _metal_name(w)
+    if w.form == "item" and w.from_base:
+        # Named as the leather bench names its suits ("Fine Deer Studded Leather"), the
+        # hide's word without "Hide": the body is the tanner's, the studs are the smith's.
+        lw = _lane("leatherworker")
+        lead = getattr(lw, "_lead_word", None) if lw is not None else None
+        if lead is not None:
+            try:
+                metal_name = str(lead(w.material)) or metal_name
+            except Exception:      # noqa: BLE001 - the material's own name will do
+                pass
     if w.form == "item":
         q = int(w.quality or 0)
         prefix = "" if q == 1 else f"{wc.quality_name(q)} "
@@ -1639,7 +1726,7 @@ def record(item, count: int | None = None) -> dict | None:
         return None
     q = int(w.quality or 0)
     n = int(count if count is not None else getattr(item, "count", 1) or 1)
-    return {
+    rec = {
         "id": w.rid or _slug(w.name), "name": w.name or work_name(w),
         "kind": "crafted", "craft": TRACK_ID, "count": n,
         "gear": w.gear, "base": w.shape, "slot": _slot_of(w.gear),
@@ -1650,6 +1737,9 @@ def record(item, count: int | None = None) -> dict | None:
         "smith": _copy.deepcopy(w.smith) or {"level": 1, "perks": {}},
         "schema": RECORD_SCHEMA,
     }
+    if w.from_base:
+        rec["from_base"] = dict(w.from_base)
+    return rec
 
 
 def records(actor) -> list[dict]:
@@ -1697,10 +1787,21 @@ class Piece:
     work: Work | None = None
     cut: int = 0
     old: str = ""
+    # Leather stock (plan §4.4-4.5): `leather` is the leather bench's own record of a grip
+    # or a lacing set (`leatherworker.Hide`), `base` a leatherworker's finished record that
+    # names suits it is the base for. `worn` is said in words by `fit_reason`.
+    leather: object | None = None
+    base: dict | None = None
+    worn: bool = False
 
     @property
     def rank(self) -> int:
         return wc.tier_rank(self.tier)
+
+    @property
+    def from_leather(self) -> bool:
+        """Leather stock: the tanner's work, which the smith only fits."""
+        return self.leather is not None or self.base is not None
 
     @property
     def amount(self) -> float:
@@ -1712,6 +1813,11 @@ class Piece:
 
     @property
     def quality(self) -> int | None:
+        if self.base is not None:
+            q = self.base.get("quality_index")
+            return int(q) if q is not None else None
+        if self.leather is not None:
+            return getattr(self.leather, "quality", None)
         return self.work.quality if self.work else None
 
     @property
@@ -1723,9 +1829,12 @@ class Piece:
 
     def as_work(self) -> Work:
         """This entry as a forge product, so a bought bar and a smelted ingot are worked
-        the same way. A raw slaggy bar is slaggy (plan §5.5)."""
+        the same way. A raw slaggy bar is slaggy (plan §5.5). Leather stock is never a bar:
+        `fit_reason` keeps it out of every step that would ask."""
         if self.work is not None:
             return self.work.copy()
+        if self.from_leather:
+            raise CraftError(f"{self.name} is leather work, not metal to be worked.")
         m = metal(self.material)
         form = "ingot" if self.form == "ingot" else "bar"
         return Work(form=form, material=self.material, tier=self.tier,
@@ -1743,6 +1852,12 @@ class Piece:
                 out.append("honed")
             if w.passes:
                 out.append(f"strengthened ×{w.passes}")
+        if self.base is not None:
+            out.append("leather base")
+        if self.leather is not None:
+            out.append(f"grade {int(getattr(self.leather, 'grade', 0) or 0)}")
+        if self.worn:
+            out.append("worn")
         for t in self.traits:
             out.append(t.replace("_", "-"))
         return out
@@ -1750,7 +1865,9 @@ class Piece:
     def as_item(self, actor=None) -> dict:
         m = metal(self.material) if self.material else None
         d = {"key": self.key, "name": self.name, "material": self.material,
-             "form": self.form, "group": GROUPS.get(self.form, "Other"),
+             "form": self.form,
+             "group": (LEATHER_GROUPS.get(self.form) if self.from_leather else None)
+             or GROUPS.get(self.form, "Other"),
              "count": self.count, "amount": self.amount, "tier": self.tier,
              "rank": self.rank, "glyph": KIND_GLYPH.get(m.kind, "🪨") if m else "🪨",
              "passes": self.passes, "quality": self.quality,
@@ -1766,7 +1883,79 @@ class Piece:
                 d["quench"] = self.work.quench
             if self.work.form == "item":
                 d["record"] = record(self.work, self.count)
+        if self.base is not None:
+            d["record"] = _copy.deepcopy(self.base)
+            d["gear"] = str(self.base.get("gear") or "armour")
+            d["base_for"] = list(self.base.get("base_for") or [])
+        if self.from_leather:
+            d["leather"] = True
+            d["fills"] = sorted(slot for _g, slot in LEATHER_FILLS.get(self.form, ())) \
+                or (["body"] if self.base is not None else [])
         return d
+
+
+def _worn_ids(actor) -> set[str]:
+    out = set()
+    for rec in (getattr(actor, "worn", None) or {}).values():
+        if isinstance(rec, dict) and rec.get("id"):
+            out.add(str(rec["id"]).strip().lower())
+    return out
+
+
+def _leather_piece(actor, sid: str, st, reserved: dict) -> Piece | None:
+    """A leather shelf entry as the forge sees it, or None when the forge has no use for
+    it (plan §4.5): a grip or a lacing set from the leather bench (`leatherworker.Hide`,
+    form `grip` or `lacing`), or a leatherworker's finished record that is a base for a
+    suit the forge finishes (`base_for`, plan §4.3). Green hides, leather by the hide,
+    panels, plates and finished goods that are no base stay on the leather bench."""
+    key = f"stock:{sid}"
+    count = int(getattr(st, "count", 0) or 0) - int(reserved.get(key, 0))
+    if count <= 0:
+        return None
+    rec = getattr(st, "record", None)
+    if isinstance(rec, dict):
+        if rec.get("craft") != "leatherworker" or not rec.get("base_for"):
+            return None
+        body = (rec.get("pieces") or {}).get("body") or {}
+        rid = str(rec.get("id") or "").strip().lower()
+        return Piece(key=key, name=str(getattr(st, "name", "") or rec.get("name") or sid),
+                     material=str(body.get("material") or ""), form="base", count=count,
+                     tier=str(rec.get("tier") or getattr(st, "tier", "") or "common"),
+                     base=_copy.deepcopy(rec), worn=bool(rid and rid in _worn_ids(actor)))
+    lw = _lane("leatherworker")
+    if lw is None or str(getattr(st, "craft", "") or "") != getattr(lw, "TRACK_ID", ""):
+        return None
+    h = lw.Hide.from_stock(st)
+    if h is None or h.form not in LEATHER_FILLS:
+        return None
+    return Piece(key=key, name=str(getattr(st, "name", "") or h.name or sid),
+                 material=h.material, form=h.form, count=count, tier=h.tier_name, leather=h)
+
+
+def off_rack_reason(actor, key: str) -> str:
+    """Why a carried thing the page put on the anvil is not on the forge's rack, in words,
+    or "" when this rule has nothing to say (it is simply not carried). A raw or bought hide,
+    a tannin and leather not yet cut into a piece are the leather bench's (`LEATHER_FILLS`):
+    the refusal says so, rather than "no longer on your rack" about a hide still in the pack."""
+    kind, _, ident = str(key or "").partition(":")
+    if kind == "inv" and int((getattr(actor, "inventory", {}) or {}).get(ident, 0) or 0) > 0:
+        m = metal(ident)
+        if m is not None and m.kind in LEATHER_ONLY_KINDS:
+            if m.kind == "hide":
+                return (f"{m.name} is a hide, not yet a piece the forge can use: tan it and "
+                        f"cut it at the leather bench into a grip, a lacing set or a base.")
+            return f"{m.name} is a tanner's material: it is used at the leather bench."
+    if kind == "stock":
+        st = (getattr(actor, "stock", {}) or {}).get(ident)
+        lw = _lane("leatherworker")
+        h = lw.Hide.from_stock(st) if (st is not None and lw is not None) else None
+        if h is not None and h.form not in LEATHER_FILLS:
+            return (f"{st.name} is not yet a piece the forge can use: cut it at the leather "
+                    f"bench into a grip, a lacing set or a base.")
+        rec = getattr(st, "record", None)
+        if isinstance(rec, dict) and rec.get("craft") == "leatherworker":
+            return f"{st.name} is finished leather work, not a base for anything the forge makes."
+    return ""
 
 
 def rack(actor, reserved: dict | None = None) -> list[Piece]:
@@ -1782,7 +1971,10 @@ def rack(actor, reserved: dict | None = None) -> list[Piece]:
         if int(n or 0) <= 0:
             continue
         m = metal(iid)
-        if m is None or not _forge_relevant(m):
+        if m is None or not _forge_relevant(m) or m.kind in LEATHER_ONLY_KINDS:
+            # A hide in the satchel is raw or bought leather by the hide (it arrives in its
+            # `sold_as` form): neither is a grip, a lacing set or a base until the leather
+            # bench cuts it into one (`LEATHER_FILLS`).
             continue
         key = f"inv:{m.id}"
         count = int(n) - int(reserved.get(key, 0))
@@ -1792,6 +1984,9 @@ def rack(actor, reserved: dict | None = None) -> list[Piece]:
     for sid, st in sorted((getattr(actor, "stock", {}) or {}).items(),
                           key=lambda kv: kv[1].name.lower()):
         if str(st.craft or "") not in BENCH_CRAFTS:
+            got = _leather_piece(actor, sid, st, reserved)
+            if got is not None:
+                out.append(got)
             continue
         key = f"stock:{sid}"
         whole = int(st.count or 0)
@@ -1924,6 +2119,10 @@ def _alloy_ids() -> set[str]:
     return out
 
 
+def _a(noun: str) -> str:
+    return ("an " if noun[:1] in "aeiou" else "a ") + noun
+
+
 def _edged(shape: str) -> bool:
     return bool((shape_info(shape) or {}).get("edged"))
 
@@ -1986,11 +2185,40 @@ def fit_reason(method: str, slot: str, p: Piece, *, gear: str = "") -> str:
     if method == "assemble":
         gear = gear or ("weapon" if slot in PIECES["weapon"] else "armour")
         main = PIECES[gear][0]
+        if p.worn:
+            return "you are wearing it: take it off before the smith works it"
+        if f == "base":
+            # A leather base is the body of a suit the forge finishes (plan §4.3).
+            if slot != "body" or gear != "armour":
+                return "a leather base is a suit's body"
+            if not [s for s in (p.base or {}).get("base_for") or () if from_base(s)]:
+                return f"{p.name} is not a base for anything the forge finishes"
+            return ""
         if slot == main:
             if f not in PIECE_FORMS:
-                return f"the {slot} is a forged {'blank' if gear == 'weapon' else 'plate'}"
+                return (f"the {slot} is a forged {'blank' if gear == 'weapon' else 'plate'}"
+                        + ("" if gear == "weapon" else " or a leather base"))
             want = ("weapon",) if slot == "head" else ("armour", "shield")
-            return "" if w.gear in want else f"that is not shaped for a {slot}"
+            if w.gear not in want:
+                return f"that is not shaped for a {slot}"
+            rule = from_base(w.shape)
+            if rule:
+                # Studded leather and the armored coat start from a leatherworker's base
+                # (owner Q1.3): a metal plate shaped for one is its lining, never its body.
+                shape = _shape_name(w.shape).lower()
+                return (f"{_a(shape)} is finished from a leather base: put the base in the "
+                        f"body" + (" and these plates in the lining"
+                                   if rule.get("takes") == "plate" else ""))
+            return ""
+        if f in LEATHER_FILLS:
+            if (gear, slot) in LEATHER_FILLS[f]:
+                return ""
+            return ("a grip is wrapped over a weapon's haft" if f == "grip"
+                    else "a lacing set fastens a suit or a shield")
+        if f == "plate" and slot == "lining" and w is not None:
+            rule = from_base(w.shape)
+            if rule and rule.get("slot") == "lining" and rule.get("takes") == "plate":
+                return ""
         if f in PIECE_FORMS or f == "item":
             return f"a worked piece cannot be the {slot}"
         if m is None or not m.fills(gear, slot):
@@ -2166,12 +2394,15 @@ def plan_step(actor, progress, method: str, slots: dict, batch: int = 1, *,
     track = wc.get(TRACK_ID)
     top = wc.tier_rank(track.at(level).max_tier)
     smithy_rank = int(bench_rules().get("smithy_rank", 3))
+    # Leather stock is the tanner's work, which the smith only fits: a sharkskin grip or a
+    # red dragonhide base is not metal the smith's level must reach (leatherworking plan
+    # §4.4-4.5). The forge's own pieces on the same anvil are gated as ever.
     seen = []
     for p, _ in plan.consumes:
-        if p.material and p.material not in seen:
+        if p.material and p.material not in seen and not p.from_leather:
             seen.append(p.material)
     for w, _ in plan.outputs:
-        for mid in [w.material] + list(w.alloy_of):
+        for mid in ([] if w.from_base else [w.material]) + list(w.alloy_of):
             if mid and mid not in seen:
                 seen.append(mid)
     for mid in seen:
@@ -2410,6 +2641,15 @@ def _build_forge(plan: ForgePlan, row: dict) -> None:
             if not plan.shape else
             f"There is no {plan.shape!r} on the weapon or armour lists to forge.")
         return
+    rule = from_base(info["id"])
+    if rule and rule.get("takes") != "plate":
+        # Studded leather is a leather base and its studs (owner Q1.3): there is nothing
+        # of it to forge. The armored coat's lining plates ARE forged, so it passes.
+        plan.problems.append(
+            f"{info['name'].capitalize()} is finished from a leather base: there is nothing "
+            f"to forge for it. Put the base and its {rule.get('takes', 'fittings')} on the "
+            f"anvil at Assemble.")
+        return
     units = plan.batch
     plan.shape, plan.gear = info["id"], info["gear"]
     m, fm = metal(bar.material), metal(fuel.material)
@@ -2585,12 +2825,22 @@ def _build_assemble(plan: ForgePlan, row: dict) -> None:
     main = _piece(plan, names[0])
     if main is None:
         return
+    if main.base is not None:
+        _build_from_base(plan, row, main)
+        return
     for slot in names[1:REQUIRED_PIECES]:
         _piece(plan, slot)
     for slot in plan.slots:
         if slot not in names:
             plan.problems.append(f"A {_shape_name(main.work.shape).lower()} has no "
                                  f"{slot}.")
+    fast = plan.slots.get("fastenings")
+    if laced(main.work.shape) and fast and fast[0].form != "lacing":
+        # Steel lamellar is steel plates laced together (owner, 2026-10-08 answer 1): the
+        # leatherworker supplies the lacing set, as with a grip.
+        plan.problems.append(f"{_a(_shape_name(main.work.shape).lower()).capitalize()} is "
+                             f"laced: its fastenings are a leatherworker's lacing set, not "
+                             f"{fast[0].name.lower()}.")
     if plan.problems:
         return
     head = main.work.copy()
@@ -2602,6 +2852,9 @@ def _build_assemble(plan: ForgePlan, row: dict) -> None:
             continue
         p = got[0]
         w = p.work
+        if p.leather is not None:
+            pieces[slot] = _leather_spec(p)
+            continue
         piece = {"material": p.material, "passes": int(w.passes) if w else 0}
         if slot == names[0]:
             if "folded" in head.traits:
@@ -2641,14 +2894,158 @@ def _build_assemble(plan: ForgePlan, row: dict) -> None:
     plan.outputs = [(out, 1)]
     plan.units = 1
     plan.lead = m
-    plan.rank_in = max(p.rank for p, _ in plan.slots.values())
-    plan.rank_out = wc.tier_rank(out.tier)
+    # The smith's own pieces set the step's rarity; a leather grip or lacing set is the
+    # tanner's work and is not gated by the smith's level (the item keeps its tier).
+    forged = [p.rank for p, _ in plan.slots.values() if not p.from_leather] or [main.rank]
+    plan.rank_in = max(forged)
+    plan.rank_out = max(forged)
     plan.working = list(m.working)
     plan.minutes = _minutes(plan, row, 1)
     plan.noun = "item"
     plan.shape = head.shape
     if "slaggy" in head.traits:
         plan.step_ceiling = min(plan.step_ceiling, plan.ceiling - 1)
+
+
+def _leather_spec(p: Piece) -> dict:
+    """A record's piece for a leather grip or lacing set (leatherworking contracts §4.2):
+    the hide's id and laminations, its form, grade and tannin, and a generic hide's beast,
+    as the leather bench writes its own pieces (`leatherworker._piece_spec`)."""
+    h = p.leather
+    spec = {"material": p.material, "passes": int(getattr(h, "passes", 0) or 0),
+            "form": p.form, "grade": int(getattr(h, "grade", 0) or 0)}
+    if getattr(h, "tannage", ""):
+        spec["tannage"] = str(h.tannage)
+    if getattr(h, "creature", ""):
+        spec["creature"] = str(h.creature)
+    return spec
+
+
+def _build_from_base(plan: ForgePlan, row: dict, main: Piece) -> None:
+    """Assemble with a leatherworker's base as the body (leatherworking plan §4.3; owner
+    Q1.3 and the 2026-10-08 answer 2). The base is consumed and its pieces kept; the forge
+    fills the one slot its finish names (studs into the fastenings for studded leather,
+    the forged plates into the lining for an armored coat) and the record's base becomes
+    the finished suit. The quality is the LOWER of the base's and this Assemble's, so
+    neither craft lifts the other's work: the step's ceiling is held at the base's tier.
+    Masterwork follows the book (plan §13.4): Superior or better, or a body masterwork by
+    nature, which `forge_items.build` reads off the body itself."""
+    rec = main.base or {}
+    base_q = int(rec.get("quality_index") if rec.get("quality_index") is not None else 1)
+    finishes = [s for s in rec.get("base_for") or () if from_base(s)]
+    filled = {}
+    for s in finishes:
+        rule = from_base(s)
+        got = plan.slots.get(rule["slot"])
+        if got and _finish_fits(got[0], s, rule) == "":
+            filled[s] = rule
+    want = str(plan.shape or "").strip().lower()
+    if want and want not in finishes:
+        # Asked for by name (the page sends a shape only at Forge; a request may send one
+        # anywhere): a leather base becomes only what its maker made it a base for.
+        plan.problems.append(
+            f"{main.name} is a base for "
+            + " or ".join(_shape_name(s).lower() for s in finishes)
+            + f", not {_shape_name(want).lower()}.")
+        return
+    if want:
+        shape = want
+    elif len(filled) == 1:
+        shape = next(iter(filled))
+    else:
+        plan.problems.append(
+            f"{main.name} is the base for " + " or ".join(
+                f"{_shape_name(s).lower()} ({_finish_words(s)})" for s in finishes) + ".")
+        return
+    rule = from_base(shape)
+    slot = rule["slot"]
+    got = plan.slots.get(slot)
+    if not got:
+        plan.problems.append(f"{_shape_name(shape).capitalize()} takes "
+                             f"{_finish_words(shape)}.")
+        return
+    piece = got[0]
+    why = _finish_fits(piece, shape, rule)
+    if why:
+        plan.problems.append(f"{piece.name}: {why}.")
+    for other in plan.slots:
+        if other not in ("body", slot):
+            # The base keeps its own lacing and lining: the forge fills only its slot.
+            plan.problems.append(f"The base keeps its own {other}: the forge fills only the "
+                                 f"{slot} of {_a(_shape_name(shape).lower())}.")
+    if plan.problems:
+        return
+    info = shape_info(shape) or {}
+    pieces = _copy.deepcopy(rec.get("pieces") or {})
+    w = piece.work
+    spec = {"material": piece.material, "passes": int(w.passes) if w else 0}
+    if w is not None and w.alloy_of:
+        spec["alloy_of"] = list(w.alloy_of)
+    pieces[slot] = spec
+    m = metal(piece.material)
+    mw = _mw_index()
+    body_doc = metal(main.material)
+    always = bool(body_doc is not None and body_doc.doc.get("always_masterwork") is True)
+    ready = base_q >= mw or always
+    plan.masterwork_work = bool(ready and plan.aim)
+    plan.masterwork_why = (
+        f"the base is {wc.quality_name(base_q)}: the finished suit is no better than its base"
+        if not ready else ("" if plan.aim else "you are not aiming for masterwork"))
+    plan.dc = int(info.get("dc", m.dc if m else 10))
+    # The owner's rule: the lower of the base's tier and this Assemble's.
+    cap = min(plan.ceiling, base_q)
+    if not plan.masterwork_work:
+        cap = min(cap, mw - 1)
+    elif cap >= mw and not (m is not None and m.has("flawless")):
+        plan.dc = max(plan.dc, int(bench_rules().get("masterwork_dc", MASTERWORK_DC)))
+    plan.step_ceiling = cap
+    smith = rec.get("smith") or rec.get("maker") or {}
+    out = Work(form="item", material=main.material, shape=shape, gear="armour",
+               quench=w.quench if w is not None else "", pieces=pieces,
+               traits=[t for t in (w.traits if w is not None else [])
+                       if t in ("brittle", "hot_short", "slaggy")],
+               smith={"level": plan.level,
+                      "perks": {"potency": plan.perks.get("potency", 0),
+                                "hardening": plan.perks.get("hardening", 0)}},
+               tier=wc.TIERS[max(main.rank, piece.rank) - 1],
+               from_base={"id": str(rec.get("id") or ""), "name": main.name,
+                          "craft": str(rec.get("craft") or "leatherworker"),
+                          "quality": base_q,
+                          "level": int((smith or {}).get("level", 1) or 1)})
+    plan.consumes = [(main, 1), (piece, 1)]
+    plan.outputs = [(out, 1)]
+    plan.units = 1
+    plan.lead = m
+    plan.rank_in = piece.rank
+    plan.rank_out = piece.rank
+    plan.working = list(m.working) if m is not None else []
+    plan.minutes = _minutes(plan, row, 1)
+    plan.noun = "item"
+    plan.gear, plan.shape = "armour", shape
+
+
+def _finish_words(shape: str) -> str:
+    rule = from_base(shape) or {}
+    if rule.get("takes") == "studs":
+        return f"studs in the {rule.get('slot', 'fastenings')}"
+    return f"its forged plates in the {rule.get('slot', 'lining')}"
+
+
+def _finish_fits(p: Piece, shape: str, rule: dict) -> str:
+    """Why this piece cannot be what the forge adds to a base for this suit, or ""."""
+    takes = rule.get("takes")
+    if takes == "studs":
+        if p.work is None and not p.from_leather and p.material in stud_ids():
+            return ""
+        return (f"{_shape_name(shape).lower()} is studded with "
+                + " or ".join(n.lower() for n in
+                              [(metal(x).name if metal(x) else x) for x in stud_ids()]
+                              or ["metal studs"]))
+    if takes == "plate":
+        if p.form == "plate" and p.work is not None and p.work.shape == shape:
+            return ""
+        return f"{_a(_shape_name(shape).lower())} is lined with plates forged for it"
+    return "the forge adds nothing to this base"
 
 
 def _build_finish(plan: ForgePlan, row: dict) -> None:
@@ -2763,7 +3160,8 @@ def failure_losses(plan: ForgePlan, miss: int) -> list[tuple[Piece, int]]:
     shares = []
     for i, (p, n) in enumerate(plan.consumes):
         exact = n * ruin / total
-        worked = 1 if p.work is not None else 0
+        # A leather base or grip is worked stock too, so a tie spoils the studs first.
+        worked = 1 if (p.work is not None or p.from_leather) else 0
         shares.append([p, int(exact), exact - int(exact), n, (worked, p.rank, i)])
     left = ruin - sum(s[1] for s in shares)
     for s in sorted(shares, key=lambda s: (-round(s[2], 9), s[4])):
@@ -2829,7 +3227,9 @@ def assay_source(actor, material_id: str) -> Piece | None:
     """What a sliver for assaying this material would come from: a bar or ingot of it
     first (a tenth is cut), else ore or any raw unit of it (one is used)."""
     mid = str(material_id or "").strip().lower()
-    items = [p for p in rack(actor) if p.material == mid and not p.old
+    # Leather stock is never cut for a sliver at the forge: a hide is graded at the leather
+    # bench (lane F's Grade), and a grip is not a bar.
+    items = [p for p in rack(actor) if p.material == mid and not p.old and not p.from_leather
              and p.form not in PIECE_FORMS + ("item",)]
     # A bar already cut into is cut again before a whole one is started, or two assays
     # would leave two part-bars on the rack.
