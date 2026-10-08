@@ -670,3 +670,18 @@ proposal stands. These override the plan and the contracts wherever they differ.
 - **For the owner / World Bible (lane W):** the plan asks World Bible for creature type, CR
   and resistances, but the format forbids stat blocks; lane W documented a proposed creature
   row of words and ids only (`{"id", "name", "like": "<bestiary id>", "tags"}`).
+
+**Final-pass list (lead, 2026-10-08):**
+- Forge drop sounds for the leather forms on the anvil (`base`, `lacing`): lane H moved them to
+  `blacksmith.LEATHER_GROUPS`, so they are silent until the forge bus has `forge.drop.base/lacing`.
+- The forge's ledger card shows a 409 for a tanner's material as "Couldn't load this material"
+  with Retry; `MaterialLedger` should read the 409's `track`/`card` and open the Tanner's card.
+- Dragon scales: nothing makes `scales` stock yet (lane E has no step); the forge must accept
+  them as the body of the dragon-scale metal suits once it exists.
+- A town smith finishing a base for a fee for a character with no Blacksmith levels (plan §4.3,
+  proposed) is not built.
+- Stale comment in `rules/market.py` (lane G) claiming no common hide or dye is priced.
+- `places.KIND_WORDS` does not fold "tanyard"/"tan pits" to `tannery`.
+- Lane M's not-yet list: rust on the wearer not the suit; shields take no rust; `body.metal`
+  granted by nothing; domain powers carry no `ability_type`; gear saves vs heat/chill metal
+  rolled by the engine even for the player.
