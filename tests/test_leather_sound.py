@@ -81,9 +81,16 @@ def _promised() -> set[str]:
     return names
 
 
+_PLAYED = re.compile(r'(?:Sound\.play|\bsound|\.sound|\bcue|playSound)\(\s*["\'](leather\.[a-z][a-z.-]*[a-z])["\']')
+_SOUNDS_MAP = re.compile(r"SOUNDS:\s*\{([^}]*)\}")
+
+
 def _called() -> set[str]:
-    """OFFERED, plus every `leather.…` string literal in the merged leather games, stage and
-    table files (SOUNDS maps, `Sound.play(...)`, `sound(...)`)."""
+    """OFFERED, plus every leather sound the merged leather games, stage and table files
+    play: the values of a game's `SOUNDS` map, and the first argument of `Sound.play(...)`,
+    `sound(...)` or `cue(...)`. Not every `leather.…` literal: lane U3 registers its games
+    under "leather.flense", "leather.cut" and so on (the smith's game owns the bare
+    "assemble" key), and those are game ids, not sounds."""
     names = set(OFFERED)
     files = []
     for d in (JS / "leather-games", JS / "tannery-stage"):
@@ -92,8 +99,28 @@ def _called() -> set[str]:
     files += [f for f in TABLE.glob("*.js") if "leather" in f.name or "harvest" in f.name]
     files.append(TABLE / "44-forge-ledger.js")
     for f in files:
-        names.update(re.findall(r'["\'](leather\.[a-z][a-z.-]*[a-z])["\']', _read(f)))
+        src = _read(f)
+        names.update(_PLAYED.findall(src))
+        for block in _SOUNDS_MAP.findall(src):
+            names.update(re.findall(r'["\'](leather\.[a-z][a-z.-]*[a-z])["\']', block))
     return names
+
+
+def test_the_games_sounds_are_read_from_their_sounds_maps():
+    """A guard on `_called`: the lead's list of what lane U3's games play (2026-10-08), as a
+    SOUNDS map would name them, is read back, and a game's registration id is not."""
+    sample = ('defs["leather.flense"] = { id: "leather.flense", SOUNDS: { hit: "leather.scrape",'
+              ' tear: "leather.tear" } }; Sound.play("leather.knife", {surface: s});')
+    got = set(_PLAYED.findall(sample))
+    for block in _SOUNDS_MAP.findall(sample):
+        got.update(re.findall(r'["\'](leather\.[a-z][a-z.-]*[a-z])["\']', block))
+    assert got == {"leather.scrape", "leather.tear", "leather.knife"}, got
+
+
+# What the lead said lane U3's merged games play (2026-10-08): each must be defined.
+GAMES_PLAY = ("leather.scrape", "leather.tear", "leather.salt", "leather.slosh",
+              "leather.cut-test", "leather.knife", "leather.stitch.pull", "leather.steam",
+              "leather.stamp", "leather.brush", "leather.clamp", "leather.buckle")
 
 
 _FAKE = (ROOT / "tests" / "test_alchemy_sound.py").read_text(encoding="utf-8")
@@ -143,7 +170,7 @@ def test_every_promised_and_called_event_exists_and_builds_sound(tmp_path):
     reads, sane or not; an unknown leather name answers false and builds nothing. Running
     every synth under odd options also catches one that throws or ramps a gain to zero (a
     RangeError in real Web Audio), e.g. a `casing` of "x" or a `heat` of 9."""
-    names = sorted(_promised() | _called())
+    names = sorted(_promised() | _called() | set(GAMES_PLAY) | {"leather.found"})
     got = _node(tmp_path, "const names = " + json.dumps(names) + ";\n const opts = " + OPTS + r""";
       Sound.unlock();
       const out = { missing: [], silent: [], loops: [] };

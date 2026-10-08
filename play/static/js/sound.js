@@ -2123,6 +2123,12 @@
     knock(c, { f: k(c, [175, 165, 190]), peak: 0.05, lp: 600, d: 0.05 });
     return bell(c, { at: 0.05, f: k(c, [2900, 3050, 2750]), peak: 0.006, d: 0.15 });
   });
+  def("leather.found", 3, pitched(function (c) {
+    // Something learned about a hide (a Grade or a lesson that found a property, the
+    // alchemy bank's `found` for this bench): a soft creak of the scrap, then a clear note.
+    creak(c, { n: 5, dur: 0.08, f: 480, peak: 0.04 });
+    return bell(c, { at: 0.12, f: k(c, [1046, 1108, 988]), peak: 0.03, d: 0.8 });
+  }));
   def("leather.grade", 3, function (c) {
     // Grade (the ledger card): the scrap cut free, bent and rubbed between the fingers.
     noise(c, { f: k(c, [2300, 2450, 2150]), q: 2, peak: 0.05, a: 0.002, d: 0.03 });
