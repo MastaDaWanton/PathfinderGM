@@ -111,6 +111,27 @@
   // widened by the working traits before sending it: counting band_scale again would widen a
   // catalyst's band twice (the forge's narrow_window lesson, makeCtx below).
 
+  // THE LEATHERWORKER'S GAMES (docs/leatherworking-contracts.md §11.1, leather UI plan §6.4 and
+  // §9, added 2026-10-08). The games under js/leather-games/ register with `track: "leather"`
+  // under the key "leather.<method>" (the forge already holds "assemble" on this one registry,
+  // and a second definition there would silently replace the smith's game; one prefix for all
+  // eleven is a rule the shell can follow without an exception list). They read the server's
+  // `opts.band` (or `tuning.band`), the shape rules/leatherworker.py `band_for` sends:
+  // {unit, value_start, target: [lo, hi], fail: [lo, hi] | null, drift, narrow}. One new gauge,
+  // behind its own definition key, so no herb, forge, enchant or alchemy game notices it:
+  //   BAND: the band gauge (UI plan §6.4, the owner's Q8.3: "every band shown as a number and a
+  //         bar as well as a colour"). A straight bar on the variable's real scale, the target
+  //         outlined in gold and notched, the failing band cross-hatched with a saw edge, a
+  //         needle, the bands' names in words under it, and the number in its real unit in
+  //         the hint column ("0.42 of thickness", "62 °C", "11 SPI", "14 min since wetting").
+  //         The GAME moves the needle (`ctx.gauge.v`): a tanner's variables move by the hand
+  //         (pressure, a stitch's pitch, the liquor stepped up), not on their own like a forge
+  //         bar cooling, so the frame draws and scores the reading and never steps it.
+  // The window: the generous start times the server's band scale (lane E's working traits:
+  // forgiving, supple, fine_pitch...) times the game's Steady factor, and x0.8 when the server
+  // says `narrow` (rare hides: the forge's "better metal, tighter window", Giants' Foundry),
+  // never pushed into the failing band.
+
   // Every method a game is registered for: the herb list first, in its fixed order, then any
   // other definition on the registry in the order it registered. Read at call time, so a game
   // file loaded after this one is still found (the registry is one shared object).
@@ -547,6 +568,7 @@
       if (HEAT_WORDS[s]) return HEAT_WORDS[s];
     }
     if (r.react) { var rw = r.react.say(); if (rw) return rw; }
+    if (r.gauge) { var bw = r.gauge.say(); if (bw) return bw; }   // leather games only
     var live = r.game && r.game.hint ? r.game.hint() : null;
     return live || r.def.hint(r.steady);
   }
@@ -994,6 +1016,128 @@
     }).sort(function (p, q) { return (q.colour === C.ink ? 1 : 0) - (p.colour === C.ink ? 1 : 0); }), x0, x1, by + bh + 12);
   }
 
+  // --- the band gauge (leather games with BAND only) ------------------------------------------
+  // Each unit's default scale and how its number reads. The scale is the bar's ends; the server
+  // sends only the bands, so a game may widen its scale (BAND.scale) where its variable runs
+  // past the default (Salt's weight past 100%, Curry's fat to 30%).
+  var BAND_UNITS = {
+    fraction: { scale: [0, 1], text: function (v) { return v.toFixed(2); } },
+    strength: { scale: [0, 1], text: function (v) { return v.toFixed(2); } },
+    percent: { scale: [0, 100], text: function (v) { return Math.round(v) + "%"; } },
+    celsius: { scale: [20, 100], text: function (v) { return Math.round(v) + " °C"; } },
+    spi: { scale: [4, 18], text: function (v) { return Math.round(v) + " SPI"; } },
+    minutes: { scale: [0, 60], text: function (v) { return Math.round(v) + " min"; } }
+  };
+  var BAND_STATES = ["low", "in", "high", "fail"];
+
+  function pair(p) {
+    return Array.isArray(p) && p.length === 2 && finite(+p[0]) && finite(+p[1]) && +p[1] >= +p[0]
+      ? [+p[0], +p[1]] : null;
+  }
+
+  // The gauge for one game. `spec` is the game's BAND {unit, label, after, scale, target, fail,
+  // value_start, drift, words: {low, in, high, fail}, say: {low, high, fail}, levels?}; `given`
+  // the server's band. The server's unit, bands, start and drift win where they are readable;
+  // a unit the game was not built for keeps the game's own (a gauge in the wrong unit would
+  // print a number that means nothing). The target is widened about its middle by `scale`; a
+  // target that runs to an end of the scale (Tan's strong liquor to 1.0, Cut's 0 off the line)
+  // widens inward from that end only; neither ever reaches into the failing band.
+  function makeBand(spec, given, scale) {
+    given = given && typeof given === "object" ? given : {};
+    var unit = BAND_UNITS[given.unit] && given.unit === spec.unit ? given.unit : spec.unit;
+    var U = BAND_UNITS[unit] || BAND_UNITS.fraction;
+    var sc = pair(spec.scale) || U.scale.slice();
+    var lo = sc[0], hi = sc[1], span = hi - lo;
+    var tg = pair(given.target) || pair(spec.target);
+    var fail = given.fail === null ? null : (pair(given.fail) || (given.fail === undefined ? pair(spec.fail) : null));
+    tg = [clamp(tg[0], lo, hi), clamp(tg[1], lo, hi)];
+    var w = (tg[1] - tg[0]) * scale, band;
+    if (tg[0] <= lo + 1e-9 && tg[1] < hi) band = [lo, clamp(lo + w, lo, hi)];
+    else if (tg[1] >= hi - 1e-9 && tg[0] > lo) band = [clamp(hi - w, lo, hi), hi];
+    else { var mid = (tg[0] + tg[1]) / 2; band = [clamp(mid - w / 2, lo, hi), clamp(mid + w / 2, lo, hi)]; }
+    if (fail) {
+      var gap = span * 0.02;
+      if (fail[0] >= tg[1] && band[1] > fail[0] - gap) { band[0] = Math.max(lo, band[0] - (band[1] - (fail[0] - gap))); band[1] = fail[0] - gap; }
+      if (fail[1] <= tg[0] && band[0] < fail[1] + gap) { band[1] = Math.min(hi, band[1] + (fail[1] + gap - band[0])); band[0] = fail[1] + gap; }
+    }
+    var start = finite(+given.value_start) ? +given.value_start : finite(+spec.value_start) ? +spec.value_start : lo;
+    var drift = finite(+given.drift) && +given.drift >= 0 ? +given.drift : (+spec.drift || 0);
+    var words = spec.words || {}, say = spec.say || {};
+    var G = {
+      unit: unit, label: spec.label || "", after: spec.after || "", v: clamp(start, lo, hi),
+      scale: [lo, hi], target: tg, band: band, fail: fail, drift: drift,
+      inBand: function () { return G.v >= band[0] && G.v <= band[1]; },
+      // 1 in the band's inner `inner` share, falling to `edge` at its rim, 0 outside (the
+      // forge's curve). A band anchored at an end of the scale is measured from that end: for
+      // Cut, 0 off the line is the best there is, not the band's rim.
+      quality: function (inner, edge, at) {
+        var v = at == null ? G.v : at;
+        if (v < band[0] || v > band[1]) return 0;
+        inner = inner == null ? 0.5 : inner; edge = edge == null ? 0.6 : edge;
+        var d, hw;
+        if (band[0] <= lo + 1e-9 && tg[0] <= lo + 1e-9) { hw = band[1] - band[0]; d = v - band[0]; }
+        else if (band[1] >= hi - 1e-9 && tg[1] >= hi - 1e-9) { hw = band[1] - band[0]; d = band[1] - v; }
+        else { hw = (band[1] - band[0]) / 2; d = Math.abs(v - (band[0] + band[1]) / 2); }
+        var iw = hw * inner;
+        return d <= iw ? 1 : 1 - (1 - edge) * ((d - iw) / Math.max(1e-6, hw - iw));
+      },
+      statusAt: function (v) {
+        if (fail && v >= fail[0] && v <= fail[1]) return "fail";
+        return v < band[0] ? "low" : v > band[1] ? "high" : "in";
+      },
+      status: function () { return G.statusAt(G.v); },
+      word: function (s) { return words[s || G.status()] || ""; },
+      say: function () { return say[G.status()] || null; },
+      // The reading in words: the label, the number in its unit, what it is "of", and for a
+      // liquor the strength's own word ("Liquor 0.62, medium").
+      text: function () {
+        var n = U.text(G.v), lv = "";
+        (spec.levels || []).some(function (l) { if (G.v < l[0]) { lv = l[1]; return true; } return false; });
+        return [G.label, n + (lv ? ", " + lv : ""), G.after].filter(function (x) { return x; }).join(" ");
+      },
+      X: function (v, x0, x1) { return x0 + (x1 - x0) * clamp((v - lo) / span, 0, 1); }
+    };
+    return G;
+  }
+
+  // The band gauge, drawn as the alchemist's straight gauges are (the herb Mix lesson: a gauge
+  // must read as a gauge): a plain bar with a tick at each band edge, the failing band cross-
+  // hatched with a saw edge (dangerZone), the target hatched, outlined and notched in gold
+  // (targetBand), the needle with its keel, and the bands' names under the bar, the target's
+  // first, then the failing band's, so the names that matter are the ones always drawn.
+  function drawBandGauge(r, g, W, top) {
+    var G = r.gauge, C = r.C, x0 = 10, x1 = W - 10;
+    if (x1 - x0 < 80) return;
+    var X = function (v) { return G.X(v, x0, x1); };
+    var by = top + 6, bh = 9;
+    g.save();
+    g.fillStyle = C.panel; g.fillRect(x0, by, x1 - x0, bh);
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.strokeRect(x0 + 0.5, by + 0.5, x1 - x0 - 1, bh - 1);
+    g.fillStyle = C.ash;
+    [G.band[0], G.band[1]].concat(G.fail ? G.fail : []).forEach(function (v) { g.fillRect(Math.round(X(v)), by + bh, 1, 4); });
+    g.restore();
+    if (G.fail) dangerZone(g, C, X(G.fail[0]), X(G.fail[1]), by, bh);
+    targetBand(g, C, X(G.band[0]), X(G.band[1]), by, bh);
+    if (finite(G.ghost)) {
+      // A hollow mark where something pending will land (Curry's dubbin soaking in, the
+      // reaction gauge's bloom), so an overshoot is a choice the player could see.
+      var lx = X(G.ghost);
+      g.save(); g.strokeStyle = C.ink; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(lx, by - 2); g.lineTo(lx, by + bh + 2); g.stroke(); g.restore();
+      KIT.diamond(g, lx, by - 6, 3.5, null, C.ink, 1.2);
+    }
+    needle(g, C, X(G.v), by, bh);
+    var lo = G.scale[0], hi = G.scale[1], items = [
+      { text: G.word("in"), a: X(G.band[0]), b: X(G.band[1]), colour: C.ink }
+    ];
+    if (G.fail) items.push({ text: G.word("fail"), a: X(G.fail[0]), b: X(G.fail[1]), colour: C.ink });
+    var highTo = G.fail && G.fail[0] >= G.band[1] ? G.fail[0] : hi;
+    var lowFrom = G.fail && G.fail[1] <= G.band[0] ? G.fail[1] : lo;
+    items.push({ text: G.word("low"), a: X(lowFrom), b: X(G.band[0]), colour: C.dim });
+    items.push({ text: G.word("high"), a: X(G.band[1]), b: X(highTo), colour: C.dim });
+    gaugeNames(g, C, items, x0, x1, by + bh + 12);
+  }
+
   function degrees(c) {
     var n = String(Math.round(c / 5) * 5);
     return n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " °C";
@@ -1130,6 +1274,17 @@
       hint.appendChild(reactNum);
       hintText.setAttribute("aria-live", "polite");
     }
+    // A leather game's band gauge: the reading in its real unit above the hint ("62 °C",
+    // "Pitch 11 SPI"), and the hint spoken when it changes, because the gauge's words ("Too
+    // deep: ease off") are what a player who cannot see the needle's colour reads.
+    var bandNum = null;
+    if (def.BAND) {
+      root.classList.add("has-band");
+      bandNum = el("p", "bench-game__band-num");
+      bandNum.setAttribute("aria-label", (def.BAND.label || def.name) + ", the reading");
+      hint.appendChild(bandNum);
+      hintText.setAttribute("aria-live", "polite");
+    }
     if (def.STAGES) root.classList.add("has-stages");
     if (def.track === "alchemy") hintText.setAttribute("aria-live", "polite");
     if (def.track) root.classList.add("bench-game--" + def.track);
@@ -1178,7 +1333,7 @@
     return { root: root, thread: thread, meter: meter, canvas: canvas, hint: hint, tier: tier,
       hintText: hintText, tools: tools, help: help, word: word, band: band, live: live,
       card: card, cardText: cardText, cardSub: cardSub, heatNum: heatNum, reheat: reheat,
-      hour: hourWordsEl, reactNum: reactNum };
+      hour: hourWordsEl, reactNum: reactNum, bandNum: bandNum };
   }
 
   // --- the loop ---------------------------------------------------------------------------
@@ -1202,11 +1357,13 @@
     // game with an hour does the same with the day-phase band (no game has both).
     var gh = r.heat ? GAUGE_H : r.hour ? HOUR_H : 0;
     if (r.react) gh = GAUGE_H; else if (r.stages) gh = STAGE_H;   // alchemy only
+    if (r.gauge) gh = GAUGE_H;                                     // leather only
     r.game.draw(g, r.W, r.H - gh);
     if (r.heat) drawGauge(r, g, r.W, r.H - gh);
     else if (r.hour) drawHourBand(r, g, r.W, r.H - gh);
     if (r.react) drawReaction(r, g, r.W, r.H - gh);
     else if (r.stages && r.game.track) drawStageTrack(r, g, r.W, r.H - gh);
+    if (r.gauge) drawBandGauge(r, g, r.W, r.H - gh);
     if (r.particles.length) drawParticles(r, g);
     var p = r.game.progress ? r.game.progress(r.t) : r.t / r.game.duration;
     r.dom.thread.style.transform = "scaleX(" + clamp(p, 0, 1).toFixed(4) + ")";
@@ -1263,6 +1420,7 @@
     }
     if (r.heat) showHeat(r);
     else if (r.react) showReact(r);
+    else if (r.gauge) showGauge(r);
     else if (r.game.hint) setHint(r, hintNow(r));
     var s = clamp(r.game.score(), 0, 1);
     if (Math.abs(s - r.lastScore) >= 0.004) {
@@ -1301,6 +1459,19 @@
       if (r.reactState) r.dom.root.classList.remove("react-" + r.reactState);
       r.reactState = s;
       r.dom.root.classList.add("react-" + s);
+    }
+    setHint(r, hintNow(r));
+  }
+
+  // The band gauge's reading and zone (leather games with BAND): "Water 62 °C", a `band-<zone>`
+  // class on the strip (low, in, high, fail) for the stylesheet, and the hint.
+  function showGauge(r) {
+    var n = r.gauge.text(), s = r.gauge.status();
+    if (r.dom.bandNum && n !== r.gaugeShown) { r.gaugeShown = n; r.dom.bandNum.textContent = n; }
+    if (s !== r.gaugeState) {
+      if (r.gaugeState) r.dom.root.classList.remove("band-" + r.gaugeState);
+      r.gaugeState = s;
+      r.dom.root.classList.add("band-" + s);
     }
     setHint(r, hintNow(r));
   }
@@ -1418,6 +1589,17 @@
         baseWin * (from === "reaction" ? 1 : bandScale) * (steady ? (DR.steadyBand || 1) : 1));
     }
     if (r.def.STAGES) r.stages = readStages(opts.stages || tuning.stages, r.def.STAGE_NAMES || []);
+    // The leather band gauge (leather contracts §11.1): the opts first, the server's tuning
+    // second (rules/leatherworker.py puts `band` on both the roll's body and its tuning). Lane
+    // E's band_scale is the working traits only, and its `narrow` is the hide's rarity alone,
+    // so each is counted once here.
+    var DB = r.def.BAND;
+    if (DB) {
+      var bandIn = opts.band && typeof opts.band === "object" ? opts.band
+        : tuning.band && typeof tuning.band === "object" ? tuning.band : null;
+      r.gauge = makeBand(DB, bandIn, baseWin * bandScale * (steady ? (DB.steadyBand || 1) : 1) *
+        (bandIn && bandIn.narrow ? NARROW : 1));
+    }
     var voice = { hardness: tuning.hardness, bath: tuning.bath };
     // The enchanter's sound contract (contracts §13): enchant events carry the day phase.
     // Only an hour adds it, and only an enchant game with HOUR has one.
@@ -1437,6 +1619,8 @@
       // The alchemist's reaction gauge and colour stages (null for every other game).
       react: r.react || null,
       stages: r.stages || null,
+      // The leather band gauge (null for every other game): the game sets `gauge.v`.
+      gauge: r.gauge || null,
       narrow: narrow,
       bandScale: bandScale,
       band: function (steadyFactor) { return baseWin * bandScale * (steady ? (steadyFactor || 1) : 1); },
@@ -1786,6 +1970,7 @@
       paint(r);
       showBand(r, 0);
       if (r.heat) showHeat(r);
+      if (r.gauge) showGauge(r);
       if (r.stage) {
         try { if (typeof r.stage.update === "function") r.stage.update(r.game.state()); }
         catch (e) { r.stage = null; }
@@ -1825,6 +2010,7 @@
     r.game = def.create(ctx);
     return {
       game: r.game, heat: r.heat, ctx: ctx, hour: r.hour, react: r.react || null, stages: r.stages || null,
+      gauge: r.gauge || null,
       // What the strip would say over the hint (the day-phase words), for the tests.
       hourWords: function () { return r.hour ? hourWords(r.hour, finite(r.game.widen) ? r.game.widen : null) : ""; },
       t: function () { return r.t; },
@@ -1866,6 +2052,8 @@
     gauge: { names: HEAT_NAMES.map(function (b) { return b.name; }), degrees: degrees },
     // The day-phase band's fallback windows and names (tests hold them to rules/sky.py).
     dayPhases: { windows: PHASE_WINDOWS, names: PHASE_NAMES },
+    // The band gauge's units (leather contracts §11.1), for the tests.
+    bandUnits: Object.keys(BAND_UNITS),
     running: function () { return !!run; },
     kit: KIT
   };
