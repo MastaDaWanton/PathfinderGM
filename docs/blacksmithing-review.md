@@ -123,10 +123,10 @@ are one `bundle`.
 | Mammoth Ivory Grip | uncommon | weapon: haft | +2 hit points per inch; +2 Diplomacy; **-2 Attack rolls** | – | – | easily_worked |
 | Sharkskin Grip | uncommon | weapon: haft | +2 Attack rolls; +2 CMB; **-2 hardness** | – | – | forgiving |
 | Wire-Wrapped Grip | uncommon | weapon: haft | +2 CMD the duellist's grip, against being disarmed; +2 Attack rolls; **-2 hardness** | – | – | narrow_window |
-| Dragonhide Grip | rare | weapon: haft | Resist fire 3; +2 CMD; **-2 Attack rolls** | – | – | narrow_window |
+| Dragonhide Grip | rare | weapon: haft | +2 CMD; +2 Attack rolls; **Weighs 20% more** | – | – | narrow_window |
 | Ironwood Haft | rare | weapon: haft | +3 hardness; +2 hit points per inch; **Weighs 20% more** | – | – | narrow_window |
 | Wyroot Haft | rare | weapon: haft | 1 temporary hit points, on a critical hit, on whoever has it, for 1 day (1× per day); +2 Attack rolls; **-2 hit points per inch** | – | – | malleable |
-| Angelskin Binding | exotic | armour: lining | – | +3 Will; +2 Armour class; **-3 Diplomacy** | – | pure |
+| Angelskin Binding | exotic | armour: lining | – | +2 Will; +2 Diplomacy; **-2 Stealth** | armour: +3 hardness | pure |
 | Fiend Bone Core | exotic | weapon: haft | +3 Initiative; +2 Attack rolls; **-3 Will** | – | – | reactive |
 
 ## Treatments (finishes)
@@ -214,4 +214,4 @@ are one `bundle`.
 | Abyssal Salt | exotic | – | cleans_slag, easily_worked, reactive |
 | Stardust Flux | legendary | – | weld_aid, pure, flawless |
 
-Totals: 223 house modifiers and quench marks, 84 book effects, 112 materials.
+Totals: 223 house modifiers and quench marks, 85 book effects, 112 materials.

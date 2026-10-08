@@ -61,7 +61,9 @@ def test_an_old_entry_loads_with_every_field_defaulted():
     can iterate without a guard."""
     doc = materials.normalise({"id": "Orichalch", "name": "Orichalch", "kind": "metal"})
     assert doc["id"] == "orichalch" and doc["material"] == "orichalch"
-    assert doc["pieces"] == {"weapon": [], "armour": []}
+    # Every gear a piece can be named for, the leatherworker's shield and worn goods too
+    # (leatherworking contracts §3), each an empty list.
+    assert doc["pieces"] == {"weapon": [], "armour": [], "shield": [], "worn": []}
     assert doc["weapon"] == [] and doc["armour"] == [] and doc["working"] == []
     assert doc["quench_mark"] is None and doc["book"] is False
     assert doc["form"] == "bar" and doc["tier"] == "common"
@@ -124,6 +126,14 @@ def test_one_material_many_shelves():
     for shelf in ("ore:mithral-ore", "catalyst:mithral-dust", "catalyst:mithral-filings",
                   "fitting:mithral-fittings"):
         assert shelf in forms, forms
+    # And the other way (leatherworking plan §4.4, Q7.4): the forge's four leather pieces
+    # are forms of the leatherworker's hides. Before the leather data pass only the
+    # dragonhide grip was linked, so a sharkskin grip taught nothing about sharkskin.
+    assert materials.material_of("leather-grip") == "cowhide"
+    assert materials.material_of("sharkskin-grip") == "sharkskin"
+    assert materials.material_of("dragonhide-grip") == "red-dragonhide"
+    assert materials.material_of("angelskin-binding") == "angelskin"
+    assert "grip:sharkskin-grip" in materials.get("sharkskin")["forms"]
 
 
 def test_every_link_names_a_real_parent():
@@ -180,7 +190,7 @@ def test_every_structural_material_has_three_and_three_with_a_drawback(forge):
     for d in forge:
         if d["kind"] not in materials.STRUCTURAL:
             continue
-        for gear in materials.GEARS:
+        for gear in materials.FORGE_GEARS:
             if not d["pieces"][gear]:
                 continue
             if len(d[gear]) < 3:
@@ -207,7 +217,7 @@ def test_no_material_effect_is_narrative(forge):
 def test_every_effect_passes_the_shared_vocabulary(forge):
     problems = []
     for d in forge:
-        for gear in materials.GEARS:
+        for gear in materials.FORGE_GEARS:
             for i, spec in enumerate(d[gear]):
                 problems.extend(effectspec.validate(spec, f"{d['id']} {gear} {i + 1}"))
         for i, spec in enumerate(d["working"]):
@@ -224,7 +234,7 @@ def test_house_numbers_stay_inside_the_tier_ceilings(forge):
     over, under = [], []
     for d in forge:
         ceiling = materials.TIER_CEILING[d["tier"]]
-        for gear in materials.GEARS:
+        for gear in materials.FORGE_GEARS:
             for e in d[gear]:
                 if e.get("book"):
                     continue
@@ -284,7 +294,7 @@ def test_every_material_is_relevant(forge):
     thing to buy and never use."""
     idle = []
     for d in forge:
-        ok = (any(d["pieces"][g] for g in materials.GEARS)
+        ok = (any(d["pieces"][g] for g in materials.FORGE_GEARS)
               or d["kind"] in ("fuel", "flux", "quenchant")
               or (d["kind"] == "treatment" and d["finishes"]
                   and any(d[g] for g in d["finishes"]))
@@ -297,7 +307,7 @@ def test_every_material_is_relevant(forge):
 
 def test_book_flag_agrees_with_book_effects(forge):
     for d in forge:
-        has = any(e.get("book") for g in materials.GEARS for e in d[g])
+        has = any(e.get("book") for g in materials.FORGE_GEARS for e in d[g])
         assert d["book"] == has, d["id"]
 
 
@@ -402,6 +412,11 @@ BOOK = {
     "fire-forged-steel": {_r("armour", "resistance", "fire", 2)},
     "frost-forged-steel": {_r("armour", "resistance", "cold", 2)},
     "darkwood-haft": {_r("weapon", "gear_mod", "weight_pct", -50)},
+    # Angelskin's printed hardness 5 (Ultimate Equipment; leatherworking prior art §1.3),
+    # +3 on leather's 2. The binding is a form of the leather lane's angelskin now
+    # (leatherworking plan §4.4) and carries its list; before that it carried Will +3,
+    # AC +2 and Diplomacy -3, which no book prints.
+    "angelskin-binding": {_r("armour", "gear_mod", "hardness", 3)},
 }
 
 
@@ -413,17 +428,17 @@ def test_book_effects_equal_the_prior_art_table(forge):
     wrong = {}
     for mid, want in BOOK.items():
         d = by_id[mid]
-        have = {_canon(g, e) for g in materials.GEARS for e in d[g] if e.get("book")}
+        have = {_canon(g, e) for g in materials.FORGE_GEARS for e in d[g] if e.get("book")}
         if have != want:
             wrong[mid] = {"missing": sorted(map(str, want - have)),
                           "unexpected": sorted(map(str, have - want))}
     assert not wrong, json.dumps(wrong, indent=1)
     stray = [d["id"] for d in forge if d["id"] not in BOOK
-             and any(e.get("book") for g in materials.GEARS for e in d[g])]
+             and any(e.get("book") for g in materials.FORGE_GEARS for e in d[g])]
     assert not stray, stray
     # The same set in a list: a duplicated book row would hide inside a set comparison.
     for mid in BOOK:
-        rows = [_canon(g, e) for g in materials.GEARS for e in by_id[mid][g] if e.get("book")]
+        rows = [_canon(g, e) for g in materials.FORGE_GEARS for e in by_id[mid][g] if e.get("book")]
         dupes = {r for r in rows if rows.count(r) > 1}
         assert not dupes - {_r("weapon", "combat_mod", "damage", 1)}, (mid, dupes)
 
@@ -443,7 +458,7 @@ def test_the_eleven_catalogue_errors_are_gone(forge):
                    for e in d["horacalcum"]["weapon"])
     # Singing steel: the invented +2 Perform is gone as a book number.
     assert not any(e.get("target") == "perform" and e.get("book")
-                   for g in materials.GEARS for e in d["singing-steel"][g])
+                   for g in materials.FORGE_GEARS for e in d["singing-steel"][g])
     # Inubrix and noqual keep their drawbacks.
     assert any(materials.is_negative(e) and e.get("book") for e in d["inubrix"]["weapon"])
     assert any(e.get("target") == "asf" and e.get("amount") == 20

@@ -59,14 +59,30 @@ ALCHEMY_KINDS = ("reagent", "gland", "solvent", "vessel", "salt", "treatment", "
                  "catalyst")
 _ALCHEMY_ONLY_KINDS = ("reagent", "gland", "solvent", "vessel", "salt", "catalyst")
 
-# The eight forge kinds. Fixed: tests/test_blacksmith.py pins them, and a typo'd kind
-# would load and then never count as fuel or metal anywhere.
-KINDS = ("ore", "metal", "alloy", "fuel", "flux", "quenchant", "fitting", "treatment")
-STRUCTURAL = ("metal", "alloy", "fitting")
+# The eight forge kinds. Fixed: a typo'd kind would load and then never count as fuel or
+# metal anywhere. `is_forge` asks THESE, never `KINDS`: a homebrew hide with no catalogue is
+# the leatherworker's, and judging it by the forge's rules would refuse it for not being a
+# metal.
+FORGE_KINDS = ("ore", "metal", "alloy", "fuel", "flux", "quenchant", "fitting", "treatment")
+# The leatherworker's six (leatherworking contracts §3). `fitting` and `treatment` are shared
+# with the forge by name, which is why a document's catalogue, not its kind, says whose bench
+# judges it (`is_leather`).
+LEATHER_ONLY_KINDS = ("hide", "tannin", "oil", "wax", "thread", "dye")
+KINDS = FORGE_KINDS + LEATHER_ONLY_KINDS
+STRUCTURAL = ("metal", "alloy", "fitting", "hide")
 CONSUMABLE = ("fuel", "flux")          # working traits only (the owner's ruling)
-GEARS = ("weapon", "armour")
+# The forge's gear words, which are also the item-effect lists a forge document carries.
+FORGE_GEARS = ("weapon", "armour")
+# Every gear a material's `pieces` may name (contracts §3): a shield reads its own `shield`
+# list or else `armour` (forge_items._effects_for); worn goods (cloak, boots, gloves) read
+# the `armour` list minus the suit-only numbers (plan §18.2), so `worn` has no list of its
+# own. EFFECT_GEARS is the lists that exist.
+GEARS = ("weapon", "armour", "shield", "worn")
+EFFECT_GEARS = ("weapon", "armour", "shield")
 PIECES = {"weapon": ("head", "haft", "fittings"),
-          "armour": ("body", "fastenings", "lining")}
+          "armour": ("body", "fastenings", "lining"),
+          "shield": ("body", "fastenings", "lining"),
+          "worn": ("body", "lining")}
 
 # The ceiling on any one house modifier, by tier (plan §5.7). Book numbers are exempt,
 # being the book. The ceilings above 2 are proposed and still open to playtest (§17).
@@ -104,6 +120,92 @@ _FORM_OF_KIND = {"ore": "ore", "metal": "bar", "alloy": "alloy bar", "fuel": "fu
                  "flux": "flux", "quenchant": "quenchant", "treatment": "treatment"}
 _DEFAULT_FORMS = {"metal": ["ingot", "bar", "blank", "plate"],
                   "alloy": ["alloy bar", "blank", "plate"]}
+
+
+# --- the leatherworker's document fields (leatherworking contracts §3, plan §14.2) ----------
+
+LEATHER_CATALOGUE = "leatherworker-materials"
+LEATHER_CONSUMABLES = ("tannin", "oil", "wax", "thread", "dye", "treatment")
+LEATHER_KINDS = ("hide", "fitting") + LEATHER_CONSUMABLES
+# What a hide's outside is, for the stage and the swatch (UI plan §4) and for lane C's
+# generic hides (`harvest.hide.generic.<surface>`).
+SURFACES = ("fur", "scale", "smooth", "feather", "chitin", "shell")
+# How a tannin tans (plan §8.1): brain at the kit, alum at the kit, bark, mineral and planar
+# in a tannery vat. The tannage, not the tannin's id, is what decides the wait and whether
+# the leather can be hardened (alum and brain leather cannot), so it is a field.
+TANNAGES = ("brain", "alum", "bark", "mineral", "planar")
+# A leather document with no colour gets its kind's, so the swatch never draws nothing.
+# Every shipped leather material writes its own; this is for homebrew.
+KIND_COLOUR = {"hide": "#a0764a", "tannin": "#7a4a26", "oil": "#c9a24a", "wax": "#d9c48a",
+               "thread": "#d8cfb8", "dye": "#8a3030", "fitting": "#9a9a9a",
+               "treatment": "#e8e4dc"}
+# The ids that are curing salt whatever their document says (contracts §3: "curing-salt, or
+# `salt: true`"). One reader for salt, by id and field, never by a word in a name: the
+# herbalist's `has_salt` matched name fragments (plan §6), the shape the three laws refuse.
+SALT_IDS = ("curing-salt",)
+# Armour rows the leather bench's book materials name but `tables.ARMOUR` / `SHIELDS` do not
+# have yet: leather lane B adds them (contracts §4.2). `allowed_bases` may name them now so the
+# book restriction is written once; drop a row from here when it lands in the tables
+# (tests/test_leather_materials.py refuses one that already has).
+PENDING_BASES = ("quilted cloth", "leather lamellar", "horn lamellar", "armored coat",
+                 "steel lamellar", "madu")
+
+# **Marks are on hold** (the owner, 2026-10-08, leatherworking questions "Plan open points"
+# 13: "explain before deciding"). A consumable carries working traits only until then; the
+# proposed marks (plan §14.6) live in the leatherworker catalogue's top-level
+# `marks_on_hold` block, which nothing reads, so the owner's decision deletes or enables them
+# in one place. While this is True the validator refuses a `mark` on any shipped document.
+MARKS_HELD = True
+# How many discoverable properties a consumable needs. The plan's three (§14.6) counted the
+# mark; with marks held, the leather vocabulary leaves most dyes, oils and threads one or two
+# honest working traits (a dye is fast or fugitive, and nothing else in
+# effectspec.LEATHER_TRAITS describes a dye). Padding them with a trait that is not true
+# would teach the player something false, so the floor while marks are held is the
+# contract's "at least one working trait"; the review page lists each consumable's count.
+CONSUMABLE_PROPERTIES = 3
+CONSUMABLE_PROPERTIES_WHILE_HELD = 1
+
+
+def is_leather(doc: dict) -> bool:
+    """Whether the leather bench's rules judge this document: the leatherworker's own
+    catalogue, and homebrew with no catalogue written in one of the leather-only kinds."""
+    cat = doc.get("catalogue", "")
+    return cat == LEATHER_CATALOGUE or (cat == "" and doc.get("kind") in LEATHER_ONLY_KINDS)
+
+
+def grip_capable(doc: dict) -> bool:
+    """Whether a hide can be a grip: it names the forge's `haft` among its weapon pieces
+    (plan §14.3). Only these carry a weapon list (the owner, Q3.1)."""
+    return "haft" in ((doc or {}).get("pieces") or {}).get("weapon", [])
+
+
+def is_salt(doc_or_id) -> bool:
+    """Whether a material is curing salt: one of `SALT_IDS`, or a document saying
+    `"salt": true`. Takes a document or an id."""
+    if isinstance(doc_or_id, str):
+        mid = doc_or_id.strip().lower()
+        if mid in SALT_IDS:
+            return True
+        doc = get(mid) or {}
+    else:
+        doc = doc_or_id or {}
+    return str(doc.get("id") or "").strip().lower() in SALT_IDS or doc.get("salt") is True
+
+
+def hide_forms(doc: dict) -> list[str]:
+    """The shelves a hide appears on as it is worked (contracts §4.1's `form` values, plan
+    §9), when its document does not list them: every hide goes green, salted, pelt, leather,
+    rawhide, panel, plate, lacing and scrap; a furred or feathered one can be tanned
+    hair-on as fur; a grip-capable one becomes a grip. Scales are written by hand on the
+    hides whose best scales the forge takes (the dragons, plan §15)."""
+    out = ["green", "salted", "pelt", "leather"]
+    if doc.get("surface") in ("fur", "feather"):
+        out.append("fur")
+    out += ["rawhide", "panel", "plate", "lacing"]
+    if grip_capable(doc):
+        out.append("grip")
+    out.append("scrap")
+    return out
 
 
 def _fitting_form(mid: str) -> str:
@@ -152,7 +254,13 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
     if isinstance(obtain, dict):            # the alchemist's nested dialect
         obtain = obtain.get("how") or ""
     mark = raw.get("quench_mark")
-    return {
+    leather = catalogue == LEATHER_CATALOGUE or (catalogue == "" and kind in LEATHER_ONLY_KINDS)
+    colour = _colour(raw.get("color"))
+    if colour == "" and leather:
+        colour = KIND_COLOUR.get(kind, "")
+    lmark = raw.get("mark")
+    tannage = str(raw.get("tannage") or "").strip().lower()
+    doc = {
         "id": mid,
         "name": str(raw.get("name") or mid),
         "kind": kind,
@@ -162,8 +270,32 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "pieces": pieces,
         "weapon": [dict(e) for e in _list(raw.get("weapon")) if isinstance(e, dict)],
         "armour": [dict(e) for e in _list(raw.get("armour")) if isinstance(e, dict)],
+        # A shield's own list; empty means it reads `armour` (forge_items._effects_for).
+        "shield": [dict(e) for e in _list(raw.get("shield")) if isinstance(e, dict)],
         "working": [dict(e) for e in _list(raw.get("working")) if isinstance(e, dict)],
         "quench_mark": dict(mark) if isinstance(mark, dict) else None,
+        # A leather consumable's one small mark (contracts §3, generalising the quench
+        # mark). Held by the owner's ruling (`MARKS_HELD`): no shipped document carries one.
+        "mark": dict(lmark) if isinstance(lmark, dict) else None,
+        # The leatherworker's fields (contracts §3), defaulted on every entry so no reader
+        # asks which shelf a document came from. Meaningless (and at their defaults) on a
+        # metal, except `ferrous`, which is the metal's.
+        "surface": str(raw.get("surface") or "smooth"),
+        "allowed_bases": [str(b) for b in _list(raw.get("allowed_bases"))],
+        "always_masterwork": bool(raw.get("always_masterwork", False)),
+        "druid_permitted": bool(raw.get("druid_permitted", False)),
+        # Iron or an iron alloy: what rusting grasp eats (plan §18.5, contracts §6.2).
+        "ferrous": bool(raw.get("ferrous", False)),
+        "salt": bool(raw.get("salt", False)),
+        "tannage": tannage or None,
+        # The form a counter sells a hide in (plan §9: a shop sells tanned leather, never a
+        # green hide, which "cannot be bought or sold in most settlements", Harvest Parts).
+        # Its `price_gp` is the price of that form. "" on everything that is sold as itself.
+        "sold_as": str(raw.get("sold_as") or ""),
+        # Printed clauses no effect type can say yet (angelskin's aura, griffon mane's
+        # cheaper flight): kept as words so the card can say "book effect, not yet in
+        # play" rather than staying silent (the forge's honest pattern, plan §14.5).
+        "not_yet": [str(n) for n in _list(raw.get("not_yet"))],
         "book": bool(raw.get("book", False)),
         "forms": [str(f) for f in _list(raw.get("forms"))],
         # Which forge methods a material with no piece to fill feeds: djezet, zinc and
@@ -212,7 +344,8 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         # The enchanter writes a colour as a CSS string ("#c8a2ff"); the alchemist as the
         # [r, g, b] the stage draws its liquid in (alchemy contracts §3). Each shelf keeps
         # its own shape: flattening the list to a string would hand the stage "[0.86, ...]".
-        "color": _colour(raw.get("color")),
+        # A leather document with none takes its kind's (`KIND_COLOUR`).
+        "color": colour,
         # The alchemist's fields (docs/alchemy-contracts.md §3), defaulted on every entry
         # for the reason the enchanter's are. `product` is what the material puts in a
         # bottle; an alchemist entry written before the revamp has only `effects`, which is
@@ -238,6 +371,13 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "binds_at": str(raw.get("binds_at") or ""),
         "drawbacks": [dict(e) for e in _list(raw.get("drawbacks")) if isinstance(e, dict)],
     }
+    # A hide's shelves, computed when its document lists none, so a homebrew hide is
+    # worked through every stage without having to list them (`hide_forms`).
+    if kind == "hide" and not doc["forms"]:
+        doc["forms"] = hide_forms(doc)
+    if kind == "hide" and not doc["sold_as"]:
+        doc["sold_as"] = "fur" if doc["surface"] in ("fur", "feather") else "leather"
+    return doc
 
 
 def _int(value) -> int:
@@ -401,7 +541,16 @@ def is_forge(doc: dict) -> bool:
     homebrew written in one of the eight forge kinds. The other crafts' entries are read
     through this door and judged by their own benches."""
     cat = doc.get("catalogue", "")
-    return cat == FORGE_CATALOGUE or (cat == "" and doc.get("kind") in KINDS)
+    return cat == FORGE_CATALOGUE or (cat == "" and doc.get("kind") in FORGE_KINDS)
+
+
+def is_judged(doc: dict) -> bool:
+    """Whether `validate` holds this document to a bench's full rules, not just the shared
+    shape: the forge's, the leatherworker's (contracts §3: this replaced the early return
+    that let all 127 leather documents through unjudged), the alchemist's, and an essence.
+    The enchanter's vessels and the rest are read through this door and judged elsewhere."""
+    return (is_forge(doc) or is_leather(doc) or doc.get("catalogue") == ALCHEMY_CATALOGUE
+            or doc.get("kind") == "essence")
 
 
 def _rank(tier: str) -> int:
@@ -452,9 +601,12 @@ def _walk(spec: dict):
 
 def properties(doc: dict) -> int:
     """How many things there are to discover about this material: its item effects, its
-    working traits and its quench mark (plan §5.7, "three traits to discover")."""
+    working traits and its quench mark (plan §5.7, "three traits to discover"), and a
+    leather document's shield list and mark."""
     return (len(doc.get("weapon") or []) + len(doc.get("armour") or [])
-            + len(doc.get("working") or []) + (1 if doc.get("quench_mark") else 0))
+            + len(doc.get("shield") or [])
+            + len(doc.get("working") or []) + (1 if doc.get("quench_mark") else 0)
+            + (1 if doc.get("mark") else 0))
 
 
 # --- validation -------------------------------------------------------------------------------
@@ -471,7 +623,9 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
     """
     if "pieces" not in doc or not isinstance(doc.get("pieces"), dict) \
             or "catalogue" not in doc:
-        default = ENCHANT_CATALOGUE if doc.get("kind") == "essence" else FORGE_CATALOGUE
+        default = (ENCHANT_CATALOGUE if doc.get("kind") == "essence"
+                   else LEATHER_CATALOGUE if doc.get("kind") in LEATHER_ONLY_KINDS
+                   else FORGE_CATALOGUE)
         doc = normalise(doc, doc.get("catalogue", default))
         if doc["kind"] == "essence" and not doc["phase"]:
             doc["phase"] = str((_families_raw().get(doc["family"]) or {}).get("phase")
@@ -507,14 +661,20 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
     if doc.get("kind") == "essence" and not is_forge(doc):
         out.extend(essence_problems(doc, shelf=known))
         return out
+    if is_leather(doc):
+        out.extend(leather_problems(doc, shelf=known))
+        return out
     if not is_forge(doc):
         return out
 
     kind = doc.get("kind")
     tier = doc.get("tier")
     ceiling = TIER_CEILING.get(tier, 2)
-    if kind not in KINDS:
-        say(f"kind {kind!r} is not a forge kind. One of: {', '.join(KINDS)}.")
+    if kind not in FORGE_KINDS:
+        say(f"kind {kind!r} is not a forge kind. One of: {', '.join(FORGE_KINDS)}.")
+    if doc.get("ferrous") and kind not in ("metal", "alloy"):
+        say("is marked ferrous and is not a metal or an alloy. Only iron and its alloys "
+            "are ferrous (rusting grasp's target); remove the mark.")
 
     # Pieces name real slots.
     for gear, slots in doc["pieces"].items():
@@ -523,18 +683,18 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
                 say(f"{gear} piece {slot!r} is not a slot. A {gear} has "
                     f"{', '.join(PIECES.get(gear, ()))}.")
 
-    lists = {g: doc.get(g) or [] for g in GEARS}
+    lists = {g: doc.get(g) or [] for g in FORGE_GEARS}
 
     # Every effect is a real, executable document. `effectspec.validate` is the
     # vocabulary's own judge; narrative is legal there and refused here (contract §2).
-    for gear in GEARS:
+    for gear in FORGE_GEARS:
         for i, spec in enumerate(lists[gear]):
             out.extend(_effect_problems(spec, f"{mid} {gear} effect {i + 1}"))
     if doc.get("quench_mark"):
         out.extend(_effect_problems(doc["quench_mark"], f"{mid} quench mark"))
 
     # Book flags agree with each other.
-    book_effects = [e for g in GEARS for e in lists[g] if e.get("book")]
+    book_effects = [e for g in FORGE_GEARS for e in lists[g] if e.get("book")]
     if book_effects and not doc.get("book"):
         say("carries book effects but is not marked \"book\": true. Mark the document.")
     if doc.get("book") and not book_effects:
@@ -543,7 +703,7 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
 
     # House numbers: within the tier ceiling, and at least the base on summed lists.
     summed = kind in STRUCTURAL
-    for gear in GEARS:
+    for gear in FORGE_GEARS:
         for i, spec in enumerate(lists[gear]):
             if spec.get("book"):
                 continue
@@ -574,7 +734,7 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
 
     # The structural rule: 3 + 3 where the piece is named, one drawback in each.
     if kind in STRUCTURAL:
-        for gear in GEARS:
+        for gear in FORGE_GEARS:
             named = bool(doc["pieces"].get(gear))
             n = len(lists[gear])
             if named and n < 3:
@@ -592,15 +752,15 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
         if not doc["finishes"]:
             say("is a treatment that finishes nothing. Say which gear it goes on in "
                 "\"finishes\" (weapon, armour).")
-        for gear in GEARS:
+        for gear in FORGE_GEARS:
             if lists[gear] and gear not in doc["finishes"]:
                 say(f"has {gear} effects but does not finish a {gear}. Add it to "
                     f"\"finishes\" or remove them.")
-        if any(doc["pieces"].get(g) for g in GEARS):
+        if any(doc["pieces"].get(g) for g in FORGE_GEARS):
             say("is a treatment and fills a piece. A finish is laid over the item; remove "
                 "\"pieces\".")
     elif kind in CONSUMABLE or kind == "quenchant" or kind == "ore":
-        for gear in GEARS:
+        for gear in FORGE_GEARS:
             if lists[gear]:
                 what = ("a fuel or flux carries working traits only (the owner's ruling)"
                         if kind in CONSUMABLE else
@@ -608,7 +768,7 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
                         if kind == "quenchant" else
                         "an ore's effects are its metal's; link it with \"material\"")
                 say(f"has {gear} effects, but {what}. Remove them.")
-        if any(doc["pieces"].get(g) for g in GEARS):
+        if any(doc["pieces"].get(g) for g in FORGE_GEARS):
             say(f"is a {kind} and fills a piece. Remove \"pieces\".")
 
     danger = doc.get("assay_danger")
@@ -664,10 +824,10 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
             f"traits or effects.")
 
     # Relevance: it fills a piece, feeds a method, or finishes an item (plan §5.7).
-    relevant = (any(doc["pieces"].get(g) for g in GEARS)
+    relevant = (any(doc["pieces"].get(g) for g in FORGE_GEARS)
                 or kind in CONSUMABLE or kind == "quenchant"
                 or (kind == "treatment" and doc["finishes"]
-                    and any(lists[g] for g in GEARS))
+                    and any(lists[g] for g in FORGE_GEARS))
                 or bool(doc["feeds"])
                 or (kind == "ore" and parent is not None))
     if not relevant:
@@ -696,6 +856,256 @@ def _effect_problems(spec: dict, path: str) -> list[str]:
             out.append(f"{path}: {t} is not executable by the engine. Use a type it can "
                        f"run (combat_mod, gear_mod, strikes_as, resistance...).")
     out.extend(effectspec.validate(spec, path))
+    return out
+
+
+# =============================================================================================
+# The leatherworker's shelf (docs/leatherworking-contracts.md §3, plan §14; leather lane D,
+# 2026-10-08)
+# =============================================================================================
+#
+# Measured before this pass (plan §14.1, inventory §2): 127 materials, 96 of their 171 effect
+# specs `narrative`, 52 materials carrying only prose, none with three traits of any kind, no
+# hide with a drawback in executable form, and `validate` returning early for every one of
+# them, so nothing judged a leather document at all. A hide in a body slot contributed nothing
+# to a build because its effects sat in the legacy `effects` list nothing new reads.
+#
+# The rules below are the forge's (plan §14.2), with leather's own: a hide is structural and
+# carries >= 3 armour effects with a drawback; only a grip-capable hide carries a weapon list
+# (the owner, Q3.1); a consumable carries working traits only (Q3.2, with marks held); every
+# effect is in the leather vocabulary (`effectspec.leather_effect_problems`, lane A).
+
+
+def _known_bases() -> set[str]:
+    from .tables import ARMOUR, SHIELDS
+
+    return ({k for k in ARMOUR if k != "none"} | {k for k in SHIELDS if k != "none"}
+            | set(PENDING_BASES))
+
+
+def _leather_effect(spec: dict, path: str) -> list[str]:
+    """One effect on a leather document: lane A's leather rules (no narrative, the leather
+    working traits, DR with a bypass a blow can carry), and something the engine runs or a
+    reader the vocabulary names (`object_immunity` and `as_base` wait on leather lane B, the
+    enchanting cost on the Enchanting price: effectspec's honesty ledgers)."""
+    out = list(effectspec.leather_effect_problems(spec, path))
+    for nested in _walk(spec):
+        t = str(nested.get("type") or "")
+        if nested is not spec and t == "narrative":
+            out.append(f"{path}: carries narrative prose inside it. Type it or leave it out.")
+        elif t == "working":
+            out.append(f"{path}: a working trait is not an item effect. Move it to "
+                       f"\"working\".")
+        waiting = (t in effectspec.AWAITING_READER
+                   or str(nested.get("target") or "")
+                   in effectspec.TARGETS_AWAITING_READER.get(t, {}))
+        if effectspec.find(t) is not None and t != "narrative" and not waiting \
+                and not effectspec.executable(nested):
+            out.append(f"{path}: {t} is not executable by the engine, and no reader is "
+                       f"promised for it. Use a type it runs (combat_mod, gear_mod, "
+                       f"resistance, skill_mod...).")
+    return out
+
+
+def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
+    """Everything wrong with one leatherworker's material (contracts §3, plan §14.2), each
+    with the fix named. Takes a normalised document (`normalise(raw, LEATHER_CATALOGUE)`).
+
+    A **hide** is structural: it fills at least one armour piece, carries >= 3 armour
+    effects with at least one drawback, and a weapon list only when it is grip-capable
+    (then >= 3 with a drawback); house numbers sit inside the tier ceiling, at least
+    ±`HOUSE_FLOOR`, and combat, save and skill modifiers are typed `material`.
+    A leather **fitting** fills a fastening and carries what it is made of: a form of a
+    forge metal carries that metal's numbers exactly (one material, many shelves), and is
+    worked at the forge, so its parent's working traits are its own.
+    A **consumable** (tannin, oil, wax, thread, dye, treatment) carries working traits only:
+    no item effects, no pieces, and no mark while the owner holds marks (`MARKS_HELD`).
+    Every effect is in the leather vocabulary; every book flag agrees with its effects;
+    `always_masterwork` and `druid_permitted` are the book's and need a book document;
+    `allowed_bases` names armour rows; only a tannin has a tannage, and every tannin has one.
+    """
+    mid = doc.get("id") or "?"
+    out: list[str] = []
+    known = shelf
+
+    def say(msg: str) -> None:
+        out.append(f"{mid}: {msg}")
+
+    kind, tier = doc.get("kind"), doc.get("tier")
+    ceiling = TIER_CEILING.get(tier, 2)
+    if kind not in LEATHER_KINDS:
+        say(f"kind {kind!r} is not a leatherworker's kind. One of: {', '.join(LEATHER_KINDS)}.")
+    if doc.get("surface") not in SURFACES:
+        say(f"surface {doc.get('surface')!r} is not one of {', '.join(SURFACES)}.")
+    if not _is_colour(str(doc.get("color") or "")):
+        say(f"color {doc.get('color')!r} is not #rrggbb; the swatch and the stage read it.")
+
+    for gear, slots in (doc.get("pieces") or {}).items():
+        for slot in slots:
+            if slot not in PIECES.get(gear, ()):
+                say(f"{gear} piece {slot!r} is not a slot. A {gear} has "
+                    f"{', '.join(PIECES.get(gear, ()))}.")
+
+    lists = {g: list(doc.get(g) or []) for g in EFFECT_GEARS}
+    for gear in EFFECT_GEARS:
+        for i, spec in enumerate(lists[gear]):
+            out.extend(_leather_effect(spec, f"{mid} {gear} effect {i + 1}"))
+    mark = doc.get("mark")
+    if mark:
+        out.extend(_leather_effect(mark, f"{mid} mark"))
+    working = list(doc.get("working") or [])
+    for i, spec in enumerate(working):
+        if spec.get("type") != "working":
+            say(f"working entry {i + 1} is a {spec.get('type')!r}, not a working trait. "
+                f"Write {{\"type\": \"working\", \"trait\": ...}}.")
+            continue
+        out.extend(effectspec.leather_effect_problems(spec, f"{mid} working {i + 1}"))
+
+    # The book's flags.
+    book_effects = [e for g in EFFECT_GEARS for e in lists[g] if e.get("book")]
+    if book_effects and not doc.get("book"):
+        say("carries book effects but is not marked \"book\": true. Mark the document.")
+    if doc.get("book") and not book_effects:
+        say("is marked \"book\": true with no book effect. Remove the mark or add the "
+            "printed rule as an effect with \"book\": true.")
+    for flag, what in (("always_masterwork", "always masterwork"),
+                       ("druid_permitted", "a druid may wear")):
+        if doc.get(flag) and not doc.get("book"):
+            say(f"says {what}, which only the book grants (dragonhide, eel hide, angelskin, "
+                f"darkleaf cloth). Mark the document \"book\": true with its printed "
+                f"effects, or remove \"{flag}\".")
+        if doc.get(flag) and kind != "hide":
+            say(f"says {what}, and only a hide is the body of a suit. Remove \"{flag}\".")
+    bases = _known_bases()
+    for b in doc.get("allowed_bases") or []:
+        if b not in bases:
+            say(f"allowed base {b!r} is no armour or shield row. Name a row of "
+                f"tables.ARMOUR or tables.SHIELDS (\"leather\", \"hide armour\").")
+    if doc.get("allowed_bases") and kind != "hide":
+        say("restricts its bases and is not a hide. Only the body of a suit can.")
+    if doc.get("ferrous"):
+        say("is marked ferrous; only a metal can be (rusting grasp's target). Remove it.")
+    if kind == "tannin":
+        if doc.get("tannage") not in TANNAGES:
+            say(f"is a tannin with tannage {doc.get('tannage')!r}. Say how it tans: one of "
+                f"{', '.join(TANNAGES)} (plan §8.1).")
+    elif doc.get("tannage"):
+        say("has a tannage and is not a tannin. Remove it, or make it a tannin.")
+    if doc.get("salt") and kind in ("hide", "fitting"):
+        say("is marked salt and is a hide or a fitting. Only a treatment cures a hide.")
+    sold = doc.get("sold_as") or ""
+    if kind == "hide" and sold not in ("leather", "fur", "rawhide"):
+        say(f"is sold as {sold!r}; a counter sells a hide tanned (plan §9): \"leather\", "
+            f"\"fur\" or \"rawhide\".")
+    elif kind == "hide" and sold not in (doc.get("forms") or []):
+        say(f"is sold as {sold!r}, which is not one of its forms. Add it to \"forms\".")
+    elif kind != "hide" and sold:
+        say("says what form it is sold as and is not a hide; a consumable is sold as "
+            "itself. Remove \"sold_as\".")
+
+    # House numbers: inside the tier ceiling, at least the floor on summed lists, typed.
+    summed = kind in STRUCTURAL
+    for gear in EFFECT_GEARS:
+        for i, spec in enumerate(lists[gear]):
+            if spec.get("book"):
+                continue
+            pts = points(spec)
+            if pts is None:
+                continue
+            here = f"{gear} effect {i + 1} ({spec.get('type')} {spec.get('target', '')})"
+            if pts > ceiling:
+                say(f"{here} is {pts:g} points; a {tier} house modifier is at most "
+                    f"±{ceiling}. Bring it inside the ceiling or mark a printed rule "
+                    f"\"book\": true.")
+            if summed and pts < HOUSE_FLOOR:
+                say(f"{here} is {pts:g} points; house modifiers start at ±{HOUSE_FLOOR} "
+                    f"(a lining at half weight rounds ±1 to nothing). Raise it to ±2.")
+            if summed and spec.get("type") in ("combat_mod", "save_mod", "skill_mod",
+                                               "ability_mod") \
+                    and spec.get("bonus_type") != "material":
+                say(f"{here} has bonus type {spec.get('bonus_type')!r}; a house modifier "
+                    f"on a piece is a \"material\" bonus so two pieces fold into one "
+                    f"number, and a hide's AC folds into the suit's armour bonus instead "
+                    f"of meeting it. Set \"bonus_type\": \"material\".")
+    if mark:
+        for spec in _walk(mark):
+            pts = points(spec)
+            if pts is not None and not spec.get("book") and pts > ceiling:
+                say(f"mark ({spec.get('type')} {spec.get('target', '')}) is {pts:g} points; "
+                    f"a {tier} mark is at most ±{ceiling}.")
+
+    linked = doc.get("material") not in (None, "", mid)
+    parent = None
+    if linked and known is not None:
+        parent = known.get(_root(doc["material"], known))
+
+    def _lists_rule(gear: str, what: str) -> None:
+        n = len(lists[gear])
+        if n < 3:
+            say(f"{what} and has {n} {gear} effect(s); it needs at least 3. Add house "
+                f"modifiers at ±2 (combat_mod, gear_mod, skill_mod, resistance...).")
+        if n and not any(is_negative(e) for e in lists[gear]):
+            say(f"has no drawback in its {gear} effects; every hide needs at least one (a "
+                f"heavier check penalty, a lost Dexterity point, a softer grip). Add a "
+                f"negative house modifier.")
+
+    pieces = doc.get("pieces") or {}
+    if kind == "hide":
+        if not pieces.get("armour"):
+            say("fills no armour piece. A hide is a body, a lacing or a lining: name them "
+                "in \"pieces\".")
+        _lists_rule("armour", "is a hide")
+        grip = grip_capable(doc)
+        if lists["weapon"] and not grip:
+            say(f"has {len(lists['weapon'])} weapon effect(s) and is not grip-capable, so "
+                f"none can ever apply (the owner, Q3.1: only hides that can be grips carry "
+                f"a weapon list). Add \"haft\" to its weapon pieces or remove them.")
+        if grip:
+            _lists_rule("weapon", "is a grip-capable hide")
+        if any(p != "haft" for p in pieces.get("weapon", [])):
+            say("fills a weapon piece other than the haft. A hide is a weapon's grip and "
+                "nothing else: name only \"haft\".")
+        if lists["shield"]:
+            _lists_rule("shield", "carries its own shield list")
+    elif kind == "fitting":
+        if not any(pieces.get(g) for g in GEARS):
+            say("is a fitting that fills no piece. Name the fastening it is in \"pieces\".")
+        for gear in EFFECT_GEARS:
+            if pieces.get(gear) and gear != "shield":
+                _lists_rule(gear, f"fills a {gear} piece")
+        if parent is not None:
+            for gear in EFFECT_GEARS:
+                mine = [dict(e) for e in lists[gear]]
+                theirs = [dict(e) for e in parent.get(gear) or []]
+                if pieces.get(gear) and theirs and mine != theirs:
+                    say(f"is a form of {parent['id']} and its {gear} effects differ from "
+                        f"{parent['id']}'s. A form carries what it is made of (one material, "
+                        f"many shelves): copy {parent['id']}'s {gear} list.")
+    else:
+        for gear in EFFECT_GEARS:
+            if lists[gear]:
+                say(f"has {gear} effects, but a {kind} carries working traits only (the "
+                    f"owner, Q3.2). Remove them.")
+        if any(pieces.get(g) for g in GEARS):
+            say(f"is a {kind} and fills a piece. Remove \"pieces\".")
+        if mark and MARKS_HELD:
+            say("carries a mark, and marks are on hold (the owner, 2026-10-08). Keep it in "
+                "the catalogue's \"marks_on_hold\" block until the owner rules.")
+
+    # Working traits: at least one, the form's parent's counting for a linked fitting.
+    inherited = list((parent or {}).get("working") or []) if linked else []
+    if not working and not inherited:
+        say("has no working trait. Every material behaves some way at the bench: give it "
+            f"at least one ({', '.join(effectspec.LEATHER_TRAITS[:4])}...).")
+
+    count = properties(doc) + (properties(parent) if parent is not None else 0)
+    if kind in LEATHER_CONSUMABLES:
+        need = CONSUMABLE_PROPERTIES_WHILE_HELD if MARKS_HELD else CONSUMABLE_PROPERTIES
+    else:
+        need = 3
+    if count < need:
+        say(f"has {count} discoverable propert{'y' if count == 1 else 'ies'}; a {kind} needs "
+            f"at least {need} (item effects, working traits, mark).")
     return out
 
 
