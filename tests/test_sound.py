@@ -402,6 +402,8 @@ def test_prefs_have_their_defaults_survive_broken_storage_and_tell_listeners(tmp
                                "sound.enchant": 0.8,
                                # The Alchemy bench's bus (alchemy UI plan §11).
                                "sound.alchemy": 0.8,
+                               # The Leatherworking bench's bus (leather UI plan §11).
+                               "sound.leather": 0.8,
                                "sound.ambience": 0.4, "sound.combat": 0.7,
                                "sound.mute": False,
                                # The owner's soundtrack (music.js, 2026-10-02).

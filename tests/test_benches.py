@@ -363,20 +363,98 @@ def test_one_word_for_what_is_being_made():
 def test_a_shape_the_bench_does_not_make_is_refused_by_name(client):
     """Before the aliases were normalised, a tannery simply never saw the word the player
     typed: `shaping` matched none of its keys, so asking for a dagger silently produced a
-    satchel. It now answers with the patterns it does know."""
-    from play.craft_views import _craft_materials
+    satchel. It now answers with the patterns it does know.
 
+    Re-pinned by leather lane U7 (2026-10-08): the /craft/ page no longer takes a leather
+    chain at all (the route answers the `moved` sentence, below), so the shape refusal is
+    read where it still lives, the routing table's own preview (rules/leatherworker.py
+    `preview`, lane E), through the same alias normalising."""
+    from rules.leatherworker import CraftError
+
+    chain = benches.chain_from_body("leatherworker", {"methods": ["skin", "cure"],
+                                                      "shaping": "dagger"})
+    with pytest.raises(CraftError) as why:
+        benches.preview("leatherworker", 1, chain)
+    assert "satchel" in str(why.value), str(why.value)
+
+
+def test_the_old_page_refuses_a_leather_chain_and_says_where_the_bench_went(client):
+    """Leatherworking UI plan §13: the chain bench retires for leather. Before, the
+    Leatherworking tab drew the whole 127-material shelf as emoji tiles and a batch Craft
+    that spent every input on any failure (leatherworking inventory §1). Its preview, craft
+    and recipe routes now answer 409 with the moved sentence, as herbalism's do, and the
+    track state carries it for the page."""
+    body = {"craft": "leatherworking", "ingredients": ["deer-hide"],
+            "materials": ["deer-hide"], "methods": ["tan"], "shaping": "satchel"}
+    for route in ("/api/craft/preview", "/api/craft/do", "/api/craft/recipes"):
+        r = client.post(route, data=json.dumps(dict(body, name="x")),
+                        content_type="application/json")
+        assert r.status_code == 409, (route, r.content[:200])
+        assert r.json()["moved"] is True
+        assert r.json()["error"].startswith("Leatherworking is at the table now"), r.json()
+    d = client.get("/api/craft/ingredients?craft=leatherworking").json()
+    assert d["track"]["moved"].startswith("Leatherworking is at the table now")
+
+
+def test_the_old_leatherworking_tab_is_a_card_that_opens_the_bench():
+    """UI plan §13 (owner Q8.4, "a moved card"): /craft/'s Leatherworking tab becomes one
+    card with one way to the tanner's bench over the table (`/play/#leather`), and none of
+    its words carry an em-dash or en-dash (UI plan §8)."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "play" / "templates" / "play"
+           / "craft.html").read_text(encoding="utf-8")
+    sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
+    assert 'if (CRAFT === "leatherworking") { renderLeatherMoved(); return; }' in sel
+    assert 'CRAFT === "leatherworking";' in sel
+    card = src[src.index("function renderLeatherMoved()"):src.index("function renderAlchemyMoved()")]
+    assert 'href="/play/#leather"' in card and "Open the leather bench" in card
+    assert "Leatherworking is at the table now" in card
+    assert "—" not in card and "–" not in card
+
+
+def test_a_skinned_hide_lands_green_with_its_clock(client, monkeypatch):
+    """Contracts §9: `craft_excursion` never passed `at_minute`, so a skinned hide was a
+    bare count in the satchel, and the leather bench reads a bare count as a counter's
+    purchase, sold tanned. Measured 2026-10-08: a wolf pelt carried that way reached the
+    rack as "Wolf Fur (oak bark)", form fur; it must reach it as a green hide whose 48-hour
+    clock started at the skinning. Skinning stays on the hub until the harvest lane
+    replaces it (leatherworking contracts §1, lane C)."""
+    from rules import leatherworker as lw
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+
+    monkeypatch.setattr(Dice, "d20", lambda self, modifiers=None, label="", visibility="hidden":
+                        self.given(20, modifiers, label))
     c = cm.current()
-    mats = [m["id"] for m in _craft_materials("leatherworker")[:3]]
-    for m in mats:
-        c.scene.pc().carry(m, 4)
+    for ref in [r for r in c.scene.actors if r != "pc"]:
+        c.scene.depart(ref)
+    wolf = instantiate("wolf", scene=c.scene, name="a wolf")
+    c.scene.add(wolf)
+    wolf.hp = -20
+    wolf.apply_hp_state()
+    pc = c.scene.pc()
+    pc.inventory.clear()
+    pc.picked_at.clear()
+    pc.preserved.clear()
     c.save()
-    body = {"craft": "leatherworking", "ingredients": mats, "materials": mats,
-            "methods": ["skin", "cure"], "shaping": "dagger"}
-    r = client.post("/api/craft/preview", data=json.dumps(body),
+    skinned_at = c.scene.clock_minutes
+
+    r = client.post("/api/craft/excursion", data=json.dumps({"action": "leatherworker:skin"}),
                     content_type="application/json")
-    assert r.status_code == 400
-    assert "satchel" in r.json()["error"], r.json()["error"]
+    assert r.status_code == 200, r.content[:300]
+    assert r.json()["succeeded"] is True
+    pc = cm.current().scene.pc()
+    hides = [mid for mid in pc.inventory if (lw.material(mid) or {}).get("kind") == "hide"]
+    assert hides, f"a natural 20 skinned no hide: {r.json()['found']}"
+    for mid in hides:
+        assert pc.picked_at.get(mid) == skinned_at, mid
+    rows = [p for p in lw.rack(pc, cm.current().scene.clock_minutes) if p.material in hides]
+    assert rows and all(p.form in ("green", "salted") for p in rows), \
+        [(p.name, p.form) for p in rows]
+    assert all(p.hide.tannage == "" for p in rows), [p.name for p in rows]
+    # Anything else the carcass gave (sinew, tallow) keeps no clock of its own.
+    assert all(mid in hides for mid in pc.picked_at)
 
 
 # --- herbalism moved to the table's step bench (2026-10-02) ---------------------------

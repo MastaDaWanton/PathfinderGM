@@ -671,14 +671,18 @@ async function selectCraft(id) {
   // Alchemy moved on 2026-10-07 (docs/alchemy-ui-plan.md §5.1, alchemy lane U1): the bench
   // over the table; the old chain's preview is refused in words (rules/benches.MOVED), so
   // its shelf, cauldron and per-dose dice are never drawn for it again.
+  // Leatherworking moved on 2026-10-08 (docs/leatherworking-ui-plan.md §13, leather lane
+  // U7): the tanner's bench over the table; the old chain is refused in words
+  // (play/craft_views.py `moved`), so its emoji shelf and batch Craft are never drawn again.
   const moved = CRAFT === "herbalism" || CRAFT === "blacksmithing" || CRAFT === "enchanting" ||
-    CRAFT === "alchemy";
+    CRAFT === "alchemy" || CRAFT === "leatherworking";
   document.body.classList.toggle("herb-moved", moved);
   const seq = ++CRAFT_SEQ;
   if (CRAFT === "herbalism") { renderHerbalismMoved(); return; }
   if (CRAFT === "blacksmithing") { renderForgeMoved(); return; }
   if (CRAFT === "enchanting") { renderEnchantMoved(); return; }
   if (CRAFT === "alchemy") { renderAlchemyMoved(); return; }
+  if (CRAFT === "leatherworking") { renderLeatherMoved(); return; }
   const track = STATE.tracks[CRAFT] || {};
   if (!track.available) { renderLocked(); return; }
   // The tab's own panel at once, before the two requests below (measured on the audit,
@@ -771,6 +775,27 @@ function renderLoading() {
   $("#main").innerHTML = `<div class="locked-note" role="status">
     <b>${esc(d.name)}</b>Laying out the shelf.</div>`;
   $("#craft").disabled = true; $("#save").disabled = true;
+}
+
+// The card that stands where the old leatherworking chain was (leather lane U7). Its one
+// button returns to the table with the tanner's bench open (`/play/#leather`, which the
+// leather shell opens on load). The chain spent every input on any failure and printed the
+// tannin's prose on the finished suit; the bench works one step at a time with the hide's
+// clock and grade in view. Written before renderAlchemyMoved so the forge's and alchemy's
+// own cards keep the slices their tests read.
+function renderLeatherMoved() {
+  $("#main").innerHTML = `<section class="panel moved-card" aria-labelledby="moved-title">
+      <h2 id="moved-title">Leatherworking is at the table now</h2>
+      <div class="inner">
+        <p>Your rack of hides and supplies, the beam, the vats and the work order open over
+          the table, where you stand. Flense, salt, tan and stitch one step at a time; a field
+          kit works anywhere, a tannery opens the vats and rare hides, and a tanning waits In
+          progress until its days have passed.</p>
+        <a class="act moved-go" href="/play/#leather">Open the leather bench</a>
+      </div>
+    </section>`;
+  $("#craft").disabled = true; $("#save").disabled = true;
+  $("#mastery").innerHTML = "";
 }
 
 // The card that stands where the old alchemy chain was (alchemy lane U1). Its one button
