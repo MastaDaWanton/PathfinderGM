@@ -56,5 +56,7 @@ class TestTheDoor:
         src = Path("play/views.py").read_text(encoding="utf-8")
         body = src[src.index("def cast_act("):]
         body = body[:body.index("\ndef ", 10)]
-        assert "It is not your turn." in body
+        # Through the one turn check since 2026-10-08 (tests/test_use_waits_its_turn.py),
+        # whose refusal still opens "It is not your turn."
+        assert "_wait_your_turn(scene, pc)" in body
         assert "No fight is on" not in body
