@@ -6,6 +6,7 @@
     {
       "key": "wild shape",
       "name": "Wild Shape",
+      "ability_type": "su",
       "aliases": ["wildshape", "shapeshift", "change shape"],
       "level": 4,
       "source": "CRB p.51 Wild Shape: from 4th, as beast shape I (a Small or Medium animal); from 6th as beast shape II (Tiny or Large too); 1 hour per druid level; a standard action to change or change back. Beast shape I: Small +2 size Dex and +1 natural armour, Medium +2 size Str and +2 natural armour. Beast shape II: Tiny +4 size Dex, -2 Str, +1 natural armour; Large +4 size Str, -2 Dex, +4 natural armour. The form's natural attacks.",

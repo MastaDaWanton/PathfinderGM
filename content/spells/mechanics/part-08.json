@@ -3630,17 +3630,12 @@
   "heat-metal": {
    "effects": [
     {
-     "type": "save_gate",
-     "target": "will",
-     "dc": "10 + spell level + casting ability modifier",
-     "note": "unattended nonmagical metal gets no save; magical metal does; an item in a creature's possession uses the creature's save bonus unless its own is higher",
-     "on_failure": [
-      {
-       "type": "narrative",
-       "target": "The metal becomes red-hot and a creature whose equipment is heated takes fire damage each round: round 1 warm, no damage; round 2 hot, 1d4; rounds 3-5 searing, 2d4; round 6 hot, 1d4; round 7 warm, no damage. It takes full damage if its armour, shield or weapon is affected, and minimum damage (1 or 2 points) if it is not wearing or wielding such an item."
-      }
-     ],
-     "on_success": []
+     "type": "metal_temperature",
+     "damage_type": "fire",
+     "schedule": "0, 1d4, 2d4, 2d4, 2d4, 1d4, 0",
+     "minimum": "0, 1, 2, 2, 2, 1, 0",
+     "save": "will",
+     "note": "Round 1 warm, round 2 hot (1d4), rounds 3-5 searing (2d4), round 6 hot (1d4), round 7 warm. Full damage to a creature wearing or wielding the metal, the minimum (1 or 2) to one only carrying it. Unattended nonmagical metal gets no save; an item in a creature's possession uses the creature's save bonus."
     },
     {
      "type": "narrative",
@@ -3655,7 +3650,7 @@
    },
    "element": "fire",
    "converted_by": "read",
-   "notes": "The damage repeats every round on a fixed seven-round curve that rises and falls, and the vocabulary has no repeating-damage type, so the table is written out rather than emitted as a damage spec that would fire once for the wrong amount."
+   "notes": "Executable since the leatherworking revamp's metal readers (plan §18.5): the curve is a `metal_temperature` spec, its first round landing on the cast and the rest spent by the periodic executor; who takes full and who the minimum is read off the creature's metal standing tags."
   },
   "heavy-water": {
    "effects": [

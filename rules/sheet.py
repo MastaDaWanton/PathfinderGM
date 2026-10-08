@@ -1303,7 +1303,18 @@ class Actor:
         a timed copy the ticker expires. Returns one record per change, in the shapes
         `_ward_tell` already says (law 3: every application is a tell).
         """
-        out: list[dict] = []
+        # A class's prohibition first (the druid's metal, `classfeatures.settle`): what is
+        # worn decides it like what is carried decides the rest, and this is the pass every
+        # batch's end and every stretch of the clock already makes. Settled, not told:
+        # `Scene.advance` calls this too and most of its callers drop what it says, so the
+        # sentence waits for the batch's end (`Engine._carried_settles` tells it).
+        from . import classfeatures as _classfeatures
+
+        _classfeatures.settle(self, tell=False)
+        # Rust on a suit no longer worn leaves with the suit (`casting.settle_rust`).
+        from . import casting as _casting
+
+        out: list[dict] = list(_casting.settle_rust(self))
         want = self.carried_effects()
         want.update(self.worn_effects())
         have = {str(e.payload.get("carried_key")): e for e in self.effects
@@ -1458,7 +1469,18 @@ class Actor:
                     # ever burned.
                     if "times_left" in p:
                         times = min(times, max(0, int(p.get("times_left") or 0)))
-                    total = sum(_amount_of(p.get("damage"), dice) for _ in range(times))
+                    # `schedule`: a curve, one entry per firing, taken from the front —
+                    # heat metal's 1d4, 2d4, 2d4, 2d4, 1d4, 0 (CRB), chill metal's the same
+                    # in cold (leatherworking plan §18.5, `casting.metal_curve`). `damage`
+                    # is the entry for this firing; the list running out ends the effect,
+                    # as `times_left` does.
+                    sched = p.get("schedule")
+                    if isinstance(sched, list):
+                        due = sched[:times]
+                        del sched[:times]
+                        total = sum(_amount_of(x, dice) for x in due)
+                    else:
+                        total = sum(_amount_of(p.get("damage"), dice) for _ in range(times))
                     if total > 0:
                         d = self.take_damage(total, dtype)
                         out.append({"kind": "damage", "ref": self.ref,
@@ -1466,10 +1488,13 @@ class Actor:
                                     "type": normalise_damage_type(dtype), "source": source,
                                     "origin": e.origin, "hp_after": self.hp,
                                     "hp_max": self.hp_max})
+                    spent = ("times_left" in p and max(
+                        0, int(p.get("times_left") or 0) - times) <= 0) or (
+                        isinstance(sched, list) and not sched)
                     if "times_left" in p:
                         p["times_left"] = max(0, int(p.get("times_left") or 0) - times)
-                        if p["times_left"] <= 0 and self.remove_effects(
-                                match=lambda x, e=e: x is e):
+                    if spent:
+                        if self.remove_effects(match=lambda x, e=e: x is e):
                             out.append({"kind": "effect_ended", "ref": self.ref,
                                         "what": e.name or "the fire",
                                         "origin": e.origin})
@@ -2340,7 +2365,11 @@ class Actor:
         # Stored effects' tags, then the standing ones a feat document or the class
         # list grants without an effect (stage 8). The one door for both.
         return (any(states.matches(t, q) for e in self.effects for t in e.tags)
-                or any(states.matches(t, q) for t in self.standing_tags()))
+                or any(states.matches(t, q) for t in self.standing_tags())
+                # What is metal on them, walked only when the question could be about it
+                # (`bearer_tags` says why).
+                or (q.split(".", 1)[0] in states.BEARER_ROOTS
+                    and any(states.matches(t, q) for t in self.bearer_tags())))
 
     # --- condition contributions --------------------------------------------------
 
@@ -4391,9 +4420,11 @@ class Actor:
                     "cmd": self.flat_cmd is not None}.get(t, False)
         return False
 
-    def standing_tags(self) -> tuple[str, ...]:
+    def standing_tags(self, bearer: bool = False) -> tuple[str, ...]:
         """Tags held without an effect: a feat document's `tags`, and the class's
-        proficiencies as `proficient.<category>` / `proficient.weapon.<key>`.
+        proficiencies as `proficient.<category>` / `proficient.weapon.<key>`. With
+        `bearer`, the metal on them too (`bearer_tags`, which `has_state` asks only for a
+        query that could match one).
 
         `has_state` reads stored effects' tags; feats are live-read, not stored, so
         their tags need a second source or a Martial Weapon Proficiency feat is
@@ -4491,7 +4522,24 @@ class Actor:
         # `reads_tag` reader asks (ghost touch armour, seeking, wild) by prefix (law 1),
         # never by a name. Live-read: off comes the cloak, gone is the sight.
         out.extend(self._worn_tags(walk))
+        if bearer:
+            out.extend(self.bearer_tags())
         return tuple(out)
+
+    def bearer_tags(self) -> tuple[str, ...]:
+        """What is metal on them — `wears.armour.metal`, `wields.metal`, `carries.metal`
+        (leatherworking plan §18.5, `item_tags.bearer_tags`): the druid's prohibition,
+        heat and chill metal and shocking grasp ask these by prefix (law 1). Live-read:
+        off comes the suit, gone is the tag.
+
+        Asked by `has_state` only for a query under one of their roots
+        (`states.BEARER_ROOTS`): measured 2026-10-08, joining them to every
+        `standing_tags` read took `has_state("state.down")` on the Kesst fixture in
+        studded leather from 0.32 ms to 7.4 ms a call (the pack walked for every
+        question), and `has_state` is the hottest question the sheet answers."""
+        from . import item_tags as _item_tags
+
+        return _item_tags.bearer_tags(self)
 
     def _worn_tags(self, walk: list | None = None) -> list[str]:
         out: list[str] = []

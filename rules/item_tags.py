@@ -234,6 +234,11 @@ def material_tags(thing) -> tuple[str, ...]:
         out.add(states.material_tag(sub, root))
         if is_main:
             out.add(states.main_material_tag(root))
+        # Iron and its alloys (lane D's `ferrous: true` on the metal document): rusting
+        # grasp's target. Read off the root's document, never off a name — "ironwood" is
+        # wood and "star-iron" is iron, and only the documents say so.
+        if sub == "metal" and (_material(root) or {}).get("ferrous") is True:
+            out.add(states.METAL_FERROUS)
 
     for slot, mid in pieces.items():
         add(mid, slot == main)
@@ -275,5 +280,106 @@ def materials_in(thing) -> list[str]:
     return out
 
 
+def exempt(thing, flag: str) -> bool:
+    """Whether the item's main material's document carries `flag` as true — dragonhide's
+    `druid_permitted` (CRB: "druids can wear dragonhide armor"). The book's exemption is
+    the material's, so it is asked of the main piece only: steel buckles on a dragonhide
+    suit do not make the suit a forbidden one, and a dragonhide strap on a steel suit does
+    not make it a permitted one."""
+    if not flag:
+        return False
+    main = main_material(thing)
+    return bool(main) and (_material(main) or {}).get(flag) is True
+
+
+# --- what a creature has on it ---------------------------------------------------------------
+
+def _wielded(actor):
+    rec = actor.wielded_record() if hasattr(actor, "wielded_record") else None
+    if rec is not None:
+        return rec
+    key = str(getattr(actor, "equipped", "") or "").strip().lower()
+    return key if key and key != "unarmed" else None
+
+
+def _packed(actor) -> list:
+    """Everything else on them an item tag could be read off: the weapons they carry, the
+    suits and shields in the pack, and the made things on their shelf."""
+    from . import forge_items
+    from . import goods as goods_mod
+
+    out: list = [w for w in (getattr(actor, "weapons", None) or ()) if w]
+    for k in (getattr(actor, "goods", None) or {}):
+        if goods_mod.kind_of(k) in ("armour", "shield", "weapon"):
+            out.append(k)
+    for entry in (getattr(actor, "stock", None) or {}).values():
+        rec = forge_items.record_of(entry)
+        if isinstance(rec, dict) and str(rec.get("gear") or "") in (
+                "weapon", "armour", "shield"):
+            out.append(rec)
+    return out
+
+
+def bearer_tags(actor, exempt_flag: str = "") -> tuple[str, ...]:
+    """What `actor` has on it that is metal, as standing tags (`states.WEARS_ARMOUR_METAL`
+    and its siblings, each with `.ferrous` beneath it when iron is among the metal).
+
+    Read off the same things `armour.wears_metal` always read (`armour.worn_by_kind`), so
+    there is one derivation: that function now asks this one. `exempt_flag` leaves out a
+    worn or wielded thing whose main material's document carries that flag (the druid's
+    `druid_permitted`, `classfeatures.prohibition`); the standing tags the sheet holds are
+    asked with no flag, because a dragonhide suit with steel buckles still has steel on it
+    for heat metal to find.
+
+    A stat block with a printed AC wears what its note says, which nothing can read
+    (`armour.wears_metal`'s rule), so it wears no metal here either; what it wields and
+    carries is read as anybody's."""
+    from . import armour as armour_mod
+
+    out: list[str] = []
+
+    def metal_of(thing) -> tuple[bool, bool]:
+        # One walk of the thing's materials for both answers: the walk is the cost
+        # (`materials.get` stats its folders per id), measured at 6 ms a creature.
+        tags = material_tags(thing)
+        return (any(states.matches(t, states.METAL) for t in tags),
+                states.METAL_FERROUS in tags)
+
+    def mark(prefix: str, thing) -> bool:
+        if thing is None or (exempt_flag and exempt(thing, exempt_flag)):
+            return False
+        metal, iron = metal_of(thing)
+        if not metal:
+            return False
+        out.append(prefix)
+        if iron:
+            out.append(f"{prefix}.{states.FERROUS_LEAF}")
+        return True
+
+    any_metal = False
+    if getattr(actor, "flat_ac", None) is None:
+        worn = armour_mod.worn_by_kind(actor)
+        any_metal |= mark(states.WEARS_ARMOUR_METAL, worn.get("armour"))
+        any_metal |= mark(states.WEARS_SHIELD_METAL, worn.get("shield"))
+    any_metal |= mark(states.WIELDS_METAL, _wielded(actor))
+    # Carrying covers what is worn and wielded too; the pack is read only while it could
+    # still change the answer (one iron thing already settles it).
+    ferrous = any(t.endswith("." + states.FERROUS_LEAF) for t in out)
+    if not ferrous:
+        for thing in _packed(actor):
+            metal, iron = metal_of(thing)
+            if metal:
+                any_metal = True
+                if iron:
+                    ferrous = True
+                    break
+    if any_metal:
+        out.append(states.CARRIES_METAL)
+        if ferrous:
+            out.append(f"{states.CARRIES_METAL}.{states.FERROUS_LEAF}")
+    return tuple(out)
+
+
 __all__ = ["material_tags", "has_material", "main_material", "materials_in",
-           "substance_of", "root_material", "default_pieces", "weapon_key", "table"]
+           "substance_of", "root_material", "default_pieces", "weapon_key", "table",
+           "exempt", "bearer_tags"]

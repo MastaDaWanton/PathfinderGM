@@ -550,6 +550,10 @@ def harm_of(spell, caster_level: int) -> str:
                     found["harm"] = True
             if kind == "damage" and spec.get("dice"):
                 found["harm"] = True
+            # Heat metal, chill metal, rusting grasp (leatherworking plan §18.5): harm
+            # with no `damage` spec of their own — a curve, and rust on a suit.
+            if kind in ("metal_temperature", "rust"):
+                found["harm"] = True
             for key in ("on_failure", "on_success", "effects", "options"):
                 walk(spec.get(key))
     walk(spells_mod.effects_at(spell, caster_level))

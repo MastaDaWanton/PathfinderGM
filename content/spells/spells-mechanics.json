@@ -10522,23 +10522,19 @@
    "id": "runic-overload"
   },
   {
-   "scaling": {
-    "kind": "damage",
-    "die": 6,
-    "base_dice": 3,
-    "damage_type": "untyped"
-   },
    "effects": [
     {
-     "type": "damage",
-     "dice": "3d6",
-     "damage_type": "untyped",
-     "lethality": "lethal",
-     "scales": "full",
-     "note": "scales with caster level"
+     "type": "touch_attack",
+     "touch": "melee"
+    },
+    {
+     "type": "rust",
+     "armour_ac": "1d6",
+     "creature_damage": "3d6",
+     "creature_bonus": "min(caster_level, 15)",
+     "note": "Written by hand (leatherworking plan §18.5): a nonmagical iron item touched is ruined; worn iron armour loses 1d6 of the armour class its metal gives (a leather-bodied suit at most its metal pieces' share, the owner's answer 7); a ferrous creature takes 3d6 + 1 a level (max +15); magic metal is immune. The machine reading this replaced was 3d6 to whatever was touched."
     }
    ],
-   "effects_converted": true,
    "id": "rusting-grasp"
   },
   {
@@ -11068,6 +11064,12 @@
    },
    "effects": [
     {
+     "type": "touch_attack",
+     "touch": "melee",
+     "bonus_vs_metal": 3,
+     "note": "CRB: +3 on the attack roll if the opponent is wearing metal armor (or is carrying a metal weapon or is made of metal)."
+    },
+    {
      "type": "damage",
      "dice": "1d6",
      "damage_type": "electricity",
@@ -11076,7 +11078,6 @@
      "note": "scales with caster level"
     }
    ],
-   "effects_converted": true,
    "id": "shocking-grasp"
   },
   {

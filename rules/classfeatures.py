@@ -851,6 +851,236 @@ def _evasion_armour(actor) -> frozenset:
     return frozenset(out)
 
 
+# --- a class's prohibition (leatherworking plan §18.5) ---------------------------------------
+#
+# CRB Druid, Weapon and Armor Proficiency: "Druids are proficient with light and medium
+# armor but are prohibited from wearing metal armor ... A druid who wears prohibited armor
+# or uses a prohibited shield is unable to cast druid spells or use any of her supernatural
+# or spell-like class abilities while doing so and for 24 hours thereafter." Until this the
+# druid's "no metal armour" token was read by the armour-proficiency parser alone, as a
+# proficiency that granted nothing, and a druid cast in full plate.
+#
+# Said as a block on the class document, never a class name in the engine (stage 9's
+# direction, `test_the_shared_engine_names_fewer_classes_and_feats_than_it_did`):
+#
+#   "prohibits": {"tags": ["wears.armour.metal", "wears.shield.metal"], "lapse_hours": 24,
+#                 "suspends": ["casting.class", "ability.su.class", "ability.sp.class"],
+#                 "exempt": "druid_permitted", "name": ..., "tell_on": ..., ...}
+#
+# One ActiveEffect carries it (origin `rule:prohibited-metal`, law 2): held with no clock
+# while a prohibited tag holds, and given its 24 hours by the same applicator the moment
+# none does, so the one ticker (`Actor.tick_effects`, through `Scene.advance` and the round
+# tick) ends it and there is no second clock. Put back on during the lapse, it goes back to
+# holding with no clock; taken off again, the 24 hours start again — the book's "thereafter".
+#
+# Settled at the doors that need the answer now (the cast, a class ability) and at every
+# batch's end and before every stretch of the clock (`Actor.sync_carried`, `Scene.advance`),
+# so a suit taken off before a day's wait starts its lapse before the wait, not after it.
+
+PROHIBITION_ORIGIN = "rule:prohibited-metal"
+PROHIBITION_KEY = "prohibited"
+PROHIBITS_KEYS = frozenset({"tags", "lapse_hours", "suspends", "exempt", "name", "source",
+                            "tell_on", "tell_lapse"})
+ROUNDS_PER_HOUR = 600            # ten rounds a minute (CRB p.178), sixty minutes
+
+
+def prohibits(actor) -> dict:
+    """The class document's `prohibits` block, or {}."""
+    cls = getattr(actor, "class_data", None) or {}
+    block = cls.get("prohibits") if isinstance(cls, dict) else None
+    return block if isinstance(block, dict) and block.get("tags") else {}
+
+
+def breaking(actor, block: dict | None = None) -> list[str]:
+    """The prohibited tags this creature holds now, leaving out anything the block's
+    `exempt` flag excuses (dragonhide's `druid_permitted`). Asked by prefix through
+    `states.matches` over the same standing tags `has_state` reads
+    (`item_tags.bearer_tags`); the exemption is the one thing `has_state` cannot say,
+    because it is a fact about the class, not the creature."""
+    from . import item_tags, states
+
+    block = prohibits(actor) if block is None else block
+    if not block:
+        return []
+    held = item_tags.bearer_tags(actor, exempt_flag=str(block.get("exempt") or ""))
+    return [q for q in (str(t) for t in block.get("tags") or ())
+            if any(states.matches(h, q) for h in held)]
+
+
+def _prohibition_effect(actor):
+    for e in actor.effects:
+        if e.origin == PROHIBITION_ORIGIN and e.key == PROHIBITION_KEY:
+            return e
+    return None
+
+
+def _said(block: dict, which: str, actor, default: str) -> str:
+    text = str(block.get(which) or default)
+    return text.replace("{name}", str(getattr(actor, "name", "") or "They"))
+
+
+def settle(actor, tell: bool = True) -> list[dict]:
+    """Bring the prohibition's one effect up to date with what is worn, through the one
+    applicator, and return what is owed a telling: records `_ward_tell` says
+    (`kind: "prohibition"`, with `said`), one when it takes hold and one when its lapse
+    begins. Its end is the ticker's (`effect_ended`).
+
+    The sentence waits on the effect (`payload["untold"]`) until a caller with `tell` set
+    takes it. `Scene.advance` settles with `tell=False`, because most doors that move the
+    clock drop its return: measured while building it, putting the suit on through the
+    `wear` op settled inside that op's donning minute and the tell went nowhere, so the
+    batch's end (`Engine._carried_settles`, through `Actor.sync_carried`) found nothing
+    left to say. Now the batch's end says it, once."""
+    from .activeeffect import ActiveEffect
+    from . import states
+
+    block = prohibits(actor)
+    have = _prohibition_effect(actor)
+    if not block and not (have is not None and have.rounds_left is None):
+        return _untold(actor, have, tell)
+    if not block:
+        # The class lost its block (a homebrew edit): nothing holds it any more, so it
+        # lapses as if taken off rather than lingering forever.
+        block = {"lapse_hours": 24, "suspends": []}
+    now = breaking(actor, block)
+    cid = str(getattr(actor, "char_class", "") or "").strip().lower()
+    tags = tuple(states.suspended_tag(s) for s in block.get("suspends") or ())
+    name = str(block.get("name") or "Prohibited metal")
+    base = dict(name=name, kind="rule", key=PROHIBITION_KEY,
+                source=f"class:{cid}" if cid else "class", origin=PROHIBITION_ORIGIN,
+                tags=tags or (have.tags if have is not None else ()))
+    if now:
+        if have is not None and have.rounds_left is None:
+            return _untold(actor, have, tell)
+        said = _said(block, "tell_on", actor,
+                     "{name} wears what their class forbids, and its magic will not "
+                     "answer.")
+        have = actor.apply_effect(ActiveEffect(
+            duration="until-dismissed", rounds_left=None,
+            payload={"breaking": list(now),
+                     "untold": {"state": "holds", "said": said, "breaking": list(now)}},
+            **base))
+        return _untold(actor, have, tell)
+    if have is None or have.rounds_left is not None:
+        return _untold(actor, have, tell)
+    hours = int(block.get("lapse_hours", 24) or 0)
+    if hours <= 0:
+        actor.remove_effects(match=lambda e: e is have)
+        return [{"kind": "effect_ended", "ref": actor.ref, "what": name,
+                 "origin": PROHIBITION_ORIGIN}] if tell else []
+    said = _said(block, "tell_lapse", actor,
+                 f"{{name}} has taken it off; their magic returns {hours} hours from now.")
+    have = actor.apply_effect(ActiveEffect(
+        duration="rounds", rounds_left=hours * ROUNDS_PER_HOUR,
+        payload={"breaking": [], "lapse_hours": hours,
+                 "untold": {"state": "lapsing", "said": said, "hours": hours}},
+        **base))
+    return _untold(actor, have, tell)
+
+
+def _untold(actor, have, tell: bool) -> list[dict]:
+    """The sentence the effect is still owed, taken once (see `settle`)."""
+    if not tell or have is None or not isinstance(have.payload, dict):
+        return []
+    owed = have.payload.pop("untold", None)
+    if not isinstance(owed, dict):
+        return []
+    return [{"kind": "prohibition", "ref": actor.ref, "origin": PROHIBITION_ORIGIN,
+             **owed}]
+
+
+def suspended(actor, entry: str) -> bool:
+    """Whether a prohibition holds `entry` ("casting.class", "ability.su.class") — the
+    `suspended.*` tag, asked by prefix (law 1)."""
+    from . import states
+
+    return actor.has_state(states.suspended_tag(entry))
+
+
+def _remaining(actor) -> str:
+    e = _prohibition_effect(actor)
+    if e is None or e.rounds_left is None:
+        return ""
+    minutes = -(-int(e.rounds_left) // 10)
+    hours, mins = divmod(minutes, 60)
+    if hours and mins:
+        return f"{hours} hours and {mins} minutes"
+    if hours:
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+    return f"{mins} minute{'s' if mins != 1 else ''}"
+
+
+def refusal(actor, entry: str, what: str) -> str:
+    """Why `what` (a spell, a class ability) cannot be used while the prohibition holds
+    `entry`, as a printable sentence, or "". Settles first: a suit put on earlier in this
+    same batch has not met a batch's end yet. The settle's own sentence is left for the
+    batch's end to say (`tell=False`): this one is the refusal's."""
+    settle(actor, tell=False)
+    if not suspended(actor, entry):
+        return ""
+    block = prohibits(actor)
+    now = breaking(actor, block) if block else []
+    if now:
+        worn = " and ".join(_WORN_SAID.get(t, t) for t in now)
+        return (f"{actor.name} reaches for {what} and nothing answers: {worn} is forbidden "
+                f"to their class while it is worn and for "
+                f"{int(block.get('lapse_hours', 24) or 0)} hours after. Nothing is spent.")
+    left = _remaining(actor)
+    return (f"{actor.name} reaches for {what} and nothing answers yet: the forbidden gear "
+            f"is off, and {left or 'a while'} of the lapse is left to run. Nothing is "
+            f"spent.")
+
+
+# How a refusal names a prohibited tag.
+_WORN_SAID = {"wears.armour.metal": "metal armour", "wears.shield.metal": "a metal shield",
+              "wields.metal": "a metal weapon in hand", "carries.metal": "metal carried"}
+
+
+def validate_prohibits(block) -> list[str]:
+    """Everything wrong with a class's `prohibits` block, with the fix named. Called by
+    `classbuilder.validate_class`."""
+    from . import states
+
+    if block in (None, {}):
+        return []
+    if not isinstance(block, dict):
+        return ["prohibits: an object — {\"tags\": [...], \"suspends\": [...], "
+                "\"lapse_hours\": 24}."]
+    out: list[str] = []
+    extra = sorted(set(block) - PROHIBITS_KEYS)
+    if extra:
+        out.append(f"prohibits: unknown field(s) {', '.join(extra)}; it carries "
+                   f"{', '.join(sorted(PROHIBITS_KEYS))}.")
+    allowed = (states.WEARS_ARMOUR_METAL, states.WEARS_SHIELD_METAL, states.WIELDS_METAL,
+               states.CARRIES_METAL)
+    tags = block.get("tags")
+    if not isinstance(tags, list) or not tags:
+        out.append(f"prohibits.tags: a list of what may not be worn — "
+                   f"{', '.join(allowed)} (each may end .ferrous).")
+    else:
+        for t in tags:
+            if not any(states.matches(str(t), a) for a in allowed):
+                out.append(f"prohibits.tags: {t!r} is nothing a creature can wear; use "
+                           f"{', '.join(allowed)}.")
+    sus = block.get("suspends")
+    if not isinstance(sus, list) or not sus:
+        out.append(f"prohibits.suspends: a list from {', '.join(states.SUSPENDS)} — "
+                   f"without one the prohibition stops nothing.")
+    else:
+        for s in sus:
+            if s not in states.SUSPENDS:
+                out.append(f"prohibits.suspends: {s!r} is not one of "
+                           f"{', '.join(states.SUSPENDS)}.")
+    hours = block.get("lapse_hours", 24)
+    if not isinstance(hours, int) or hours < 0:
+        out.append("prohibits.lapse_hours: whole hours, 0 or more (the druid's is 24).")
+    flag = block.get("exempt")
+    if flag is not None and flag not in ("druid_permitted",):
+        out.append(f"prohibits.exempt: {flag!r} is no material flag; the material "
+                   f"documents carry druid_permitted.")
+    return out
+
+
 # --- validation ----------------------------------------------------------------------------
 
 def validate(class_id: str, docs: dict | None = None) -> list[str]:
