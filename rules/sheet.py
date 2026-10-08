@@ -6946,6 +6946,12 @@ def to_dict(actor: Actor) -> dict:
     # in them, so every save from before the revamp still round-trips byte for byte.
     if actor.herb_known:
         d["herb_known"] = {str(k): dict(v) for k, v in actor.herb_known.items()}
+    # A bare hide in a satchel this build saves is a counter's purchase (sold tanned); in a
+    # save from before the leather revamp it was raw. The stamp tells the next load which,
+    # written only while a hide is carried (leatherworking plan §20, rules/leather_migration).
+    from . import leather_migration
+
+    leather_migration.stamp_save(actor, d)
     if actor.manuals_read:
         d["manuals_read"] = [str(m) for m in actor.manuals_read]
     # Which world's drafted race `race` means, on the same rule: only a character forged
@@ -7171,7 +7177,7 @@ def _migrated(d):
     read by none of the forge's readers (no material, no strikes, no build)."""
     if not isinstance(d, dict):
         return d
-    from . import alchemy_migration, blacksmith, enchanter
+    from . import alchemy_migration, blacksmith, enchanter, leather_migration
 
     # Each migration answers None for a record that is not its own, and none claims
     # another's (`craft` "blacksmith", "enchanter", or the alchemist's: old work with
@@ -7183,8 +7189,13 @@ def _migrated(d):
     # a plain shelf entry the new bench offered as an UNENCHANTED vessel, its +N and
     # properties flat specs no layer reader saw — a +1 flaming sword could be "enchanted"
     # again from scratch, and its fire (a note, "on a hit", with no trigger) never fired.
+    # The leatherworker's is plan §20 ("convert"): an old leather or studded leather suit
+    # re-derived as the forge's crafted record; measured 2026-10-08 (lane I) on the 230 old
+    # suits the pre-revamp bench makes, each donned as the TABLE row, its masterwork and its
+    # hide's numbers gone.
     for migrate in (blacksmith.migrate_old_record, enchanter.migrate_old_record,
-                    alchemy_migration.migrate_old_record):
+                    alchemy_migration.migrate_old_record,
+                    leather_migration.migrate_old_record):
         try:
             new = migrate(d)
         except Exception:  # noqa: BLE001 — a record the migration cannot read stays as it was

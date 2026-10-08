@@ -543,6 +543,12 @@ class Campaign:
         from rules import alchemy_migration
 
         alchemy_migration.settle_campaign(campaign)
+        # The leatherworker's half (leatherworking plan §20): an old satchel's raw hides
+        # onto the rack with their 48 hours started at the scene's minute, which is why it
+        # is here and not in `from_dict`; an old suit in the armour slot put on; the notice.
+        from rules import leather_migration
+
+        leather_migration.settle_campaign(campaign)
         return campaign
 
     def _retire_stale_masters(self) -> None:
