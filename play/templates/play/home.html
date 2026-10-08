@@ -2931,8 +2931,7 @@ function paneForgeWho() {
         return n ? ` +${n} ${esc((r.name || "race").toLowerCase())}` : "";
       })()} + Int)` : ""}. More arrive with every level, on the Class tab.</span>
       <b>${f.skills.length} / ${rb}</b></div>
-    <p class="note">Hover over a skill, tab to it or press its ? to see what it does in
-      this game.</p>
+    <p class="note">Hover over or press a skill's ? to see what it does in this game.</p>
     <div class="skillgrid">${opts.skills.map(s => SkillHelp.row(s, `
       <label class="${cls && cls.class_skills.includes(s) ? "classskill" : ""}">
         <input type="checkbox" data-crskill="${esc(s)}" ${

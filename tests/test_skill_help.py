@@ -136,3 +136,17 @@ def test_both_pages_load_the_card_and_draw_rows_for_it():
     # tap open it too, Escape closes it, and a screen reader is given the words.
     for need in ('"focusin"', '"click"', '"Escape"', "aria-describedby"):
         assert need in js, f"skillhelp.js lost {need}"
+
+
+def test_the_card_opens_from_the_question_mark_and_never_from_the_row():
+    """The owner, 2026-10-08, an emergency: the card opened on hovering anywhere on a skill
+    row (and on focusing its checkbox or +/-), covered the next rows, and made skills
+    "impossible to select". Every opening listener now resolves its row through the "?"
+    (`[data-skillinfo]`); none looks for the row directly."""
+    js = (ROOT / "play" / "static" / "js" / "skillhelp.js").read_text(encoding="utf-8")
+    for event in ("mouseover", "mouseout", "focusin", "focusout"):
+        start = js.index(f'document.addEventListener("{event}"')
+        body = js[start:js.index("});", start)]
+        assert "infoRow(ev.target)" in body, event
+        assert 'closest("[data-skillhelp]")' not in body, event
+    assert 'tabindex="-1" data-skillinfo' not in js
