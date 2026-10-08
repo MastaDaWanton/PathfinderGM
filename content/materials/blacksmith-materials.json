@@ -657,7 +657,8 @@
      "trait": "forgiving"
     }
    ],
-   "book": false
+   "book": false,
+   "ferrous": true
   },
   {
    "id": "wrought-iron",
@@ -729,7 +730,8 @@
      "trait": "forgiving"
     }
    ],
-   "book": false
+   "book": false,
+   "ferrous": true
   },
   {
    "id": "bismuth",
@@ -1356,7 +1358,8 @@
      "trait": "narrow_window"
     }
    ],
-   "book": true
+   "book": true,
+   "ferrous": true
   },
   {
    "id": "star-iron",
@@ -1435,7 +1438,8 @@
      "trait": "slaggy"
     }
    ],
-   "book": false
+   "book": false,
+   "ferrous": true
   },
   {
    "id": "viridium",
@@ -2461,7 +2465,8 @@
      "trait": "forgiving"
     }
    ],
-   "book": false
+   "book": false,
+   "ferrous": true
   },
   {
    "id": "bronze",
@@ -2896,7 +2901,8 @@
      "trait": "narrow_window"
     }
    ],
-   "book": false
+   "book": false,
+   "ferrous": true
   },
   {
    "id": "pattern-steel",
@@ -2971,7 +2977,8 @@
      "trait": "narrow_window"
     }
    ],
-   "book": false
+   "book": false,
+   "ferrous": true
   },
   {
    "id": "nexavaran-steel",
@@ -3048,7 +3055,8 @@
      "trait": "forgiving"
     }
    ],
-   "book": true
+   "book": true,
+   "ferrous": true
   },
   {
    "id": "elysian-bronze",
@@ -3287,7 +3295,8 @@
      "trait": "malleable"
     }
    ],
-   "book": true
+   "book": true,
+   "ferrous": true
   },
   {
    "id": "fire-forged-steel",
@@ -3368,7 +3377,8 @@
      "trait": "narrow_window"
     }
    ],
-   "book": true
+   "book": true,
+   "ferrous": true
   },
   {
    "id": "frost-forged-steel",
@@ -3449,7 +3459,8 @@
      "trait": "narrow_window"
     }
    ],
-   "book": true
+   "book": true,
+   "ferrous": true
   },
   {
    "id": "singing-steel",
@@ -4864,11 +4875,12 @@
   },
   {
    "id": "leather-grip",
+   "material": "cowhide",
    "name": "Leather Grip",
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Wet-wrapped leather that dries to the shape of the hand. As a grip it holds true and hard to wrest away; as a lining it pads blows and eases movement at the cost of weight.",
+   "text": "Wet-wrapped cowhide that dries to the shape of the hand: plain leather, cut as a grip or a lining. As a grip it holds true and hard to wrest away; as a lining it turns blows and eases movement at the cost of weight.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -5122,11 +5134,12 @@
   },
   {
    "id": "sharkskin-grip",
+   "material": "sharkskin",
    "name": "Sharkskin Grip",
    "kind": "fitting",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Ray or shark hide, rough as a file in one direction. It never slips, wet, bloody or otherwise, so the swing and the grab are both surer; a hide grip is softer than bone.",
+   "text": "Sharkskin cut and wrapped over the tang. It never slips, wet, bloody or otherwise, so the swing and the grab are both surer; a hide grip is softer than bone.",
    "risky": false,
    "source": "bought",
    "biomes": [
@@ -5381,7 +5394,7 @@
    "kind": "fitting",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Red dragonhide, supple where scale meets scale. The grip shrugs off flame, so its wielder does too, and it holds the weapon fast, but the scale is slick under a swing. The book's dragonhide is for armour and shields.",
+   "text": "Red dragonhide, supple where scale meets scale, wrapped as a grip. It holds the weapon fast and true and weighs a little. The book's dragonhide powers are for armour and shields; on a hilt it is a fine grip and nothing more.",
    "risky": false,
    "source": "monster",
    "biomes": [],
@@ -5408,11 +5421,6 @@
    },
    "weapon": [
     {
-     "type": "resistance",
-     "target": "fire",
-     "amount": 3
-    },
-    {
      "type": "combat_mod",
      "target": "cmd",
      "amount": 2,
@@ -5421,8 +5429,13 @@
     {
      "type": "combat_mod",
      "target": "attack",
-     "amount": -2,
+     "amount": 2,
      "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
     }
    ],
    "working": [
@@ -5435,11 +5448,12 @@
   },
   {
    "id": "angelskin-binding",
+   "material": "angelskin",
    "name": "Angelskin Binding",
    "kind": "fitting",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale leather from a celestial's remains. Bound inside armour it steadies the wearer's will and turns blows, and anyone who learns what it is trusts them less. The book's angelskin dims an evil aura, which the app does not model.",
+   "text": "Angelskin cut as a lining. It steadies the wearer and calms their voice, and it shines. The book's angelskin is the suit itself, always masterwork, and dims an evil aura, which the app does not yet model; as a lining it carries only the house numbers.",
    "risky": false,
    "source": "monster",
    "biomes": [],
@@ -5460,21 +5474,27 @@
    },
    "armour": [
     {
-     "type": "save_mod",
-     "target": "will",
+     "type": "gear_mod",
+     "target": "hardness",
      "amount": 3,
-     "bonus_type": "material"
+     "book": true
     },
     {
-     "type": "combat_mod",
-     "target": "ac",
+     "type": "save_mod",
+     "target": "will",
      "amount": 2,
      "bonus_type": "material"
     },
     {
      "type": "skill_mod",
      "target": "diplomacy",
-     "amount": -3,
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": -2,
      "bonus_type": "material"
     }
    ],
@@ -5484,7 +5504,7 @@
      "trait": "pure"
     }
    ],
-   "book": false
+   "book": true
   },
   {
    "id": "fiend-bone-core",

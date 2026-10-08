@@ -134,6 +134,27 @@ def entry(mid: str, **fields) -> None:
     ENTRIES[mid] = fields
 
 
+_LEATHER_PASS = None
+
+
+def leather_form(mid: str, **fields) -> None:
+    """One of the forge's four leather pieces (leather-grip, sharkskin-grip, dragonhide-grip,
+    angelskin-binding). They are forms of the leatherworker's hides now (leatherworking plan
+    §4.4) and carry their parent's numbers, which tools/leather_data_pass.py owns; this pass
+    asks it rather than keeping a second copy that a re-run would write back over the
+    leather pass's (CLAUDE.md: grep for every copy of a rule)."""
+    global _LEATHER_PASS
+    if _LEATHER_PASS is None:
+        import importlib.util
+
+        path = Path(__file__).resolve().parent / "leather_data_pass.py"
+        spec = importlib.util.spec_from_file_location("_leather_data_pass", path)
+        _LEATHER_PASS = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_LEATHER_PASS)
+    lp = _LEATHER_PASS
+    entry(mid, **fields, **lp.forge_form(mid, lp.leather_parents()))
+
+
 # ---- ores: each smelts to its metal, and is assayed for it ----------------------------------
 
 entry("iron-ore", material="iron", working=wk("forgiving"),
@@ -802,13 +823,9 @@ entry("bone-grip", pieces={"weapon": ["haft"]},
       working=wk("easily_worked"),
       text="Scales of polished bone riveted to the tang. Hard-wearing and sure against a "
            "disarm, and slick in a sweating hand.")
-entry("leather-grip", pieces={"weapon": ["haft"], "armour": ["lining"]},
-      weapon=[cm("attack", 2), cm("cmd", 2), gm("hardness", -2)],
-      armour=[cm("ac", 2), gm("acp", 2), gm("weight_pct", 20)],
-      working=wk("forgiving"),
-      text="Wet-wrapped leather that dries to the shape of the hand. As a grip it holds "
-           "true and hard to wrest away; as a lining it pads blows and eases movement "
-           "at the cost of weight.")
+# A form of cowhide (plain leather): its weapon and armour lists are cowhide's.
+leather_form("leather-grip", pieces={"weapon": ["haft"], "armour": ["lining"]},
+             working=wk("forgiving"))
 entry("cord-wrapped-grip", pieces={"weapon": ["haft"]},
       weapon=[cm("attack", 2), cm("cmb", 2), gm("hp_per_inch", -2)],
       working=wk("easily_worked"),
@@ -835,13 +852,9 @@ entry("wire-wrapped-grip", pieces={"weapon": ["haft"]},
            "Fiddly to lay, and softer than a solid grip.",
       legacy=[{"type": "combat_mod", "amount": 2, "bonus_type": "untyped",
                "target": "cmd", "note": "against being disarmed of the fitted weapon"}])
-entry("sharkskin-grip", pieces={"weapon": ["haft"]},
-      weapon=[cm("attack", 2), cm("cmb", 2), gm("hardness", -2)],
-      working=wk("forgiving"),
-      text="Ray or shark hide, rough as a file in one direction. It never slips, wet, "
-           "bloody or otherwise, so the swing and the grab are both surer; a hide grip "
-           "is softer than bone.",
-      legacy=[])
+# A form of the leatherworker's sharkskin: its weapon list is sharkskin's.
+leather_form("sharkskin-grip", pieces={"weapon": ["haft"]}, working=wk("forgiving"),
+             legacy=[])
 entry("mammoth-ivory-grip", pieces={"weapon": ["haft"]},
       weapon=[gm("hp_per_inch", 2), sk("diplomacy", 2), cm("attack", -2)],
       working=wk("easily_worked"),
@@ -876,21 +889,16 @@ entry("wyroot-haft", pieces={"weapon": ["haft"]},
            "but is weaker than ash. The book stores a point for ki or arcane pools, "
            "which the app does not have.",
       legacy=[])
-entry("dragonhide-grip", pieces={"weapon": ["haft"]}, material="red-dragonhide",
-      weapon=[res("fire", 3), cm("cmd", 2), cm("attack", -2)],
-      working=wk("narrow_window"),
-      text="Red dragonhide, supple where scale meets scale. The grip shrugs off flame, so "
-           "its wielder does too, and it holds the weapon fast, but the scale is slick "
-           "under a swing. The book's dragonhide is for armour and shields.",
-      legacy=[{"type": "resistance", "target": "fire", "amount": 1,
-               "note": "a red dragonhide grip, to its wielder"}])
-entry("angelskin-binding", pieces={"armour": ["lining"]},
-      armour=[sv("will", 3), cm("ac", 2), sk("diplomacy", -3)],
-      working=wk("pure"),
-      text="Pale leather from a celestial's remains. Bound inside armour it steadies the "
-           "wearer's will and turns blows, and anyone who learns what it is trusts them "
-           "less. The book's angelskin dims an evil aura, which the app does not model.",
-      legacy=[])
+# A form of red dragonhide: its weapon list is the hide's grip list. The old resistance
+# fire 3 on a grip gave the WIELDER the dragon's protection, the defect dragonhide's book
+# rule exists to refuse (leatherworking plan §15).
+leather_form("dragonhide-grip", pieces={"weapon": ["haft"]}, working=wk("narrow_window"),
+             legacy=[{"type": "resistance", "target": "fire", "amount": 1,
+                      "note": "a red dragonhide grip, to its wielder"}])
+# A form of the leatherworker's angelskin: its armour list is angelskin's. The old Will +3,
+# AC +2 and Diplomacy -3 were invented (leatherworking questions, contradiction 3).
+leather_form("angelskin-binding", pieces={"armour": ["lining"]}, working=wk("pure"),
+             legacy=[])
 entry("fiend-bone-core", pieces={"weapon": ["haft"]}, risky=True,
       weapon=[cm("initiative", 3), cm("attack", 2), sv("will", -3)],
       working=wk("reactive"),

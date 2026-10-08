@@ -121,7 +121,10 @@ def test_same_tier_hides_are_not_reskins():
     for m in _shipped():
         if m["kind"] != "hide":
             continue
-        key = json.dumps(m.get("effects") or [], sort_keys=True)
+        # The item effects the forge's build reads (leather lane D's data pass), not the
+        # legacy `effects` the old chain bench keeps: that list now holds only the typed
+        # leftovers, and the three fire dragons' are one line each.
+        key = json.dumps([m.get("armour") or [], m.get("weapon") or []], sort_keys=True)
         clash = by_tier.setdefault(m["tier"], {}).get(key)
         assert clash is None, \
             f"{m['id']} and {clash} are {m['tier']} hides with identical effects"
@@ -136,6 +139,11 @@ def test_every_hide_names_a_creature_the_bestiary_has():
     orphans = []
     for m in _shipped():
         if m["kind"] != "hide":
+            continue
+        # Leather lane D's new hides that no name names: the six generic hides come off a
+        # beast by lane C's type rule (harvest.hide.generic.<surface>), and cowhide, ray
+        # skin and darkleaf cloth are bought. Every hide a name joins still must match.
+        if m["id"].startswith("generic-") or m.get("obtain") == "bought":
             continue
         frags = [f.lower() for f in m.get("from_creatures") or []]
         assert frags, f"{m['id']} has no from_creatures"
@@ -158,7 +166,9 @@ def test_raw_hide_window_matches_the_herbalist_animal_clock():
     keeps the two numbers from drifting — the stale-copy trap, pre-empted."""
     assert lw.FRESH_HOURS == herbprep.ANIMAL_HOURS
     for m in _shipped():
-        if m["kind"] == "hide":
+        # Darkleaf cloth is filed with the hides (it is a suit's body) and is woven, never
+        # green: its written forms start at the finished sheet (leather lane D).
+        if m["kind"] == "hide" and "green" in (m.get("forms") or ["green"]):
             assert m.get("fresh_hours"), f"{m['id']} has no freshness window"
 
 

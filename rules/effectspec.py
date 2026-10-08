@@ -2804,7 +2804,9 @@ _WORKING_PHRASE = {
     "clean_heat": "burns clean: no risk of a flaw from the fire",
     "quench_sensitive": "quench-sensitive: a narrow quench, and brine cracks it on a miss",
     "narrow_window": "a narrow working window: the heat bands are tight",
-    "forgiving": "forgiving: the heat bands are wide",
+    # Shared by the forge and the leather bench (LEATHER_SHARED_TRAITS): "heat bands" was
+    # the forge's word, and a forgiving deer hide on the fleshing beam has no heat in it.
+    "forgiving": "forgiving: its working bands are wide",
     "reactive": "reactive: assaying it is dangerous",
     "cleans_slag": "cleans the slag out of a smelt",
     "weld_aid": "aids a weld: folding and strengthening come easier",
