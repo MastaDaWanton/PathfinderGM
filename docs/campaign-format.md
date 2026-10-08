@@ -635,6 +635,160 @@ world that sends a recipe list is sending something the app will not read.
 | `play.cast[]` alchemists | words only: a person described as "an alchemist" or "a chymist" is one (the app's occupation `alchemist`, tag `alchemy`, `content/people/occupations.json`). A world's own word for the trade needs that table to learn it |
 | prices | none from a world. A town laboratory rents at 2 sp an hour (`market.LAB_RENT_CP_PER_HOUR`, a house rate; the book only sells a lab outright, 200 gp); the party's own costs nothing. Products sell at the book's price (a spell potion 50 gp × spell level × caster level), the tier ladder for a house compound, the quality ladder multiplying both; reagents at their own `price_gp` |
 
+## Leatherworking
+
+Written 2026-10-08 by the leatherworking revamp's lane W (docs/leatherworking-revamp-plan.md
+§21; contracts §11), from what lanes A to I built. As with alchemy, nothing here is a new
+export section except one field on creatures: a world's leatherwork arrives through the rows
+it already has, `play.materials[]` for its hides and the tannery's consumables,
+`play.places[]` for its tanneries, `play.cast[]` for its tanners. Fixes are world-agnostic
+(the standing instruction of 2026-09-28), so every field below is what the shipped shelf
+itself is written in: `content/materials/leatherworker-materials.json` (140 rows: hide 77,
+including the six generic hides, tannin 14, dye 12, thread 11, fitting 9, oil 8, wax 5,
+treatment 4). A world's hide is its own even when it is called Wolf Pelt; it is never
+validated against the shipped row it shares a name with.
+
+### A world's hides: `play.materials[]` rows of `kind` `hide`
+
+A hide is a structural material, like a metal (contracts §3): it fills the **body** of a
+suit, a shield or a worn good, and the forge's build (`forge_items.build`) sums its numbers
+exactly as it sums a metal's. Leather armour is the forge's armour model (owner Q7.1), so a
+world's hide meets the same fences a world's metal does (`materials.validate`, every refusal
+with its fix named).
+
+```json
+{
+  "id": "5bbd0c40345f~material:marsh-elk-hide",
+  "name": "Marsh Elk Hide",
+  "kind": "hide",
+  "tier": "common",
+  "text": "Heavy and close-haired; the fen people say it never quite dries.",
+  "surface": "fur",
+  "color": "#7a5a3c",
+  "size": "large",
+  "fresh_hours": 48,
+  "sold_as": "fur",
+  "price_gp": 2,
+  "creature_type": "animal",
+  "pieces": {"armour": ["body", "fastenings", "lining"], "shield": ["body"],
+             "worn": ["body", "lining"]},
+  "armour": [
+    {"type": "resistance", "target": "cold", "amount": 2},
+    {"type": "skill_mod", "target": "survival", "amount": 2, "bonus_type": "material"},
+    {"type": "gear_mod", "target": "acp", "amount": -2}
+  ],
+  "working": [{"type": "working", "trait": "thick"}, {"type": "working", "trait": "slow_tan"}]
+}
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `pieces` | which slots it fills, per gear: `armour` (`body`, `fastenings` as a lacing set, `lining`), `shield` (`body`: the madu), `worn` (`body`, `lining`: cloaks, boots, gloves, bracers, belts, caps, satchels, quivers), and `weapon` `haft` **only for a grip-capable hide** (sharkskin, dragonhide: the grip the forge's Assemble takes, owner Q7.4) | fills nothing |
+| `armour` | **at least three effects, at least one a drawback** (owner Q3.1), in the effect vocabulary. Read for a suit, a worn good (less its `ac`, `acp`, `max_dex` and `asf`: a cloak has no armour bonus to change) and a shield when `shield` is empty. A hide's AC is typed `material` and folds into the suit's armour bonus; typed `armour` it would be swallowed by the suit's own (measured: 13 shipped hide specs did nothing, inventory §0.2). Never `narrative` | `[]` |
+| `shield` | a shield's own list when it should differ from `armour` | reads `armour` |
+| `weapon` | only on a grip-capable hide, then at least three, at least one a drawback. A `weapon` list on any other hide is refused | `[]` |
+| `working` | at least one trait from the leather list (`effectspec.WORKING_TRAITS`): `thick` (it can make hide armour), `fast_tan`, `slow_tan`, `ceiling_up`, `ceiling_down`, `salt_proof`, `tans_white`, `supple`, `fills_tooling`, `strong_seam`, `weatherproof`, `fine_pitch`, `fast_colour`, `fugitive`, `rancid`, besides the forge's own | `[]` |
+| `surface` | `fur`, `scale`, `smooth`, `feather`, `chitin`, `shell`: what the bench and its stage draw, and which generic hide a creature with no named hide gives (below) | `smooth` |
+| `color` | `#rrggbb`, the swatch on the rack and the hide on the stage | the kind's colour |
+| `size` | the hide's size, `tiny` to `colossal`: its **hide units** (Medium 1, doubling per size, plan §5.5) when it is bought or converted, so a Large hide is two units and cuts a Medium suit's body. Lane E measured 2026-10-08 that the one door dropped this field, and every Large hide read as one Medium unit | `medium` |
+| `fresh_hours` | how long it keeps green, from the minute it comes off the carcass, before it spoils to scraps: 48 on every shipped hide (owner Q4.4), the herbalist's animal clock. Salt stops it for six weeks; tanned leather never spoils | 48 |
+| `sold_as` | the form a counter sells it in: `leather`, `fur` or `rawhide`, never green (a green hide "cannot be bought or sold in most settlements", plan §9). Must be one of its forms. A bought hide is oak-bark tanned at grade 2 (lanes D and E, for the owner's review) | `fur` for a fur or feather surface, else `leather` |
+| `price_gp` | the price of that sold form, held to the one price rule (`rules/pricing.py`: common 1, uncommon 5, rare 25, exotic 125, legendary 625 gp at least). **Required on a common hide** to be on the leatherworker's counter: every settlement's leatherworker always stocks the common hides and dyes that carry one (owner, 2026-10-08, open point 9; `stall-lines.json` `staple_kinds`), and an unpriced one is on no counter (measured: 15 of the 21 shipped common hides are priced) | absent: not sold |
+| `creature_type` | the creature type it comes from, in the bestiary's spelling (`animal`, `magical-beast`, `dragon`, `outsider`, `vermin`...): Grade (the leather assay) is one easier for each known hide of the same type, at most four (plan §16, lane F). Stated on the hide because names do not resolve: the bestiary finds only 45 of the 71 shipped named hides' creatures, no dragon among them | none: no comparison |
+| `allowed_bases` | the table suits it may be made into, when the book limits it (angelskin: leather, hide armour, studded leather) | any |
+| `always_masterwork`, `book` | the book's masterwork-by-nature hides (dragonhide, eel hide, angelskin, darkleaf), with their printed effects marked `"book": true`. A world's own hide is house, not book | `false` |
+| `druid_permitted` | a hide armour a druid may wear with no penalty although it is armour (the book's own few) | `false` |
+| `from_creatures` | creature names, the old fallback for a carcass with no harvest tags. Prefer the tags (below); a name never decides when a tag exists | `[]` |
+| `material` | as every row: the hide this is a form of | its own id |
+
+### The tannery's consumables: tannins, oils, waxes, threads, dyes, fittings, treatments
+
+Rows of `kind` `tannin`, `oil`, `wax`, `thread`, `dye`, `fitting` or `treatment`. They bring
+**working traits only**, never an `armour` or `weapon` list (owner Q3.2: a tannin's prose
+reached the finished item before the revamp, "a boar-hide suit listed 'the standard tanning
+agent'"), at most one small `mark`, and **marks are on hold** (owner, 2026-10-08: an
+explanation was asked for before deciding), so a world sends none until the app says.
+
+| Field | Meaning | Default |
+|---|---|---|
+| `tannage` | **required on a tannin**: how it tans, one of `brain`, `alum`, `bark`, `mineral`, `planar` (plan §8.1). It decides the time in the vat, whether the leather can be hardened (not alum or brain) and where the work can be done | none: a row without one is refused |
+| `salt` | `true` on a treatment that cures a hide (the shipped `curing-salt`): what the harvest spends, one measure per hide unit, to stop a hide's clock, and what herbalism's animal parts use too. Read by id and kind, never by a name fragment | `false` |
+| `material` | **required on a fitting** (the forge's rule): the root metal, so steel studs answer the metal tag and a druid's armour check reads them (`"material": "steel"`) | its own id |
+| `price_gp` | the one price rule. **Required on every common consumable** and every common dye: the leatherworker's counter carries them always, never sold out, and only priced rows reach it | absent: not sold |
+
+### Creatures carry their own harvest (the owner's rule)
+
+The owner, 2026-10-05 (Q9.2): "apply the tags to the beasts and just have a reader in
+skinning to find the relevant tag with that no list is necessary." So there is **no fauna
+list**. A creature says what its carcass gives in its own `tags`, in the one tag vocabulary,
+and the harvest's reader finds them; it reads **only tags and stat-block fields**, never the
+creature's name (a wolf the narrator calls "the grey one" still yields its pelt).
+
+| Tag | Means |
+|---|---|
+| `harvest.hide.<material-id>` | this beast yields that named hide |
+| `harvest.hide.generic.<surface>` | a generic hide of this surface (`fur`, `scale`, `smooth`, `feather`, `chitin`, `shell`): the shipped `generic-fur-hide` and its five siblings, made the beast's own by its stat block (below) |
+| `harvest.horn.<id>`, `harvest.bone.<id>`, `harvest.sinew` | the outer parts a leatherworker takes |
+| `harvest.scales.<id>` | the best scales, for the forge's dragon-scale suits |
+| `harvest.plan.<plan>` | the body plan the bench's 3D hide is drawn from: `quadruped`, `long`, `winged`, `serpent`, `carapace`. Drawing only |
+| `harvest.blood.<id>`, `harvest.reagent.<id>`, `harvest.essence.<id>`, `harvest.part.<id>` | the forge's, the alchemist's, the enchanter's and the herbalist's, the same grammar (see "A world's essences" above) |
+
+**Where the tags live.** On a stat block the app already reads them live into the creature's
+standing tags, beside `role.guard` (`rules/sheet.py`, the block's `tags`). The export has no
+creature section, and "What is not here" keeps it so: no stat blocks. A world's own beast
+therefore comes in, the day World Bible exports one, as **words and ids only**: the
+bestiary template it fights as (an id) and its own `tags`. The proposed shape, for the
+owner's and World Bible's review, is one row wherever a world names a beast:
+
+```json
+{"id": "5bbd0c40345f~creature:marsh-elk", "name": "marsh elk", "like": "elk",
+ "tags": ["harvest.hide.5bbd0c40345f~material:marsh-elk-hide", "harvest.plan.quadruped"]}
+```
+
+`like` names the bestiary block whose numbers it has; the reader takes `type`, `subtype`,
+`size`, CR, `resist`, `immune`, `reductions` and the natural armour in `ac_note` from that
+block, so the export never carries a rules number. A beast with no tag falls back to the
+generic rule.
+
+**The generic rule** (plan §5.3, the reader's fallback, so an old world's beast still
+yields; lane C's, not built yet: today's carcass excursions read only the tags that name a
+material, `gathering.harvest_tagged`, and a creature with none by its name as before): animals and magical beasts give a generic fur hide unless their subtype or tags say
+otherwise, vermin chitin, dragons scale; monstrous humanoids, aberrations, fey, outsiders,
+plants, oozes, undead and constructs give nothing unless tagged. A generic hide is made the
+beast's own from its stat block, never stored as a number: CR sets its tier (0 to 2 common,
+3 to 5 uncommon, 6 to 9 rare, 10 to 14 exotic, 15 and up legendary), size its units, its
+highest energy resistance or immunity one house resistance (÷ 5, at least 1), natural armour
++5 or more the `thick` trait, and on a rare-or-better hide its highest DR as DR
+max(1, N ÷ 5) (owner, 2026-10-08, open point 6).
+
+**What the stat block decides besides the hide** (lane C's reader; not built yet, the
+shapes are the plan's and the owner's answers of 2026-10-08):
+- **A dangerous body forces a second check while skinning** (open point 10): a poison
+  special attack or poisonous flesh, an acid or energy subtype, a breath weapon, a body that
+  burns or shocks to the touch, read from the block's tags and fields, never a list of
+  names. A failure deals that creature's hazard: poison through the one poison door, acid or
+  energy as damage of its type.
+- **Harvesting a good outsider is a deed** (`type.outsider` with `subtype.good`), and so is
+  a good-aligned dragon's, by kind (open point 12). A world whose own dragons are good says
+  so with the bestiary's word in its tags, `subtype.good`; nothing reads an alignment line.
+  Deeds are small signed values on the sheet and affect nothing yet (open point 11).
+
+**Refused, with the fix named** (the app's validator on every load, and World Bible's on
+export): a `harvest.hide*` tag on a humanoid ("humanoids are never skinned: remove the
+tag"; the world owns its own races, but a person is never a hide), a tag naming a material
+that does not exist, and a true dragon tagged with another colour's dragonhide (measured
+before the revamp: a red dragon offered all eleven colours, inventory §0.4).
+
+### Tanneries and leatherworkers
+
+| Field | Meaning |
+|---|---|
+| `play.places[].kind: "tannery"` | read since 2026-10-06 (the places row's `kind`, above): a world's own tannery by any name ("the Tanyard", "Hide Row") is one, its keeper a tanner by occupation (`content/people/occupations.json` `tanner`, tag `leather`), with the vats, the lime pit and the hardening kettle for rare-and-up hides, rented by the hour and the vat by the day. Beside the smithy and the laboratory. Write it only for what the place IS. The kind word itself must be `tannery`: the app does not yet fold "tanyard" or "tan pits" to it (`places.KIND_WORDS`), so say `"kind": "tannery"` whatever the room is called |
+| a settlement's own words | a tannery is appended on a settlement's **outskirts**, downwind of the last houses, when its own facts or paragraphs name its tanners: `tanner(s)`, `tannery`, `tanneries`, `tanning`, `tanyard(s)`, `tan pits`, `currier(s)`, `leatherworker(s)`, `leatherworking`, `the leather trade`, `its leather trade`, `leather goods`, `leather-workers`, `the hide trade` (`places.TANNERY_CUES`). "Leather" alone is not a cue (it describes what people wear: "iron-studded leather armor"), nor are "hides" and "pelts" alone (otter-herders selling pelts is trapping). No scale guarantees one: a tannery is rarer than a smithy. An authored town gets none appended: an author who listed the rooms has said what the town has |
+| the leatherworker's counter | nothing from a world. **Every settlement**, village up, has a leatherworker keeper (`stall-lines.json`, the `leatherworker` shop, smallest `village`) selling the craft's supplies: curing salt, tannins, oils, waxes, threads, dyes, fittings, common hides and the field kit, always, at the catalogue's own prices (owner, 2026-10-08: "every town has a leatherworker and that person does not necessarily have a tannery") |
+| `play.cast[]` tanners | words only: a person described as a tanner, currier, saddler, cobbler or leatherworker is the occupation `tanner`. A world's own word for the trade needs a row in that table |
+| prices | none from a world: the yard by the hour and a vat by the day are the app's house rates (`market.tannery_rate`, `market.vat_rate`); hides and consumables at their own `price_gp` |
+
 ## SQLite
 
 Same data, one row per thing. `entities.facts` is a JSON string; `entities.prose` is every

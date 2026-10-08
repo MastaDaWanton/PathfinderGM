@@ -330,6 +330,38 @@ when its own words name its alchemists or play founds one. The full vocabulary i
 | a laboratory in a town whose words name alchemists | Not written: Aurvantis's nine "black-market alchemist collective" settlements and Pilfnook and Sparburrow ("alchemical explosives", "alchemical curiosities") list none, and `tools/check_places.py` notes each | Author the place in that settlement's `places`, with `kind: "laboratory"`. The app never appends one to an authored town: an author who listed the rooms has said what the town has |
 | people whose work is alchemy | The app's own occupation `alchemist` (`content/people/occupations.json`, tag `alchemy`); a laboratory's keeper is one, and a person described as an alchemist or chymist is one | Nothing new: describe the person's work in words ("an alchemist", "a chymist"). A world's own word for the trade needs a row in the occupation table here, with the `alchemy` tag, and then its workroom counts as a laboratory with nothing else changed |
 
+### What a leatherworker needs from a world (leatherworking revamp, lanes A to I)
+
+Consolidated 2026-10-08 by lane W (docs/leatherworking-revamp-plan.md §21) from what the
+other lanes built; the shapes are in `campaign-format.md`, "Leatherworking". Before the
+revamp a world's own beast yielded only six generic carcass goods (sinew, gut cord, tallow
+and the like), picked by matching the creature's display NAME against hide names: a red
+dragon offered all eleven dragonhides, a "Battle Mage" bat-wing leather, and a lion nothing
+(inventory §0.4). Every world now skins by the creature's tags and stat block, and gets the
+shipped shelf of 140 leather materials.
+
+The owner's rulings that bind every row: **tags on the beasts, a reader in skinning, no
+fauna list** (Q9.2); **a person is never a hide**, whatever the world calls its peoples;
+**every settlement has a leatherworker's counter, a tannery only where the settlement's own
+words imply one** (2026-10-08, open point 9); **marks are on hold** (send none). What a world
+must **never** send: a hide's numbers derived from its creature (the app reads them from the
+stat block on every build), a tannery's rent, a fauna list, or a sky.
+
+| Field | Now | Best shape |
+|---|---|---|
+| creature `tags` | Absent: the export has no creature section, and no shipped stat block carries a harvest tag yet (lane C's bestiary pass will write them) | On every beast the world names, its parts in the one grammar: `harvest.hide.<material-id>` for a named hide, `harvest.hide.generic.<fur\|scale\|smooth\|feather\|chitin\|shell>` otherwise, `harvest.horn.<id>`, `harvest.bone.<id>`, `harvest.sinew`, `harvest.scales.<id>`, `harvest.plan.<quadruped\|long\|winged\|serpent\|carapace>`, beside the other crafts' `blood`, `reagent`, `essence` and `part`. The tags that name a material (`harvest.hide.<id>` and its siblings) are read today by every carcass excursion (`gathering.harvest_tagged`, since 2026-10-06); `generic.*`, a bare `harvest.sinew` and `plan.*` are ignored there and wait for the harvest of a carcass (lane C, not built). A beast with none falls back to the generic rule by type, which is why the next field matters |
+| a world creature's statistics | Absent, and kept so: "no stat blocks" | **Proposed, for the owner and World Bible**: a beast row of words and ids only, `{"id", "name", "like": "<bestiary id>", "tags": [...]}`. `like` names the block whose numbers it fights with; the reader takes type, subtype, size, CR, resistances, immunities, DR and natural armour from it, so the export carries no rules number and a world's marsh elk can still yield its own hide. A good-aligned beast (a good outsider, a metallic dragon) says `subtype.good` in its tags: harvesting it is a deed |
+| validator | Absent | World Bible refuses `harvest.hide*` on a humanoid (a `play.races[]` people never carries one), a tag naming no material in the export or the app's shelf, and a true dragon tagged with another colour's dragonhide. The app refuses the same on load, with the fix named |
+| `play.materials[]` rows of `kind` `hide` | Absent (the whole of `play.materials[]` is proposed): every world skins the shipped 71 named hides and 6 generic | The forge's shape plus the leather fields: `pieces` (armour `body`/`fastenings`/`lining`, shield `body`, worn `body`/`lining`; weapon `haft` only for a grip-capable hide), `armour` with at least three effects and one drawback (AC typed `material`), `working` with at least one leather trait, `surface`, `color`. Never `narrative` |
+| `.creature_type` (lane F) | Absent | The creature type it comes from, in the bestiary's words (`animal`, `magical-beast`, `dragon`...): Grade is one easier per known hide of the same type, at most four. Stated on the hide because a name does not resolve (only 45 of the 71 shipped named hides' creatures are in the bestiary) |
+| `.size`, `.fresh_hours` (lanes D and E) | Absent | `size` (`tiny` to `colossal`) is the hide's units when it is bought or converted (Medium 1, doubling per size); `fresh_hours` how long it keeps green, 48 on every shipped hide. Both were measured lost through the one door until 2026-10-08, every Large hide reading as one Medium unit |
+| `.sold_as` (lanes D and E) | Absent | `leather`, `fur` or `rawhide`: the form a counter sells it in (never green), one of its forms. A bought hide comes oak-bark tanned at grade 2 |
+| `.price_gp` on hides and dyes (lane G) | Absent | The price of the sold form, by the one price rule (common at least 1 gp). **A common hide or dye without one is on no counter**: every settlement's leatherworker stocks the priced common hides, dyes and fittings always, never sold out. Leave it out only for a hide the world does not sell |
+| `play.materials[]` tannins, oils, waxes, threads, dyes, fittings, treatments | Absent | Working traits only, no `armour` or `weapon` list, no `mark` while marks are on hold. A tannin **must** say its `tannage` (`brain`, `alum`, `bark`, `mineral`, `planar`); a curing salt says `"salt": true`; a fitting names its metal in `material`. Common ones carry `price_gp`, or the counter that always sells them cannot |
+| `play.places[].kind: "tannery"` | Read since 2026-10-06 (the places row's `kind`). Lane G measured 2026-10-08: the three shipped exports author twelve tanneries, all as authored rooms with no `kind` | `"kind": "tannery"` on a world's own tannery by any name ("the Tanyard"): its keeper is then a tanner, and it has the vats, the lime pit and the hardening kettle. Beside `smithy` and `laboratory`. The kind word itself must be `tannery`: "tanyard" does not fold to it yet (`places.KIND_WORDS`) |
+| a settlement's words that imply tanners | Read (`places.TANNERY_CUES`, lane G): a settlement with no authored tannery whose own facts or paragraphs say `tanner`, `tannery`, `tanning`, `tanyard`, `tan pits`, `currier`, `leatherworker`, `the leather trade`, `leather goods` or `the hide trade` gets one on its outskirts. Measured 2026-10-08: no cue fires in any shipped export (their tanneries are authored) | Nothing new: describe a town's trades in its own words. "Leather" alone and "hides" or "pelts" alone are deliberately not cues (what people wear; trappers selling pelts). A world that wants a tannery in a town it lists rooms for authors the room |
+| the leatherworker's counter | Every settlement, village up (`stall-lines.json` `leatherworker`, lane G) | Nothing from a world, besides the `play.places[].supplies[]` ask above (`"supplies": ["leatherworker"]` on a world's own saddler or cobbler). A tanner, currier, saddler or cobbler in `play.cast[]` is the occupation `tanner` by their words |
+
 ## Things worth stealing
 
 Patterns from World Bible that solved problems this app will hit too:
