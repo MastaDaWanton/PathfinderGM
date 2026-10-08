@@ -48,8 +48,21 @@ PIECES: dict[str, tuple[str, ...]] = {
     "weapon": ("head", "haft", "fittings"),
     "armour": ("body", "fastenings", "lining"),
     "shield": ("body", "fastenings", "lining"),
+    # The leatherworker's worn goods — cloak, boots, gloves, bracers, belt, cap
+    # (leatherworking plan §13.6, §18.2; contracts §4.2): a body and a lining, read from the
+    # hide's `armour` list less the numbers that only mean something on a suit
+    # (`WORN_DROPS`).
+    "worn": ("body", "lining"),
 }
-MAIN_PIECE = {"weapon": "head", "armour": "body", "shield": "body"}
+MAIN_PIECE = {"weapon": "head", "armour": "body", "shield": "body", "worn": "body"}
+MAKER_KEYS = ("smith", "maker")
+
+# What a worn good leaves out of a hide's armour list (plan §13.6): "AC, ACP, max Dex and
+# spell failure are dropped from them (there is no armour bonus to fold into)". The armour
+# category and the speed penalty go with them for the same reason — a cloak has no weight
+# class to shift and slows nobody as a suit does. A typed AC that is not the armour bonus
+# (a deflection lining) is not an armour number and stays.
+WORN_DROPS = frozenset({"acp", "max_dex", "asf", "category", "speed_penalty"})
 
 # --- the numbers of §6.2, each named once ---------------------------------------------------
 
@@ -113,12 +126,40 @@ def material(material_id: str) -> dict | None:
 
 def _effects_for(doc: dict, gear: str) -> list[dict]:
     """The effect list a material brings to this kind of gear. A shield reads the material's
-    own `shield` list when it has one and its armour list otherwise."""
+    own `shield` list when it has one and its armour list otherwise; a worn good reads the
+    armour list without the suit's own numbers (`WORN_DROPS`, and the AC that would fold
+    into an armour bonus it does not have)."""
     if gear == "shield":
         raw = doc.get("shield") or doc.get("armour") or []
+    elif gear == "worn":
+        raw = [e for e in doc.get("armour") or [] if isinstance(e, dict)
+               and not (e.get("type") == "gear_mod" and str(e.get("target")) in WORN_DROPS)
+               and not _folds_into_armour(e)]
     else:
         raw = doc.get(gear) or []
     return [dict(e) for e in raw if isinstance(e, dict)]
+
+
+def _inherited(creature_id: str) -> list[dict]:
+    """What a generic hide carries from the beast it was taken off (leatherworking plan §5.4;
+    contracts §4.1, §5.2): lane C's `harvest.inherited(creature)`, derived from the stat
+    block on read and never stored. Imported lazily, as `material` imports lane D's door:
+    built in parallel, a module that is not there yet answers nothing. Every effect comes
+    back marked `from_creature` so the build can tell it from a house number."""
+    if not creature_id:
+        return []
+    try:
+        from . import harvest as _harvest
+    except ImportError:
+        return []
+    fn = getattr(_harvest, "inherited", None)
+    if not callable(fn):
+        return []
+    try:
+        got = fn(str(creature_id)) or []
+    except Exception:  # noqa: BLE001 — an unknown beast is a problem in the build, not a crash
+        return []
+    return [dict(e, from_creature=True) for e in got if isinstance(e, dict)]
 
 
 def _number(value) -> float | None:
@@ -215,7 +256,7 @@ def _key(spec: dict) -> tuple:
 
 # --- the build -------------------------------------------------------------------------------
 
-def _parts_label(parts) -> str:
+def _parts_label(parts, made: str = "forged") -> str:
     """The roll term's words for a summed row: which forged pieces it comes from, "forged
     iron head" or "forged ash haft and brass guard".
 
@@ -237,7 +278,7 @@ def _parts_label(parts) -> str:
         words.append(f"{name} {piece}".strip())
     if not words:
         return ""
-    return "forged " + (words[0] if len(words) == 1
+    return f"{made} " + (words[0] if len(words) == 1
                         else ", ".join(words[:-1]) + " and " + words[-1])
 
 
@@ -258,7 +299,9 @@ def build(record: dict) -> dict:
     origin = f"item:{item_id}"
     base_key = str(rec.get("base") or rec.get(gear) or "")
     main = MAIN_PIECE[gear]
-    smith = rec.get("smith") if isinstance(rec.get("smith"), dict) else {}
+    # The maker's level and perks under either key (contracts §4.2): writers use "smith"
+    # for now, and a tanner's record may say "maker".
+    smith = next((rec[k] for k in MAKER_KEYS if isinstance(rec.get(k), dict)), {})
     perks = smith.get("perks") if isinstance(smith.get("perks"), dict) else {}
     level = int(smith.get("level", 1) or 1)
     quality_index = int(rec.get("quality_index", 1) if rec.get("quality_index") is not None
@@ -266,6 +309,8 @@ def build(record: dict) -> dict:
     q_mult = quality_multiplier(quality_index) * (
         1 + POTENCY_PER_PICK * max(0, int(perks.get("potency", 0) or 0)))
     cut = negative_cut(level, int(perks.get("hardening", 0) or 0))
+    # The roll term's verb (`_parts_label`): a tanner's wolf pelt is not "forged".
+    made = "worked" if str(rec.get("craft") or "") == "leatherworker" else "forged"
 
     rows: dict[tuple, dict] = {}
     book: list[dict] = []
@@ -277,6 +322,10 @@ def build(record: dict) -> dict:
 
     pieces = rec.get("pieces") if isinstance(rec.get("pieces"), dict) else {}
     order = list(PIECES[gear]) + [p for p in pieces if p not in PIECES[gear]]
+    # The leatherworker's readers (leatherworking contracts §4.2, plan §13.4, §15, §5.4):
+    always_masterwork = False
+    as_base = ""
+    inherited: list[tuple[dict, str]] = []
     for slot in order:
         spec = pieces.get(slot)
         if isinstance(spec, str):
@@ -296,6 +345,24 @@ def build(record: dict) -> dict:
         if doc is None:
             problems.append(f"{slot}: no material called {mid!r}.")
             continue
+        if slot == main:
+            # The book's "always masterwork" hides (dragonhide, eel hide, angelskin,
+            # darkleaf: plan §13.4, Q3.4). Measured before (inventory §0.7): a dragonhide
+            # suit was not masterwork without the Tool step, which the book never asks.
+            always_masterwork = doc.get("always_masterwork") is True
+            allowed = [str(b).strip().lower() for b in doc.get("allowed_bases") or () if b]
+            if allowed and gear in ("armour", "shield"):
+                _, have = _armour_key_of(base_key)
+                if (have or base_key.strip().lower()) not in allowed:
+                    problems.append(
+                        f"{slot}: {doc.get('name') or mid} is made only into "
+                        f"{_listed(allowed)}, not {base_key or 'nothing'} (the book's own "
+                        f"limit).")
+        # What a generic hide carries from its beast (plan §5.4): the stock's `creature`,
+        # copied onto the piece by the bench, read live through lane C. Collected for the
+        # one rule below, never summed.
+        if spec.get("creature"):
+            inherited += [(e, slot) for e in _inherited(str(spec["creature"]))]
         passes = max(0, int(spec.get("passes", 0) or 0))
         mult = (MAIN_WEIGHT if slot == main else OTHER_WEIGHT) * STRENGTHEN_PER_PASS ** passes
         for eff in _effects_for(doc, gear):
@@ -303,6 +370,27 @@ def build(record: dict) -> dict:
             if eff is None:
                 continue
             kind = str(eff.get("type") or "")
+            if kind == "as_base":
+                # Bulette leather "has the same statistics as studded leather" (plan
+                # §14.5): the main piece's word, read by `armour_row`. The row's metal is
+                # not carried with it — the material tag reads the pieces, and no piece
+                # here is metal.
+                if slot == main and gear == "armour":
+                    want = str(eff.get("target") or "").strip().lower()
+                    from .tables import ARMOUR as _ARMOUR
+
+                    if want in _ARMOUR and want != "none":
+                        as_base = want
+                    else:
+                        problems.append(f"{slot}: {doc.get('name') or mid} names no armour "
+                                        f"row called {want!r} to take statistics from.")
+                if eff.get("book") and slot == main:
+                    book.append(dict(eff, origin=origin, source=mid))
+                continue
+            if eff.get("from_creature"):
+                # A creature's own DR or resistance on a named hide: the one rule below.
+                inherited.append((eff, slot))
+                continue
             if eff.get("book"):
                 # The book is the main piece's alone, and never scaled (§6.3).
                 if slot == main:
@@ -360,7 +448,7 @@ def build(record: dict) -> dict:
         out = {"type": row["type"], "target": row["target"], "amount": final,
                "bonus_type": row["bonus_type"] or "material",
                "origin": origin, "source": "+".join(row["sources"]),
-               "label": _parts_label(row.get("parts") or ())}
+               "label": _parts_label(row.get("parts") or (), made)}
         if row["bypass"]:
             out["bypass"] = row["bypass"]
         if row["when"]:
@@ -377,16 +465,18 @@ def build(record: dict) -> dict:
         elif kind == "strikes_as":
             strikes.append(str(eff.get("target") or ""))
 
-    masterwork = bool(rec.get("masterwork")) or quality_index >= MASTERWORK_AT
+    masterwork = (bool(rec.get("masterwork")) or quality_index >= MASTERWORK_AT
+                  or always_masterwork)
     if masterwork:
         # The book's masterwork: +1 enhancement on attack rolls for a weapon (it does not
         # stack with a magic weapon's enhancement, which is why it is typed), 1 less armour
-        # check penalty for armour or a shield. Its own effect, never scaled (§4.4).
+        # check penalty for armour or a shield. Its own effect, never scaled (§4.4). A worn
+        # good has no check penalty to lighten.
         if gear == "weapon":
             specs.append({"type": "combat_mod", "target": "attack", "amount": 1,
                           "bonus_type": "enhancement", "origin": "rule:masterwork",
                           "source": "masterwork", "item": item_id})
-        else:
+        elif gear in ("armour", "shield"):
             gear_out["acp"] += 1
 
     def _unscaled(eff: dict, source: str) -> None:
@@ -439,6 +529,30 @@ def build(record: dict) -> dict:
             _unscaled({"type": "gear_mod", "target": "hardness", "amount": 1},
                       f"folded:{slot}")
 
+    # A hide's DR and energy resistance INHERITED FROM ITS CREATURE (`from_creature`, lane
+    # C's mark; leatherworking plan §5.4 and open point 6, the owner's "reduced DR",
+    # 2026-10-08: DR max(1, N/5)/x on a rare-and-up hide) apply whole and once, when the
+    # hide is the main piece — the suit's body, a worn good's whole — and never from a
+    # lining or fastenings. Measured before this rule (tests/test_leather_items.py): the
+    # forge's sum SCALES such a number, so a DR 1/silver hide body at Crude came out
+    # 1 x 0.75 = 0.75, toward zero 0, and as a lining 1 x 0.5 = 0 at any quality below
+    # +3 — the owner's floor of 1 rounded away to nothing. Hand-written house DR and
+    # resistance on the material documents keep the forge's maths. Laminate's passes do not
+    # multiply it either: the beast's hide resists what the beast resisted.
+    seen_inherited: set[str] = set()
+    for eff, slot in inherited:
+        if slot != main:
+            continue
+        sig = json.dumps({k: v for k, v in eff.items() if k not in ("origin", "source")},
+                         sort_keys=True)
+        if sig in seen_inherited:
+            continue
+        seen_inherited.add(sig)
+        src = str((pieces.get(main) or {}).get("creature") or "") if isinstance(
+            pieces.get(main), dict) else ""
+        _unscaled(dict(eff, from_creature=True),
+                  f"creature:{src}" if src else str(eff.get("source") or "creature"))
+
     specs.extend(extras)
     out = {
         "id": item_id, "name": str(rec.get("name") or item_id), "kind": gear,
@@ -446,6 +560,7 @@ def build(record: dict) -> dict:
         "specs": specs, "book": book,
         "strikes_as": sorted({s for s in strikes if s}),
         "gear": gear_out, "riders": riders, "sum": sums, "masterwork": masterwork,
+        "always_masterwork": always_masterwork, "as_base": as_base,
         "quality_index": quality_index,
         "multipliers": {"quality": round(q_mult, 4), "negative_cut": round(cut, 4)},
         "problems": problems,
@@ -472,7 +587,35 @@ def build(record: dict) -> dict:
         out["specs"] = specs + [dict(s) for s in lay["specs"]]
         out["strikes_as"] = sorted(set(out["strikes_as"]) | set(lay["strikes_as"]))
         out["problems"] = problems + [f"magic: {p}" for p in lay["problems"]]
+    out["object_immunity"] = object_immunities(out)
     return out
+
+
+def object_immunities(b: dict) -> list[str]:
+    """The energies the ITEM itself takes no damage from (`object_immunity`, leatherworking
+    plan §15, §18.4): dragonhide's book power, "the armour is immune ... although this does
+    not confer any protection to the wearer". Read off the build's book (the main piece's
+    printed effects) and its other specs, sorted. Asked by `Actor.damage_item`, the one
+    door every sunder, acid splash and fireball on gear goes through."""
+    from .tables import ENERGY_DAMAGE
+
+    out: set[str] = set()
+    for s in list(b.get("book") or ()) + list(b.get("specs") or ()):
+        if isinstance(s, dict) and s.get("type") == "object_immunity":
+            t = str(s.get("target") or "").strip().lower()
+            if t in ENERGY_DAMAGE:
+                out.add(t)
+    return sorted(out)
+
+
+def _armour_key_of(base: str) -> tuple[str, str]:
+    from . import armour as armour_mod
+
+    return armour_mod.key_for(base)
+
+
+def _listed(words: list[str]) -> str:
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " or " + words[-1]
 
 
 def preview(pieces: dict, *, gear: str, base: str, quality_index: int, level: int,
@@ -594,13 +737,17 @@ def record_for_base(base: str, *, gear: str, quality_index: int = 3,
     }
 
 
-_ROLL_EXCLUDED = frozenset({"gear_mod", "strikes_as", "working", "narrative"})
+# `object_immunity` and `as_base` are about the item, never a roll: read by
+# `object_immunities` and `armour_row`.
+_ROLL_EXCLUDED = frozenset({"gear_mod", "strikes_as", "working", "narrative",
+                            "object_immunity", "as_base"})
 
 
 def roll_specs(b: dict) -> list[dict]:
     """The modifiers a roll reads: the summed specs and the book's own roll modifiers.
     Gear numbers, strikes and riders are read by their own readers."""
-    out = [dict(s) for s in b.get("specs") or []]
+    out = [dict(s) for s in b.get("specs") or []
+           if str(s.get("type") or "") not in ("object_immunity", "as_base")]
     out += [dict(s) for s in b.get("book") or []
             if str(s.get("type") or "") not in _ROLL_EXCLUDED and not s.get("trigger")]
     return out
@@ -631,6 +778,21 @@ def armour_row(base: dict, b: dict) -> dict:
     which proficiency a suit needs.
     """
     row = dict(base)
+    as_base = str(b.get("as_base") or "")
+    if as_base:
+        # Bulette leather (plan §14.5): the named row's statistics replace the suit's own
+        # — armour bonus, max Dex, check penalty, spell failure, weight and class — and
+        # the build moves those. Its name and donning stay the suit's, and its metal is the
+        # pieces' (`item_tags`), never the row's: a bulette suit is studded leather's
+        # numbers with no studs.
+        from .tables import ARMOUR as _ARMOUR
+
+        stats = _ARMOUR.get(as_base) or {}
+        for k in ("ac", "max_dex", "acp", "asf", "lb", "weight"):
+            if k in stats:
+                row[k] = stats[k]
+        row["as_base"] = as_base
+        base = row
     g = b.get("gear") or {}
     ac_add = sum(int(s.get("amount", 0) or 0) for s in roll_specs(b) if _folds_into_armour(s))
     row["ac"] = max(0, int(base.get("ac", 0) or 0) + ac_add)
@@ -713,7 +875,10 @@ def stock_item(record: dict, count: int | None = None) -> ForgedStock:
         tier=str(rec.get("tier") or "common"),
         # A shield goes in the shield slot (contracts §12 item 6): the old default put a
         # forged buckler in the armour slot, where it would have been read as a suit.
-        slot=str(rec.get("slot") or {"weapon": "hands", "shield": "shield"}.get(gear, "armor")),
+        # A worn good has no default: a cloak and a pair of boots are the record's to say
+        # (`Actor.wear` refuses a slot it does not know, rather than guessing "armor").
+        slot=str(rec.get("slot") or {"weapon": "hands", "shield": "shield",
+                                     "worn": ""}.get(gear, "armor")),
         wearable=True,
         weapon=base if gear == "weapon" else None,
         armour=base if gear == "armour" else None,
@@ -743,6 +908,7 @@ def material_carried_effects(material_id: str) -> list[dict]:
 
 
 __all__ = ["build", "preview", "material", "is_forged", "record_of", "record_for_base",
+           "object_immunities", "WORN_DROPS",
            "roll_specs",
            "standing_specs", "armour_row", "weapon_row", "ForgedStock", "stock_item",
            "material_carried_effects", "quality_multiplier", "negative_cut", "PIECES",

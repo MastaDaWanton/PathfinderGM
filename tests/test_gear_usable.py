@@ -442,11 +442,16 @@ def test_the_outfit_files_a_replaced_suit_by_its_key():
 # --- D: the tables -----------------------------------------------------------------------------
 
 def test_the_armour_table_has_all_12_crb_armours_and_6_shields_with_weight_and_asf():
-    """It had 7 of 12 and 3 of 6, with no weights and no arcane spell failure."""
+    """It had 7 of 12 and 3 of 6, with no weights and no arcane spell failure. Re-pinned by
+    leather lane B (2026-10-08): the leatherworker's five suits and the madu beyond Table
+    6-6 (APG, UE; tests/test_leather_items.py pins their numbers) make 17 and 7."""
     from rules.tables import ARMOUR, SHIELDS
 
-    assert len([k for k in ARMOUR if k != "none"]) == 12
-    assert len([k for k in SHIELDS if k != "none"]) == 6
+    crb = {"padded", "leather", "studded leather", "chain shirt", "hide armour", "scale mail",
+           "breastplate", "chainmail", "splint mail", "banded mail", "half-plate",
+           "full plate"}
+    assert crb <= set(ARMOUR) and len([k for k in ARMOUR if k != "none"]) == 12 + 5
+    assert len([k for k in SHIELDS if k != "none"]) == 6 + 1
     for table in (ARMOUR, SHIELDS):
         for k, row in table.items():
             if k != "none":

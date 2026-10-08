@@ -47,7 +47,7 @@ from . import states
 
 # Forge pieces by gear (forge_items.PIECES), repeated here only as the order a default row
 # is read in; the gear words are the forge's.
-_MAIN = {"weapon": "head", "armour": "body", "shield": "body"}
+_MAIN = {"weapon": "head", "armour": "body", "shield": "body", "worn": "body"}
 
 
 # --- the data file ---------------------------------------------------------------------------

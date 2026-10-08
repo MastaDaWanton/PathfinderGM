@@ -5196,6 +5196,31 @@ def wear_item(request):
         return JsonResponse({"error": f"you are not carrying {item_id!r}"}, status=400)
 
     record = held.as_dict()
+    # A crafted suit or shield is put on through the engine's `wear` op, whatever
+    # button asked (leatherworking plan §18.1, contracts §4.3). Measured (inventory §0.1):
+    # this path put the record's NAME in the armour slot and left `armour` alone, so a
+    # bench-made studded leather was "worn" at AC 15 → 15 — neither its armour bonus nor
+    # its masterwork −1 check penalty ever reached the sheet. The engine sets the table
+    # key, reads the build, spends the donning minutes and refuses mid-fight; taking it off
+    # is its `take_off` op for the same reason (a suit left in `armour` with an empty slot).
+    from rules import forge_items
+
+    # Weapons keep this door's old behaviour (the Wield button already sends `op`).
+    gear = str(record.get("gear") or "") if forge_items.is_forged(record) else (
+        "" if record.get("weapon") else "armour" if record.get("armour") else "")
+    if gear in ("armour", "shield"):
+        from rules import armour as armour_mod
+
+        if not off:
+            return _wear_by_the_engine(c, pc, item_id)
+        # Off through the engine only when it really is the suit on: one put on the old
+        # way (a save from before this, its name in the slot and `armour` untouched) comes
+        # off the old way below, or it could never come off at all.
+        key = armour_mod.key_for(str((record.get("base") if forge_items.is_forged(record)
+                                      else record.get("armour")) or ""))[1]
+        if key and key in (str(pc.armour), str(pc.shield)):
+            return _wear_by_the_engine(c, pc, str(record.get("name") or item_id),
+                                       op="take_off")
     try:
         if off:
             if not pc.take_off(record["name"]):

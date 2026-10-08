@@ -156,6 +156,7 @@ function defenceCard(s) {
     `<div class="t"><span>Hit points</span><b>${hp.current} of ${hp.max}</b></div>`,
     hp.temp ? `<div class="t"><span>Temporary${hp.temp_source ? `, from ${esc(hp.temp_source)}` : ""}</span><b>${sign(hp.temp)}</b></div>` : "",
     ...(d.dr || []).map(r => `<div class="t"><span>Damage reduction${r.source ? `, from ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`),
+    ...(d.resistances || []).map(r => `<div class="t"><span>Resists ${esc(r.type)}</span><b>${r.amount}</b></div>`),
     `<div class="t"><span>Unconscious at</span><b>0</b></div>`,
     con ? `<div class="t"><span>Dead at</span><b>-${con.score}</b></div>` : "",
     `<div class="t"><span>Non-lethal taken</span><b>${hp.nonlethal || 0}</b></div>`,

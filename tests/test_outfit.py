@@ -123,5 +123,9 @@ def test_a_rogue_is_trained_in_light_armour_and_the_rogues_own_weapons():
     keys = outfit_views.proficient_keys(load_pc("fixtures/pc-kesst.json"))
     assert {"rapier", "dagger", "shortbow"} <= set(keys["weapon"])
     assert "longsword" not in keys["weapon"]
-    assert set(keys["armour"]) == {"padded", "leather", "studded leather", "chain shirt"}
+    # Every light suit of the table: Table 6-6's four, and since leather lane B
+    # (2026-10-08) the two light suits Ultimate Equipment adds, quilted cloth and leather
+    # lamellar (tests/test_leather_items.py). The medium ones stay out.
+    assert set(keys["armour"]) == {"padded", "leather", "studded leather", "chain shirt",
+                                   "quilted cloth", "leather lamellar"}
     assert keys["shield"] == []

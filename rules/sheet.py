@@ -28,7 +28,7 @@ from .tables import (
     CLASSES, CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
-    WEAPONS, ENERGY_VS_OBJECTS_HALVED, ability_modifier, bab_for,
+    WEAPONS, ENERGY_DAMAGE, ENERGY_VS_OBJECTS_HALVED, ability_modifier, bab_for,
     is_physical, iterative_attacks, maneuver_text, material_for, normalise_damage_type,
     save_for, base_skill,
 )
@@ -157,8 +157,16 @@ class Item:
         return self.hp <= 0
 
     def take_damage(self, amount: int, dtype: str = "untyped",
-                    traits: tuple[str, ...] = ()) -> dict:
+                    traits: tuple[str, ...] = (), immune: tuple[str, ...] = ()) -> dict:
         """Hardness first, then the object's hit points.
+
+        `immune` is the energies the object itself shrugs off (`object_immunity`,
+        dragonhide's book power: "the armor is immune to that energy type", CRB/UE special
+        materials). Read live from what the thing is made of by `Actor.damage_item` and
+        passed in, never stored on the Item, so a corrected material document reaches a
+        suit already made. Before it (leatherworking inventory §0, plan §18.4) nothing could
+        be immune: eleven dragonhide entries gave the WEARER resistance 5 instead, which
+        the book says the hide does not do, and the suit itself burned like calfskin.
 
         Energy is halved against objects before hardness, per the Core Rulebook — except
         acid, which this app needs to bite: an ability whose whole point is ruining
@@ -171,6 +179,13 @@ class Item:
         """
         rolled = max(0, int(amount))
         d = normalise_damage_type(dtype)
+        if d in {normalise_damage_type(e) for e in immune or ()}:
+            return {
+                "item": self.name, "rolled": rolled, "type": d, "halved": False,
+                "hardness": self.hardness, "reduced": 0, "taken": 0,
+                "hp": self.hp, "hp_max": self.hp_max, "broken": False, "destroyed":
+                self.destroyed, "immune": d,
+            }
         halved = d in ENERGY_VS_OBJECTS_HALVED
         after_energy = rolled // 2 if halved else rolled
 
@@ -1109,6 +1124,16 @@ class Actor:
             take((b.get("magic") or {}).get("worn"), name, origin, True)
         crafted = set(self.worn)
         for rec in self.worn_items():
+            if forge_items.is_forged(rec) and rec.get("gear") == "worn":
+                # A leatherworker's cloak or boots (leatherworking plan §18.2): its build,
+                # as the suit's is read above, so a winter-wolf cloak's cold resistance
+                # reaches `resistance` the way a fire-forged shirt's does.
+                b = self._live_build(rec)
+                name = str(rec.get("name") or b.get("name") or "worn gear")
+                origin = f"item:{b.get('id')}"
+                take(forge_items.roll_specs(b), name, origin)
+                take((b.get("magic") or {}).get("worn"), name, origin, True)
+                continue
             if _is_weapon_record(rec) or forge_items.is_forged(rec):
                 continue
             name = str(rec.get("name") or "worn gear")
@@ -1564,7 +1589,10 @@ class Actor:
             if _is_weapon_record(rec):
                 continue                        # its own swing only: read below
             if forge_items.is_forged(rec):
-                if rec is suit or rec is arm:
+                # The suit and the shield while they are the ones worn, and every worn
+                # good (a wolf-pelt cloak's Stealth, plan §18.2: typed `material`, so a
+                # cloak and a lining of the same hide never add twice — `dice.stack`).
+                if rec is suit or rec is arm or rec.get("gear") == "worn":
                     read(forge_items.standing_specs(self._live_build(rec)),
                          str(rec.get("name") or "worn gear"))
                 continue
@@ -4054,7 +4082,37 @@ class Actor:
 
     def damage_item(self, name: str, amount: int, dtype: str = "untyped",
                     traits: tuple[str, ...] = ()) -> dict:
-        return self.item(name).take_damage(amount, dtype, traits)
+        return self.item(name).take_damage(amount, dtype, traits,
+                                           immune=self.item_immunities(name))
+
+    def worn_reductions(self) -> list[Reduction]:
+        """The DR what is worn gives (`worn_specs_of`), for the sheet's lists: the damage
+        path reads the same documents (`damage_reduction`), and before 2026-10-08 the
+        sheet listed only the innate and the class's, so a suit's DR was real in a fight
+        and absent from the page. A conditional one (elysian bronze's "against magical
+        beasts") says so in its source."""
+        out = []
+        for s, name, _ in self.worn_specs_of("damage_reduction", ask_when=False):
+            try:
+                n = int(s.get("amount", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if n > 0:
+                out.append(Reduction(n, str(s.get("bypass") or ""),
+                                     name + (" (only against some foes)" if s.get("when")
+                                             else "")))
+        return out
+
+    def item_immunities(self, name: str) -> tuple[str, ...]:
+        """The energies the thing called `name` takes no damage from as an object
+        (`forge_items.object_immunities`): its crafted record's build, read live. () for a
+        thing with no record — a bought rope is immune to nothing."""
+        from . import forge_items
+
+        rec = self.crafted_record(name)
+        if not forge_items.is_forged(rec):
+            return ()
+        return tuple(self._live_build(rec).get("object_immunity") or ())
 
     def damage_all_gear(self, amount: int, dtype: str = "untyped") -> list[dict]:
         """Acid in a blood pool does not pick a target. Everything carried takes it."""
@@ -5443,7 +5501,8 @@ class Actor:
             "temp_hp": self.temp_hp,
             "nonlethal": self.nonlethal,
             "nonlethal_threshold": self.nonlethal_threshold,
-            "dr": [r.label for r in self.reductions + self.class_reductions()],
+            "dr": [r.label for r in self.reductions + self.class_reductions()
+                   + self.worn_reductions()],
             # A 10 that used to be a 14 is not the same as a 10, and the grid shows only
             # the score. Without this the player sees a number and no reason for it.
             "ability_damage": {a: self.ability_damage.get(a, 0)
@@ -5894,8 +5953,16 @@ def full_sheet(actor: Actor) -> dict:
             "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
                     "source": r.source}
                    # The class's own DR beside the innate and the applied: a barbarian's
-                   # 4/— at 16th is on her sheet, not only in the damage path.
-                   for r in actor.reductions + actor.class_reductions()],
+                   # 4/— at 16th is on her sheet, not only in the damage path. And what is
+                   # worn (`worn_reductions`): adamantine armour's, a werewolf-pelt suit's.
+                   for r in actor.reductions + actor.class_reductions()
+                   + actor.worn_reductions()],
+            # Energy resistance by energy, the number `take_damage` will subtract (the best
+            # of the stat block's, the race's and everything worn). Measured 2026-10-08
+            # (leather lane B, live): a winter-wolf cloak's cold resistance 2 reached the
+            # damage path and was on no page at all — the sheet listed no resistances.
+            "resistances": [{"type": e, "amount": actor.resistance(e)}
+                            for e in ENERGY_DAMAGE if actor.resistance(e)],
             "temp_pools": [{"amount": p.amount, "source": p.source,
                             "rounds_left": p.rounds_left} for p in actor.temp_pools],
             # Everything carried that is not a weapon, a herb or a jar: whatever the

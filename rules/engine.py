@@ -8551,6 +8551,7 @@ class Engine:
                      "broken" if r["broken"] else f"{r['hp']}/{r['hp_max']}")
             bits.append(f"{target.name}'s {r['item']}: {r['taken']} through hardness "
                         f"{r['hardness']} — {state}.")
+        bits += _immune_tells(target.name, results)
         if not bits:
             bits.append(f"Nothing {target.name} carries is marked by it.")
         if intent.origin_name:
@@ -15923,13 +15924,15 @@ class Engine:
         results = ([who.damage_item(named, rolled, dtype)] if named
                    else who.damage_all_gear(rolled, dtype))
         notable = [r for r in results if r["taken"]]
+        immune = _immune_tells(who.name, results)
         tell = "; ".join(
             f"{who.name}'s {r['item']} takes {r['taken']} through hardness "
             f"{r['hardness']}" + (" — destroyed" if r["destroyed"] else
                                   " — broken" if r["broken"] else "")
-            for r in notable) or f"Nothing {who.name} carries is marked by it"
+            for r in notable) or ("" if immune else
+                                  f"Nothing {who.name} carries is marked by it")
         return ([{"kind": "item_damage", "ref": who.ref, **r} for r in results],
-                [tell + "."])
+                ([tell + "."] if tell else []) + immune)
 
     def _stand_by(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """An effect that is not due yet: register it and wait for its trigger.
@@ -19911,6 +19914,30 @@ class Engine:
 
         if crafted is not None and _record_gear(crafted) in ("weapon", "armour", "shield"):
             return wear_crafted(crafted)
+        if crafted is not None and str(crafted.get("gear") or "") == "worn":
+            # A leatherworker's cloak, boots or belt (leatherworking plan §18.2): into the
+            # slot its record names, through the sheet's one door (`Actor.wear`), which
+            # also refuses work still In progress and a slot already full.
+            why = self._held_back(actor, crafted)
+            if why:
+                return no(f"The {crafted.get('name') or item} is {why}.")
+            from .sheet import IllegalSheet
+
+            label = str(crafted.get("name") or item)
+            if any(str(w or "").strip().lower() == label.strip().lower()
+                   for s in actor.slots.values() for w in s):
+                return no(f"{actor.name} already has the {label} on.")
+            try:
+                slot = actor.wear(crafted)
+            except IllegalSheet as exc:
+                return no(str(exc))
+            seen = self._noticed(actor, crafted)
+            return Outcome(
+                intent_id=intent.id, op="wear",
+                effects=[{"ref": actor.ref, "kind": "wear", "item": str(
+                    crafted.get("id") or label).lower(), "crafted": True, "slot": slot}],
+                tell=f"{actor.name} puts on the {label}." + (f" {seen}" if seen else ""),
+                because=intent.because)
 
         # The one key, by the two resolvers (E1). Compared key to key, so "leather
         # armour", "Chain Shirt" and "bo staff" find what the sheet holds as "leather",
@@ -20074,10 +20101,19 @@ class Engine:
         from . import armour as armour_mod
         from . import weapons as weapons_mod
 
+        from . import forge_items
+
         gear = _record_gear(rec)
         name = str(rec.get("name") or rec.get("id") or "the item")
         rec_id = str(rec.get("id") or name).strip().lower()
-        base = str(rec.get("base") or rec.get(gear) or "")
+        # A forged record's `base` is its table key (contracts §4); an older crafted record
+        # keeps the key under `armour` / `weapon`, and its `base` is the Stock's NAME
+        # (`crafting.Stock.base`). Measured (leatherworking inventory §0.1): this read
+        # `base` first for both, so a bench's "Deer Armour" was refused as "not built on
+        # any suit the rules know ('Deer Armour')" — the sheet's own `_crafted_weapon`
+        # already read the old record's `weapon` field for exactly this reason.
+        base = str((rec.get("base") or rec.get(gear)) if forge_items.is_forged(rec)
+                   else (rec.get(gear) or rec.get("base")) or "")
         if gear == "shield":
             return self._wear_forged_shield(intent, actor, rec, name, rec_id, base, no)
         if gear == "weapon":
@@ -20243,10 +20279,16 @@ class Engine:
         # A forged thing by its own name: the suit in the armour slot, or the blade in hand.
         crafted = actor.crafted_record(bare) if bare else None
         if not kind and crafted is not None:
+            in_slot = {str(w or "").strip().lower() for w in actor.slots.get("armor") or ()}
             if crafted is actor.armour_record():
                 kind, key = "armour", str(actor.armour)
             elif crafted is actor.shield_record():
                 kind, key = "shield", str(actor.shield)
+            elif (str(crafted.get("name") or "").strip().lower() in in_slot
+                  and armour_mod.key_for(str(crafted.get("armour") or ""))[1]
+                  == str(actor.armour)):
+                # An older crafted suit, worn by its `armour` key (`_wear_crafted`).
+                kind, key = "armour", str(actor.armour)
             elif str(crafted.get("id") or crafted.get("name") or "").lower() == held.lower():
                 return self._op_wear(Intent(
                     id=intent.id, op="wear", actor=actor.ref,
@@ -20290,6 +20332,17 @@ class Engine:
         # A forged suit comes off into the pack it never left (its record is stock); only a
         # plain suit goes back to `goods`.
         forged_suit = actor.armour_record() if kind == "armour" else actor.shield_record()
+        if forged_suit is None:
+            # An older crafted suit worn through `wear` (its key under `armour`, its name in
+            # the slot, its record in the pack): back to the pack it never left too. Without
+            # this a tanner's "Deer Armour" taken off became a second, plain studded leather
+            # in `goods` beside the record.
+            for slot_name in actor.slots.get("armor" if kind == "armour" else "shield") or ():
+                rec = actor.worn.get(str(slot_name or "").strip().lower())
+                if isinstance(rec, dict) and armour_mod.key_for(
+                        str(rec.get("armour") or ""))[1] == worn:
+                    forged_suit = rec
+                    break
         setattr(actor, kind, "none")
         actor.remove_effects(match=lambda e: str(e.source or "") == f"donned hastily:{worn}")
         if forged_suit is not None:
@@ -21856,6 +21909,25 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
     return ""
+
+
+# What an object immune to an energy does not do (`object_immunity`, leatherworking plan
+# §18.4, §18.6: "the dragonhide does not char"). Law 3: the immunity is a fact the narrator
+# needs, so it rides as a tell; a silent zero left the prose free to burn the suit.
+_IMMUNE_VERBS = {"fire": "does not char", "cold": "does not stiffen or crack",
+                 "acid": "does not pit", "electricity": "does not scorch",
+                 "sonic": "does not split"}
+
+
+def _immune_tells(owner: str, results) -> list[str]:
+    """One sentence per object the energy found and could not hurt."""
+    out = []
+    for r in results or ():
+        if r.get("immune"):
+            verb = _IMMUNE_VERBS.get(str(r["immune"]), f"takes no {r['immune']} damage")
+            out.append(f"{owner}'s {r['item']} {verb}: the {r['immune']} cannot touch "
+                       f"what it is made of.")
+    return out
 
 
 def _record_gear(rec: dict) -> str:

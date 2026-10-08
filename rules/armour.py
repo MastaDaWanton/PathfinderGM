@@ -38,6 +38,13 @@ _ALIASES = {
     "half plate": "half-plate", "halfplate": "half-plate",
     "banded": "banded mail", "splint": "splint mail", "scale": "scale mail",
     "breast plate": "breastplate",
+    # The leatherworker's rows (tables.ARMOUR): the British spelling of the coat, and the
+    # Archives' own "Lamellar (leather)" word order. "hide" is NOT here, although the
+    # leatherworking contracts (§4.2) asked for it: a carried tanner's hide must never be a
+    # suit (test_a_bare_material_word_is_not_armour), and every record's `base` is the table
+    # key "hide armour", which needs no alias (tests/test_leather_items.py measures it).
+    "armoured coat": "armored coat", "lamellar leather": "leather lamellar",
+    "lamellar horn": "horn lamellar", "lamellar steel": "steel lamellar",
 }
 _SHIELD_ALIASES = {
     "steel shield": "heavy shield", "wooden shield": "heavy wooden shield",

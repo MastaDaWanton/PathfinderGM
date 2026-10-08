@@ -58,9 +58,15 @@
     "splint mail": {"body": "steel", "fastenings": "iron", "lining": "quilted-cloth"},
     "banded mail": {"body": "steel", "fastenings": "iron", "lining": "quilted-cloth"},
     "half-plate": {"body": "steel", "fastenings": "iron", "lining": "quilted-cloth"},
-    "full plate": {"body": "steel", "fastenings": "iron", "lining": "quilted-cloth"}
+    "full plate": {"body": "steel", "fastenings": "iron", "lining": "quilted-cloth"},
+    "quilted cloth": {"body": "quilted-cloth", "fastenings": "linen-thread", "lining": "quilted-cloth"},
+    "leather lamellar": {"body": "leather", "fastenings": "leather"},
+    "armored coat": {"body": "leather", "fastenings": "leather", "lining": "steel"},
+    "horn lamellar": {"body": "horn", "fastenings": "leather", "lining": "leather"},
+    "steel lamellar": {"body": "steel", "fastenings": "leather", "lining": "leather"}
   },
   "shields": {
+    "madu": {"body": "leather", "fastenings": "leather"},
     "buckler": {"body": "steel", "fastenings": "leather"},
     "light shield": {"body": "steel", "fastenings": "leather"},
     "heavy shield": {"body": "steel", "fastenings": "leather"},
