@@ -422,8 +422,48 @@ def test_the_forges_teacher_never_teaches_a_hide(client):
     assert r.status_code == 400
     assert r.json()["error"] == ("Deer Hide is a tanner's material, not a smith's: show it "
                                  "to a leatherworker at the leather bench.")
-    card = client.get("/api/forge/material/deer-hide").json()
-    assert card["smiths_here"] == [] and card["ask_elsewhere"]
     # A metal is still the smith's: the refusal is about the person, not the material.
     r = post(client, "/api/forge/ask", {"material": "iron", "ref": "anyone"})
     assert r.json()["error"] == "Nobody here by that name knows metals."
+
+
+def test_the_smiths_ledger_holds_no_hide_and_serves_no_hide_card(client):
+    """Lane U5, live, 2026-10-08: `knowledge.ledger` lists every material met, so the
+    Smith's ledger listed the hides and tannins carried (here deer hide and oak bark beside
+    iron), and the forge's card for a hide came in the steel swatch with an Assay that would
+    cut a sliver of hide as if it were a bar. A tanner's material belongs to the Tanner's
+    ledger: the forge's ledger leaves it out, and its card refuses in words and names the
+    leather bench's card for the page to open instead."""
+    c = cm.current()
+    pc = c.scene.pc()
+    pc.inventory.update({"deer-hide": 1, "oak-bark": 1, "iron": 1})
+    c.save()
+    ids = {row["id"] for row in client.get("/api/forge/ledger").json()["ledger"]}
+    assert "iron" in ids and not ids & {"deer-hide", "oak-bark"}, ids
+    r = client.get("/api/forge/material/deer-hide")
+    assert r.status_code == 409
+    assert r.json() == {"error": "Deer Hide is a tanner's material: its card is in the "
+                                 "Tanner's ledger at the leather bench.",
+                        "track": "leatherworker", "card": "/api/leather/material/deer-hide"}
+    assert client.get("/api/forge/material/iron").status_code == 200
+
+
+def test_the_forge_racks_card_opens_from_the_question_mark_and_never_from_the_row():
+    """The owner's emergency rule of 2026-10-08 (master 39a783c, skillhelp.js): a help card
+    opens from a "?" only. Lane U5 measured the forge's rack still opening its ledger card
+    on hovering anywhere on a rack row (`closest(".fr.has-info")`) and on focusing a row's
+    add button (`closest(".fr-add")`), so walking the rack by pointer or by arrow keys
+    dragged a card over the next rows. Every listener that opens or keeps the card now
+    resolves the "?" itself (`infoOf`), and none looks for the row or its add button."""
+    from pathlib import Path
+
+    js = (Path("play") / "static" / "js" / "table" / "41-forge-rack.js").read_text(
+        encoding="utf-8")
+    start = js.index("// --- the ledger card")
+    card = js[start:]
+    for event in ("mouseover", "mouseout", "focusin"):
+        at = card.index(f'list.addEventListener("{event}"')
+        body = card[at:card.index("});", at)]
+        assert "infoOf(e.target)" in body, event
+        assert '".fr.has-info")' not in body and '".fr-add")' not in body, event
+    assert '.bt-info[data-material]' in card[card.index("function infoOf"):]

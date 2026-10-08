@@ -245,34 +245,46 @@
   });
 
   // --- the ledger card (lane U5, contracts §11) --------------------------------------------------
-  // Hover, focus or "?" opens `ForgeLedger.card(materialId, anchorEl)` beside the rack when
-  // lane U5's file is in the build. Hover waits a beat so a pointer crossing the list does
-  // not flash a card per row; hover is never required.
+  // Only the row's "?" opens `ForgeLedger.card(materialId, anchorEl)` beside the rack, when
+  // lane U5's file is in the build: a click or Enter pins it, and the pointer resting on the
+  // "?" or keyboard focus on it PEEKS (an unpinned card that goes when they leave, lane U5's
+  // `peek`/`unpeek`, which waits a beat so the pointer can cross onto the card, WCAG 2.1
+  // SC 1.4.13 "hoverable").
+  //
+  // Never from the row itself (the owner's emergency rule of 2026-10-08, master 39a783c,
+  // play/static/js/skillhelp.js: "a card opened by a row covered the next rows and made the
+  // list unusable"). Measured before here (lane U5, live): hovering anywhere on a rack row,
+  // or focusing its add button with the arrow keys, opened the card, so walking the rack
+  // with the pointer or with ↑ and ↓ dragged a card over the rows being reached for.
   function openCard(mid, el) {
     var L = window.ForgeLedger;
     if (!L || typeof L.card !== "function" || !mid) return;
     try { L.card(mid, el); } catch (err) { console.error("forge ledger card failed:", err); }
   }
-  // Hover and focus PEEK (an unpinned card that goes when the pointer or focus leaves,
-  // lane U5's `peek`/`unpeek`); "?" opens it pinned.
   var hoverT = 0;
-  function peek(li, now) {
+  function peek(info, now) {
     var L = window.ForgeLedger;
     clearTimeout(hoverT);
     if (!L || typeof L.peek !== "function") return;
-    if (!li) { if (L.unpeek) L.unpeek(); return; }
-    var info = li.querySelector(".bt-info");
+    if (!info) { if (L.unpeek) L.unpeek(); return; }
+    var li = info.closest(".fr") || info;
     var go = function () { try { L.peek(info.dataset.material, li); } catch (err) { /* */ } };
     if (now) go(); else hoverT = setTimeout(go, 280);
   }
+  function infoOf(t) { return t && t.closest ? t.closest(".fr.has-info .bt-info[data-material]") : null; }
   list.addEventListener("mouseover", function (e) {
-    var li = e.target.closest(".fr.has-info");
-    if (li) peek(li, false);
+    var info = infoOf(e.target);
+    if (info) peek(info, false);
+  });
+  list.addEventListener("mouseout", function (e) {
+    var info = infoOf(e.target);
+    if (info && !(e.relatedTarget && info.contains(e.relatedTarget))) peek(null);
   });
   list.addEventListener("mouseleave", function () { peek(null); });
   list.addEventListener("focusin", function (e) {
-    var li = e.target.closest(".fr-add") && e.target.closest(".fr.has-info");
-    if (li) peek(li, true);
+    var info = infoOf(e.target);
+    if (info) peek(info, true);
+    else peek(null);
   });
   list.addEventListener("focusout", function (e) { if (!list.contains(e.relatedTarget)) peek(null); });
 })();

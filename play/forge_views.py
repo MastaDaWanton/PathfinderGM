@@ -1166,7 +1166,28 @@ def forge_ledger(request):
     kn = bs._lane("knowledge")
     if kn is None or not hasattr(kn, "ledger"):
         return _err("The smith's ledger is not available in this build yet.", 501)
-    return JsonResponse({"ledger": list(kn.ledger(pc) or [])})
+    # The tanner's materials are the Tanner's ledger's (play/leather_views.py
+    # `leather_ledger`, lane U5's MaterialLedger on the "leatherworker" track). Measured
+    # before (lane U5, live, 2026-10-08): `knowledge.ledger` lists every material met, so
+    # hides and tannins filled the Smith's ledger, each opening a forge card in steel grey
+    # with an Assay button.
+    rows = []
+    for row in kn.ledger(pc) or []:
+        m = bs.metal(str(row.get("id") or ""))
+        if m is not None and _tanners(kn, m):
+            continue
+        rows.append(row)
+    return JsonResponse({"ledger": rows})
+
+
+def _tanners(kn, m) -> bool:
+    """Whether this material answers to the leatherworker's rows (`knowledge.craft_of`)."""
+    if kn is None or not hasattr(kn, "craft_of"):
+        return False
+    try:
+        return kn.craft_of(m.doc) == getattr(kn, "LEATHERWORKER", "leatherworker")
+    except Exception:      # noqa: BLE001 - an odd document stays the smith's, as before
+        return False
 
 
 @require_GET
@@ -1180,6 +1201,15 @@ def forge_material(request, material_id: str):
     if m is None:
         return _err("There is no such material.", 404)
     kn = bs._lane("knowledge")
+    if _tanners(kn, m):
+        # A hide's card is the Tanner's ledger's: graded at the leather bench (lane F's
+        # Grade), coloured from its own document. Before (lane U5, live): the forge served
+        # it in the steel swatch with an Assay that would cut a sliver of hide as if a bar.
+        # `track` and `card` let the page open the right ledger instead.
+        return JsonResponse({"error": f"{m.name} is a tanner's material: its card is in "
+                                      f"the Tanner's ledger at the leather bench.",
+                             "track": "leatherworker",
+                             "card": f"/api/leather/material/{m.id}"}, status=409)
     carried = sum(p.amount for p in _rack(c, pc) if p.material == m.id and not p.old)
     card = {"id": m.id, "name": m.name, "kind": m.kind, "tier": m.tier,
             "form": m.rack_form, "text": str(m.doc.get("text") or ""),
