@@ -284,6 +284,9 @@ BLACKSMITH_SCHEMA = 2
 ENCHANTER_SCHEMA = 2
 # The stamp `migrate_alchemist` writes (docs/alchemy-revamp-plan.md §18, `alchemy_v2`).
 ALCHEMIST_SCHEMA = 2
+# The stamp `migrate_leatherworker` writes (docs/leatherworking-revamp-plan.md §20,
+# `leatherworking_v2`).
+LEATHERWORKER_SCHEMA = 2
 
 
 def quality_name(index: int) -> str:
@@ -615,10 +618,35 @@ def migrate_alchemist(progress: Progress) -> bool:
     return True
 
 
+def migrate_leatherworker(progress: Progress) -> bool:
+    """`leatherworking_v2`: settle a pre-revamp Leatherworker under the 2026-10-05 rules,
+    once (leatherworking plan §20, owner Q9.1 "convert"). True if it ran.
+
+    The alchemist's conversion, for the alchemist's measured reason: the unlocks now stop at
+    3 and the perk bank is counted from the level, so an old Leatherworker 4 already holds
+    one pick-pair and an old 5 two, waiting at the bench's perk picker; banked mastery is
+    untouched; the old `legendary-hide` milestone is inert, since no level waits on it.
+    Levels 1 to 3 are three levels before and after, so only a level PAST the unlocks is
+    stamped: stamping a Leatherworker 1 would rewrite every save on its first load for
+    nothing. Old ITEMS and raw hides are lane I's (plan §20), on load.
+
+    Idempotent by the stamp, so running it on every load is safe.
+    """
+    if int(progress.schema) >= LEATHERWORKER_SCHEMA:
+        return False
+    track = _track_of(progress)
+    unlocks = track.max_level if track is not None else UNLOCK_LEVELS
+    if int(progress.level) <= unlocks:
+        return False
+    progress.schema = LEATHERWORKER_SCHEMA
+    return True
+
+
 # Load-time migrations by track id. The one place a track is named in this module, and
 # only because a migration is by definition about one track's own history.
 MIGRATIONS = {"herbalist": migrate_herbalist, "blacksmith": migrate_blacksmith,
-              "enchanter": migrate_enchanter, "alchemist": migrate_alchemist}
+              "enchanter": migrate_enchanter, "alchemist": migrate_alchemist,
+              "leatherworker": migrate_leatherworker}
 
 
 def migrate(progress: Progress) -> bool:
@@ -633,9 +661,9 @@ def award(track: Track, progress: Progress, *, recipe_id: str, tier: str,
           milestone: str = "") -> dict:
     """Score one craft and advance the track if it is earned.
 
-    The per-recipe award the Alchemist, Blacksmith, Leatherworker and Enchanter benches
-    and the GM's `craft` op use. The Herbalist's step-by-step bench scores through
-    `award_step` instead.
+    The per-recipe award the GM's `craft` op uses. Every world-class bench scores through
+    `award_step` now (the Leatherworker was the last to move, 2026-10-08); a homebrew track
+    with no `endless` block still scores here.
 
     Returns an itemised breakdown rather than a total, for the same reason every roll in
     this app does: "3 first time, 2 risky harvest, 4 for three stages" is a sentence the
