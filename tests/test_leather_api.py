@@ -385,3 +385,18 @@ def test_a_leatherworking_manual_teaches_and_pays_its_mastery_once(client):
     assert again.status_code == 200 and not again.json()["first"]
     assert not again.json()["mastery"]["lines"]
     assert post(client, "/api/leather/manual", {"item": "no such book"}).status_code == 400
+
+
+def test_an_unknown_property_row_carries_nothing_but_its_blankness(client):
+    """Measured 2026-10-08 by lane U5: every unknown row on /api/leather/material went out
+    with its `group`, and its key's letter (a0, t0) named the group too, so the page held
+    which list a property was in before any Grade. An unknown row now says only that it
+    is unknown, and the book clauses not yet in play wait until something is known."""
+    card = client.get("/api/leather/material/deer-hide").json()
+    blind = [p for p in card["properties"] or [] if not p.get("known")]
+    assert blind, "a fresh character knows nothing of deer hide"
+    for i, p in enumerate(blind):
+        assert p == {"key": f"unknown-{i}", "known": False, "text": None,
+                     "drawback": None, "how": None}, p
+    if not any(p.get("known") for p in card["properties"]):
+        assert card["not_yet"] == []

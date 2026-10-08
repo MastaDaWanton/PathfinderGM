@@ -663,3 +663,10 @@ proposal stands. These override the plan and the contracts wherever they differ.
   bought hide's ceiling one rung above the crafter's own hands (Superior from Leatherworker
   1's Fine, still under the grade cap). Kept: a town tanner's best traditional tan beating a
   novice's is plausible. For the owner's review.
+- **For lane C (harvest), found by lanes U5–U7:** carrying a hide with a minute calls
+  `herbprep.has_salt`, which marks it salted for free if any salt is carried (against "salt
+  costs salt"); the old skin excursion gave a wolf feathered, scaled and chitin hides (its
+  yield ignores the creature); the hub's "Harvest the carcass" waits on C and U2.
+- **For the owner / World Bible (lane W):** the plan asks World Bible for creature type, CR
+  and resistances, but the format forbids stat blocks; lane W documented a proposed creature
+  row of words and ids only (`{"id", "name", "like": "<bestiary id>", "tags"}`).

@@ -1130,6 +1130,24 @@ def leather_material(request, material_id: str):
             card["grade_dc"] = int(kn.assay_dc(doc, pc))
         except Exception:      # noqa: BLE001 - the card shows what it can
             pass
+    # An unknown row says only that it is unknown. Measured 2026-10-08 by lane U5: each
+    # unknown row went out with its `group`, and its key's letter (a0, t0) named the group
+    # too, so the page held which list a property was in before any Grade; alchemy's U1
+    # closed the same leak the same way (`alchemy_views`, "unknown-N"). The book clauses no
+    # effect can play yet (`not_yet`) are the material's own words too: sent once anything
+    # about it is known, never on a blind card.
+    if card["properties"] is not None:
+        blind, rows = 0, []
+        for p in card["properties"]:
+            if isinstance(p, dict) and not p.get("known"):
+                rows.append({"key": f"unknown-{blind}", "known": False, "text": None,
+                             "drawback": None, "how": None})
+                blind += 1
+            else:
+                rows.append(p)
+        card["properties"] = rows
+    if not any(isinstance(p, dict) and p.get("known") for p in card["properties"] or []):
+        card["not_yet"] = []
     card["tanners_here"] = tanners_here(c, pc)
     return JsonResponse(card)
 

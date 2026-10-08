@@ -259,14 +259,17 @@ def test_an_unknown_line_never_says_where_it_acts_on_the_tanners_card(served, dr
     been graded there: the alchemy leak lane U1 closed on 2026-10-07. The tanner's card files
     unknown lines under "Not yet known" and names no group no known line has earned. The
     smith's card is unchanged (it still heads the same row, by its own design)."""
-    unknown_groups = {p["group"] for p in served["pelt"]["properties"] if not p["known"]}
-    assert "working" in unknown_groups, "the fixture no longer has an unknown-only group"
+    # Since the lead's fix the same day the server sends no group at all on an unknown
+    # row (`leather_views.leather_material`, "unknown-N"), so the page cannot leak one.
+    blind = [p for p in served["pelt"]["properties"] if not p["known"]]
+    assert blind and all(p.get("group") is None and p["key"].startswith("unknown-")
+                         for p in blind)
     html = drawn["pelt"]
     assert "At the bench" not in html and "At the anvil" not in html
     assert '<h4 class="fl-group">In armour</h4>' in html
     assert '<h4 class="fl-group">Not yet known</h4>' in html
     assert html.index("In armour") < html.index("+2 Survival") < html.index("Not yet known")
-    assert "At the anvil" in drawn["peltAsForge"], "the smith's card stopped heading its unknowns"
+    assert "At the anvil" not in drawn["peltAsForge"], "a blind row reached a group heading"
 
 
 def test_the_shield_group_has_a_heading_on_both_cards(drawn):
