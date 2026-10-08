@@ -573,7 +573,7 @@ def _ready(request):
     return c, pc, None
 
 
-def _slots(body, items) -> tuple[dict, JsonResponse | None]:
+def _slots(body, items, pc=None) -> tuple[dict, JsonResponse | None]:
     """`slots` as {slot: (rack Piece, count)}. A slot's value is a rack key, or
     {"key", "count"} where the count matters (the alloy's ratio)."""
     raw = body.get("slots", {})
@@ -594,6 +594,9 @@ def _slots(body, items) -> tuple[dict, JsonResponse | None]:
         else:
             return {}, _err(f"The {slot} slot holds something that is not a rack key.")
         if key not in by_key:
+            why = bs.off_rack_reason(pc, key) if pc is not None else ""
+            if why:
+                return {}, _err(why, 400)
             return {}, _err("Something on the anvil is no longer on your rack. Take it "
                             "off and look again.", 409)
         out[str(slot).strip().lower()] = (by_key[key], count)
@@ -605,7 +608,7 @@ def _plan_from(c, pc, body):
     if not method:
         return None, [], None, _err("Choose a method first.")
     items = _rack(c, pc)
-    slots, refused = _slots(body, items)
+    slots, refused = _slots(body, items, pc)
     if refused:
         return None, items, None, refused
     batch = read_int(body, "batch", 1, lo=1, hi=MAX_BATCH)

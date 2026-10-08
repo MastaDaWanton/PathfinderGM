@@ -383,6 +383,13 @@ def test_a_base_is_studded_through_the_forge_api_and_worn(client):
     rows = {x["key"]: x for x in state["rack"]}
     assert "inv:deer-hide" not in rows
     assert rows[base]["form"] == "base" and rows[base]["group"] == "Leather bases"
+    # Put on the anvil anyway (an old page, a hand-made request), the raw hide is refused
+    # in words, not as "no longer on your rack" about a hide still in the pack.
+    r = post(client, "/api/forge/check", {"method": "assemble",
+                                          "slots": {"body": "inv:deer-hide"}})
+    assert r.status_code == 400 and r.json()["error"] == (
+        "Deer Hide is a hide, not yet a piece the forge can use: tan it and cut it at the "
+        "leather bench into a grip, a lacing set or a base.")
     body = {"method": "assemble", "slots": {"body": base, "fastenings": "inv:steel-studs"}}
     check = post(client, "/api/forge/check", body).json()
     assert check["problems"] == [] and check["gear"] == "armour"

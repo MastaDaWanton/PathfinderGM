@@ -987,9 +987,13 @@ OLD_WORK = ("made at the old forge: it can be worn, wielded or sold, not worked 
 GROUPS = {"ore": "Ore", "ingot": "Ingots", "bar": "Bars", "blank": "Blanks and plates",
           "plate": "Blanks and plates", "fitting": "Hafts, grips and fittings",
           "fuel": "Fuel", "flux": "Flux", "quenchant": "Quenchants",
-          "treatment": "Treatments", "item": "Finished work", "old": "Old work",
-          "grip": "Hafts, grips and fittings", "lacing": "Hafts, grips and fittings",
-          "base": "Leather bases"}
+          "treatment": "Treatments", "item": "Finished work", "old": "Old work"}
+# The leather forms' rack groups, kept out of GROUPS: GROUPS' keys are the forge's own form
+# vocabulary, which the sound bank voices one `forge.drop.<form>` each
+# (tests/test_forge_sound.py). A lacing set or a base dropped on the anvil is silent until
+# the sound lane gives them a voice ("unknown events are silent", contracts §11).
+LEATHER_GROUPS = {"grip": "Hafts, grips and fittings", "lacing": "Hafts, grips and fittings",
+                  "base": "Leather bases"}
 
 # Leather stock the forge's rack takes (leatherworking plan §4.4-4.5): only a form that
 # fills a piece, and the piece it fills. A grip is wrapped over a weapon's haft, a lacing
@@ -1861,7 +1865,9 @@ class Piece:
     def as_item(self, actor=None) -> dict:
         m = metal(self.material) if self.material else None
         d = {"key": self.key, "name": self.name, "material": self.material,
-             "form": self.form, "group": GROUPS.get(self.form, "Other"),
+             "form": self.form,
+             "group": (LEATHER_GROUPS.get(self.form) if self.from_leather else None)
+             or GROUPS.get(self.form, "Other"),
              "count": self.count, "amount": self.amount, "tier": self.tier,
              "rank": self.rank, "glyph": KIND_GLYPH.get(m.kind, "🪨") if m else "🪨",
              "passes": self.passes, "quality": self.quality,
@@ -1924,6 +1930,32 @@ def _leather_piece(actor, sid: str, st, reserved: dict) -> Piece | None:
         return None
     return Piece(key=key, name=str(getattr(st, "name", "") or h.name or sid),
                  material=h.material, form=h.form, count=count, tier=h.tier_name, leather=h)
+
+
+def off_rack_reason(actor, key: str) -> str:
+    """Why a carried thing the page put on the anvil is not on the forge's rack, in words,
+    or "" when this rule has nothing to say (it is simply not carried). A raw or bought hide,
+    a tannin and leather not yet cut into a piece are the leather bench's (`LEATHER_FILLS`):
+    the refusal says so, rather than "no longer on your rack" about a hide still in the pack."""
+    kind, _, ident = str(key or "").partition(":")
+    if kind == "inv" and int((getattr(actor, "inventory", {}) or {}).get(ident, 0) or 0) > 0:
+        m = metal(ident)
+        if m is not None and m.kind in LEATHER_ONLY_KINDS:
+            if m.kind == "hide":
+                return (f"{m.name} is a hide, not yet a piece the forge can use: tan it and "
+                        f"cut it at the leather bench into a grip, a lacing set or a base.")
+            return f"{m.name} is a tanner's material: it is used at the leather bench."
+    if kind == "stock":
+        st = (getattr(actor, "stock", {}) or {}).get(ident)
+        lw = _lane("leatherworker")
+        h = lw.Hide.from_stock(st) if (st is not None and lw is not None) else None
+        if h is not None and h.form not in LEATHER_FILLS:
+            return (f"{st.name} is not yet a piece the forge can use: cut it at the leather "
+                    f"bench into a grip, a lacing set or a base.")
+        rec = getattr(st, "record", None)
+        if isinstance(rec, dict) and rec.get("craft") == "leatherworker":
+            return f"{st.name} is finished leather work, not a base for anything the forge makes."
+    return ""
 
 
 def rack(actor, reserved: dict | None = None) -> list[Piece]:
