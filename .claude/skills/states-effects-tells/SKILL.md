@@ -129,8 +129,6 @@ lethal; `Scene.advance` heals nonlethal 1/hour/level by hour boundaries crossed.
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
   the bridge in the doc's last section. No code grants them today.
-- `ActiveEffect.periodic` executors beyond `spend_pool` — periodic damage/heal
-  is schema-ready with no consumer.
 - `grants` documents for blood spike, coagulator and blood commander paths.
 - Blood Burst's computed save DC; Rupture Self's blood-pool targeting (see the
   path's `needs` map).
@@ -197,9 +195,11 @@ overclaims in the researchers' own findings.
 
 ## Worked judgment
 
-- *"Add an ongoing poison"* → an `ActiveEffect` with `periodic` (build the
-  executor first — see Promised), never a new field on Actor. Its application
-  and expiry each emit a tell.
+- *"Add an ongoing poison"* → an `ActiveEffect` with `periodic`, run by the one
+  executor `Actor.run_periodic` (built in the forge revamp; it takes a per-round
+  `schedule` list since the leather metal lane, 2026-10-08 — this ledger called it
+  unbuilt until then), never a new field on Actor and never a second ticker. Its
+  application and expiry each emit a tell.
 - *"Add a new fear condition"* → a `TAGS` entry under `state.fear.*` in
   `rules/states.py` plus a `CONDITIONS` row; never a boolean, and no consumer
   may match the new key as a string — they ask `has_state("state.fear")`. If it
