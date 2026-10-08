@@ -34,6 +34,9 @@ never a map.
                        second fork, so nothing offers more than six ways on
   the fields           when the land close by is farmland
   the shore            when the settlement is a port or its own words put it on water
+  the tannery          when the settlement's own words name its tanners and its own
+                       places hold no tannery (`places.tannery_implied`, leatherworking
+                       plan §10): the trade kept outside the walls, kept by a tanner
   the reaches          the hinterland (`geography.Reach`, 2026-10-05): up to four named
                        stretches of open ground a short walk out ("the ridgelines", "the
                        badlands"), each on its own ground, at its own miles, off the
@@ -268,6 +271,22 @@ def _ring(world, location, at: str) -> tuple:
         link(fields_id or out_id,
              add(ring_id(sid, reach.ground, slug), reach.name, about, reach.ground,
                  miles=reach.miles))
+
+    # The tannery (leatherworking plan §10, contracts §8): out here, not in the street,
+    # because the trade was kept outside — fifteenth-century Coventry's tanneries stood
+    # just outside the walls by the river, where the town's own rules sent them for the
+    # smell and the runoff (`places.TANNERY_CUES` has the sources). Only when the
+    # settlement's OWN words name its tanners, and never beside one it already has: an
+    # author's tannery stands where the author put it, in town or not. Hung off the
+    # outskirts — or, when the outskirts already offer six ways on, the fields or the
+    # shore, whichever offers fewest — so nothing on the ring offers more than six.
+    if places_mod.tannery_implied(location) and not places_mod.has_a_tannery(home):
+        anchors = [a for a in (out_id, fields_id, ring_id(sid, "coast", "the-shore"))
+                   if a in made]
+        roomy = [a for a in anchors if len(made[a]["exits"]) < 6]
+        anchor = roomy[0] if roomy else min(anchors, key=lambda a: len(made[a]["exits"]))
+        link(anchor, add(ring_id(sid, ground, "the-tannery"), places_mod.TANNERY_LABEL,
+                         places_mod.TANNERY_ABOUT, ground))
 
     # The stretch of road a stopped journey left the party on: joined while they stand on
     # it, and hung off its own road head, so walking back is walking to the head.

@@ -106,17 +106,22 @@ def test_the_weapons_on_sale_are_the_weapons_the_outfit_page_sold():
 def test_a_village_has_exactly_a_general_store_and_stalls(worlds):
     """The owner, 2026-09-29: "villages get a general store and stalls". No armorer, no
     weaponsmith, no alchemist; the horse lines stand at the market only where a village has
-    no stables of its own."""
+    no stables of its own.
+
+    And a leatherworker, everywhere: the owner, 2026-10-08 (leatherworking plan open point
+    9), "every town has a leatherworker and that person does not necessarily have a
+    tannery", read as every settlement, village up (tests/test_leather_places.py)."""
     villages = _settlements(worlds, ("village",))
     for e in villages:
         cs = market.counters(e)
         shops = [c.id for c in cs if c.sort == "shop"]
-        assert shops == ["general"], (e.name, shops)
+        assert shops == ["general", "leatherworker"], (e.name, shops)
         assert {c.sort for c in cs} <= {"shop", "stall", "horses"}
         assert sum(c.sort == "stall" for c in cs) >= 1
     for e in _settlements(worlds, ("town", "city")):
         shops = [c.id for c in market.counters(e) if c.sort == "shop"]
-        assert shops == ["general", "armorer", "weaponsmith", "alchemist"], (e.name, shops)
+        assert shops == ["general", "armorer", "weaponsmith", "alchemist",
+                         "leatherworker"], (e.name, shops)
 
 
 def test_a_town_keeps_its_stalls_and_two_towns_differ():

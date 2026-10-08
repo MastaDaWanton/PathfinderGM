@@ -271,6 +271,12 @@ def everything_priced() -> list:
     # watcher must know.
     for m in consumables_of(tuple((_consumables_block().get("kinds") or {}))):
         seen.setdefault(str(getattr(m, "id", "")), m)
+    # And a craft shop's staple kinds (the leatherworker's common hides and dyes), for the
+    # same reason: harvested and gathered rows that no "bought" list reaches.
+    for row in _shops() + _stalls():
+        for craft, kinds in (row.get("staple_kinds") or {}).items():
+            for m, _price in kind_staples(str(craft), kinds):
+                seen.setdefault(str(getattr(m, "id", "")), m)
     _POOL = list(seen.values())
     return _POOL
 
@@ -431,7 +437,7 @@ def lines_doc() -> dict:
 
         path = Path(settings.BASE_DIR) / "content" / "rules" / "stall-lines.json"
         doc = json.loads(path.read_text(encoding="utf-8"))
-        problems = consumable_problems(doc)
+        problems = consumable_problems(doc) + staple_kind_problems(doc)
         if problems:
             raise ValueError("content/rules/stall-lines.json is refused: "
                              + " ".join(problems))
@@ -655,6 +661,8 @@ def staples_of(kind: str) -> list:
             for table in _line(line).get("tables") or ():
                 out.extend(goods_mod.table_goods(str(table)))
     out.extend(consumable_goods(consumables_at(kind)))
+    held = {str(getattr(g, "id", "")) for g in out}
+    out.extend(g for g in kind_staple_goods(kind) if str(getattr(g, "id", "")) not in held)
     return out
 
 
@@ -975,6 +983,127 @@ def consumable_goods(crafts) -> list:
     return out
 
 
+# --- what a craft's own counter always has, beyond what it burns -------------------------------
+#
+# The owner, 2026-10-08 (leatherworking plan open point 9): "every town has a leatherworker
+# and that person does not necessarily have a tannery but every town should have access to
+# leatherworking supplies and the things needed to use the craft" — curing salt, tannins,
+# oils, waxes, threads, DYES, a field kit and COMMON HIDES. The consumables above cover the
+# first five by kind; dyes and hides are filed `made_from` (the craft works them, it does
+# not burn them), so they reached a counter only through the daily draw. A shop row's
+# `staple_kinds` names them: `{"leatherworker": ["hide", "dye"]}` puts every COMMON row of
+# those kinds on the counter, always, never sold out, at the catalogue's own price — the
+# consumables' bargain, for the things a craft's own shop is for. World of Warcraft's
+# "Leatherworking Supplies" vendors are the precedent: salt and thread in unlimited stock in
+# nearly every zone (wowhead, "Salt", item 4289).
+#
+# Priced rows only, as the consumables are: `price_gp` absent means "the world does not sell
+# this" (`rules/pricing.py`), and deriving a price here would erase that. Measured
+# 2026-10-08: none of the 14 common hides and none of the 5 common dyes in
+# leatherworker-materials.json has a price, so today the line names them and shelves none;
+# they come on the counter the day the catalogue prices them, with nothing here changed.
+_KIND_STAPLES: dict[tuple, list] | None = None
+
+
+def staple_kinds_at(kind: str) -> dict[str, tuple[str, ...]]:
+    """`{craft: (kinds...)}` a market counter always carries the common rows of, from its
+    shop row's `staple_kinds` (or its stall lines'); {} for anything else."""
+    sort, ids = _parts(kind)
+    if sort == "shop":
+        rows = [next((s for s in _shops() if s.get("id") == ids[0]), {})]
+    elif sort == "stall":
+        rows = [_line(x) for x in ids]
+    else:
+        rows = []
+    out: dict[str, list[str]] = {}
+    for row in rows:
+        for craft, kinds in (row.get("staple_kinds") or {}).items():
+            have = out.setdefault(str(craft), [])
+            have.extend(str(k) for k in kinds or () if str(k) not in have)
+    return {c: tuple(k) for c, k in out.items()}
+
+
+def kind_staples(craft: str, kinds) -> list:
+    """The staple rows of one craft's catalogue of these kinds: common tier (the
+    consumables' `tiers`), authored price, as (the bench's own `Material`, the row's
+    price in gp), by name. The price is the catalogue row's (`_row_price`, either shape),
+    the one fact `consumable_problems` holds a staple to."""
+    global _KIND_STAPLES
+    if _KIND_STAPLES is None:
+        _KIND_STAPLES = {}
+    key = (str(craft), tuple(sorted(set(kinds or ()))))
+    if key not in _KIND_STAPLES:
+        from . import benches
+
+        tiers = {str(t).lower() for t in (_consumables_block().get("tiers") or ())}
+        try:
+            known = benches.module_for(craft).materials()
+        except Exception:
+            known = {}
+        seen: dict[str, object] = {}
+        for row in _catalogue_rows(craft):
+            if str(row.get("kind") or "") not in key[1]:
+                continue
+            if str(row.get("tier") or "common").lower() not in tiers:
+                continue
+            m = known.get(str(row["id"]))
+            price = _row_price(row)
+            if m is None or price is None:
+                continue
+            seen.setdefault(str(row["id"]), (m, price))
+        _KIND_STAPLES[key] = sorted(seen.values(),
+                                    key=lambda mp: str(getattr(mp[0], "name", "")))
+    return _KIND_STAPLES[key]
+
+
+def unpriced_staples(craft: str, kinds) -> list[str]:
+    """The common rows of these kinds a counter would carry and cannot, because the
+    catalogue gives them no price — what to price for them to reach the counter. For the
+    report and the test that names the gap; nothing sells from it."""
+    tiers = {str(t).lower() for t in (_consumables_block().get("tiers") or ())}
+    return sorted(str(r["id"]) for r in _catalogue_rows(craft)
+                  if str(r.get("kind") or "") in set(kinds or ())
+                  and str(r.get("tier") or "common").lower() in tiers
+                  and _row_price(r) is None)
+
+
+def kind_staple_goods(kind: str) -> list:
+    """`staple_kinds_at` as goods on a counter, in the shape `consumable_goods` hands over:
+    staples, filed `kind="material"` so `goods.deliver` puts them in the satchel."""
+    from . import goods as goods_mod
+
+    out = []
+    for craft, kinds in staple_kinds_at(kind).items():
+        for m, price in kind_staples(craft, kinds):
+            mid = str(getattr(m, "id", ""))
+            out.append(goods_mod.Good(
+                id=mid, name=str(getattr(m, "name", mid)),
+                price_gp=float(price) or goods_mod.FREE_AT_A_COUNTER_GP,
+                tier=str(getattr(m, "tier", "common") or "common"), kind="material", key=mid))
+    return out
+
+
+def staple_kind_problems(doc: dict) -> list[str]:
+    """A `staple_kinds` that names a craft with no catalogue, or a kind its catalogue
+    does not have, each with the fix named; [] when sound. A misspelt kind would shelve
+    nothing, silently — the 0-of-60 curing salt again."""
+    out: list[str] = []
+    for row in list(doc.get("shops") or []) + list(doc.get("stalls") or []):
+        for craft, kinds in (row.get("staple_kinds") or {}).items():
+            rows = _catalogue_rows(str(craft))
+            if not rows:
+                out.append(f"{row.get('id')!r} staple_kinds names {craft!r}, which has no "
+                           f"content/materials/{craft}-materials.json: fix the craft's name.")
+                continue
+            present = {str(r.get("kind") or "") for r in rows}
+            for k in kinds or ():
+                if str(k) not in present:
+                    out.append(f"{row.get('id')!r} staple_kinds files {craft} kind {k!r}, "
+                               f"which no row of {craft}-materials.json has: fix the "
+                               f"spelling.")
+    return out
+
+
 def is_craft_material(item) -> bool:
     """Whether a thing off a shelf is one of the four crafts' materials — what a bench
     works from, which belongs in the satchel — rather than gear or a magic item. Read
@@ -1122,6 +1251,67 @@ def lab_rent(scene, hours: float, known=()) -> int:
     from . import places as places_mod
 
     return _rent(hours, lambda: places_mod.laboratory_here(scene, known))
+
+
+# --- the town tannery: the yard by the hour, the vats by the day (leatherworking plan §8.2,
+# §10, contracts §8) ---------------------------------------------------------------------------
+#
+# The yard and its kettle by the hour at the forge's silver (the plan's proposal: "a work
+# rate, 1 sp an hour, the forge's"), and each vat by the day at two silver (§8.2), because a
+# bark tannage sits in somebody else's vat for four weeks while the party is away: a month
+# in one vat is 6 gp, against the CRB's 3 sp a day for a trained hireling. Nothing at the
+# party's own tannery. Flat across scales, as the forge's and the laboratory's.
+TANNERY_RENT_CP_PER_HOUR = 10
+VAT_RENT_CP_PER_DAY = 20
+
+
+def tannery_rate(*, owned_by_party: bool = False) -> int:
+    """Copper an hour in a tannery's yard: nothing at the party's own, the town rate
+    elsewhere. The one answer `places.tannery_here` puts in its `rate_cp_per_hour`."""
+    return 0 if owned_by_party else TANNERY_RENT_CP_PER_HOUR
+
+
+def vat_rate(*, owned_by_party: bool = False) -> int:
+    """Copper a day for one vat: nothing at the party's own tannery, the town rate
+    elsewhere. The one answer `places.tannery_here` puts in its `vat_rate_cp_per_day`."""
+    return 0 if owned_by_party else VAT_RENT_CP_PER_DAY
+
+
+def tannery_rent(scene, hours: float, known=()) -> int:
+    """What `hours` of work in the tannery the party is standing in costs, in copper
+    (leatherworking contracts §8). Read off where the party is (`places.tannery_here`),
+    never passed a rate, for the forge's reason; nothing when there is no tannery here or
+    it is the party's own. A coin begun is a coin paid (`_rent`)."""
+    from . import places as places_mod
+
+    return _rent(hours, lambda: places_mod.tannery_here(scene, known))
+
+
+def vat_rent(scene, days, vats: int = 1, known=()) -> int:
+    """What `vats` vats for `days` days cost at the tannery the party is standing in, in
+    copper (contracts §8): the vat rate × vats × days, a day begun being a day paid — a
+    tannage collected an hour into its fifth week has paid for that week's first day.
+    Nothing when there is no tannery here, it is the party's own, or nothing is asked for.
+
+    Read off where the party is, so the bench charges it when the hides go INTO the vat,
+    for the tannage's whole wait (lane E knows the wait): the hide stays while the party
+    goes anywhere (plan §8.2), and a rent charged at collection would let a player walk
+    away from the bill."""
+    import math
+
+    from . import places as places_mod
+
+    try:
+        d = float(days or 0)
+        n = int(vats or 0)
+    except (TypeError, ValueError):
+        return 0
+    if not d > 0 or n <= 0 or math.isinf(d):
+        return 0
+    here = places_mod.tannery_here(scene, known)
+    if here is None:
+        return 0
+    return int(here["vat_rate_cp_per_day"]) * n * int(math.ceil(round(d, 6)))
 
 
 def is_market(place_id: str, founded=()) -> bool:
