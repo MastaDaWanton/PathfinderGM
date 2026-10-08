@@ -210,7 +210,11 @@ def label_of(place_id: str) -> str:
     than looking up, for the reason the whole module of place ids exists: the id carries
     what it says, and nothing here has a world to ask.
     """
-    spot = str(place_id or "").split(":")[-1].split(places_mod.STOREY)[0]
+    # A place on the outskirts ring carries "@" before its slug ("~forest:@the-tannery",
+    # `rules/outskirts.py`); it is not part of the name. Measured 2026-10-08: the tanner
+    # at an outskirts tannery read "@the tannery", which is no trade place, so their
+    # counter never opened.
+    spot = str(place_id or "").split(":")[-1].split(places_mod.STOREY)[0].lstrip("@")
     return spot.replace("-", " ")
 
 

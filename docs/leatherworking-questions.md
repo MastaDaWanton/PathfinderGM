@@ -645,3 +645,14 @@ proposal stands. These override the plan and the contracts wherever they differ.
 | 12 | Good dragons | As recommended: harvesting a good-aligned dragon (by kind; alignment is not tracked) is a deed too, recorded the same way, with a negative value. |
 | 13 | Marks per item | **Owner asked for an explanation before deciding** (2026-10-08). Hold marks until answered: lanes build without them, and the data pass keeps mark rows separable. |
 | 14 | Numbers to tune | As recommended: the proposed numbers, all in rule rows, tuned in play. |
+
+**Lead's rulings while building (2026-10-08), from the owner's standing rules:**
+- **No vat cap.** Lane G proposed four vats a tannery and a "vats here are full" refusal. The
+  owner's ruling on every craft is "there should be no limit to how many things are crafting",
+  so a tannery never refuses a tannage for want of a vat: vats are rented per tannage, as many
+  as the work needs (`places.vats_for(units)` prices them). The count is shown, never a gate.
+- **Inherited DR and resistance are not scaled.** What a hide inherits from its creature
+  (answer 6's DR, plan §5.4's energy resistance) applies whole when the hide is the suit's
+  body or a worn good's whole, and never from a lining; the forge's quality scaling would
+  round DR 1 to 0 at Crude, breaking the owner's "at least 1". House modifiers keep the
+  forge maths.

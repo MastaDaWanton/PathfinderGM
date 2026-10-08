@@ -422,3 +422,13 @@ def test_the_field_kit_reaches_common_and_uncommon_and_hardens_them():
     there = places.leather_bench_here(scene2, scene2.pc(), engine2.places())
     assert there["at"] == "tannery" and there["vats"]
     assert there["tiers"][-1] == "legendary" and there["tannery"]["kind"] == "town"
+
+
+def test_an_outskirts_place_reads_its_name_without_the_ring_mark():
+    """Measured 2026-10-08 by lane G: `keepers.label_of("…~forest:@the-tannery")` read
+    "@the tannery", no trade place, so the tanner at an outskirts tannery kept no counter.
+    The ring's "@" is part of the id, never the name."""
+    from rules import keepers
+
+    assert keepers.label_of("abc123~forest:@the-tannery") == "the tannery"
+    assert keepers.label_of("abc123~urban:the-market") == "the market"
