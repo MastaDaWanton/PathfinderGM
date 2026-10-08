@@ -22,8 +22,11 @@ from rules.sheet import from_dict, load_pc, to_dict
 # left with its own (docs/enchanting-revamp-plan.md §5, 2026-10-05), pinned by
 # tests/test_enchanter.py.
 # The Alchemist left with its own (docs/alchemy-revamp-plan.md §4, 2026-10-06), pinned by
-# tests/test_alchemist.py.
-OTHERS = ("leatherworker",)
+# tests/test_alchemist.py. The Leatherworker, the last, left with its own
+# (docs/leatherworking-revamp-plan.md §17, 2026-10-08), pinned by tests/test_leatherworker.py;
+# the five-level per-recipe table it kept is pinned on a table of its own in
+# tests/test_worldclass.py (`PER_RECIPE`), where `award` is still tested.
+OTHERS = ()
 
 
 @pytest.fixture
@@ -317,13 +320,19 @@ def test_a_settled_save_round_trips_byte_for_byte():
 
 # --- everyone else -------------------------------------------------------------------------
 
-@pytest.mark.parametrize("track_id", OTHERS)
-def test_the_other_world_classes_are_unaffected(track_id):
-    """The endless block is the Herbalist's alone. Before it was declared per track, the
-    scaffold counted perk picks for any track past level 3, so an Alchemist 7 would have
-    been offered eight Herbalist perks. Each other track keeps its five-level table, its
-    flat price past it, its per-recipe award and no migration."""
-    t = wc.get(track_id)
+def test_a_track_without_an_endless_block_is_unaffected(monkeypatch):
+    """The endless block is declared per track. Before it was, the scaffold counted perk
+    picks for any track past level 3, so an Alchemist 7 would have been offered eight
+    Herbalist perks. A track with no block — no shipped one since the Leatherworker's revamp
+    (2026-10-08), so the scaffold's own table stands in (`PER_RECIPE`, registered for the
+    test) — keeps its five-level table, its flat price past it, its per-recipe award and
+    no migration."""
+    from tests.test_worldclass import PER_RECIPE
+
+    assert not OTHERS, "a shipped track went back to the five-level table"
+    t = wc.from_dict(PER_RECIPE)
+    monkeypatch.setitem(wc.tracks(), t.id, t)
+    track_id = t.id
     assert t.max_level == 5 and not t.endless
     assert t.to_next(9) == t.top_cost == t.thresholds[-1]
     p = wc.Progress(track=track_id, level=9)

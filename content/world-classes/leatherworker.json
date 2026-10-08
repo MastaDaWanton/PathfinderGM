@@ -1,170 +1,341 @@
 {
  "id": "leatherworker",
  "name": "Leatherworker",
- "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — skinning, curing and crafting — turning what a fight leaves on the ground into satchels, cloaks, barding and armour, from deer hide to dragonhide.",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (every step at the tanner's beam and the vat), opening methods and rarer hides at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, hardening, quality or yield.",
  "grantable_at_creation": true,
- "_thresholds_note": "Herbalist's curve, kept deliberately: the mastery awards in rules/worldclass.py are shared across tracks, so the same MP arithmetic that set 25/65/50/100 there sets it here. The dip at level 4 is the herbalist file's documented intent — each high-tier piece is a larger undertaking, so fewer of them make a level — and it holds for a breastplate exactly as it held for an elixir. Do not 'fix' it in one file and not the other; that is the stale-copy bug CLAUDE.md warns about, so if it ever changes, change both.",
+ "_ruling_2026_10_05_note": "The owner's leatherworking revamp (docs/leatherworking-questions.md, nine rounds answered 2026-10-05, and the plan's open points answered 2026-10-08; docs/leatherworking-revamp-plan.md §7, §8, §10, §11, §17). Three unlock levels replace five: level 1 is field work on common and uncommon hides (Salt, Flense, Tan by brain or as rawhide, Cut, Stitch, Harden, Assemble, Grade); level 2 the tannery's work and rare and exotic hides (bark, alum and mineral tannages, Curry, Tool, Dye, Laminate); level 3 legendary hides and the planar tannages. Harden is a level-1 method because the owner put 'a small kettle' in the field kit (answer 3, 2026-10-08): 'plain leather armour is therefore makeable at level 1 in the field'. Skin became the cross-craft harvest (rules/harvest.py, lane C), Cure became Salt (which really takes salt), Oil folded into Curry, and Line became the lining piece at Assemble. The level 4 and 5 rows, the `legendary-hide` milestone and its deed are gone. Old saves keep their level: an old Leatherworker 4 holds one pair of perk picks, an old 5 two (`worldclass.migrate_leatherworker`).",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's and the Blacksmith's numbers on purpose: the crafts are meant to pace the same.",
  "thresholds": [
   25,
-  65,
-  50,
-  100
+  65
  ],
- "milestones": {
-  "5": "legendary-hide"
- },
- "_deeds_note": "Same shape as the herbalist's deed, for the same measured reason: a deed that requires a level-5 method can never open the gate to level 5. The deed is the material, not the method — successfully working legendary hide into anything is the proof, and masterwork tooling is the mastery that follows it. A Leatherworker 4 reaches legendary hide the way the refusals allow: with a legendary-capable tannin and a chain of methods learned by 4, since nothing below `tool` is gated at 5.",
- "deeds": {
-  "legendary-hide": {
-   "min_tier": "legendary",
-   "note": "Any successful piece worked from legendary hide, however it was reached."
+ "_endless_note": "Levels past the written table (plan §17.2; the forge's four, Yield moved to the harvest, owner Q6.3). Leaving level 3 costs `base` and each level after it `step` more (50, 60, 70...). Each endless level banks `picks_per_level` picks; the same perk may be taken twice. Potency adds to the multiplier on the bonus modifiers of everything made, hardening takes that fraction off the negative modifiers (multiplied with the per-level cut), quality raises the ceiling by that many steps, and yield is read at the HARVEST (lane C): the chance per hide taken of more hide units, rolled and shown. The bench reads no yield.",
+ "endless": {
+  "base": 50,
+  "step": 10,
+  "picks_per_level": 2,
+  "perks": {
+   "potency": 0.05,
+   "hardening": 0.05,
+   "quality": 1,
+   "yield": 0.05
   }
  },
+ "_ceiling_note": "`ceiling` is the highest quality index a level's hands can reach (0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless), the forge's table (plan §17.3). Superior or better is masterwork. Each Quality perk adds one past Flawless.",
  "levels": [
   {
    "level": 1,
    "tools": [
-    "skinning knife",
-    "fleshing beam"
+    "leatherworker's field kit: skinning knife, fleshing beam, round knife, awl and needles, mallet, a small kettle"
    ],
    "methods": [
-    "skin",
+    "salt",
     "flense",
-    "cure",
+    "tan",
     "cut",
-    "stitch"
+    "stitch",
+    "harden",
+    "assemble",
+    "grade"
    ],
-   "max_tier": "common / mundane",
-   "note": "Rawhide work: skin the beast in the field, flense and salt-cure the hide, cut and stitch cured rawhide into cords, wraps, sheaths and simple satchels. The clock starts at the skinning — a green hide is refuse in two days."
+   "max_tier": "uncommon / volatile",
+   "ceiling": 2,
+   "note": "Field work on common and uncommon hides: salt a green hide before it spoils, flense it, tan it with brain or dry it as rawhide, cut and stitch it, boil bark-tanned panels hard in the kit's small kettle, and lace the pieces into a suit, a madu or a cloak."
   },
   {
    "level": 2,
    "tools": [
-    "tanning rack",
-    "bark vats"
+    "tannery vats",
+    "currier's table",
+    "stamps and swivel knife",
+    "dye pots"
    ],
    "methods": [
-    "tan",
-    "oil"
+    "curry",
+    "tool",
+    "dye",
+    "laminate"
    ],
-   "max_tier": "uncommon / volatile",
-   "note": "True leather. Tanning binds the hide for good — it will never spoil again — and oiling keeps it leather instead of board. Monster hides open up: winter wolf, dire boar, the shells and scaled things."
+   "max_tier": "exotic / planar",
+   "ceiling": 3,
+   "note": "The tannery's work: bark tanning in a vat for weeks, alum tawing, mineral tanning, currying, tooling, dyeing and laminating two leathers into one. Rare and exotic hides; Superior work is masterwork."
   },
   {
    "level": 3,
    "tools": [
-    "dye vats",
-    "half-moon knife",
-    "stitching pony"
+    "planar mordants"
    ],
-   "methods": [
-    "dye",
-    "line"
-   ],
-   "max_tier": "rare / magical",
-   "note": "Coloured and lined work: dyed leathers that hold their colour, fur-lined cloaks and boots built as two hides working together."
-  },
-  {
-   "level": 4,
-   "tools": [
-    "wax kettle",
-    "hardening trough"
-   ],
-   "methods": [
-    "harden"
-   ],
-   "max_tier": "exotic / planar",
-   "note": "Cuir bouilli — leather boiled in wax until it sets like thin steel. The hardening station is where leather stops being clothing and starts being armour."
-  },
-  {
-   "level": 5,
-   "tools": [
-    "master tannery"
-   ],
-   "methods": [
-    "tool"
-   ],
+   "methods": [],
    "max_tier": "legendary / mythic",
-   "note": "Masterwork tooling: the ornament, fit and finish that makes a piece masterwork — and dragonhide work, which accepts nothing less."
+   "ceiling": 4,
+   "note": "Legendary hides, dragonhide among them, and the planar tannages: dragonblood, wyrm gall, the Styx mordant."
   }
  ],
  "method_descriptions": {
-  "skin": "Takes the hide off a fallen creature in the field. This happens over a carcass, not at the bench — every hide on the bench already went through it, and the spoilage clock started when it did.",
-  "flense": "Scrapes fat and flesh from the inside of a green hide over the beam. Flesh left on the hide putrefies under the salt, so this comes before curing or tanning.",
-  "cure": "Salts a green hide to stop the spoilage clock. Cured rawhide keeps indefinitely but is not yet leather: it goes stiff, and soaking softens it back toward spoiling.",
-  "cut": "Cuts panels, straps and pieces to pattern. Straps are cut work and nothing more; everything assembled is cut before it is stitched.",
-  "stitch": "Sews cut pieces into a finished thing with thread, sinew or gut. Only cured or tanned hide takes a seam — stitching a green hide sews a bag of rot.",
-  "tan": "Steeps a flensed hide in tannin liquor until it is leather through and through. A tanned hide never spoils, takes every later method, and is the foundation of all higher work. The tannin must be equal to the hide: bark for beasts, harsher liquors for monsters.",
-  "oil": "Dresses leather with oils and fats so it stays supple, sheds water and survives service. Some oils bring their own character — salamander oil keeps fire off, troll fat closes scratches overnight.",
-  "dye": "Colours leather in the vat. Common dyes are colour and nothing else; the rare ones carry their own qualities into the piece.",
-  "line": "Builds a piece as two layers — a working outer hide and an inner lining of fur or soft leather — so both hides' qualities ride in one garment.",
-  "harden": "Cuir bouilli: boils tanned leather in wax until it sets rigid. Hardened leather turns blades like thin steel and is the heart of leather armour. Only tanned hide survives the kettle — raw hide boils down to glue.",
-  "tool": "Masterwork finishing: carved, stamped and burnished ornament, exact fit, perfect edges. A tooled piece is masterwork, takes enchantment, and is the only standard dragonhide accepts."
+  "salt": "Rubs curing salt into a green hide. A salted hide keeps for weeks instead of rotting in two days, which buys the time to reach a beam or a vat.",
+  "flense": "Scrapes the flesh and fat off the inside of a hide over the beam, hair on for a fur, off for leather. A thick hide is limed in a tannery's pit for days before the hair and flesh will come away.",
+  "tan": "Turns a fleshed hide into leather or fur. Brain tanning is a day's work at the kit; alum tawing takes a week in a sealed bag; bark, mineral and planar tannages sit in a tannery's vat for days or weeks while you go about your business. With no tannin at all the hide is stretched and dried as rawhide.",
+  "curry": "Works oil and tallow into tanned leather until it is supple and sheds water. A soft good needs it before it can be Superior work.",
+  "cut": "Cuts panels to a pattern, a lacing set or a grip strip, combining hides of one kind and grade until there is enough.",
+  "stitch": "Sews cut panels into a body or a lining with thread or sinew.",
+  "harden": "Cuir bouilli: soaks bark-tanned panels and works them in hot water until they set hard. The kit's small kettle does it for common and uncommon hides; rarer ones want a tannery's hardening kettle. Brain, alum and mineral leather will not harden.",
+  "tool": "Stamps and carves the leather's face while it is cased. Required for Flawless work.",
+  "dye": "Colours a piece. Mordant salts fix the colour; without them it runs in the first soaking.",
+  "laminate": "Glues and stitches two leathers of one hide and one tannage into one heavier leather: every modifier half as strong again, the drawbacks too.",
+  "assemble": "Joins a body, its fastenings and a lining into the finished suit, shield or worn good, or into a base the forge finishes.",
+  "grade": "Flexes and reads a scrap of a material: one property it gives and one it costs."
  },
- "_method_help_note": "The structured half of method_descriptions: what the tooltip renders. `does` is the mechanical effect in numbers, `needs` is what must be on the bench for the method to be legal, `for` is what a player reaches for it to accomplish. Kept beside the prose rather than replacing it — the prose is the voice, this is the answer to 'what will this button do to my DC'.",
+ "_method_help_note": "The structured half of a method's tooltip: `does` is the mechanical effect, `needs` what must be on the bench, `for` what a player reaches for it to do. Every method in the level table has an entry; tests/test_benches.py asserts the two sets match.",
  "method_help": {
-  "skin": {
-   "does": "Field action, not a bench stage: puts a hide into stock with its 48-hour spoilage clock started. Contributes no potency and no DC.",
-   "needs": "A fallen creature in the scene, and a skinning knife. Refused at the bench — the hide there is already off the beast.",
-   "for": "Turning a fight into material. What the beast was decides the hide's tier."
+  "salt": {
+   "does": "Stops a green hide's 48-hour clock for six weeks.",
+   "needs": "A green or fleshed hide that is not yet salted, and one measure of curing salt for each hide unit.",
+   "for": "Buying time between the kill and the beam."
   },
   "flense": {
-   "does": "No potency change. Required before cure or tan on a green hide; without it those steps are refused.",
-   "needs": "A green hide and the fleshing beam.",
-   "for": "Stopping the hide putrefying under the salt. Skipping it spoils the vat, not just the piece."
-  },
-  "cure": {
-   "does": "Stops the spoilage clock permanently. No potency change. +2 DC as a stage, like any other.",
-   "needs": "A flensed green hide and curing salt.",
-   "for": "Buying time. Cured rawhide keeps forever, takes a seam, and is the cheapest way to make a hide safe on the day you skinned it."
-  },
-  "cut": {
-   "does": "No potency change. Assembles the `straps` pattern on its own; every other pattern is cut before it is stitched.",
-   "needs": "A hide that is cured or tanned, and a half-moon knife for fine work.",
-   "for": "Panels to pattern. The step where a hide becomes pieces of a thing."
-  },
-  "stitch": {
-   "does": "No potency change. Assembles every pattern except straps — without it the chain produces a stack of panels.",
-   "needs": "Thread on the bench (linen, sinew, gut), and hide that is cured or tanned. Stitching green hide is refused: it rots.",
-   "for": "Making the piece exist. This is the method that finishes an ordinary garment."
+   "does": "Turns a green or salted hide into a pelt ready to tan. A thick hide waits three days in a tannery's lime pit.",
+   "needs": "A hide that has not spoiled. A thick hide needs a tannery.",
+   "for": "Nothing can be tanned until it is fleshed."
   },
   "tan": {
-   "does": "No potency change, but it is the gate on everything above: hardening, and the armour rows on the output, require tanned leather. Also ends spoilage for good.",
-   "needs": "A tannin within one tier of the hide — oak bark for a deer, dragonblood tannin for dragonhide — and the bark vats.",
-   "for": "Turning hide into leather. Nothing that matters is reachable without it."
+   "does": "Makes leather or fur (or rawhide with no tannin). The tannin decides the wait, where it happens and whether the leather can later be hardened, and its working traits move the quality ceiling.",
+   "needs": "A pelt and a tannin within one tier of the hide, one measure a hide unit. Bark, mineral and planar tannins need a tannery's vat.",
+   "for": "Leather that never spoils again."
   },
-  "oil": {
-   "does": "Potency x1.10. Some oils carry their own effect into the piece (salamander oil, resist fire 1; troll fat, self-mending).",
-   "needs": "An oil on the bench — neatsfoot, currier's tallow, something rendered.",
-   "for": "Service life, and a cheap way to buy an extra property from the oil itself."
+  "curry": {
+   "does": "Dresses tanned leather. A soft body must be curried before Assemble can reach Superior.",
+   "needs": "Tanned leather or fur, and an oil.",
+   "for": "Masterwork soft goods."
   },
-  "dye": {
-   "does": "No potency change. Rare dyes contribute their own effects (shadow black, +1 Stealth in darkness; void dye, +2).",
-   "needs": "A dye on the bench and the dye vats. Mordant salts fix the rare colours permanently.",
-   "for": "Colour, and at the top of the ladder a genuine mechanical property."
+  "cut": {
+   "does": "Cuts panels for a pattern's body or lining, a lacing set, or a grip. Hides of one kind and grade combine; what is left over goes back on the rack.",
+   "needs": "Tanned leather, fur or rawhide, enough hide units for the pattern.",
+   "for": "The pieces of a thing."
   },
-  "line": {
-   "does": "No potency change. Both hides' effects ride in the finished piece rather than only the outer one's.",
-   "needs": "Two hides on the bench — an outer and an inner. Refused with one.",
-   "for": "Stacking two hides' qualities in one garment: a working outer shell over a warm or silent lining."
+  "stitch": {
+   "does": "Sews panels into a body or a lining.",
+   "needs": "Cut panels and a thread.",
+   "for": "Every soft body and every lining."
   },
   "harden": {
-   "does": "Potency x1.25. Cuir bouilli — the piece sets rigid and becomes armour-grade.",
-   "needs": "Tanned leather (raw hide boils to glue and is refused) and a wax on the bench, in the hardening trough.",
-   "for": "Armour. This is where leather stops being clothing."
+   "does": "Boils bark- or planar-tanned panels into hardened plates (cuir bouilli), the body of leather armour, lamellar and the madu.",
+   "needs": "Panels cut for a plated pattern, bark or planar tanned. The kit's kettle hardens common and uncommon hides; rare and up need a tannery.",
+   "for": "Leather armour, which the book says is boiled."
   },
   "tool": {
-   "does": "Potency x1.25 and sets `masterwork` on the output — the flag the enchanter's vessel requirement reads. Must be the last method in the chain.",
-   "needs": "The master tannery, and a piece worth finishing. Legendary hide accepts no lesser standard.",
-   "for": "Masterwork. A tooled armour piece is what an enchantment gets bound to; an untooled one cannot take it."
+   "does": "Tools the leather's face. Assemble cannot reach Flawless without a tooled body.",
+   "needs": "A tanned piece, and a wax if you have one.",
+   "for": "Flawless work."
+  },
+  "dye": {
+   "does": "Colours a piece; with mordant salts the colour is fast.",
+   "needs": "A tanned piece and a dye.",
+   "for": "Colour."
+  },
+  "laminate": {
+   "does": "Two leathers of one hide, grade and tannage become one, a strengthening pass: every modifier x1.5.",
+   "needs": "Two of one tanned leather.",
+   "for": "Stronger leather from more hide."
+  },
+  "assemble": {
+   "does": "Makes the finished item. Suits and shields are the book's Craft DC (10 + armour bonus), worn and carried goods DC 10; aiming for masterwork is DC 20 unless the hide is masterwork by nature.",
+   "needs": "A body cut for the pattern (stitched panels, or hardened plates for leather armour, lamellar and the madu), fastenings for a suit or shield, and a lining if you want one.",
+   "for": "Armour, shields, cloaks, boots and bags."
+  },
+  "grade": {
+   "does": "Reveals one benefit and one drawback of a material.",
+   "needs": "A field kit or a tannery, and a scrap of the material: a quarter unit of hide, or one measure of a supply.",
+   "for": "Knowing what a hide will do before you build with it."
   }
  },
- "_portable_note": "The tannery is furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split the herbalist's workbench established.",
+ "_bench_note": "The leather bench's rule rows (docs/leatherworking-revamp-plan.md §5.5, §6, §7, §8, §10, §11, §13; contracts §7), read by rules/leatherworker.py. Every number the plan marks proposed lives here so it tunes without a code change. `where` is `kit` (the field kit or a tannery) or `tannery`. `bulk` methods take a batch: one roll and one game for the stack. `minutes` is per hide unit where `per_unit` is true, else per piece. `tuning`: `difficulty` is the game's base, raised by `rarity_step` per band above common (rarer hides narrow the window, the forge's Giants' Foundry rule), and `band` is the real variable the game shows (docs/leatherworking-prior-art.md §3.9): its unit, the target band, the failing band, where it starts and how fast it drifts.",
+ "bench": {
+  "order": [
+   "flense",
+   "salt",
+   "tan",
+   "curry",
+   "cut",
+   "stitch",
+   "harden",
+   "tool",
+   "dye",
+   "laminate",
+   "assemble",
+   "grade"
+  ],
+  "methods": {
+   "flense": {
+    "name": "Flense", "where": "kit", "bulk": true, "minutes": 40, "per_unit": true,
+    "takes": "a green or salted hide", "makes": "a pelt",
+    "lime_minutes": 4320,
+    "tuning": {"seconds": 7, "difficulty": 0.4,
+               "band": {"unit": "fraction", "value_start": 0.1, "target": [0.25, 0.55],
+                        "fail": [0.85, 1.0], "drift": 0.05}}
+   },
+   "salt": {
+    "name": "Salt", "where": "kit", "bulk": true, "minutes": 10, "per_unit": true,
+    "salt_per_unit": 1,
+    "takes": "a green hide and curing salt", "makes": "a salted hide",
+    "tuning": {"seconds": 6, "difficulty": 0.35,
+               "band": {"unit": "percent", "value_start": 0, "target": [25, 100],
+                        "fail": null, "drift": 0}}
+   },
+   "tan": {
+    "name": "Tan", "where": "kit", "bulk": true, "minutes": 60, "per_unit": false,
+    "tannin_per_unit": 1, "desalt_minutes": 480,
+    "takes": "a pelt and a tannin (none: rawhide)", "makes": "leather, fur or rawhide",
+    "tuning": {"seconds": 8, "difficulty": 0.45,
+               "band": {"unit": "strength", "value_start": 0.0, "target": [0.7, 1.0],
+                        "fail": null, "drift": 0.04}}
+   },
+   "curry": {
+    "name": "Curry", "where": "kit", "bulk": false, "minutes": 60, "per_unit": false,
+    "oil_per_piece": 1,
+    "takes": "tanned leather or fur, and an oil", "makes": "curried leather",
+    "tuning": {"seconds": 6, "difficulty": 0.4,
+               "band": {"unit": "percent", "value_start": 0, "target": [2, 10],
+                        "fail": [16, 30], "drift": 0.5}}
+   },
+   "cut": {
+    "name": "Cut", "where": "kit", "bulk": true, "minutes": 30, "per_unit": false,
+    "takes": "tanned leather, fur or rawhide", "makes": "panels, a lacing set or a grip",
+    "tuning": {"seconds": 6, "difficulty": 0.4,
+               "band": {"unit": "fraction", "value_start": 0.0, "target": [0.0, 0.1],
+                        "fail": [0.4, 1.0], "drift": 0.03}}
+   },
+   "stitch": {
+    "name": "Stitch", "where": "kit", "bulk": false, "minutes": 60, "per_unit": true,
+    "thread_per_piece": 1,
+    "takes": "cut panels and a thread", "makes": "a stitched body or lining",
+    "tuning": {"seconds": 7, "difficulty": 0.45,
+               "band": {"unit": "spi", "value_start": 6, "target": [10, 12],
+                        "fail": [0, 7], "drift": 0.4}}
+   },
+   "harden": {
+    "name": "Harden", "where": "kit", "bulk": false, "minutes": 30, "per_unit": false,
+    "takes": "bark- or planar-tanned panels", "makes": "hardened plates",
+    "tuning": {"seconds": 7, "difficulty": 0.5,
+               "band": {"unit": "celsius", "value_start": 20, "target": [50, 85],
+                        "fail": [95, 100], "drift": 3.0}}
+   },
+   "tool": {
+    "name": "Tool", "where": "kit", "bulk": false, "minutes": 120, "per_unit": false,
+    "takes": "a tanned piece, and a wax if you like", "makes": "a tooled piece",
+    "tuning": {"seconds": 7, "difficulty": 0.5,
+               "band": {"unit": "minutes", "value_start": 0, "target": [10, 25],
+                        "fail": [40, 60], "drift": 1.0}}
+   },
+   "dye": {
+    "name": "Dye", "where": "kit", "bulk": false, "minutes": 60, "per_unit": false,
+    "takes": "a tanned piece, a dye, and mordant salts for a fast colour", "makes": "a dyed piece",
+    "tuning": {"seconds": 6, "difficulty": 0.4,
+               "band": {"unit": "percent", "value_start": 0, "target": [85, 100],
+                        "fail": null, "drift": 0}}
+   },
+   "laminate": {
+    "name": "Laminate", "where": "kit", "bulk": false, "minutes": 120, "per_unit": false,
+    "takes": "two of one tanned leather", "makes": "one heavier leather",
+    "tuning": {"seconds": 6, "difficulty": 0.45,
+               "band": {"unit": "percent", "value_start": 0, "target": [80, 100],
+                        "fail": null, "drift": 0}}
+   },
+   "assemble": {
+    "name": "Assemble", "where": "kit", "bulk": false, "minutes": 30, "minutes_suit": 60,
+    "per_unit": false,
+    "takes": "a body, fastenings, and a lining if you have one", "makes": "the finished item",
+    "tuning": {"seconds": 6, "difficulty": 0.4,
+               "band": {"unit": "fraction", "value_start": 0.0, "target": [0.7, 1.0],
+                        "fail": null, "drift": 0.05}}
+   },
+   "grade": {
+    "name": "Grade", "where": "kit", "bulk": false, "minutes": 10, "per_unit": false,
+    "takes": "a scrap of a material", "makes": "knowledge"
+   }
+  },
+  "_tannages_note": "Plan §8.1 (proposed times). `minutes` is bench time (a flat setup, or per hide unit where `per_unit`); `wait_minutes` is how long it then waits In progress (rules/inprogress.py), `thick_wait_minutes` for a thick hide. `where` is where the wait happens: `kit` travels with you (a brain tan needs no wait at all; rawhide dries and alum ages in the pack), `tannery` sits in a vat at the tannery and is collected there. `hardens`: whether the leather takes Harden (vegetable and planar only; alum softens in water). `vat`: false for work that fills no vat. `shrink_c` is the tannage's shrinkage temperature (prior art §3.9), shown, never a game. A tannin's own `fast_tan` and `slow_tan` traits, and the hide's, scale the wait (`traits`).",
+  "tannages": {
+   "brain": {"name": "brain and smoke", "level": 1, "where": "kit", "minutes": 480,
+             "per_unit": true, "wait_minutes": 0, "hardens": false, "shrink_c": [60, 65]},
+   "rawhide": {"name": "rawhide", "level": 1, "where": "kit", "minutes": 60,
+               "per_unit": false, "wait_minutes": 1440, "hardens": false, "vat": false,
+               "shrink_c": null},
+   "alum": {"name": "alum tawing", "level": 2, "where": "kit", "minutes": 60,
+            "per_unit": false, "wait_minutes": 10080, "hardens": false, "vat": false,
+            "shrink_c": [55, 60]},
+   "bark": {"name": "bark (vegetable)", "level": 2, "where": "tannery", "minutes": 60,
+            "per_unit": false, "wait_minutes": 40320, "thick_wait_minutes": 80640,
+            "hardens": true, "shrink_c": [75, 85]},
+   "mineral": {"name": "mineral", "level": 2, "where": "tannery", "minutes": 60,
+               "per_unit": false, "wait_minutes": 4320, "hardens": false,
+               "shrink_c": [100, 120]},
+   "planar": {"name": "planar", "level": 3, "where": "tannery", "minutes": 60,
+              "per_unit": false, "wait_minutes": 60480, "hardens": true, "shrink_c": [85, 95]}
+  },
+  "_units_note": "Hide units (plan §5.5, proposed): one Medium hide is one unit, doubling per size; stored in quarters. `products` is what a pattern's body takes for a Medium wearer (a suit's body scales with the wearer's size by `suit_by_size`) and its lining. The book's only printed yield is dragonhide's: one dragon gives a suit for a creature one size smaller, which is exactly two units for a Large dragon.",
+  "hide_units": {"fine": 0, "diminutive": 0, "tiny": 0.25, "small": 0.5, "medium": 1,
+                 "large": 2, "huge": 4, "gargantuan": 8, "colossal": 16},
+  "suit_by_size": {"tiny": 0.5, "small": 1, "medium": 2, "large": 4, "huge": 8},
+  "products": {
+   "padded": {"body": 2, "lining": 0},
+   "quilted cloth": {"body": 2, "lining": 1},
+   "leather armour": {"body": 2, "lining": 1},
+   "hide armour": {"body": 2, "lining": 1},
+   "leather lamellar": {"body": 2, "lining": 1},
+   "bone-studded leather": {"body": 2, "lining": 1},
+   "madu": {"body": 1, "lining": 0},
+   "cloak": {"body": 1, "lining": 1},
+   "boots": {"body": 0.5, "lining": 0.5},
+   "gloves": {"body": 0.25, "lining": 0.25},
+   "bracers": {"body": 0.25, "lining": 0},
+   "belt": {"body": 0.25, "lining": 0},
+   "cap": {"body": 0.25, "lining": 0.25},
+   "satchel": {"body": 0.5, "lining": 0},
+   "sheath": {"body": 0.25, "lining": 0},
+   "quiver": {"body": 0.5, "lining": 0},
+   "kit roll": {"body": 0.5, "lining": 0},
+   "lacing": {"body": 0.25, "lining": 0},
+   "grip": {"body": 0.25, "lining": 0}
+  },
+  "_gates_note": "`masterwork_dc` and `masterwork_index` are the book's: a masterwork component is DC 20 (CRB Craft), and Superior (index 3) or better is masterwork, unless the main hide is masterwork by nature (`always_masterwork`, plan §13.4) or `flawless` (Unchained), which waive the DC. `book_dc`: a suit or shield is 10 + its armour bonus, worn and carried goods a typical item, 10. `grade_caps`: the hide grade's cap on any work from it (plan §5.7: grade 1 none, 2 Superior, 3 Fine, 4 Sound). `flawless_needs_tool`: Assemble cannot reach Flawless on an untooled body (plan §7, proposed). `forge_fittings`: fastenings that make a forge suit (steel studs make studded leather), refused at this bench with the reason, because the forge finishes them (owner Q1.3). `fastenings_for`: a pattern that takes only these fastenings.",
+  "masterwork_dc": 20,
+  "masterwork_index": 3,
+  "book_dc": {"armour_base": 10, "goods": 10},
+  "grade_caps": {"1": null, "2": 3, "3": 2, "4": 1},
+  "flawless_needs_tool": true,
+  "forge_fittings": ["steel-studs", "cold-iron-studs"],
+  "fastenings_for": {"bone-studded leather": ["bone-studs"]},
+  "_bought_note": "A counter sells a hide tanned, never green (Harvest Parts: a green hide 'cannot be bought or sold in most settlements'; plan §9). Lane D's proposal (docs/leatherworking-review.md): a bought hide is in its document's `sold_as` form, oak-bark tanned (a town tannery's bark tan, so it can be hardened), grade 2, its units by its size.",
+  "bought": {"tannage": "oak-bark", "grade": 2},
+  "_clock_note": "Plan §6: a green hide keeps 48 hours from the harvest (the herbalist's animal clock; a document's own `fresh_hours` wins); a salted one keeps six weeks (FAO, about 15% salt), then the clock runs again. A spoiled hide is scrap: it can still be graded and sold as glue stock, never worked.",
+  "fresh_hours": 48,
+  "salted_keep_minutes": 60480,
+  "rarity_step": 0.05,
+  "_traits_note": "What the working traits do at the bench (plan §8.1, §14.6; proposed). `time` scales a tannage's wait, `ceiling` moves the quality ceiling of the tannage and everything later made from that leather, `band` scales every game's band and `<method>_band` only that method's. Read off the hide and the tannin in hand.",
+  "traits": {
+   "fast_tan": {"time": 0.5},
+   "slow_tan": {"time": 1.5},
+   "ceiling_up": {"ceiling": 1},
+   "ceiling_down": {"ceiling": -1},
+   "forgiving": {"band": 1.2},
+   "supple": {"curry_band": 1.25},
+   "fills_tooling": {"tool_band": 1.25},
+   "fine_pitch": {"stitch_band": 1.25},
+   "strong_seam": {"stitch_band": 1.1}
+  }
+ },
+ "_old_methods_note": "Methods removed 2026-10-05 and what an old recipe naming one maps onto (plan §7). Skin left the bench for the harvest of a carcass (lane C), so it maps onto nothing here.",
+ "old_methods": {
+  "cure": "salt",
+  "oil": "curry",
+  "line": "assemble",
+  "skin": ""
+ },
+ "_portable_note": "Where you work is read from the scene (rules/places.py `leather_bench_here`) and the pack (the leatherworker's field kit), never from the player's words (plan §10). The kit works common and uncommon hides anywhere, Harden included (the owner's small kettle, 2026-10-08); a tannery, a town's you pay for by the hour and its vats by the day, or one you found and own, adds the vats (bark, mineral and planar tannages), the lime pit for thick hides and rare-and-up hides. A tannery never refuses a tannage for want of a vat: vats are rented as the work needs (the lead's ruling, 2026-10-08).",
  "fixed_tools": [
-  "master tannery",
-  "hardening trough",
-  "bark vats",
-  "tanning rack"
+  "tannery vats",
+  "lime pit",
+  "hardening kettle"
  ],
- "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
+ "_fixed_tools_note": "Read now. The 2026-08-25 ruling ('leave these alone until property ownership exists') is retired by plan §10, as the forge retired it for smithies: founded places and their `holds.place.<slug>` effects exist, so a tannery is a place you can own, and the bench asks where you are standing."
 }

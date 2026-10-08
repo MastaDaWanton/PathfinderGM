@@ -33,7 +33,8 @@ from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
-                  works_views, enchant_views, alchemy_views, tradecraft_views)
+                  works_views, enchant_views, alchemy_views, tradecraft_views,
+                  leather_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -158,6 +159,20 @@ urlpatterns = [
     path("api/alchemy/codex", alchemy_views.alchemy_codex, name="alchemy_codex"),
     path("api/alchemy/material/<str:material_id>", alchemy_views.alchemy_material,
          name="alchemy_material"),
+    # The leather bench (docs/leatherworking-contracts.md §7). Lane E's block: every fixed
+    # name sits above any catch-all, so the herb bench's route-order bug (a parameter route
+    # swallowing "state", test_bench_routes) cannot recur here (tests/test_leather_api.py
+    # pins it).
+    path("api/leather/state", leather_views.leather_state, name="leather_state"),
+    path("api/leather/check", leather_views.leather_check, name="leather_check"),
+    path("api/leather/roll", leather_views.leather_roll, name="leather_roll"),
+    path("api/leather/finish", leather_views.leather_finish, name="leather_finish"),
+    path("api/leather/collect", leather_views.leather_collect, name="leather_collect"),
+    path("api/leather/grade", leather_views.leather_grade, name="leather_grade"),
+    path("api/leather/perks", leather_views.leather_perks, name="leather_perks"),
+    path("api/leather/ledger", leather_views.leather_ledger, name="leather_ledger"),
+    path("api/leather/material/<str:material_id>", leather_views.leather_material,
+         name="leather_material"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
     # `api/bench/<bench_id>`: Django takes the first match, and below it "state" was read
     # as a homebrew bench id and answered 404 "no bench 'state'" (Lane D, 2026-10-02).
