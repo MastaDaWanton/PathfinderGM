@@ -44,6 +44,7 @@ scene away, or the campaign may save mid-flight while the model is still thinkin
 """
 from __future__ import annotations
 
+import json
 import re
 import threading
 
@@ -59,6 +60,12 @@ TURNS_BETWEEN_LOOKS = 7
 # no tell, and without this nothing would ever put "she has the sealed jar" on the
 # woman's card.
 CARD_TURNS_BETWEEN_LOOKS = 3
+# How many cards, and how many people by ref, one look at the cards is shown (`_jobs_for`).
+MAX_CARDS = 8
+MAX_REFS = 24
+# The longest undercurrent sentence kept (`_valid_thread`). The schema allows a little
+# more, so a sentence the grammar cut at its cap is refused rather than kept cut.
+THREAD_LEN = 300
 
 # The closed price vocabulary. The model picks a word; the app's own `pricing` formula
 # turns the tier into a number (inert, no specs — a locket is priced as a locket, about
@@ -141,7 +148,8 @@ def _jobs_for(c) -> list[dict]:
             "job": "garnish", "campaign": c.id, "ref": ref, "who": a.name,
             "snapshot": _belongings(a),
             "thread": opening.note_thread(note),
-            "cast": [x.name for x in c.scene.actors.values() if x.name],
+            # Bounded like the cards' refs below: everybody shown is an actor for good.
+            "cast": [x.name for x in c.scene.actors.values() if x.name][-MAX_REFS:],
             "known": frozenset(known),
         })
 
@@ -169,6 +177,17 @@ def _jobs_for(c) -> list[dict]:
     since = _LAST_CARD_LOOK.get(c.id, _LAST_LOOK[c.id])
     if live and turns - since >= CARD_TURNS_BETWEEN_LOOKS:
         _LAST_CARD_LOOK[c.id] = turns
+        # Bounded, both lists: every live card and every actor on the board went in, and
+        # neither stops growing in a long campaign (a card keeps FACT_CAP facts, but the
+        # cards themselves have no cap, and everybody the narration shows is an actor and
+        # stays one). The prompt is one user message, and one message too long for the
+        # window is the case Ollama answers by keeping about half of it (8,195 tokens of
+        # a 16,384 window, measured 2026-10-08; the player's log has a call of exactly
+        # that count). The cards touched most recently, and the people on them first.
+        live = sorted(live, key=lambda k: -int(getattr(k, "touched", 0) or 0))[:MAX_CARDS]
+        on_cards = [r for k in live for r in k.people if r in c.scene.actors]
+        others = [r for r, a in c.scene.actors.items() if not a.is_pc]
+        refs = list(dict.fromkeys(on_cards + others))[:MAX_REFS]
         jobs.append({
             "job": "cards", "campaign": c.id, "turn": len(c.transcript),
             "cards": [{"id": k.id, "title": k.title, "facts": list(k.facts),
@@ -177,7 +196,8 @@ def _jobs_for(c) -> list[dict]:
                        "people": [c.scene.actors[r].name if r in c.scene.actors else r
                                   for r in k.people]}
                       for k in live],
-            "refs": {r: a.name for r, a in c.scene.actors.items() if not a.is_pc},
+            "refs": {r: c.scene.actors[r].name for r in refs
+                     if not c.scene.actors[r].is_pc},
             "recent": [f"{b.get('who', '?')}: {str(b.get('text', ''))[:400]}"
                        for b in c.transcript[-8:]],
             "known": frozenset(known),
@@ -287,33 +307,120 @@ def _work(jobs: list[dict]) -> None:
                 _PENDING.append(proposal)
 
 
-def _ask(messages: list[dict], cfg: dict, schema: dict,
-         prefer_thinking: bool = False):
-    """One model call, two attempts, thinking toggled between them.
+class RanAway(ValueError):
+    """The answer reached its token cap (`done_reason=length`). Not retried: the cap is
+    sized to the largest answer the schema allows, so a reply that reaches it is writing
+    something else (thinking, or whitespace between JSON tokens, which a JSON grammar
+    permits without end), and the same call would do it again."""
 
-    Measured live on deepseek-r1:8b: the garnish call died three of three times with
-    thinking on — the ENTIRE budget went into Ollama's `thinking` channel (900 and
-    2,000 tokens both ended `done_reason=length`, content "") because the format
-    grammar constrains only the content, which never began; with `think=False` the
-    same call answered a clean object in 0.4s. The undercurrent call, by contrast,
-    succeeded two of two *with* thinking and its rewrites were better grounded in the
-    transcript than the unthinking one's. So each job leads with what worked for it
-    and retries the other way — which is also the attempt a watcher model that
-    refuses or ignores the `think` key converges onto.
+
+# Tokens per character of a JSON answer, at the worst. JSON is punctuation-heavy and
+# tokenises worse than prose: the probes of 2026-10-08 answered 134 characters in 40
+# tokens and 48 characters in 18 (3.4 and 2.7 characters a token). Two characters a
+# token, plus room for the braces and keys, is a cap no valid answer reaches.
+_ANSWER_CHARS_PER_TOKEN = 2.0
+_ANSWER_SLACK = 48
+UNBOUNDED_ANSWER_TOKENS = 900
+
+
+def answer_tokens(max_chars: int) -> int:
+    """num_predict for an answer of at most `max_chars` characters."""
+    return int(max_chars / _ANSWER_CHARS_PER_TOKEN) + _ANSWER_SLACK
+
+
+# Room a model's own layout takes around one value or member: a newline, an indent, the
+# comma and the space after the colon.
+_LAYOUT = 8
+
+
+def max_answer_chars(node: dict) -> int | None:
+    """The longest JSON text `node` (a JSON schema) admits, or None when nothing bounds
+    it (a string with no maxLength, an array with no maxItems).
+
+    Read from the schema the call sends, so the cap and the schema cannot drift apart.
+    It is a real bound only because Ollama enforces the bounds: probed 2026-10-08 on the
+    shipped model, `maxLength: 40` held 3 of 3 (each string stopped at exactly 40
+    characters, mid-word) and `maxItems: 2` held 3 of 3, as `enum` and `required` already
+    had (0 of 6 for `contains`/`prefixItems`, which nothing here uses). A string is
+    counted with a tenth more for escapes."""
+    if not isinstance(node, dict):
+        return None
+    if "enum" in node:
+        return max((len(json.dumps(v)) for v in node["enum"]), default=4)
+    kinds = node.get("type")
+    best = 0
+    for kind in (kinds if isinstance(kinds, list) else [kinds]):
+        if kind == "string":
+            cap = node.get("maxLength")
+            if cap is None:
+                return None
+            size = int(cap) + int(cap) // 10 + 2
+        elif kind in ("integer", "number"):
+            size = 12
+        elif kind in ("boolean", "null"):
+            size = 5
+        elif kind == "array":
+            cap, item = node.get("maxItems"), max_answer_chars(node.get("items") or {})
+            if cap is None or item is None:
+                return None
+            size = 2 + int(cap) * (item + _LAYOUT)
+        elif kind == "object":
+            size = 2
+            for key, sub in (node.get("properties") or {}).items():
+                inner = max_answer_chars(sub)
+                if inner is None:
+                    return None
+                size += len(json.dumps(key)) + 1 + inner + _LAYOUT
+        else:
+            return None
+        best = max(best, size)
+    return best
+
+
+def _ask(messages: list[dict], cfg: dict, schema: dict):
+    """One model call with thinking off, capped at what the largest valid answer needs.
+
+    Measured 2026-10-08 on igorls/gemma-4-12B-it-heretic, the shipped watcher model, with
+    the real prompts (scratchpad probe, two runs each): with `think` unsent, the cards and
+    undercurrent calls spent all 900 tokens in Ollama's thinking channel, 4 of 4 —
+    `done_reason=length`, 3,220 to 3,670 characters of thinking, content "" — in 19 to
+    21 s, and were then retried. With `think=False` the same calls answered in 35 to 43
+    tokens, `done_reason=stop`, 4 of 4, in 4 to 10 s. The player's log has the first half
+    of that: four watcher calls at the 900-token cap on prompts of 824 to 844 tokens.
+
+    It led with thinking for the cards and the undercurrent because deepseek-r1:8b, the
+    watcher's model before 2026-08-28, wrote better-grounded undercurrent rewrites with
+    it (two of two). That model is not the watcher now; Gemma 4 thinks by default, and
+    `settings.MODELS` already rides `think=False` on every agent call for that reason.
+
+    So: `think=False` first, always. A model that refuses the key (Ollama answers 400 for
+    a model with no thinking to switch off, which reaches here as `ModelUnavailable`) is
+    asked once more without it. A reply cut at its cap is `RanAway` and is NOT retried —
+    it was retried before, which is how one look cost two full-length calls. The cap is
+    the longest answer the schema allows (`max_answer_chars`), in tokens; a schema with
+    no bound anywhere keeps the old 900.
     """
-    order = (None, False) if prefer_thinking else (False, None)
-    for n, think in enumerate(order):
+    longest = max_answer_chars(schema)
+    num_predict = answer_tokens(longest) if longest is not None else UNBOUNDED_ANSWER_TOKENS
+    reply = None
+    for think in (False, None):
         try:
             reply = client.chat(
                 messages, cfg["model"], cfg.get("host", "http://localhost:11434"),
                 as_json=True, provider=cfg.get("provider", "ollama"),
                 api_key=cfg.get("api_key", ""),
-                temperature=0.4, num_predict=900,
+                temperature=0.4, num_predict=num_predict,
                 schema=schema, think=think)
-            return reply.json()
-        except (ValueError, client.ModelUnavailable):
-            if n:
+            break
+        except client.ModelStalled:
+            raise                          # a wedged Ollama is not asked twice
+        except client.ModelUnavailable:
+            if think is None:
                 raise
+    if reply.cut_off:
+        raise RanAway(f"the answer reached its {num_predict}-token cap "
+                      f"({reply.reply_tokens} tokens) and was not finished")
+    return reply.json()
 
 
 _SYSTEM = ("You are the event watcher for a Pathfinder game: you read what happened "
@@ -335,6 +442,8 @@ def _propose_garnish(job: dict, cfg: dict) -> dict | None:
              f'Answer JSON: {{"item": "a short item name", "band": "worthless" | '
              f'"modest" | "fine"}} — band is what a market stall would pay.'}],
         cfg,
+        # 80 against `_valid_garnish`'s 60: a name the grammar cut at its cap is
+        # always refused, never kept half-written.
         {"type": "object",
          "properties": {"item": {"type": "string", "maxLength": 80},
                         "band": {"type": "string",
@@ -423,11 +532,12 @@ def _propose_undercurrent(job: dict, cfg: dict) -> dict | None:
                'Answer JSON: {"action": "keep" | "advance" | "new", "sentence": '
                '"the whole rewritten thread, or empty for keep"}'}],
         cfg,
-        prefer_thinking=True,
+        # 320 against `_valid_thread`'s 300: it was 300 for both, so a sentence the
+        # grammar cut mid-word at its cap was exactly long enough to be kept.
         schema={"type": "object",
          "properties": {"action": {"type": "string",
                                    "enum": ["keep", "advance", "new"]},
-                        "sentence": {"type": "string", "maxLength": 300}},
+                        "sentence": {"type": "string", "maxLength": THREAD_LEN + 20}},
          "required": ["action", "sentence"]})
     sentence = _valid_thread(data, job["known"])
     if sentence is None:
@@ -453,6 +563,50 @@ _TITLE_WORDS = frozenset({
     "unpaid", "promise", "promised", "secret", "warning", "threat", "offer", "request",
     "who", "what", "where", "why", "how", "is", "are", "was", "has", "have", "not", "no",
 })
+
+
+def cards_schema(job: dict) -> dict:
+    """The shape of a look at the cards, with every list and string bounded.
+
+    It had none of the list bounds: `changes` could hold any number of entries naming any
+    id, and a new card any number of facts and people, so the only cap on the answer was
+    the token cap. Bounded now by what the job holds: one change per card shown, an id
+    from those cards, an objective number a card has, at most three facts (all
+    `_propose_cards` keeps), people from the refs shown. Ollama enforces `enum` and
+    `maxItems` (`max_answer_chars` says what was probed), so the longest answer is
+    known and the call's token cap is sized from it. The string caps sit above the
+    validators' (FACT_LEN, TITLE_LEN), so a string the grammar cut is refused, not kept.
+    """
+    cards = job.get("cards") or []
+    ids = [k["id"] for k in cards] or [""]
+    most = max([len(k.get("objectives") or []) for k in cards] + [1])
+    refs = list(job.get("refs") or {})
+    people = ({"type": "array", "maxItems": min(len(refs), 6),
+               "items": {"type": "string", "enum": refs}} if refs
+              else {"type": "array", "maxItems": 0, "items": {"type": "string",
+                                                               "maxLength": 1}})
+    return {"type": "object",
+            "properties": {
+                "changes": {"type": "array", "maxItems": max(1, len(cards)), "items": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string", "enum": ids},
+                                   "action": {"type": "string",
+                                              "enum": ["keep", "advance", "resolve",
+                                                       "objective"]},
+                                   "objective": {"type": "integer",
+                                                 "enum": list(range(1, most + 1))},
+                                   "fact": {"type": "string",
+                                            "maxLength": FACT_LEN[1] + 20}},
+                    "required": ["id", "action", "fact"]}},
+                "new": {"type": ["object", "null"],
+                        "properties": {"title": {"type": "string",
+                                                 "maxLength": TITLE_LEN[1] + 10},
+                                       "facts": {"type": "array", "maxItems": 3,
+                                                 "items": {"type": "string",
+                                                           "maxLength": FACT_LEN[1] + 20}},
+                                       "people": people},
+                        "required": ["title", "facts", "people"]}},
+            "required": ["changes", "new"]}
 
 
 def _propose_cards(job: dict, cfg: dict) -> dict | None:
@@ -496,27 +650,7 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
                '"new": {"title": "...", "facts": ["..."], '
                '"people": ["c1"]} | null}'}],
         cfg,
-        prefer_thinking=True,
-        schema={"type": "object",
-                "properties": {
-                    "changes": {"type": "array", "items": {
-                        "type": "object",
-                        "properties": {"id": {"type": "string"},
-                                       "action": {"type": "string",
-                                                  "enum": ["keep", "advance", "resolve",
-                                                           "objective"]},
-                                       "objective": {"type": "integer"},
-                                       "fact": {"type": "string", "maxLength": 240}},
-                        "required": ["id", "action", "fact"]}},
-                    "new": {"type": ["object", "null"],
-                            "properties": {"title": {"type": "string", "maxLength": 80},
-                                           "facts": {"type": "array",
-                                                     "items": {"type": "string",
-                                                               "maxLength": 240}},
-                                           "people": {"type": "array",
-                                                      "items": {"type": "string"}}},
-                            "required": ["title", "facts", "people"]}},
-                "required": ["changes", "new"]})
+        schema=cards_schema(job))
     if not isinstance(data, dict):
         return None
     known = job["known"]
@@ -610,7 +744,7 @@ def _valid_thread(data: dict, known) -> str | None:
     if str(data.get("action", "")).strip().lower() not in ("advance", "new"):
         return None
     s = " ".join(str(data.get("sentence", "")).split())
-    if not (20 <= len(s) <= 300):
+    if not (20 <= len(s) <= THREAD_LEN):
         return None
     if not s.endswith((".", "!", "?")):
         s += "."
