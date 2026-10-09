@@ -158,7 +158,7 @@ take      pick up, loot, take, tip or count out of a container; the target is th
           person or the container it comes out of
 drop      put down, set down, drop or leave a thing behind
 steal     pick a pocket, steal, filch
-attack    hit, punch, stab, shoot, finish somebody
+attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish somebody
 cast      cast a named spell
 use       draw a weapon, put on, show, use, bandage, light
 consume   eat or drink
@@ -346,6 +346,20 @@ _DEMOS = [
     ("I seize the pickpocket by the arm.",
      {"question": False, "claims": [], "actions": [
          {"span": "seize the pickpocket by the arm", "target": "the pickpocket",
+          "act": "attack"}]}),
+    # Violence nobody is named for (2026-10-09, the owner: "if i say I attack the closest
+    # person or i go on a rampage or i assault a civilian etc. it should be able to start a
+    # fight"). Measured live the same day on gemma-4-12B: "I go on a rampage." was read
+    # `other`, and "I pick a fight with the biggest bruiser in the room." `insult` -- the
+    # gloss said "pick a fight with words". Who the blow lands on is not the reader's to
+    # say here: the words are kept whole and `confirm_victims` asks it of the people here.
+    ("I pick a fight with the tallest of the sailors.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "pick a fight with the tallest of the sailors",
+          "target": "the tallest of the sailors", "act": "attack"}]}),
+    ("I run amok through the fish stalls.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "run amok through the fish stalls", "place": "the fish stalls",
           "act": "attack"}]}),
     # What somebody else will do is not the player's deed at all: no action. Tried first
     # as `sell, commit: intended` for "who will pay me for it", and on the dev lines the
@@ -958,6 +972,106 @@ def confirm_first_aid(span: str, patient: str, *, model: str | None = None) -> s
     except Exception:  # noqa: BLE001
         return ""
     return got if got in AID_ANSWERS else ""
+
+
+# --- who a blow lands on, asked ---------------------------------------------------------
+#
+# The owner, 2026-10-09: "if i say I attack the closest person or i go on a rampage or i
+# assault a civilian etc. it should be able to start a fight." Measured live the same day
+# (gemma-4-12B, a market of three bystanders on scratch data): "I attack the closest person."
+# had the planner aim, rightly, at the fruit seller beside the player — and the fight
+# declarer required a `spawn` behind it, so two bandits came out of nowhere and joined the
+# fight on her side. `judgement.inject_fight` read the sentence with a regex and, finding
+# nobody `_can_be_fought` (bystanders are not), conjured a template opponent.
+#
+# Who "the closest person", "a civilian" or "the biggest bruiser in the room" means is not
+# in the words alone: it is the words held against the people standing here. So the one
+# question is put with those people in front of it, as refs the sampler cannot leave: WHICH
+# of them could the words mean — every one of them for "the closest person" or a rampage,
+# the townsfolk for "a civilian", the one bruiser for "the biggest bruiser", nobody when
+# nobody here fits. Which of those is NEAREST is the engine's to answer, from the squares
+# people keep (`acts_to_ops.victims`), never the model's: a model asked "who is closest"
+# would be guessing at a map it cannot see.
+#
+# Demonstrations written for this, with their own people; none is a measured line.
+_VICTIM_DEMOS = [
+    ("attack the closest person",
+     [("c1", "a fishwife gutting herring"), ("c2", "the sailor with a bad leg"),
+      ("c3", "the harbour guard")], ["c1", "c2", "c3"]),
+    ("assault a civilian",
+     [("c1", "the gate guard (a guard)"), ("c2", "a baker carrying loaves"),
+      ("c3", "the old washerwoman")], ["c2", "c3"]),
+    ("run amok through the stalls",
+     [("c1", "the pedlar"), ("c2", "a girl selling ribbons")], ["c1", "c2"]),
+    ("pick a fight with the biggest man in the tavern",
+     [("c1", "a thin clerk"), ("c2", "the hulking stevedore with tattooed arms"),
+      ("c3", "an old woman by the fire")], ["c2"]),
+    ("punch the guard",
+     [("c1", "a merchant"), ("c2", "the watchman at the door (a guard)")], ["c2"]),
+    ("stab the priest",
+     [("c1", "a farmer"), ("c2", "a small boy")], []),
+    ("hit the nearest guard",
+     [("c1", "the sergeant (a guard)"), ("c2", "a spearman of the watch (a guard)"),
+      ("c3", "a cloth merchant")], ["c1", "c2"]),
+    ("keep swinging my sword",
+     [("c1", "a merchant watching from his stall")], []),
+]
+
+
+def victim_messages(span: str, words: str, people) -> list[dict]:
+    system = ("In a role-playing game the player's character attacks somebody. Here are the "
+              "people standing nearby, each with a ref. Answer one question: which of them "
+              "could the player's words mean? Everyone the words could fit — all of them "
+              "for 'the closest person', 'someone', 'anyone' or a rampage; only those who "
+              "fit a description ('a civilian' is anybody who is not a guard or soldier); "
+              "the one person a name or a description picks out; nobody ([]) when nobody "
+              "here fits the words.")
+    out = [{"role": "system", "content": system}]
+
+    def ask(deed, here):
+        listed = "\n".join(f"{ref}: {label}" for ref, label in here)
+        return f"People here:\n{listed}\nThe attack: {deed}"
+
+    for deed, here, meant in _VICTIM_DEMOS:
+        out.append({"role": "user", "content": ask(deed, here)})
+        out.append({"role": "assistant", "content": json.dumps({"meant": meant})})
+    # The span holds the target words; when the reader's span lost them, they are added.
+    deed = span if (not words or words.lower() in str(span).lower()) else f"{span} ({words})"
+    out.append({"role": "user", "content": ask(deed or words, people)})
+    return out
+
+
+def confirm_victims(span: str, words: str, people, *,
+                    model: str | None = None) -> list[str] | None:
+    """The refs among `people` ((ref, label) pairs, everyone standing here) that the attack
+    in `span` could mean; [] for nobody here; None when the call fails (the caller then
+    builds nothing, and the plan stands)."""
+    from . import client
+    from play import modelcfg
+
+    refs = [str(r) for r, _ in people]
+    if not refs:
+        return []
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object",
+              "properties": {"meant": {"type": "array",
+                                       "items": {"type": "string", "enum": refs}}},
+              "required": ["meant"]}
+    try:
+        reply = client.chat(victim_messages(span, words, people), model or cfg["model"],
+                            cfg["host"], as_json=True, think=False, temperature=0.0,
+                            num_predict=20 + 8 * len(refs),
+                            provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = (reply.json() or {}).get("meant")
+    except Exception:  # noqa: BLE001 — a failed question builds nothing
+        return None
+    if not isinstance(got, list):
+        return None
+    # Checked in code, whatever the sampler enforced: a ref that is not here is no answer.
+    return list(dict.fromkeys(str(r) for r in got if str(r) in refs))
 
 
 # --- in the turn ---------------------------------------------------------------------

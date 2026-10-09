@@ -617,6 +617,211 @@ def first_aid(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[s
     return notes
 
 
+# --- who a declared blow lands on -------------------------------------------------------------
+
+# The acts whose deed is a blow at somebody (`interpret.ACTS`).
+VIOLENT_ACTS = frozenset({"attack"})
+# Acts that, done before a blow in the same sentence, put somebody in front of the player
+# whom the engine cannot see yet: a walk into another room, the person sought or followed.
+# "I walk into the tavern and punch the first man I see" is about people in the tavern,
+# and the people standing HERE at plan time are not them.
+_FINDS_SOMEBODY_FIRST = frozenset({"go", "journey", "leave", "call_on", "break_in",
+                                   "seek", "follow"})
+# How far each zone is, in feet, for a scene with no map to measure on (rules/intents.py
+# ZONES; the squares `Scene.place_by_zone` lays them at).
+_ZONE_FEET = {"engaged": 5, "near": 15, "far": 40}
+
+NOBODY_TO_ATTACK = "there is nobody here to attack"
+
+
+def _standing_here(scene) -> list:
+    """Everybody non-player here who could be struck as a fresh blow: not down, not dead,
+    and seen (somebody hiding is not in the room the character can see — the brief's own
+    rule for WHO IS HERE)."""
+    return [a for a in (getattr(scene, "actors", {}) or {}).values()
+            if not getattr(a, "is_pc", False) and not a.is_down
+            and not a.has_state("state.hidden")]
+
+
+def _ours(actor) -> bool:
+    from rules import states as states_mod
+
+    return (actor.has_state(states_mod.TRAVELS_WITH_YOU)
+            or actor.has_state(states_mod.OWNED_BY_YOU))
+
+
+def nearest(scene, refs) -> str:
+    """The one of `refs` nearest the player, by the squares people keep (`Scene.positions`;
+    the ruling of 2026-09-28: everyone in a scene has a square from arrival and keeps it),
+    else by zone; the lower ref breaks a tie, so the answer never depends on dict order.
+    The player's own people come last: an unnamed blow is never the obvious reading of a
+    friend (the drover shot dying, 2026-10-01)."""
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    actors = getattr(scene, "actors", {}) or {}
+
+    def key(ref):
+        a = actors.get(ref)
+        feet = scene.distance_between(pc.ref, ref) if pc is not None else None
+        if feet is None:
+            feet = _ZONE_FEET.get(str((getattr(scene, "zones", {}) or {}).get(ref)), 999)
+        num = int(re.sub(r"\D", "", ref) or 0)
+        return (a is not None and _ours(a), feet, num, ref)
+
+    pool = [r for r in refs if r in actors]
+    return min(pool, key=key) if pool else ""
+
+
+def label(actor) -> str:
+    """How the victim question shows a person: the name the player knows them by, and the
+    two facts the engine holds that decide "a civilian" and "my friend" — never a guess."""
+    from rules import states as states_mod
+
+    bits = []
+    if actor.has_state("role.guard") or str(getattr(actor, "from_template", "")) in (
+            "watchman", "guard", "soldier"):
+        bits.append("a guard")
+    if actor.has_state(states_mod.TRAVELS_WITH_YOU):
+        bits.append("travels with you")
+    elif actor.has_state(states_mod.OWNED_BY_YOU):
+        bits.append("yours")
+    if actor.is_down:
+        bits.append("down")
+    return str(actor.name) + (f" ({'; '.join(bits)})" if bits else "")
+
+
+def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str]:
+    """A declared blow lands on a REAL person here, or the turn says there is nobody.
+
+    The owner, 2026-10-09: "if i say I attack the closest person or i go on a rampage or i
+    assault a civilian etc. it should be able to start a fight." Measured live the same day
+    (gemma-4-12B, a market of three bystanders, scratch data): "I attack the closest person."
+    was planned at the fruit seller beside the player, and the fight declarer then REQUIRED
+    a spawn, so two bandits came out of nowhere and joined the fight on her side; "I go on a
+    rampage." was read `other` and five plans aimed at `new1` until the turn degraded into
+    prose about slicing men who were not there. The regex door (`inject_fight`'s cue table
+    and template thug) is gone; this builds the blow from the reading:
+
+      * the target slot resolves through the engine's finders (`person`: a name, a
+        description shown as the name, a pronoun) — "I attack Bob" is Bob;
+      * a pronoun keeps the 2026-09-18 rule in a fight: it means somebody IN the fight
+        (`judgement._can_be_fought`), never a bystander, or the one the player is engaged
+        with; out of a fight it is the one the player is dealing with (`addressed`);
+      * no words in a fight: the nearest foe standing;
+      * anything else — "the closest person", "a civilian", "the biggest bruiser", a
+        rampage — is ONE question with the people here as an enum
+        (`interpret.confirm_victims`): which of them could the words mean? The NEAREST of
+        those, by the squares people keep, is the engine's answer (`nearest`);
+      * nobody standing here at all, or nobody the words fit: the row is `missing`, and
+        the turn is the refusal in words ("There is nobody here to attack.") — never an
+        invented opponent.
+
+    The attack built here goes to the plan through `judgement.inject_fight`, which aims the
+    plan's own blow at it; the engine's battle gate opens the fight on it and brings in
+    their own kind and the law (`Engine._ensure_encounter`, `rally`, `_law_joins`).
+    `ask` None (the test suite, the reader off) builds only what needs no question.
+    Returns a line per row decided, for the turn log."""
+    from . import interpret, judgement
+
+    notes: list[str] = []
+    if not frame or scene is None or not hasattr(scene, "pc") or scene.pc() is None:
+        return notes
+    pc = scene.pc()
+    actions = frame.get("actions") or []
+    actors = getattr(scene, "actors", {}) or {}
+    fighting = bool(getattr(scene, "in_encounter", False))
+    for row in rows:
+        a = actions[row.index] if row.index < len(actions) else {}
+        if row.act not in VIOLENT_ACTS or row.intents or not interpret.acting(a):
+            continue
+        if any(interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
+               for b in actions[:row.index]):
+            row.note = "the blow comes after somebody is found or a place is reached"
+            continue
+        here = _standing_here(scene)
+        words = " ".join(str(a.get("target") or "").split())
+        # "it" too, for a blow: the live reader reads "I attack it" `target: it`.
+        pronoun = words.lower() in _PRONOUNS | {"it"}
+        if not fighting and not here and not any(
+                not getattr(x, "is_pc", False) and not x.has_state("state.down.dead")
+                for x in actors.values()) and not (words and not pronoun
+                                                   and person(scene, words)):
+            # Not a soul but the player (and the dead): the refusal, in words. A body the
+            # words name is theirs to kick (`redirect_attacks_off_corpses` lets that blow
+            # stand); in a fight the answer to nobody left is the fight's end
+            # (`judgement.inject_fight`), which is what pays out.
+            row.missing = NOBODY_TO_ATTACK
+            notes.append(row.missing)
+            continue
+        ref, how = "", ""
+        if pronoun:
+            ref = _pronoun_victim(scene, words, fighting)
+            how = f"{words!r}, by the engine's state"
+        elif words:
+            ref = person(scene, words)
+            how = f"{words!r}, by name"
+        elif fighting:
+            foes = [x.ref for x in here if judgement._can_be_fought(x)]
+            ref = nearest(scene, foes)
+            how = "the nearest foe"
+        if not ref and here and not pronoun:
+            if ask is None:
+                row.note = "who the blow is aimed at was not asked (no reader)"
+                continue
+            meant = ask(str(a.get("span") or words), words,
+                        [(x.ref, label(x)) for x in here])
+            if meant is None:
+                row.note = "the question of who the blow is aimed at failed"
+                continue
+            if not meant:
+                if fighting:
+                    # "I keep swinging" with every foe down: the fight is over, and
+                    # `inject_fight` says so.
+                    row.note = "nobody left in the fight the words could mean"
+                    continue
+                row.missing = (f"nobody here answers to {words}" if words
+                               else NOBODY_TO_ATTACK)
+                notes.append(row.missing)
+                continue
+            # The player's own people only when nobody else is meant.
+            strangers = [r for r in meant if not _ours(actors[r])]
+            ref = nearest(scene, strangers or meant)
+            how = (f"the nearest of {len(meant)} the words could mean" if len(meant) > 1
+                   else "the one the words mean")
+        victim = actors.get(ref) if ref else None
+        if victim is None:
+            if not row.note:
+                row.note = "nobody resolved; the plan's own blow stands"
+            continue
+        if victim.is_down or victim.has_state("state.helpless"):
+            # A body on the floor is a finishing blow, which is its own rule
+            # (`judgement.declare_coup_de_grace`) and opens no fight: the plan's stands.
+            row.note = f"{victim.name} is down: the plan's own blow stands"
+            continue
+        row.intents.append({"op": "attack", "actor": pc.ref, "target": victim.ref,
+                            "because": f"the player attacks {victim.name}"})
+        row.note = f"the blow lands on {victim.name} ({victim.ref}): {how}"
+        notes.append(row.note)
+    return notes
+
+
+def _pronoun_victim(scene, words: str, fighting: bool) -> str:
+    """Who "him", "her", "them" means for a blow. In a fight, only somebody in it: measured
+    2026-09-18 with the map open, the planner's attack on "the man" landed on a 4-hp
+    bystander who had never been in the fight (`judgement._can_be_fought`). Out of one, the
+    pronoun against the people here, else whoever the player is dealing with."""
+    from . import judgement
+
+    here = _standing_here(scene)
+    pool = [x for x in here if judgement._can_be_fought(x)] if fighting else \
+        [x for x in here if not _ours(x)]
+    fits = [x.ref for x in pool
+            if words.lower() in _pronoun_forms(getattr(x, "pronouns", ""))]
+    if len(fits) == 1:
+        return fits[0]
+    who = addressed(scene)
+    return who if who in {x.ref for x in pool} else ""
+
+
 def declared(rows: list[Row]) -> list[str]:
     """The op names the plan must carry, in the order the words do them — the `declared`
     block's keys (`prompts.turn_schema`). Ops built whole are not asked of the model."""
@@ -634,8 +839,12 @@ def unresolved(rows: list[Row]) -> list[str]:
 def refusal(rows: list[Row]) -> str:
     """The turn's whole answer when every deed the words declared moves a thing and not
     one of them can: "Kesst Vayr is not carrying a crate." Nothing is planned, nothing is
-    invented, and the player is told what was not found. "" when anything else is owed."""
-    if not rows or any(r.act not in GOODS_ACTS or r.intents or r.ops for r in rows):
+    invented, and the player is told what was not found. "" when anything else is owed.
+
+    A blow with nobody to land on is the same refusal (`victims`, 2026-10-09): "There is
+    nobody here to attack." — the words the template thug used to answer."""
+    if not rows or any(r.act not in GOODS_ACTS | VIOLENT_ACTS or r.intents or r.ops
+                       for r in rows):
         return ""
     missing = unresolved(rows)
     if not missing or any(not r.missing for r in rows):
@@ -695,7 +904,9 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     pc = scene.pc() if hasattr(scene, "pc") else None
     if pc is None:
         return raw
-    built = [i for r in rows for i in r.intents]
+    # A blow the table aimed (`victims`) is put in by `judgement.inject_fight`, which aims
+    # the plan's own blow at the same person rather than adding a second one.
+    built = [i for r in rows if r.act not in VIOLENT_ACTS for i in r.intents]
     nothing = [r.thing for r in rows if r.act in GOODS_ACTS and r.thing and not r.intents]
     acting = [a for a in frame.get("actions") or [] if interpret.acting(a)]
     acts = {str(a.get("act") or "") for a in acting}
