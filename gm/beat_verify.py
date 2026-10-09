@@ -214,6 +214,23 @@ def facts_from(ctx) -> Facts:
         end = ""
     was = places_mod.find(known, str(ctx.was_at or "")) if ctx.was_at else None
     start = _name_of(was) if was is not None else end
+    # Where the party stood before is looked up among the places known HERE, so a walk in
+    # from open ground outside this town found nothing and fell back to `end`: start ==
+    # end, "the player did not move". Measured on the owner's save, 2026-10-09: "I go to
+    # the tavern" from the ridgelines resolved (went by the fields, the outskirts and the
+    # gate), and the read-back cut the true walk as "a move the engine did not make" and
+    # ended the beat "You are still at the tavern." A place we cannot name here is still
+    # not where the party is now: it is named from its own id.
+    if was is None and ctx.was_at:
+        try:
+            here_id = str(getattr(engine.here(), "id", "") or "")
+        except Exception:  # noqa: BLE001
+            here_id = ""
+        if str(ctx.was_at) != here_id:
+            from rules import keepers
+
+            # The outskirts ring's "@" is part of the id, never the name.
+            start = keepers.label_of(str(ctx.was_at)).lstrip("@") or "somewhere else"
     outcomes = tuple(o if isinstance(o, dict) else o.as_dict() for o in ctx.outcomes)
     went_by: list[str] = []
     for o in outcomes:

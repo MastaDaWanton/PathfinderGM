@@ -185,3 +185,30 @@ def test_somebody_who_leaves_while_the_engine_keeps_them_here():
     found = bv.diff([claim("left", who="c12")], facts())
     assert kinds(found) == [("contradiction", "presence")]
     assert bv.diff([claim("left", who=bv.NEW_PERSON)], facts()) == []
+
+
+def test_a_walk_in_from_open_ground_outside_town_is_a_move():
+    """The owner's save, 2026-10-09: "I go to the tavern" from the ridgelines resolved (the
+    walk went by the fields, the outskirts and the gate), but the read-back looked the old
+    place up among the places known IN TOWN, found nothing, took start == end, and cut the
+    true walk as "a move the engine did not make", ending the beat "You are still at the
+    tavern." `facts_from` now names a start it cannot find here from its own id."""
+    from types import SimpleNamespace
+
+    tavern = SimpleNamespace(id="85addedc9153~urban:the-tavern", name="the tavern")
+    gate = SimpleNamespace(id="85addedc9153~urban:the-gate", name="the gate")
+    engine = SimpleNamespace(places=lambda: [tavern, gate], open_ground=lambda: [],
+                             here=lambda: tavern)
+    walk = {"intent_id": "i1", "op": "travel", "status": "resolved",
+            "effects": [{"kind": "biome", "place": tavern.id,
+                         "was_place": "85addedc9153~hills:@the-ridgelines",
+                         "went_by": ["the fields", "the outskirts", "the gate"]}]}
+    scene = SimpleNamespace(actors={}, clock_minutes=26 * 1440 + 8 * 60,
+                            in_encounter=False, pc=lambda: None, props_here=lambda: [])
+    ctx = SimpleNamespace(engine=engine, scene=scene, outcomes=[walk],
+                          was_at="85addedc9153~hills:@the-ridgelines")
+    f = bv.facts_from(ctx)
+    assert f.start == "the ridgelines" and f.end == "the tavern"
+    found = bv.diff([claim("move", "You push through the main gates of Scrapden.",
+                           place="the gate")], f)
+    assert not [d for d in found if d.category == "move"], found
