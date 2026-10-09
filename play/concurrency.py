@@ -81,8 +81,13 @@ READ_WAIT = 300.0
 #                  answering, which is when the lock is held, and it reads the save from
 #                  disk rather than the campaign in memory. A POST under the lock would
 #                  also bump the revision and send every device off to re-fetch.
+#   /api/corrections counts the "That's wrong" log for Settings and opens its folder
+#                  (`play/corrections.py`). It reads a file that lands by rename and
+#                  touches no campaign; Settings must not hang behind a turn to say a
+#                  number. The correcting itself (/api/beat/correct) changes the game and
+#                  takes the lock like any turn.
 EXEMPT = ("/static/", "/api/alive", "/api/revision", "/api/setup", "/api/lan",
-          "/api/report", "/manual", "/licence")
+          "/api/report", "/api/corrections", "/manual", "/licence")
 
 _GAME = threading.RLock()
 

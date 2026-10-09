@@ -2618,40 +2618,11 @@ class GMAgent:
         # owner's beat "we climax together…" went through this rewrite for a recurring
         # phrase (2026-09-30), on the PLANNER's model with a briefing that says nothing
         # about content — a model the table never picked for this, free to soften it.
-        who = ((self.prose_model, self.prose_host, self.prose_provider, self.prose_key)
-               if intimate else (self.model, self.host, self.provider, self.api_key))
-
         def _rewrite(complaint: str, note: str):
-            reply = client.chat(
-                prompts.narration_repair_messages(
-                    text, complaint, player_input, scene_brief, facts=facts,
-                    keep=prompts.INTIMATE_KEEP if intimate else ""),
-                who[0], who[1], as_json=True, think=False, provider=who[2],
-                api_key=who[3], temperature=0.6,
-                # An intimate beat runs to 3,000 characters: its rewrite gets the same
-                # budget and no grammar ceiling, or a mended phrase would come back cut
-                # to 1,800 and lose the end of the scene.
-                num_predict=prompts.INTIMATE_NUM_PREDICT if intimate else 900,
-                # Structural insurance, not a truncation cure: `as_json` already puts a
-                # JSON grammar at the sampler, and the live "Unterminated string" failure
-                # was the token budget dying mid-string — which no grammar prevents and
-                # the except below still catches. What the schema adds is the required
-                # key and a length ceiling the budget can actually afford.
-                #
-                # 1,800, the grammar ceiling the prose call itself writes under. It was
-                # 1,600 — lower than the draft it rewrites — and on 2026-09-30 (item 6)
-                # Ollama closed the string at exactly 1,600 characters, mid-word, and
-                # the cut rewrite shipped as "…They'. What do you do?".
-                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING,
-                                            unbounded=intimate),
-            )
-            # The same page pass as the first draft: refs, schema, stutter, a sentence
-            # cut off, beats copied from earlier ones.
-            fixed, page = self._page_pass(
-                self._lift(str(reply.json().get("narration", "")).strip()), earlier)
-            return (fixed,
-                    Attempt("polish", reply.seconds, reply.model, reply.text,
-                            note=note + (f" — page: {'; '.join(page)}" if page else "")))
+            fixed, attempt, _messages = self.repair_beat(
+                text, complaint, player_input, scene_brief, facts=facts,
+                intimate=intimate, earlier=earlier, note=note)
+            return fixed, attempt
 
         attempts: list[Attempt] = []
         try:
@@ -2722,6 +2693,62 @@ class GMAgent:
                                         note=f"retry failed: {str(exc)[:100]}"))
 
         return text, made + [f"unrepaired: {', '.join(review.as_log())}"], attempts
+
+    def repair_beat(self, text: str, complaint: str, player_input: str = "",
+                    scene_brief: str = "", *, facts: list[str] | None = None,
+                    intimate: bool = False, earlier: list[str] | None = None,
+                    note: str = "") -> tuple[str, Attempt, list[dict]]:
+        """One rewrite of a whole beat against a complaint: the repair call, its page pass,
+        and the messages it was asked with. Returns (text, attempt, messages).
+
+        The one copy of this call. `polish` asks it with the review's complaint; the
+        player's "That's wrong" (play/corrections.py, 2026-10-09) asks it with the
+        sentences the player marked and their note. Two copies of a prompt drift — the
+        consequence rule fixed in the main prompt and left stale in the rewrite prompt is
+        CLAUDE.md's own example — so the player's remake rides this one, model choice,
+        budget, grammar and page pass included. `messages` is returned because a remake
+        the player rejects is a training example for this call too.
+
+        An intimate beat at an explicit table is rewritten by the model the table chose to
+        write prose, told to keep the passage exactly as explicit as it is. The owner's
+        beat "we climax together…" went through this rewrite for a recurring phrase
+        (2026-09-30), on the PLANNER's model with a briefing that says nothing about
+        content — a model the table never picked for this, free to soften it.
+        """
+        who = ((self.prose_model, self.prose_host, self.prose_provider, self.prose_key)
+               if intimate else (self.model, self.host, self.provider, self.api_key))
+        messages = prompts.narration_repair_messages(
+            text, complaint, player_input, scene_brief, facts=facts,
+            keep=prompts.INTIMATE_KEEP if intimate else "")
+        reply = client.chat(
+            messages,
+            who[0], who[1], as_json=True, think=False, provider=who[2],
+            api_key=who[3], temperature=0.6,
+            # An intimate beat runs to 3,000 characters: its rewrite gets the same
+            # budget and no grammar ceiling, or a mended phrase would come back cut
+            # to 1,800 and lose the end of the scene.
+            num_predict=prompts.INTIMATE_NUM_PREDICT if intimate else 900,
+            # Structural insurance, not a truncation cure: `as_json` already puts a
+            # JSON grammar at the sampler, and the live "Unterminated string" failure
+            # was the token budget dying mid-string — which no grammar prevents and
+            # the callers' excepts still catch. What the schema adds is the required
+            # key and a length ceiling the budget can actually afford.
+            #
+            # 1,800, the grammar ceiling the prose call itself writes under. It was
+            # 1,600 — lower than the draft it rewrites — and on 2026-09-30 (item 6)
+            # Ollama closed the string at exactly 1,600 characters, mid-word, and
+            # the cut rewrite shipped as "…They'. What do you do?".
+            schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING,
+                                        unbounded=intimate),
+        )
+        # The same page pass as the first draft: refs, schema, stutter, a sentence
+        # cut off, beats copied from earlier ones.
+        fixed, page = self._page_pass(
+            self._lift(str(reply.json().get("narration", "")).strip()), earlier)
+        return (fixed,
+                Attempt("polish", reply.seconds, reply.model, reply.text,
+                        note=note + (f" — page: {'; '.join(page)}" if page else "")),
+                messages)
 
     def _intimate_beat(self) -> bool:
         """Whether this beat is an intimate scene between adults that the content rule
@@ -3301,6 +3328,12 @@ class GMAgent:
             # token budget bounds it instead. Every other beat is clamped as before.
             unbounded=self._intimate_beat())
         budget = prompts.INTIMATE_NUM_PREDICT if self._intimate_beat() else 1400
+        # The input that writes this beat, kept for "That's wrong" (play/corrections.py):
+        # a beat the player rejects is a training example only beside the exact prompt
+        # that produced it, and the turn log keeps 300 characters of each reply and none
+        # of the prompt. `last_prose_model` is set below to whichever model's beat stood.
+        self.last_prose_messages = messages
+        self.last_prose_model = ""
 
         # Prose gets the second model call 1 has always had. It never did, and the
         # gap was invisible until the beat a model declines to write: one call,
@@ -3374,6 +3407,7 @@ class GMAgent:
                     continue
                 text = self._lift(salvaged)
                 self.last_suggestions = []
+                self.last_prose_model = model
                 break
             declined = narration_mod.reads_as_a_refusal(text)
             # A deflection is a refusal that reads as prose: rather than saying
@@ -3393,6 +3427,7 @@ class GMAgent:
             attempts.append(Attempt("prose", reply.seconds, reply.model,
                                     reply.text, note=note))
             if text and not declined and not lost:
+                self.last_prose_model = reply.model or model
                 break
             if lost and not declined:
                 best_lost = (text, lost)
@@ -3423,6 +3458,7 @@ class GMAgent:
                     if text2 and not lost2 and not narration_mod.reads_as_a_refusal(text2):
                         text = text2
                         self.last_suggestions = _suggestions(data2)
+                        self.last_prose_model = again.model or model
                         break
                     if text2 and lost2:
                         best_lost = (text2, lost2)
@@ -3442,6 +3478,9 @@ class GMAgent:
                          f"{', '.join(made or lost)} the one already here")
         if not text:
             return "", ["prose failed on every model"], attempts
+        # The narrator's own draft, before any groom or rewrite touched it: what the
+        # model itself wrote for this prompt, beside the page the player judged.
+        self.last_prose_draft = text
         # A beat the grammar closed mid-word (`maxLength` ends the string cleanly, so the
         # reply parses): cut back to its last whole sentence before anything reads it.
         # 2026-09-30, item 6: "…pick it up. They'" shipped as "They'. What do you do?".

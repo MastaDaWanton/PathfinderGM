@@ -2240,7 +2240,8 @@ function paintReport() {
   } else {
     const words = n.querySelector("#reportwords").value.length;
     list.innerHTML = REPORT.listing.files.map(f => {
-      const out = f.kind === "save" && !withSave;
+      // The corrections log goes with the save (play/report.py `WITH_THE_SAVE`).
+      const out = (f.kind === "save" || f.kind === "corrections") && !withSave;
       const size = f.kind === "words" ? `your words, ${words} characters`
         : out ? "left out" : reportSize(f.bytes);
       return `<li class="${out ? "out" : ""}"><span>${esc(f.name)}</span>
