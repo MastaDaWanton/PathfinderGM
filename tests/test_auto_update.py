@@ -276,3 +276,68 @@ def test_a_built_manifest_names_a_file_that_is_there():
     assert (release / named).exists(), (
         f"latest.yml points at {named!r}, which is not in release/. An update would ask "
         f"GitHub for an asset by that name and get a 404.")
+
+
+# --- the blockmap goes up with the installer, or every update is the whole installer ----------
+
+def release_assets(release: Path) -> list[str]:
+    """The files a release built into `release` must carry, in upload order, or the
+    reason it cannot: `latest.yml`, the blockmap, the installer `latest.yml` names.
+    Raises AssertionError naming what is missing."""
+    manifest = release / "latest.yml"
+    assert manifest.exists(), f"no latest.yml in {release}"
+    named = ""
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        if line.startswith("path:"):
+            named = line.split(":", 1)[1].strip()
+    assert named, "latest.yml names no installer at all"
+    assert (release / named).exists(), f"latest.yml names {named!r}, not in {release}"
+    blockmap = release / f"{named}.blockmap"
+    assert blockmap.exists(), (
+        f"{blockmap.name} is not beside {named}. Without it on the release, electron-updater "
+        f"asks for it, gets a 404 and downloads the whole installer: measured 2026-10-08, "
+        f"Pathfinder-GM-Setup-0.2.10.exe.blockmap 404, a full ~190 MB download.")
+    return ["latest.yml", blockmap.name, named]
+
+
+def test_the_check_finds_a_missing_blockmap(tmp_path):
+    """The check itself, on a folder shaped like a build, so it is tested on every run and
+    not only on a machine that has just run `npm run dist`."""
+    import pytest
+
+    (tmp_path / "latest.yml").write_text(
+        "version: 9.9.9\npath: Pathfinder-GM-Setup-9.9.9.exe\n", encoding="utf-8")
+    (tmp_path / "Pathfinder-GM-Setup-9.9.9.exe").write_bytes(b"MZ")
+    # An older build's blockmap is not this installer's.
+    (tmp_path / "Pathfinder-GM-Setup-9.9.8.exe.blockmap").write_bytes(b"x")
+    with pytest.raises(AssertionError, match="blockmap"):
+        release_assets(tmp_path)
+    (tmp_path / "Pathfinder-GM-Setup-9.9.9.exe.blockmap").write_bytes(b"x")
+    assert release_assets(tmp_path) == ["latest.yml", "Pathfinder-GM-Setup-9.9.9.exe.blockmap",
+                                        "Pathfinder-GM-Setup-9.9.9.exe"]
+
+
+def test_a_built_release_has_the_blockmap_of_its_installer():
+    """Run against a real build when one is present, skipped otherwise (the same rule as
+    the manifest check above: `release/` is gitignored)."""
+    import pytest
+
+    release = ELECTRON / "release"
+    if not (release / "latest.yml").exists():
+        pytest.skip("no build in electron/release — run `npm run dist` to check this")
+    release_assets(release)
+
+
+def test_the_build_still_writes_a_blockmap():
+    """electron-builder writes the blockmap for an NSIS target unless told not to."""
+    nsis = _pkg()["build"]["nsis"]
+    assert nsis.get("differentialPackage", True) is not False
+
+
+def test_the_release_procedure_uploads_the_blockmap():
+    """It never said to, and four of the last six releases went up without one
+    (`gh release view`, 2026-10-08: blockmaps on 0.2.6 and 0.2.9 only)."""
+    doc = (Path(settings.BASE_DIR) / "docs" / "packaging.md").read_text(encoding="utf-8")
+    steps = doc.split("### Cutting a release, in order", 1)[1].split("\n## ", 1)[0]
+    assert "Pathfinder-GM-Setup-<version>.exe.blockmap" in steps
+    assert steps.index(".exe.blockmap") < steps.index("--draft=false")

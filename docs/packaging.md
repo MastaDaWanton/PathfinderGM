@@ -402,14 +402,31 @@ build rather than trusting it.
 5. **Tag after building, never before.** v0.1.3's installer was rebuilt hours after its tag
    while `package.json` still read 0.1.3, so the artifact on disk was not that tag's code
    and the release had to ship without one.
-6. `gh release create --draft` with `latest.yml` and the notes, **then** upload
-   `Pathfinder-GM-Setup-<version>.exe`, **then** `gh release edit --draft=false`. Both files
-   must be on the release, and the order matters: the in-app updater reads `latest.yml`
-   from the latest published release, so a published `latest.yml` whose installer is still
-   uploading is thirteen minutes of every installed copy being offered a download that 404s.
-   A draft is invisible to it.
-7. Upload the installer **detached** (`nohup gh release upload … &`) and confirm the asset
-   with `gh release view --json assets` before publishing. 120 MB at this connection's
+6. `gh release create --draft` with `latest.yml`,
+   `Pathfinder-GM-Setup-<version>.exe.blockmap` and the notes, **then** upload
+   `Pathfinder-GM-Setup-<version>.exe`, **then** `gh release edit --draft=false`. All three
+   files must be on the release, and the order matters: the in-app updater reads
+   `latest.yml` from the latest published release, so a published `latest.yml` whose
+   installer is still uploading is thirteen minutes of every installed copy being offered a
+   download that 404s. A draft is invisible to it.
+
+   **The blockmap is what makes an update small.** `npm run dist` writes it beside the
+   installer (`electron/release/Pathfinder-GM-Setup-<version>.exe.blockmap`, about 200 KB),
+   and the procedure never said to upload it, so it went up by accident or not at all: on
+   2026-10-08 `gh release view` showed one on 0.2.6 and 0.2.9 and none on 0.2.7, 0.2.8,
+   0.2.10 or 0.2.11. Measured the same day in a player's update log:
+   electron-updater asked for `Pathfinder-GM-Setup-0.2.10.exe.blockmap`, got a 404, and fell
+   back to downloading the whole ~190 MB installer. It asks for the blockmap of the version
+   it is updating FROM as well as the one it is updating TO, so an update is differential
+   only between two releases that both carry theirs: the first update out of a release
+   without one is still a full download. `tests/test_auto_update.py` checks that a built
+   `release/` has the blockmap whose name matches the installer `latest.yml` names. (The
+   0.2.10 and 0.2.11 blockmaps are still on disk in the `release-0210` worktree's
+   `electron/release/`; uploading each to its own release, if they are the files from the
+   build that was published, would let copies on those versions update by difference.)
+7. Upload the installer **detached** (`nohup gh release upload … &`) and confirm the assets
+   (installer, `latest.yml`, blockmap) with `gh release view --json assets` before
+   publishing. 120 MB at this connection's
    ~160 KB/s is twelve to fourteen minutes, longer than any tool timeout, and `gh` has no
    stall detection of its own: on 0.1.8 it sat for 34 minutes with zero bytes moving, and
    only re-running the upload through curl surfaced the cause — GitHub had answered HTTP 500
