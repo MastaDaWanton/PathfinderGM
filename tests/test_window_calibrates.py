@@ -46,8 +46,13 @@ class _Ollama:
         ctx = payload["options"]["num_ctx"]
         want = payload["options"]["num_predict"]
         room = max(0, ctx - prompt)
-        reply = min(want, room, 60)       # a short answer, unless the window cuts it
-        cut = room < min(want, 60)
+        # A narration-sized answer (~400 tokens), unless the window cuts it. It was 60, and
+        # the test of the defect then rested on a margin of a few characters: on the
+        # leather build (2026-10-09) the same prompt left 155 tokens of room, a 60-token
+        # answer fitted, and "the uncalibrated prompt should have overflowed" failed while
+        # the defect (155 < MAX_COMPLETION_TOKENS) was still there.
+        reply = min(want, room, 400)
+        cut = room < min(want, 400)
         self.calls.append({"prompt": prompt, "room": room, "want": want, "cut": cut,
                            "messages": payload["messages"]})
         return _Resp({"message": {"content": '{"narration": "ok"}'},
