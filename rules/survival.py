@@ -239,8 +239,21 @@ class Toll:
             if getattr(other, flag):
                 setattr(self, flag, True)
 
+    def shown_checks(self) -> list[dict]:
+        """The checks, each keeping its roll (`rolled`) only if it failed or is the first
+        of its kind in the stretch — what the dice log shows (`_check` says why)."""
+        seen: set[str] = set()
+        out = []
+        for c in self.checks:
+            first = c.get("kind") not in seen
+            seen.add(c.get("kind"))
+            if c.get("rolled") and c.get("passed") and not first:
+                c = {k: v for k, v in c.items() if k != "rolled"}
+            out.append(c)
+        return out
+
     def as_dict(self) -> dict:
-        return {"hours": self.hours, "checks": self.checks,
+        return {"hours": self.hours, "checks": self.shown_checks(),
                 "nonlethal": self.nonlethal, "conditions": self.conditions,
                 "collapsed": self.collapsed, "fell_asleep": self.fell_asleep,
                 "woke": self.woke, "knocked_out": self.knocked_out,
@@ -330,24 +343,36 @@ def state(actor) -> dict:
     }
 
 
-def _check(actor, kind: str, dc: int, dice, save: str = "") -> dict:
-    """One endurance roll, as the log records it."""
+def _check(actor, kind: str, dc: int, dice, save: str = "", against: str = "") -> dict:
+    """One endurance roll, as the log records it.
+
+    `against` is the roll context's word for the danger (`effectspec.AGAINST`): thirst
+    and starvation, which Endurance's +4 asks for by name. The Constitution check goes
+    through `Actor.ability_check_modifiers`, so the feat, and a sickened character's -2
+    on ability checks, are named on the roll's breakdown; until 2026-10-09 it was a bare
+    `Modifier(con)` that nothing on the sheet could reach, and the owner's sheet called
+    Endurance "not computed" for exactly that reason.
+    """
+    ctx = {"against": against} if against else None
     if save:
-        mods = actor.save_modifiers(save)
+        mods = actor.save_modifiers(save, ctx)
         roll = dice.d20(mods, label=f"{kind} ({save.title()} save)",
                         visibility="player")
     else:
-        from .dice import Modifier
-
-        mod = actor.ability_mod("con")
-        roll = dice.d20([Modifier(mod, "Constitution")], label=f"{kind} check",
-                        visibility="player")
+        mods = (actor.ability_check_modifiers("con", ctx)
+                if hasattr(actor, "ability_check_modifiers") else [])
+        roll = dice.d20(mods, label=f"{kind} check", visibility="player")
     # A save's face decides before its total (CRB p.180, `dice.d20_succeeds`); the
     # Constitution check beside it is a check, and 1e gives checks no such rule.
     from .dice import d20_succeeds
 
     passed = d20_succeeds(roll, dc) if save else roll.total >= dc
-    return {"kind": kind, "dc": dc, "total": roll.total, "passed": passed, "save": save}
+    # The roll itself rides along (`rolled`), so the turn's dice log can show what the
+    # total was made of — "+4 Endurance" beside "+1 Con". Kept on a failed check and the
+    # first of each kind only (`Toll.as_dict`): a three-week wait is five hundred hourly
+    # thirst checks, and the passes are one sentence, not five hundred rolls.
+    return {"kind": kind, "dc": dc, "total": roll.total, "passed": passed, "save": save,
+            "rolled": roll.as_dict() if hasattr(roll, "as_dict") else None}
 
 
 def asleep(actor):
@@ -654,7 +679,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
         if (watered % MINUTES_PER_HOUR == 0 and not exempt(actor, NO_WATER)
                 and watered // MINUTES_PER_HOUR > hours_until_thirsty(actor)):
             made = int(getattr(actor, "thirst_checks", 0))
-            got = _check(actor, "Thirst", thirst_dc(made), dice)
+            got = _check(actor, "Thirst", thirst_dc(made), dice, against="thirst")
             actor.thirst_checks = made + 1
             toll.checks.append(got)
             if not got["passed"]:
@@ -667,7 +692,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
                 and fed // MINUTES_PER_HOUR > hours_until_hungry(actor)
                 and (fed // MINUTES_PER_HOUR) % FOOD_INTERVAL_HOURS == 0):
             made = int(getattr(actor, "hunger_checks", 0))
-            got = _check(actor, "Hunger", hunger_dc(made), dice)
+            got = _check(actor, "Hunger", hunger_dc(made), dice, against="starvation")
             actor.hunger_checks = made + 1
             toll.checks.append(got)
             if not got["passed"]:

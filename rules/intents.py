@@ -872,8 +872,10 @@ def is_null(value) -> bool:
 # `roll` is `extinguish`'s "I roll on the ground" (the +2 smother bonus): written as the
 # word "false" it was truthy to `bool()`, so beating at the flames got the roll's +2
 # (lane C3's report, 2026-10-07). Every other op's `roll` is engine-owned and popped.
+# `defensively` is the cast's (2026-10-09): read at last by the concentration check, and
+# "false" written as a word must not cost a caster a spell.
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
-                         "thrown", "quoted", "own", "roll"})
+                         "thrown", "quoted", "own", "roll", "defensively"})
 
 
 def _flag(value) -> bool:

@@ -274,6 +274,10 @@ def dr_ignored(traits) -> int:
 # antimagic field "suppresses" and the spell resumes when the field is gone, which is the
 # shape this keeps — the clocks keep running underneath.
 MAGIC_SUPPRESSED = "suppressed.magic"
+# A body that stabilises on its own when dying: Diehard's "you automatically stabilize"
+# (content/feats/mechanics, 2026-10-09), read by `Actor.bleed_out` and
+# `Engine._resolve_dying` instead of the Constitution check.
+DYING_STABILISES = "dying.stabilises"
 # What counts as magic for it: effects a spell or a ward put there (the provenance stamp,
 # stage 8). A herbal tea's buff (`item:<herb>`) is chemistry and stays; a class ability's
 # rage stays (the owner named buffs and wards).
@@ -2151,6 +2155,9 @@ class Actor:
         # enhancement channel below, where boots would have eaten it. Measured
         # 2026-10-05: a level-20 barbarian's speed stayed 30 ft.
         base += sum(m.value for m in self._class_mods("speed", "land_base"))
+        # And a feat's (Fleet: "while you are wearing light or no armor, your base speed
+        # increases by 5 feet", its armour and load asked by the document's `bearer`).
+        base += sum(m.value for m in self._feat_mods("speed", "land_base"))
         # The weight class it MOVES as: a forged suit's build may shift it (mithral's "one
         # category lighter for movement"), which never touches proficiency.
         suit = self.armour_stats()
@@ -2500,6 +2507,54 @@ class Actor:
 
         mods.extend(self._condition_mods("saves"))
         mods.extend(self._buff_mods("save_mod", save, ctx))
+        return stack(mods)
+
+    # --- ability checks and concentration ---------------------------------------------
+
+    def ability_check_modifiers(self, ability: str, ctx: dict | None = None) -> list[Modifier]:
+        """A plain ability check — d20 + the ability's modifier — and what moves it.
+
+        `ctx` says what the check is made against (`{"against": "thirst"}`), which is
+        what Endurance's "+4 on Constitution checks made to avoid nonlethal damage from
+        starvation or thirst" asks (content/feats/mechanics). Until 2026-10-09 every
+        ability check in the engine was built by hand as `[Modifier(con, "Constitution")]`:
+        survival's thirst and hunger, the breath held underwater, the goo's Strength
+        check. Nothing on the sheet could reach them — not a feat, and not sickened's
+        "-2 on ability checks", which the condition table has always carried. The
+        target is `<ability>_check` on the combat channel, Foundry PF1's `conChecks`.
+        """
+        ability = ability.strip().lower()
+        mods: list[Modifier] = []
+        am = self.ability_mod(ability)
+        if am:
+            mods.append(Modifier(am, ability.title()))
+        mods.extend(self._condition_mods("ability_checks"))
+        mods.extend(self._buff_mods("combat_mod", f"{ability}_check", ctx))
+        return stack(mods)
+
+    def concentration_modifiers(self, ctx: dict | None = None) -> list[Modifier]:
+        """d20 + caster level + the casting ability's modifier (CRB p.206, Concentration),
+        and what moves it — Combat Casting's +4 "when casting on the defensive or while
+        grappled", asked through `ctx` (`{"casting": "defensively"}`).
+
+        A creature with no casting class casts its spell-like abilities at its hit dice
+        and Charisma, which is the Bestiary's rule for them ("concentration ... based on
+        Charisma") and what a stat block's own concentration line is made of.
+        """
+        from . import casting
+
+        cl = casting.caster_level(self)
+        ability = casting.casting_ability(self)
+        mods: list[Modifier] = []
+        if cl:
+            mods.append(Modifier(cl, "caster level"))
+        else:
+            mods.append(Modifier(max(1, int(self.hit_dice or 1)), "hit dice"))
+            ability = ability or "cha"
+        am = self.ability_mod(ability or "int")
+        if am:
+            mods.append(Modifier(am, (ability or "int").title()))
+        mods.extend(self._buff_mods("combat_mod", "concentration", ctx))
         return stack(mods)
 
     # --- initiative -------------------------------------------------------------------
@@ -3010,8 +3065,12 @@ class Actor:
     def attack_modifiers(
         self, weapon_key: str | None = None, iteration: int = 0,
         power_attack: bool = False, lethality: str | None = None, defender=None,
-        thrown: bool = False,
+        thrown: bool = False, range_ft: float | None = None,
     ) -> list[Modifier]:
+        """`range_ft` is the distance to the defender when the board can measure it
+        (`Engine._gap_ft`); a `when: {"range_ft": {"lte": 30}}` term asks it —
+        Point-Blank Shot's "+1 ... on ranged weapons at ranges of up to 30 feet". None
+        (no map, the sheet's own line) drops the term, as every unevaluable clause is."""
         w = self.weapon(weapon_key)
         key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
@@ -3096,7 +3155,8 @@ class Actor:
         mods.extend(self._buff_mods("combat_mod", "attack",
                                     self._roll_context(key, power_attack=power_attack,
                                                       defender=defender,
-                                                      thrown=ranged and thrown)))
+                                                      thrown=ranged and thrown,
+                                                      **_ranged_at(range_ft))))
         if w.get("bash_plus"):
             # A bashing shield "acts as a +1 weapon when used to bash" (`shield_bash`).
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
@@ -3185,7 +3245,10 @@ class Actor:
 
     def damage_modifiers(
         self, weapon_key: str | None = None, power_attack: bool = False, defender=None,
+        thrown: bool = False, range_ft: float | None = None,
     ) -> list[Modifier]:
+        """`thrown` and `range_ft` as `attack_modifiers` takes them: a thrown dagger is
+        a ranged weapon for Point-Blank Shot's damage as it is for the attack roll."""
         w = self.weapon(weapon_key)
         key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
@@ -3213,8 +3276,10 @@ class Actor:
         # Weapon Specialization and Power Attack's damage ride it too, from their
         # documents, against the weapon in hand.
         mods.extend(self._buff_mods("combat_mod", "damage",
-                                    self._roll_context(key, power_attack=power_attack,
-                                                      defender=defender)))
+                                    self._roll_context(
+                                        key, power_attack=power_attack, defender=defender,
+                                        thrown=bool(thrown and w.get("range_ft")),
+                                        **_ranged_at(range_ft))))
         if w.get("bash_plus"):
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
                                  "enhancement"))
@@ -4903,9 +4968,16 @@ class Actor:
         re-entrancy guard is for a formula: Toughness feeds `hp_max`, and
         `resources.variables` can name `hp_max`.
         """
-        if getattr(self, "_reading_feats", False) or self._flat_for(kind, target):
+        if getattr(self, "_reading_feats", False):
             return []
-        from . import feats as feats_mod, resources
+        # A printed stat block's total already holds what a feat ALWAYS adds (Iron Will
+        # in a printed Will), so those terms are skipped under it. What a feat adds only
+        # in a situation — a `when` — is never in a printed total: a monster with
+        # Endurance prints Fort +5, and its +4 against the cold is the book's "+4 vs.
+        # cold" beside it, not inside it. Before 2026-10-09 the whole channel was shut
+        # under a printed number, so a printed creature's situational feats never fired.
+        flat = self._flat_for(kind, target)
+        from . import classfeatures, feats as feats_mod, resources
 
         want = str(target).lower()
         out: list[Modifier] = []
@@ -4925,15 +4997,34 @@ class Actor:
                     continue
                 seen.add(key)
                 for spec in doc.get("modifiers") or ():
-                    if not isinstance(spec, dict) or spec.get("type") != kind \
-                            or str(spec.get("target", "")).lower() != want:
+                    if not isinstance(spec, dict) or spec.get("type") != kind:
                         continue
+                    if flat and not spec.get("when"):
+                        continue
+                    # `$target` as the TARGET: Skill Focus (perception) is a skill_mod on
+                    # whichever skill the sheet's parenthetical names, folded onto the one
+                    # id ranks sit on ("craft (alchemy)" is Craft, `tables.base_skill`).
+                    aimed = str(spec.get("target", "")).lower()
+                    if aimed == "$target":
+                        aimed = str(doc.get("target") or "").strip().lower()
+                        if kind == "skill_mod" and aimed:
+                            aimed = base_skill(aimed)
+                    if not aimed or aimed != want:
+                        continue
+                    # `bearer` (light armour, a shield, a light load) is answered off the
+                    # character by the class documents' reader, which hands the rest of
+                    # the clause to `_when_holds` — one grammar, never a second copy.
                     if not _scope_holds(spec.get("scope"), doc, ctx) \
-                            or not _when_holds(spec.get("when"), ctx):
+                            or not classfeatures.holds(spec.get("when"), self, ctx):
                         continue
                     if spec.get("formula"):
+                        # A skill term may ask `ranks`: the ranks in the skill it lands
+                        # on — Alertness's "if you have 10 or more ranks in one of these
+                        # skills, the bonus increases to +4 for that skill".
+                        extra = {"ranks": int(self.ranks.get(want, 0) or 0)} \
+                            if kind == "skill_mod" else None
                         try:
-                            amount = resources.evaluate(spec["formula"], self)
+                            amount = resources.evaluate(spec["formula"], self, extra)
                         except resources.FormulaError:
                             continue
                     else:
@@ -5342,18 +5433,32 @@ class Actor:
         # not have.
         if self.settle_broken():
             return {"ref": self.ref, "outcome": "broken", "hp": self.hp}
-        if self.hp > self.death_floor():
-            self.hp -= 1
-        if self.hp <= self.death_floor():
-            self.apply_hp_state()
-            return {"ref": self.ref, "outcome": "dead", "hp": self.hp}
+        # Diehard (CRB): "When your hit point total is below 0, but you are not dead, you
+        # automatically stabilize. You do not need to make a Constitution check each
+        # round to avoid losing additional hit points." Asked of the vocabulary — the
+        # feat document's `dying.stabilises` tag (`standing_tags`) — so a homebrew trait
+        # or an orc's ferocity-like gift is a document line, not a branch here.
+        automatic = self.has_state(DYING_STABILISES)
+        if not automatic:
+            if self.hp > self.death_floor():
+                self.hp -= 1
+            if self.hp <= self.death_floor():
+                self.apply_hp_state()
+                return {"ref": self.ref, "outcome": "dead", "hp": self.hp}
 
         dc = 10 + abs(self.hp)
-        roll = dice.d20([Modifier(self.ability_mod("con"), "Con")],
-                        label=f"{self.name} stabilise", visibility="hidden")
-        if roll.total >= dc:
+        # Through the ability-check funnel since 2026-10-09: a sickened body's "-2 on
+        # ability checks" reaches the check that keeps it alive.
+        roll = None if automatic else dice.d20(self.ability_check_modifiers("con"),
+                                               label=f"{self.name} stabilise",
+                                               visibility="hidden")
+        if automatic or roll.total >= dc:
             self.remove_condition("dying")
-            self.add_condition("stable", source="stabilised")
+            self.add_condition("stable", source="stabilised on its own" if automatic
+                               else "stabilised")
+            if automatic:
+                return {"ref": self.ref, "outcome": "stable", "hp": self.hp,
+                        "automatic": True}
             return {"ref": self.ref, "outcome": "stable", "hp": self.hp,
                     "roll": roll.total, "dc": dc}
         return {"ref": self.ref, "outcome": "dying", "hp": self.hp,
@@ -6140,16 +6245,42 @@ def _document_effect_text(doc: dict) -> str:
     "bonus hit points" for a feat that adds none — which is what the hand-written
     text did for Toughness for as long as the table had no reader.
     """
+    import re
+
+    from . import effectspec
+
     bits = []
     for spec in doc.get("modifiers") or ():
         if not isinstance(spec, dict):
             continue
         amount = spec.get("formula") or f"{int(spec.get('amount', 0) or 0):+d}"
-        what = str(spec.get("target", "")).replace("_", " ")
+        # The ten-rank rung (Alertness, Skill Focus) said the way the book says it, not
+        # as the formula: "+2 (+4 at 10 ranks)" rather than "2 + 2 * min(1, ranks // 10)".
+        rung = re.fullmatch(r"\s*(\d+)\s*\+\s*(\d+)\s*\*\s*min\(\s*1\s*,\s*ranks\s*//\s*10"
+                            r"\s*\)\s*", str(spec.get("formula") or ""))
+        if rung:
+            low = int(rung.group(1))
+            amount = f"+{low} (+{low + int(rung.group(2))} at 10 ranks)"
+        target = str(spec.get("target", ""))
+        if target == "$target":
+            target = str(doc.get("target") or "the chosen skill")
+        vocab = {"combat_mod": "combat_target", "save_mod": "save"}.get(
+            str(spec.get("type") or ""))
+        what = (effectspec._vocab_name(vocab, target).lower() if vocab
+                else target.replace("_", " "))
+        if spec.get("type") == "save_mod":
+            what += " saves"
         typed = str(spec.get("bonus_type") or "")
         typed = f" ({typed})" if typed and typed != "untyped" else ""
-        waits = " — when " + ", ".join(
-            f"{k} {v}" for k, v in (spec.get("when") or {}).items()) if spec.get("when") else ""
+        clauses = []
+        for k, v in (spec.get("when") or {}).items():
+            if k == "against":
+                clauses.append(f"against {v}")
+            elif k == "casting":
+                clauses.append("casting " + ("while " if v != "defensively" else "") + str(v))
+            else:
+                clauses.append(f"{k} {v}")
+        waits = " — when " + ", ".join(clauses) if clauses else ""
         bits.append(f"{amount} {what}{typed}{waits}")
     for tag in doc.get("tags") or ():
         bits.append(f"grants {tag}")
@@ -6390,6 +6521,12 @@ def _said_rounds(rounds: int) -> str:
             n = rounds // per
             return f"{n} {unit}{'s' if n != 1 else ''}"
     return f"{rounds} round{'s' if rounds != 1 else ''}"
+
+
+def _ranged_at(range_ft) -> dict:
+    """`{"range_ft": feet}` for a roll context when the distance is known, else nothing —
+    so a `range_ft` clause with no measurement is dropped (`_when_holds`), never read as 0."""
+    return {} if range_ft is None else {"range_ft": float(range_ft)}
 
 
 def _scope_holds(scope, doc: dict, ctx: dict | None) -> bool:

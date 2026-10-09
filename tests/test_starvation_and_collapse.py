@@ -62,8 +62,8 @@ class _Rigged:
     def __init__(self, monkeypatch, passed=lambda kind: False, harm=None):
         real = survival._check
 
-        def spy(actor, kind, dc, dice, save=""):
-            out = real(actor, kind, dc, dice, save)
+        def spy(actor, kind, dc, dice, save="", against=""):
+            out = real(actor, kind, dc, dice, save, against)
             out["passed"] = passed(kind)
             return out
 
