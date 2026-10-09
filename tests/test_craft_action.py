@@ -218,7 +218,7 @@ def test_a_creature_met_while_foraging_gets_its_scene_after_the_haul(client, mon
     assert d["scene"] == good
     assert "Clockwork Spy" in cm.current().history[-1]["content"]
     assert any("Approach" in s or "Spy" in s for s in d["suggestions"]), d["suggestions"]
-    spy = next(a for a in cm.current().scene.actors.values() if a.name == "Clockwork Spy")
+    spy = next(a for a in cm.current().scene.actors.values() if a.name == "clockwork spy")
     assert spy.has_state("state.holding-ground")
 
 
@@ -249,7 +249,7 @@ def test_a_scene_that_has_it_attack_is_repaired_once_then_floored(client, monkey
     assert "lunges" in asked[1] and "Veyrith" in asked[1] and "Three" in asked[1]
     scene = d["scene"]
     assert scene != bad and "has the ground you wanted" not in scene
-    assert "Clockwork Spy" in scene and "does not come at you" in scene
+    assert "clockwork spy" in scene.lower() and "does not come at you" in scene
     assert not any(ch.isdigit() for ch in scene)
     log = cm.current().turn_log[-1]
     assert log.get("door") == "excursion" and any("floor" in r for r in log["repairs"])

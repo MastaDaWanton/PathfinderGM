@@ -11902,7 +11902,10 @@ class Engine:
                 actor.carry(iid, int(n) * (enc.yield_times - 1),
                             at_minute=self.scene.clock_minutes if fresh else None)
             return clause
-        made = self._bring_in(enc.creature["id"], count=1, name=enc.creature["name"])
+        from . import bestiary as bestiary_mod
+
+        made = self._bring_in(enc.creature["id"], count=1,
+                               name=bestiary_mod.kind_word(enc.creature))
         ref = made[0]["ref"]
         self.scene.zones[ref] = "far"
         self.scene.positions.pop(ref, None)
@@ -11938,7 +11941,7 @@ class Engine:
             # The patch is booked as an engine record, paid by `_settle_guarded_finds`
             # once the creature is dead or gone and the player is still HERE (`at`).
             self.scene.guarded_finds.append({
-                "guard": ref, "guard_name": enc.creature["name"],
+                "guard": ref, "guard_name": str(self.scene.actors[ref].name),
                 "what": f"{what} find" if enc.kind == "guarded" else spot,
                 "found": booked_found, "stock": booked_stock, "fresh": fresh,
                 "names": dict((effects[0].get("names") or {}) if effects else {}),
@@ -22326,13 +22329,13 @@ def _a_person(template: str) -> bool:
     people's body line is always wrong for a minotaur or a harpy — gets neither. The
     hand-made civilian blocks (guildhand, watchman) are not in the imported bestiary and
     are people by construction.
+
+    The rule itself is `bestiary.is_a_person`, one copy: `judgement.name_the_nameless`
+    held a second that knew nothing of it (2026-10-09, below there).
     """
     from . import bestiary
 
-    row = bestiary.imported().get(str(template or "").strip().lower())
-    if row is None:
-        return True
-    return str(row.get("creature_type") or "").strip().lower() == "humanoid"
+    return bestiary.is_a_person(template)
 
 
 def _damage_note(d: dict) -> str:

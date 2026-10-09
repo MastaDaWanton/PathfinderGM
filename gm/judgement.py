@@ -8677,10 +8677,34 @@ def name_the_nameless(scene, world) -> list[str]:
     save had neither). Returns the refs named."""
     if scene is None or world is None:
         return []
+    from rules import bestiary as bestiary_mod
     from rules import names as names_mod
 
     done = []
+    peoples: set[str] | None = None
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        template = str(getattr(a, "from_template", "") or "")
+        if (not a.is_pc and not a.world_entity_id and template
+                and not bestiary_mod.is_a_person(template)):
+            # A creature that is no person (`bestiary.is_a_person`, the rule `_bring_in`
+            # asks at the arrival) gets neither a name nor a people's face here: this loop
+            # gave the owner's forage hag, "Aelzeldra" (a monstrous humanoid), her
+            # template's name as a true name and a Goblin's body line on the turn after she
+            # arrived faceless, and the brief then told the narrator she was "Goblin:
+            # Small, wiry, sharp-toothed" (2026-10-09). A save that already holds what this
+            # loop gave is put back: a face in `appearance_for`'s own shape ("<people>:
+            # …") and a true name that is only the template's own name. A name the player
+            # gave their creature (`_op_rename`) is neither, and stays.
+            if peoples is None:
+                peoples = names_mod.people_names(world, scene)
+            head = str(a.appearance or "").split(":", 1)[0].strip().lower()
+            if ":" in str(a.appearance or "") and head in peoples:
+                a.appearance = ""
+            row = bestiary_mod.imported().get(template.strip().lower()) or {}
+            if str(getattr(a, "true_name", "") or "").lower() == \
+                    str(row.get("name") or "").lower():
+                a.true_name = ""
+            continue
         if a.is_pc or getattr(a, "true_name", ""):
             continue
         name = str(a.name or "")

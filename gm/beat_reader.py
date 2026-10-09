@@ -1104,23 +1104,51 @@ def name_refusal(scene, world, ref: str, name: str) -> str:
     reader read off the page, the same three `apply_introductions` made: the person has no
     proper name yet; nobody else here answers to it (`judgement._answers_to`, the Borin
     case of 2026-09-27); and it is not what one of the world's peoples is called (item 14,
-    2026-10-03: "a man named Korvu", "the smith, Korvu" — Korvu is a people)."""
-    from rules import names as names_mod
-
+    2026-10-03: "a man named Korvu", "the smith, Korvu" — Korvu is a people), nor what
+    the person's own kind is called (`what_not_who`, 2026-10-09)."""
     from . import judgement
 
     actors = getattr(scene, "actors", {}) or {}
     who = actors.get(ref)
     if who is None or getattr(who, "is_pc", False):
         return "nobody here to name"
+    # What they are is never who they are, whatever else is true of them — asked first,
+    # so the refusal says so even of somebody already named (2026-10-09).
+    kind = what_not_who(scene, world, ref, name)
+    if kind:
+        return kind
     held = str(who.name or "")
     if held[:1].isupper() and not held.lower().startswith(("the ", "a ", "an ")):
         return f"already named {held}"
     taken = judgement._answers_to(actors, who, name)
     if taken:
         return f"{taken} answers to it"
-    if judgement._a_people(name, names_mod.people_names(world, scene)):
+    return ""
+
+
+def what_not_who(scene, world, ref: str, name: str) -> str:
+    """Why `name` is what somebody IS rather than who: "a people of this world" (the
+    world's own peoples, non-humanoid ones included, and the rulebook's races —
+    `names.people_names`), or "what they are, not who" (their own kind: `bestiary.
+    kind_names` of the template they were made from), else "".
+
+    A comparison of the reader's answer with the engine's own vocabularies, never a word
+    list: item 14 of 2026-10-03 ("a man named Korvu", Korvu a people) and the owner's
+    report of 2026-10-09 — a creature met as a kind on an ore seam, asked its name,
+    "introduced itself as its species like it was a name"."""
+    from rules import bestiary
+    from rules import names as names_mod
+
+    given = re.sub(r"(?i)^(?:the|a|an)\s+", "", " ".join(str(name or "").split()))
+    if not given:
+        return ""
+    if names_mod.is_a_peoples_name(given, known=names_mod.people_names(world, scene)):
         return "a people of this world"
+    who = (getattr(scene, "actors", {}) or {}).get(ref)
+    template = str(getattr(who, "from_template", "") or "") if who is not None else ""
+    if template and names_mod.is_a_peoples_name(given,
+                                                 known=bestiary.kind_names(template)):
+        return "what they are, not who"
     return ""
 
 
