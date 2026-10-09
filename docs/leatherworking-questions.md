@@ -755,3 +755,46 @@ proposal stands. These override the plan and the contracts wherever they differ.
   shield's rust (needs an item-aimed touch); `body.metal` on stat blocks; the player's own die
   for gear saves vs heat/chill metal; the plan marks still unwritten (need effect types); the
   mordant's "lost on soaking"; the fats/galls tag branch (lane W).
+
+**Tanning shortened, 2026-10-09.** The final pass took a harvested hide to leather armour and
+measured three pacing facts: Leatherworker 2 for the bark tan, 42 days in the vat (bark's 4
+weeks x oak bark's `slow_tan` 1.5), and two hides' worth for the suit when a wolf gives one.
+The owner: **"shorten the tan."** Built on fix/shorter-tanning; pinned by
+`tests/test_leather_bench.py::test_an_oak_bark_tan_took_42_days_and_now_takes_a_week`; the
+waits and every tannin's are on docs/leatherworking-review.md, "Tanning times".
+- **Every wait divided by six**, one divisor for all six tannages so their order and ratios
+  stand (`bench.tannages` in content/world-classes/leatherworker.json): brain none (no wait
+  before either); rawhide 1 day -> 4 hours; mineral 3 days -> 12 hours; alum 1 week -> 28
+  hours; bark 4 weeks -> 4 days 16 hours, a thick hide 8 weeks -> 9 days 8 hours; planar 6
+  weeks -> 7 days. With the tannins' traits: oak, willow, bog liquor and ironbark bark tans 7
+  days (were 42); hemlock, sumac, tara and mangrove 2 days 8 hours (were 14 days); Styx
+  mordant and dragonblood 10 days 12 hours (were 63); wyrm gall 3 days 12 hours (were 21);
+  salamander ash lye 6 hours (were 36 hours). Planar is still the longest plain wait, rawhide
+  and mineral the shortest after brain.
+- **In progress unchanged**: the tannage still waits In progress, collected at the tannery
+  with the cut test, refused early with the time left; carried tannages still travel.
+- **The vat rent fell with the wait**: it is 2 sp a vat a day, a day begun a day paid, and
+  is charged for the whole wait as the hides go in, so an oak-bark tan in one vat is 1 gp 4 sp
+  (was 8 gp 4 sp); a fast bark tannin 6 sp; a slow planar one 2 gp 2 sp.
+- **Not changed, for the owner** (the other two pacing facts):
+  - *Bark tanning at Leatherworker 2 is the plan's rule.* Q6.2, accepted 2026-10-05: "Level 2:
+    bark and alum tanning, Curry, Dye, Tool, Harden and Laminate, for rare and exotic hides"
+    (plan §17.1: level 2 opens "Tan (bark, alum, mineral)"). But it sits against answer 3 of
+    2026-10-08 ("Plain leather armour is therefore makeable at level 1 in the field"): leather
+    armour's body is hardened plates, Harden takes only bark- or planar-tanned panels
+    (`hardens`, alum reverts in water and brain leather is soft), and bark is a level-2 tannage
+    in a tannery's vat. So a level-1 field leatherworker makes leather armour only from a
+    **bought** hide (a counter sells it oak-bark tanned, grade 2); from a **harvested** hide it
+    needs Leatherworker 2 and a tannery. Your call whether answer 3 meant harvested hides too
+    (e.g. bark tanning at level 1, or a field bark tan in the kit).
+  - *Two hides for a suit is the plan's rule.* Plan §5.5, from Q5.3 (accepted, "by size, the
+    book's dragonhide ratio": "a suit needs one Large or two Medium"): hide units by size are
+    Tiny 0.25, Small 0.5, Medium 1, Large 2, Huge 4, Gargantuan 8, Colossal 16 (Fine and
+    Diminutive 0); a suit body for a Medium wearer takes 2 (Small 1, Large 4, Tiny 0.5, Huge
+    8); leather, hide, lamellar, bone-studded and quilted suits 2 + 1 for a lining, padded 2,
+    a cloak 1 + 1, the madu 1, boots, satchel, quiver and kit roll 0.5, gloves, bracers, belt,
+    cap, sheath, lacing and grip 0.25. A wolf is Medium: 1 unit, so a Medium suit body is two
+    wolves (of one material and grade, which combine at Cut), or one Large beast. The book's
+    only printed yield (one dragon, one suit for a wearer one size smaller) is exactly this
+    ratio, so changing it leaves the book; the Yield perk (+50% on a 5% chance a pick) is the
+    only thing that moves it today.

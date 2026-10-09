@@ -230,6 +230,27 @@ def tannage_row(kind: str) -> dict:
     return dict((bench_rules().get("tannages") or {}).get(str(kind or ""), {}) or {})
 
 
+def tan_wait(kind: str, working=(), *, thick: bool = False) -> int:
+    """Minutes a tannage of `kind` waits In progress, for a tannin and hide whose working
+    traits together are `working`: the row's wait (`thick_wait_minutes` for a `thick` hide
+    when the row has one), scaled by every `fast_tan` and `slow_tan`. Rawhide is not tanned
+    at all, only dried, so no trait moves it. 0 when the tannage has no wait.
+
+    The one reckoning: the bench's plan and the review page (tools/leather_review.py) both
+    ask here, so the page cannot show a wait the bench does not charge."""
+    trow = tannage_row(kind)
+    working = list(working or ())
+    wait = int(trow.get("thick_wait_minutes") if thick and trow.get("thick_wait_minutes")
+               else trow.get("wait_minutes", 0) or 0)
+    if not wait:
+        return 0
+    traits = bench_rules().get("traits") or {}
+    scale = 1.0
+    for trait in working if kind != "rawhide" else ():
+        scale *= float((traits.get(trait) or {}).get("time", 1.0))
+    return max(1, int(round(wait * scale)))
+
+
 def old_method(name: str) -> str:
     """What a removed method became (cure -> salt, oil -> curry, line -> assemble; skin
     left the bench for the harvest and becomes nothing here)."""
@@ -1394,7 +1415,7 @@ class LeatherPlan:
     @property
     def info(self) -> str:
         """The line under the stage (UI plan §6.3): "1 pelt. 40m. DC 10, you need 4 or
-        better. Then 4 weeks in the vat." Every number is this plan's."""
+        better. Then 7 days in the vat." Every number is this plan's."""
         if not self.units:
             return ""
         # The product, never Cut's offcut going back on the rack beside it.
@@ -1646,7 +1667,7 @@ def _build_tan(plan: LeatherPlan, row: dict, actor) -> None:
                              f"Leatherworker {lvl}.")
     if trow.get("where") == "tannery" and not plan.where.get("tannery"):
         plan.problems.append(f"{trow.get('name', kind).capitalize()} tanning sits in a "
-                             f"tannery's vat for weeks: it needs a tannery.")
+                             f"tannery's vat for days: it needs a tannery.")
     if t is not None and p.rank - t.rank > 1:
         plan.problems.append(f"{t.name} cannot bite {p.name}: the tannin must be within one "
                              f"tier of the hide it is asked to bind.")
@@ -1684,16 +1705,11 @@ def _build_tan(plan: LeatherPlan, row: dict, actor) -> None:
                                        if k in trow}}, total_q)
     if p.hide.salted and not _has(tdoc, "salt_proof"):
         plan.minutes += int(row.get("desalt_minutes", 480))
-    wait = int(trow.get("thick_wait_minutes") if "thick" in p.working
-               and trow.get("thick_wait_minutes") else trow.get("wait_minutes", 0) or 0)
+    # A tannin's and the hide's fast_tan and slow_tan move a TANNAGE; the hide's own
+    # `thick` picks the thick wait.
+    wait = tan_wait(kind, _working(tdoc) + p.working, thick="thick" in p.working)
     if wait:
-        traits = rules.get("traits") or {}
-        scale = 1.0
-        # A tannin's and the hide's fast_tan and slow_tan move a TANNAGE; rawhide is
-        # not tanned at all, only dried, and dries in its day whatever the hide.
-        for trait in (_working(tdoc) + p.working) if kind != "rawhide" else ():
-            scale *= float((traits.get(trait) or {}).get("time", 1.0))
-        plan.wait_minutes = max(1, int(round(wait * scale)))
+        plan.wait_minutes = wait
         plan.wait_where = "tannery" if trow.get("where") == "tannery" else "carried"
         if plan.wait_where == "tannery" and trow.get("vat", True) is not False:
             plan.vats = vats_for(total_q)
@@ -2571,5 +2587,5 @@ __all__ = ["ACQUISITION", "CUT_PIECES", "Chain", "CraftError", "FORMS", "FRESH_H
            "method_level", "method_row", "methods_view", "obtainable", "pay_grade",
            "piece_view", "plan_step", "preview", "product_dc", "product_units",
            "products_view", "put_hide", "rack", "record_of_hide", "rent_cp", "reveal",
-           "spend", "tuning_for", "units_of_size", "vat_rent_cp", "where_here",
+           "spend", "tan_wait", "tuning_for", "units_of_size", "vat_rent_cp", "where_here",
            "working_keys"]

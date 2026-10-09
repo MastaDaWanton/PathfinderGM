@@ -58,7 +58,7 @@
    ],
    "max_tier": "exotic / planar",
    "ceiling": 3,
-   "note": "The tannery's work: bark tanning in a vat for weeks, alum tawing, mineral tanning, currying, tooling, dyeing and laminating two leathers into one. Rare and exotic hides; Superior work is masterwork."
+   "note": "The tannery's work: bark tanning in a vat for days, alum tawing, mineral tanning, currying, tooling, dyeing and laminating two leathers into one. Rare and exotic hides; Superior work is masterwork."
   },
   {
    "level": 3,
@@ -74,7 +74,7 @@
  "method_descriptions": {
   "salt": "Rubs curing salt into a green hide. A salted hide keeps for weeks instead of rotting in two days, which buys the time to reach a beam or a vat.",
   "flense": "Scrapes the flesh and fat off the inside of a hide over the beam, hair on for a fur, off for leather. A thick hide is limed in a tannery's pit for days before the hair and flesh will come away.",
-  "tan": "Turns a fleshed hide into leather or fur. Brain tanning is a day's work at the kit; alum tawing takes a week in a sealed bag; bark, mineral and planar tannages sit in a tannery's vat for days or weeks while you go about your business. With no tannin at all the hide is stretched and dried as rawhide.",
+  "tan": "Turns a fleshed hide into leather or fur. Brain tanning is a day's work at the kit; alum tawing takes a day and more in a sealed bag; mineral, bark and planar tannages sit in a tannery's vat for hours or days while you go about your business. With no tannin at all the hide is stretched and dried as rawhide.",
   "curry": "Works oil and tallow into tanned leather until it is supple and sheds water. A soft good needs it before it can be Superior work.",
   "cut": "Cuts panels to a pattern, a lacing set or a grip strip, combining hides of one kind and grade until there is enough.",
   "stitch": "Sews cut panels into a body or a lining with thread or sinew.",
@@ -253,24 +253,24 @@
     "takes": "a scrap of a material", "makes": "knowledge"
    }
   },
-  "_tannages_note": "Plan §8.1 (proposed times). `minutes` is bench time (a flat setup, or per hide unit where `per_unit`); `wait_minutes` is how long it then waits In progress (rules/inprogress.py), `thick_wait_minutes` for a thick hide. `where` is where the wait happens: `kit` travels with you (a brain tan needs no wait at all; rawhide dries and alum ages in the pack), `tannery` sits in a vat at the tannery and is collected there. `hardens`: whether the leather takes Harden (vegetable and planar only; alum softens in water). `vat`: false for work that fills no vat. `shrink_c` is the tannage's shrinkage temperature (prior art §3.9), shown, never a game. A tannin's own `fast_tan` and `slow_tan` traits, and the hide's, scale the wait (`traits`).",
+  "_tannages_note": "Plan §8.1 (proposed times), every wait divided by six on the owner's word of 2026-10-09 (\"shorten the tan\"): the final pass measured an oak-bark leather armour at 42 days in the vat (bark's 4 weeks x oak's slow_tan 1.5), now 7. One divisor for all six, so their order and their ratios stay: rawhide 1 day -> 4 hours, mineral 3 days -> 12 hours, alum 1 week -> 28 hours, bark 4 weeks -> 4 days 16 hours (8 weeks -> 9 days 8 hours thick), planar 6 weeks -> 7 days; brain had no wait. The vat rent is per day, so it fell with the wait (oak bark, one vat: 42 days, 8 gp 4 sp -> 7 days, 1 gp 4 sp). `minutes` is bench time (a flat setup, or per hide unit where `per_unit`); `wait_minutes` is how long it then waits In progress (rules/inprogress.py), `thick_wait_minutes` for a thick hide. `where` is where the wait happens: `kit` travels with you (a brain tan needs no wait at all; rawhide dries and alum ages in the pack), `tannery` sits in a vat at the tannery and is collected there. `hardens`: whether the leather takes Harden (vegetable and planar only; alum softens in water). `vat`: false for work that fills no vat. `shrink_c` is the tannage's shrinkage temperature (prior art §3.9), shown, never a game. A tannin's own `fast_tan` and `slow_tan` traits, and the hide's, scale the wait (`traits`).",
   "tannages": {
    "brain": {"name": "brain and smoke", "level": 1, "where": "kit", "minutes": 480,
              "per_unit": true, "wait_minutes": 0, "hardens": false, "shrink_c": [60, 65]},
    "rawhide": {"name": "rawhide", "level": 1, "where": "kit", "minutes": 60,
-               "per_unit": false, "wait_minutes": 1440, "hardens": false, "vat": false,
+               "per_unit": false, "wait_minutes": 240, "hardens": false, "vat": false,
                "shrink_c": null},
    "alum": {"name": "alum tawing", "level": 2, "where": "kit", "minutes": 60,
-            "per_unit": false, "wait_minutes": 10080, "hardens": false, "vat": false,
+            "per_unit": false, "wait_minutes": 1680, "hardens": false, "vat": false,
             "shrink_c": [55, 60]},
    "bark": {"name": "bark (vegetable)", "level": 2, "where": "tannery", "minutes": 60,
-            "per_unit": false, "wait_minutes": 40320, "thick_wait_minutes": 80640,
+            "per_unit": false, "wait_minutes": 6720, "thick_wait_minutes": 13440,
             "hardens": true, "shrink_c": [75, 85]},
    "mineral": {"name": "mineral", "level": 2, "where": "tannery", "minutes": 60,
-               "per_unit": false, "wait_minutes": 4320, "hardens": false,
+               "per_unit": false, "wait_minutes": 720, "hardens": false,
                "shrink_c": [100, 120]},
    "planar": {"name": "planar", "level": 3, "where": "tannery", "minutes": 60,
-              "per_unit": false, "wait_minutes": 60480, "hardens": true, "shrink_c": [85, 95]}
+              "per_unit": false, "wait_minutes": 10080, "hardens": true, "shrink_c": [85, 95]}
   },
   "_units_note": "Hide units (plan §5.5, proposed): one Medium hide is one unit, doubling per size; stored in quarters. `products` is what a pattern's body takes for a Medium wearer (a suit's body scales with the wearer's size by `suit_by_size`) and its lining. The book's only printed yield is dragonhide's: one dragon gives a suit for a creature one size smaller, which is exactly two units for a Large dragon.",
   "hide_units": {"fine": 0, "diminutive": 0, "tiny": 0.25, "small": 0.5, "medium": 1,

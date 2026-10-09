@@ -199,7 +199,7 @@ def test_a_hide_suit_from_bought_hides_is_worn_and_reaches_the_ac(client):
 # --- the tannery: a tannage In progress, collected with the cut test -------------------------------
 
 def test_a_bark_tannage_waits_in_the_vat_and_is_collected_there(client, where):
-    """Plan §8: bark tanning sits in a tannery vat for weeks while the party is away, paid
+    """Plan §8: bark tanning sits in a tannery vat for days while the party is away, paid
     for as the hides go in (lane G: "a rent charged at collection would let a player walk
     away from the bill"); collecting early is refused with the time left; the cut test at
     collection decides the tier with the setup half. Measured before (Inv §0.5): tanning was
@@ -227,7 +227,7 @@ def test_a_bark_tannage_waits_in_the_vat_and_is_collected_there(client, where):
 
 
 def test_wait_for_it_passes_the_time_through_the_one_clock_door(client, where):
-    """Rawhide dries a day in the pack; "wait" stays with it until it is ready and then
+    """Rawhide dries four hours in the pack; "wait" stays with it until it is ready and then
     collects it (the alchemy bench's Wait for it), through `Scene.advance`."""
     pelt = _put("pelt", "deer-hide", quarters=4, grade=2)
     _, _, done = step(client, "tan", {"hide": pelt})

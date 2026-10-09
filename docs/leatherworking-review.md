@@ -203,6 +203,38 @@ A fitting fills a fastening. The eight that are forms of a forge metal carry tha
 | Mithral Fittings | rare | mithral | book: Armour check penalty 3 lighter; book: +2 maximum Dexterity bonus; book: -10% arcane spell failure; book: Weighs 50% less; book: Moves as one weight class lighter; book: +5 hardness; **-2 hit points per inch** | 500 gp |
 | Adamantine Buckles | exotic | adamantine | book: DR 1/— (when armour weight light); book: DR 2/— (when armour weight medium); book: DR 3/— (when armour weight heavy); book: +10 hardness; book: +10 hit points per inch; +2 Armour class; **-2 armour check penalty** | 3000 gp |
 
+## Tanning times (shortened 2026-10-09)
+
+Your word after the final pass: "shorten the tan". The pass measured a harvested hide to leather armour at 42 days in the vat (bark's 4 weeks x oak bark's `slow_tan` 1.5, 8 gp 4 sp of vat rent). Every wait was divided by six, one divisor for all six tannages, so their order and ratios stand: rawhide 1 day, mineral 3 days, alum 1 week, bark 4 weeks (8 thick), planar 6 weeks before. The vat rent is 2 sp a vat a day, a day begun a day paid, so it fell with the wait. A tannin's and the hide's `fast_tan` (x0.5) and `slow_tan` (x1.5) still scale the wait; rawhide is only dried, so nothing moves it.
+
+| Tannage | Level | Where | Wait | Thick hide | Vat rent, one vat |
+|---|---|---|---|---|---|
+| brain and smoke | 1 | kit (carried) | none | - | no vat |
+| rawhide | 1 | kit (carried) | 4 hours | - | no vat |
+| mineral | 2 | tannery vat | 12 hours | - | 2 sp |
+| alum tawing | 2 | kit (carried) | 1 day 4 hours | - | no vat |
+| bark (vegetable) | 2 | tannery vat | 5 days | 10 days | 1 gp |
+| planar | 3 | tannery vat | 7 days | - | 1 gp 4 sp |
+
+Each tannin on a hide with no time trait of its own (a wolf pelt); a deer hide's `fast_tan` halves these, a boar's `slow_tan` and `thick` lengthen them.
+
+| Tannin | Tannage | Time trait | Wait | Vat rent, one vat |
+|---|---|---|---|---|
+| Brain Tan Paste | brain and smoke | fast_tan | none | no vat |
+| Hemlock Bark | bark (vegetable) | fast_tan | 3 days | 6 sp |
+| Oak Bark | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
+| Sumac Leaf | bark (vegetable) | fast_tan | 3 days | 6 sp |
+| Tawing Alum | alum tawing | - | 1 day 4 hours | no vat |
+| Willow Bark | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
+| Bog Liquor | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
+| Mangrove Bark | bark (vegetable) | fast_tan | 3 days | 6 sp |
+| Tara Pod | bark (vegetable) | fast_tan | 3 days | 6 sp |
+| Ironbark Tannin | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
+| Wyrm Gall | planar | fast_tan | 4 days | 8 sp |
+| Salamander Ash Lye | mineral | fast_tan | 6 hours | 2 sp |
+| Styx Mordant | planar | slow_tan | 11 days | 2 gp 2 sp |
+| Dragonblood Tannin | planar | slow_tan | 11 days | 2 gp 2 sp |
+
 ## Consumables (working traits only)
 
 No consumable carries an item list, so no tannin, wax or thread prose reaches a finished item again (measured before: a boar-hide suit listed "The standard tanning agent" as an effect); what one leaves is its one mark, below. Each trait is one that is true of the thing. Most dyes, oils and threads have one or two ("Props" counts them, the mark included; the plan's target is three).

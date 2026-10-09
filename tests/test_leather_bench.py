@@ -143,11 +143,12 @@ def test_flense_then_brain_tan_in_the_field_with_no_wait(pc):
     assert leather.hide.tannage == "brain-paste" and leather.hide.harvested_at is None
 
 
-def test_no_tannin_dries_rawhide_in_the_pack_for_a_day(pc):
-    """Rawhide (plan §8.1): no tannin, stretched and dried, a day In progress carried."""
+def test_no_tannin_dries_rawhide_in_the_pack(pc):
+    """Rawhide (plan §8.1): no tannin, stretched and dried, In progress carried: a day until
+    the owner shortened the tan (2026-10-09), four hours now."""
     put(pc, "pelt", "deer-hide", quarters=4, grade=2)
     p = plan(pc, "tan", {"hide": _key(pc, "pelt")})
-    assert (p.tannage, p.wait_minutes, p.wait_where) == ("rawhide", 1440, "carried")
+    assert (p.tannage, p.wait_minutes, p.wait_where) == ("rawhide", 240, "carried")
     got = do(pc, p)
     item = pc.stock[got[0]["key"]]
     block = inprogress.work_of(item, 0)
@@ -165,8 +166,9 @@ def test_a_tannage_is_not_collectable_before_its_minute(pc):
     pc.carry("oak-bark", 1)
     p = plan(pc, "tan", {"hide": _key(pc, "pelt"), "tannin": "inv:oak-bark"},
              where=TANNERY)
-    # Bark: four weeks, slow_tan on oak x1.5, fast_tan on deer x0.5.
-    assert p.wait_minutes == int(round(40320 * 1.5 * 0.5))
+    # Bark: 4 days 16 hours (the owner's shortened tan, 2026-10-09), slow_tan on oak x1.5,
+    # fast_tan on deer x0.5.
+    assert p.wait_minutes == int(round(6720 * 1.5 * 0.5))
     assert p.vats == 1
     got = do(pc, p, now=0, where=TANNERY)
     key, ready = got[0]["key"], got[0]["ready_at"]
@@ -178,6 +180,44 @@ def test_a_tannage_is_not_collectable_before_its_minute(pc):
     done = inprogress.collect(pc, key, now=ready, here=here)
     assert done["ok"], done
     assert pc.stock[key].properties and not inprogress.work_of(pc.stock[key], ready)
+
+
+# The waits before the owner's "shorten the tan" (2026-10-09), in minutes.
+_OLD_WAITS = {"brain": 0, "rawhide": 1440, "mineral": 4320, "alum": 10080, "bark": 40320,
+              "planar": 60480}
+_OLD_THICK_BARK = 80640
+
+
+def test_an_oak_bark_tan_took_42_days_and_now_takes_a_week(pc):
+    """The final pass (2026-10-09) took a harvested hide to leather armour and measured it: a
+    bark tan took 42 days in the vat (bark's 4 weeks x oak bark's slow_tan 1.5), 8 gp 4 sp of
+    vat rent, before the hide could be hardened. The owner: "shorten the tan". Every wait is
+    divided by six, so an oak-bark tan of a wolf pelt (no time trait of its own) is 7 days,
+    and the order and ratios of the six tannages are what they were: fast ones stay fast,
+    planar stays the longest of the plain waits."""
+    rows = lw.bench_rules()["tannages"]
+    for kind, old in _OLD_WAITS.items():
+        assert int(rows[kind]["wait_minutes"]) * 6 == old, kind
+    assert int(rows["bark"]["thick_wait_minutes"]) * 6 == _OLD_THICK_BARK
+    order = sorted(_OLD_WAITS, key=lambda k: (int(rows[k]["wait_minutes"]), k))
+    assert order == sorted(_OLD_WAITS, key=lambda k: (_OLD_WAITS[k], k))
+    assert order[-1] == "planar"
+
+    _level(pc, 2)
+    put(pc, "pelt", "wolf-pelt", quarters=4, grade=2)
+    pc.carry("oak-bark", 1)
+    p = plan(pc, "tan", {"hide": _key(pc, "pelt"), "tannin": "inv:oak-bark"},
+             where=TANNERY)
+    assert p.problems == [], p.problems
+    assert p.wait_minutes == 7 * 1440, "an oak-bark tan was 42 days (60480 minutes)"
+    assert lw.tan_wait("bark", ["slow_tan"]) == p.wait_minutes
+    assert "Then 7 days in the vat." in p.info
+    # The rent is by the day, so it fell with the wait: one vat at the town's 2 sp a day.
+    from rules import market
+
+    assert p.vats == 1
+    assert market.vat_cost(p.wait_minutes / 1440, p.vats) == 140
+    assert market.vat_cost(60480 / 1440, 1) == 840
 
 
 def test_the_cut_test_decides_the_tier_with_the_setup_half(pc):
@@ -200,7 +240,7 @@ def test_the_cut_test_decides_the_tier_with_the_setup_half(pc):
 
 
 def test_bark_tanning_needs_a_tannerys_vat_and_level_2(pc):
-    """Plan §8.1: bark sits in a tannery vat for weeks; it is a level-2 tannage. Each
+    """Plan §8.1: bark sits in a tannery vat for days; it is a level-2 tannage. Each
     refusal says why in words."""
     put(pc, "pelt", "deer-hide", quarters=4, grade=2)
     pc.carry("oak-bark", 1)

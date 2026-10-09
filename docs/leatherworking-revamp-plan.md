@@ -491,6 +491,8 @@ otherwise; Grade 10 min. All in the rule rows (`content/world-classes/leatherwor
 | **Mineral** | `salamander-ash-lye` | 2 (exotic tannin) | tannery vat | 3 days | boil-fast; a high heat tolerance |
 | **Planar** | `styx-mordant`, `dragonblood-tannin`, `wyrm-gall` | 3 | tannery vat | 6 weeks | as bark, plus the tannin's mark |
 
+**Shortened 2026-10-09** (the owner, after the final pass measured an oak-bark tan at 42 days: "shorten the tan"): every time above is divided by six, so rawhide 4 hours, mineral 12 hours, alum 28 hours, bark 4 days 16 hours (9 days 8 hours thick), planar 7 days; brain still has no wait. The data is `bench.tannages` in content/world-classes/leatherworker.json; the record is the end of docs/leatherworking-questions.md.
+
 **Each tannin carries working traits** (Q3.2) that set the time and the ceiling:
 `fast_tan` (time ×0.5: hemlock, the shipped prose's "halves tanning time" made real),
 `slow_tan` (×1.5), `ceiling_up` (+1 quality ceiling: tara, ironbark), `ceiling_down` (−1: willow),

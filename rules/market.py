@@ -1259,9 +1259,11 @@ def lab_rent(scene, hours: float, known=()) -> int:
 #
 # The yard and its kettle by the hour at the forge's silver (the plan's proposal: "a work
 # rate, 1 sp an hour, the forge's"), and each vat by the day at two silver (§8.2), because a
-# bark tannage sits in somebody else's vat for four weeks while the party is away: a month
-# in one vat is 6 gp, against the CRB's 3 sp a day for a trained hireling. Nothing at the
-# party's own tannery. Flat across scales, as the forge's and the laboratory's.
+# bark tannage sits in somebody else's vat for days while the party is away, against the
+# CRB's 3 sp a day for a trained hireling. The rent is per day, so it fell when the owner
+# shortened the tan (2026-10-09, every wait divided by six): an oak-bark tannage in one vat
+# was 42 days and 8 gp 4 sp, and is 7 days and 1 gp 4 sp. Nothing at the party's own
+# tannery. Flat across scales, as the forge's and the laboratory's.
 TANNERY_RENT_CP_PER_HOUR = 10
 VAT_RENT_CP_PER_DAY = 20
 
@@ -1312,7 +1314,24 @@ def vat_rent(scene, days, vats: int = 1, known=()) -> int:
     here = places_mod.tannery_here(scene, known)
     if here is None:
         return 0
-    return int(here["vat_rate_cp_per_day"]) * n * int(math.ceil(round(d, 6)))
+    return vat_cost(d, n, int(here["vat_rate_cp_per_day"]))
+
+
+def vat_cost(days, vats: int = 1, rate_cp_per_day: int = VAT_RENT_CP_PER_DAY) -> int:
+    """The vat arithmetic alone, with no tannery to stand in: `rate` x vats x days, a day
+    begun being a day paid. `vat_rent` charges through it; the review page
+    (tools/leather_review.py) prices each tannage's wait through it, so the two cannot
+    round two ways."""
+    import math
+
+    try:
+        d = float(days or 0)
+        n = int(vats or 0)
+    except (TypeError, ValueError):
+        return 0
+    if not d > 0 or n <= 0 or math.isinf(d):
+        return 0
+    return int(rate_cp_per_day) * n * int(math.ceil(round(d, 6)))
 
 
 def is_market(place_id: str, founded=()) -> bool:

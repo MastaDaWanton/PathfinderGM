@@ -132,6 +132,67 @@ def _order(docs):
     return sorted(docs, key=lambda d: (TIERS.index(d["tier"]), d["name"]))
 
 
+def _tanning_times(tannins) -> list[str]:
+    """Each tannage's wait and each tannin's, as the bench charges them (`lw.tan_wait`, the
+    plan's own reckoning) and the vat rent a town tannery takes for it (`market.vat_cost`),
+    so the page cannot show a wait or a rent the game does not."""
+    from rules import leatherworker as lw
+    from rules import market, sky
+
+    rows = lw.bench_rules().get("tannages") or {}
+
+    def span(m: int) -> str:
+        return sky.span_words(m) if m else "none"
+
+    def rent(kind: str, m: int) -> str:
+        if rows[kind].get("where") != "tannery" or rows[kind].get("vat", True) is False:
+            return "no vat"
+        return _cp(market.vat_cost(m / 1440, 1))
+
+    out = ["## Tanning times (shortened 2026-10-09)\n",
+           "Your word after the final pass: \"shorten the tan\". The pass measured a harvested "
+           "hide to leather armour at 42 days in the vat (bark's 4 weeks x oak bark's "
+           "`slow_tan` 1.5, 8 gp 4 sp of vat rent). Every wait was divided by six, one divisor "
+           "for all six tannages, so their order and ratios stand: rawhide 1 day, mineral 3 "
+           "days, alum 1 week, bark 4 weeks (8 thick), planar 6 weeks before. The vat rent is "
+           f"{_cp(market.vat_cost(1, 1))} a vat a day, a day begun a day paid, so it fell "
+           "with the wait. A tannin's and "
+           "the hide's `fast_tan` (x0.5) and `slow_tan` (x1.5) still scale the wait; rawhide "
+           "is only dried, so nothing moves it.\n",
+           "| Tannage | Level | Where | Wait | Thick hide | Vat rent, one vat |",
+           "|---|---|---|---|---|---|"]
+    for kind, row in sorted(rows.items(), key=lambda kv: (int(kv[1].get("wait_minutes", 0)),
+                                                          kv[0])):
+        m = lw.tan_wait(kind)
+        thick = lw.tan_wait(kind, thick=True)
+        out.append(f"| {row.get('name', kind)} | {row.get('level', 1)} | "
+                   f"{'tannery vat' if row.get('where') == 'tannery' else 'kit (carried)'} | "
+                   f"{span(m)} | {span(thick) if thick != m else '-'} | {rent(kind, m)} |")
+    out.append("")
+    out.append("Each tannin on a hide with no time trait of its own (a wolf pelt); a deer "
+               "hide's `fast_tan` halves these, a boar's `slow_tan` and `thick` lengthen them.\n")
+    out.append("| Tannin | Tannage | Time trait | Wait | Vat rent, one vat |")
+    out.append("|---|---|---|---|---|")
+    for d in tannins:
+        kind = d["tannage"]
+        if kind not in rows:
+            continue
+        working = [w["trait"] for w in d["working"]]
+        timing = ", ".join(t for t in working if t in ("fast_tan", "slow_tan")) or "-"
+        m = lw.tan_wait(kind, working)
+        out.append(f"| {d['name']} | {rows[kind].get('name', kind)} | {timing} | {span(m)} | "
+                   f"{rent(kind, m)} |")
+    out.append("")
+    return out
+
+
+def _cp(cp: int) -> str:
+    gp, rest = divmod(int(cp), 100)
+    sp, cp = divmod(rest, 10)
+    parts = [f"{gp} gp"] * bool(gp) + [f"{sp} sp"] * bool(sp) + [f"{cp} cp"] * bool(cp)
+    return " ".join(parts) or "0 cp"
+
+
 def render() -> str:
     shelf = materials.all()
     docs = [d for d in shelf.values() if d["catalogue"] == materials.LEATHER_CATALOGUE]
@@ -288,6 +349,8 @@ def render() -> str:
         out.append(f"| {d['name']} | {d['tier']} | {parent} | {_cell(d['armour'])} | "
                    f"{_price(d)} |")
     out.append("")
+
+    out.extend(_tanning_times(_order([d for d in docs if d["kind"] == "tannin"])))
 
     # --- consumables ------------------------------------------------------------------------
     out.append("## Consumables (working traits only)\n")

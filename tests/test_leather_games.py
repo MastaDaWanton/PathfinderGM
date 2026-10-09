@@ -544,7 +544,7 @@ def _tunings() -> dict:
     from rules import leatherworker as lw
 
     out = {m: lw.tuning_for(lw.LeatherPlan(method=m)) for m in METHODS if m != "tan"}
-    out["tan"] = lw.tuning_for(lw.LeatherPlan(method="tan", wait_minutes=4 * 7 * 1440, tannage="oak-bark"))
+    out["tan"] = lw.tuning_for(lw.LeatherPlan(method="tan", wait_minutes=7 * 1440, tannage="oak-bark"))
     out["curry_supple"] = lw.tuning_for(lw.LeatherPlan(method="curry", working=["supple"]))
     return out
 

@@ -756,8 +756,8 @@
   }
 
   // The info block under the stage (UI plan §6.3): the step's own line ("1 pelt. 40m. DC 10,
-  // you need 7 or better."), the wait of a tannage ("Then 4 weeks in the vat at Hollin's
-  // tannery. Ready day 42."), the vats it fills (shown, never a gate: no vat cap), the rent.
+  // you need 7 or better."), the wait of a tannage ("Then 7 days in the vat at Hollin's
+  // tannery. Ready day 12."), the vats it fills (shown, never a gate: no vat cap), the rent.
   function renderStage() {
     drawFallbackTool();
     var chips = $id("leather-chips"), info = $id("leather-info"), why = $id("leather-why");
@@ -796,7 +796,7 @@
         }
       } else if (c) {
         if (c.info) text.push(c.info);
-        // The info line says how long and where ("Then 2 weeks in the vat."); the day it is
+        // The info line says how long and where ("Then 7 days in the vat."); the day it is
         // ready is the wait's own (UI plan §6.3: "Ready Day 42").
         if (c.wait && c.wait.ready_day) text.push("Ready day " + c.wait.ready_day + ".");
         if (c.wait && c.wait.vats) text.push(c.wait.vats === 1 ? "It fills 1 vat." : "It fills " + c.wait.vats + " vats.");

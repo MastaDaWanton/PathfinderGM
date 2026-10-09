@@ -323,8 +323,8 @@ def test_the_partys_tannages_fill_the_vats_until_they_are_collected():
 
 def test_the_rent_is_read_off_where_the_party_stands():
     """No caller names a rate (the forge's reason: a second answer to what the tanner
-    charges). Three hours in the yard is 3 sp; two vats for a four-week bark tannage is
-    11 gp 2 sp; a day begun is a day paid; nothing out of the tannery."""
+    charges). Three hours in the yard is 3 sp; two vats for 28 days (the old four-week bark
+    tannage, before the owner shortened the tan) is 11 gp 2 sp; a day begun is a day paid; nothing out of the tannery."""
     _w, _t, scene, engine, _tannery = _at_the_tannery()
     known = engine.places()
     assert market.tannery_rent(scene, 3, known) == 30
