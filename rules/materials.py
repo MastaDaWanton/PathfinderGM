@@ -149,20 +149,114 @@ SALT_IDS = ("curing-salt",)
 # (tests/test_leather_materials.py refuses one that already has).
 PENDING_BASES = ()  # emptied 2026-10-08: lane B added all six table rows
 
-# **Marks are on hold** (the owner, 2026-10-08, leatherworking questions "Plan open points"
-# 13: "explain before deciding"). A consumable carries working traits only until then; the
-# proposed marks (plan §14.6) live in the leatherworker catalogue's top-level
-# `marks_on_hold` block, which nothing reads, so the owner's decision deletes or enables them
-# in one place. While this is True the validator refuses a `mark` on any shipped document.
-MARKS_HELD = True
-# How many discoverable properties a consumable needs. The plan's three (§14.6) counted the
-# mark; with marks held, the leather vocabulary leaves most dyes, oils and threads one or two
-# honest working traits (a dye is fast or fugitive, and nothing else in
-# effectspec.LEATHER_TRAITS describes a dye). Padding them with a trait that is not true
-# would teach the player something false, so the floor while marks are held is the
-# contract's "at least one working trait"; the review page lists each consumable's count.
+# **Marks** (plan §14.6; held 2026-10-08 morning, kept as planned by the owner the same day,
+# leatherworking questions "Deeds and marks" 13). A tannin, oil, wax, thread or dye may carry
+# at most ONE small mark: an item effect it leaves on what it was worked into, applied once
+# and unscaled from the step that used it (Tan, Curry, Tool, Stitch, Dye), the forge's quench
+# mark generalised. An item carries at most one mark per kind (up to five), and two marks of
+# the same effect do not stack: the higher applies (`forge_items.build`). A treatment works
+# the hide and leaves nothing on the item, so it carries none.
+MARK_KINDS = ("tannin", "oil", "wax", "thread", "dye")
+# The step each kind's mark comes from, for the build card's "Curry: ..." line.
+MARK_STEP = {"tannin": "tan", "oil": "curry", "wax": "tool", "thread": "stitch", "dye": "dye"}
+# How big a mark may be (plan §14.6's table: "small"), by type, in points (`points`). Book
+# scale, checked against the book's own small numbers: resist energy is 10 at its least, a
+# masterwork tool +2 circumstance, masterwork armour 1 off the check penalty. A mark sits
+# under all of them: energy resistance 1 or 2, a skill +1 or +2, one point of an item number
+# (hardness 1, a tenth of the weight), a save or a blow +1. Anything else (DR, fast healing,
+# a condition, a rider) is not a mark's to give: it is an enchantment.
+MARK_LIMIT = {"resistance": 2, "skill_mod": 2, "gear_mod": 1, "save_mod": 1,
+              "combat_mod": 1}
+# Combat modifiers a mark may give only to a weapon (a grip): a suit tanned in styx-mordant
+# does not make its wearer's sword bite outsiders, and a mark's effect on armour is read on
+# every roll the wearer makes (`Actor._standing_mods`).
+_MARK_WEAPON_ONLY = ("attack", "damage")
+# How many discoverable properties a consumable needs. The plan's target is three (§14.6, as
+# the forge's fuels, fluxes and quenchants all have), counting the mark. Measured 2026-10-08
+# with marks on (leather lane "marks"): the leather vocabulary leaves most dyes, oils and
+# threads one or two TRUE properties (a dye is fast or fugitive; nothing else in
+# effectspec.LEATHER_TRAITS describes a dye), and padding them with a trait that is not true
+# would teach the player something false. So the validator's floor is the contract's "at
+# least one working trait", and the review page (tools/leather_review.py) lists every
+# consumable short of the target with its count, for the owner.
 CONSUMABLE_PROPERTIES = 3
-CONSUMABLE_PROPERTIES_WHILE_HELD = 1
+CONSUMABLE_PROPERTIES_FLOOR = 1
+
+
+def mark_effects(doc: dict | None, gear: str) -> list[dict]:
+    """The effects a consumable's mark leaves on an item of this gear: [] for none.
+
+    A mark is one effect (`{"type": "resistance", ...}`), or one per gear when it acts
+    differently on a weapon and a suit, keyed as the quench mark is (`{"weapon": {...}}`).
+    A shield reads the armour's when it has none of its own; a worn good reads `worn`,
+    then the armour's (a cloak dressed in salamander oil chars as slowly as a coat)."""
+    mark = (doc or {}).get("mark")
+    if not isinstance(mark, dict):
+        return []
+    if "type" in mark:
+        return [mark]
+    order = {"shield": ("shield", "armour"), "worn": ("worn", "armour")}.get(gear, (gear,))
+    for g in order:
+        if isinstance(mark.get(g), dict):
+            return [mark[g]]
+    return []
+
+
+def mark_problems(doc: dict) -> list[str]:
+    """What is wrong with a consumable's mark (plan §14.6), each with the fix named: the
+    kind may carry one, its shape is one effect or one per gear, the effect is in the
+    leather vocabulary and runs, and it is small (`MARK_LIMIT`) and a house number."""
+    mid = doc.get("id") or "?"
+    mark = doc.get("mark")
+    if not mark:
+        return []
+    out: list[str] = []
+
+    def say(msg: str) -> None:
+        out.append(f"{mid}: {msg}")
+
+    kind = doc.get("kind")
+    if kind not in MARK_KINDS:
+        say(f"carries a mark, and a {kind} leaves nothing on the item (plan §14.6: a "
+            f"tannin, oil, wax, thread or dye may). Remove \"mark\".")
+        return out
+    if not isinstance(mark, dict):
+        say("mark is not an effect. Write one effect, or {\"weapon\": ..., \"armour\": ...}.")
+        return out
+    if "type" in mark:
+        parts = [("", mark)]
+    else:
+        bad = [g for g in mark if g not in GEARS]
+        if bad or not mark:
+            say(f"mark is keyed by {', '.join(map(repr, bad)) or 'nothing'}; key a per-gear "
+                f"mark by {', '.join(GEARS)}, or write one effect.")
+            return out
+        parts = [(g, e) for g, e in mark.items()]
+    for gear, eff in parts:
+        where = f"mark{' (' + gear + ')' if gear else ''}"
+        if not isinstance(eff, dict):
+            say(f"{where} is not an effect.")
+            continue
+        out.extend(_leather_effect(eff, f"{mid} {where}"))
+        t = str(eff.get("type") or "")
+        if t not in MARK_LIMIT:
+            say(f"{where} is a {t!r}; a mark is small: one of "
+                f"{', '.join(MARK_LIMIT)} (plan §14.6). Anything bigger is an enchantment.")
+            continue
+        if eff.get("book"):
+            say(f"{where} is marked \"book\"; no book prints a tanner's mark. It is a house "
+                f"number: remove \"book\".")
+        if eff.get("trigger"):
+            say(f"{where} has a trigger; a mark is a standing number, never a rider.")
+        pts = points(eff)
+        if pts is not None and pts > MARK_LIMIT[t]:
+            say(f"{where} ({t} {eff.get('target', '')}) is {pts:g} points; a mark is at "
+                f"most {MARK_LIMIT[t]} (book scale, plan §14.6).")
+        if t == "combat_mod" and str(eff.get("target") or "") in _MARK_WEAPON_ONLY \
+                and gear != "weapon":
+            say(f"{where} adds to {eff.get('target')} and is not keyed to a weapon; on a suit "
+                f"it would reach every blow its wearer strikes. Key it {{\"weapon\": ...}}.")
+    return out
 
 
 def is_leather(doc: dict) -> bool:
@@ -273,8 +367,8 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "shield": [dict(e) for e in _list(raw.get("shield")) if isinstance(e, dict)],
         "working": [dict(e) for e in _list(raw.get("working")) if isinstance(e, dict)],
         "quench_mark": dict(mark) if isinstance(mark, dict) else None,
-        # A leather consumable's one small mark (contracts §3, generalising the quench
-        # mark). Held by the owner's ruling (`MARKS_HELD`): no shipped document carries one.
+        # A leather consumable's one small mark (contracts §3, plan §14.6, generalising the
+        # quench mark): one effect, or one per gear (`mark_effects`).
         "mark": dict(lmark) if isinstance(lmark, dict) else None,
         # The leatherworker's fields (contracts §3), defaulted on every entry so no reader
         # asks which shelf a document came from. Meaningless (and at their defaults) on a
@@ -883,7 +977,8 @@ def _effect_problems(spec: dict, path: str) -> list[str]:
 #
 # The rules below are the forge's (plan §14.2), with leather's own: a hide is structural and
 # carries >= 3 armour effects with a drawback; only a grip-capable hide carries a weapon list
-# (the owner, Q3.1); a consumable carries working traits only (Q3.2, with marks held); every
+# (the owner, Q3.1); a consumable carries working traits and at most one small mark (Q3.2,
+# plan §14.6); every
 # effect is in the leather vocabulary (`effectspec.leather_effect_problems`, lane A).
 
 
@@ -929,8 +1024,9 @@ def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list
     A leather **fitting** fills a fastening and carries what it is made of: a form of a
     forge metal carries that metal's numbers exactly (one material, many shelves), and is
     worked at the forge, so its parent's working traits are its own.
-    A **consumable** (tannin, oil, wax, thread, dye, treatment) carries working traits only:
-    no item effects, no pieces, and no mark while the owner holds marks (`MARKS_HELD`).
+    A **consumable** (tannin, oil, wax, thread, dye, treatment) carries working traits, no
+    item effects and no pieces; a tannin, oil, wax, thread or dye at most one small mark
+    (`mark_problems`, plan §14.6), a treatment none.
     Every effect is in the leather vocabulary; every book flag agrees with its effects;
     `always_masterwork` and `druid_permitted` are the book's and need a book document;
     `allowed_bases` names armour rows; only a tannin has a tannage, and every tannin has one.
@@ -962,8 +1058,7 @@ def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list
         for i, spec in enumerate(lists[gear]):
             out.extend(_leather_effect(spec, f"{mid} {gear} effect {i + 1}"))
     mark = doc.get("mark")
-    if mark:
-        out.extend(_leather_effect(mark, f"{mid} mark"))
+    out.extend(mark_problems(doc))
     working = list(doc.get("working") or [])
     for i, spec in enumerate(working):
         if spec.get("type") != "working":
@@ -1038,12 +1133,8 @@ def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list
                     f"on a piece is a \"material\" bonus so two pieces fold into one "
                     f"number, and a hide's AC folds into the suit's armour bonus instead "
                     f"of meeting it. Set \"bonus_type\": \"material\".")
-    if mark:
-        for spec in _walk(mark):
-            pts = points(spec)
-            if pts is not None and not spec.get("book") and pts > ceiling:
-                say(f"mark ({spec.get('type')} {spec.get('target', '')}) is {pts:g} points; "
-                    f"a {tier} mark is at most ±{ceiling}.")
+    # A mark's size is `mark_problems`' (`MARK_LIMIT`, at most 2: inside every tier's
+    # ceiling, so the tier's own check would never fire on one).
 
     linked = doc.get("material") not in (None, "", mid)
     parent = None
@@ -1099,9 +1190,6 @@ def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list
                     f"owner, Q3.2). Remove them.")
         if any(pieces.get(g) for g in GEARS):
             say(f"is a {kind} and fills a piece. Remove \"pieces\".")
-        if mark and MARKS_HELD:
-            say("carries a mark, and marks are on hold (the owner, 2026-10-08). Keep it in "
-                "the catalogue's \"marks_on_hold\" block until the owner rules.")
 
     # Working traits: at least one, the form's parent's counting for a linked fitting.
     inherited = list((parent or {}).get("working") or []) if linked else []
@@ -1111,7 +1199,7 @@ def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list
 
     count = properties(doc) + (properties(parent) if parent is not None else 0)
     if kind in LEATHER_CONSUMABLES:
-        need = CONSUMABLE_PROPERTIES_WHILE_HELD if MARKS_HELD else CONSUMABLE_PROPERTIES
+        need = CONSUMABLE_PROPERTIES_FLOOR
     else:
         need = 3
     if count < need:

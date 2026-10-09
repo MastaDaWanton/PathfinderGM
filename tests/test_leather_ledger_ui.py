@@ -157,6 +157,9 @@ const out = {};
     const marked = Object.assign({}, data.pelt, { properties: data.pelt.properties.concat([
       { key: 'k0', known: true, text: 'Fire resistance 1', drawback: false, how: 'graded, day 4', group: 'mark' }]) });
     out.marked = R.card(marked, Object.assign({ actions: true }, L));
+    const markedBlind = Object.assign({}, data.pelt, { properties: data.pelt.properties.concat([
+      { key: 'unknown-9', known: false, text: null, drawback: null, how: null, group: 'mark' }]) });
+    out.markedBlind = R.card(markedBlind, Object.assign({ actions: true }, L));
     out.rows = R.rows({ track: 'leatherworker', ledger: data.ledger.ledger, open: '', cards: {}, unknownFirst: false });
     out.rowsFirst = R.rows({ track: 'leatherworker', ledger: data.ledger.ledger, open: '', cards: {}, unknownFirst: true });
     out.rowsEmpty = R.rows({ track: 'leatherworker', ledger: data.empty_ledger.ledger, open: '', cards: {} });
@@ -281,13 +284,17 @@ def test_the_shield_group_has_a_heading_on_both_cards(drawn):
         assert '<h4 class="fl-group">In a shield</h4>' in html and "+1 shield bonus" in html
 
 
-def test_marks_are_on_hold_and_the_card_shows_none(drawn):
-    """The owner asked for an explanation before deciding marks (open point 13,
-    2026-10-08): build nothing that applies or shows a mark. Even a known mark row reaching
-    the tanner's card is not drawn, so lifting the hold is a decision, never a side effect
-    of a document that grew a mark."""
-    assert "Fire resistance 1" not in drawn["marked"]
-    assert "mark" not in _text(drawn["marked"]).lower()
+def test_a_known_mark_has_its_heading_and_an_unknown_one_names_nothing(drawn):
+    """Marks were held on the morning of 2026-10-08 and the card dropped every mark row,
+    known or not; the owner kept them as planned the same day. A KNOWN mark (graded) is
+    drawn under "On the finished item"; an unknown one is a blank "unknown" line under no
+    heading of its own, even if a stray `group: "mark"` reaches the page, so the card never
+    says a supply has a mark before Grade finds it."""
+    assert '<h4 class="fl-group">On the finished item</h4>' in drawn["marked"]
+    assert "Fire resistance 1" in drawn["marked"]
+    blind = drawn["markedBlind"]
+    assert "On the finished item" not in blind
+    assert blind.count(">unknown</span>") == drawn["pelt"].count(">unknown</span>") + 1
 
 
 def test_grade_is_offered_with_the_servers_cost_and_refused_in_words_with_nothing_to_cut(drawn):

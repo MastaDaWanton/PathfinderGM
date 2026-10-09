@@ -140,7 +140,7 @@ def test_the_stage_reads_only_a_piece_s_drawing_keys():
     row; the stage must not become a second way to show what is on it. It keeps a fixed list of
     keys (colour, surface, form, grade, passes, defects, units, plan, tannage) and copies
     nothing else, and no file of the stage names a property, an effect, the "?" count or a
-    material's mark (marks are on hold, the owner's 2026-10-08 ruling)."""
+    material's mark (a mark is a property to discover, plan §14.6)."""
     code = ALL_CODE[STAGE.name]
     keys = re.findall(r'"(\w+)"', re.search(r"var PIECE_KEYS = \[([^\]]*)\]", code).group(1))
     assert sorted(keys) == sorted(["material", "color", "surface", "grade", "passes", "defects", "form",

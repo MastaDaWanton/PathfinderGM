@@ -651,7 +651,8 @@ def _preview(plan, pc) -> dict | None:
     by_tier = {}
     for t in range(0, max(0, plan.step_ceiling) + 1):
         got = bs.preview_of(pieces, gear=gear, base=base, quality_index=t,
-                            level=plan.level, perks=perks)
+                            level=plan.level, perks=perks,
+                            marks=out_w.marks if out_w.form == "item" else ())
         if got is None:
             return None
         by_tier[worldclass.quality_name(t)] = got

@@ -5,7 +5,8 @@
 //
 // The design is docs/leatherworking-ui-plan.md (§5, §6, §8, §12) as the owner's answers of
 // 2026-10-08 amend it (docs/leatherworking-questions.md, the last table: no vat cap, the field
-// kit's small kettle, marks on hold). The API is lane E's play/leather_views.py. FILE NUMBERS:
+// kit's small kettle; marks, held that morning and kept as planned the same day). The API is
+// lane E's play/leather_views.py. FILE NUMBERS:
 // the contracts named 45-48 and 50, which the enchanting circle (45-49) and the alchemy bench
 // (50-54) took first, so this bench is 55 (shell), 56 (rack) and 58 (work order), with 57 left
 // for lane U4's stage adapter. Lane U1 built it FLAT FIRST, the forge's and alchemy's order

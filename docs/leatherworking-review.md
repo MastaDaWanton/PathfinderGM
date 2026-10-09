@@ -25,12 +25,12 @@ How to read it:
 
 ## Your rulings this pass follows (2026-10-08)
 
-- **Marks are on hold.** A consumable (tannin, oil, wax, thread, dye, treatment) carries
-  working traits only. The marks the plan proposed (§14.6) are kept in the catalogue's
-  `marks_on_hold` block, which nothing reads; "Marks on hold" below lists them. To enable:
-  `ENABLE_MARKS` in tools/leather_data_pass.py and `materials.MARKS_HELD` to False, then
-  re-run the pass. To delete: remove `MARKS_ON_HOLD` there and re-run. One decision, one
-  place.
+- **Marks, kept as planned** (held that morning, decided the same day). A tannin, oil,
+  wax, thread or dye carries working traits and at most one small mark (plan §14.6): an
+  item effect it leaves, once and unscaled, on what it was worked into, by the step that
+  used it (Tan, Curry, Tool, Stitch, Dye). One mark per consumable kind on an item, the
+  body's first; two marks of one kind give the higher. "The marks" below lists them; each
+  is a house number for your review, and a property the player discovers by Grade.
 - **Reduced DR.** A hand-written DR on a named hide follows your generic-hide rule: the
   creature's printed DR N/x gives `DR max(1, N/5)/x`, on rare-and-up hides only, as one of
   the hide's house modifiers. Four hides carry one (salamander, noble salamander, phoenix,
@@ -50,7 +50,8 @@ How to read it:
 - **309 house modifiers and 71 book effects** on the item lists; 0 narrative in them (96 of 171 before the pass), and 0 narrative left in the legacy `effects` the old chain bench reads.
 - **21 grip-capable hides** carry a weapon list: Cowhide, Crocodile Hide, Monitor Lizard Hide, Viper Skin, Giant Frilled Lizard Hide, Ray Skin, Sharkskin, Basilisk Hide, Behir Hide, Wyvern Hide, Black Dragonhide, Blue Dragonhide, Brass Dragonhide, Bronze Dragonhide, Copper Dragonhide, Gold Dragonhide, Green Dragonhide, Red Dragonhide, Silver Dragonhide, Umbral Dragonhide, White Dragonhide. No other hide does.
 - **25 thick hides** can be the body of hide armour (plan §14.4): Boar Hide, Crocodile Hide, Elk Hide, Ankheg Shell Leather, Black Bear Hide, Dire Boar Hide, Frostfallen Bison Hide, Grizzly Hide, Polar Bear Hide, Bulette Plate, Cave Bear Hide, Dragon Turtle Shell Leather, Purple Worm Plate, Black Dragonhide, Blue Dragonhide, Brass Dragonhide, Bronze Dragonhide, Copper Dragonhide, Gold Dragonhide, Green Dragonhide, Red Dragonhide, Silver Dragonhide, Tarrasque Plate, Umbral Dragonhide, White Dragonhide.
-- **9 marks on hold** (below); no shipped document carries a mark.
+- **11 consumables carry a mark** (below).
+- **22 of 54 consumables** reach the plan's 3 discoverable properties with their mark counted; 32 do not (listed under "What the data could not say").
 
 ## The book fixes (plan §14.5, §15)
 
@@ -204,7 +205,7 @@ A fitting fills a fastening. The eight that are forms of a forge metal carry tha
 
 ## Consumables (working traits only)
 
-No consumable carries an item effect, so no tannin, wax or thread prose reaches a finished item again (measured before: a boar-hide suit listed "The standard tanning agent" as an effect). Each trait is one that is true of the thing. With marks held, most dyes, oils and threads have one or two ("Props" counts them; the plan's three counted the mark).
+No consumable carries an item list, so no tannin, wax or thread prose reaches a finished item again (measured before: a boar-hide suit listed "The standard tanning agent" as an effect); what one leaves is its one mark, below. Each trait is one that is true of the thing. Most dyes, oils and threads have one or two ("Props" counts them, the mark included; the plan's target is three).
 
 ### Tannins
 
@@ -222,21 +223,21 @@ No consumable carries an item effect, so no tannin, wax or thread prose reaches 
 | Ironbark Tannin | rare | bark | ceiling_up, slow_tan, flawless | 3 | 60 gp |
 | Wyrm Gall | rare | planar | fast_tan, ceiling_up, forgiving | 3 | not sold |
 | Salamander Ash Lye | exotic | mineral | fast_tan, salt_proof, flawless | 3 | not sold |
-| Styx Mordant | exotic | planar | slow_tan, ceiling_up, salt_proof | 3 | 700 gp |
+| Styx Mordant | exotic | planar | slow_tan, ceiling_up, salt_proof | 4 | 700 gp |
 | Dragonblood Tannin | legendary | planar | ceiling_up, flawless, slow_tan | 3 | not sold |
 
 ### Oils
 
 | Material | Tier | Working | Props | Price |
 |---|---|---|---|---|
-| Currier's Tallow | common | rancid, forgiving | 2 | 1 gp |
+| Currier's Tallow | common | rancid, forgiving, weatherproof | 3 | 1 gp |
 | Fish Oil | common | supple, rancid | 2 | 1 gp |
 | Neatsfoot Oil | common | supple, forgiving | 2 | 1 gp |
-| Mink Oil | uncommon | supple, flawless | 2 | 5 gp |
-| Salamander Oil | rare | supple | 1 | not sold |
-| Troll Fat | rare | rancid | 1 | not sold |
+| Mink Oil | uncommon | supple, flawless, weatherproof | 3 | 5 gp |
+| Salamander Oil | rare | supple | 2 | not sold |
+| Troll Fat | rare | rancid | 2 | not sold |
 | Wyvern Fat | exotic | supple, flawless | 2 | not sold |
-| Umbral Oil | legendary | supple | 1 | 4000 gp |
+| Umbral Oil | legendary | supple | 2 | 4000 gp |
 
 ### Waxes
 
@@ -245,8 +246,8 @@ No consumable carries an item effect, so no tannin, wax or thread prose reaches 
 | Seam Pitch | common | weatherproof, strong_seam | 2 | 1 gp |
 | Thread Wax | common | strong_seam, weatherproof, forgiving | 3 | 1 gp |
 | Hardening Wax | uncommon | fills_tooling, forgiving | 2 | 6 gp |
-| Fireproof Wax | rare | fills_tooling | 1 | not sold |
-| Ghost Wax | exotic | fills_tooling, flawless | 2 | 450 gp |
+| Fireproof Wax | rare | fills_tooling | 2 | not sold |
+| Ghost Wax | exotic | fills_tooling, flawless | 3 | 450 gp |
 
 ### Threads
 
@@ -258,9 +259,9 @@ No consumable carries an item effect, so no tannin, wax or thread prose reaches 
 | Sinew Thread | common | weatherproof, strong_seam | 2 | 1 gp |
 | Waxed Heavy Flax | common | weatherproof, strong_seam, forgiving | 3 | 2 gp |
 | Silk Thread | uncommon | fine_pitch, flawless | 2 | 10 gp |
-| Spider Silk Cord | uncommon | strong_seam, fine_pitch | 2 | 25 gp |
-| Shadow-Silk | rare | fine_pitch | 1 | 200 gp |
-| Wire-Silk | rare | strong_seam, flawless | 2 | 150 gp |
+| Spider Silk Cord | uncommon | strong_seam, fine_pitch | 3 | 25 gp |
+| Shadow-Silk | rare | fine_pitch | 2 | 200 gp |
+| Wire-Silk | rare | strong_seam, flawless | 3 | 150 gp |
 | Wyvern Sinew | exotic | strong_seam, weatherproof | 2 | not sold |
 | Dragon Sinew | legendary | strong_seam, weatherproof, flawless | 3 | not sold |
 
@@ -277,9 +278,9 @@ No consumable carries an item effect, so no tannin, wax or thread prose reaches 
 | Murex Purple | uncommon | fast_colour, flawless | 2 | 120 gp |
 | Vermilion | uncommon | fugitive | 1 | not sold |
 | Dragon's-Blood Crimson | rare | fugitive | 1 | 120 gp |
-| Shadow Black | rare | fast_colour | 1 | 140 gp |
+| Shadow Black | rare | fast_colour | 2 | 140 gp |
 | Moonlight Silver | exotic | fast_colour | 1 | 600 gp |
-| Void Dye | legendary | fast_colour | 1 | 6000 gp |
+| Void Dye | legendary | fast_colour | 2 | 6000 gp |
 
 ### Treatments
 
@@ -290,21 +291,23 @@ No consumable carries an item effect, so no tannin, wax or thread prose reaches 
 | Mordant Salts | uncommon | fast_colour | 1 | 5 gp |
 | Planar Quench | exotic | forgiving | 1 | 800 gp |
 
-## Marks on hold
+## The marks
 
-Not read by anything. Each is the one small effect the consumable would leave on a finished item (plan §14.6): the old typed `effects` line the chain bench laid on every item, or the plan's proposal. Mink oil's "weatherproof" and ghost wax's "an incorporeal creature can wear it" have no effect vocabulary and are not here; dragonblood tannin's "resistance 2 to the dragon's energy" is not here because the tannin names no dragon.
+Each is the one small effect the consumable leaves on a finished item (plan §14.6), from the step that used it, once and never scaled (`forge_items.build`; `materials.MARK_LIMIT` keeps it small: energy resistance 1 or 2, a skill +1 or +2, one point of an item number, a save or a grip's blow +1). Written from the old typed `effects` line the chain bench laid on every item, the plan's proposal, or the consumable's own text (wire silk's "cannot be cut with a knife", ghost wax's "weighs less than it should"). Not written: mink oil's "weatherproof" (soaking is not modelled; it is mink oil's working trait instead), ghost wax's "an incorporeal creature can wear it" (nothing reads it), dragonblood tannin's "resistance 2 to the dragon's energy" (the tannin names no dragon), and the plan's light clauses on shadow-black and void dye (the sheet has no dim-light test; both are standing Stealth marks).
 
-| Consumable | Mark |
-|---|---|
-| Fireproof Wax | Resist fire 1 |
-| Salamander Oil | Resist fire 1 |
-| Shadow Black | +1 Stealth |
-| Shadow-Silk | +1 Stealth |
-| Spider Silk Cord | +1 hardness |
-| Styx Mordant | +1 Damage rolls (when target type outsider) |
-| Troll Fat | +1 hardness |
-| Umbral Oil | +1 Stealth |
-| Void Dye | +2 Stealth |
+| Consumable | Kind | Step | Mark |
+|---|---|---|---|
+| Styx Mordant | tannin | Tan | +1 Damage rolls (when target type outsider) (on a grip) |
+| Salamander Oil | oil | Curry | Resist fire 1 |
+| Troll Fat | oil | Curry | +1 hardness |
+| Umbral Oil | oil | Curry | +1 Stealth |
+| Fireproof Wax | wax | Tool | Resist fire 1 |
+| Ghost Wax | wax | Tool | Weighs 10% less |
+| Shadow-Silk | thread | Stitch | +1 Stealth |
+| Spider Silk Cord | thread | Stitch | +1 hardness |
+| Wire-Silk | thread | Stitch | +1 hardness |
+| Shadow Black | dye | Dye | +1 Stealth |
+| Void Dye | dye | Dye | +2 Stealth |
 
 ## What a leatherworker's counter can sell (for lane G)
 
@@ -328,7 +331,7 @@ Every settlement's leatherworker sells the craft's supplies (your answer to open
 - **Minimums the book prints**: eel hide's and darkleaf's check penalty "to 0" is already `armour_row`'s clamp; darkleaf's spell failure "minimum 5%" is not (a darkleaf leather suit computes 10% - 10 = 0%). Lane B: clamp asf at 5 when the body is darkleaf, or give the build a floor field.
 - **Prices the book prints per suit** (eel hide +1,200 / +1,800 gp, angelskin +1,000 / +2,000, darkleaf +750 / +1,500, dragonhide double the masterwork price with double Craft progress) are suit surcharges, plan §13.5: lane E's pricing of the product. Darkleaf's shelf price (375 gp) is half its light-suit surcharge per hide unit; it is a book document and exempt from the price rule.
 - **`as_base` and `object_immunity`** wait on lane B's readers (effectspec's honesty ledger); **the enchanting discount** on the Enchanting price (`magic_layer._price`).
-- **The working-trait vocabulary is narrow for consumables.** With marks held a dye is fast or fugitive and nothing else the leather list says. Prior art §1.5 makes Unchained's material traits (easily worked, flawless, malleable, pure) rules for leather; `effectspec.LEATHER_SHARED_TRAITS` admits only flawless and forgiving. Widening it (with leather wording for each) would let every consumable carry three true traits; until then `materials.CONSUMABLE_PROPERTIES_WHILE_HELD` is 1.
+- **Consumables short of three properties.** With marks on, 32 of 54 consumables have fewer than 3 true things to discover: Curing Salt 1, Fish Oil 2, Gut Cord 1, Horsehair Cord 1, Iron Gall Black 1, Linen Thread 2, Madder Red 1, Neatsfoot Oil 2, Seam Pitch 2, Sinew Thread 2, Walnut Brown 2, Weld Yellow 1, Woad Blue 1, Glowcap Green 1, Hardening Wax 2, Liming Quicklime 1, Mordant Salts 1, Murex Purple 2, Silk Thread 2, Vermilion 1, Dragon's-Blood Crimson 1, Fireproof Wax 2, Salamander Oil 2, Shadow Black 2, Shadow-Silk 2, Troll Fat 2, Moonlight Silver 1, Planar Quench 1, Wyvern Fat 2, Wyvern Sinew 2, Umbral Oil 2, Void Dye 2. A dye is fast or fugitive and nothing else the leather list says; a treatment carries no mark. Prior art §1.5 makes Unchained's material traits (easily worked, flawless, malleable, pure) rules for leather, but they describe the raw hide, and giving a dye "pure" (the check rolled twice) to make up a count would teach the player something false and hand cheap dyes a strong bench rule. So the validator's floor is one working trait (`materials.CONSUMABLE_PROPERTIES_FLOOR`) and the three is your call: more marks from the texts (glowcap's glimmer, moonlight silver's light), new leather traits with a bench reader, or a lower target for consumables.
 - **The field kit** is a goods row like `smith's field kit`: it needs a leatherworker row in `rules/goods.py` (skinning knife, fleshing beam, round knife, awl and needles, mallet, and a small kettle that hardens common and uncommon hides) and the `places.has_field_kit(actor, craft="leatherworker")` reader (lane G / F).
 - **The forge's rack reads `pieces` (lane H).** Hides name the pieces they fill now, and `blacksmith._forge_relevant` and `Metal.fills` read `pieces`, so a carried raw hide shows on the forge's rack and fits a forged suit's lining and fastenings, and a grip-capable one a weapon's haft, untanned (measured live 2026-10-08: deer hide on a breastplate's lining and fastenings, "FITS"). Contracts §4.5 gives lane H the rack: it should take leather stock in a form that fills a piece (grip, lacing, base, scales), never a raw hide.
 - **`content/rules/base-pieces.json`** gained a `bone-studs` substance row (bone) and its `leather-grip` row now names `cowhide`, so the material tag and `materials.material_of` give one answer.
@@ -337,4 +340,4 @@ Every settlement's leatherworker sells the craft's supplies (your answer to open
 - **Ferrous** is set on iron, wrought iron, cold iron, star-iron, steel, high-carbon, pattern, nexavaran, living, fire-forged and frost-forged steel. Not on inubrix ("ghost iron" is a skymetal that cannot harm iron), abysium or wyrmsteel.
 - **Worn goods that keep only a drawback.** A cloak, boots or gloves read the armour list without AC, check penalty, max Dex and spell failure (plan §18.2). These hides' positives are all suit numbers, so worn goods of them carry only the drawback: Cowhide, Deer Hide. Your call whether that is right (thin leather makes poor cloaks) or each wants a worn-good positive.
 
-Totals: 309 house modifiers, 71 book effects, 140 materials, 9 marks on hold.
+Totals: 309 house modifiers, 71 book effects, 140 materials, 11 marks.

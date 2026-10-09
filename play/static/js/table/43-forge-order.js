@@ -321,7 +321,18 @@
     return layer && !layer.hidden ? layer : document.getElementById("forge");
   }
   F.showCard = function (card, back) { openCard(card, back, document.getElementById("forge-pops"), F.pushEsc, F.dropEsc); };
+  // The tanner's marks (leatherworking plan §14.6), one line each, in the server's words: the
+  // step and the consumable, what it leaves, and why not when a higher mark of the same kind
+  // stands over it. The server sends only the marks the character KNOWS
+  // (play/leather_views.py `_marks_card`); nothing here can name one it did not send.
+  function markLines(card) {
+    return ((card && card.marks) || []).map(function (m) {
+      return m.step + " with " + m.material + ": " + m.text +
+        (m.applied ? "" : " (not applied: " + m.why + ")");
+    });
+  }
   window.BuildCard = {
+    markLines: markLines,
     open: function (card, anchor) {
       var layer = benchOf(anchor);
       var pops = layer ? layer.querySelector(".bench-pops") : null;
@@ -357,6 +368,8 @@
         esc(card.powers.join(", ")) + '</p>' : "") +
       // The leather card (it carries `by_nature`) is armour and worn goods, where the book's
       // masterwork is not +1 to attack: it says only that the book's masterwork applies.
+      (markLines(card).length ? '<p class="fc-book"><span class="fx-k">Marks, once each and never scaled:</span> ' +
+        esc(markLines(card).join("; ")) + '</p>' : "") +
       (card.masterwork ? '<p class="fc-book">' + ("by_nature" in card
         ? (card.by_nature ? "Masterwork by its nature, by the book, apart from this sum." : "Masterwork, by the book, apart from this sum.")
         : "Masterwork: the book's +1 to attack, apart from this sum.") + '</p>' : "") +

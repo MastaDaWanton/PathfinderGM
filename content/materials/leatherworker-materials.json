@@ -1,7 +1,7 @@
 {
  "source": "Leatherworker world class, built against the shipped bestiary",
  "craft": "leatherworker",
- "note": "Tier follows the worldclass ladder (a deer is common work, a dragon legendary). The leather bench reads `pieces`, `armour`, `weapon` (grip-capable hides only), `working`, `surface`, `color`, `allowed_bases`, `always_masterwork`, `druid_permitted`, `tannage`, `salt` and `sold_as` through rules/materials.py (docs/leatherworking-contracts.md §3); effects marked \"book\": true are printed PF1e rules, applied from the main piece only and never scaled, and every other number is a house modifier for the owner's review (docs/leatherworking-review.md, written by tools/leather_review.py from this file). `price_gp` on a hide is the price of the form it is sold in (`sold_as`). `effects` is the pre-revamp flat list the old chain bench still reads until its replacement lands: its narrative lines are gone and a consumable's is empty. `from_creatures` is the old name-fragment join, superseded by harvest tags on the creature (leather lane C). `marks_on_hold` is the consumables' proposed marks, held by the owner's ruling of 2026-10-08 and read by nothing.",
+ "note": "Tier follows the worldclass ladder (a deer is common work, a dragon legendary). The leather bench reads `pieces`, `armour`, `weapon` (grip-capable hides only), `working`, `surface`, `color`, `allowed_bases`, `always_masterwork`, `druid_permitted`, `tannage`, `salt` and `sold_as` through rules/materials.py (docs/leatherworking-contracts.md §3); effects marked \"book\": true are printed PF1e rules, applied from the main piece only and never scaled, and every other number is a house modifier for the owner's review (docs/leatherworking-review.md, written by tools/leather_review.py from this file). `price_gp` on a hide is the price of the form it is sold in (`sold_as`). `effects` is the pre-revamp flat list the old chain bench still reads until its replacement lands: its narrative lines are gone and a consumable's is empty. `from_creatures` is the old name-fragment join, superseded by harvest tags on the creature (leather lane C). `mark` on a tannin, oil, wax, thread or dye is the one small effect it leaves on an item it was worked into (plan §14.6), applied once and unscaled; a house number for review.",
  "materials": [
   {
    "id": "deer-hide",
@@ -5782,6 +5782,19 @@
     }
    ],
    "tannage": "planar",
+   "mark": {
+    "weapon": {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 1,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "type": "outsider"
+      }
+     }
+    }
+   },
    "price_gp": 700,
    "obtain": "bought",
    "craft_dc": null,
@@ -5996,6 +6009,11 @@
      "trait": "fine_pitch"
     }
    ],
+   "mark": {
+    "type": "gear_mod",
+    "target": "hardness",
+    "amount": 1
+   },
    "price_gp": 25,
    "obtain": "bought",
    "craft_dc": null,
@@ -6022,6 +6040,11 @@
      "trait": "flawless"
     }
    ],
+   "mark": {
+    "type": "gear_mod",
+    "target": "hardness",
+    "amount": 1
+   },
    "price_gp": 150,
    "obtain": "bought",
    "craft_dc": null,
@@ -6044,6 +6067,12 @@
      "trait": "fine_pitch"
     }
    ],
+   "mark": {
+    "type": "skill_mod",
+    "target": "stealth",
+    "amount": 1,
+    "bonus_type": "circumstance"
+   },
    "price_gp": 200,
    "obtain": "bought",
    "craft_dc": null,
@@ -6155,6 +6184,10 @@
     {
      "type": "working",
      "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "weatherproof"
     }
    ],
    "price_gp": 1,
@@ -6208,6 +6241,10 @@
     {
      "type": "working",
      "trait": "flawless"
+    },
+    {
+     "type": "working",
+     "trait": "weatherproof"
     }
    ],
    "price_gp": 5,
@@ -6236,6 +6273,11 @@
      "trait": "rancid"
     }
    ],
+   "mark": {
+    "type": "gear_mod",
+    "target": "hardness",
+    "amount": 1
+   },
    "obtain": "harvested",
    "from_creatures": [
     "troll"
@@ -6260,6 +6302,11 @@
      "trait": "supple"
     }
    ],
+   "mark": {
+    "type": "resistance",
+    "target": "fire",
+    "amount": 1
+   },
    "obtain": "harvested",
    "from_creatures": [
     "salamander"
@@ -6312,6 +6359,12 @@
      "trait": "supple"
     }
    ],
+   "mark": {
+    "type": "skill_mod",
+    "target": "stealth",
+    "amount": 1,
+    "bonus_type": "circumstance"
+   },
    "price_gp": 4000,
    "obtain": "bought",
    "craft_dc": null,
@@ -6542,6 +6595,12 @@
      "trait": "fast_colour"
     }
    ],
+   "mark": {
+    "type": "skill_mod",
+    "target": "stealth",
+    "amount": 1,
+    "bonus_type": "circumstance"
+   },
    "price_gp": 140,
    "obtain": "bought",
    "craft_dc": null,
@@ -6608,6 +6667,12 @@
      "trait": "fast_colour"
     }
    ],
+   "mark": {
+    "type": "skill_mod",
+    "target": "stealth",
+    "amount": 2,
+    "bonus_type": "circumstance"
+   },
    "price_gp": 6000,
    "obtain": "bought",
    "craft_dc": null,
@@ -6719,6 +6784,11 @@
      "trait": "fills_tooling"
     }
    ],
+   "mark": {
+    "type": "resistance",
+    "target": "fire",
+    "amount": 1
+   },
    "obtain": "mined",
    "biomes": [
     "underground"
@@ -6747,6 +6817,11 @@
      "trait": "flawless"
     }
    ],
+   "mark": {
+    "type": "gear_mod",
+    "target": "weight_pct",
+    "amount": -10
+   },
    "price_gp": 450,
    "obtain": "bought",
    "craft_dc": null,
@@ -8226,63 +8301,5 @@
    "source": "bought",
    "effects": []
   }
- ],
- "marks_on_hold": {
-  "_note": "The owner's ruling of 2026-10-08 holds marks until explained: each row is the one small effect plan §14.6 proposes the consumable leaves on a finished item. Nothing reads this block. To enable: set ENABLE_MARKS in tools/leather_data_pass.py and materials.MARKS_HELD to False, and re-run the pass. To delete: remove MARKS_ON_HOLD there and re-run.",
-  "salamander-oil": {
-   "type": "resistance",
-   "target": "fire",
-   "amount": 1
-  },
-  "fireproof-wax": {
-   "type": "resistance",
-   "target": "fire",
-   "amount": 1
-  },
-  "troll-fat": {
-   "type": "gear_mod",
-   "target": "hardness",
-   "amount": 1
-  },
-  "spider-silk-cord": {
-   "type": "gear_mod",
-   "target": "hardness",
-   "amount": 1
-  },
-  "shadow-silk": {
-   "type": "skill_mod",
-   "target": "stealth",
-   "amount": 1,
-   "bonus_type": "circumstance"
-  },
-  "shadow-black": {
-   "type": "skill_mod",
-   "target": "stealth",
-   "amount": 1,
-   "bonus_type": "circumstance"
-  },
-  "void-dye": {
-   "type": "skill_mod",
-   "target": "stealth",
-   "amount": 2,
-   "bonus_type": "circumstance"
-  },
-  "umbral-oil": {
-   "type": "skill_mod",
-   "target": "stealth",
-   "amount": 1,
-   "bonus_type": "circumstance"
-  },
-  "styx-mordant": {
-   "type": "combat_mod",
-   "target": "damage",
-   "amount": 1,
-   "bonus_type": "material",
-   "when": {
-    "target": {
-     "type": "outsider"
-    }
-   }
-  }
- }
+ ]
 }

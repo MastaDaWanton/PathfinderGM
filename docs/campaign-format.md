@@ -706,8 +706,15 @@ with its fix named).
 Rows of `kind` `tannin`, `oil`, `wax`, `thread`, `dye`, `fitting` or `treatment`. They bring
 **working traits only**, never an `armour` or `weapon` list (owner Q3.2: a tannin's prose
 reached the finished item before the revamp, "a boar-hide suit listed 'the standard tanning
-agent'"), at most one small `mark`, and **marks are on hold** (owner, 2026-10-08: an
-explanation was asked for before deciding), so a world sends none until the app says.
+agent'"), and a tannin, oil, wax, thread or dye **at most one small `mark`** (owner,
+2026-10-08: kept as planned): the one effect it leaves, once and unscaled, on an item it was
+worked into. One effect (`{"type": "resistance", "target": "fire", "amount": 1}`), or one
+per gear keyed `weapon`/`armour`/`shield`/`worn` when it acts on a grip only. Small, by
+type: `resistance` up to 2, `skill_mod` up to 2, `gear_mod` one point (hardness 1, weight
+-10), `save_mod` 1, `combat_mod` 1 (attack and damage keyed to `weapon`); never `book`,
+never a trigger, never on a treatment or a fitting (`materials.mark_problems`, refused on
+load with the fix named). An item carries one mark per kind, and two marks of one effect
+give the higher. The player learns a mark by Grade, a teacher or a manual.
 
 | Field | Meaning | Default |
 |---|---|---|
