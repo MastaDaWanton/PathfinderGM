@@ -46,7 +46,9 @@ function abilityLabel(a) {
 function renderCombat(s) {
   const bar = $("#combatbar");
   if (!bar) return;
-  const on = s.scene && s.scene.in_encounter;
+  // Not while the player cannot act: every button would come back 409 "… is in no
+  // condition to act." (2026-10-08). Say or Continue carries them on (play/views.py).
+  const on = s.scene && s.scene.in_encounter && !s.scene.pc_down;
   bar.hidden = !on;
   if (!on) { COMBAT.target = COMBAT.move = COMBAT.standard = COMBAT.swift = null;
              COMBAT.frees = []; COMBAT.aim = COMBAT.picked = null; return; }

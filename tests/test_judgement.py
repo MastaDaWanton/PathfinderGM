@@ -198,42 +198,25 @@ def test_there_is_no_fallback_for_a_creature_that_cannot_act(scene):
 
 # --- Creating the people the GM was already talking about ------------------------------
 
-def test_invented_refs_become_a_spawn(scene):
-    """The recurring loss: the player writes "two guild bravos come round the corner",
-    the GM answers with `attack thug1`, the registry refuses it — correctly, people must
-    not be inventable by naming them — and five attempts later the turn is gone. It has
-    an example and a hint pointing at spawn and still does this, so the repair is done in
-    code rather than asked for a third time.
-    """
-    raw = [{"op": "attack", "actor": "pc", "target": "thug1"},
-           {"op": "attack", "actor": "thug2", "target": "pc"}]
-    out = judgement.repair_unknown_refs(
-        raw, "I put my back to the wall and draw.", scene)
-
-    assert out[0]["op"] == "spawn"
-    # Two, because the GM named two — not because the player said a number. How many
-    # enemies there are is the GM's to decide.
-    assert out[0]["params"]["count"] == 2
-    assert out[1]["target"] == "c2" and out[2]["actor"] == "c3"
-
-
-def test_the_repair_reaches_opposed_by_as_well(scene):
-    """A turn was lost to `opposed_by: {ref: "thug1"}` while only actor and target were
-    being repaired — the ref registry refuses every place a ref can appear, so the repair
-    has to reach every one of them too."""
-    raw = [{"op": "check", "actor": "pc",
-            "params": {"skill": "stealth",
-                       "opposed_by": {"ref": "thug1", "skill": "perception"}}}]
-    out = judgement.repair_unknown_refs(raw, "I keep to the shadows.", scene)
-    assert out[0]["op"] == "spawn"
-    assert out[1]["params"]["opposed_by"]["ref"] == "c2"
-
-
-def test_the_repair_reads_the_creature_from_the_players_words(scene):
-    raw = [{"op": "attack", "actor": "watch1", "target": "pc"}]
-    out = judgement.repair_unknown_refs(
-        raw, "I back away from the watchman coming down the alley.", scene)
-    assert out[0]["params"]["template"] == "watchman"
+@pytest.mark.parametrize("raw,said", [
+    ([{"op": "attack", "actor": "pc", "target": "thug1"},
+      {"op": "attack", "actor": "thug2", "target": "pc"}],
+     "I put my back to the wall and draw."),
+    ([{"op": "check", "actor": "pc",
+       "params": {"skill": "stealth", "opposed_by": {"ref": "thug1",
+                                                     "skill": "perception"}}}],
+     "I keep to the shadows."),
+    ([{"op": "attack", "actor": "watch1", "target": "pc"}],
+     "I back away from the watchman coming down the alley."),
+])
+def test_invented_refs_make_nobody(scene, raw, said):
+    """Until 2026-10-08 an invented ref (`thug1`, `watch1`) was turned into a spawn here,
+    named and templated from the ref's and the player's words. It was the twin of the
+    misaim repair that made a thug called "top of his skull" and killed the player that
+    day; the owner's ruling (2026-10-09) is that no door mints a person from words. A ref
+    nobody holds is validation's refusal, which names the refs that exist; the people
+    who arrive are the beat reader's to make, from its closed "new" answer."""
+    assert judgement.repair_unknown_refs(raw, said, scene) is None
 
 
 def test_a_real_ref_that_is_simply_wrong_is_left_alone(scene):
@@ -355,51 +338,27 @@ def test_a_conscious_thug_still_is(scene):
     assert judgement.fill_obvious_targets(raw, scene)[0]["target"] == "c1"
 
 
-def test_an_attack_on_somebody_who_does_not_exist_creates_them(stale_scene):
-    """The playtest turn, replayed: the narration had introduced a winged woman, she was
-    never spawned, the player wrote "I rush the winged woman and run her through", and
-    the GM answered `attack c1` — a valid ref belonging to the dying gatekeeper three
-    scenes away. Every check passed and the wrong man was stabbed to -4."""
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    amended = judgement.repair_misaimed_attack(
-        raw, "I don't trust her. I rush the winged woman and run her through.",
-        stale_scene)
-    assert amended is not None
-    assert amended[0]["op"] == "spawn"
-    assert amended[0]["params"]["name"] == "winged woman"
-    assert amended[1]["op"] == "attack"
-    assert amended[1]["target"] == "c2"          # the ref the spawn will mint
-
-
-def test_naming_the_actual_target_repairs_nothing(scene):
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    assert judgement.repair_misaimed_attack(
-        raw, "I attack the thug before he can move.", scene) is None
-
-
-def test_a_pronoun_repairs_nothing(stale_scene):
-    """"I attack him" names nobody, so there is no disagreement to detect — and spawning
-    a creature called "him" would be worse than the misaim."""
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    assert judgement.repair_misaimed_attack(raw, "I attack him now.", stale_scene) is None
-
-
-def test_the_spawned_victim_survives_validation(stale_scene):
-    """The repair's output must pass the engine's own checks, projected ref and all —
-    otherwise the repair is a different way of losing the turn."""
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    amended = judgement.repair_misaimed_attack(
-        raw, "I charge the winged woman.", stale_scene)
-    engine = Engine(stale_scene, Dice(seed=7))
-    intents = engine.validate(amended, origin="author:test")
-    assert [i.op for i in intents] == ["spawn", "attack"]
-
-
-def test_the_template_follows_the_players_wording(stale_scene):
-    amended = judgement.repair_misaimed_attack(
-        [{"op": "attack", "actor": "pc", "target": "c1"}],
-        "I rush the guard dog and stab it.", stale_scene)
-    assert amended[0]["params"]["template"] == "guard dog"
+@pytest.mark.parametrize("raw,said", [
+    ([{"op": "attack", "actor": "pc", "target": "c1"}],
+     "I don't trust her. I rush the winged woman and run her through."),
+    ([{"op": "attack", "actor": "pc"}], "I spin and rush the careful walker, blade out."),
+    ([{"op": "attack", "actor": "pc"}], "I rush the guard dog and stab it."),
+])
+def test_the_victim_the_player_names_is_never_made_from_their_words(stale_scene, raw, said):
+    """The misaim repair (2026-08-22 to 2026-10-08) spawned whoever the player's sentence
+    named that the board did not hold: the winged woman, the careful walker, a guard dog.
+    On 2026-10-08 the same door read "I attack the top of his skull" and spawned a thug
+    called "top of his skull" that killed the player, and the owner ruled it fixed without
+    regex (2026-10-09): it is retired. A person the narration showed is a full actor the
+    moment the beat reader reads them (seen people are real, 2026-10-01) and in the plan's
+    ref enum; a person nobody showed is nobody, and nothing here makes them."""
+    assert not hasattr(judgement, "repair_misaimed_attack")
+    out = judgement.fill_obvious_targets([dict(r) for r in raw], stale_scene)
+    out = judgement.check_the_target(out, said, stale_scene) or out
+    assert not [r for r in out if r.get("op") in ("spawn", "introduce")]
+    # (`inject_fight` still makes an opponent out of a fight when nobody fightable is
+    # here at all — the one word door left, flagged to the owner on 2026-10-09; in a
+    # fight it makes nobody, and `Engine.validate` refuses any spawn a turn carries.)
 
 
 # --- sleep and meals declared at the table (playtest, 2026-08-22) --------------------------
@@ -462,28 +421,6 @@ def test_a_rest_the_model_proposed_is_not_doubled(scene):
         [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}],
         "I go to sleep.", scene)
     assert [r["op"] for r in out].count("rest") == 1
-
-
-def test_an_untargeted_attack_on_a_named_stranger_creates_them(scene):
-    """Found in the confirmation session, live: "I rush the careful walker, blade out"
-    came back as an attack with no target at all. The misaim repair declined it — it only
-    read targeted attacks — and `fill_obvious_targets` then handed the blow to the only
-    body in the yard, all over again. An attack with nobody on it, on a turn where the
-    player named somebody who does not exist, is aimed at that somebody."""
-    amended = judgement.repair_misaimed_attack(
-        [{"op": "attack", "actor": "pc"}],
-        "I spin and rush the careful walker, blade out.", scene)
-    assert amended is not None
-    assert amended[0]["op"] == "spawn"
-    assert amended[0]["params"]["name"] == "careful walker"
-    assert amended[1]["target"] == "c2"
-
-
-def test_an_untargeted_attack_with_no_named_victim_is_left_for_the_fill(scene):
-    """"I attack" names nobody; the lone-conscious-candidate fill is the right reading
-    there, and the misaim repair must stay out of its way."""
-    assert judgement.repair_misaimed_attack(
-        [{"op": "attack", "actor": "pc"}], "I attack!", scene) is None
 
 
 def test_a_declared_journey_moves_the_engines_ground(scene):
@@ -1085,11 +1022,13 @@ def test_the_gm_cannot_end_the_fight_it_is_starting():
 
 
 
-def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
+def test_an_attack_on_a_corpse_makes_nobody_from_the_players_words():
     """Live save: both refs were corpses, the prose had guardsmen for three turns, and
-    every swing was aimed at a body — one living combatant, so no encounter could
-    form and the combat bar never appeared. When the player's words name opposition,
-    the attack gets a real target; a swing at the corpse with no such words stands."""
+    every swing was aimed at a body. This repair used to spawn a Guard out of "punch the
+    closest guard" — a person minted from the player's words, the door that made a thug
+    called "top of his skull" on 2026-10-08 (owner's ruling 2026-10-09: no such door).
+    The guardsmen the prose shows are the beat reader's to make real; a swing with
+    nobody living stands as kicking the fallen."""
     from gm import judgement
     from rules.bestiary import instantiate
 
@@ -1101,20 +1040,9 @@ def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
 
     raw = [{"op": "attack", "actor": "pc", "target": body.ref, "params": {},
             "because": "swinging"}]
-    fixed = judgement.redirect_attacks_off_corpses(
-        raw, "i charge at them and punch the closest guard", scene)
-    assert fixed is not None
-    # A Guard out of the corpus since 2026-09-19, not the hand-written 11-hp watchman:
-    # `judgement.template_for` asks `npcs.choose` first and takes its pick when the block
-    # IS the role word (item 30). The watchman remains the floor for guard-shaped words the
-    # corpus has no block for.
-    assert fixed[0]["op"] == "spawn" and fixed[0]["params"]["template"] == "guard"
-    assert fixed[1]["target"] not in (body.ref,)
-
-    # No opposition named: kicking the fallen is a thing a player may mean.
-    assert judgement.redirect_attacks_off_corpses(
-        raw, "I kick him while he is down", scene) is None
-
+    for said in ("i charge at them and punch the closest guard",
+                 "I kick him while he is down"):
+        assert judgement.redirect_attacks_off_corpses(raw, said, scene) is None
 
 
 def test_an_attack_on_a_corpse_does_not_satisfy_the_fight_the_player_wants():

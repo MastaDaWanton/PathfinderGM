@@ -59,7 +59,8 @@ NEW_SCENE = ["where_label", "where_detail", "setting", "conversation", "day_part
              "exits",          # I6, the "From here" row (Phase 3)
              "places_found",   # the fog-of-war place chart (2026-09-30)
              "writings",       # notes and maps written with ink and paper (2026-10-01)
-             "confided"]       # what companions have told the player (2026-10-01)
+             "confided",       # what companions have told the player (2026-10-01)
+             "pc_down"]        # the player cannot take a turn: no combat bar (2026-10-09)
 
 
 # --- helpers ------------------------------------------------------------------------------

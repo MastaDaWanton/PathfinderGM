@@ -604,15 +604,20 @@ class GMAgent:
                 # an untargeted attack with a `legality` error and legality errors
                 # regenerate rather than repair: five attempts, then the turn is gone.
                 #
-                # Three mechanical repairs, in dependency order. The misaim check first,
-                # because it reads the *model's* target before anything fills one in: an
-                # attack aimed at a valid ref that is not the person the player named
-                # gets the named person spawned and the attack moved onto them — the
-                # playtest stabbed a dying gatekeeper three scenes away because the
-                # winged woman in the narration had never been made real. Then the
-                # lone-candidate fill, then the survival injection, which appends `rest`,
-                # `eat` and `drink` for the sleep and meals both models narrate and
-                # neither ever proposes, worked example notwithstanding.
+                # The lone-candidate fill, then the survival injection, which appends
+                # `rest`, `eat` and `drink` for the sleep and meals both models narrate
+                # and neither ever proposes, worked example notwithstanding.
+                #
+                # An attack's target is RESOLVED against the people here, never minted
+                # from the player's words. The misaim repair that stood first in this list
+                # (2026-08-22, the winged woman never made real) read the victim out of the
+                # sentence with a regex and spawned whoever it found there; on 2026-10-08
+                # it read "I attack the top of his skull" and spawned a thug called "top of
+                # his skull", which joined the fight and killed the player. Its own case is
+                # the beat reader's now: anybody the narration shows out of a fight is a
+                # full actor at once (seen people are real, 2026-10-01), so the plan's
+                # schema already offers her ref; in a fight nobody comes in on a turn's
+                # words at all (`Engine.validate`, the fight rule).
                 raw = data.get("intents")
                 # The ops the player's words committed the turn to, which the schema asks
                 # for as required keys because Ollama does not enforce `contains`
@@ -626,8 +631,8 @@ class GMAgent:
                 if conjured:
                     self.reading.setdefault("dropped_gifts", []).extend(conjured)
                 # First, because everything downstream reads the shapes this
-                # straightens: a target pocketed in params is invisible to the misaim
-                # check, and an invented param is a schema refusal five lines later.
+                # straightens: a target pocketed in params is invisible to the target
+                # checks, and an invented param is a schema refusal five lines later.
                 raw = judgement.split_plural_targets(raw)
                 # An introduce placeholder nothing introduced (`attack new1`) is the
                 # person the plan plainly meant, before anything fills a target or
@@ -649,11 +654,9 @@ class GMAgent:
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 # A thing thrown or swung is an improvised-weapon attack that names
-                # the thing — before the misaim check reads "the man" it was thrown
+                # the thing — before the target fill reads "the man" it was thrown
                 # at, and before anything can dress the throw as a spell.
                 raw = judgement.inject_improvised(raw, player_input, self.engine.scene)
-                raw = judgement.repair_misaimed_attack(
-                    raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 # The stat block a person the plan introduces walks on with, read off
                 # their words the way the prose's people always were (`template_for`).
