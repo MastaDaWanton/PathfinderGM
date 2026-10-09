@@ -227,7 +227,7 @@ def _fold(text: str) -> dict:
 def _stalled(model: str, host: str, why: str) -> ModelStalled:
     return ModelStalled(
         f"The model has stopped answering: Ollama has {model} loaded but {why}. This is "
-        f"Ollama, not your game — quit Ollama from its tray icon, start it again, and send "
+        f"Ollama, not your game. Quit Ollama from its tray icon, start it again, and send "
         f"your line again. Your turn has not been lost.")
 
 
@@ -393,7 +393,7 @@ def chat(
                 why = " ".join(detail.split())[:160] or f"HTTP {exc.code}"
                 raise ModelStalled(
                     f"Ollama could not start {model} ({why}). This is Ollama, not your "
-                    f"game — quit Ollama from its tray icon, start it again, and send "
+                    f"game. Quit Ollama from its tray icon, start it again, and send "
                     f"your line again. Your turn has not been lost.") from exc
             else:
                 raise
