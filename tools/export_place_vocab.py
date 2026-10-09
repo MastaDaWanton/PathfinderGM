@@ -178,6 +178,13 @@ def build() -> dict:
         # armoury, a smithy by any name whose keeper is a smith) gets nothing appended.
         "appended_to_authored": {k: list(v)
                                  for k, v in places.APPENDED_TO_AUTHORED.items()},
+        # The place kinds a settlement drinks from, free (the owner, 2026-10-09: "yes they
+        # should drink from the well"). A character living through time anywhere inside a
+        # settlement drinks at one of these when the pack is dry. NOT appended to an
+        # authored settlement: one whose author lists none has no free water, and a wait
+        # there stops where the pack runs out. Measured the same day, all 76 authored
+        # settlements of Aurvantis and Pangrella list a well or a cistern.
+        "water_sources": sorted(f"the {k}" for k in places.WATER_SOURCES),
         # The great square and its crossings, which a city has ON TOP of its rooms and
         # which are not counted against its size. Published 2026-09-16 because a checker
         # on either side cannot work out what a legal total is without it — and because

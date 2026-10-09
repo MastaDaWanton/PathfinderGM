@@ -272,8 +272,12 @@ def test_alchemy_wait_for_it_stops_in_words_on_an_empty_pack(tmp_path):
             got = post(bench, "/api/alchemy/collect", {"key": key, "wait": True})
             assert got.status_code == 200, got.content[:300]
             got = got.json()
-            assert got["stopped"] == "water" and got["waited"] == 36 * HOUR
-            assert "stops waiting after 1 day 12 hours" in " ".join(got["body"])
+            # The bench campaign stands in a town, and a town has a well (the owner,
+            # 2026-10-09): water no longer stops the wait at 36 hours there — the body
+            # drinks at the well — and the empty pack's FOOD stops it at hunger's 72.
+            assert got["stopped"] == "food" and got["waited"] == 72 * HOUR, got
+            assert "stops waiting after 3 days" in " ".join(got["body"]), got["body"]
+            assert "drinks at the well" in " ".join(got["body"]), got["body"]
             pc = cm.current().scene.pc()
             assert not pc.has_state("state.down") and got["works"]
 

@@ -5734,6 +5734,13 @@ def _counter_pick(c, want: str = "", line: str = ""):
         # morning): the general store's keeper was still at home while the leatherworker
         # stood at her counter, and the panel answered "Nobody is at the general store
         # just now" with no counters at all, so no counter in the market could be opened.
+        #
+        # That morning's cause is fixed at its root (2026-10-09): keepers keep their hours
+        # on the clock (`Engine.settle_on_clock`), so the general store's keeper is back at
+        # first light whether or not the party has moved. Kept for what the root fix does
+        # not cover: a general-store keeper who is dead, down, or somewhere the plan took
+        # them, when a market with other counters standing open would otherwise answer
+        # with nothing the player can open.
         order = sorted(choices, key=lambda x: x.id != "general")
         chosen = order[0]
         for x in order:

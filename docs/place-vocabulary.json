@@ -152,6 +152,10 @@
    "the laboratory"
   ]
  },
+ "water_sources": [
+  "the cistern",
+  "the well"
+ ],
  "junctions_by_scale": {
   "village": 0,
   "town": 0,

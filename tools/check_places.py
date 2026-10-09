@@ -404,9 +404,18 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
                           "arrested to",
         "the barracks": "a city keeps more than a watch house full of soldiers",
         "the gate": "somewhere to leave by, which every road out of town arrives at",
-        "the well": "somewhere to draw water, which every settlement is built around",
+        # Since 2026-10-09 the well is also the only free water a character waiting in the
+        # settlement drinks from when their pack is dry, and it is NOT appended to an
+        # authored list: one that names no well or cistern has none.
+        "the well": "somewhere to draw water, which every settlement is built around — "
+                    "and the only water a character living through time here drinks for "
+                    "nothing; an authored list with no well or cistern gets none, and a "
+                    "wait in it stops where the pack runs dry",
     }
+    water = {str(w).lower() for w in (vocab.get("water_sources") or ())}
     for label in always:
+        if label.lower() == "the well" and have & water:
+            continue                         # a cistern waters a settlement as well
         if label.lower() not in have:
             notes.append(f"no {label} — the consumer builds one into every {scale}: "
                          f"{why.get(label, 'it is one every settlement of this size has')}")
