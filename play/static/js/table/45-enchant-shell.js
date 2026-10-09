@@ -1398,7 +1398,10 @@
       track: t ? { title: "Enchanter", level: t.level, mp: t.mp,
                    need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
       picks: t && t.picks_banked,
-      buttons: (L && typeof L.recipes === "function" ? '<button type="button" class="bf-btn" data-enchant-recipes>Recipes</button>' : "") +
+      // Manuals when an enchanting manual is carried (the server's `state.manuals`).
+      buttons: ((s && s.manuals && s.manuals.length)
+                 ? '<button type="button" class="bf-btn" data-enchant-manuals aria-haspopup="dialog">Manuals</button>' : "") +
+               (L && typeof L.recipes === "function" ? '<button type="button" class="bf-btn" data-enchant-recipes>Recipes</button>' : "") +
                (L && typeof L.journal === "function" ? '<button type="button" class="bf-btn" data-enchant-ledger>Ledger</button>' : ""),
     };
   }
@@ -1421,9 +1424,28 @@
         document.dispatchEvent(new CustomEvent("enchant:ledger"));
         return;
       }
+      var mb = e.target.closest("[data-enchant-manuals]");
+      if (mb) { E.openManuals(mb); return; }
       if (e.target.closest("[data-bench-perks]")) E.openPerks();
     });
   }
+
+  // The enchanting manuals carried, read through POST api/enchant/manual (the core's
+  // dialog). A reading may teach essences, recipes and properties: the clock turns, the
+  // shelf is read again and the ledger's cache is let go, as after a Read.
+  E.openManuals = function (from) {
+    core.manuals({
+      list: (E.state && E.state.manuals) || [], route: "/api/enchant/manual", word: "enchanting",
+      about: "essences, their makings and their properties", from: from,
+      after: function (got) {
+        if (got.clock) tickClock(0, got.clock);
+        if ((got.revealed || []).length && window.EnchantLedger && EnchantLedger.forget) {
+          try { EnchantLedger.forget(); } catch (err) { /* */ }
+        }
+        E.refresh();
+      },
+    });
+  };
 
   // A Read or a lesson from lane U5's card took a pinch and passed time: the shelf, the
   // clock and the footer are the server's, so they are read again.

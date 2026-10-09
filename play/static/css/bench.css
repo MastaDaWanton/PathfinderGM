@@ -459,6 +459,20 @@
 .bench-dialog-acts { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 .bench .bench-danger { border-color: var(--bench-warn); }
 
+/* The Manuals dialog (29-bench-core.js `manuals`): the books carried, each with its Read, and
+   what a reading taught. The leather bench's book list (leather.css .lw-book-list), shared. */
+.bench-books-d { width: min(560px, 100%); }
+.bench-books-body { display: grid; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.bench-books { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bench-books li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center; }
+.bench-books li b { font-weight: 400; color: var(--bench-ink); grid-column: 1; }
+.bench-books li i { grid-column: 1; color: var(--bench-quiet); font-size: 13px; font-style: italic; }
+.bench-books li span { grid-column: 1; color: var(--bench-quiet); font-size: 13px; }
+.bench-books li .v2-btn { grid-column: 2; grid-row: 1 / span 3; }
+.bench-books-said p { margin: 0 0 6px; color: var(--bench-ink); }
+.bench-books-learned li { grid-template-columns: minmax(0, 1fr); }
+.bench-books-paid { color: var(--bench-accent); }
+
 .bench-perks { width: min(620px, 100%); }
 .pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 6px; }
 .bench .pk { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; padding: 12px; min-height: 96px;

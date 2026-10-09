@@ -1017,8 +1017,11 @@
       track: t ? { title: "Blacksmith", level: t.level, mp: t.mp,
                    need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
       picks: t && t.picks_banked,
-      buttons: window.ForgeLedger && typeof ForgeLedger.journal === "function"
-        ? '<button type="button" class="bf-btn" data-forge-ledger>Ledger</button>' : "",
+      // Manuals when a smithing manual is carried (the server's `state.manuals`).
+      buttons: ((s && s.manuals && s.manuals.length)
+        ? '<button type="button" class="bf-btn" data-forge-manuals aria-haspopup="dialog">Manuals</button>' : "") +
+        (window.ForgeLedger && typeof ForgeLedger.journal === "function"
+        ? '<button type="button" class="bf-btn" data-forge-ledger>Ledger</button>' : ""),
     };
   }
   function renderFoot() { core.renderFoot(); }
@@ -1039,9 +1042,28 @@
         }, 120);
         return;
       }
+      var mb = e.target.closest("[data-forge-manuals]");
+      if (mb) { F.openManuals(mb); return; }
       if (e.target.closest("[data-bench-perks]")) F.openPerks();
     });
   }
+
+  // The smithing manuals carried, read through POST api/forge/manual (the core's dialog).
+  // A reading passes hours and may teach metals: the clock turns, the state is read again
+  // and the ledger's cache is let go, as after an assay.
+  F.openManuals = function (from) {
+    core.manuals({
+      list: (F.state && F.state.manuals) || [], route: "/api/forge/manual", word: "smithing",
+      about: "metals and the smith's stores", from: from,
+      after: function (got) {
+        if (got.clock) tickClock(0, got.clock);
+        if ((got.revealed || []).length && window.ForgeLedger && ForgeLedger.forget) {
+          try { ForgeLedger.forget(); } catch (err) { /* */ }
+        }
+        F.refresh();
+      },
+    });
+  };
 
   // An assay or a lesson from the ledger card (lane U5's 44) took a sliver and passed
   // time: the rack, the clock and the footer are the server's, so they are read again.

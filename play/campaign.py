@@ -1198,7 +1198,7 @@ def _heal_minted_goods(scene) -> None:
     inventing one. A pouch stays: it was a real pouch, only empty."""
     from gm.judgement import _is_a_thing
     from rules import goods as goods_mod
-    from rules import holding
+    from rules import holding, knowledge
 
     for actor in list(getattr(scene, "actors", {}).values()):
         store = getattr(actor, "goods", None)
@@ -1208,7 +1208,13 @@ def _heal_minted_goods(scene) -> None:
             if holding.is_money(name):
                 n = max(1, int(store.pop(name) or 1))
                 actor.purse = goods_mod.credit(actor.purse, n)
-            elif not _is_a_thing(name) and not holding.is_container(name):
+            elif (not _is_a_thing(name) and not holding.is_container(name)
+                  and knowledge.manual_named(name) is None):
+                # A craft's manual is a book the rules hold, never words minted into a
+                # thing. Measured 2026-10-08: three of the 33 manuals ("Fire and Water: A
+                # Journeyman's Notes", "Hafts, Grips and Guards", "On the Useful Parts of
+                # Beasts") read as no thing to `_is_a_thing`, so a handed-over or looted
+                # copy, which lives in `goods`, was thrown away on the next load.
                 store.pop(name)
 
 

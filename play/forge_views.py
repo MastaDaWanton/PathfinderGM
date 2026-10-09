@@ -29,8 +29,11 @@ from django.views.decorators.http import require_GET, require_POST
 from rules import blacksmith as bs
 from rules import crafting, worldclass
 
+from rules import knowledge
+
 from . import bench_clock
 from . import campaign as campaign_mod
+from . import manual_reader
 from .apiutil import read_body, read_int
 
 TRACK_ID = bs.TRACK_ID
@@ -585,6 +588,10 @@ def _state_body(c, pc) -> dict:
         "shapes": bs.shapes()["families"],
         "alloys": _alloys(),
         "clock": _clock(c),
+        # The smithing manuals carried, for the footer's Manuals button (POST
+        # api/forge/manual reads one). Smithing books only: a leatherworking manual is read
+        # at the leather bench (play/leather_views.py `leather_manual`).
+        "manuals": manual_reader.carried(pc, knowledge.BLACKSMITH),
     }
 
 
@@ -1333,3 +1340,20 @@ def forge_ask(request):
                          "refused": "", "clock": _clock(c),
                          "mastery": {"lines": lines, "total": progress.mp,
                                      "level": progress.level, "levelled": levelled}})
+
+
+# --- manuals -----------------------------------------------------------------------------
+
+@require_POST
+def forge_manual(request):
+    """Read a smithing manual the character has with them (content/rules/smithing-
+    manuals.json): the metals and stores it teaches are learned, its hours pass, and a first
+    reading pays its mastery on the Blacksmith track (play/manual_reader.py). Measured
+    2026-10-08: before it, a bought smithing manual could never be opened, since the only
+    reader in play/ was the herb bench's, which looks up herbal manuals only."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    body = read_body(request)
+    said = str(body.get("item") or body.get("manual") or "")
+    return manual_reader.read(c, pc, knowledge.BLACKSMITH, said, track_id=TRACK_ID, clock=_clock)

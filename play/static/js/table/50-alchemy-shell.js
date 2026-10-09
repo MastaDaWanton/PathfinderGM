@@ -1449,7 +1449,10 @@
       track: t ? { title: "Alchemist", level: t.level, mp: t.mp,
                    need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
       picks: t && t.picks_banked,
-      buttons: '<button type="button" class="bf-btn" data-alchemy-formulary aria-haspopup="dialog">Formulary</button>' +
+      // Manuals when an alchemy manual or formulary is carried (the server's `state.manuals`).
+      buttons: ((s && s.manuals && s.manuals.length)
+                 ? '<button type="button" class="bf-btn" data-alchemy-manuals aria-haspopup="dialog">Manuals</button>' : "") +
+               '<button type="button" class="bf-btn" data-alchemy-formulary aria-haspopup="dialog">Formulary</button>' +
                '<button type="button" class="bf-btn" data-alchemy-codex aria-haspopup="dialog">Codex</button>',
     };
   }
@@ -1460,9 +1463,28 @@
     footEl.addEventListener("click", function (e) {
       var b = e.target.closest("[data-alchemy-formulary], [data-alchemy-codex]");
       if (b) { A.book(b.hasAttribute("data-alchemy-formulary") ? "formulary" : "codex", b); return; }
+      var mb = e.target.closest("[data-alchemy-manuals]");
+      if (mb) { A.openManuals(mb); return; }
       if (e.target.closest("[data-bench-perks]")) A.openPerks();
     });
   }
+
+  // The alchemy manuals carried, read through POST api/alchemy/manual (the core's dialog):
+  // the reagents a book teaches. A formulary's formulae are copied from the Formulary, as
+  // before. A reading passes hours: the clock turns and the bench is read again.
+  A.openManuals = function (from) {
+    core.manuals({
+      list: (A.state && A.state.manuals) || [], route: "/api/alchemy/manual", word: "alchemy",
+      about: "reagents and the alchemist's stores", from: from,
+      after: function (got) {
+        if (got.clock) tickClock(got.clock);
+        if ((got.revealed || []).length && window.AlchemyBooks && typeof AlchemyBooks.forget === "function") {
+          try { AlchemyBooks.forget(); } catch (err) { /* */ }
+        }
+        A.refresh();
+      },
+    });
+  };
 
   // --- the books (contracts §12: lane U4's `window.AlchemyBooks`) -----------------------------------
   // `.formulary(host)` and `.codex(host)` when lane U4's file is in the build; without it, a
