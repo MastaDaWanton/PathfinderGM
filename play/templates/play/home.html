@@ -137,6 +137,22 @@
      card. A button placed straight after the grid sat inside that reach: "Begin a
      sandbox" printed across the bottom rule of "Someone new" (2026-09-05). */
   .cards + .go { margin-top: 44px; }
+  /* The same reach from the other side, and from the next grid. The bosses ride 10px
+     past a card's edge (34px out, 24px in). A druid's bond is two grids, the choice and
+     then its domains or animals, and nothing stood between them: the first row's bottom
+     bosses lay 10px across the tops of "Air", "Animal" and "Earth" and the two frames
+     crossed by 20px (the owner's screenshot, 2026-10-09; measured at 375, 770, 1024,
+     1440 and 1920). The note under a chosen bloodline's or bond's cards ("Draconic,
+     dragon type:", the companion's name) printed under the bosses the same way, and the
+     house rules' Core races switch sat 8px under the race tiers. A grid keeps 18px clear
+     of whatever is beside it, the 10px reach and the 4px a card lifts on hover with 4px
+     to spare (as margins these collapse into a neighbour's larger one, so nothing that
+     already stood further off moves), and a grid after a grid stands off by a row gap. */
+  .cards { margin-block: 18px; }
+  .cards + .cards { margin-top: 32px; }
+  /* A card standing alone, as the house rules' switches do: the note after "Fade to
+     black" sat under its bosses too. */
+  .card + p { margin-top: 18px; }
   .card {
     background: linear-gradient(#191309, #120e09); border: 1px solid var(--edge);
     border-radius: 3px; padding: 16px 18px; text-align: left;

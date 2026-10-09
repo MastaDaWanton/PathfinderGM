@@ -554,7 +554,9 @@ def test_the_phone_is_the_designs_phone():
     offers are one sideways row; the sheet is a tab of its own. Measured on the running
     app: scrollWidth 375 on every tab."""
     phone = _css()[_css().index("/* --- Phone: the story is the page"):]
-    assert re.search(r"\.modes \{ grid-area: modes; min-width: 0;[^}]*overflow-x: auto", phone)
+    # A line of their own in the wrapping bar (tests/test_nothing_overlaps.py), no longer
+    # a grid area: the same row, the same min-width, the same sideways scroll.
+    assert re.search(r"\.modes \{ order: 3; flex: 1 1 100%; min-width: 0;[^}]*overflow-x: auto", phone)
     assert "#exits .ex-list { flex-wrap: nowrap; overflow-x: auto;" in phone
     assert "#suggestions { flex-wrap: nowrap; overflow-x: auto;" in phone
     assert "body.mode-sheet .stage { display: flex; flex-direction: column;" in phone
