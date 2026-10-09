@@ -25,6 +25,8 @@ function showDeath(d) {
       <span><b>${esc(e.name)}</b> — ${esc(e.line)}</span>
       <small>${e.status === "dead" ? "died" : e.status}</small>
     </div>`).join("") : "";
+  // The last option: back to the shelf, the save untouched (table.html says why it is a link).
+  $("#deathhome").hidden = false;
   $("#deathveil").classList.add("on");
 }
 

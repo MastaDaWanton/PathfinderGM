@@ -39,6 +39,8 @@ async function openRoster() {
     </button>`).join("")
     + `<button class="pick" id="closeroster"><b>Never mind</b>
        <small>carry on with the game in front of you</small></button>`;
+  // The death screen's way out is for a death; the roster has "Never mind" instead.
+  $("#deathhome").hidden = true;
   $("#deathveil").classList.add("on");
 }
 
@@ -111,6 +113,10 @@ document.addEventListener("click", async e => {
 document.addEventListener("click", async e => {
   const pick = e.target.closest(".pick");
   if (!pick || pick.disabled) return;
+  // A link dressed as a pick (the death screen's "Return to the main page") is left to
+  // the browser. Without this the fall-through below posted /api/character/new with an
+  // undefined source, the same double-handling the note above records for the roster.
+  if (pick.tagName === "A") return;
 
   if (pick.id === "closeroster") {
     $("#deathveil").classList.remove("on");

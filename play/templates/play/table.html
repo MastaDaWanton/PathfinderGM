@@ -632,6 +632,15 @@
   .pick small { color: var(--dim); font: 13px/1.5 var(--body); }
   .pick em { display: block; color: var(--dim); font: italic 13px/1.5 var(--body);
              margin-top: 5px; }
+  /* The way out: a `.pick` like every other choice, but an anchor, so it needs the
+     underline taken off and a focus ring of its own (the global ring is for buttons). */
+  .deathhome { flex: none; margin: 14px 0 0; text-decoration: none;
+               /* What a button carries and an anchor does not: the line beneath the
+                  name inherits the button's tracking on every other pick. */
+               color: var(--gold); font: 400 15px/1 var(--display); letter-spacing: .16em;
+               font-variant: small-caps; }
+  .deathhome[hidden] { display: none; }
+  .deathhome:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
   .grave { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0;
            border-bottom: 1px solid #241d15; font: 14px/1.5 var(--body); }
   .grave.dead { color: var(--dim); }
@@ -3947,6 +3956,18 @@
       <div id="deathchoices"></div>
       <div id="deathroster"></div>
     </div>
+    <!-- The last option on the death screen (the owner's ask, 2026-10-08): leave for the
+         shelf without choosing anybody. A real link, not a button that navigates, so it
+         is reached by Tab, opened by Enter, and goes the same way the topbar's
+         "Worlds & characters" does (in the desktop app too: a same-origin navigation the
+         window's will-navigate handler lets through). It posts nothing, so the save is
+         untouched: the dead stay dead until raised or switched. Outside the scrolling
+         list so a long roster never pushes it out of sight. Shown for a death only; the
+         roster has its own "Never mind". -->
+    <a class="pick deathhome" id="deathhome" href="/" hidden>
+      <b>Return to the main page</b>
+      <small>Your worlds and characters. This game is kept as it stands.</small>
+    </a>
   </div>
 </div>
 
