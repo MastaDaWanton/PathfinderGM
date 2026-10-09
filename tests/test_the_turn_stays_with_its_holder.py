@@ -58,13 +58,16 @@ def test_a_bystander_joining_does_not_take_the_turn_out_of_your_hand():
         assert scene.current_ref() == "pc", f"a bystander rolling {face} took the turn"
 
 
+# The spawns below are the world's arrivals, so they go through the trusted door: since
+# 2026-10-09 an untrusted list brings nobody into a fight (`Engine.validate`, the thug a
+# repair called "top of his skull").
 def test_a_creature_spawning_mid_fight_does_not_take_the_turn():
     for face in (1, 20):
         scene, engine = _fight_with_a_bystander(face)
         engine.run(engine.validate([{"op": "spawn", "actor": "pc",
                                      "params": {"template": "thug", "count": 1,
                                                 "name": "a latecomer"},
-                                     "because": "test"}]))
+                                     "because": "test"}], origin="author:test"))
         assert scene.current_ref() == "pc", f"a spawn rolling {face} took the turn"
 
 
@@ -74,7 +77,7 @@ def test_a_troop_arriving_mid_fight_does_not_take_the_turn():
         engine.run(engine.validate([{"op": "spawn", "actor": "pc",
                                      "params": {"template": "thug", "count": 6,
                                                 "name": "a mob"},
-                                     "because": "test"}]))
+                                     "because": "test"}], origin="author:test"))
         assert scene.current_ref() == "pc", f"a troop rolling {face} took the turn"
 
 
@@ -83,7 +86,7 @@ def test_a_troop_scattering_does_not_move_the_turn_either():
     engine.run(engine.validate([{"op": "spawn", "actor": "pc",
                                  "params": {"template": "thug", "count": 6,
                                             "name": "a mob"},
-                                 "because": "test"}]))
+                                 "because": "test"}], origin="author:test"))
     mob = next(r for r, _ in scene.initiative if r not in ("pc", "c1", "c2"))
     assert scene.initiative[0][0] == mob, "the mob rolled 20: it is ahead of the player"
     engine._rout(scene.actors[mob])

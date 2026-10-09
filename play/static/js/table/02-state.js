@@ -300,6 +300,13 @@ function render(s, hold) {
   // never keeps a hook from seeing the turn.
   if (typeof runRenderHooks === "function") runRenderHooks(s, prev);
 
+  // A death the enemies' turns dealt is shown with the turn that dealt it, whichever door
+  // the turn came through. Measured 2026-10-08: the combat panel's Attack and the roll
+  // both ran the creatures' turns, the player died in one of them, and the death screen
+  // waited for a typed line — while the panel stayed live and its next click came back
+  // 409 "… is in no condition to act." `_state` carries `ended` once the campaign has.
+  if (s && s.ended && typeof showDeath === "function") showDeath(s);
+
   if (hold) return;
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
 }

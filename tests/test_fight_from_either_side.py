@@ -164,8 +164,9 @@ def test_a_strike_at_the_weapon_is_a_sunder_on_its_holder(market):
     assert market.thread.get("ref") == apron.ref
 
     text = "I strike the weapon and sunder it"
-    assert judgement.repair_misaimed_attack([{"op": "attack", "actor": "pc"}], text,
-                                            market) is None, "never a victim called weapon"
+    # The misaim repair that once spawned a thug called "weapon" is retired (2026-10-09):
+    # no door mints a person from the player's words.
+    assert not hasattr(judgement, "repair_misaimed_attack")
     fixed = judgement.aim_at_the_holder([{"op": "attack", "actor": "pc"}], text, market)
     assert fixed[0]["target"] == apron.ref
     assert fixed[0]["params"]["manoeuvre"] == "sunder"

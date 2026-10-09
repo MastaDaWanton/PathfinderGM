@@ -1512,20 +1512,32 @@ def _touches_ref(raw: dict, refs: list[str]) -> bool:
 
 
 def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
-    """Create the people the GM was already talking about, instead of losing the turn.
+    """Resolve a ref the plan invented to a person the engine already holds — never make one.
 
-    The recurring failure: the player writes "two guild bravos come round the corner",
-    the GM answers with `attack thug1`, the ref registry refuses it — correctly, it must
-    not be possible to invent people by naming them — and five attempts later the turn is
-    gone. It has an example and a hint pointing at `spawn` and it still does this.
+    The recurring failure: the GM answers with `attack thug1`, the ref registry refuses
+    it — correctly, it must not be possible to invent people by naming them. Until
+    2026-10-08 this repair then did exactly that, in code: it spawned a thug under the
+    invented ref's own words (`kaldrimia`, `winged_woman`), the twin of the misaim repair
+    that turned "I attack the top of his skull" into a creature of that name. The owner's
+    ruling (2026-10-09) is that no door mints a person from words, so what is left is
+    resolution against what the engine owns:
 
-    So the repair is done in code rather than asked for again. This is narrow on purpose:
-    it fires only when the unknown refs look like invented names rather than typos, the
-    count comes from the *player's* sentence, and the result goes through the ordinary
-    validation. Nothing is created that the player did not describe arriving.
+    * out of a fight, somebody the beat reader already recorded HERE (a population
+      record, made from its closed "new" answer) is given the body the record is owed;
+      found twice over, the player is asked which;
+    * somebody the player looked for whom the world places elsewhere or nowhere is the
+      world's answer (`narrate_only`'s `not_here`);
+    * anything else is left to validation's refusal, which names the refs that exist —
+      and in a fight nothing here makes or embodies anybody ("no bodies in a fight", the
+      beat reader's rule and `Engine.validate`'s).
 
-    Returns amended raw intents, or None if this is not that problem.
+    Returns amended raw intents, or None if there is nothing it may do.
     """
+    # In a fight the people are the ones here. Embodying a record mid-fight is a body
+    # brought in on a turn's words, which seen_people refuses and the engine now refuses
+    # too; the plan is asked again with the legal refs named.
+    if getattr(scene, "in_encounter", False):
+        return None
     # Speech is not action: the character's own words are blanked before any
     # cue is looked for here. See `redact_speech`.
     player_text = redact_speech(player_text)
@@ -1616,35 +1628,11 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
                              "params": {"not_here": found["line"]}})
                 return kept
 
-    template = template_for(player_text or "", _pc_level(scene), floor="thug")
-
-    # How many, from how many the GM itself named. Not from the player's sentence: the
-    # player does not decide how many enemies are round the corner.
-    count = len(invented)
-    from rules.bestiary import next_ref
-
-    minted: list[str] = []
-    while len(minted) < count:
-        minted.append(next_ref(scene, taken=minted))
-
-    swap = dict(zip(invented, minted))
-    params = {"template": template, "count": count}
-    if count == 1:
-        # The GM's invented ref usually *is* the fiction's name — it wrote `kaldrimia`
-        # or `winged_woman`, not `npc7`. Spawning her as "thug" made every later tell
-        # narrate the wrong person: the live fight read "the thug steps forward" about a
-        # guildmate the scene had introduced by name. Only for one: two invented refs
-        # cannot share a name, and picking which ref names the pair is a guess.
-        # A label is not a name: `npc1` made somebody called "npc" (`_LABEL_WORDS`).
-        cleaned = re.sub(r"\d+$", "", invented[0]).replace("_", " ").replace("-", " ").strip()
-        if cleaned and cleaned != template and not _is_label(invented[0]):
-            params["name"] = cleaned
-    amended = [{"op": "spawn", "because": "they are already in the scene the GM described",
-                "params": params}]
-    swap.update(bound)
-    for raw in raw_intents:
-        amended.append(_swap_refs(dict(raw), swap))
-    return amended
+    # Nobody the engine holds, and nobody the world answers for: nothing is made. This
+    # spawned a thug under the invented ref's words until 2026-10-08 — the same door, in
+    # the plan's pocket, as the misaim repair's "top of his skull". Validation's refusal
+    # names the refs that exist, and the plan chooses among them.
+    return None
 
 
 def _swap_refs(raw: dict, swap: dict) -> dict:
@@ -2111,99 +2099,21 @@ def _name_words(name: str) -> set[str]:
             if w not in _NAME_NOISE}
 
 
-def repair_misaimed_attack(raw_intents, player_text: str, scene):
-    """Aim the attack at the person the player named, creating them if they must exist.
-
-    The failure this repairs, verbatim from the 2026-08-22 playtest: the narration had
-    introduced a winged woman; she was never spawned; the player wrote "I rush the winged
-    woman and run her through", and the GM answered `attack c1` — a *valid* ref belonging
-    to the gatekeeper dying at 0 hp, three scenes and one biome away. Every check passed,
-    the wrong man was stabbed to -4, and the narrator then rewrote the fiction to agree
-    with the engine ("it's Zara, the guildhand who was supposed to be watching the
-    gate"). `repair_unknown_refs` never fired because nothing was unknown.
-
-    So the mechanical test is disagreement between two names: the attack's target is a
-    known actor none of whose name-words appear anywhere in the player's sentence, while
-    the player's sentence names a victim — determiner and all — who matches no actor in
-    the scene. Both halves must hold. A pronoun triggers nothing; naming the actual
-    target triggers nothing; only aiming at somebody who does not exist while the intent
-    aims at somebody who does.
-
-    The repair spawns the named victim — a generic statblock under the fiction's own
-    name, template picked from the player's wording — and moves the attack onto them.
-    Returns None when there is nothing to do.
-    """
-    # Speech is not action: the character's own words are blanked before any
-    # cue is looked for here. See `redact_speech`.
-    player_text = redact_speech(player_text)
-    if not isinstance(raw_intents, list) or scene is None or not player_text:
-        return None
-    aimed = _AIMED_AT.search(player_text)
-    if not aimed:
-        return None
-    victim_phrase = " ".join(aimed.group(1).split())
-    victim_words = _name_words(victim_phrase)
-    if not victim_words:
-        return None
-    # A thing is never a victim to create. "I strike the weapon and sunder it" read
-    # "the weapon" as somebody the scene had not made real and spawned a thug named
-    # "weapon" (2026-09-18); `aim_at_the_holder` owns that sentence and aims it at
-    # whoever holds the thing.
-    if names_a_thing(victim_phrase):
-        return None
-
-    actors = getattr(scene, "actors", {}) or {}
-    # The player named somebody who is already here: nothing to repair, whatever the
-    # intent says — second-guessing a match is how a repair becomes a bug.
-    for a in actors.values():
-        if victim_words & _name_words(getattr(a, "name", "")):
-            return None
-
-    def _aims_wrong(raw) -> bool:
-        if not isinstance(raw, dict) or str(raw.get("op", "")).lower() != "attack":
-            return False
-        target = raw.get("target")
-        # No target at all counts. The confirmation session found this the hard way:
-        # the player wrote "I rush the careful walker", the model emitted an untargeted
-        # attack, this function declined it — and `fill_obvious_targets` then handed it
-        # to the only body in the yard, the gatekeeper, all over again. An attack with
-        # nobody on it, on a turn where the player named somebody who does not exist,
-        # is aimed at that somebody.
-        if not target:
-            return True
-        if not isinstance(target, str) or target not in actors:
-            return False
-        return not (victim_words & _name_words(getattr(actors[target], "name", "")))
-
-    if not any(_aims_wrong(raw) for raw in raw_intents):
-        return None
-
-    template = template_for(victim_phrase, _pc_level(scene), floor="")
-    if not template:
-        template = template_for(player_text, _pc_level(scene), floor="thug")
-
-    from rules.bestiary import next_ref
-
-    minted = next_ref(scene)
-
-    # As many as the phrase says, and the number is not part of their name. Measured live
-    # 2026-09-19: "I charge the twelve raiders coming up the road" spawned ONE creature
-    # called "twelve raiders coming up the road" with 29 hit points — the "twelve soldier"
-    # family of bug at a site nobody had checked. `opponent_count` is the reader the fight
-    # injector already uses, and at five and up the engine forms one unit of them
-    # (`troops.UNIT_FROM`, item 33) rather than a dozen bodies.
-    count = max(1, opponent_count(victim_phrase) if _NUMBER_IN.search(victim_phrase)
-                else opponent_count(player_text))
-    spawn_name = _without_the_count(victim_phrase)
-    out = [{"op": "spawn", "because": f"the {victim_phrase} the player is attacking "
-                                      f"was described but never created",
-            "params": {"template": template, "count": count, "name": spawn_name}}]
-    for raw in raw_intents:
-        raw = dict(raw) if isinstance(raw, dict) else raw
-        if _aims_wrong(raw):
-            raw["target"] = minted
-        out.append(raw)
-    return out
+# `repair_misaimed_attack` stood here (2026-08-22 to 2026-10-08): when the plan's attack
+# was aimed at somebody the player's sentence did not name, it read the victim out of the
+# sentence with `_AIMED_AT` and SPAWNED them under those words. It is gone, not narrowed.
+# Measured 2026-10-08 (a player on 0.2.10, reproduced live on gemma-4-12B in the caravan
+# ambush): "I attack the top of his skull" became `spawn name="top of his skull"`, a 13-hp
+# thug on a side of its own, and the two raiders and it killed the player. Its earlier
+# victims were the same door — the thug called "weapon" (2026-09-18), "twelve raiders
+# coming up the road" as one creature (2026-09-19) — each closed with one more word list.
+# The owner's ruling (2026-10-09): fix it without regex, so it is fixed for every phrase.
+# The structure that does: an attack's target is resolved against the actors here and
+# never minted; newcomers come only from the beat reader's closed "new" answer out of a
+# fight (seen people are real, 2026-10-01 — the winged woman this repair was written for
+# is an actor the moment a beat shows her); and in a fight nothing on a turn brings
+# anybody in (`Engine.validate`). `_AIMED_AT` stays for `check_the_target`, which only
+# reads whether the player named their victim and never makes anybody.
 
 
 # --- sleep, food and water declared at the table ----------------------------------------
@@ -2741,10 +2651,9 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
     describing guardsmen for three turns, and the model — forced to choose a legal
     ref — aimed every swing at a body. One living combatant means no encounter can
     form, so the combat bar never appeared while the player 'fought' a crowd that
-    existed only in sentences. When the player's own words name opposition (the same
-    template cues the spawn repair reads), the attack gets a freshly spawned target;
-    when they do not, the swing at the corpse stands — kicking the fallen is a thing
-    a player may genuinely mean.
+    existed only in sentences. The attack goes to somebody living here; with nobody
+    living, the swing at the corpse stands — kicking the fallen is a thing a player may
+    genuinely mean — and nobody is made from the player's words (2026-10-09).
 
     Returns amended raw intents, or None when nothing needed redirecting.
     """
@@ -2782,22 +2691,13 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
         swap = living[0]
         out = [dict(r, target=swap) if r in targets_dead else r for r in raw_intents]
         return out
-    # No floor on purpose: nothing recognised in the player's words means nobody new, and
-    # the blow stands as kicking the fallen. The words the corpus knows now reach here too
-    # ("the raiders keep coming" finds a Raider), which is the same widening item 30 asked
-    # for everywhere else.
-    template = template_for(player_text or "", _pc_level(scene), floor="")
-    if not template:
-        return None                       # kicking the fallen: let it stand
-    from rules.bestiary import next_ref
-
-    ref = next_ref(scene)
-    out: list = [{"op": "spawn",
-                  "because": "the fight the fiction has been describing",
-                  "params": {"template": template, "count": 1}}]
-    for r in raw_intents:
-        out.append(dict(r, target=ref) if r in targets_dead else r)
-    return out
+    # Nobody living: the blow stands as kicking the fallen. Until 2026-10-08 this spawned
+    # an opponent out of the template cues in the player's words ("the raiders keep
+    # coming" found a Raider) — a person minted from words mid-fight, the door the owner
+    # closed on 2026-10-09 after "the top of his skull" became a thug. The guardsmen the
+    # prose describes are the beat reader's to make real, out of a fight, from its
+    # closed "new" answer (seen people are real).
+    return None
 
 
 def drop_premature_end(raw_intents) -> list:
@@ -8119,6 +8019,10 @@ def inject_company(raw_intents, player_text: str, scene, world=None):
     if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "introduce"
            for r in raw_intents):
         return raw_intents
+    # Never in a fight: nobody comes into one on a turn's words (`Engine.validate` refuses
+    # the spawn, and the plan would only be asked again for it).
+    if getattr(scene, "in_encounter", False):
+        return raw_intents
     if _ASKS_AROUND.search(speech.blanked(str(player_text or ""))):
         return raw_intents
     sought = person_sought(player_text)
@@ -9760,8 +9664,10 @@ def check_the_target(raw_intents, player_text: str, scene, recent=()) -> list | 
     as a question through the engine's own refusal (`params.undecided`), which reaches
     the page as "Which of them — …?" and costs nothing else.
 
-    A player who NAMES their victim is never second-guessed: `repair_misaimed_attack`
-    owns that sentence, and a match on the target's own name ends this at once.
+    A player who NAMES their victim is never second-guessed: a sentence with a named
+    victim (`_AIMED_AT`) is left as the plan aimed it, and a match on the target's own
+    name ends this at once. (The misaim repair that once owned that sentence, and
+    spawned the victim, was retired 2026-10-08 — see the note where it stood.)
     Returns amended intents, or the list unchanged when there is nothing to do.
     """
     if not isinstance(raw_intents, list) or scene is None:
