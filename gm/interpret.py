@@ -929,9 +929,9 @@ def aid_messages(span: str, patient: str) -> list[dict]:
               "wound, stopping the bleeding, tending them — or doing something else?")
     out = [{"role": "system", "content": system}]
     for said, who, answer in _AID_DEMOS:
-        out.append({"role": "user", "content": f"Dying: {who}\nThe deed: {said}"})
-        out.append({"role": "assistant", "content": json.dumps({"deed": answer})})
-    out.append({"role": "user", "content": f"Dying: {patient}\nThe deed: {span}"})
+        out.append({"role": "user", "content": f"Dying: {who}\nThe act: {said}"})
+        out.append({"role": "assistant", "content": json.dumps({"act": answer})})
+    out.append({"role": "user", "content": f"Dying: {patient}\nThe act: {span}"})
     return out
 
 
@@ -944,15 +944,17 @@ def confirm_first_aid(span: str, patient: str, *, model: str | None = None) -> s
     cfg = modelcfg.for_role("interpreter")
     if not cfg.get("model"):
         cfg = modelcfg.for_role("narrator")
-    schema = {"type": "object", "properties": {"deed": {"type": "string",
-                                                        "enum": list(AID_ANSWERS)}},
-              "required": ["deed"]}
+    # The key is act: the deeds system keeps its own word out of everything the models are
+    # shown (tests/test_deeds.py), and this question is about the act itself.
+    schema = {"type": "object", "properties": {"act": {"type": "string",
+                                                       "enum": list(AID_ANSWERS)}},
+              "required": ["act"]}
     try:
         reply = client.chat(aid_messages(span, patient), model or cfg["model"], cfg["host"],
                             as_json=True, think=False, temperature=0.0, num_predict=20,
                             provider=cfg.get("provider", "ollama"),
                             api_key=cfg.get("api_key", ""), schema=schema)
-        got = str((reply.json() or {}).get("deed") or "")
+        got = str((reply.json() or {}).get("act") or "")
     except Exception:  # noqa: BLE001
         return ""
     return got if got in AID_ANSWERS else ""
