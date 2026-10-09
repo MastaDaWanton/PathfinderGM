@@ -34,7 +34,7 @@ from django.urls import path, re_path
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
                   works_views, enchant_views, alchemy_views, tradecraft_views,
-                  leather_views, harvest_views)
+                  leather_views, harvest_views, report_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -205,6 +205,10 @@ urlpatterns = [
          name="delete_character"),
     path("api/settings/models", home_views.model_settings,
          name="model_settings"),
+    # "Make a report for the developer" (Settings): what goes in, the zip, and the two
+    # ways to send it. Built server-side; see `play/report.py`.
+    path("api/report", report_views.report_zip, name="report_zip"),
+    path("api/report/links", report_views.report_links, name="report_links"),
     # First run: what is missing before a turn can be attempted, and the pull that
     # closes the gap. See `play/preflight.py` for why this is a per-launch check
     # rather than a step in the installer.

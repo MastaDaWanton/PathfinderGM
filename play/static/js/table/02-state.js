@@ -121,6 +121,15 @@ async function readJSON(r) {
   }
 }
 
+// The error a failed POST throws. A model that stopped answering (`gm.client.ModelStalled`)
+// marks it `report`, and the page offers "Make a report" beside the sentence
+// (04-combat-and-turns.js, `showStalled`).
+function refusedWith(r, data) {
+  const e = new Error(data.error || ("HTTP " + r.status));
+  if (data.report) e.report = true;
+  return e;
+}
+
 async function post(url, body) {
   // The clock this screen showed when the player acted, for `table:posted` below.
   const clockBefore = (STATE && STATE.scene) ? STATE.scene.clock_minutes : null;
@@ -173,7 +182,7 @@ async function post(url, body) {
   if (r.status === 409 && data.busy) {
     const e = new Error(data.error); e.hint = true; throw e;
   }
-  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  if (!r.ok) throw refusedWith(r, data);
   // This page's own POST succeeded. Dispatched before the caller renders the answer, so
   // a listener (the time-skip clock, 09-clock.js) can arm on it and fire from the render
   // hook that follows. Never on load, a resync or the other device's turn: none of those

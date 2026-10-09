@@ -64,6 +64,22 @@ function backendCommand() {
   return { command: python, args: [path.join(projectRoot, 'desktop.py')] };
 }
 
+/**
+ * What the backend is told about the shell it runs under. The release number lives only
+ * in this app's package.json (inside the asar), so the backend cannot read it for itself,
+ * and the report a player sends the developer (`play/report.py`) has to say which release
+ * it came from. Versions only: nothing about the player.
+ */
+function backendEnv(extra) {
+  return {
+    ...process.env,
+    PATHFINDER_GM_APP_VERSION: app.getVersion(),
+    PATHFINDER_GM_ELECTRON_VERSION: process.versions.electron || '',
+    PATHFINDER_GM_CHROME_VERSION: process.versions.chrome || '',
+    ...(extra || {}),
+  };
+}
+
 function startBackend() {
   return new Promise((resolve, reject) => {
     const { command, args } = backendCommand();
@@ -75,6 +91,7 @@ function startBackend() {
       cwd: isPackaged ? process.resourcesPath : projectRoot,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      env: backendEnv(),
     });
 
     // The number is read off the constant: when the timeout went from 60s to 180s the
@@ -212,19 +229,170 @@ function createWindow() {
     }
   });
 
+  wireReportDownloads(mainWindow.webContents.session);
+
   mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+/**
+ * A report a player makes for the developer (Settings, `play/report.py`) goes straight
+ * to their Downloads folder and Explorer opens on it with the file selected, so the next
+ * thing they do (drag it into a GitHub issue, attach it to an email) starts from the file.
+ *
+ * Done here rather than by a preload bridge the page could call: the page has no Node and
+ * no IPC (`contextIsolation`, `nodeIntegration: false`), and the smallest safe way to give
+ * it this one ability is to give it none at all. The page downloads the zip the way any
+ * browser page does; the shell recognises the download by its name and decides where it
+ * goes. Every other download keeps Chromium's own Save dialog. Unset, Electron asks
+ * where to save, and a player who is reporting a problem should not be asked a question
+ * the app can answer (electronjs.org/docs/latest/api/download-item, `setSavePath`).
+ *
+ * A name already taken gets `-1`, `-2`: an earlier report is the player's file, and
+ * overwriting it is not ours to do.
+ */
+const REPORT_NAME = /^pathfindergm-report-[0-9]{8}-[0-9]{6}(-[0-9]+)?\.zip$/;
+
+/** The player's Downloads folder: Electron asks Windows for the Known Folder, so a moved
+ * Downloads is found. `PATHFINDER_GM_DOWNLOADS` is for the provers, as
+ * `PATHFINDER_GM_NO_UPDATE` is: a live check must not fill the owner's own Downloads. */
+function downloadsDir() {
+  return process.env.PATHFINDER_GM_DOWNLOADS || app.getPath('downloads');
+}
+
+function freeReportPath(folder, name) {
+  const fs = require('fs');
+  let target = path.join(folder, name);
+  for (let n = 1; fs.existsSync(target) && n < 1000; n += 1) {
+    target = path.join(folder, name.replace(/\.zip$/, `-${n}.zip`));
+  }
+  return target;
+}
+
+function wireReportDownloads(session) {
+  session.on('will-download', (event, item) => {
+    const name = item.getFilename();    if (!REPORT_NAME.test(name)) return;
+    const target = freeReportPath(downloadsDir(), name);
+    item.setSavePath(target);
+    item.once('done', (e, state) => {
+      if (state === 'completed') shell.showItemInFolder(target);
+      else updateLog('error', `report download ${state}: ${name}`);
+    });
+  });
+}
+
+/**
+ * The startup-failure box's "Make a report": the same backend exe, run again with
+ * `--report`, which builds the zip into Downloads without starting a server
+ * (`desktop.py:_report_only`). One implementation of what goes in a report and what is
+ * scrubbed out of it, in Python, rather than a second copy here that drifts.
+ * Resolves to `{path, github, mailto}` or `{error}`.
+ */
+const REPORT_LINE = 'PATHFINDERGM_REPORT';
+const REPORT_TIMEOUT_MS = STARTUP_TIMEOUT_MS;
+
+function makeReportFromShell(note) {
+  return new Promise((resolve) => {
+    const { command, args } = backendCommand();
+    let settled = false;
+    const done = (value) => { if (!settled) { settled = true; resolve(value); } };
+    let child;
+    try {
+      child = spawn(command, [...args, '--report', '--report-dir', downloadsDir()], {
+        cwd: isPackaged ? process.resourcesPath : projectRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: backendEnv({ PATHFINDER_GM_REPORT_NOTE: String(note || '').slice(0, 4000) }),
+      });
+    } catch (err) {
+      done({ error: err.message });
+      return;
+    }
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch (_) { /* gone */ }
+      done({ error: `the report took longer than ${REPORT_TIMEOUT_MS / 1000} seconds` });
+    }, REPORT_TIMEOUT_MS);
+    readline.createInterface({ input: child.stdout }).on('line', (line) => {
+      if (!line.startsWith(REPORT_LINE)) return;
+      clearTimeout(timer);
+      try {
+        done(JSON.parse(line.slice(REPORT_LINE.length).trim()));
+      } catch (err) {
+        done({ error: 'the report said something unreadable' });
+      }
+    });
+    child.on('error', (err) => { clearTimeout(timer); done({ error: err.message }); });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      done({ error: `the report stopped (exit ${code})` });
+    });
+  });
+}
+
+/** Opened the way every outside link is (`setWindowOpenHandler` above): the player's own
+ * browser or mail program, never this window. Only the two shapes a report produces. */
+function openReportLink(url) {
+  if (typeof url === 'string' && (url.startsWith('https://github.com/') || url.startsWith('mailto:'))) {
+    return shell.openExternal(url).catch((err) => updateLog('error', 'open link: ' + err.message));
+  }
+  return Promise.resolve();
 }
 
 function showGame(url) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(url);
 }
 
-function showStartupFailure(error) {
-  dialog.showErrorBox(
-    'Pathfinder GM could not start',
-    `${error.message}\n\nIf this keeps happening, the log is in your Pathfinder GM ` +
-    'data folder under logs\\pathfindergm.log.'
-  );
+/**
+ * A box with the reason, and a way to send it. It was `dialog.showErrorBox`, which has one
+ * button and pointed the player at "the log in your data folder", a folder most players
+ * have never opened. "Make a report" builds the same zip Settings does (the logs, the
+ * save) into Downloads, shows it in Explorer, and offers the issue and the email.
+ * Twice-called is once: a failed page load and a dead backend can both arrive.
+ */
+let failing = false;
+
+async function showStartupFailure(error) {
+  if (failing) return;
+  failing = true;
+  const detail = `${error.message}\n\nIf this keeps happening, make a report: it saves ` +
+    'the log and your game in one file in your Downloads folder, for the developer.';
+  const { response } = await dialog.showMessageBox({
+    type: 'error',
+    title: 'Pathfinder GM could not start',
+    message: 'Pathfinder GM could not start.',
+    detail,
+    buttons: ['Make a report', 'Close'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (response === 0) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setTitle('Pathfinder GM: making a report');
+    }
+    const made = await makeReportFromShell(error.message);
+    if (made && made.path) {
+      shell.showItemInFolder(made.path);
+      const { response: send } = await dialog.showMessageBox({
+        type: 'info',
+        title: 'The report is saved',
+        message: `Saved ${path.basename(made.path)} in your Downloads folder.`,
+        detail: 'Nothing has been sent. To send it, open a GitHub issue or an email ' +
+          'with the details filled in, then attach the file.',
+        buttons: ['Open a GitHub issue', 'Email it', 'Close'],
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true,
+      });
+      // Awaited: `app.exit` below would otherwise end the process before the hand-off.
+      if (send === 0) await openReportLink(made.github);
+      if (send === 1) await openReportLink(made.mailto);
+    } else {
+      updateLog('error', 'report from the startup box failed: ' + (made && made.error));
+      dialog.showErrorBox('The report could not be made',
+        `${(made && made.error) || 'unknown'}\n\nThe log is in your Pathfinder GM data ` +
+        'folder under logs\\pathfindergm.log.');
+    }
+  }
   app.exit(1);
 }
 

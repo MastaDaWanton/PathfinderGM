@@ -644,6 +644,7 @@ async function takeTurn(body, clearInput) {
   catch (err) {
     // A refusal the player can fix says why and offers the fix (10-spells.js).
     if (err.refusal && typeof showRefusal === "function") showRefusal(err.refusal);
+    else if (err.report) showStalled(err.message);
     else {
       if (!err.handled) $("#err").textContent = err.message;
       if (err.hint) $("#err").className = "hint";
@@ -651,6 +652,24 @@ async function takeTurn(body, clearInput) {
   }
   finally { busy(false); }
 }
+
+// The model stopped answering (owner, 2026-10-08): the sentence says to restart Ollama,
+// and beside it the report the developer would need if that keeps happening. It opens the
+// Settings panel on the report with the sentence carried in as the app's own note, so the
+// player only has to add what they were doing.
+function showStalled(message) {
+  const err = $("#err");
+  err.className = "";
+  err.innerHTML = `<span class="errtext">${esc(message)}</span><button type="button"
+    class="quiet errreport">Make a report</button>`;
+}
+
+document.addEventListener("click", e => {
+  const btn = e.target.closest("#err .errreport");
+  if (!btn) return;
+  const sentence = (btn.parentElement.querySelector(".errtext") || {}).textContent || "";
+  if (typeof showSettingsAt === "function") showSettingsAt("report", sentence);
+});
 
 // A spell chip may go alone: an empty box with a chip is "I cast Burning Hands." and the
 // model reads the likely use from the scene (item 21.1). Only the kind and the id are

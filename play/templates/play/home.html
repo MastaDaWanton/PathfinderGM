@@ -402,6 +402,45 @@
   .prefrow input { accent-color: var(--accent); margin: 3px 0 0; }
   .prefrow .why, .prefnote { margin-top: 2px; font-size: 13px; color: var(--dim); }
   .prefnote { margin-top: 7px; }
+  /* Make a report for the developer (play/report.py). One more card in the Settings pane,
+     drawn in the role cards' own frame, field and label type: nothing here is a new
+     material. The file list is the one dense thing, so it gets the page's monospace (the
+     same face the phone address uses) and right-aligned sizes. */
+  .reportcard { max-width: 46em; }
+  .reportcard[hidden] { display: none; }
+  .reportlabel { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+  .reportcard textarea { display: block; width: 100%; min-height: 108px; margin-top: 6px;
+    padding: 9px 11px; font: 15px/1.55 var(--body); color: var(--ink); resize: vertical;
+    border-radius: 2px; background: linear-gradient(var(--sunk), #14100c);
+    border: 1px solid #2e251a; }
+  .reportcard textarea:focus { border-color: var(--gold-dim); outline: none; }
+  .reportcard :focus-visible, .reportwrap > button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+  .reportapp { margin-top: 8px; font-size: 13px; color: var(--dim); }
+  .reportapp q { color: var(--ink); font-style: italic; }
+  .reportfiles { list-style: none; margin: 6px 0 0; padding: 8px 11px;
+    border: 1px solid #2e251a; border-radius: 2px; background: rgba(0,0,0,.22); }
+  .reportfiles li { display: flex; justify-content: space-between; gap: 14px;
+    font: 12.5px/1.75 ui-monospace, monospace; color: var(--accent); }
+  .reportfiles li span:first-child { overflow-wrap: anywhere; min-width: 0; }
+  .reportfiles li span:last-child { flex: none; color: var(--dim);
+    font-variant-numeric: tabular-nums; }
+  .reportfiles li.out { color: var(--dim); opacity: .55; }
+  .reportfiles li.out span:first-child { text-decoration: line-through; }
+  .reportfiles li.why { font: italic 13px/1.6 var(--body); color: var(--dim); }
+  .reportgo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-top: 16px; }
+  .reportgo .note { margin: 0; }
+  .reportgo button:disabled { opacity: .5; cursor: progress; }
+  .reportsend { margin-top: 14px; padding-top: 12px; border-top: 1px solid #2b2319; }
+  .reportsend .where { color: var(--brew); font-size: 14px; margin: 0 0 10px;
+    overflow-wrap: anywhere; }
+  .reportsendrow { display: flex; gap: 10px; flex-wrap: wrap; }
+  /* Phone width: the pane's 30px sides become the 16px gutter every phone page keeps. */
+  @media (max-width: 600px) {
+    main { padding: 16px 16px 32px; }
+    .reportsendrow a.quiet, .reportgo button.go { flex: 1 1 100%; text-align: center; }
+  }
   .preflabel { display: block; margin-top: 13px; font-size: 11.5px; color: var(--dim); }
   .choice { display: inline-flex; margin-top: 3px; border: 1px solid #2e251a; border-radius: 2px;
             background: linear-gradient(var(--sunk), #14100c); }
@@ -1958,7 +1997,9 @@ function soundSample(name) {
 }
 
 function paneSettings() {
-  if (!SETTINGS) return `<p class="note">Reading the model settings…</p>` + soundPanel();
+  if (!SETTINGS) {
+    return `<p class="note">Reading the model settings…</p>` + soundPanel() + reportSlot();
+  }
   const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
   return `
     <h2 class="sect">Before you can play</h2>
@@ -2016,7 +2057,8 @@ function paneSettings() {
       <span class="note" id="modelsaid" style="margin-left:12px"></span>
     </div>
     <div id="modelerr"></div>
-    ${soundPanel()}`;
+    ${soundPanel()}
+    ${reportSlot()}`;
 }
 
 /* --- Playing from a phone -------------------------------------------------------
@@ -2073,6 +2115,216 @@ async function lanFetch(url, method) {
     LAN = { open: false, error: String(err) };
   }
   render();
+}
+
+/* --- Make a report for the developer ---------------------------------------------
+ *
+ * The owner's design (2026-10-08): one zip, saved to Downloads, with the logs, the
+ * current game's turn log and the end of its transcript, the save itself unless the
+ * player unticks it, and their own words. Built by the server (`play/report.py`); this
+ * page never reads a file, it only asks what would go in, asks for the zip, and asks for
+ * the two prefilled ways to send it. In the desktop app the shell saves the download to
+ * Downloads and opens Explorer on it (`electron/main.js`, `wireReportDownloads`); in a
+ * browser it is an ordinary download.
+ *
+ * The card is ONE node, built once and moved back into the pane after every `render()`
+ * (`mountReport`). The pane is redrawn from strings whenever the LAN or setup state
+ * changes, and a textarea rebuilt from a string under somebody typing loses the caret and
+ * whatever they wrote since the last redraw. Kept, it loses nothing.
+ */
+const REPORT = {
+  open: QUERY.get("report") === "1",
+  // The sentence the table's "Make a report" stood beside (a model that stopped
+  // answering), sent as the app's own note, apart from the player's words.
+  note: (QUERY.get("note") || "").slice(0, 600),
+  listing: null, busy: false, saved: "", links: null, error: "",
+};
+let REPORT_NODE = null;
+const IN_DESKTOP_APP = /Electron\//.test(navigator.userAgent);
+
+function reportSlot() {
+  return `<h2 class="sect" id="reporthead">Report a problem</h2><div id="reportslot"></div>`;
+}
+
+function reportSize(n) {
+  if (n < 1024) return `${n} bytes`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function buildReportNode() {
+  const node = document.createElement("div");
+  node.className = "reportwrap";
+  node.innerHTML = `
+    <p class="note">When something goes wrong, this saves one file for the developer: the
+      game's logs, the game you are playing, and what you say happened. Nothing is sent
+      from here. You choose how to send it afterwards.</p>
+    <button type="button" class="quiet" id="reportopen" aria-expanded="false"
+      aria-controls="reportcard">Make a report for the developer</button>
+    <div class="rolecard reportcard" id="reportcard" hidden>
+      <label class="reportlabel" for="reportwords">What went wrong?</label>
+      <div class="prefnote" id="reporthint">What you did, what you expected, and what
+        happened instead.</div>
+      <textarea id="reportwords" rows="5" aria-describedby="reporthint"></textarea>
+      <div class="reportapp" id="reportapp" hidden></div>
+      <label class="prefrow"><input type="checkbox" id="reportsave" checked>
+        <span>Include the save<div class="why">The whole game as it stands, so the
+          developer sees what you saw. Untick it to keep the game to yourself.</div></span>
+      </label>
+      <span class="preflabel" id="reportlisthead">What goes in</span>
+      <ul class="reportfiles" id="reportfiles" aria-labelledby="reportlisthead"></ul>
+      <p class="prefnote">Never in it: your API keys, this app's secret key, the phone
+        pass, or your Windows user name, wherever a log or a path held them.</p>
+      <div class="reportgo">
+        <button type="button" class="go" id="reportmake">Save the report</button>
+        <span class="note" id="reportsaid" role="status" aria-live="polite"></span>
+      </div>
+      <div id="reporterr"></div>
+      <div class="reportsend" id="reportsend" hidden>
+        <p class="where" id="reportwhere"></p>
+        <div class="reportsendrow">
+          <a class="quiet" id="reportgithub" target="_blank" rel="noopener">Open a GitHub issue</a>
+          <a class="quiet" id="reportmail" target="_blank" rel="noopener">Email it</a>
+        </div>
+        <p class="prefnote">Both open with the details filled in and send nothing by
+          themselves. Attach the zip yourself: drag it into the issue, or attach it to
+          the email.</p>
+      </div>
+    </div>`;
+  node.querySelector("#reportopen").addEventListener("click", () => {
+    REPORT.open = !REPORT.open;
+    paintReport();
+    if (REPORT.open) node.querySelector("#reportwords").focus();
+  });
+  node.querySelector("#reportsave").addEventListener("change", () => paintReport());
+  // The list's "your words, N characters" follows the typing; the textarea is never redrawn.
+  node.querySelector("#reportwords").addEventListener("input", () => paintReport());
+  node.querySelector("#reportmake").addEventListener("click", saveReport);
+  return node;
+}
+
+function paintReport() {
+  const n = REPORT_NODE;
+  if (!n) return;
+  const open = n.querySelector("#reportopen");
+  open.setAttribute("aria-expanded", REPORT.open ? "true" : "false");
+  open.hidden = REPORT.open;
+  n.querySelector("#reportcard").hidden = !REPORT.open;
+  if (!REPORT.open) return;
+  if (!REPORT.listing && !REPORT.fetching) fetchReportListing();
+  const app = n.querySelector("#reportapp");
+  app.hidden = !REPORT.note;
+  if (REPORT.note) app.innerHTML = `The app adds what it said: <q>${esc(REPORT.note)}</q>`;
+  const withSave = n.querySelector("#reportsave").checked;
+  const list = n.querySelector("#reportfiles");
+  if (REPORT.listing && REPORT.listing.error) {
+    list.innerHTML = `<li class="why">${esc(REPORT.listing.error)}</li>`;
+  } else if (!REPORT.listing) {
+    list.innerHTML = `<li class="why">Reading what is there…</li>`;
+  } else {
+    const words = n.querySelector("#reportwords").value.length;
+    list.innerHTML = REPORT.listing.files.map(f => {
+      const out = f.kind === "save" && !withSave;
+      const size = f.kind === "words" ? `your words, ${words} characters`
+        : out ? "left out" : reportSize(f.bytes);
+      return `<li class="${out ? "out" : ""}"><span>${esc(f.name)}</span>
+        <span>${esc(size)}</span></li>`;
+    }).join("") + (REPORT.listing.has_save ? "" : `<li class="why">No game has been
+      played yet, so there is no save to include.</li>`);
+  }
+  const make = n.querySelector("#reportmake");
+  make.disabled = REPORT.busy;
+  make.textContent = REPORT.busy ? "Saving the report…" : "Save the report";
+  n.querySelector("#reporterr").innerHTML = REPORT.error
+    ? `<div class="problems"><div>${esc(REPORT.error)}</div></div>` : "";
+  const send = n.querySelector("#reportsend");
+  send.hidden = !(REPORT.saved && REPORT.links);
+  if (REPORT.saved && REPORT.links) {
+    n.querySelector("#reportwhere").textContent = IN_DESKTOP_APP
+      ? `Saved ${REPORT.saved} in your Downloads folder.`
+      : `Your browser is saving ${REPORT.saved}, usually to your Downloads folder.`;
+    n.querySelector("#reportgithub").href = REPORT.links.github;
+    n.querySelector("#reportmail").href = REPORT.links.mailto;
+  }
+}
+
+function mountReport() {
+  const slot = document.getElementById("reportslot");
+  if (!slot) return;
+  const first = !REPORT_NODE;
+  if (first) REPORT_NODE = buildReportNode();
+  const had = REPORT_NODE.contains(document.activeElement) ? document.activeElement : null;
+  slot.replaceWith(REPORT_NODE);
+  if (had) had.focus();
+  paintReport();
+  // Opened from the table's "Make a report" (`?report=1`): brought into view once the
+  // model settings above it have arrived. Scrolled on the first mount, it was pushed off
+  // screen again when they did (measured at phone width, 2026-10-08).
+  if (first && REPORT.open) REPORT_NODE.querySelector("#reportwords").focus({ preventScroll: true });
+  if (REPORT.open && !REPORT.scrolled && SETTINGS) {
+    REPORT.scrolled = true;
+    REPORT_NODE.scrollIntoView({ block: "start" });
+  }
+}
+
+async function fetchReportListing() {
+  REPORT.fetching = true;
+  try {
+    const r = await fetch("/api/report");
+    const body = await r.text();
+    let d; try { d = JSON.parse(body); } catch { d = { error: body.slice(0, 160) }; }
+    REPORT.listing = r.ok ? d : { error: d.error || `HTTP ${r.status}` };
+  } catch (err) {
+    REPORT.listing = { error: String(err) };
+  } finally {
+    REPORT.fetching = false;
+  }
+  paintReport();
+}
+
+function reportPost(url, body) {
+  return fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function saveReport() {
+  if (REPORT.busy) return;
+  const n = REPORT_NODE;
+  const description = n.querySelector("#reportwords").value;
+  const include_save = n.querySelector("#reportsave").checked;
+  REPORT.busy = true; REPORT.error = ""; REPORT.saved = ""; REPORT.links = null;
+  paintReport();
+  n.querySelector("#reportsaid").textContent = "";
+  try {
+    const r = await reportPost("/api/report", { description, include_save, note: REPORT.note });
+    if (!r.ok) {
+      const body = await r.text();
+      let d; try { d = JSON.parse(body); } catch { d = { error: body.slice(0, 160) }; }
+      throw new Error(d.error || `HTTP ${r.status}`);
+    }
+    const name = r.headers.get("X-Report-Name") || "pathfindergm-report.zip";
+    // A download the ordinary way: an object URL and an anchor with `download`. The
+    // shell recognises the name (electron/main.js) and saves it to Downloads; a browser
+    // saves it wherever it saves things.
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.hidden = true;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    REPORT.saved = name;
+    const l = await reportPost("/api/report/links", { description, zip: name });
+    if (!l.ok) throw new Error(`The report is saved, but the links to send it did not come back (HTTP ${l.status}).`);
+    REPORT.links = await l.json();
+  } catch (err) {
+    REPORT.error = err.message || String(err);
+  } finally {
+    REPORT.busy = false;
+    paintReport();
+    if (REPORT.saved && REPORT.links) n.querySelector("#reportgithub").focus();
+  }
 }
 
 async function saveModelSettings() {
@@ -3014,6 +3266,8 @@ function render() {
     : TAB === "settings" ? paneSettings()
     : TAB === "homebrew" ? paneHomebrew()
     : paneCharacters());
+  // The report card is a kept node, put back into its slot after every redraw.
+  mountReport();
 }
 
 document.addEventListener("input", e => {

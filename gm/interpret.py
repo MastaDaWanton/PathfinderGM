@@ -831,6 +831,133 @@ def confirm_sale(sentence: str, span: str, *, model: str | None = None) -> str:
     return got if got in COMMITS else ""
 
 
+# --- a take from a person, asked again -------------------------------------------------
+#
+# Since 2026-10-08 a `give` the player makes from somebody else's hands is a TAKE
+# (`Engine._op_give`): the owner is kept and the thing is marked stolen. That is right for
+# "I take an apple from the fruit seller without paying" (measured: it used to be filed as
+# the seller handing it over), and wrong for "I take the purse he holds out" — a reward
+# would be a theft. Whether the holder agreed is not in the take's own words; it is in the
+# beat before them, so the one question is asked with that beat in front of it: did the
+# person give or offer it, or did the player take it without their agreement? Two enum
+# values, demonstrated, none of them from the measured lines (tests/test_spoken_theft.py
+# holds what was measured).
+TAKE_ANSWERS = ("offered", "taken")
+
+_TAKE_DEMOS = [
+    ("The tanner is bent over a vat, her back to the street.",
+     "I lift a strip of leather from the tanner's rack", "taken"),
+    ("The old reeve holds out a small purse. \"For your trouble,\" he says.",
+     "I take the purse from the reeve", "offered"),
+    ("The baker slides a warm bun across the counter. \"On the house.\"",
+     "I take the bun from her and thank her", "offered"),
+    ("The gaoler snores on his stool, the ring of keys on his belt.",
+     "I take the keys from the gaoler", "taken"),
+    ("The pedlar haggles with a woman over a length of ribbon.",
+     "I help myself to a ribbon from the pedlar's tray", "taken"),
+    ("\"Go on, then — pick one,\" the fishwife says, tipping her basket towards you.",
+     "I take a herring from the fishwife", "offered"),
+    ("The clerk pushes the receipt across the desk for you to keep.",
+     "I take the receipt from the clerk", "offered"),
+    ("The cooper counts his barrels and does not look up.",
+     "I grab a mallet from the cooper", "taken"),
+]
+
+
+def take_messages(beat: str, span: str) -> list[dict]:
+    system = ("A player in a role-playing game takes something from another person. "
+              "Using the scene just before, answer one question: did that person GIVE or "
+              "OFFER it (held it out, handed it over, told them to take it, a gift, a "
+              "reward, their change) — offered — or did the player take it WITHOUT the "
+              "person agreeing (lifted, grabbed, helped themselves, did not pay, while "
+              "the person was busy or asleep) — taken?")
+    out = [{"role": "system", "content": system}]
+    for before, said, answer in _TAKE_DEMOS:
+        out.append({"role": "user", "content": f"Scene: {before}\nThe take: {said}"})
+        out.append({"role": "assistant", "content": json.dumps({"took": answer})})
+    out.append({"role": "user", "content": f"Scene: {beat or '(nothing yet)'}\n"
+                                           f"The take: {span}"})
+    return out
+
+
+def confirm_take(beat: str, span: str, *, model: str | None = None) -> str:
+    """"offered" or "taken" for a take from a person; "" when the call fails (the caller
+    then leaves it a take — the engine's own rule, docs/items-have-owners.md)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object", "properties": {"took": {"type": "string",
+                                                        "enum": list(TAKE_ANSWERS)}},
+              "required": ["took"]}
+    try:
+        reply = client.chat(take_messages(beat, span), model or cfg["model"], cfg["host"],
+                            as_json=True, think=False, temperature=0.0, num_predict=20,
+                            provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = str((reply.json() or {}).get("took") or "")
+    except Exception:  # noqa: BLE001 — a failed question leaves the take a take
+        return ""
+    return got if got in TAKE_ANSWERS else ""
+
+
+# --- first aid, asked -----------------------------------------------------------------
+#
+# A deed aimed at somebody the engine says is dying (`acts_to_ops.first_aid`) may be first
+# aid or anything else done to a body. The reader reads "I give first aid to the porter"
+# as `other` and "I bandage him" as `use`, and no act of its vocabulary is first aid, so
+# the one question is put on its own, with the deed's own words. Demonstrations written
+# for this; none is a measured line.
+AID_ANSWERS = ("first aid", "something else")
+
+_AID_DEMOS = [
+    ("press my cloak hard against the sailor's wound", "the sailor", "first aid"),
+    ("drag the sailor into the shade of the wall", "the sailor", "something else"),
+    ("stitch the gash in the hunter's thigh", "the hunter", "first aid"),
+    ("say a prayer over the old drover", "the old drover", "something else"),
+    ("try to stop the bleeding with my belt", "the guard", "first aid"),
+    ("search the guard's boots for a hidden blade", "the guard", "something else"),
+]
+
+
+def aid_messages(span: str, patient: str) -> list[dict]:
+    system = ("In a role-playing game, the player's character does something to a person "
+              "who is lying on the ground dying, bleeding out. Answer one question: is the "
+              "player trying to keep them alive — first aid, binding or stitching the "
+              "wound, stopping the bleeding, tending them — or doing something else?")
+    out = [{"role": "system", "content": system}]
+    for said, who, answer in _AID_DEMOS:
+        out.append({"role": "user", "content": f"Dying: {who}\nThe deed: {said}"})
+        out.append({"role": "assistant", "content": json.dumps({"deed": answer})})
+    out.append({"role": "user", "content": f"Dying: {patient}\nThe deed: {span}"})
+    return out
+
+
+def confirm_first_aid(span: str, patient: str, *, model: str | None = None) -> str:
+    """One of `AID_ANSWERS`; "" when the call fails (no first aid is built: the plan's own
+    ops stand, as before)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object", "properties": {"deed": {"type": "string",
+                                                        "enum": list(AID_ANSWERS)}},
+              "required": ["deed"]}
+    try:
+        reply = client.chat(aid_messages(span, patient), model or cfg["model"], cfg["host"],
+                            as_json=True, think=False, temperature=0.0, num_predict=20,
+                            provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = str((reply.json() or {}).get("deed") or "")
+    except Exception:  # noqa: BLE001
+        return ""
+    return got if got in AID_ANSWERS else ""
+
+
 # --- in the turn ---------------------------------------------------------------------
 #
 # First integration (2026-09-27), additive by design: the research's advice was to keep
@@ -1068,6 +1195,19 @@ def _leaving(action: dict, scene, places, location=None) -> str:
     cur = by_id.get(here_id)
     named = places_mod.find(places, slot) if slot else None
     indoors = cur is not None and places_mod.is_indoors(cur.id, cur.terrain, cur.shape)
+    # Asked of the place's own id when the list does not carry it (the floorplan answers
+    # either way, `places.is_indoors`).
+    roofed = indoors if cur is not None else bool(here_id) and places_mod.is_indoors(here_id)
+    if not slot and here_id and not roofed:
+        # A bare "walk off" under the open sky names nothing to leave: not a building
+        # (there is none around them) and not the settlement (nobody said so). Measured
+        # 2026-10-08 (the deeds lane, local model): "I take another apple from the fruit
+        # seller and walk off" read `leave` with no place, this answered "settlement",
+        # the travel was owed with only the roads out to choose from, and the player
+        # walked out of Vormoor onto the road to Scrapden over an apple. Inform's EXIT
+        # outside any container answers "But you aren't in anything at the moment" —
+        # leaving needs a thing to leave. No walk is owed; the plan may still choose one.
+        return ""
     if (not slot or words & _SETTLEMENT_WORDS or (name and name in slot)
             or (location is not None and places_mod.scale_of(location) in words)):
         if indoors and slot and (named is not None and named.id == here_id):

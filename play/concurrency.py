@@ -76,8 +76,13 @@ READ_WAIT = 300.0
 #   /api/lan       decides whether the app listens to the network. It touches no
 #                  campaign, and the one moment a player reaches for it is while a
 #                  turn is running and they want the phone in their hand.
+#   /api/report    builds the report a player sends the developer (`play/report.py`). It
+#                  is wanted most while a turn is stuck on a model that stopped
+#                  answering, which is when the lock is held, and it reads the save from
+#                  disk rather than the campaign in memory. A POST under the lock would
+#                  also bump the revision and send every device off to re-fetch.
 EXEMPT = ("/static/", "/api/alive", "/api/revision", "/api/setup", "/api/lan",
-          "/manual", "/licence")
+          "/api/report", "/manual", "/licence")
 
 _GAME = threading.RLock()
 

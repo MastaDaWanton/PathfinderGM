@@ -3528,6 +3528,13 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
         from rules import gathering
 
         props["key"] = {"type": "string", "enum": gathering.excursion_keys()}
+    if op == "check" and "skill" in props:
+        # A skill is a closed list too (the rules' own, `tables.SKILLS`). Declared since
+        # 2026-10-08 by a skill the player named ("I use the Heal skill",
+        # `means.HELD_OPS`), where a free string could come back "first aid".
+        from rules.tables import SKILLS
+
+        props["skill"] = {"type": "string", "enum": list(SKILLS)}
     if op == "cast" and "aim" in props:
         from rules import areas
 

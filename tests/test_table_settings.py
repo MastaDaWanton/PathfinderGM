@@ -23,7 +23,9 @@ def test_the_table_has_a_settings_button_and_a_panel_over_the_game():
 
 def test_the_button_opens_the_shelfs_own_settings_embedded():
     js = SHELL.read_text(encoding="utf-8")
-    assert 'frame.src = "/?tab=settings&embed=1";' in js
+    # Built in a variable since 2026-10-08, so a stalled model's "Make a report" can open
+    # the same page already unfolded on the report (`&report=1`).
+    assert 'let src = "/?tab=settings&embed=1";' in js and "frame.src = src;" in js
     # Esc inside the frame never reaches the table; the page posts this instead.
     assert 'e.data.pgm === "close-settings"' in js and "btn.focus();" in js
 

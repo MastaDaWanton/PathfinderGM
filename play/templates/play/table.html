@@ -1374,6 +1374,9 @@
   .chip.att.risky { border-color: var(--alarm); }
   .chip.att.risky ~ .att-note { border-left-color: var(--alarm); }
   #err .errfix { margin-left: 10px; padding: 6px 12px; font-size: 12px; }
+  /* "Make a report" beside a model that stopped answering (04-combat-and-turns.js). On
+     its own line under the sentence, which is long and says to restart Ollama first. */
+  #err .errreport { display: block; margin-top: 8px; padding: 6px 12px; font-size: 12px; }
 
   /* --- The time-skip clock (Lane F, 09-clock.js) -----------------------------
    * Twelve identical black strips on a brass face, no numerals (owner, Q45), in main so

@@ -177,6 +177,32 @@ the pouch into the purse" — with no price, because the ledger holds no digit (
 rule); the price is the tell's: "Kesst Vayr sells the crate to the clerk of the counting
 house for 7 silver pieces, 5 copper pieces."
 
+## A take named in words (2026-10-08)
+
+Measured by the deeds lane with the local model, in 0.2.11, and reproduced with the live
+reader and planner before the fix: "I take an apple from the fruit seller without paying"
+came out as "the fruit seller hands Kesst Vayr apple", nothing stolen; "another apple" and
+"one of the apples" missed the seller's "apple" line, she kept every apple and one was
+minted; "…and walk off" walked Kesst out of town.
+
+- **The one acting is the taker.** A `give` with `from_` a person, made by the one who
+  ends up holding it, is a take (`Engine._op_give`'s `taking`): the owner is kept and
+  `stolen` set, as the holder search already did. A price is consent; so is the holder
+  being the actor (Inform's giving action, the rule above read the other way); a
+  companion's pack is the party's. The dead own nothing: taken from a body, it is the loot
+  op's rule, told as "from the dead thug's body".
+- **What they carry, never a new thing.** A take from a person resolves against that
+  person's own goods, shelf, weapons and label (`Engine._carried_by`, `holding.named_among`:
+  the holder's names matched whole-word inside the words), and a thing they do not carry
+  is refused. The open-pockets rule stays for a holder who hands a thing over.
+- **Offered or taken is asked, once.** Whether the holder agreed is in the beat before the
+  words, not in them, so a take from a person is put to one enum question with the last
+  beat shown (`interpret.confirm_take`, `acts_to_ops.confirm_takes`): "offered" makes the
+  holder the actor. 16 of 16 on lines written apart from its demonstrations. A `steal` is
+  never asked, and out of a fight is built as the same take (in a fight it is the
+  manoeuvre).
+- **A bare "walk off" under the sky owes no road out** (`interpret._leaving`).
+
 ## Replayed on the owner's save
 
 The recorded turns of `items/slice.json`, from an empty pack, through the item stages of

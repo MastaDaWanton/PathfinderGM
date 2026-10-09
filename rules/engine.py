@@ -18259,6 +18259,13 @@ class Engine:
             key = holding.key_in(actor.goods, item)
             if key:
                 return actor, key
+        # "another apple", "one of the apples": the holder's own line named inside the
+        # words (`holding.named_among`, the 2026-10-08 measurement), after every exact
+        # match has had its chance.
+        for actor in others:
+            key = holding.named_among(actor.goods, item)
+            if key:
+                return actor, key
         for actor in others:
             thing = holding.label_carries(actor.name, item)
             if thing and not any(rec.get("owner") == actor.ref
@@ -18267,6 +18274,33 @@ class Engine:
                                  for rec in self.scene.props):
                 return actor, thing
         return None
+
+    def _carried_by(self, holder: Actor, item: str) -> str | None:
+        """The name, as `holder` carries it, of the thing `item` asks for — their goods
+        line, a jar on their shelf, a weapon on their list, or what their own label puts in
+        their hands — or None when they carry nothing it can be. The engine's own lists are
+        the vocabulary; the words are only searched for one of their names
+        (`holding.named_among`), never trusted to name a new thing."""
+        key = holding.key_in(holder.goods, item) or holding.named_among(holder.goods, item)
+        if key:
+            return key
+        shelf = {}
+        for iid, s in (getattr(holder, "stock", None) or {}).items():
+            for n in (getattr(s, "name", ""), getattr(s, "base", ""),
+                      str(iid).split("#")[0].replace("-", " ")):
+                if n:
+                    shelf.setdefault(str(n), str(getattr(s, "name", "") or n))
+        key = holding.key_in(shelf, item) or holding.named_among(shelf, item)
+        if key:
+            return shelf[key]
+        arms = {str(w): str(w) for w in getattr(holder, "weapons", None) or ()
+                if str(w).lower() not in ("unarmed", "improvised")}
+        canon = goods.canonical(item)
+        key = (next((w for w in arms if goods.canonical(w) == canon), None)
+               or holding.named_among(arms, item))
+        if key:
+            return key
+        return holding.label_carries(holder.name, item) or None
 
     def _coin_lying_here(self) -> dict | None:
         """A record lying here with coin in it — a pile somebody set down, a dropped
@@ -18502,6 +18536,40 @@ class Engine:
         # off the holder chain and refuses the take outright; here the narrator stages
         # hand-overs the plan cannot see, so the take goes through and the owner stays.
         taken_from: Actor | None = None
+        # A giver named in `from_` who is not the one acting, by the one who ends up
+        # holding it, did not hand it over: it was TAKEN. Inform's giving action makes the
+        # actor the giver (above); the same reading the other way round makes the actor
+        # the taker, and a take from a person is the holder search's take below — the
+        # owner kept, the `stolen` flag set. Measured 2026-10-08 (the deeds lane, local
+        # model): "I take an apple from the fruit seller without paying" was planned
+        # `give item=apple from_=c1 to=pc`, read here as a hand-over, and the tell said
+        # "the fruit seller hands Kesst Vayr apple" — a theft filed as a gift, with nothing
+        # marked stolen. A price is consent; so is the holder being the one who acts
+        # (`acts_to_ops.confirm_takes` writes a thing the player was OFFERED that way);
+        # a companion's pack is the party's. Coin keeps its own door (a number, never a
+        # props record).
+        acting = str(intent.actor or (pc.ref if pc is not None else ""))
+        taking = (giver is not None and not inferred and not giver.is_pc
+                  and taker is not None and taker is not giver and taker.ref == acting
+                  and giver.ref != acting and source is None and not denom
+                  and not intent.params.get("price")
+                  and not giver.has_state(states.TRAVELS_WITH_YOU))
+        if taking:
+            # What they actually carry, and nothing else: a take from a person never comes
+            # out of the air. "another apple" from a seller with an "apple" line is that
+            # apple (`_carried_by`); "a pear" from a seller with none is refused, where it
+            # used to be minted through the open-pockets rule below, which stays for a
+            # holder who HANDS a thing over (the clerk who slides a pouch across).
+            from .bestiary import collapse_kit
+
+            collapse_kit(giver)
+            held = self._carried_by(giver, item)
+            if held is None:
+                return self._refuse(
+                    intent, f"{giver.name} has no {holding.plain(item) or item} to take. "
+                            f"Nothing changes hands.")
+            item = held
+            taken_from = giver
         if giver is None and taker is not None and source is None and not denom:
             source = self._box_holding(item, taker)
         if giver is None and taker is not None and source is None and not denom:
@@ -18510,6 +18578,12 @@ class Engine:
                 giver, item = found
                 # Paid for is handed over: a price is the holder's consent.
                 taken_from = None if intent.params.get("price") else giver
+        # The dead hand nothing over and own nothing any more: taking from a body is the
+        # loot op's rule (no owner kept), said as a body's — never "the dead thug hands
+        # Kesst Vayr a sap", which is what a `from_` naming a corpse read as before.
+        looted = None
+        if taken_from is not None and taken_from.is_dead:
+            looted, taken_from = taken_from, None
         if source is not None and not denom:
             # Out of a container the taker can reach: the thing leaves its contents.
             box = holding.contents(source)
@@ -18742,6 +18816,8 @@ class Engine:
             how = "took_from"
             tell = (f"{taker.name} takes {self._the(what)} from {taken_from.name}, who "
                     f"did not hand it over; it is still theirs.")
+        elif looted is not None and taker is not None:
+            tell = f"{taker.name} takes {self._the(what)} from {looted.name}'s body."
         elif giver is not None and taker is not None:
             how = "handed"
             tell = f"{giver.name} hands {taker.name} {what}{paid}."
@@ -20661,8 +20737,18 @@ class Engine:
                 return self._op_wear(Intent(
                     id=intent.id, op="wear", actor=actor.ref,
                     params={"item": "unarmed"}, because=intent.because), partial)
+        if not bare:
+            # Nothing named is nothing taken off. Measured live 2026-10-08 (the spoken-
+            # theft lane): "I take one of the pears from the fruit seller, then a melon"
+            # was planned with two `take_off` ops and no item — the planner reaching for
+            # an op called "take" — and this door read the blank as the armour: Kesst's
+            # leather came off in the middle of the market, armour class 15 to 13. Every
+            # door that means it names the thing (`judgement.declare_take_off`, the
+            # equipment tab, the prompt's own example).
+            return self._refuse(intent, f"Name what {actor.name} takes off: the armour, "
+                                        f"the shield, or what is in hand. Nothing comes off.")
         if not kind:
-            if bare in ("", "armour", "armor", "suit", "mail", "my armour"):
+            if bare in ("armour", "armor", "suit", "mail", "my armour"):
                 kind, key = "armour", str(actor.armour)
             elif bare in ("shield", "buckler"):
                 kind, key = "shield", str(actor.shield)
