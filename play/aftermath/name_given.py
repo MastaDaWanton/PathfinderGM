@@ -42,6 +42,12 @@ def step(ctx) -> list[dict]:
             continue
         if judgement._answers_to(actors, who, given):
             continue
+        # Never what they are as who they are (`beat_reader.what_not_who`): the one other
+        # door a name comes in by keeps the rule `name_refusal` keeps (2026-10-09).
+        from gm import beat_reader
+
+        if beat_reader.what_not_who(scene, getattr(ctx, "world", None), ref, given):
+            continue
         was = str(who.name)
         judgement._take_the_name(scene, who, given)
         rows.append({"kind": "name-given", "ref": ref, "was": was, "name": given})

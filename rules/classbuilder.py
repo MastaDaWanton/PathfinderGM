@@ -1104,12 +1104,25 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
         problems.append(
             f"{at}: unknown field(s) {', '.join(unknown)}. A feat document carries: "
             f"{', '.join(sorted(_FEAT_DOC_KEYS))}.")
+    from . import classfeatures
+
     for i, spec in enumerate(doc.get("modifiers") or []):
         mat = f"{at}.modifiers[{i}]"
-        if not isinstance(spec, dict) or str(spec.get("type", "")) not in _MOD_TYPES:
+        kind = str(spec.get("type", "")) if isinstance(spec, dict) else ""
+        if kind == "speed":
+            # Fleet's "+5 feet to base speed": the class documents' own speed channel,
+            # `land_base` (before armour, untyped, stacking — `Actor.speed_feet`), not
+            # the enhancement channel boots ride. Only that target: an untyped term on
+            # `land` is read as enhancement there and would be eaten by a pair of boots.
+            if str(spec.get("target", "")) != "land_base":
+                problems.append(
+                    f"{mat}: a feat's speed is its base speed — target \"land_base\", "
+                    f"the barbarian's channel, which stacks and comes before armour.")
+        elif kind not in _MOD_TYPES:
             problems.append(
                 f"{mat}: a feat's modifiers are the four modifier types — "
-                f"{', '.join(_MOD_TYPES)} — because they ride the sheet's own lists.")
+                f"{', '.join(_MOD_TYPES)} — or a `speed` on land_base, because they "
+                f"ride the sheet's own lists.")
             continue
         extra = sorted(set(spec) - _FEAT_MOD_KEYS)
         if extra:
@@ -1121,12 +1134,44 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             problems.append(f"{mat}: an amount (a number) or a formula over the sheet.")
         probe = {k: v for k, v in spec.items()
                  if k in ("type", "target", "amount", "formula", "bonus_type", "note")}
-        problems.extend(validate_effect(probe, mat, ()))
+        if str(probe.get("target", "")) == "$target":
+            # Skill Focus (perception): the sheet's parenthetical is the skill, bound
+            # when the feat is read (`Actor._feat_mods`). Only a skill can be aimed so —
+            # a weapon binds through `scope` instead.
+            if kind != "skill_mod":
+                problems.append(f"{mat}: \"$target\" as a target is a skill_mod's — the "
+                                f"parenthetical names the skill. A weapon is bound with "
+                                f"scope {{\"weapon\": \"$target\"}}.")
+            probe["target"] = "perception"
+        if probe.get("formula"):
+            # A skill term's formula may ask `ranks` (the skill's own ranks, supplied by
+            # the reader), which the generic check does not know; checked here with it.
+            names = ("ranks",) if kind == "skill_mod" else ()
+            trouble = resources.check(probe.pop("formula"), names)
+            probe.setdefault("amount", 0)
+            if trouble:
+                problems.append(f"{mat}.formula: {trouble}"
+                                + (" A skill term may also ask `ranks`, the ranks in "
+                                   "that skill." if names else ""))
+        if kind == "speed":
+            probe = None
+        if probe is not None:
+            problems.extend(validate_effect(probe, mat, ()))
         for cond in ("scope", "when"):
             if cond in spec and not isinstance(spec[cond], dict):
                 problems.append(
                     f"{mat}.{cond}: an object — scope {{\"weapon\": \"$target\"}}, "
                     f"when {{\"range_ft\": {{\"lte\": 30}}}}.")
+        when = spec.get("when")
+        if isinstance(when, dict) and when:
+            # The `when` grammar's own check (2026-10-09): until now a feat's clause was
+            # never validated, so a misspelt `against` would have held for nobody.
+            # `bearer` is the class documents' clause, checked by their checker.
+            rest = {k: v for k, v in when.items() if k != "bearer"}
+            if rest:
+                problems.extend(effectspec.when_problems(rest, f"{mat}.when"))
+            problems.extend(classfeatures._check_when(
+                {"bearer": when["bearer"]} if "bearer" in when else None, mat, doc))
     for field_name in ("tags", "not_yet", "requires", "requires_not"):
         got = doc.get(field_name)
         if got is not None and (not isinstance(got, (list, tuple))

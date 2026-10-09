@@ -82,9 +82,16 @@ def test_a_burn_that_keeps_burning_goes_through_take_damage():
 
 
 def test_a_days_work_runs_once_per_day_crossed_and_never_per_round():
-    """`Scene.advance` is expiry-only for rounds — an eight-hour rest is 4,800 rounds and
-    firing a round's work that often would heal a troll 4,800 points. A `per: day` entry
-    runs once per day boundary the clock crosses: three days, three times."""
+    """A `per: day` entry runs once per day boundary the clock crosses: three days, three
+    times — never once per round of them.
+
+    This test also pinned that a per-ROUND heal did nothing across `Scene.advance` ("an
+    eight-hour rest is 4,800 rounds and firing a round's work that often would heal a
+    troll 4,800 points"). That was the defect the owner hit on 2026-10-09 — fast healing
+    5 and "my health is not going up" — and the book's answer to the troll is that it IS
+    whole after eight hours. Per-round heals now run over the stretch, capped at full and
+    at each effect's rounds left (`run_periodic(elapsed=True)`,
+    tests/test_rest_and_fast_healing.py); per-round damage and saves still do not."""
     scene, pc = _scene()
     # Three days without water roll thirst checks on the clock's door since 2026-10-05
     # (rules/survival.py, `charge`); this measures the periodic heal alone.
@@ -92,8 +99,7 @@ def test_a_days_work_runs_once_per_day_crossed_and_never_per_round():
         pc.overrides[need] = True
     pc.hp = pc.hp_max - 10
     pc.apply_effect(ActiveEffect(name="slow mending", kind="buff",
-                                 periodic=[{"heal": 2, "per": "day"},
-                                           {"heal": 1}]))       # per round: not here
+                                 periodic=[{"heal": 2, "per": "day"}]))
     scene.clock_minutes = 600
     scene.advance(minutes=3 * 1440)
     assert pc.hp == pc.hp_max - 10 + 3 * 2

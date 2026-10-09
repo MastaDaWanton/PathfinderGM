@@ -123,26 +123,39 @@ function castIsPersonal(spell) {
   return /^\s*personal\b/i.test(String((spell && spell.range) || ""));
 }
 
-function castStep(spell, onSelf) {
+// Cast defensively (Core Rulebook, Concentration): a spell cast within a foe's reach
+// provokes an attack of opportunity, unless it is cast defensively — a concentration
+// check of DC 15 + twice the spell's level, the spell lost on a failure. Offered as a
+// toggle on the same menu since 2026-10-09, when casting began to provoke and the cast
+// op's `defensively` began to be read (with it, Combat Casting's +4).
+function castStep(spell, onSelf, defensively) {
   const params = { spell: spell.id };
   const self = onSelf || castIsPersonal(spell);
   if (self) params.aim = "self";
+  if (defensively) params.defensively = true;
   const act = { op: "cast", params };
   if (!self && COMBAT.target) act.target = COMBAT.target;
   const at = self ? "on yourself" : COMBAT.target ? `at ${targetName()}` : "";
-  return { label: `Cast ${spell.name}${at ? " " + at : ""}`, actions: [act],
+  return { label: `Cast ${spell.name}${at ? " " + at : ""}${defensively ? ", defensively" : ""}`,
+           actions: [act],
            cast: { id: spell.id, name: spell.name, range: spell.range || "",
-                   self: !!onSelf } };
+                   self: !!onSelf, defensively: !!defensively } };
 }
 
 function castMenu(spell) {
   const personal = castIsPersonal(spell);
   const self = COMBAT.standard && COMBAT.standard.cast && COMBAT.standard.cast.self;
+  const def = COMBAT.standard && COMBAT.standard.cast && COMBAT.standard.cast.defensively;
   const turn = personal || !COMBAT.target ? "" : self
     ? `<button type="button" data-castaim="target">At ${esc(targetName())} instead</button>`
     : `<button type="button" data-castaim="self">On yourself instead</button>`;
-  combatMenu(`${turn}<span class="cb-note">${esc(spell.name)} is in this turn, with ${
-    COMBAT.move ? "your move" : "any move you click on the map"}. Commit turn casts it.</span>`);
+  const guard = `<button type="button" data-castdef="${def ? "off" : "on"}" aria-pressed="${
+    def ? "true" : "false"}">${def ? "Cast normally instead" : "Cast defensively"}</button>`;
+  combatMenu(`${turn}${guard}<span class="cb-note">${esc(spell.name)} is in this turn, with ${
+    COMBAT.move ? "your move" : "any move you click on the map"}. Commit turn casts it.${
+    def ? " Defensively: no attack of opportunity, but a concentration check (DC 15 + twice"
+      + " the spell's level) or the spell is lost."
+      : " Cast within a foe's reach, it provokes an attack of opportunity."}</span>`);
 }
 
 // Called by 10-spells.js when a spell is chosen in a fight. Returns false when there is
@@ -300,7 +313,7 @@ document.addEventListener("click", async e => {
     // picker is one press away from the Spells button), and "Cast Magic Missile at the
     // thug" must not stay aimed at the thug once the player has pointed at somebody else.
     const cast = COMBAT.standard && COMBAT.standard.cast;
-    if (cast && !cast.self) COMBAT.standard = castStep(cast, false);
+    if (cast && !cast.self) COMBAT.standard = castStep(cast, false, cast.defensively);
     // A staged throw at a person follows the chip the same way; one at a square stays.
     const flask = COMBAT.standard && COMBAT.standard.flask;
     if (flask && !flask.square) COMBAT.standard = throwStep(flask, null);
@@ -311,7 +324,14 @@ document.addEventListener("click", async e => {
   }
   const castAim = t.closest("[data-castaim]");
   if (castAim && COMBAT.standard && COMBAT.standard.cast) {
-    COMBAT.standard = castStep(COMBAT.standard.cast, castAim.dataset.castaim === "self");
+    COMBAT.standard = castStep(COMBAT.standard.cast, castAim.dataset.castaim === "self",
+                               COMBAT.standard.cast.defensively);
+    renderPlan(); castMenu(COMBAT.standard.cast); return;
+  }
+  const castDef = t.closest("[data-castdef]");
+  if (castDef && COMBAT.standard && COMBAT.standard.cast) {
+    const c = COMBAT.standard.cast;
+    COMBAT.standard = castStep(c, c.self, castDef.dataset.castdef === "on");
     renderPlan(); castMenu(COMBAT.standard.cast); return;
   }
   const un = t.closest("[data-unplan]");

@@ -1860,9 +1860,21 @@
   .v2-btn.is-small { letter-spacing: .06em; }
 
   /* --- The top bar: the way out, the world, the tabs, Talk and the sheet toggle ---- */
+  /* A wrapping row, not three grid tracks. The tracks were `minmax(0, 1fr) auto
+     minmax(0, 1fr)` (and `auto minmax(0, 1fr) auto` under 1181px): every one could shrink
+     below what it held, so when the window narrowed nothing gave way, it overlapped.
+     Swept 2026-10-09 at every 5px from 375 to 1920 with a caster's Spells tab and Talk's
+     "2 new": 152 of 310 widths had two controls on top of each other, the owner's
+     screenshot among them (Talk over Trade and Journal from 1185 to 1550px, Worlds &
+     characters under Table and Map from 765 to 1070px). As a flex row each part keeps
+     its own width and the end group drops to a line of its own when the three do not
+     fit, in the order the tab key takes them; the two ends grow from nothing at the
+     same rate, so the tabs still sit centred whenever the room is there. */
   .topbar {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center; gap: 12px; padding: 8px 16px 9px;
+    /* min-width 0: as the page grid's item the bar otherwise sizes to its widest part,
+       the phone's seven scrolling tabs, and it measured 440px on a 375px phone. */
+    display: flex; flex-wrap: wrap; min-width: 0;
+    align-items: center; gap: 8px 12px; padding: 8px 16px 9px;
     border-bottom: 1px solid var(--gold-dim);
     background: linear-gradient(rgba(255, 225, 170, .05), rgba(0, 0, 0, 0) 30%, rgba(8, 6, 4, .40)),
                 var(--tex-card-leather) #241d15;
@@ -1871,17 +1883,23 @@
     box-shadow: inset 0 1px 0 rgba(255, 225, 170, .10), 0 4px 10px rgba(0, 0, 0, .55);
     position: relative; z-index: 10;
   }
-  .worldnav { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+  /* Its narrowest is the way out's one line: `min-width: 0` here let the column shrink to
+     nothing and the link print under the tabs. The world's name is contained, so a long
+     one never widens the bar; it takes the column's width and ends in an ellipsis. */
+  .worldnav { display: grid; gap: 4px; justify-items: start; flex: 1 1 0; }
   /* The way out to Worlds & characters: small and italic, read as where the world sits,
      not a button competing with the tabs. */
   .leave { color: var(--dim); font: italic 400 13px/1.1 var(--body); text-decoration: none;
-           border-bottom: 1px dotted rgba(147, 134, 110, .55); padding-bottom: 1px; }
+           border-bottom: 1px dotted rgba(147, 134, 110, .55); padding-bottom: 1px;
+           white-space: nowrap; }
   .leave:hover, .leave:focus-visible { color: var(--ink); border-bottom-color: var(--ink); }
   .world { margin: 0; font: 400 15px/1 var(--display); letter-spacing: .14em;
            font-variant: small-caps; color: var(--dim); text-shadow: var(--engraved);
-           max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topend { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-  .modes { justify-self: center; }
+           max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+           contain: inline-size; justify-self: stretch; }
+  .topend { display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+            flex: 1 1 0; white-space: nowrap; }
+  .modes { flex: none; }
   /* The toggle keeps the width of its longer label, so nothing shifts when it flips, and
      it keeps its place (hidden, not removed) in the tabs it does not apply to. */
   #sheettoggle { min-width: 8.6em; }
@@ -3040,8 +3058,8 @@
     body.mode-sheet .sheetmore { grid-column: 2; }
     body.mode-sheet .device { grid-area: 1 / 2 / 2 / 3; }
     /* Seven tabs, Talk and the sheet toggle did not fit three equal columns at 1024px:
-       the right-hand group overran into the tabs. The world's name gives way instead. */
-    .topbar { gap: 8px; padding: 8px 12px 9px; grid-template-columns: auto minmax(0, 1fr) auto; }
+       the right-hand group overran into the tabs. Tighter here; the wrap does the rest. */
+    .topbar { gap: 8px; padding: 8px 12px 9px; }
     .modes > button { padding: 8px 10px; letter-spacing: .05em; font-size: 14px; }
     /* Measured at 1024x768: the book's head took 100px of a 270px book when "Here" fell
        to a line of its own; a tighter head keeps it on one. */
@@ -3057,7 +3075,7 @@
        between the world's name and Talk (13-device.js moves it into .dv-slot): turned a
        quarter clockwise, so the lamp and lever are at the right and its lit side is
        still the top. The book gets its left boss back. */
-    .dv-slot { display: block; grid-area: dev; position: relative; justify-self: center;
+    .dv-slot { display: block; order: 1; flex: none; position: relative;
                width: calc(var(--dv-w) * 773 / 268); height: var(--dv-w); --dv-w: 30px; }
     .dv-slot .device { --dv-w: 30px; left: 50%; top: 50%; --dv-sx: 3px; --dv-sy: -1.2px;
                        transform: translate(-50%, -50%) rotate(90deg); }
@@ -3065,14 +3083,19 @@
       background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
                        auto 40px, auto 40px; }
     body { font-size: 16px; }
-    .topbar { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas:
-                "world dev end" "modes modes modes"; padding: 6px 12px 7px; gap: 6px 10px; }
-    .worldnav { grid-area: world; }
-    .topend { grid-area: end; }
+    /* The world's name, the device and Talk's group share the first line while they fit,
+       the tabs always take a line of their own below. The first line was a grid of
+       `minmax(0, 1fr) auto auto`, so it never wrapped: with Talk's "2 new" the device
+       lay over Worlds & characters from 375 to 445px and the bar was 403px wide on a
+       375px phone, Settings cut off and the whole page sliding sideways (measured
+       2026-10-09). Now Talk's group drops to a second line instead (the same `order`
+       as the grid's areas had, so the tab key's order is what it was). */
+    .topbar { padding: 6px 12px 7px; gap: 6px 10px; }
+    .topend { order: 2; }
     /* The tabs keep their words and scroll sideways rather than shrink to initials.
-       min-width 0: as a grid item the row otherwise sizes to its seven tabs, and one
-       measured 479px, widening the whole page to 427px on a 375px phone. */
-    .modes { grid-area: modes; min-width: 0; justify-self: stretch; overflow-x: auto;
+       min-width 0: the row otherwise sizes to its seven tabs, and one measured 479px,
+       widening the whole page to 427px on a 375px phone. */
+    .modes { order: 3; flex: 1 1 100%; min-width: 0; overflow-x: auto;
              justify-content: flex-start; scrollbar-width: none; padding: 4px 4px 6px; }
     .modes > button { flex: none; padding: 8px 12px; font-size: 13.5px; letter-spacing: .04em;
                       min-height: 40px; }

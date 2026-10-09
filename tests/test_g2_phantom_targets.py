@@ -140,7 +140,10 @@ def test_at_self_is_the_caster_and_not_a_person_called_self():
     s.actors["pc"].prepared["mage-armor"] = 1
     outs = e.run(e.validate([{"op": "cast", "actor": "pc",
                               "params": {"spell": "mage-armor", "at": "self"}}])).outcomes
-    cast = next(x for x in outs[0].effects if x.get("kind") == "cast")
+    # The cast's own outcome, by op: since 2026-10-09 a spell cast within a foe's reach
+    # provokes (CRB Table 8-2), so the room's thug may swing first.
+    cast_out = next(o for o in outs if o.op == "cast")
+    cast = next(x for x in cast_out.effects if x.get("kind") == "cast")
     assert cast["targets"] == ["pc"]
 
 

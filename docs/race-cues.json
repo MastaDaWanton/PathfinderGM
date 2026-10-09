@@ -277,6 +277,31 @@
    "shows": "+1 on all saving throws",
    "engine_ready": true,
    "waits_on": ""
+  },
+  "fast-healing.1": {
+   "shows": "fast healing 1",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "fast-healing.2": {
+   "shows": "fast healing 2",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "fast-healing.3": {
+   "shows": "fast healing 3",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "fast-healing.4": {
+   "shows": "fast healing 4",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "fast-healing.5": {
+   "shows": "fast healing 5",
+   "engine_ready": true,
+   "waits_on": ""
   }
  }
 }

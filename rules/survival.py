@@ -239,8 +239,21 @@ class Toll:
             if getattr(other, flag):
                 setattr(self, flag, True)
 
+    def shown_checks(self) -> list[dict]:
+        """The checks, each keeping its roll (`rolled`) only if it failed or is the first
+        of its kind in the stretch — what the dice log shows (`_check` says why)."""
+        seen: set[str] = set()
+        out = []
+        for c in self.checks:
+            first = c.get("kind") not in seen
+            seen.add(c.get("kind"))
+            if c.get("rolled") and c.get("passed") and not first:
+                c = {k: v for k, v in c.items() if k != "rolled"}
+            out.append(c)
+        return out
+
     def as_dict(self) -> dict:
-        return {"hours": self.hours, "checks": self.checks,
+        return {"hours": self.hours, "checks": self.shown_checks(),
                 "nonlethal": self.nonlethal, "conditions": self.conditions,
                 "collapsed": self.collapsed, "fell_asleep": self.fell_asleep,
                 "woke": self.woke, "knocked_out": self.knocked_out,
@@ -330,24 +343,36 @@ def state(actor) -> dict:
     }
 
 
-def _check(actor, kind: str, dc: int, dice, save: str = "") -> dict:
-    """One endurance roll, as the log records it."""
+def _check(actor, kind: str, dc: int, dice, save: str = "", against: str = "") -> dict:
+    """One endurance roll, as the log records it.
+
+    `against` is the roll context's word for the danger (`effectspec.AGAINST`): thirst
+    and starvation, which Endurance's +4 asks for by name. The Constitution check goes
+    through `Actor.ability_check_modifiers`, so the feat, and a sickened character's -2
+    on ability checks, are named on the roll's breakdown; until 2026-10-09 it was a bare
+    `Modifier(con)` that nothing on the sheet could reach, and the owner's sheet called
+    Endurance "not computed" for exactly that reason.
+    """
+    ctx = {"against": against} if against else None
     if save:
-        mods = actor.save_modifiers(save)
+        mods = actor.save_modifiers(save, ctx)
         roll = dice.d20(mods, label=f"{kind} ({save.title()} save)",
                         visibility="player")
     else:
-        from .dice import Modifier
-
-        mod = actor.ability_mod("con")
-        roll = dice.d20([Modifier(mod, "Constitution")], label=f"{kind} check",
-                        visibility="player")
+        mods = (actor.ability_check_modifiers("con", ctx)
+                if hasattr(actor, "ability_check_modifiers") else [])
+        roll = dice.d20(mods, label=f"{kind} check", visibility="player")
     # A save's face decides before its total (CRB p.180, `dice.d20_succeeds`); the
     # Constitution check beside it is a check, and 1e gives checks no such rule.
     from .dice import d20_succeeds
 
     passed = d20_succeeds(roll, dc) if save else roll.total >= dc
-    return {"kind": kind, "dc": dc, "total": roll.total, "passed": passed, "save": save}
+    # The roll itself rides along (`rolled`), so the turn's dice log can show what the
+    # total was made of — "+4 Endurance" beside "+1 Con". Kept on a failed check and the
+    # first of each kind only (`Toll.as_dict`): a three-week wait is five hundred hourly
+    # thirst checks, and the passes are one sentence, not five hundred rolls.
+    return {"kind": kind, "dc": dc, "total": roll.total, "passed": passed, "save": save,
+            "rolled": roll.as_dict() if hasattr(roll, "as_dict") else None}
 
 
 def asleep(actor):
@@ -471,17 +496,58 @@ def _wake(actor, toll: Toll, dice=None) -> None:
     a cure that wakes them, anything that lifts the condition first — never gets here,
     and so gets none of it."""
     actor.remove_effects(match=lambda e: e is asleep(actor))
-    night = actor.sleep_through("night", dice)
     toll.woke = True
-    if night.get("refilled"):
-        toll.rested.append("Recovered: " + ", ".join(night["refilled"]) + ".")
-    if night.get("prepared"):
-        toll.rested.append(str(night["prepared"]))
-    lv = night.get("levelled") or {}
+    toll.rested.extend(night(actor, dice))
+
+
+def night(actor, dice=None) -> list[str]:
+    """A full night slept, wherever it was slept: `Actor.sleep_through`, said.
+
+    The one door for every night that is not the `rest` op's own (which tells its night
+    in its own sentence, with the camp's): the collapse slept off (`_wake`), the nights
+    inside a lived-through wait (`_provide`), a march's or a working week's camps
+    (`Engine._march`, `Engine._work_hours`). Before 2026-10-09 only `_wake` came here; the
+    other three called `sleep`, which resets the awake clock and nothing else, so a
+    three-day wait or a week on the road healed not one hit point and refilled no spell —
+    "A night inside a long wait resets wakefulness but does not give natural healing"
+    (the long-wait lane, 2026-10-08). 1e gives all of it to "a full night's rest (8 hours
+    of sleep or more)" (CRB p.191), and the owner ruled a collapse's eight hours earn it
+    too (2026-10-05); a night a body lives through is no less a night.
+    """
+    return rested_said(actor, actor.sleep_through("night", dice))
+
+
+def rested_said(actor, slept: dict) -> list[str]:
+    """What a night gave back, as tells (law 3): the hit points with the rate that earned
+    them — the owner read 1 a night at level 1 as "my health is not going up" (2026-10-09),
+    so the rule is said beside the number — then pools and slots, the preparation, a level
+    settled."""
+    out: list[str] = []
+    name = getattr(actor, "name", "") or "They"
+    healed = int(slept.get("healed") or 0)
+    if healed:
+        out.append(heal_said(actor, healed, str(slept.get("kind") or "night")))
+    if slept.get("refilled"):
+        out.append("Recovered: " + ", ".join(slept["refilled"]) + ".")
+    if slept.get("prepared"):
+        out.append(str(slept["prepared"]))
+    lv = slept.get("levelled") or {}
     if lv.get("ok"):
         grants = ", ".join(lv.get("grants") or ())
-        toll.rested.append(f"In the sleep, level {lv['level']} settles: +{lv['hp']} hp"
-                           + (f", {grants}" if grants else "") + ".")
+        out.append(f"In the sleep, level {lv['level']} settles for {name}: +{lv['hp']} hp"
+                   + (f", {grants}" if grants else "") + ".")
+    return out
+
+
+def heal_said(actor, healed: int, kind: str = "night") -> str:
+    """"Sammy recovers 1 hit point (35/73) — a night's rest heals 1 per character level."
+    The natural healing of CRB p.191, with its rate, so a slow night reads as the rule."""
+    name = getattr(actor, "name", "") or "They"
+    per = 2 if kind == "bed rest" else 1
+    how = ("a day and night of bed rest heals 2 per character level" if per == 2
+           else "a night's rest heals 1 per character level")
+    return (f"{name} recovers {healed} hit point{'s' if healed != 1 else ''} "
+            f"({actor.hp}/{actor.hp_max}) — {how}.")
 
 
 def daily_need(actor, need: str, biome: str = "") -> float:
@@ -510,7 +576,7 @@ def _up(actor) -> bool:
     return asleep(actor) is None and not actor.is_down and actor.can_act()
 
 
-def _provide(actor, toll: Toll, biome: str) -> None:
+def _provide(actor, toll: Toll, biome: str, dice=None) -> None:
     """A body living through a stretch sees to itself as each need comes due: a day's
     water once a day since the last drink, a day's food once a day since the last meal,
     out of the pack (`gear.provide`, the reader of the pack's `eat`/`drink` verbs), and a
@@ -519,7 +585,7 @@ def _provide(actor, toll: Toll, biome: str) -> None:
     Due at a day, not at the grace: the book's rate is a gallon and a pound "per day", and
     a character who waits until thirst bites before drinking is not living through a wait,
     they are rationing. The meal goes through `eat` and `drink`, the same reset `_op_eat`
-    and a march's camp use, and the night through `sleep`, the camp's own — so nothing
+    and a march's camp use, and the night through `night`, every camp's own — so nothing
     here is a second ticker (law 2): the counters move only in `charge`, and only those
     three doors put them back. A need due with too little carried is noted once in
     `ran_out` and left to the ordinary checks, which tell the rest; `Scene.wait` stops the
@@ -542,7 +608,9 @@ def _provide(actor, toll: Toll, biome: str) -> None:
                                              else "hunger", freed))
     if not exempt(actor, NO_SLEEP) \
             and int(getattr(actor, "awake_minutes", 0) or 0) >= AWAKE_GRACE_HOURS * MINUTES_PER_HOUR:
-        sleep(actor)
+        # A night's sleep inside the stretch, through the night's one door: healing, the
+        # pools and the preparation with the awake clock (`night`), not the clock alone.
+        toll.rested.extend(night(actor, dice))
         toll.nights += 1
 
 
@@ -648,13 +716,13 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
         # Living through it: the meal, the drink and the night come before the hour's
         # checks, so a body that eats at the day's mark is never asked about hunger.
         if live and _due(actor, toll) and _up(actor):
-            _provide(actor, toll, biome)
+            _provide(actor, toll, biome, dice)
 
         watered = int(actor.watered_minutes)
         if (watered % MINUTES_PER_HOUR == 0 and not exempt(actor, NO_WATER)
                 and watered // MINUTES_PER_HOUR > hours_until_thirsty(actor)):
             made = int(getattr(actor, "thirst_checks", 0))
-            got = _check(actor, "Thirst", thirst_dc(made), dice)
+            got = _check(actor, "Thirst", thirst_dc(made), dice, against="thirst")
             actor.thirst_checks = made + 1
             toll.checks.append(got)
             if not got["passed"]:
@@ -667,7 +735,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
                 and fed // MINUTES_PER_HOUR > hours_until_hungry(actor)
                 and (fed // MINUTES_PER_HOUR) % FOOD_INTERVAL_HOURS == 0):
             made = int(getattr(actor, "hunger_checks", 0))
-            got = _check(actor, "Hunger", hunger_dc(made), dice)
+            got = _check(actor, "Hunger", hunger_dc(made), dice, against="starvation")
             actor.hunger_checks = made + 1
             toll.checks.append(got)
             if not got["passed"]:

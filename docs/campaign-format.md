@@ -176,6 +176,9 @@ gets **no** entry: treat it as a heritage of some other body rather than a speci
   on a modern card: everything above it is description, and the description should be
   written *from* these tags rather than the tags guessed from it. A tag the consumer does
   not know reaches nothing and is shown to the player as a trait neither side can name.
+  *(2026-10-09)* `fast-healing.1` … `fast-healing.5` joined the list: a people that heals
+  at a rate states it here, since no prose cue reads a rate. The consumer grants it as a
+  standing effect healing that many hit points every round, in a fight and over time.
 
   Ruled 2026-09-16: *"we should not need to interpret anatomy on import. We should
   receive exactly the anatomy as our engine will read it, and World Bible should also

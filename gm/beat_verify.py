@@ -214,6 +214,23 @@ def facts_from(ctx) -> Facts:
         end = ""
     was = places_mod.find(known, str(ctx.was_at or "")) if ctx.was_at else None
     start = _name_of(was) if was is not None else end
+    # Where the party stood before is looked up among the places known HERE, so a walk in
+    # from open ground outside this town found nothing and fell back to `end`: start ==
+    # end, "the player did not move". Measured on the owner's save, 2026-10-09: "I go to
+    # the tavern" from the ridgelines resolved (went by the fields, the outskirts and the
+    # gate), and the read-back cut the true walk as "a move the engine did not make" and
+    # ended the beat "You are still at the tavern." A place we cannot name here is still
+    # not where the party is now: it is named from its own id.
+    if was is None and ctx.was_at:
+        try:
+            here_id = str(getattr(engine.here(), "id", "") or "")
+        except Exception:  # noqa: BLE001
+            here_id = ""
+        if str(ctx.was_at) != here_id:
+            from rules import keepers
+
+            # The outskirts ring's "@" is part of the id, never the name.
+            start = keepers.label_of(str(ctx.was_at)).lstrip("@") or "somewhere else"
     outcomes = tuple(o if isinstance(o, dict) else o.as_dict() for o in ctx.outcomes)
     went_by: list[str] = []
     for o in outcomes:
@@ -228,17 +245,12 @@ def facts_from(ctx) -> Facts:
         props = tuple(str(r.get("name") or "") for r in scene.props_here() if r.get("name"))
     except Exception:  # noqa: BLE001
         props = ()
+    from .mentions import what_they_are
+
     people = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
-        what = []
-        template = str(getattr(a, "from_template", "") or "").replace("_", " ")
-        if template and template.lower() not in str(a.name).lower():
-            what.append(template)
-        race = str(getattr(a, "race", "") or "")
-        if race and race.lower() not in str(a.name).lower():
-            what.append(race)
         dead = bool(getattr(a, "hp", 1) < 0 or a.has_state("state.down.dead"))
-        people.append(Person(ref=str(ref), name=str(a.name), what=", ".join(what),
+        people.append(Person(ref=str(ref), name=str(a.name), what=what_they_are(a),
                              pc=bool(getattr(a, "is_pc", False)),
                              down=bool(getattr(a, "is_down", False)), dead=dead))
     # And the people held elsewhere in this town: the beat reader's own list of them, one
@@ -350,7 +362,7 @@ _SYSTEM = (
     "down (unconscious, collapsed and unable to fight), dead. Looking down, kneeling, "
     "being tired or afraid is not harm.\n"
     "arrived / left: somebody who comes into, or goes out of, the place during the "
-    "passage. Not the player.\n"
+    "passage, or whom it says is no longer there. Not the player.\n"
     "time_of_day: EVERY sentence in which the narrator says what time of day it is NOW "
     "— the light, the sky, the hour — one entry per sentence, even when two sentences "
     "say different hours. Empty when it never says; never a time somebody mentions or "
@@ -942,9 +954,21 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
-    if c.category in ("arrived", "left"):
-        way = "comes into" if c.category == "arrived" else "goes out of"
-        return f"Does this sentence say that {_name(facts, s['who'])} {way} the place?"
+    if c.category == "arrived":
+        return f"Does this sentence say that {_name(facts, s['who'])} comes into the place?"
+    if c.category == "left":
+        # A departure is told as a state as often as an act. Asked "does this sentence say
+        # that Aelzeldra goes out of the place?" of "The Aelzeldra is gone.", gemma said
+        # no three times of three (the bench's `gone-while-you-slept`, 2026-10-09) — the
+        # owner's report, a creature the engine kept on its seam written gone while the
+        # player slept, and the first read had it right every time. Probed the same day,
+        # two asks each at temperature 0: "…has left the place, or is gone from it?" 0/2
+        # on that sentence; "…is no longer here?" 2/2 on it but 0/2 on "a boy … slips out
+        # into the rain"; this wording 2/2 on both, and 0/2 on each of two sentences that
+        # keep the creature there ("is still there", "remains a silent, looming shadow").
+        # The hands question learned the same about "left behind".
+        return (f"Does this sentence say that {_name(facts, s['who'])} has gone — left, or "
+                f"no longer here?")
     # The hour is not asked again. Asked "does this sentence say that it is dawn now?" of
     # "the pre-dawn light is just beginning to bleed into the gray", gemma said no — and
     # was right, it says before dawn, at 01:28, which is just as wrong. The part word is
@@ -1022,8 +1046,15 @@ def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provide
     first read named. QAGS's shape: answer the question from the text, then compare.
     A call that fails keeps the contradiction, as every second read does."""
     codes = [*facts.refs, NEW_PERSON, NOBODY]
-    people = "; ".join(f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else "")
-                       for p in facts.people)
+    # Who each code is, as the first read was told it (`_ask`): what they are, and "not
+    # here". Listed by name alone, "c29: Sorvika Sorvix" beside "c21: goblin with a scarred
+    # cheek", the owner's goblin standing on the ridge was the away goblin 16 times of 16
+    # (the eight goblin sentences of the name-turn replays, two asks each, 2026-10-09).
+    people = "; ".join(
+        f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else
+                                f" — {', '.join(x for x in (p.what, '' if p.here else 'not here') if x)}"
+                                if (p.what or not p.here) else "")
+        for p in facts.people)
     ask = ((f"The sentence before it, for context: {before}\n" if before else "")
            + f"The sentence: {d.sentence}\n\nPeople: {people}\n\nQuestion: which of these "
            f"people does this sentence show doing or saying something, here and now? "

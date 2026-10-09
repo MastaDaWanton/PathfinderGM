@@ -708,15 +708,26 @@ def special_refusal(actor, kind: str, spell) -> str:
         return f"The level {lvl} {what} slot already holds a spell. Unprepare it first."
     return ""
 
-def save_dc(actor, spell_level: int) -> int:
-    """10 + the spell's level + the caster's ability modifier.
+def save_dc(actor, spell_level: int, spell=None) -> int:
+    """10 + the spell's level + the caster's ability modifier, and what moves it.
 
     The spell's level *on the caster's own list*, not its lowest anywhere: hold person is a
     2nd-level spell for a cleric and a 3rd for a wizard, and using the lower one everywhere
     would quietly make every wizard's DCs a point light.
+
+    `spell` scopes the funnel's `spell_dc` terms to its school (`{"school": ...}`): Spell
+    Focus (evocation)'s "+1 to the Difficulty Class for all saving throws against spells
+    from the school of magic you select" (2026-10-09). With no spell (the sheet's
+    per-level line) a scoped term is dropped, as every scope with no context is.
     """
     data = caster_data(actor)
-    return 10 + max(0, int(spell_level)) + actor.ability_mod(data.get("ability", "int"))
+    dc = 10 + max(0, int(spell_level)) + actor.ability_mod(data.get("ability", "int"))
+    if spell is not None and hasattr(actor, "_buff_mods"):
+        from .dice import stack
+
+        ctx = {"school": str(getattr(spell, "school", "") or "").strip().lower()}
+        dc += sum(m.value for m in stack(actor._buff_mods("combat_mod", "spell_dc", ctx)))
+    return dc
 
 
 def level_on_list(spell, list_name: str) -> int | None:

@@ -627,6 +627,7 @@ level, so a wizard cannot memorise five fireballs into two slots.
 ### Not yet
 
 Spontaneous casters (the sorcerer's spells-known table), domains and specialist schools,
-concentration checks, metamagic, and casting defensively — `defensively` is accepted as a
-parameter and currently does nothing, which is recorded here rather than left to be
-discovered from behaviour.
+and metamagic. (Concentration and casting defensively closed 2026-10-09: `defensively` is
+a yes/no flag the cast reads — a concentration check of DC 15 + twice the spell's level
+instead of the attack of opportunity a cast within a foe's reach now provokes; grappled
+and struck-while-casting checks beside it, `Engine._concentrate`.)

@@ -581,7 +581,20 @@ VOCAB: dict[str, list[dict]] = {
         # target to land on — it sat in the hand-written feat table read by nothing.
         # The channel is symmetric on the sheet (`set_hp_max` subtracts it) so a
         # printed total round-trips.
-        ("hp_max", "Maximum hit points"))],
+        ("hp_max", "Maximum hit points"),
+        # 2026-10-09, the feat sweep. The owner's sheet tagged Endurance and Combat
+        # Casting "not computed" because neither roll they modify went through the
+        # funnel: survival's Constitution checks were a bare `Modifier(con)` and no
+        # concentration check existed at all. Foundry PF1 has the same targets for the
+        # same reason (`conChecks`, `concentration` in CONFIG.PF1.buffTargets, read
+        # 2026-10-09 off gitlab.com/foundryvtt_pathfinder1e module/config.mjs). One per
+        # ability, read by `Actor.ability_check_modifiers`; the save DC by
+        # `casting.save_dc`, asked with the spell's school for Spell Focus's scope.
+        ("str_check", "Strength checks"), ("dex_check", "Dexterity checks"),
+        ("con_check", "Constitution checks"), ("int_check", "Intelligence checks"),
+        ("wis_check", "Wisdom checks"), ("cha_check", "Charisma checks"),
+        ("concentration", "Concentration checks"),
+        ("spell_dc", "Spell save DCs"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2338,7 +2351,10 @@ WHEN_KEYS: dict[str, str] = {
     "weapon": "the weapon's own fields: category, hands, light, finessable, key, ranged, "
               "slashing_or_piercing (sheet._when_holds)",
     "choice": "an attack option the player declared, such as power_attack",
-    "against": "what the save or resistance is against: spell, poison, fear, trap, cold",
+    "against": "what the save or check is against, one of AGAINST: spell, poison, fear, "
+               "trap, cold, heat, thirst, starvation, breath ...",
+    "casting": "the situation a concentration check is made in: defensively, grappled, "
+               "damaged (Engine._concentrate)",
     "attack": "the kind of attack: melee or ranged",
     "maneuver": "the combat manoeuvre being made or resisted",
     "resting": "a save made while resting (a bedroll's cold)",
@@ -2356,6 +2372,37 @@ _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment"
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting")
+
+# What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
+# each with the reader that passes it. A closed list, because the clause is answered by
+# equality: until 2026-10-09 `against` took any string, and a document that wrote
+# "dehydration" where the survival clock passes "thirst" would have held for nobody with
+# nothing saying why. The first seven are what shipped documents already asked; the
+# survival words came with Endurance (CRB p.141, aonprd.com/FeatDisplay.aspx?
+# ItemName=Endurance), whose benefit is a list of exactly these rolls.
+AGAINST: dict[str, str] = {
+    "spell": "a save a spell called for (Engine._op_save, the cast's saves)",
+    "poison": "a poison's own save (Engine._op_save, a poison gate)",
+    "disease": "a disease's save",
+    "fear": "a fear effect",
+    "enchantment": "an enchantment",
+    "trap": "a trap",
+    "cold": "cold weather: the hourly Fortitude save (Engine._exposure, hazards.json cold)",
+    "heat": "hot weather: the hourly Fortitude save (Engine._exposure, hazards.json heat)",
+    "thirst": "the hourly Constitution check without water (survival.charge)",
+    "starvation": "the daily Constitution check without food (survival.charge)",
+    "breath": "the Constitution check to keep holding one's breath (Engine.breathe)",
+    "spell_resistance": "the caster level check to overcome spell resistance "
+                        "(Engine._resists)",
+}
+
+# The situations a concentration check is made in (`Engine._concentrate`), as the
+# Core Rulebook's Table 8-5 names them and as far as the engine makes them.
+CASTING_SITUATIONS: dict[str, str] = {
+    "defensively": "casting defensively: DC 15 + double the spell's level",
+    "grappled": "casting while grappled: DC 10 + the grappler's CMB + the spell's level",
+    "damaged": "struck while casting: DC 10 + the damage taken + the spell's level",
+}
 
 
 def when_problems(when, where: str = "when") -> list[str]:
@@ -2410,6 +2457,15 @@ def when_problems(when, where: str = "when") -> list[str]:
 
             if want not in PHASES:
                 out.append(f"{where}.day_phase is one of {', '.join(PHASES)}.")
+        elif key == "against":
+            if str(want) not in AGAINST:
+                out.append(f"{where}.against: no roll is made against {want!r}, so the "
+                           f"clause would hold for nobody. One of: "
+                           f"{', '.join(AGAINST)}.")
+        elif key == "casting":
+            if str(want) not in CASTING_SITUATIONS:
+                out.append(f"{where}.casting: no concentration check is made "
+                           f"{want!r}. One of: {', '.join(CASTING_SITUATIONS)}.")
         elif isinstance(want, dict):
             bad = sorted(set(want) - set(_WHEN_COMPARE))
             if bad or not want:

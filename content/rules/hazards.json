@@ -64,7 +64,9 @@
     "type": "cold",
     "lethality": "nonlethal",
     "save": {"save": "fort", "dc": 15, "rises": 1},
+    "against": "cold",
     "fatigues": "fatigued",
+    "harm_said": "frostbite",
     "save_note": "Added 2026-10-01 with carried gear (content/rules/gear.json): the source line always said 'on a failed Fortitude save' and the row rolled the damage with no save at all. 'Fortitude save each hour (DC 15, +1 per previous check)'; 'A character who takes any nonlethal damage from cold or exposure is beset by frostbite or hypothermia (treat her as fatigued).' The save reads the roll context {against: cold}, so a cold-weather bonus reaches it."
   },
   "heat": {
@@ -73,7 +75,12 @@
     "slot": {"name": "hours", "min": 1, "max": 24, "per": 1},
     "dice_per_unit": "1d4",
     "type": "fire",
-    "lethality": "nonlethal"
+    "lethality": "nonlethal",
+    "save": {"save": "fort", "dc": 15, "rises": 1},
+    "against": "heat",
+    "fatigues": "fatigued",
+    "harm_said": "heatstroke",
+    "save_note": "Added 2026-10-09 with Endurance's computed clauses: like the cold row before 2026-10-01, the source line always said 'on a failed Fortitude save' and the row rolled the damage with no save at all. CRB, Heat Dangers: 'a character in very hot conditions (above 90° F) must make a Fortitude saving throw each hour (DC 15, +1 for each previous check) or take 1d4 points of nonlethal damage' and 'A character who takes any nonlethal damage from heat exposure now suffers from heatstroke and is fatigued.' The save reads the roll context {against: heat}, which Endurance's +4 asks. Not modelled: the -4 on the save for heavy clothing or armour of any sort, the extreme bands (above 110° F, above 140° F) and the Survival check's +4 for a guide."
   },
   "starvation": {
     "name": "starvation",

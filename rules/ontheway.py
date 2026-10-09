@@ -230,13 +230,17 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
         if kind == "creature":
             low = max(1 / 3, int(level or 1) - BELOW)
             high = max(1, int(level or 1) + ABOVE)
+            # The ground's own creatures (`bestiary.ground_stated`), never an adventure's
+            # named somebody whose ground was guessed for them.
             rows = [x for x in bestiary.search(biome=biome, cr_min=low, cr_max=high,
-                                               limit=400)
+                                               stated=True, limit=400)
                     if x.get("cr_value") is not None]
             if rows:
-                pick = dice.roll(f"1d{len(rows)}", label="what lives out here",
-                                 visibility="hidden").total
-                row = rows[pick - 1]
+                # `pick_index`: one of one is not rolled ("1d1" is refused notation),
+                # which a stated-ground window can now be.
+                from .gathering import pick_index
+
+                row = rows[pick_index(dice, len(rows), "what lives out here")]
                 return Meeting(kind="creature", roll=r, creature=row,
                                template=str(row.get("id") or ""),
                                count=1, after=w,
@@ -290,13 +294,14 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
             continue
         low = max(1 / 3, int(level or 1) - BELOW)
         high = max(1, int(level or 1) + ABOVE)
-        rows = [x for x in bestiary.search(biome=biome, cr_min=low, cr_max=high, limit=400)
+        rows = [x for x in bestiary.search(biome=biome, cr_min=low, cr_max=high,
+                                           stated=True, limit=400)
                 if x.get("cr_value") is not None]
         if not rows:
             return None
-        pick = dice.roll(f"1d{len(rows)}", label="what lives out here",
-                         visibility="hidden").total
-        row = rows[pick - 1]
+        from .gathering import pick_index
+
+        row = rows[pick_index(dice, len(rows), "what lives out here")]
         return Meeting(kind="creature", roll=chance, creature=row,
                        template=str(row.get("id") or ""), count=1, after=w,
                        aggressive=row.get("creature_type") in AGGRESSIVE)
@@ -382,7 +387,9 @@ def passing(meeting: Meeting, where: str = "", law: str = "") -> str:
         lead = "there are others on the road"
         tail = "you pass them, and walk on"
     elif meeting.kind == "creature" and meeting.creature:
-        name = str(meeting.creature.get("name") or "something")
+        from . import bestiary
+
+        name = bestiary.kind_word(meeting.creature) or "something"
         article = "an" if name[:1].lower() in "aeiou" else "a"
         lead = f"{article} {name} is near the way"
         tail = "it lets you pass, and you walk on"
@@ -463,7 +470,9 @@ def _describe(meeting: Meeting, where: str = "", law: str = "") -> str:
         return (f"Somebody has been waiting for somebody, and you will do{at}. "
                 f"You get no further.")
     if meeting.kind == "creature" and meeting.creature:
-        name = str(meeting.creature.get("name") or "something")
+        from . import bestiary
+
+        name = bestiary.kind_word(meeting.creature) or "something"
         article = "an" if name[:1].lower() in "aeiou" else "a"
         return (f"The road is not empty: {article} {name} is on it, and it has seen you."
                 if meeting.aggressive else

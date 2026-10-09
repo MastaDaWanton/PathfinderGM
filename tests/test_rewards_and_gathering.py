@@ -190,7 +190,8 @@ def test_the_creature_in_the_way_holds_its_ground_as_an_effect_with_a_tell(monke
     assert "has the ground you wanted" not in clause
     assert "holds the ground between you and the patch" in clause
     assert "neither comes at you nor gives way" in clause
-    assert clause.count("The Clockwork Spy") >= 1, clause
+    # A printed kind goes by its kind, lower-case (`bestiary.kind_word`, 2026-10-09).
+    assert clause.count("The clockwork spy") >= 1, clause
     assert effects[-1]["stance"] and effects[-1]["spot"] == "patch"
     assert not s.in_encounter, "a creature holding its ground does not open a fight"
 
@@ -205,7 +206,7 @@ def test_the_patch_it_holds_is_booked_once_and_paid_only_once_it_has_gone(monkey
     assert len(s.guarded_finds) == 1
     book = s.guarded_finds[0]
     assert book["found"] == {"bitterroot": 2}, "booked at x1, not the guardian's x3"
-    assert book["at"] == s.at and book["guard_name"] == "Clockwork Spy"
+    assert book["at"] == s.at and book["guard_name"] == "clockwork spy"
     assert "yours once it has gone" in clause
     # Still there: nothing pays.
     assert engine._settle_guarded_finds() == ""
@@ -219,7 +220,7 @@ def test_the_patch_it_holds_is_booked_once_and_paid_only_once_it_has_gone(monkey
     before = s.pc().inventory.get("bitterroot", 0)
     s.remove(ref)
     line = engine._settle_guarded_finds()
-    assert "The patch the Clockwork Spy held is yours now" in line, line
+    assert "The patch the clockwork spy held is yours now" in line, line
     assert s.pc().inventory.get("bitterroot", 0) == before + 2
     assert s.guarded_finds == []
 

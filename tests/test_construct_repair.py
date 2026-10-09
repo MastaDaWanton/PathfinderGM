@@ -329,7 +329,8 @@ def test_a_name_is_not_given_to_what_is_not_yours():
     assert judgement.declare_name([], "I name him Bob", scene) == []
     (out,) = engine.run(engine.validate([{"op": "rename", "target": spy.ref,
                                           "params": {"name": "Bob"}}])).outcomes
-    assert out.status == "refused" and spy.name == "Clockwork Spy"
+    # A printed kind goes by its kind (`bestiary.kind_word`, 2026-10-09).
+    assert out.status == "refused" and spy.name == "clockwork spy"
     scene2, _e2, spy2 = _owned_spy()
     assert judgement.declare_name([], "I call him a coward", scene2) == []
 

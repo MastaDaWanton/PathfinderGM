@@ -73,9 +73,11 @@ def creature_for(biome: str, level: int, dice, guarding: bool = False) -> dict |
     """A bestiary row that lives here and is a fair match, or None when the book has
     nothing for this ground — a stone shelf where no creature is tagged is quiet."""
     low, high = _cr_window(level, guarding)
-    rows = bestiary.search(biome=biome, cr_min=low, cr_max=high, limit=400)
-    # Things that are only "any" for this biome are the second choice; specialists
-    # first, so a forest gives up a wolf before a generic humanoid.
+    # Only creatures whose ground is the book's own words (`bestiary.ground_stated`): the
+    # spreadsheet's guessed ground drew a named hag of an adventure, Aelzeldra, onto a
+    # seam in the hills and the tell called her "an Aelzeldra" (the owner, 2026-10-09:
+    # "it introduced itself as its species like it was a name").
+    rows = bestiary.search(biome=biome, cr_min=low, cr_max=high, stated=True, limit=400)
     rows = [r for r in rows if r.get("cr_value") is not None
             and r.get("creature_type") not in ("humanoid", "outsider", "undead")]
     if not rows:
@@ -150,7 +152,7 @@ def describe(enc: Encounter, what: str, biome: str = "", *, spot: str = "",
         return (f"The ground here is generous: a rich {where} of {what}, and the haul is "
                 f"twice what it would have been.")
     if enc.kind == "creature" and enc.creature:
-        name = enc.creature["name"]
+        name = bestiary.kind_word(enc.creature)
         # The second sentence used to be "Something is in the way: a Clockwork Spy has
         # the ground you wanted, and has not moved off it." — which the owner could not
         # parse (playtest 2026-09-30, item 8): what ground, wanted for what, after a haul
@@ -162,7 +164,7 @@ def describe(enc: Encounter, what: str, biome: str = "", *, spot: str = "",
                 f"Making for one last {where}, "
                 f"you find {_an(name)} there before you.")
     if enc.kind == "guarded" and enc.creature:
-        name = enc.creature["name"]
+        name = bestiary.kind_word(enc.creature)
         return (f"The find of a lifetime — {'a massive vein of' if dug else 'a whole hollow of'} "
                 f"{what}, three times any ordinary haul — and {_an(name)} sitting on it. "
                 f"It is yours when that is dead or gone.")

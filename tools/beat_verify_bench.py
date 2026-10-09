@@ -232,6 +232,11 @@ def beats_of(subset: str) -> list[dict]:
         return held
     if subset == "tuned":
         return [b for b in G.GOLD if b not in held]
+    if subset.startswith("id:"):
+        # The beats whose id starts with one of these (comma-separated), for measuring one
+        # change on its own rows before the whole bench is run.
+        prefixes = tuple(p for p in subset[3:].split(",") if p)
+        return [b for b in G.GOLD if b["id"].startswith(prefixes)]
     return list(G.GOLD)
 
 
@@ -357,7 +362,8 @@ def main() -> None:
     ap.add_argument("--json", default="")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--no-confirm", action="store_true")
-    ap.add_argument("--subset", choices=("all", "tuned", "held"), default="all")
+    ap.add_argument("--subset", default="all",
+                    help="all | tuned | held | id:<prefix> (the beats whose id starts so)")
     ap.add_argument("--replay", default="", help="score a --record file's extractions "
                     "instead of calling the model to read (the second read still calls it)")
     args = ap.parse_args()

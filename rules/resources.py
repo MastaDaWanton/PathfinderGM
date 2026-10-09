@@ -109,11 +109,16 @@ def variables(actor) -> Mapping:
     return _Lazy(actor, names)
 
 
-def evaluate(formula, actor) -> int:
+def evaluate(formula, actor, extra: dict | None = None) -> int:
     """A formula over sheet values, as an integer.
 
     Rounded down at the end, once — 1e rounds fractions down unless it says otherwise, and
     rounding at each step compounds differently depending on how the formula was written.
+
+    `extra` names what only the reader knows: a skill term's `ranks` — the ranks in the
+    skill the term lands on (`Actor._feat_mods`), which Alertness's ten-rank rung asks.
+    Given by the reader rather than added to `variables`, because a `ranks` that read 0
+    everywhere it was not supplied would be a formula quietly answering the wrong thing.
     """
     if isinstance(formula, (int, float)):
         return int(formula)
@@ -124,7 +129,12 @@ def evaluate(formula, actor) -> int:
         tree = ast.parse(text, mode="eval")
     except SyntaxError as exc:
         raise FormulaError(f"{text!r} is not a formula: {exc.msg}") from exc
-    value = _walk(tree.body, variables(actor), text)
+    names = variables(actor)
+    if extra:
+        base = names
+        names = _Lazy(actor, {**{k: (lambda k=k: base[k]) for k in base},
+                              **{k: (lambda v=v: v) for k, v in extra.items()}})
+    value = _walk(tree.body, names, text)
     return int(value // 1)
 
 
@@ -149,8 +159,11 @@ def _walk(node, names: dict[str, int], text: str):
     raise FormulaError(f"{text!r}: {type(node).__name__} is not allowed in a formula")
 
 
-def check(formula) -> str:
-    """Validate a formula without an actor, for the editor. Returns a problem or ""."""
+def check(formula, extra=()) -> str:
+    """Validate a formula without an actor, for the editor. Returns a problem or "".
+
+    `extra`: the reader-supplied names this formula may also use (`evaluate`'s `extra`),
+    each probed as 1."""
     class _Probe:
         level = hit_dice = hp = hp_max = temp_hp = bab = 1
 
@@ -161,7 +174,7 @@ def check(formula) -> str:
             return 0
 
     try:
-        evaluate(formula, _Probe())
+        evaluate(formula, _Probe(), {k: 1 for k in extra} or None)
     except FormulaError as exc:
         return str(exc)
     return ""
