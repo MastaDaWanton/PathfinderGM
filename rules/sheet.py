@@ -1273,7 +1273,27 @@ class Actor:
                 out[f"worn:{origin}#strike#{n}"] = (spec, origin, name)
         return out
 
-    def sync_carried(self, dice=None) -> list[dict]:
+    def race_effects(self) -> dict[str, tuple[dict, str, str]]:
+        """What the race document grants as standing effects, in `worn_effects`' shape —
+        today fast healing (`races.fast_healing`), which needs the round clock exactly as
+        a ring's does. Keyed `race:<id>#fast_healing#<n>` so a card edited from 2 to 5 is
+        the old effect gone and the new one granted, and a race without it holds nothing.
+
+        Measured 2026-10-09 on the owner's asura: a homebrew race card with fast healing,
+        and nothing on the save ever healed a point of it — the race's tag was asked by
+        `has_state` and by nobody with a clock."""
+        from . import races as races_mod
+
+        doc = self._race_doc()
+        n = races_mod.fast_healing(doc)
+        if n <= 0:
+            return {}
+        rid = str((doc or {}).get("id") or self.race or "race")
+        name = str((doc or {}).get("name") or self.race or "race")
+        return {f"race:{rid}#fast_healing#{n}": ({"type": "fast_healing", "amount": n},
+                                                f"race:{rid}", name)}
+
+    def sync_carried(self, dice=None, only_heals: bool = False) -> list[dict]:
         """Grant what the pack grants, take back what left it — through the one applicator.
 
         Abysium in the pack is a sickened condition with `origin: item:<id>`; the bar sold
@@ -1281,16 +1301,41 @@ class Actor:
         LINGERS that long ("sickened while carried and for 1d4 hours after", plan §5.4) as
         a timed copy the ticker expires. Returns one record per change, in the shapes
         `_ward_tell` already says (law 3: every application is a tell).
+
+        `only_heals`: the standing fast healing alone (worn or racial), for `Scene.advance`
+        to settle BEFORE it heals a stretch. Its ordinary sync comes at the stretch's end,
+        so the first wait of a session healed nothing: measured live 2026-10-09, a
+        homebrew race with fast healing 5 waited a minute at 2/9 and stood at 2/9, granted
+        the effect only as the minute closed. Everything else keeps its place at the end —
+        a lingering condition noticed early would be ticked by the stretch it began after.
         """
         out: list[dict] = []
         want = self.carried_effects()
         want.update(self.worn_effects())
+        want.update(self.race_effects())
         have = {str(e.payload.get("carried_key")): e for e in self.effects
                 if isinstance(e.payload, dict) and e.payload.get("carried_key")}
+        if only_heals:
+            def heals(key: str) -> bool:
+                return "#fast_healing#" in key
+            want = {k: v for k, v in want.items() if heals(k)}
+            have = {k: v for k, v in have.items() if heals(k)}
         for key, (eff, source, item_name) in want.items():
             if key in have:
                 continue
             kind = str(eff.get("type") or "")
+            if kind == "fast_healing" and key.startswith("race:"):
+                # The race's own (`race_effects`): the same standing effect a ring's is,
+                # run by the same executor, granted and taken back by the same door.
+                amount = int(eff.get("amount") or 0)
+                self.apply_effect(ActiveEffect(
+                    name=f"Fast healing {amount} ({item_name})", kind="trait", key=key,
+                    source=source, origin=source,
+                    payload={"carried_key": key, "carried_from": item_name, "race": True},
+                    periodic=[{"per": "round", "heal": amount}]))
+                out.append({"kind": "trait", "ref": self.ref, "what": item_name,
+                            "grants": f"fast healing {amount}"})
+                continue
             if kind == "fast_healing" and key.startswith("worn:"):
                 # A worn item's fast healing (enchanting contracts §4, plan §8.4): a
                 # standing effect whose per-round heal the one periodic executor runs
@@ -1362,6 +1407,9 @@ class Actor:
             self.remove_effects(match=lambda x, e=e: x is e)
             if e.payload.get("strikes"):
                 continue                # never said on: a hidden stun says nothing going
+            if e.payload.get("race"):
+                out.append({"kind": "effect_ended", "ref": self.ref, "what": e.name})
+                continue
             how = "worn" if e.payload.get("worn") else "carried"
             out.append({"kind": "effect_ended", "ref": self.ref,
                         "what": f"{e.name} (the {e.payload.get('carried_from') or 'item'} "
@@ -1379,7 +1427,8 @@ class Actor:
 
     # --- the periodic executor (plan §12.6) ------------------------------------------
 
-    def run_periodic(self, per: str = "round", times: int = 1, dice=None) -> list[dict]:
+    def run_periodic(self, per: str = "round", times: int = 1, dice=None,
+                     elapsed: bool = False) -> list[dict]:
         """Run every standing effect's `periodic` work that falls on this clock.
 
         `ActiveEffect.periodic` was schema-ready with one consumer (`spend_pool`, the
@@ -1395,6 +1444,16 @@ class Actor:
         `times` runs a day's work once per day crossed. Returns `_ward_tell`-shaped
         records, one per thing that happened: law 3, every application is a tell, and an
         application that changed nothing (healing at full hit points) is not one.
+
+        `elapsed`: the rounds of a stretch of time passing out of a fight (`Scene.advance`
+        — a wait, a walk, a night), run as the HEALS only, each effect for no more rounds
+        than it still had to run. Fast healing "regains hit points at an exceptional rate,
+        usually 1 or more hit points per round" (Bestiary, universal monster rules) — per
+        round of TIME, not per round of combat; before 2026-10-09 it ran only on played
+        rounds, so a ring of it, a troll-marrow draught and a race's fast healing healed
+        nothing across a ten-minute wait or a night. Damage stays with played rounds
+        (`Scene.advance`'s docstring: time passing must not roll thousands of saves),
+        and so do the day's tolls, which have their own clock.
         """
         out: list[dict] = []
         times = max(0, int(times or 0))
@@ -1409,11 +1468,31 @@ class Actor:
             for p in list(e.periodic or ()):
                 if str(p.get("per") or "round").lower() != per or "spend_pool" in p:
                     continue
+                if elapsed and "heal" not in p:
+                    continue
                 source = e.name or e.source or "an effect"
                 if "heal" in p:
-                    total = sum(_amount_of(p.get("heal"), dice) for _ in range(times))
+                    runs = times
+                    if elapsed and e.duration == "rounds" and e.rounds_left is not None:
+                        # A draught's ten rounds heal ten rounds' worth of a long wait.
+                        runs = min(runs, max(0, int(e.rounds_left)))
+                    # What there is left to mend, so a night is not 4,800 rolls of 1d4:
+                    # every point past it is healing with nowhere to land.
+                    room = max(0, self.hp_max - self.hp) + max(0, self.nonlethal)
+                    total = 0
+                    for _ in range(runs):
+                        if elapsed and total >= room:
+                            break
+                        total += _amount_of(p.get("heal"), dice)
                     had = self.nonlethal
                     healed = self.heal(total) if total > 0 and not self.is_dead else 0
+                    if healed and self.hp > 0 and self.clear_states("recovery.hit-points"):
+                        # Back above zero: the dying stop dying, as a cure's do
+                        # (`Engine._op_heal`) — "fast healing continues to function
+                        # (even at negative hit points) until a creature dies" (Bestiary).
+                        # The non-lethal ladder is asked again: what it still holds
+                        # them down with, it puts back.
+                        self.apply_nonlethal_state()
                     # Fast healing is magic too, and "not even magic" mends what thirst
                     # or hunger holds (CRB p.444): a refusal is a thing that happened,
                     # so it is a record even when nothing else was restored.

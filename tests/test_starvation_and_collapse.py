@@ -365,9 +365,15 @@ def test_the_rest_op_and_the_collapse_share_one_door():
         return {c.func.attr if isinstance(c.func, ast.Attribute) else
                 getattr(c.func, "id", "") for c in ast.walk(fn) if isinstance(c, ast.Call)}
 
-    for path, name in (("rules/engine.py", "_op_rest"), ("rules/survival.py", "_wake")):
+    # The nights inside a stretch — the collapse's, a lived wait's — go through
+    # `survival.night` (2026-10-09), which is `sleep_through` said; so the door each of
+    # them must reach is `night`, and `night` must reach `sleep_through`.
+    for path, name, door in (("rules/engine.py", "_op_rest", "sleep_through"),
+                             ("rules/survival.py", "night", "sleep_through"),
+                             ("rules/survival.py", "_wake", "night"),
+                             ("rules/survival.py", "_provide", "night")):
         made = calls(path, name)
-        assert "sleep_through" in made, (path, name)
+        assert door in made, (path, name)
         assert not made & {"refresh_pools", "ensure_prepared", "level_up", "rest"}, \
             (path, name, made & {"refresh_pools", "ensure_prepared", "level_up", "rest"})
 

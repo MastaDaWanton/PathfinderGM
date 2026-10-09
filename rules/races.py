@@ -174,6 +174,37 @@ def _fill(value, choice: str):
 # many". See `VISIBLE_BODY` for the words a person in the room gets.
 PAIRED_LIMBS: dict[str, int] = {"limbs.arms": 2, "limbs.legs": 2}
 
+# Fast healing on a race: `fast-healing.<n>`, heal n hit points a round (Bestiary,
+# universal monster rules). The eidolon evolution grants `fast-healing.1` per pick and
+# `expand` counts the picks, to the APG's own cap: "increased by 1 per round for every 2
+# additional evolution points spent (maximum 5)". A tag a card states outright, or a
+# `fast_healing` effect document on it, is taken at its word — a table's homebrew is its
+# own call, the way a homebrew item's +111 Constitution is.
+#
+# Measured 2026-10-09, the owner's asura (a homebrew card): "i also have fast healing so i
+# should be healing all the time", and the save held no fast healing anywhere — no
+# effect, no buff, nothing. The evolution's tag reached `has_state` and stopped there:
+# its `not_yet` said "waits on a periodic effect executor", and when the executor was
+# built for worn rings and draughts (`Actor.run_periodic`) nobody came back for the race.
+FAST_HEALING_PICK = "fast-healing.1"
+FAST_HEALING_MAX = 5
+_FAST_HEALING_TAG = re.compile(r"^fast-healing\.(\d+)$")
+# A card's own trait line saying it, the shape an unconverted homebrew card is left in:
+# the whole line, so a sentence ABOUT healing and the evolution's counted line
+# ("fast healing 1 (x3)", which `expand` writes and the picks already say) are not read.
+_FAST_HEALING_LINE = re.compile(r"^\s*fast[ -]healing\s+(\d+)\s*\.?\s*$", re.I)
+
+
+def fast_healing(doc: dict | None) -> int:
+    """The race's fast healing, or 0: the largest `fast-healing.<n>` it carries. Fast
+    healing is one rate, not a sum — two sources on one card name the same ability."""
+    best = 0
+    for tg in (doc or {}).get("tags") or ():
+        m = _FAST_HEALING_TAG.match(str(tg))
+        if m:
+            best = max(best, int(m.group(1)))
+    return best
+
 
 def expand(doc: dict) -> dict:
     """What the document's evolutions grant, folded into the document's own fields.
@@ -270,6 +301,11 @@ def expand(doc: dict) -> dict:
             # means one extra pair. Already-counted tags (`limbs.arms.6`) fall through
             # untouched, so expanding twice is the same as expanding once.
             tg = f"{tg}.{PAIRED_LIMBS[tg] + 2 * max(1, granted.get(tg, 0))}"
+        elif tg == FAST_HEALING_PICK and granted.get(tg, 0) > 1:
+            # The evolution taken N times is fast healing N, to the APG's maximum of 5 —
+            # the limbs' rule one tag over: the count lives in the tag because the tag
+            # list is what reaches play (`fast_healing`).
+            tg = f"fast-healing.{min(FAST_HEALING_MAX, granted[tg])}"
         if tg not in resolved:
             resolved.append(tg)
     d.update({"tags": resolved, "mods": {k: v for k, v in mods.items() if v},
@@ -679,6 +715,18 @@ def normalise(entry: dict) -> dict:
             got = [ln.strip() for ln in got.replace(",", chr(10)).split(chr(10))]
         d[key] = [str(x).strip() for x in (got or []) if str(x).strip()]
     d["tags"] = [t.lower() for t in d["tags"]]
+    # Fast healing said in the card's own shapes, converted once here into the one tag
+    # play reads (`fast_healing`): a trait line that says nothing else ("Fast healing 5"),
+    # and a `fast_healing` effect document — the effects vocabulary every other bench
+    # writes (`effectspec`), which an unconverted homebrew card carries as `effects`.
+    said = [int(m.group(1)) for m in (_FAST_HEALING_LINE.match(t) for t in d["traits"]) if m]
+    for spec in d.get("effects") or ():
+        if isinstance(spec, dict) and str(spec.get("type") or "") == "fast_healing" \
+                and _int(spec.get("amount")):
+            said.append(int(spec["amount"]))
+    for n in said:
+        if n > 0 and f"fast-healing.{n}" not in d["tags"]:
+            d["tags"].append(f"fast-healing.{n}")
     if d["id"] and f"race.{d['id']}" not in d["tags"]:
         d["tags"].insert(0, f"race.{d['id']}")
     budget = d.get("budget") or {}
@@ -694,7 +742,9 @@ def normalise(entry: dict) -> dict:
     d["description"] = str(d.get("description") or "").strip()
     d["origin"] = str(d.get("origin") or "yours")
     evs = d.get("evolutions") or []
-    d["evolutions"] = [{"id": str(e.get("id", "")).strip().lower(),
+    # Slugged, so a hand-written card's "Fast Healing" or "fast_healing" finds the
+    # catalogue's `fast-healing` rather than being skipped by `expand` without a word.
+    d["evolutions"] = [{"id": slug(e.get("id", "")),
                         "choice": str(e.get("choice") or "").strip().lower(),
                         "times": max(1, int(e.get("times", 1) or 1))}
                        for e in evs if isinstance(e, dict) and str(e.get("id", "")).strip()]
@@ -1232,6 +1282,10 @@ TAG_MEANS: dict[str, tuple[str, str]] = {
     "weakness.light-sensitivity": ("light sensitivity", ""),
     "versatile": ("an extra feat and an extra skill rank", ""),
     "lucky": ("+1 on all saving throws", ""),
+    # No cue reads fast healing out of prose — "their wounds close quickly" is a sentence
+    # about a people, not a rate — so a world STATES it (`grants[]`, 1.5), one of five
+    # exact names to the eidolon evolution's own maximum (2026-10-09, `fast_healing`).
+    **{f"fast-healing.{n}": (f"fast healing {n}", "") for n in range(1, 6)},
 }
 
 _SMALL = re.compile(r"\b(small|short|slight|diminutive|half the height|child-sized|"
