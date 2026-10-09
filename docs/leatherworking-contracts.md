@@ -25,7 +25,7 @@ adapts, and the lead updates §6 here.
 |---|---|---|
 | **A: vocabulary** | `rules/effectspec.py`; `tests/test_leather_vocabulary.py` | |
 | **B: engine readers** | `rules/forge_items.py`, `rules/sheet.py`, `rules/engine.py`, `rules/tables.py`, `rules/armour.py`, `rules/crafting.py` (**only** `from_stock_dict`'s `base` writer, plan §13.1); `tests/test_leather_engine.py`, `tests/test_leather_items.py`; re-pins `tests/test_aggregator.py:321` | `rules/materials.py` (§3 API) |
-| **C: harvest** | NEW `rules/harvest.py`, NEW `rules/deeds.py`, NEW `tools/harvest_tags.py`, `content/bestiary/*.json` (the `tags` field only), `rules/herbprep.py` (the salt reader only), NEW `play/harvest_views.py`, `pathfindergm/urls.py` (harvest routes only), the four `ACQUISITION` carcass rows in `rules/blacksmith.py`, `rules/alchemist.py`, `rules/enchanter.py`, `rules/leatherworker.py` (removal only); `tests/test_harvest.py`, `tests/test_harvest_tags.py` | `rules/materials.py`, `rules/bestiary.py`, `rules/states.py` |
+| **C: harvest** | NEW `rules/harvest.py`, NEW `tools/harvest_tags.py`, `content/bestiary/*.json` (the `tags` field only), `rules/herbprep.py` (the salt reader only), NEW `play/harvest_views.py`, `pathfindergm/urls.py` (harvest routes only), the four `ACQUISITION` carcass rows in `rules/blacksmith.py`, `rules/alchemist.py`, `rules/enchanter.py`, `rules/leatherworker.py` (removal only); `tests/test_harvest.py`, `tests/test_harvest_tags.py` | `rules/materials.py`, `rules/bestiary.py`, `rules/states.py` |
 | **D: data pass** | `content/materials/leatherworker-materials.json`, `content/materials/blacksmith-materials.json` (**only** `leather-grip`, `sharkskin-grip`, `dragonhide-grip`, `angelskin-binding`, and `ferrous` on the iron-family metals), `rules/materials.py`, NEW `tools/leather_*.py`, NEW `docs/leatherworking-review.md`; `tests/test_leather_materials.py`; re-pins `tests/test_forge_materials.py:110` | `rules/effectspec.py` |
 | **E: bench rules** | `rules/leatherworker.py`, `content/world-classes/leatherworker.json`, `rules/worldclass.py`, NEW `play/leather_views.py`, `pathfindergm/urls.py` (leather routes only); `tests/test_leatherworker.py` (rewritten, plan §23.1), `tests/test_leather_bench.py`, `tests/test_leather_api.py` | `rules/materials.py`, `rules/forge_items.py`, `rules/knowledge.py`, `rules/harvest.py`, the §6.1 interface |
 | **F: knowledge** | `rules/knowledge.py`, `rules/goods.py`, NEW `content/rules/leatherworking-manuals.json`; `tests/test_leather_knowledge.py` | `rules/materials.py` |
@@ -420,3 +420,7 @@ tags and U1 (or the lead at merge) adds them.
 - **Sound (U6 provides).** `Sound.play("leather.<event>", {...})`; unknown events are silent.
 - **In progress (the Enchanting lanes provide).** U1 calls their open function from the footer
   link; it draws nothing of its own.
+
+**Note (2026-10-08):** `rules/deeds.py` moved out of lane C to its own deeds lane (docs/deeds-plan.md
+§11, merged as build/deeds). Lane C only calls `deeds.never_harvested`, `deeds.of_carcass` and
+`deeds.record`; §5.4's store is that lane's.
