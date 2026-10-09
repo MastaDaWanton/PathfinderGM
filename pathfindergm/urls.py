@@ -44,6 +44,8 @@ urlpatterns = [
     # §2.10); `/api/state` carries only the latest entries.
     path("api/conversation", views.conversation, name="conversation"),
     path("api/history", views.history, name="history"),
+    # The Deeds card's older rows, twenty at a time (rules/deeds.py `page`).
+    path("api/deeds", views.deeds_list, name="deeds"),
     # The heartbeat every page sends so the process can tell an open window from a
     # closed one. See `pathfindergm/liveness.py` for the four hours of orphaned server
     # that made it necessary.

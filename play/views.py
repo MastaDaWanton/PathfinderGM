@@ -1118,6 +1118,25 @@ def history(request):
 
 
 @require_GET
+def deeds_list(request):
+    """Older deeds for the Sheet tab's Deeds card, twenty at a time, newest first
+    (rules/deeds.py `page`; docs/deeds-plan.md §9.3). `before` is the number of the
+    oldest row the page already shows; absent, the newest page. Rows carry names said at
+    the time and never a ref. Reads only."""
+    from rules import deeds as deeds_mod
+
+    pc = campaign_mod.current().scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    raw = request.GET.get("before")
+    try:
+        before = int(raw) if raw not in (None, "") else None
+    except ValueError:
+        return JsonResponse({"error": "before must be a whole number"}, status=400)
+    return JsonResponse(deeds_mod.page(pc, before))
+
+
+@require_GET
 def conversation(request):
     """One person's conversation log, or everybody's, a page at a time (§2.10).
 

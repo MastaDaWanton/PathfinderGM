@@ -80,7 +80,11 @@ def test_i3_sleep_on_a_stranger_is_harm(worlds):
     s, e, man = board(worlds, {"sleep": 1})
     outs = cast(e, "sleep", man)
     assert s.in_encounter
-    assert [x["kind"] for o in outs for x in o.effects] == ["battle_joined"]
+    # The deeds reader (rules/deeds.py, 2026-10-08) rides its record on the same outcome:
+    # first harm to somebody who was not hostile is the one assault, -2, and nothing more.
+    assert [x["kind"] for o in outs for x in o.effects if x["kind"] != "deed"] == ["battle_joined"]
+    assert [x["tag"] for o in outs for x in o.effects if x["kind"] == "deed"] == [
+        "deed.violence.unprovoked"]
 
 
 def test_i3_sleep_on_a_friend_opens_no_fight_and_moves_nothing(worlds):

@@ -1,0 +1,105 @@
+{
+  "_about": "The deeds catalogue (docs/deeds-plan.md §7, §8; the owner's answers of 2026-10-08 at the end of docs/leatherworking-questions.md). Every value a deed can carry is a row here; no model proposes one and rules/deeds.py refuses a tag with no row. Values are fenced to -5..+5 by the validator: a deed is a small number, and a quest-sized value belongs to a quest. `gate` is the day's gate (§8.2): 'subject-day' counts one per tag per person per game day, 'day' one per tag per game day, 'none' every time (the dead die once). `said` is the history line, past tense, second person understood; {subject} is the person's name as said at the time, {what} the thing. `said_plain` is used when there is no thing to name. The words (`bands`) are presentation, tuned after play. NOTHING in the game reads the total yet (the owner: 'i dont want it to affect anything yet'); tests/test_deeds.py holds that line.",
+  "deeds": {
+    "deed.violence.unprovoked": {
+      "value": -2, "gate": "subject-day",
+      "said": "Struck {subject}, who had not raised a hand against you",
+      "source": "Ultima IV: -5 of 99 for attacking a non-hostile creature (PA §5); the book's one step toward evil for an execution (PA §11). Started by you and meant, so more than the petty -1."
+    },
+    "deed.violence.careless": {
+      "value": -1, "gate": "subject-day",
+      "said": "Caught {subject} in harm you aimed at somebody else",
+      "source": "Collateral harm: your doing, not your aim (plan §7.1)."
+    },
+    "deed.violence.accident": {
+      "value": 0, "gate": "subject-day",
+      "said": "Caught {subject} by accident",
+      "source": "The owner's 'funny accident': listed so you see it was noticed and forgiven; atonement's unwitting misdeed (PA §11). RDR2 has no accident rule and its players complain of exactly this (PA §6)."
+    },
+    "deed.kill.unprovoked": {
+      "value": -3, "gate": "none",
+      "said": "Killed {subject}, who had not raised a hand against you",
+      "source": "Murder, the gravest act the engine can see. With the violence row, -5 in all: the owner's answer 1 (2026-10-08), 'keep -5 in all'. One blow and ten weigh the same."
+    },
+    "deed.kill.careless": {
+      "value": -1, "gate": "none",
+      "said": "Killed {subject} with harm you aimed at somebody else",
+      "source": "Collateral death: more than collateral harm, much less than murder (plan §7.1)."
+    },
+    "deed.kill.accident": {
+      "value": -1, "gate": "none",
+      "said": "Killed {subject} by accident",
+      "source": "A death is never nothing; the owner's 'small' for an accident is -1 (plan §8.3)."
+    },
+    "deed.kill.captive": {
+      "value": -2, "gate": "none",
+      "said": "Killed {subject}, beaten and helpless, after the fight was over",
+      "source": "The book's own example: executing a captured orc combatant is one step toward evil (PA §11). The same blow mid-fight is tactics, and not a deed."
+    },
+    "deed.theft": {
+      "value": -1, "gate": "subject-day",
+      "said": "Took {what} from {subject} without asking",
+      "said_plain": "Took from {subject} without asking",
+      "source": "Fallout's flat theft and Ultima's -1 for a chest (PA §2, §5). Not scaled by value: a fork and a fortune are both a theft, and value scaling would make one theft a quest-sized number."
+    },
+    "deed.trespass": {
+      "value": -1, "gate": "subject-day",
+      "said": "Broke into {subject}",
+      "source": "Petty; the law's state.suspected already answers the town's half (docs/wanted.md)."
+    },
+    "deed.harvest.good-outsider": {
+      "value": -2, "gate": "subject-day",
+      "said": "Cut from the body of {subject}, a good outsider",
+      "source": "The owner's ruling (leatherworking open point 12, Q5.2); good = the good subtype or a printed good alignment (owner's answer 3, 2026-10-08). The creature is already dead: this is the act on the body."
+    },
+    "deed.harvest.good-dragon": {
+      "value": -2, "gate": "subject-day",
+      "said": "Cut from the body of {subject}, a good dragon",
+      "source": "The owner's open point 12: a good-aligned dragon by its kind (its printed alignment), the same weight as the outsider."
+    },
+    "deed.spell.evil": {
+      "value": -1, "gate": "day",
+      "said": "Cast {what}, an evil spell",
+      "source": "'Casting an evil spell is an evil act, but... once isn't enough to change her alignment' (Horror Adventures, PA §11). The owner's answer 2: -1, once a game day."
+    },
+    "deed.mercy.saved": {
+      "value": 2, "gate": "subject-day",
+      "said": "Kept {subject} from dying",
+      "source": "The mirror of the execution's 2. Mercy to an enemy counts: KOTOR and Ultima both reward sparing (PA §5, §8)."
+    },
+    "deed.mercy.tended": {
+      "value": 1, "gate": "subject-day",
+      "said": "Tended {subject}'s wounds",
+      "source": "A small kindness, gated per person per day so a wand of cure light wounds cannot farm it (plan §7.2)."
+    },
+    "deed.mercy.subdued": {
+      "value": 1, "gate": "subject-day",
+      "said": "Brought {subject} down without killing",
+      "source": "Choosing not to kill: RDR1's alive bounty, Ultima's letting a foe go (PA §5, §6). A later execution (-2) outweighs it."
+    },
+    "deed.charity.alms": {
+      "value": 1, "gate": "subject-day",
+      "said": "Gave {what} to {subject}, who had little",
+      "source": "Ultima's beggar, +2 of 99 whatever the amount (PA §5); +1 here, and per beggar per day: the gate Ultima lacked."
+    },
+    "deed.restitution": {
+      "value": 1, "gate": "subject-day",
+      "said": "Gave {what} back to {subject}",
+      "source": "Undoing a theft: a thief who returns it nets 0 (plan §7.2)."
+    },
+    "deed.spell.good": {
+      "value": 1, "gate": "day",
+      "said": "Cast {what}, a good spell",
+      "source": "Horror Adventures' sidebar applies to the other alignment descriptors too (PA §11). The owner's answer 2: +1, once a game day."
+    }
+  },
+  "bands": [
+    {"word": "Cruel", "to": -30},
+    {"word": "Callous", "from": -29, "to": -10},
+    {"word": "Rough-handed", "from": -9, "to": -3},
+    {"word": "Unremarkable", "from": -2, "to": 2},
+    {"word": "Decent", "from": 3, "to": 9},
+    {"word": "Kind", "from": 10, "to": 29},
+    {"word": "Selfless", "from": 30}
+  ]
+}

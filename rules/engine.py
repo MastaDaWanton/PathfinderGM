@@ -47,6 +47,8 @@ from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from .grid import Grid
 from . import hazards
+from . import deeds
+from .bestiary import printed_alignment
 from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
@@ -3847,6 +3849,9 @@ class Engine:
     def _drive(self, remaining: list[dict], done: list[dict], partial: dict) -> Resolution:
         outcomes = [_rehydrate(o) for o in done]
         queue = list(remaining)
+        # Who everybody was before the suspended act, kept through the player's d20
+        # (`deeds.before`): taken out here so no op ever sees it among its own keys.
+        held_before = partial.pop("deeds_before", None) if partial else None
         while queue:
             raw = queue[0]
             # A creature's move toward somebody, with no square named, is given the
@@ -3887,13 +3892,23 @@ class Engine:
                     continue
 
             intent = _intent_from_dict(raw)
+            # The deeds reader's snapshot (rules/deeds.py, docs/deeds-plan.md §5.1): who
+            # everybody was before the player's own act, asked on the act's first entry and
+            # kept — a first blow makes its victim hostile, and a reader that asked after
+            # it would read every assault as fighting back. The resumed act keeps the one
+            # taken before its dice were handed over.
+            snap = None
+            if deeds.watches(self, intent):
+                snap = held_before if held_before is not None else deeds.before(self)
+            held_before = None
             try:
                 outcome = self._resolve_one(intent, partial)
             except _NeedsPlayerRoll as suspend:
                 # Freeze the rest of the list, including the intent we stopped inside.
                 self.scene.pending_intents = list(queue)
                 self.scene.pending_outcomes = [o.as_dict() for o in outcomes]
-                self.scene.pending_partial = suspend.partial
+                self.scene.pending_partial = (dict(suspend.partial, deeds_before=snap)
+                                              if snap is not None else suspend.partial)
                 self.scene.awaiting = suspend.prompt
                 return Resolution(outcomes=outcomes, awaiting=suspend.prompt)
             except _ReactionsOwed as owed:
@@ -3914,6 +3929,20 @@ class Engine:
             # resumed on the player's own d20 arrives here exactly as a hidden one does.
             if intent.gate:
                 queue = self._settle_gate(intent, outcome, queue)
+            # The deeds this act holds, read off its own records against the snapshot,
+            # and carried on its outcome for the history line. Every outcome is read, not
+            # only the player's: a death the player's blow caused can land in anybody's
+            # (§5.2). Here for `_settle_gate`'s reason — the one place that sees the intent
+            # and the outcome together, so a new op's harm is found by its records and
+            # not by remembering to call something. The narrator is never told a deed;
+            # the act's own tell is untouched (the owner's answer 4, 2026-10-08). A new
+            # outcome with the records added rather than the list edited in place, which
+            # `test_nothing_outside_the_applicator_edits_the_store` reads as the store.
+            found = deeds.read(self, intent, outcome, snap)
+            if found:
+                import dataclasses
+
+                outcome = dataclasses.replace(outcome, effects=list(outcome.effects) + found)
             outcomes.append(outcome)
             # What the hours this op spent did to the body, told right behind it. At the
             # batch's end only, a wait that put the player to sleep was told AFTER the
@@ -19240,7 +19269,7 @@ class Engine:
             tells.append(f"{target.name} is not evil, and the {name} is wasted.")
             return Outcome(intent_id=intent.id, op="use_ability", effects=records,
                            tell=" ".join(tells), because=intent.because)
-        if doc.get("evil_only") and target is not None and not _printed_alignment(target):
+        if doc.get("evil_only") and target is not None and not printed_alignment(target):
             tells.append(f"Nothing records {target.name}'s alignment; the {name} holds.")
         hit_ok = True
         if doc.get("attack") and target is not None:
@@ -22053,20 +22082,15 @@ def _norm_word(text) -> str:
     return " ".join(str(text or "").split()).strip().lower()
 
 
-def _printed_alignment(actor) -> str:
-    """The alignment a creature's stat block prints, or "" — the sheet has none (the
-    2026-09-19 ruling), so a person of the world has nothing to read."""
-    doc = actor._creature_doc() if hasattr(actor, "_creature_doc") else None
-    return str((doc or {}).get("alignment") or "").strip()
-
-
 def _could_be_evil(actor) -> bool:
     """False only when a printed alignment says plainly that this creature is not evil.
 
     "If the paladin targets a creature that is not evil, the smite is wasted" (CRB p.61).
     An unprinted alignment cannot say so, and the app records none, so it is not
-    refused — the tell says nothing recorded it."""
-    said = _printed_alignment(actor).upper()
+    refused — the tell says nothing recorded it. The printed field is read through
+    `bestiary.printed_alignment`, the one reader (moved there 2026-10-08 for the deeds
+    system's good carcasses, docs/deeds-plan.md §10)."""
+    said = printed_alignment(actor).upper()
     if not said:
         return True
     words = re.findall(r"[A-Z]+", said)

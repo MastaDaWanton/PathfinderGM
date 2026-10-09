@@ -57,9 +57,107 @@ function pageSheet(s) {
     ${workCard(s)}
     ${featsCard(s)}
     ${classCard(s)}
+    ${deedsCard(s)}
     ${backgroundCard(s)}
   </div>`;
 }
+
+// --- Deeds ---
+// The good and bad the character has done, as one signed number (rules/deeds.py,
+// docs/deeds-plan.md §9). The owner, 2026-10-08: "you should be able to look at this
+// number in your sheet but i dont want it to affect anything yet." So the card shows the
+// number, its word, where it sits among the seven words, and the rows it is the sum of
+// (Sawyer's visible +1/-1, PA §3), and says plainly that nothing reads it. Every figure
+// is the engine's (`full_sheet`'s "deeds"); nothing is added up here. The help opens from
+// its "?" only, by click, tap or keyboard, never from hovering a row (the skill-help
+// lesson of 2026-10-08: a card that opened on hover covered the rows under it).
+let DEEDS_HELP = false;
+const deedSign = v => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
+function deedChip(r) {
+  if (r.again) return `<span class="chip dd-v nil">0, again that day</span>`;
+  if (!r.value) return `<span class="chip dd-v nil">0, ${r.how === "accident" ? "an accident" : "not counted"}</span>`;
+  return `<span class="chip dd-v${r.value < 0 ? " warn" : ""}">${deedSign(r.value)}</span>`;
+}
+function deedRow(r) {
+  return `<li class="dd-row" data-n="${r.n}">
+    <span class="dd-when">Day ${esc(String(r.day))}${r.phase ? `, ${esc(r.phase)}` : ""}${
+      r.where ? `<span class="dd-where">${esc(r.where)}</span>` : ""}</span>
+    <span class="dd-said">${esc(r.said)}</span>${deedChip(r)}</li>`;
+}
+function deedRange(b) {
+  if (b.from == null) return `${deedSign(b.to)} or less`;
+  if (b.to == null) return `${deedSign(b.from)} or more`;
+  return `${deedSign(b.from)} to ${deedSign(b.to)}`;
+}
+function deedsCard(s) {
+  const d = s.deeds || { total: 0, word: "", rows: [], bands: [], more: false };
+  const counts = [`${d.good || 0} good`, `${d.bad || 0} bad`];
+  if (d.again) counts.push(`${d.again} not counted, the same thing again that day`);
+  if (d.forgiven) counts.push(`${d.forgiven} forgiven as ${d.forgiven === 1 ? "an accident" : "accidents"}`);
+  const scale = (d.bands || []).map(b => `<li${b.word === d.word ? ` class="on" aria-current="true"` : ""}>${
+    esc(b.word)}</li>`).join("");
+  const rows = (d.rows || []).length
+    ? `<ol class="plain dd-rows" id="dd-list" aria-label="Your deeds, newest first">${d.rows.map(deedRow).join("")}</ol>
+       ${d.more ? `<p class="cardline"><button type="button" class="v2-btn is-quiet is-small" id="dd-more">Show earlier deeds</button></p>` : ""}`
+    : `<p class="why">No deeds yet. What you do to people, good or bad, is kept here.</p>`;
+  return sheetCard("sc-deeds", "Deeds", `
+    <div class="dd-head">
+      <div class="dd-total v2-plaque" role="group" aria-label="Your deeds: ${esc(deedSign(d.total || 0))}, ${esc(d.word || "")}">
+        <b class="dd-num">${deedSign(d.total || 0)}</b><span class="dd-word">${esc(d.word || "")}</span>
+      </div>
+      <div class="dd-side">
+        <p class="dd-counts">${esc(counts.join(", "))}.</p>
+        <ol class="plain dd-scale" aria-label="The seven words, worst to best">${scale}</ol>
+      </div>
+      <button type="button" class="dd-q" id="dd-q" aria-expanded="${DEEDS_HELP}" aria-controls="dd-help"
+              aria-label="How deeds are counted">?</button>
+    </div>
+    <div class="dd-help" id="dd-help"${DEEDS_HELP ? "" : " hidden"}>
+      <p>Each thing you do to somebody, good or bad, is a small number, and the total is
+        their sum. Most acts are worth 1 either way. Harming somebody who never raised a
+        hand against you, or keeping somebody from dying, is worth 2. Killing somebody
+        who never raised a hand against you is 5 in all.</p>
+      <p>An accident, like a flask's splash on a bystander, is noticed and forgiven. The
+        same act towards the same person counts once a day; the rest are listed at 0.
+        Fighting back is never a deed, and neither is killing a foe in a fight; finishing
+        a beaten one off afterwards is.</p>
+      <dl class="dd-bands">${(d.bands || []).map(b => `<div><dt>${esc(b.word)}</dt><dd>${
+        esc(deedRange(b))}</dd></div>`).join("")}</dl>
+    </div>
+    ${rows}
+    <p class="why dd-honest">Nothing in the game reads this number yet. It changes no price,
+      no person and no roll.</p>`, "dd-card");
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("#dd-q");
+  if (!b) return;
+  DEEDS_HELP = !DEEDS_HELP;
+  b.setAttribute("aria-expanded", String(DEEDS_HELP));
+  const help = document.getElementById("dd-help");
+  if (help) help.hidden = !DEEDS_HELP;
+});
+
+// "Show earlier deeds": twenty older rows at a time from GET /api/deeds, added under the
+// ones the sheet brought. The last row's number is where the next page starts.
+document.addEventListener("click", async e => {
+  const b = e.target.closest("#dd-more");
+  if (!b) return;
+  const list = document.getElementById("dd-list");
+  const last = list && list.lastElementChild;
+  if (!last) return;
+  b.disabled = true;
+  try {
+    const d = await readJSON(await fetch(`/api/deeds?before=${encodeURIComponent(last.dataset.n)}`,
+                                         { cache: "no-store" }));
+    list.insertAdjacentHTML("beforeend", (d.rows || []).map(deedRow).join(""));
+    if (!d.more) b.closest("p").remove();
+    else b.disabled = false;
+  } catch (err) {
+    b.disabled = false;
+    b.textContent = "Could not read earlier deeds. Try again";
+  }
+});
 
 // Initiative, base attack, CMB, CMD and speed, each with its terms; every carried weapon,
 // each swing of a full attack at its own bonus; the full attack in a sentence; all ten

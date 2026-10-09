@@ -464,6 +464,13 @@ class Actor:
     # `awake_dc`): the owner's panel read "DC 107" after five days whose hours were
     # charged by the clock and never rolled.
     awake_checks: int = 0
+    # The deeds ledger (rules/deeds.py, docs/deeds-plan.md): the good and bad things the
+    # player character did, one row each, append-only, written ONLY by `deeds.record`. A
+    # plain list, not an ActiveEffect: a deed changes no number in play and grants no state
+    # (the owner, 2026-10-08: "i dont want it to affect anything yet"), so it is a record
+    # like `xp`. The total is derived (`deeds.total`), never stored. Only the player ever
+    # has rows; on everybody else it serialises to nothing.
+    deeds: list[dict] = field(default_factory=list)
     # The experience ledger. `xp` is what this character has earned; `xp_value` is what
     # defeating them awards — the bestiary's own column, carried onto the actor so a
     # finished fight can settle up without a lookup into a book the scene may not have.
@@ -6090,7 +6097,16 @@ def full_sheet(actor: Actor) -> dict:
         # None rather than an empty structure for a fighter, so the page can tell "does
         # not cast" from "casts nothing today" — they look identical and are not.
         "spells": _spell_sheet(actor),
+        # The Deeds card (rules/deeds.py `summary`): the number, its word, and the newest
+        # rows it is the sum of. Shown, and read by nothing else (docs/deeds-plan.md §8.5).
+        "deeds": _deeds_sheet(actor),
     }
+
+
+def _deeds_sheet(actor: Actor) -> dict:
+    from . import deeds as deeds_mod
+
+    return deeds_mod.summary(actor)
 
 
 def _background_sheet(actor: Actor) -> dict | None:
@@ -6901,6 +6917,9 @@ def to_dict(actor: Actor) -> dict:
         # and the owner's saves round-trip byte for byte
         # (`test_the_owners_real_saves_round_trip_byte_identically`).
         **({"awake_checks": int(actor.awake_checks)} if actor.awake_checks else {}),
+        # The same rule for the deeds ledger: written only when it holds a row, so every
+        # save made before it existed (and every NPC) round-trips byte for byte.
+        **({"deeds": [dict(r) for r in actor.deeds]} if actor.deeds else {}),
         "xp": actor.xp, "xp_value": actor.xp_value,
         "from_template": actor.from_template,
         "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
@@ -7407,6 +7426,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         thirst_checks=int(data.get("thirst_checks", 0) or 0),
         hunger_checks=int(data.get("hunger_checks", 0) or 0),
         awake_checks=int(data.get("awake_checks", 0) or 0),
+        deeds=[dict(r) for r in (data.get("deeds") or []) if isinstance(r, dict)],
         xp=int(data.get("xp", 0) or 0),
         xp_value=int(data.get("xp_value", 0) or 0),
         from_template=str(data.get("from_template", "") or ""),

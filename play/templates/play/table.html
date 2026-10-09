@@ -2554,6 +2554,60 @@
   #levelup { margin-top: 14px; }
   .pathblock h4 { font-family: var(--display); }
 
+  /* The Deeds card (05-sheet.js `deedsCard`, docs/deeds-plan.md §9.1). The one loud thing
+     is the number and its word on a plaque; the seven words sit quietly beside it with the
+     current one lit, and the rows below are the card's existing hairline list. The theme's
+     own gold, ink, dim and blood; no new colour. */
+  .dd-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px 22px;
+             align-items: center; margin: 0 0 14px; }
+  .dd-total { display: grid; justify-items: center; gap: 4px; min-width: 132px;
+              padding: 12px 18px 11px; text-align: center; }
+  .dd-num { color: var(--gold); font: 400 40px/1 var(--display); font-weight: 400;
+            text-shadow: var(--engraved); font-variant-numeric: tabular-nums; }
+  .dd-word { color: var(--ink); font: 400 15px/1.2 var(--display); letter-spacing: .08em;
+             font-variant: small-caps; }
+  .dd-counts { margin: 0 0 8px !important; color: var(--ink); }
+  .dd-scale { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 13.5px/1.4 var(--body);
+              color: var(--dim); }
+  .dd-scale li.on { color: var(--gold); text-decoration: underline; text-underline-offset: 4px;
+                    text-decoration-thickness: 1px; }
+  /* min-* reset: the phone's 44px button floor drew the ring as an oval (measured at
+     375px); the hit area grows through ::after instead. */
+  .dd-q { align-self: start; width: 26px; height: 26px; min-width: 26px; min-height: 26px;
+          padding: 0; border-radius: 50%;
+          border: 1px solid var(--gold-dim); background: transparent; color: var(--dim);
+          font: 600 13px/24px var(--body); cursor: pointer; }
+  .dd-q:hover, .dd-q[aria-expanded="true"] { color: var(--gold); border-color: var(--gold); }
+  .dd-q:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  @media (pointer: coarse) { .dd-q { position: relative; } .dd-q::after { content: "";
+    position: absolute; inset: -10px; } }
+  .dd-help { margin: 0 0 14px; padding: 10px 14px 4px; border-left: 2px solid var(--gold-dim);
+             background: rgba(8, 6, 4, .28); max-width: 72ch; }
+  .dd-bands { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+              gap: 2px 18px; margin: 4px 0 8px; font-size: 13.5px; }
+  .dd-bands div { display: flex; justify-content: space-between; gap: 8px; }
+  .dd-bands dt { color: var(--ink); } .dd-bands dd { margin: 0; color: var(--dim);
+    font-variant-numeric: tabular-nums; }
+  .dd-row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; gap: 2px 14px;
+            align-items: baseline; padding: 6px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+  .dd-row:last-child { border-bottom: 0; }
+  .dd-when { color: var(--dim); font-size: 13px; line-height: 1.35; }
+  .dd-where { display: block; }
+  .dd-said { color: var(--ink); }
+  .dd-v { margin-left: 0; font-variant-numeric: tabular-nums; }
+  .dd-v.nil { color: var(--dim); border-color: rgba(122, 101, 67, .5); background: transparent; }
+  .dd-honest { margin-top: 10px !important; }
+  @media (max-width: 760px) {
+    .dd-head { grid-template-columns: auto minmax(0, 1fr); }
+    .dd-side { grid-column: 1 / -1; grid-row: 2; }
+    .dd-q { justify-self: end; }
+    .dd-total { min-width: 0; justify-self: start; }
+    .dd-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .dd-when { grid-column: 1 / -1; }
+    .dd-where { display: inline; }
+    .dd-where::before { content: ", "; }
+  }
+
   /* --- The Journal ----------------------------------------------------------------- */
   .journal { max-width: 1180px; margin: 0 auto; display: grid; gap: 34px; align-items: start;
              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -242,7 +242,27 @@ def _effect_lines(c, effect: dict, name, actor_of_intent: str) -> list[str]:
     if kind == "wanted":
         town = _town_name(c, str(effect.get("town") or "")) or "the town"
         return [f"The watch of {town} wants you."]
+    if kind == "deed":
+        return _deed_line(effect)
     return []
+
+
+def _deed_line(effect: dict) -> list[str]:
+    """The deeds system's line (rules/deeds.py, docs/deeds-plan.md §9.2): the running
+    history shows a deed as it happens, with its value, the visible +1/-1 Sawyer asked for
+    (docs/deeds-prior-art.md §3). Only the player has deeds, so the record carries no ref.
+    The sentence is the record's own `said`, written with names at the time; never a ref."""
+    said = " ".join(str(effect.get("said") or "").split())
+    if not said:
+        return []
+    said = said[:1].lower() + said[1:]
+    value = int(effect.get("value") or 0)
+    if effect.get("again"):
+        return [f"Not counted: {said}, the same again that day."]
+    if not value:
+        return [f"Noticed and forgiven: {said} (0)."]
+    signed = f"+{value}" if value > 0 else f"−{-value}"
+    return [f"A deed: {said} ({signed})."]
 
 
 def _row_lines(c, row: dict, name, seen: set) -> list[str]:

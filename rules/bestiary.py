@@ -809,3 +809,83 @@ def vocabularies() -> dict:
             for v in c.get(key) or ():
                 counts[field][v] = counts[field].get(v, 0) + 1
     return {k: dict(sorted(v.items(), key=lambda kv: -kv[1])) for k, v in counts.items()}
+
+
+# --- What a body's own block says it is: alignment, and whether it is a people ------------
+#
+# The one reader of a block's printed alignment. It lived in rules/engine.py as
+# `_printed_alignment` for the paladin's smite and the evil-only items; the deeds system
+# (docs/deeds-plan.md §10) needs the same answer for a good outsider's or a good dragon's
+# carcass, and a second copy of a rule is how a reader and a writer come to disagree
+# (CLAUDE.md, "grep for every copy of it"). Moved here on 2026-10-08, beside the blocks.
+#
+# The sheet records no alignment (the 2026-09-19 ruling), so a person of the world has
+# nothing to read and answers "". Tags and printed fields only, never the creature's name:
+# a renamed archon is still an archon.
+
+
+def _block_of(creature) -> dict:
+    """The stat block behind a creature: the dict itself, or the block an Actor was
+    instantiated from (`Actor._creature_doc`, read live), or {}."""
+    if isinstance(creature, dict):
+        return creature
+    doc = creature._creature_doc() if hasattr(creature, "_creature_doc") else None
+    return doc or {}
+
+
+def printed_alignment(creature) -> str:
+    """The alignment a creature's stat block prints ("NG", "CE", "NG/CN"), or "".
+
+    Takes an Actor or a block. Measured on the shipped bestiary 2026-10-08: every one of
+    the 7,138 imported blocks prints the nine two-letter abbreviations, a handful two
+    alternatives ("NG/CN"), and none a word."""
+    return str(_block_of(creature).get("alignment") or "").strip()
+
+
+_GOOD = frozenset({"LG", "NG", "CG"})
+
+
+def printed_good(creature) -> bool:
+    """Whether the printed alignment is good: every alternative it prints is good.
+
+    "NG/CN" (three blocks) is a creature that may be either, and a bad deed is not written
+    on a maybe: the owner's "most actions should only have a small impact" leans the doubt
+    to the player's side. Counted 2026-10-08: 55 outsiders and 9 dragons print a good
+    alignment whichever way the slash is read, so the choice moves no outsider and no
+    dragon today."""
+    words = re.findall(r"[A-Z]{2}", printed_alignment(creature).upper())
+    return bool(words) and all(w in _GOOD for w in words)
+
+
+def body_is(creature, tag: str) -> bool:
+    """`type.<x>` / `subtype.<y>` asked of an Actor's standing tags, or derived from a
+    block's own fields through the one writer of the tag text (`states.type_tags`), so a
+    block and the creature made from it cannot answer differently."""
+    from . import states
+
+    if isinstance(creature, dict):
+        tags = list(states.type_tags(creature.get("creature_type") or "",
+                                     creature.get("subtype") or "",
+                                     creature.get("immune") or ()))
+        tags += [str(t) for t in (creature.get("tags") or ()) if str(t).strip()]
+        return any(states.matches(t, tag) for t in tags)
+    return bool(hasattr(creature, "has_state") and creature.has_state(tag))
+
+
+def never_harvested(creature) -> bool:
+    """Whether this body is a people's, never a carcass: no part of it is ever offered.
+
+    Humanoids (leatherworking plan §5.6), and, by the owner's answer of 2026-10-08 to
+    docs/deeds-plan.md open point 3, the native outsiders: aasimar, tieflings, sylphs,
+    suli, nephilim and the rest, 225 blocks, which are peoples but not humanoids, so the
+    humanoid rule alone missed them ("banned from skinning like humanoids"). Read off the
+    type and subtype tags, never the name. Reading `languages` instead was weighed and
+    refused: 222 of the 225 native outsiders print a language, but so do 680 of all 708
+    outsiders, so it cannot tell a people from a beast.
+
+    Takes an Actor or a block. The harvest (lane C, rules/harvest.py) asks this first and
+    offers nothing when it is True; `deeds.of_carcass` answers only which deed a harvest
+    would be, and is never the gate."""
+    if body_is(creature, "type.humanoid"):
+        return True
+    return body_is(creature, "type.outsider") and body_is(creature, "subtype.native")

@@ -72,6 +72,17 @@ from __future__ import annotations
 # applicator, source `card:<id>`, so `has_state("situation")` on an actor answers for
 # every card-granted tag the way it answers for a condition.
 #
+# `deed.*` — the player character's good and bad deeds (rules/deeds.py,
+# docs/deeds-plan.md): `deed.theft`, `deed.violence.unprovoked`, `deed.kill.captive`,
+# `deed.mercy.saved`, `deed.harvest.good-outsider` and the rest of
+# content/rules/deeds.json. The same vocabulary and the same matcher (`matches`), asked
+# as prefix questions — `deeds.of(pc, "deed.kill")` — and never as strings. NOT a state
+# anybody holds: a deed is a row of `Actor.deeds`, the ledger, written only by
+# `deeds.record`, so there is no TAGS row and `has_state("deed")` answers nothing. When a
+# later system makes deeds matter it grants a state of its own through the applicator (a
+# renown tag, a `knows.*` on a witness); nothing reads the ledger yet (the owner,
+# 2026-10-08), and tests/test_deeds.py holds that.
+#
 # The law's opinion of a person, per town (docs/wanted.md, docs/quest-schemes-plan.md
 # §6.6):
 #
