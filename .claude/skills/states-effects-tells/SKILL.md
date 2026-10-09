@@ -82,7 +82,7 @@ starvation, breath, cold, heat, spell_resistance … — a closed list, validate
 UNconditional terms, a cast within a foe's reach provokes unless cast `defensively`
 (`Engine._provoked_by_casting`), and concentration is rolled for casting defensively,
 grappled (the grappler's ref on the condition's `payload.by`) and struck while casting
-(`Engine._concentrate`); 65 of 1,474 feats carry a document, and each `not_yet` names
+(`Engine._concentrate`); 67 of 1,474 feats carry a document, and each `not_yet` names
 the roll still missing (`tests/test_feats_computed.py`); **the mind gate**
 — stage 8's rule asked of a mind instead of a number: a `condition` that would land an
 `attitude.*` tag, a `state.fear.*` tag, or anything in the mind-affecting or sleep
