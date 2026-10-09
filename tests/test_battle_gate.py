@@ -162,9 +162,14 @@ def test_inject_fight_stands_aside_for_a_finishing_blow(scene):
     body.hp = -7
     body.add_condition("dying", source="the earlier fight")
     raw = [{"op": "attack", "actor": "pc", "target": "c1", "because": ""}]
-    out = judgement.inject_fight(
-        raw, "i strike him one final time to put him out of his misery", scene)
-    assert out == raw, "the mercy stroke is the whole turn — nothing may be added"
+    # Through the reading the live reader gave this line (2026-10-09: the regex door that
+    # spawned the thug is gone, and the blow is the reading's `attack` act).
+    from tests._violence import everyone, through_the_reading
+
+    out, stop = through_the_reading(
+        raw, "i strike him one final time to put him out of his misery", scene,
+        ask=everyone)
+    assert out == raw and not stop, "the mercy stroke is the whole turn — nothing added"
 
 
 def test_the_redirect_leaves_the_mercy_stroke_on_the_body(scene):

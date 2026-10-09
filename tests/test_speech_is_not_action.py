@@ -1,6 +1,7 @@
 """What the character SAID may not be read as what the character DID.
 
-Measured 2026-09-08, nine player lines through `judgement.wants_a_fight`. Three
+Measured 2026-09-08, nine player lines through `judgement.wants_a_fight` (retired
+2026-10-09: the reader's `attack` act decides now, tests/_violence.py). Three
 opened a fight and all three were speech:
 
   * `I tell the clerk "I am a monk, I can handle myself in a fight or handle a bunch
@@ -46,9 +47,34 @@ ACTION = [
 ]
 
 
+def _a_room_with_a_guard():
+    """The player and a guard standing beside them — somebody a misread line WOULD hit."""
+    from rules.bestiary import instantiate
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    room = Scene()
+    room.add(load_pc("fixtures/pc-kesst.json"))
+    room.add(instantiate("watchman", scene=room, name="the guard"), zone="engaged")
+    return room
+
+
+def _strikes(line) -> bool:
+    """Whether the line, as the live reader read it (tests/_violence.py), puts a blow by
+    the player into the plan. The regex `wants_a_fight` answered this until 2026-10-09; the
+    reading's `attack` act answers it now, and code only aims it."""
+    from tests._violence import everyone, through_the_reading
+
+    out, _ = through_the_reading([{"op": "narrate_only"}], line, _a_room_with_a_guard(),
+                                 ask=everyone)
+    return any(i.get("op") == "attack" for i in out)
+
+
 def test_speech_never_starts_a_fight():
-    """Three of these nine started one on 2026-09-08, including a refusal to fight."""
-    started = [t for t in SPEECH if judgement.wants_a_fight(t)]
+    """Three of these nine started one on 2026-09-08, including a refusal to fight. The
+    live reader (2026-10-09) reads every one as words or a search, never an attack, so
+    the guard beside the player is not struck."""
+    started = [t for t in SPEECH if _strikes(t)]
     assert not started, started
 
 
@@ -56,16 +82,15 @@ def test_action_still_starts_a_fight():
     """The quarantine must not buy its silence by going deaf. A line with a real
     declaration in it is still a declaration, including one that follows speech in
     the same breath and one written in the asterisk convention."""
-    missed = [t for t in ACTION if not judgement.wants_a_fight(t)]
+    missed = [t for t in ACTION if not _strikes(t)]
     assert not missed, missed
 
 
 def test_a_threat_is_not_an_attack():
     """Pathfinder 1e already draws this line: threatening is Intimidate, a standard
     action with a DC, not a swing. Speech about future violence is not violence."""
-    assert not judgement.wants_a_fight(
-        'I tell him "I will kill you where you stand if you touch that jar"')
-    assert judgement.wants_a_fight("I kill him where he stands")
+    assert not _strikes('I tell him "I will kill you where you stand if you touch that jar"')
+    assert _strikes("I kill him where he stands")
 
 
 def test_redaction_keeps_the_line_the_same_length():
@@ -91,7 +116,7 @@ def test_an_apostrophe_is_not_a_quotation_mark():
     apostrophe is worse than the bug it fixes."""
     line = "I don't like the look of the guard's blade so I attack him"
     assert judgement.redact_speech(line) == line
-    assert judgement.wants_a_fight(line)
+    assert _strikes(line)
 
 
 def test_speech_runs_to_the_end_of_its_sentence_and_no_further():
@@ -105,17 +130,15 @@ def test_violence_the_player_is_declining_is_not_a_declaration():
     """Found beside the speech bug: "I don't want to fight, I look for the door" has
     no speech verb and no quotation, so redaction correctly leaves it whole — and the
     old rule then read "fight", found an "I" in front of it, and started one."""
-    assert not judgement.wants_a_fight("I don't want to fight, I look for the door")
-    assert not judgement.wants_a_fight("I would rather not fight the watchman")
+    assert not _strikes("I don't want to fight, I look for the door")
+    assert not _strikes("I would rather not fight the watchman")
     # Still a fight: the negation belongs to a different clause.
-    assert judgement.wants_a_fight("I don't hesitate, I attack the guard")
+    assert _strikes("I don't hesitate, I attack the guard")
 
 
-def test_a_quoted_number_is_not_a_head_count_or_a_range():
-    """`opponent_count` and `opening_feet` read the same line. A number the character
-    speaks is not a number about the fight."""
-    assert judgement.opponent_count('I say "there were four of them last night"') == 1
-    assert judgement.opponent_count("I attack the four guards") == 4
+# Retired 2026-10-09: `test_a_quoted_number_is_not_a_head_count_or_a_range` pinned
+# `opponent_count` and `opening_feet`, which sized and placed the template thug from the
+# sentence. Nobody is conjured any more, so neither exists.
 
 
 def test_a_turn_where_the_player_spoke_never_gets_the_holding_line():

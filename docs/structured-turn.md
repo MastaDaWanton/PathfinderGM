@@ -343,6 +343,70 @@ saves; the market save's 7 lines are the items save's first 7):
 - The one new op: turn 19, "count the coins", is read as taking the coins. The engine
   answers "the payment is already in the purse" and nothing moves.
 
+### A declared blow lands on a real person (2026-10-09)
+
+The owner: *"if i say I attack the closest person or i go on a rampage or i assault a
+civilian etc. it should be able to start a fight."* Measured live first (gemma-4-12B, a
+scratch market of three bystanders: the fruit seller at 5 ft, the porter at 15, a boy at
+40):
+
+| line | before | after |
+|---|---|---|
+| "I attack the closest person." | plan aimed at the fruit seller; the "fight" declarer REQUIRED `spawn`, two bandits joined her side | attack on the fruit seller (the plan's `new1` re-aimed), fight opened, nobody new |
+| "I assault a civilian." | worked by luck ("assault" was not on the regex list) | the fruit seller, nearest of the 3 the words could mean |
+| "I go on a rampage." | read `other`; five plans aimed at `new1`, turn degraded into prose about men who were not there | read `attack`; the fruit seller struck, fight opened |
+| "I pick a fight with the biggest bruiser in the room." (no bruiser) | read `insult`; spawn + begin_encounter required, five failed attempts, fallback timed out at 600 s | 422 "Nobody here answers to the biggest bruiser in the room." |
+| same, with a dockhand bruiser 40 ft off | — | the dockhand struck, though three stood nearer |
+| "I attack the watchman at the fountain." | — | that watchman; the other watchman came in on his side (`Engine.rally`) |
+| "I attack the closest person." / "I go on a rampage." with nobody here | — | 422 "There is nobody here to attack." |
+
+**Built:**
+- **Retired:** `judgement.wants_a_fight`, `opponent_count`, `opening_feet` and their
+  patterns, the template-thug body of `inject_fight`, and the `"fight"` declarer in
+  `declared_ops` — the channel the bandits came through (the schema required what the
+  conjuring would have added). `_player_is_the_one_swinging` stays, for
+  `fill_missing_actor` only.
+- **The reader:** the `attack` gloss names assault, picking a fight and running amok; two
+  demonstrations ("I pick a fight with the tallest of the sailors", "I run amok through
+  the fish stalls"). Recorded readings of 51 lines (`tests/_violence.py`): every speech,
+  question, report and idiom line the regex tests pinned reads as no attack done (one,
+  "I think about attacking him", as an attack `intended`, which moves nothing).
+- **`acts_to_ops.victims`:** the target slot through `person` (a name, a description); a
+  pronoun in a fight only means somebody in it (`_can_be_fought`, the 2026-09-18 rule),
+  out of one the person the player is dealing with; no words in a fight, the nearest foe;
+  anything else is ONE question (`interpret.confirm_victims`): which of the people here,
+  as an enum of refs, could the words mean. The nearest of those by `Scene.positions` (else
+  zone) is the engine's answer; the player's own people last. Nobody here, or nobody the
+  words fit: the row is `missing` and the turn is the refusal, with no model call.
+- **`judgement.inject_fight`** now only applies that: drops a plan's spawn / introduce /
+  begin_encounter on a turn of blows with no finding act, aims the plan's own blow at the
+  victim (or adds the table's), and ends a fight with nobody left standing.
+- **Not decided here:** a blow after a walk, a seek or a follow in the same sentence (the
+  people there are not known at plan time); a pronoun out of a fight with two who fit and
+  nobody being dealt with (the plan's own choice stands).
+
+The victim question was probed on 14 hand-written cases with market and tavern casts
+(closest, civilian, rampage, bruiser present and absent, someone, a guard present and
+absent, the nearest drunk, the man at the bar): 14 of 14 exact, about 1 to 5 s each. That
+is a probe, not a held-out bench.
+
+**What the two demonstrations cost the reader**, A/B on all 302 labelled lines, master's
+reader against this one, one run each (scored by act name only; no held-out sentence was
+read):
+
+| | strict | engine-relevant | acts in order |
+|---|---|---|---|
+| master, held-out 218 | 0.739 | 0.839 | 0.881 |
+| this branch, held-out 218 | 0.711 | 0.821 | 0.867 |
+| master, dev 84 | 0.679 | 0.798 | 0.857 |
+| this branch, dev 84 | 0.690 | 0.845 | 0.893 |
+
+Seven act sequences changed. On the held-out lines three got worse and none better: one
+labelled `insult` now reads `attack` (the "pick a fight with" demonstration; that line
+would now strike somebody), two sales gained a second act, and one line was wrong both
+ways. On the dev lines three got better. A first try that also reworded the `insult` gloss ("a fight picked with WORDS
+alone") flipped the same `insult` line and was withdrawn for the smaller change.
+
 ## Backward: the narration (lane N)
 
 The prose call's JSON is NOT given new fields. It was cut back to one field because

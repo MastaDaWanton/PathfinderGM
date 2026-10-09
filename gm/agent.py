@@ -358,9 +358,18 @@ class GMAgent:
         tended = acts_to_ops.first_aid(
             self.rows, read_ok, self.engine.scene,
             ask=interpret.confirm_first_aid if interpret.ENABLED else None)
+        # A blow lands on a real person here — "the closest person", "a civilian", a
+        # rampage — or the turn says there is nobody to strike (`acts_to_ops.victims`; the
+        # owner, 2026-10-09). Who the words could mean is asked once, of the people
+        # standing here; the nearest of them is the engine's answer.
+        struck = acts_to_ops.victims(
+            self.rows, read_ok, self.engine.scene,
+            ask=interpret.confirm_victims if interpret.ENABLED else None)
         if read_ok is not None:
             if tended:
                 read_ok["first_aid"] = tended
+            if struck:
+                read_ok["struck"] = struck
             read_ok["table"] = [r.record() for r in self.rows]
             if held_back:
                 read_ok["sales_held_back"] = held_back
@@ -412,6 +421,14 @@ class GMAgent:
         if missing:
             brief += ("\n\nNOT HERE (fact — the turn says so, and nothing is made to fill "
                       "it): " + "; ".join(missing) + ".")
+        aimed = [(i["target"], self.engine.scene.actors[i["target"]].name)
+                 for r in self.rows if r.act in acts_to_ops.VIOLENT_ACTS
+                 for i in r.intents if i["target"] in self.engine.scene.actors]
+        if aimed:
+            # Who the blow lands on is settled before the plan (`acts_to_ops.victims`),
+            # so the plan and the prose are told it as fact rather than left to pick.
+            brief += ("\n\nTHE PLAYER'S BLOW (fact — the engine aims it; attack this ref, "
+                      "bring nobody in): " + "; ".join(f"{n} ({r})" for r, n in aimed) + ".")
         if beyond:
             brief += ("\n\nBEYOND THEIR MEANS (fact — nothing on the sheet does it; no op "
                       "for it, the engine prints the refusal): "
@@ -802,10 +819,12 @@ class GMAgent:
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
                 raw = judgement.bulk_give_is_a_loot(raw, self.engine.scene)
                 raw = judgement.inject_loot(raw, player_input, self.engine.scene)
-                # Last, and after the target fills: a fight the player declared and the
-                # GM only described. Runs once there is certainly nobody to fight, so it
-                # cannot steal a turn from `fill_obvious_targets`.
-                raw = judgement.inject_fight(raw, player_input, self.engine.scene)
+                # Last, and after the target fills: the blow the reading declared, on the
+                # person the table found for it (`acts_to_ops.victims`) — the plan's own
+                # blow aimed there, or the table's added — and nobody made to receive it.
+                raw = judgement.inject_fight(raw, player_input, self.engine.scene,
+                                             rows=self.rows, frame=read_ok,
+                                             notes=own_words)
                 # Somebody's house: the engine's knock, in place of a walk into a
                 # place that is not one yet (docs/the-population.md, calling on people).
                 # Breaking in first: "I break into her house" is not a knock.
@@ -1113,7 +1132,8 @@ class GMAgent:
         does NOT skip is a single line of the engine's bookkeeping. It also skips the
         injector chain `plan_turn` runs, deliberately: those read the player's words as a
         declaration of what THEIR CHARACTER does, and `/cheat I defeat all the enemies`
-        run through `inject_fight` would spawn somebody to fight.
+        run through the injectors would have spawned somebody to fight (`inject_fight`
+        did, until 2026-10-09).
         """
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places(),
