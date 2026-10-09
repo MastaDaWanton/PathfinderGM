@@ -21,6 +21,17 @@
    1070px, the device over the world's name and a 28px sideways page scroll at 375px).
    After: 0 of 310, no sideways scroll at any width, focus order unchanged.
 
+3. The bar's second line. Wrapping cured the overlap, but with Spells and "2 new" the end
+   group fell to a line of its own from 761 to 1102px and from 1181 to 1220px, the bar
+   60px tall becoming 108 (the book 315px tall at 1024x768 instead of 364). The owner
+   (2026-10-09): give Talk, Music, Settings and the toggle their phone size at mid widths.
+   Measured with headless Chrome on a scratch server, every 5px from 375 to 1920 and every
+   1px from 761 to 1300: the bar needed 1103px under 1181 and 1221px above; with the end
+   group at phone sides and tracking under 1241px (473px to 380) and the tabs at the
+   phone's type under 1181 (481px to 451) it needs 980 and 1127. It is one row from 980px
+   up: 59.5px tall at 1024 (was 108.4), 61 at 1200 (was 109.4); 0 of 310 widths overlap,
+   none scroll sideways, the tab key's order is the same, and every word is the same.
+
 There is no layout engine in the suite, so these hold the rules the measurements came
 from: the frame's reach is computed from the same numbers the browser uses, and the bar
 is held to the shape that cannot overlap (a wrapping flex row whose parts keep their own
@@ -173,6 +184,67 @@ def test_on_a_phone_the_tabs_take_their_own_line_and_scroll():
     modes = modes[:modes.index("}")]
     assert "flex: 1 1 100%" in modes and "min-width: 0" in modes and "overflow-x: auto" in modes
     assert "grid-area" not in phone[:phone.index(".stage")], "a grid area left on the bar"
+
+
+def _block(css: str, title: str, query: str) -> str:
+    """The body of the @media block that follows the section comment `title`, which
+    must open with exactly this query."""
+    at = css.index("/* --- " + title)
+    head = "@media " + query + " {"
+    at = css.index("@media ", at)
+    assert css.startswith(head, at), f"{title!r} is no longer under {head}"
+    return css[at:css.index("\n  }\n", at)]
+
+
+def test_the_end_group_takes_its_phone_size_where_the_full_one_does_not_fit():
+    """With Spells and "2 new" the end group (Talk 127, Music 87, Settings 106, Hide sheet
+    129, 473px with its gaps) dropped to a second line from 761 to 1102px and from 1181 to
+    1220px: the bar 108px tall at 1024 and 109 at 1200 instead of 60. At phone sides and
+    tracking it is 380px (115, 65, 81, 101) and the bar is one row from 980px up. The
+    bound has to stand above 1220, the widest width the full-size group wrapped at, and
+    the block has no lower bound, so the phone's size is this same rule, not a copy."""
+    css = _style(TABLE)
+    mid = _block(css, "Mid widths: the bar's end group", "(max-width: 1240px)")
+    bound = int(re.search(r"max-width: (\d+)px", mid).group(1))
+    assert bound > 1220, "the full-size group wrapped at up to 1220px with the tabs above 1180"
+    assert ".topend { gap: 6px; }" in mid
+    assert ".talkbtn { min-height: 36px; padding: 6px 12px; }" in mid
+    assert ".topend > .v2-btn.is-quiet { min-height: 36px; padding: 6px 10px; " \
+           "letter-spacing: .04em; }" in mid
+    # The toggle holds its longer label's width, "Show sheet": 101px at the tight
+    # tracking. Its desktop 8.6em (129px) here would give back 28 of the 93px saved.
+    em = float(re.search(r"#sheettoggle \{ min-width: ([\d.]+)em; \}", mid).group(1))
+    assert 6.7 <= em < 8.6, em
+    phone = _phone(css)
+    for rule in (".talkbtn {", ".topend > .v2-btn.is-quiet {", ".topend { gap"):
+        assert rule not in phone, f"a second copy of {rule} on the phone"
+
+
+def test_under_1181_the_tabs_take_the_phones_type():
+    """The last 30px: at 14px and .05em the seven tabs measured 481px and the bar needed
+    1010px with the compact end group; at the phone's 13.5px and .04em (keeping 10px
+    sides, tighter than the phone's 12) they measure 451 and it needs 980."""
+    css = _style(TABLE)
+    narrow = _block(css, "Narrower desktops: one sheet column", "(max-width: 1180px)")
+    tabs = narrow[narrow.index(".modes > button {"):]
+    tabs = tabs[:tabs.index("}")]
+    assert "padding: 8px 10px" in tabs and "font-size: 13.5px" in tabs \
+        and "letter-spacing: .04em" in tabs
+    phone = _phone(css)
+    ptabs = phone[phone.index(".modes > button {"):]
+    assert "font-size: 13.5px" in ptabs[:ptabs.index("}")]
+
+
+def test_no_word_on_the_bar_was_shortened():
+    """Only sizes changed to keep the bar on one row: every control still says its whole
+    name, so nothing needs an aria-label or a hover tooltip to explain a cut-down word."""
+    html = Client().get("/play/").content.decode("utf-8")
+    bar = html[html.index('<header class="topbar">'):html.index("</header>")]
+    words = [re.sub(r"<[^>]+>", "", m).strip()
+             for m in re.findall(r"<(?:button|a)\b[^>]*>(.*?)</(?:button|a)>", bar, re.S)]
+    assert words == ["Worlds &amp; characters", "Table", "Map", "Sheet", "Equipment",
+                     "Spells", "Trade", "Journal", "Talk", "Music", "Settings",
+                     "Hide sheet"], words
 
 
 class _Bar(HTMLParser):

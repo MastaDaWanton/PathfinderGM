@@ -386,12 +386,20 @@ def test_the_top_bars_quiet_buttons_take_talks_phone_size():
     """Measured at 390x844 (scratch server, the circle open, on this branch and on master
     alike): the top bar was 403px wide, its end group 273px (Talk 64, Music 87, Settings
     106 at desktop padding and tracking), so the whole page scrolled sideways. With Music
-    and Settings at Talk's phone size the bar measured 390 at 390 and 360 at 360."""
+    and Settings at Talk's phone size the bar measured 390 at 390 and 360 at 360.
+
+    Since 2026-10-09 the rule lives once, in the mid-width block (`max-width: 1240px`,
+    no lower bound), which the phone is inside: the end group keeps this size from 1240px
+    down so the bar stays one row to about 1000px (tests/test_nothing_overlaps.py)."""
     html = (ROOT / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    at = html.index("Mid widths: the bar's end group")
+    mid = html[at:html.index("\n  }\n", at)]
+    assert "@media (max-width: 1240px) {" in mid, "the compact size no longer reaches a phone"
+    assert ".topend > .v2-btn.is-quiet { min-height: 36px; padding: 6px 10px;" in mid
+    assert ".topend { gap: 6px; }" in mid
     phone = html[html.index("Phone: the story is the page"):]
     phone = phone[:phone.index("\n  }\n")]
-    assert ".topend > .v2-btn.is-quiet { min-height: 36px; padding: 6px 10px;" in phone
-    assert ".topend { gap: 6px; }" in phone
+    assert ".topend > .v2-btn.is-quiet {" not in phone, "a second copy of the rule"
 
 
 def test_closing_the_conversion_notice_returns_to_the_method_strip_not_close():

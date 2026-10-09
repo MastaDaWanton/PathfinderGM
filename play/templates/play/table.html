@@ -3031,6 +3031,28 @@
   .trayempty { margin: 0; color: var(--ink); font: italic 14px/1.5 var(--body); }
   #convo:not([hidden]) ~ .trayempty, #talk:not([hidden]) ~ .trayempty { display: none; }
 
+  /* --- Mid widths: the bar's end group takes its phone size ------------------------- */
+  /* With a caster's Spells tab and Talk's "2 new" the bar needed 1103px under 1181 (the
+     way out 108, the tabs 481, Talk, Music, Settings and Hide sheet 473, gaps and sides)
+     and 1221px above it, where the tabs grow to 583: so the end group dropped to a line
+     of its own from 761 to 1102px and again from 1181 to 1220px, the bar 60px tall
+     becoming 108 (measured 2026-10-09). The owner's call the same day: give Talk, Music,
+     Settings and the toggle their phone size wherever the full one cannot fit. Phone
+     sides and tracking took the end group to 380px and, with the tabs' phone type under
+     1181, the bar needs 980px there and 1127px above: one row from 980px up, 59.5px tall
+     at 1024 and 61 at 1200 (swept every 5px, 375 to 1920: no overlap, no sideways scroll).
+     The bound is 1240, not 1220, so a "12 new" still fits. Only sizes change: the words,
+     the order, the iron and the gold are the desktop's. This block has no lower bound,
+     so a phone keeps the same size it measured first (the bar was 403px wide on a 390px
+     phone at desktop sides, enchanting leftovers 2026-10-06). The toggle keeps the width
+     of its longer label, "Show sheet", at the tighter tracking (101px). */
+  @media (max-width: 1240px) {
+    .topend { gap: 6px; }
+    .talkbtn { min-height: 36px; padding: 6px 12px; }
+    .topend > .v2-btn.is-quiet { min-height: 36px; padding: 6px 10px; letter-spacing: .04em; }
+    #sheettoggle { min-width: 6.75em; }
+  }
+
   /* --- Narrower desktops: one sheet column, character over numbers -------------------- */
   @media (max-width: 1180px) {
     /* The book is shorter at 1024x768, so the device is 60px wide (173px tall), bounded
@@ -3058,9 +3080,11 @@
     body.mode-sheet .sheetmore { grid-column: 2; }
     body.mode-sheet .device { grid-area: 1 / 2 / 2 / 3; }
     /* Seven tabs, Talk and the sheet toggle did not fit three equal columns at 1024px:
-       the right-hand group overran into the tabs. Tighter here; the wrap does the rest. */
+       the right-hand group overran into the tabs. Tighter here; the wrap does the rest.
+       The tabs take the phone's type (13.5px, .04em) at these sides: 451px for seven,
+       not 481, the last 30px the bar needed to stay one row at 1000px. */
     .topbar { gap: 8px; padding: 8px 12px 9px; }
-    .modes > button { padding: 8px 10px; letter-spacing: .05em; font-size: 14px; }
+    .modes > button { padding: 8px 10px; letter-spacing: .04em; font-size: 13.5px; }
     /* Measured at 1024x768: the book's head took 100px of a 270px book when "Here" fell
        to a line of its own; a tighter head keeps it on one. */
     .bookhead { padding: 20px 40px 8px 48px; gap: 4px 14px; }
@@ -3100,14 +3124,8 @@
     .modes > button { flex: none; padding: 8px 12px; font-size: 13.5px; letter-spacing: .04em;
                       min-height: 40px; }
     #sheettoggle { display: none; }
-    .talkbtn { min-height: 36px; padding: 6px 12px; }
-    /* Music and Settings take Talk's phone size. At their desktop 18px sides and 1.8px
-       tracking the end group measured 273px, and with the device beside it the bar was
-       403px wide on a 390px phone: the whole page scrolled sideways (enchanting
-       leftovers, 2026-10-06; the same on master). Now 221px, which leaves the world's
-       name room down to a 360px phone. */
-    .topend { gap: 6px; }
-    .topend > .v2-btn.is-quiet { min-height: 36px; padding: 6px 10px; letter-spacing: .04em; }
+    /* Talk, Music and Settings keep the compact size the mid widths give them (above,
+       under 1241px), which is where it was first measured: on a phone. */
 
     .stage, body.mode-map .stage {
       grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk";
