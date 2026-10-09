@@ -198,18 +198,27 @@ shellPaint(SHELL_MODE, false);
   const frame = document.getElementById("settingsframe");
   const close = document.getElementById("settingsclose");
   if (!btn || !layer || !frame || !close) return;
-  function open() {
-    frame.src = "/?tab=settings&embed=1";
+  function open(at, note) {
+    // `at` opens a part of Settings already unfolded: "report" is the stalled model's
+    // "Make a report" (04-combat-and-turns.js), and `note` the sentence it stood beside.
+    let src = "/?tab=settings&embed=1";
+    if (at === "report") {
+      src += "&report=1" + (note ? "&note=" + encodeURIComponent(String(note).slice(0, 600)) : "");
+    }
+    frame.src = src;
     layer.hidden = false;
     close.focus();
   }
+  // Named `showSettingsAt` because it shows a panel, never a window: nothing on the table
+  // pops a window out (tests/test_s6_panel_shell.py greps for the browser's own call).
+  window.showSettingsAt = open;
   function shut() {
     if (layer.hidden) return;
     layer.hidden = true;
     frame.src = "about:blank";
     btn.focus();
   }
-  btn.addEventListener("click", open);
+  btn.addEventListener("click", () => open());
   close.addEventListener("click", shut);
   // Esc on the panel's own bar; inside the frame the page posts `close-settings`, because a
   // key pressed in a frame never reaches the page around it.

@@ -920,6 +920,19 @@ def game_revision(request):
     return response
 
 
+def _model_down(exc: ModelUnavailable) -> JsonResponse:
+    """The model could not be reached: 503 with its sentence, and for a model that has
+    stopped answering (`gm.client.ModelStalled`) the flag that puts "Make a report" beside
+    it on the table (owner, 2026-10-08). A stall is the one failure the developer most
+    needs the log for: what Ollama was doing is only in the minutes before it."""
+    from gm.client import ModelStalled
+
+    body = {"error": str(exc)}
+    if isinstance(exc, ModelStalled):
+        body["report"] = True
+    return JsonResponse(body, status=503)
+
+
 def _only_this_machine(request):
     """Refuse anything that did not come from the desktop's own browser, or None.
 
@@ -2798,7 +2811,7 @@ def _plan_and_run(c, text: str, acting: tuple, claim: str = "", attached=None):
     except ModelUnavailable as exc:
         c.transcript.pop()
         _put_back_free_actions(c, pending)
-        return JsonResponse({"error": str(exc)}, status=503)
+        return _model_down(exc)
     except IntentError as exc:
         c.transcript.pop()
         _put_back_free_actions(c, pending)
@@ -3790,7 +3803,7 @@ def _cheat(c, wish: str, shown: str):
                                 recent_events=_recent_events(c.world, c.location))
     except ModelUnavailable as exc:
         c.transcript.pop()
-        return JsonResponse({"error": str(exc)}, status=503)
+        return _model_down(exc)
     except IntentError as exc:
         c.transcript.pop()
         return JsonResponse(

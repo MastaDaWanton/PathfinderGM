@@ -154,10 +154,14 @@ class _Tee(io.TextIOBase):
 
 
 def _without_pass(address: str) -> str:
-    """An address with its `?k=` pass masked, for the log."""
-    import re
+    """An address with its `?k=` pass masked, for the log.
 
-    return re.sub(r"([?&]k=)[^&\s]+", r"\1(the pass)", address)
+    The pattern lives in `pathfindergm/redact.py` since 2026-10-08, because the report a
+    player sends the developer runs the same rule over the whole log and a second copy of
+    it here would be the one nobody updated."""
+    from pathfindergm.redact import without_pass
+
+    return without_pass(address)
 
 
 def _console_only(line: str, redacted: str) -> None:
@@ -388,6 +392,13 @@ def main(argv: list[str] | None = None) -> int:
     if "--check" in argv:
         return _self_check()
 
+    # `--report` is the desktop shell's "Make a report" on its startup-failure box, where
+    # there is no game page to press a button on. The shell runs this same exe again with
+    # the flag, so the one implementation of what goes in a report and what is taken out
+    # of it (`play/report.py`, `pathfindergm/redact.py`) serves both doors.
+    if "--report" in argv:
+        return _report_only(argv)
+
     from pathfindergm.paths import install_root, resource_root, user_data_root
 
     # The tee must exist before django.setup(): logging.StreamHandler captures
@@ -504,6 +515,46 @@ def main(argv: list[str] | None = None) -> int:
                 portfile.unlink()
             except OSError:
                 pass
+    return 0
+
+
+REPORT_LINE = "PATHFINDERGM_REPORT"
+
+
+def _report_only(argv: list[str]) -> int:
+    """Build a report into a folder and say where, without starting the game.
+
+    No log header, no socket, no portfile: this runs beside a backend that failed (or one
+    still unpacking), and must neither bind the port nor add a launch line to the log it
+    is reading. The folder is `--report-dir`, which the shell fills with Electron's own
+    answer for Downloads (`app.getPath('downloads')`, the Known Folder, which a player may
+    have moved); without it, `~/Downloads`. The shell's error text arrives in
+    `PATHFINDER_GM_REPORT_NOTE` rather than on the command line, where quoting a
+    traceback through Windows argument rules is its own bug waiting.
+
+    Prints one `PATHFINDERGM_REPORT {json}` line: the zip's path and the two links."""
+    import django
+
+    django.setup()
+    from play import report
+
+    folder = None
+    if "--report-dir" in argv:
+        i = argv.index("--report-dir")
+        if i + 1 < len(argv):
+            folder = Path(argv[i + 1])
+    folder = folder or Path.home() / "Downloads"
+    note = os.environ.get("PATHFINDER_GM_REPORT_NOTE", "")
+    words = "The game did not start."
+    try:
+        path = report.save_to(folder, words, True, note=note)
+    except Exception as exc:
+        print(f"{REPORT_LINE} " + json.dumps({"error": f"{type(exc).__name__}: {exc}"}),
+              flush=True)
+        return 1
+    found = report.links(words, path.name)
+    print(f"{REPORT_LINE} " + json.dumps({"path": str(path), "github": found["github"],
+                                          "mailto": found["mailto"]}), flush=True)
     return 0
 
 
