@@ -231,6 +231,80 @@ onRender((s, prev) => {
   if (scene.in_encounter && !before.in_encounter) Panels.forward("scene");
 });
 
+// --- "In the scene": Harvest beside a carcass (leather UI plan §6.9, lane U2) -----------
+// A dead creature's row in the scene panel gets a Harvest button, "only while the carcass is
+// harvestable and the character has a craft that wants a part"; a body still breathing (down
+// and dying, not dead: lane C measured a wolf at -12 after the fight's last blow) says so
+// instead, so the player is not left wondering why nothing is offered. Humanoids never get
+// one: the server never lists them (`api/harvest`), so there is nothing here to refuse.
+// The button opens the sheet in 59-harvest.js (`window.HarvestSheet`, looked up when the panel
+// is drawn); without that file in the build no button is drawn at all. #board is redrawn
+// whole on every render (02-state.js), so the buttons are put back from the last answer each
+// time, and the server is asked again only when a body's hit points, the set of actors or the
+// hour changes, and never while a fight is on (the take refuses in a fight anyway).
+const HARVEST_BOARD = { sig: "", list: null };
+
+function harvestBoardPaint(s) {
+  const board = document.getElementById("board");
+  const list = HARVEST_BOARD.list;
+  if (!board || !list) return;
+  const rows = board.querySelectorAll(":scope > .who");
+  const actors = (s && s.scene && s.scene.actors) || [];
+  const bodies = new Map((list.carcasses || []).filter(b => b.parts > 0).map(b => [b.ref, b]));
+  const breathing = new Set((list.breathing || []).map(b => b.ref));
+  actors.forEach((a, i) => {
+    const row = rows[i];
+    if (!row) return;
+    // A fresh answer replaces what the last one drew: painting over the old buttons left a
+    // wolf with nothing left on it still offering Harvest (seen live, 2026-10-08).
+    row.querySelectorAll(".who-harvest, .who-breathing").forEach(el => el.remove());
+    row.classList.remove("has-harvest");
+    if (bodies.has(a.ref)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "v2-btn is-quiet is-small who-harvest";
+      b.setAttribute("data-harvest-open", a.ref);
+      b.textContent = "Harvest";
+      b.setAttribute("aria-label", `Harvest the ${a.name}`);
+      row.classList.add("has-harvest");
+      row.appendChild(b);
+    } else if (breathing.has(a.ref)) {
+      const w = document.createElement("small");
+      w.className = "who-breathing";
+      w.textContent = "still breathing: finish it first";
+      row.classList.add("has-harvest");
+      row.appendChild(w);
+    }
+  });
+}
+
+// The sheet says when a take has changed what a body still offers (59-harvest.js, on close),
+// since no hit point or hour has to change for the last part to go.
+function harvestBoardStale() { HARVEST_BOARD.sig = ""; }
+
+onRender(s => {
+  const scene = (s && s.scene) || {};
+  const actors = scene.actors || [];
+  const fallen = actors.some(a => !a.is_pc && Number(a.hp) <= 0);
+  if (!window.HarvestSheet || scene.in_encounter || !fallen) {
+    HARVEST_BOARD.list = null;
+    HARVEST_BOARD.sig = "";
+    return;
+  }
+  harvestBoardPaint(s);
+  const sig = actors.map(a => `${a.ref}:${a.hp}`).join("|") + "@" + Math.floor((scene.clock_minutes || 0) / 60);
+  if (sig === HARVEST_BOARD.sig) return;
+  HARVEST_BOARD.sig = sig;
+  fetch("/api/harvest", { cache: "no-store" })
+    .then(r => readJSON(r))
+    .then(list => {
+      if (!list || HARVEST_BOARD.sig !== sig) return;
+      HARVEST_BOARD.list = list;
+      harvestBoardPaint(STATE);
+    })
+    .catch(() => { /* the panel simply shows no button; the hub still opens the sheet */ });
+});
+
 // --- controls --------------------------------------------------------------------------
 document.addEventListener("click", e => {
   if (e.target.closest("#sheettoggle")) {
