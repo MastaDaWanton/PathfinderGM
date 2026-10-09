@@ -193,13 +193,27 @@ def test_a_printed_stat_block_keeps_its_number():
 
 
 def test_a_conditional_term_is_dropped_never_applied():
-    """Point-Blank Shot's +1 is "at ranges of up to 30 feet"; the funnel carries no
-    range yet, so the term is dropped — applying it to a longsword would be the bug.
-    The document says so under `not_yet`."""
+    """Point-Blank Shot's +1 is "at ranges of up to 30 feet"; a roll with no range in
+    its context (the sheet's own line, a board nobody measured) drops the term —
+    applying it to a longsword, or to a shot nobody measured, would be the bug.
+
+    Until 2026-10-09 the attack op passed no range at all, so the term was dropped on
+    every shot and the document carried a `not_yet` for it; the owner's sheet called the
+    feat's clause unread. The engine passes `Engine._gap_ft` now: applied at 25 ft with
+    a bow or a thrown dagger, dropped at 35 ft and on the rapier."""
     pc = _kesst("point-blank shot")
     assert "Point-Blank Shot" not in _sources(pc.attack_modifiers("rapier"))
     assert "Point-Blank Shot" not in _sources(pc.damage_modifiers("rapier"))
-    assert feats.document("point-blank shot")["not_yet"]
+    assert "Point-Blank Shot" not in _sources(pc.attack_modifiers("rapier", range_ft=5))
+    assert "Point-Blank Shot" not in _sources(pc.attack_modifiers("shortbow"))
+    assert "Point-Blank Shot" in _sources(pc.attack_modifiers("shortbow", range_ft=25))
+    assert "Point-Blank Shot" in _sources(pc.damage_modifiers("shortbow", range_ft=25))
+    assert "Point-Blank Shot" not in _sources(pc.attack_modifiers("shortbow", range_ft=35))
+    assert "Point-Blank Shot" in _sources(
+        pc.attack_modifiers("dagger", thrown=True, range_ft=10))
+    assert "Point-Blank Shot" in _sources(
+        pc.damage_modifiers("dagger", thrown=True, range_ft=10))
+    assert not feats.document("point-blank shot").get("not_yet")
 
 
 def test_validate_no_longer_calls_a_documented_feat_flavour():
@@ -219,9 +233,11 @@ def test_the_sheet_page_says_what_a_documented_feat_applies():
     pc = _kesst("toughness", "stealthy", "point-blank shot", "not a real feat")
     rows = {row["name"]: row for row in full_sheet(pc)["feats"]}
     assert rows["Toughness"]["applied"] and "hit_dice" in rows["Toughness"]["effect"]
-    assert rows["Stealthy"]["applied"] and "+2 stealth" in rows["Stealthy"]["effect"]
+    # The ten-rank rung in the book's words, not as its formula (2026-10-09).
+    assert rows["Stealthy"]["applied"] and \
+        "+2 (+4 at 10 ranks) stealth" in rows["Stealthy"]["effect"]
     pbs = rows["Point-Blank Shot"]
-    assert pbs["applied"] and "Not yet:" in pbs["effect"] and "when" in pbs["effect"]
+    assert pbs["applied"] and "when" in pbs["effect"] and "range_ft" in pbs["effect"]
     assert not rows["not a real feat"]["applied"]
 
 

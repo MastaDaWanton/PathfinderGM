@@ -77,8 +77,8 @@ class _Rigged:
         self.asked: list[tuple[str, int]] = []
         real = survival._check
 
-        def spy(actor, kind, dc, dice, save=""):
-            out = real(actor, kind, dc, dice, save)
+        def spy(actor, kind, dc, dice, save="", against=""):
+            out = real(actor, kind, dc, dice, save, against)
             self.asked.append((kind, dc))
             if passed is not None:
                 out["passed"] = passed(kind)

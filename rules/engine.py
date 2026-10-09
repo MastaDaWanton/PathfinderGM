@@ -50,8 +50,8 @@ from . import hazards
 from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
-from .sheet import (MAGIC_SUPPRESSED, Actor, _when_holds, attacker_traits, current_moment,
-                    situated)
+from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, Actor, _when_holds, attacker_traits,
+                    current_moment, situated)
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, maneuver_text,
@@ -3798,8 +3798,14 @@ class Engine:
                 continue
             fx = [dict({k: v for k, v in r.items() if k != "said"}, origin="rule:survival")
                   for r in rows]
+            # The checks' own rolls, for the dice log: what each total was made of
+            # (Endurance's +4 against thirst named beside the Constitution, 2026-10-09).
+            # Until then the body's checks were a sentence and a total, and the player
+            # could not see a feat that was — or was not — in them.
+            shown = [_roll_from_dict(c["rolled"]) for r in rows
+                     for c in r.get("checks") or () if isinstance(c.get("rolled"), dict)]
             out.append(self._articled(Outcome(intent_id="", op="body", effects=fx,
-                                              tell=tell, because="")))
+                                              rolls=shown, tell=tell, because="")))
         return out
 
     def _carried_settles(self) -> list:
@@ -4074,6 +4080,8 @@ class Engine:
             return []                   # asked by the op itself: `_leaving_the_fight`
         if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
             return self._provoked_by_maneuver(raw)
+        if raw.get("op") == "cast":
+            return self._provoked_by_casting(raw)
         if raw.get("op") != "move":
             return []
 
@@ -4165,6 +4173,131 @@ class Engine:
         if out:
             raw["params"] = dict(params, struck_from=self._wounds_left(actor))
         return out
+
+    def _provoked_by_casting(self, raw: dict) -> list[dict]:
+        """The attacks of opportunity a spell cast in a threatened square is owed.
+
+        CRB Table 8-2: "Cast a spell (1-standard-action casting time) — attack of
+        opportunity: yes", from every foe who threatens the caster (`reactions.
+        provoked_by_action`, the pick-up's question). Unless the caster casts
+        DEFENSIVELY: "If you want to cast a spell without provoking any attacks of
+        opportunity, you must make a concentration check (DC 15 + double the level of the
+        spell)" (CRB p.206) — `Engine._concentrate`, at the cast. A swift or immediate
+        casting time provokes nothing (Table 8-2 puts "cast a quickened spell" among the
+        swift actions, AoO no).
+
+        2026-10-09, with Combat Casting. The cast op had carried a `defensively` param
+        since it was written and nothing read it; and with nothing provoked by a cast,
+        reading it alone would only have been a risk with no reason to take it — the book
+        makes the choice a trade, so both halves arrived together. `_reactions_before`'s
+        docstring had named this trigger as the next one since the manoeuvres.
+
+        The caster's wounds before the swings are written into the cast's params
+        (`struck_from`, engine-side, as the manoeuvre's are): a caster struck while
+        casting must make a concentration check of DC 10 + the damage + the spell's level
+        or lose the spell, and the cast reads the difference.
+        """
+        from .intents import _flag
+
+        params = raw.get("params") or {}
+        if params.get("reaction") or _flag(params.get("defensively")) \
+                or "struck_from" in params:
+            return []
+        caster_ref = raw.get("actor")
+        caster = self.scene.actors.get(caster_ref or "")
+        if caster is None:
+            return []
+        try:
+            spell = spells_mod.get(str(params.get("spell") or ""))
+        except KeyError:
+            return []
+        timing = str(getattr(spell, "casting_time", "") or "").lower()
+        if "swift" in timing or "immediate" in timing or "free" in timing:
+            return []
+        out: list[dict] = []
+        for watcher, reaction in reactions.provoked_by_action(self.scene, caster_ref):
+            if not self._spend_reaction(watcher, reaction.budget):
+                continue
+            out.append({
+                "op": reaction.op, "actor": watcher, "target": caster_ref,
+                "because": f"{caster.name} began casting {spell.name} within reach",
+                "params": {"full_attack": False, "reaction": reaction.id},
+                "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+            })
+        if out:
+            raw["params"] = dict(params, struck_from=self._wounds_left(caster))
+        return out
+
+    def _grappler_of(self, actor):
+        """Who holds this creature, off its grapple condition's `payload["by"]`
+        (`_held_by`), or None — a grapple laid before 2026-10-09, or by a spell."""
+        for e in actor.effects:
+            if e.kind == "condition" and any(
+                    states.matches(str(t), "state.held.grappled")
+                    or states.matches(str(t), "state.held.pinned") for t in e.tags):
+                ref = str((e.payload or {}).get("by") or "")
+                if ref and ref in self.scene.actors:
+                    return self.scene.actors[ref]
+        return None
+
+    def _concentrate(self, intent: Intent, actor, spell, level: int, state: dict,
+                     pool: str) -> "Outcome | None":
+        """The concentration checks this cast owes (CRB p.206-207), rolled once, on the
+        way in: an Outcome when one fails and the spell is lost, else None.
+
+        d20 + caster level + the casting ability (`Actor.concentration_modifiers`),
+        in the situation's context (`{"casting": ...}`, `effectspec.CASTING_SITUATIONS`)
+        — which is what Combat Casting's "+4 on concentration checks made to cast a
+        spell or use a spell-like ability when casting on the defensive or while
+        grappled" asks. One check per situation the caster is in, as the book takes
+        them: struck while casting (DC 10 + damage + spell level), casting defensively
+        (DC 15 + double the spell level), grappled (DC 10 + the grappler's CMB + spell
+        level). "If the check fails, you lose the spell" — after the slot is spent, as
+        arcane spell failure takes it; a check, so a natural 1 is not a failure by
+        itself and a natural 20 not a success (`dice.d20_succeeds` is for saves).
+
+        Not yet: the checks for vigorous or violent motion, weather, entangled, and
+        continuous damage (Table 8-5 rows the engine has no situation for), and Disruptive
+        (+4 to the defensive DC from a foe who holds it).
+        """
+        situations: list[tuple[str, int, str]] = []
+        before = intent.params.get("struck_from")
+        if before is not None:
+            taken = int(before) - self._wounds_left(actor)
+            if taken > 0:
+                situations.append(("damaged", 10 + taken + level,
+                                   f"struck for {taken} while casting"))
+        if bool(intent.params.get("defensively")):
+            situations.append(("defensively", 15 + 2 * level, "casting defensively"))
+        if actor.has_state("state.held.grappled") or actor.has_state("state.held.pinned"):
+            holder = self._grappler_of(actor)
+            if holder is not None:
+                cmb = sum(m.value for m in holder.cmb_modifiers("grapple"))
+                situations.append(("grappled", 10 + cmb + level,
+                                   f"held by {holder.name}"))
+        for kind, dc, why in situations:
+            roll = self.dice.d20(actor.concentration_modifiers({"casting": kind}),
+                                 label=f"Concentration ({why}, DC {dc})",
+                                 visibility="player" if actor.is_pc else "hidden")
+            state["rolls"].append(roll.as_dict())
+            if roll.total >= dc:
+                state["tells"].append(
+                    f"{actor.name} holds {spell.name} together ({why}): concentration "
+                    f"{roll.total} against DC {dc}.")
+                continue
+            return Outcome(
+                intent_id=intent.id, op="cast",
+                rolls=[_roll_from_dict(r) for r in state["rolls"]],
+                effects=[{"ref": actor.ref, "kind": "concentration_lost",
+                          "spell": spell.id, "name": spell.name, "situation": kind,
+                          "dc": dc, "rolled": roll.total, "slot": pool,
+                          "slots_left": casting.pool_left(actor, pool),
+                          "origin": "rule:concentration"}],
+                tell=(f"{actor.name} begins {spell.name}, {why}, and loses it: "
+                      f"concentration {roll.total} against DC {dc}. The spell is lost"
+                      + ("." if casting.at_will(level) else ", and its slot with it.")),
+                because=intent.because)
+        return None
 
     @staticmethod
     def _wounds_left(actor) -> int:
@@ -6097,7 +6230,8 @@ class Engine:
                 # A throw is a ranged attack: Dex to hit (`attack_modifiers(thrown=)`).
                 atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
                                                   lethality=lethality, defender=defender,
-                                                  thrown=thrown_real)
+                                                  thrown=thrown_real,
+                                                  range_ft=self._gap_ft(actor, defender))
                 # Compulsions are charged here rather than in `attack_modifiers` because
                 # the penalty depends on *who is being attacked*, which the sheet does not
                 # know. It penalises and never prohibits: see rules/compulsion.py.
@@ -6189,6 +6323,17 @@ class Engine:
                     miss = self.dice.roll("1d100", label=f"miss chance ({why})",
                                           visibility="hidden")
                     state["rolls"].append(miss.as_dict())
+                    # Blind-Fight (CRB): "In melee, every time you miss because of
+                    # concealment, you can reroll your miss chance percentile roll one
+                    # time to see if you actually hit." The feat document's tag, asked of
+                    # the vocabulary (2026-10-09); always taken, since a reroll of a miss
+                    # can only help.
+                    if miss.total <= chance and weapon.get("category") != "ranged" \
+                            and actor.has_state("miss_chance.reroll.melee"):
+                        miss = self.dice.roll("1d100",
+                                              label=f"miss chance ({why}), rerolled",
+                                              visibility="hidden")
+                        state["rolls"].append(miss.as_dict())
                     if miss.total <= chance:
                         # The die beat the AC and the blow still found nothing: to the
                         # player that is a miss, whatever the face said.
@@ -6268,7 +6413,10 @@ class Engine:
                 dmg_mods = (actor.weapon_own_mods("combat_mod", "damage", weapon_key,
                                                   defender=defender) if dancing
                             else actor.damage_modifiers(weapon_key, power_attack=power,
-                                                        defender=defender))
+                                                        defender=defender,
+                                                        thrown=thrown_real,
+                                                        range_ft=self._gap_ft(actor,
+                                                                              defender)))
                 rider_col = "" if dancing else str(weapon.get("rider_column") or "")
                 if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
@@ -7243,10 +7391,13 @@ class Engine:
             cond = m.get("condition")
             if cond:
                 defender.add_condition(cond, source=f"{m['name']} by {actor.name}")
+                if m.get("also_grapples_attacker"):
+                    _held_by(defender, cond, actor.ref)
                 effects.append({"ref": defender.ref, "kind": "condition",
                                 "condition": cond, "from": m["name"]})
             if m.get("also_grapples_attacker"):
-                actor.add_condition("grappled", source=f"grappling {defender.name}")
+                held = actor.add_condition("grappled", source=f"grappling {defender.name}")
+                _held_by(actor, held.key, defender.ref)
                 effects.append({"ref": actor.ref, "kind": "condition",
                                 "condition": "grappled", "from": m["name"]})
             for over, extra in sorted((m.get("degrees") or {}).items()):
@@ -8075,9 +8226,14 @@ class Engine:
             # +1 per previous check)") is rolled an hour at a time, the save in the roll
             # context that names the danger — which is how a cold-weather bonus from
             # carried gear reaches it (content/rules/gear.json).
+            # The row's own `against` (cold, heat: `effectspec.AGAINST`), not its damage
+            # type — heat deals "fire" by the row and is not a save against fire; the
+            # damage type stood in while cold was the only row with a save.
+            row = hazards.get(plan["rule"]) or {}
             rolls, effects, said = self._exposure(
                 target, plan["rule"], int(plan["value"]),
-                {"against": str(plan["type"]), "resting": bool(intent.params.get("resting"))})
+                {"against": str(row.get("against") or plan["type"]),
+                 "resting": bool(intent.params.get("resting"))})
             tell = (f"{target.name} meets {plan['name']} ({plan['slot'].replace('_', ' ')} "
                     f"{plan['value']}). {said}")
             return Outcome(intent_id=intent.id, op="hazard", rolls=rolls, effects=effects,
@@ -9347,7 +9503,9 @@ class Engine:
             if not a.drown_failures:
                 # Still trying to hold it. One check a round, one harder each time.
                 dc = water.drown_dc(a.drown_failures)
-                roll = self.dice.d20([Modifier(a.ability_mod("con"), "Con")],
+                # Through the ability-check funnel, against `breath`: Endurance's "+4
+                # on Constitution checks made to hold your breath" (2026-10-09).
+                roll = self.dice.d20(a.ability_check_modifiers("con", {"against": "breath"}),
                                      label=f"{a.name} holds their breath (DC {dc})",
                                      visibility="hidden")
                 if roll.total >= dc:
@@ -9398,6 +9556,9 @@ class Engine:
             # there, inert, until somebody mends it — or it was past the floor already.
             a.apply_hp_state()
             return [f"{a.name} " + (_DESTROYED_SAID if a.is_dead else _BROKEN_SAID) + "."]
+        if a.has_state(DYING_STABILISES):
+            # Diehard: stable without the roll, off-screen as on (`Actor.bleed_out`).
+            a.bleed_out(self.dice)
         while a.hp > floor and a.has_condition("dying"):
             if self.dice.roll("1d100", label="stabilise",
                               visibility="hidden").total <= 10:
@@ -14843,7 +15004,7 @@ class Engine:
                 "pool": "" if casting.at_will(level) else casting.slot_pool(level),
                 "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
         level = int(source.get("level", level))
-        dc = int(item["dc"]) if item else casting.save_dc(actor, level)
+        dc = int(item["dc"]) if item else casting.save_dc(actor, level, spell)
         cl = int(item["cl"]) if item else casting.caster_level(actor)
         plan = spells_mod.casting_plan(spell, cl)
         dice = plan["dice"]
@@ -14982,6 +15143,14 @@ class Engine:
                 state["tells"].append(
                     f"The {fouled_by} does not foul the casting (arcane spell failure "
                     f"{asf}%, rolled {roll.total}).")
+            # Concentration (CRB p.206): struck while casting, casting defensively, or
+            # held in a grapple, each a check the spell is lost on — after the slot,
+            # like the failure above. An item's power is not a casting (no slot, no
+            # gestures), and asks none.
+            if not item:
+                lost = self._concentrate(intent, actor, spell, level, state, pool)
+                if lost is not None:
+                    return lost
             # Cast INTO a spell storing weapon (`_store_spell`): the slot is spent and the
             # spell held, its caster level and save DC the caster's as they stand now — the
             # numbers of this casting, kept with it the way a cast spell's DC is fixed
@@ -15269,8 +15438,14 @@ class Engine:
         # `spell_resistance`, read through the one funnel; nothing read it before.
         from .dice import stack as _stack
 
+        # In the context `{"against": "spell_resistance"}` (2026-10-09): Spell Penetration's
+        # +2 is a `when` term on this target, because the same target is ALSO the
+        # defender's own rating (`Actor.spell_resistance_rating`, asked with no context),
+        # and an unconditional feat term there would have handed every wizard with the
+        # feat spell resistance 2.
         mods = _stack([Modifier(int(cl), "caster level")]
-                      + actor._buff_mods("combat_mod", "spell_resistance"))
+                      + actor._buff_mods("combat_mod", "spell_resistance",
+                                         {"against": "spell_resistance"}))
         roll = self._roll_or_suspend_stage(
             intent, actor, mods,
             f"Caster level check against {target.name}'s spell resistance", sr,
@@ -17656,8 +17831,7 @@ class Engine:
             said = (f"{actor.name} hacks at the goo with the {w.get('name') or key} "
                     f"({max(0, roll.total)}, {min(done, self.GOO_HP)} of {self.GOO_HP})")
         else:
-            mods = [Modifier(actor.ability_mod("str"), "Str")] \
-                + actor._condition_mods("ability_checks")
+            mods = actor.ability_check_modifiers("str")
             roll = self._roll_or_suspend(intent, actor, mods, "Strength check to break "
                                          "free", self.BREAK_FREE_DC, partial)
             made = roll.total >= self.BREAK_FREE_DC
@@ -20830,8 +21004,13 @@ class Engine:
             return rolls, effects, ""
         line = (f"{row.get('name', rule).capitalize()}: {made} Fortitude save"
                 f"{'s' if made != 1 else ''}, {failed} failed")
-        line += (f", {taken} nonlethal damage and frostbite (fatigued)." if taken
-                 else "; the cold did not get in.")
+        # The row names its own harm (cold's frostbite, heat's heatstroke, CRB Cold and
+        # Heat Dangers) and its own danger word; this sentence said frostbite for any
+        # row with a save, which was true while cold was the only one.
+        harm = str(row.get("harm_said") or "exposure")
+        danger = str(row.get("against") or rule)
+        line += (f", {taken} nonlethal damage and {harm} ({cond or 'harmed'})." if taken
+                 else f"; the {danger} did not get in.")
         line += self._hp_state_tell(crossed)
         return rolls, effects, line
 
@@ -21820,6 +21999,18 @@ def _intent_from_dict(d: dict) -> Intent:
         gated_by=str(d.get("gated_by", "") or ""),
         gated_on=str(d.get("gated_on", "") or ""),
     )
+
+
+def _held_by(actor, key: str, holder_ref: str) -> None:
+    """Write who holds this creature onto its grapple condition (`payload["by"]`).
+
+    The grappled concentration check is "DC 10 + grappler's CMB + spell level" (CRB,
+    Grappled), and until 2026-10-09 the condition named its grappler only in its `source`
+    sentence — a name, which law one forbids reading back. The ref, written where the
+    grapple lands, is what `Engine._grappler_of` asks."""
+    for e in actor.effects:
+        if e.kind == "condition" and e.key == key:
+            e.payload = dict(e.payload or {}, by=str(holder_ref))
 
 
 def _roll_from_dict(d: dict) -> Roll:

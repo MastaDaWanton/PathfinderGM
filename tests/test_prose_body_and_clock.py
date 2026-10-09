@@ -98,8 +98,8 @@ def test_inside_a_long_stretch_the_save_still_rises_an_hour_at_a_time(sammy):
     asked = []
     real = survival._check
 
-    def spy(actor, kind, dc, dice, save=""):
-        out = real(actor, kind, dc, dice, save)
+    def spy(actor, kind, dc, dice, save="", against=""):
+        out = real(actor, kind, dc, dice, save, against)
         if kind == "Exhaustion":
             asked.append(dc)
             out["passed"] = True        # keep going, so the climb shows

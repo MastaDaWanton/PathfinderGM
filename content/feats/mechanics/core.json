@@ -14,18 +14,15 @@
       {
         "type": "skill_mod",
         "target": "stealth",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       },
       {
         "type": "skill_mod",
         "target": "escape artist",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       }
-    ],
-    "not_yet": [
-      "skill.ranks >= 10 raises each to +4"
     ]
   },
   "alertness": {
@@ -33,18 +30,15 @@
       {
         "type": "skill_mod",
         "target": "perception",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       },
       {
         "type": "skill_mod",
         "target": "sense motive",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       }
-    ],
-    "not_yet": [
-      "skill.ranks >= 10 raises each to +4"
     ]
   },
   "acrobatic": {
@@ -52,18 +46,15 @@
       {
         "type": "skill_mod",
         "target": "acrobatics",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       },
       {
         "type": "skill_mod",
         "target": "fly",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       }
-    ],
-    "not_yet": [
-      "skill.ranks >= 10 raises each to +4"
     ]
   },
   "deceitful": {
@@ -71,18 +62,15 @@
       {
         "type": "skill_mod",
         "target": "bluff",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       },
       {
         "type": "skill_mod",
         "target": "disguise",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       }
-    ],
-    "not_yet": [
-      "skill.ranks >= 10 raises each to +4"
     ]
   },
   "persuasive": {
@@ -90,18 +78,93 @@
       {
         "type": "skill_mod",
         "target": "diplomacy",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
       },
       {
         "type": "skill_mod",
         "target": "intimidate",
-        "amount": 2,
+        "formula": "2 + 2 * min(1, ranks // 10)",
         "bonus_type": "untyped"
+      }
+    ]
+  },
+  "endurance": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "con_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "thirst"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "con_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "starvation"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "con_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "breath"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "cold"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "heat"
+        }
       }
     ],
     "not_yet": [
-      "skill.ranks >= 10 raises each to +4"
+      "Swim checks to resist nonlethal damage from exhaustion: the engine makes no hourly Swim check for a long swim",
+      "Constitution checks to continue running: running is not an action here",
+      "Constitution checks against a forced march: a journey walks eight hours a day and never marches past them",
+      "Fortitude saves against suffocation: the only lack of air the engine models is water, and drowning is a Constitution check, which the breath clause covers",
+      "sleeping in light or medium armour without becoming fatigued: the engine has no rule that fatigues anybody for sleeping in armour"
+    ]
+  },
+  "combat-casting": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "concentration",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "casting": "defensively"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "concentration",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "casting": "grappled"
+        }
+      }
     ]
   },
   "improved-initiative": {
@@ -154,6 +217,35 @@
       }
     ]
   },
+  "blind-fight": {
+    "tags": [
+      "miss_chance.reroll.melee"
+    ],
+    "not_yet": [
+      "an invisible attacker gets no advantage against you in melee (no +2, you keep your Dexterity bonus): nothing reads this clause, so whatever the attack path gives an unseen attacker it still gives against you",
+      "no speed penalty for moving while you cannot see: movement under darkness is not slowed here"
+    ]
+  },
+  "spell-penetration": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "spell_resistance", "amount": 2,
+       "bonus_type": "untyped", "when": {"against": "spell_resistance"}}
+    ]
+  },
+  "greater-spell-penetration": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "spell_resistance", "amount": 2,
+       "bonus_type": "untyped", "when": {"against": "spell_resistance"}}
+    ]
+  },
+  "diehard": {
+    "tags": [
+      "dying.stabilises"
+    ],
+    "not_yet": [
+      "acting as if disabled while below 0 hit points (staggered, a standard action costing 1 hit point): the sheet offers no such choice, so a Diehard character below 0 is unconscious and stable"
+    ]
+  },
   "toughness": {
     "modifiers": [
       {
@@ -173,7 +265,7 @@
         "bonus_type": "untyped",
         "when": {
           "weapon": {
-            "category": "ranged"
+            "ranged": true
           },
           "range_ft": {
             "lte": 30
@@ -187,16 +279,13 @@
         "bonus_type": "untyped",
         "when": {
           "weapon": {
-            "category": "ranged"
+            "ranged": true
           },
           "range_ft": {
             "lte": 30
           }
         }
       }
-    ],
-    "not_yet": [
-      "attack.range_ft: the attack op does not yet pass range into the roll context"
     ]
   },
   "weapon-focus": {
@@ -827,6 +916,222 @@
         "bonus_type": "untyped",
         "scope": {
           "maneuver": "drag"
+        }
+      }
+    ]
+  },
+  "athletic": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "climb",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "swim",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "self-sufficient": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "heal",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "survival",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "magical-aptitude": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "spellcraft",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "use magic device",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "animal-affinity": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "handle animal",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "ride",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "deft-hands": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "disable device",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "sleight of hand",
+        "formula": "2 + 2 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "skill-focus": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "$target",
+        "formula": "3 + 3 * min(1, ranks // 10)",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "master-craftsman": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "$target",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
+    ],
+    "not_yet": [
+      "ranks in the skill count as caster level for Craft Magic Arms and Armor and Craft Wondrous Item: neither feat gates any bench here"
+    ]
+  },
+  "intimidating-prowess": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "intimidate",
+        "formula": "str_mod",
+        "bonus_type": "untyped"
+      }
+    ]
+  },
+  "greater-weapon-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "$target"
+        }
+      }
+    ]
+  },
+  "greater-weapon-specialization": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "$target"
+        }
+      }
+    ]
+  },
+  "spell-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "spell_dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "school": "$target"
+        }
+      }
+    ]
+  },
+  "greater-spell-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "spell_dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "school": "$target"
+        }
+      }
+    ]
+  },
+  "fleet": {
+    "modifiers": [
+      {
+        "type": "speed",
+        "target": "land_base",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "armour": [
+              "none",
+              "light"
+            ],
+            "load": [
+              "light"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "shield-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "shield": true
+          }
+        }
+      }
+    ]
+  },
+  "greater-shield-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "shield": true
+          }
         }
       }
     ]

@@ -418,7 +418,23 @@ _REACHES = {
     # lane C2 the read of an authored bonus aimed here (`spell_resistance_rating`,
     # best one applies): it left the inert list below on 2026-10-06.
     ("combat_mod", "spell_resistance"): lambda a: a.spell_resistance_rating()[0],
+    # 2026-10-09, the feat sweep: a plain ability check, the concentration check and the
+    # spell's save DC, each built through the funnel for the first time — survival's
+    # Constitution checks were a bare `Modifier(con)` and no concentration check existed,
+    # which is why the owner's sheet called Endurance and Combat Casting "not computed".
+    **{("combat_mod", f"{ab}_check"):
+       (lambda a, ab=ab: sum(m.value for m in a.ability_check_modifiers(ab)))
+       for ab in ("str", "dex", "con", "int", "wis", "cha")},
+    ("combat_mod", "concentration"):
+        lambda a: sum(m.value for m in a.concentration_modifiers()),
+    ("combat_mod", "spell_dc"): lambda a: _spell_dc(a),
 }
+
+
+def _spell_dc(a) -> int:
+    from rules import casting, spells
+
+    return casting.save_dc(a, 1, spells.get("magic-missile"))
 
 # Authorable and inert. Each names the stage that closes it. The list may only get
 # shorter: a target that starts working fails the second test below until its line is

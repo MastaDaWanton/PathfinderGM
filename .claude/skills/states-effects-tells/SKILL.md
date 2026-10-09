@@ -73,7 +73,17 @@ by `classbuilder.validate_feat_documents`, read live by `Actor._feat_mods` insid
 `_buff_mods(kind, target, ctx)` (never stored), `has_state` reading
 `standing_tags()`; **hazards** — `content/rules/hazards.json` rows with a bounded
 slot, the `hazard` op (docs/stage-8-plan.md; ratchets in
-`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`); **the mind gate**
+`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`); **feats computed, 2026-10-09** — the roll a
+situational feat modifies says what it is made AGAINST (`effectspec.AGAINST`: thirst,
+starvation, breath, cold, heat, spell_resistance … — a closed list, validated in every
+`when`), plain ability checks and concentration go through the funnel
+(`Actor.ability_check_modifiers`, `Actor.concentration_modifiers`, combat targets
+`<ab>_check`, `concentration`, `spell_dc`), a printed stat block skips only a feat's
+UNconditional terms, a cast within a foe's reach provokes unless cast `defensively`
+(`Engine._provoked_by_casting`), and concentration is rolled for casting defensively,
+grappled (the grappler's ref on the condition's `payload.by`) and struck while casting
+(`Engine._concentrate`); 67 of 1,474 feats carry a document, and each `not_yet` names
+the roll still missing (`tests/test_feats_computed.py`); **the mind gate**
 — stage 8's rule asked of a mind instead of a number: a `condition` that would land an
 `attitude.*` tag, a `state.fear.*` tag, or anything in the mind-affecting or sleep
 families is refused without an `origin`, so charm person still charms and "I decide he
@@ -162,8 +172,8 @@ a "still open" line here** — this one cost a near-miss in a report.
 **Still open after stage 8** (do not read a passing probe as proof): the
 `_op_use_ability` instant-effects loop records no per-number origin (the outcome
 record carries `ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id;
-Point-Blank Shot's `when.range_ft` waits on the attack op passing range into the
-roll context (its term is dropped, per the rule); the wielded-weapon spec channel
+(Point-Blank Shot's `when.range_ft` is CLOSED since 2026-10-09: the attack op passes
+`Engine._gap_ft` as `range_ft`; no map, no distance, the term is dropped); the wielded-weapon spec channel
 (masterwork, enchanted) has no reader — stage 9 — and worse, a weapon record put in
 the `hands` slot through the sheet editor lends its enhancement to EVERY weapon
 (`_standing_mods` has no weapon scope: a live door, measured by the verifiers);
@@ -258,5 +268,10 @@ rules/sheet.py:Actor.die
 tests/test_coup_de_grace.py
 rules/dice.py:d20_succeeds
 tests/test_save_naturals.py
+rules/sheet.py:Actor.ability_check_modifiers
+rules/sheet.py:Actor.concentration_modifiers
+rules/engine.py:Engine._concentrate
+rules/engine.py:Engine._provoked_by_casting
+tests/test_feats_computed.py
 content/classes/blood-bending.json
 -->
