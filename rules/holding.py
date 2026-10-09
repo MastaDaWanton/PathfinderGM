@@ -71,6 +71,35 @@ def key_in(store, name) -> str | None:
     return None
 
 
+def named_among(store, phrase) -> str | None:
+    """The key in `store` whose whole name stands, word for word, in `phrase` — the
+    longest such name, so "a red apple" finds "red apple" before "apple". A plural `s` is
+    forgiven on each word, as `same` forgives it. None when no key's name is in the phrase.
+
+    The store is the closed vocabulary here, never the phrase: what the holder ACTUALLY
+    carries is matched against the words, the way a spell's name is matched against the
+    catalogue (`judgement.spell_in_words`). Measured 2026-10-08 (the deeds lane, local
+    model): "I take another apple from the fruit seller" and "one of the apples" were
+    planned as `give item="another apple"` and `item="one of the apples"`; neither is
+    `same` as the seller's "apple" line, so the seller kept every apple and one was minted
+    out of nothing into the player's pack. Asked only after `key_in` finds nothing."""
+    if not store:
+        return None
+    said = [w.rstrip("s") for w in re.findall(r"[a-z0-9][a-z0-9'-]*", plain(phrase))]
+    if not said:
+        return None
+    best: tuple[int, str] | None = None
+    for key in store:
+        want = [w.rstrip("s") for w in re.findall(r"[a-z0-9][a-z0-9'-]*", plain(key))]
+        n = len(want)
+        if not n or n > len(said):
+            continue
+        if any(said[i:i + n] == want for i in range(len(said) - n + 1)):
+            if best is None or n > best[0]:
+                best = (n, key)
+    return best[1] if best is not None else None
+
+
 # --- what a phrase names -------------------------------------------------------------------
 
 def head_of(name) -> str:

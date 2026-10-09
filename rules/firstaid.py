@@ -39,12 +39,24 @@ def patient_of(engine, intent):
     """The dying creature a Heal check is aimed at, or None when this is not first aid."""
     if str(intent.params.get("skill") or "").strip().lower() != SKILL:
         return None
-    for ref in intent.targets():
-        if ref and ref != intent.actor and ref in engine.scene.actors:
+    named = [ref for ref in intent.targets() if ref and ref != intent.actor]
+    for ref in named:
+        if ref in engine.scene.actors:
             who = engine.scene.actors[ref]
             if dying(who):
                 return who
-    return None
+    if named:
+        return None             # aimed at somebody who is not dying: a Heal check of
+        #                         another kind (a poison, a disease, long-term care)
+    # Aimed at nobody: the one creature here who is dying, when there is exactly one — the
+    # engine's own state answers "on whom", never the words. Measured 2026-10-08 (the deeds
+    # lane, local model): "I give first aid to the wounded porter" was planned as
+    # `check skill=heal` with no target 3 times of 3, so this found no patient, the check
+    # rolled against the plan's DC, and the porter bled on. Two or more dying and none
+    # named is a choice the engine will not make for the player.
+    here = [a for ref, a in engine.scene.actors.items()
+            if ref != intent.actor and dying(a)]
+    return here[0] if len(here) == 1 else None
 
 
 def settle(healer, patient, succeeded: bool) -> tuple[str, list[dict]]:
