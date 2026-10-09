@@ -3294,12 +3294,9 @@ ACQUISITION: list[dict] = [
               "somewhere that will cost you. A focus is set into a ring or an amulet "
               "when its circle is laid.",
      "yields_kind": "focus"},
-    {"id": "reliquary-harvest", "label": "Harvest from the slain", "obtain": "harvested",
-     "needs": {"creature": True},
-     "blurb": "Dragon ichor, fiend ash, a lich's dust, a feather given rather than "
-              "taken. The strongest essences are cut from something that was recently "
-              "alive and objected.",
-     "yields_kind": "essence"},
+    # `reliquary-harvest` left the hub with the other three carcass excursions
+    # (leatherworking lane C, plan §5.1): the slain are harvested once, across every
+    # craft, by rules/harvest.py, an essence being a `harvest.essence.*` tag on the body.
     {"id": "scriptorium-order", "label": "Buy inks, chalks and catalysts",
      "obtain": "bought", "needs": {"market": True},
      "blurb": "Silver ink, consecrated chalk, powdered pearl. Circle materials are "

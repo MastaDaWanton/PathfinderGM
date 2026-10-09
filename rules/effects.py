@@ -429,6 +429,19 @@ def extract(text: str) -> list[Effect]:
                           else "ability_damage",
                   "target": word, "dice": m.group(1)})
 
+    # The stat block's abbreviated poison line: "effect 1d2 Con; cure 1 save" says
+    # damage by leaving the word out (Bestiary house style). Measured 2026-10-08 over the
+    # harvestable bestiary: 79 printed poison paragraphs, 34 parsed to a save and an
+    # effect, and the 45 between were exactly this shape (docs/deeds-plan.md §13.4). Only
+    # after `effect`, so a "+2 Con" bonus elsewhere is never read as damage, and only where
+    # the line above did not already take it (a following "damage" or "drain").
+    abilities = "|".join(list(ABILITY_FULL) + list(ABILITY_FULL.values()))
+    for m in re.finditer(rf"\beffect\s+({_DIE})\s+({abilities})\b(?!\s+(?:damage|drain))",
+                         text, re.I):
+        word = m.group(2).lower()[:3]
+        add("ability", f"{m.group(1)} {ABILITY_FULL[word]} damage", scales=True,
+            spec={"type": "ability_damage", "target": word, "dice": m.group(1)})
+
     # Damage dealt, when it is not healing and not an ability score.
     for m in re.finditer(rf"\b({_DIE})\s*(?:points? of\s+)?({'|'.join(DAMAGE_KINDS)})\s+damage",
                          text, re.I):

@@ -315,7 +315,7 @@ def harvest_tagged(creature, track: str) -> list:
 
     Read off the tags the creature stands on (its stat block's `tags`, live, through
     `Actor.standing_tags`, and any effect's), by prefix under the craft's branches."""
-    from . import benches, states
+    from . import states
 
     if creature is None:
         return []
@@ -329,12 +329,21 @@ def harvest_tagged(creature, track: str) -> list:
         pass
     for e in getattr(creature, "effects", ()) or ():
         tags += [str(t) for t in (getattr(e, "tags", ()) or ())]
-    try:
-        shelf = benches.module_for(track).materials()
-    except Exception:  # noqa: BLE001
+    # The harvest's own shelf and validator (rules/harvest.py, lane C), so the two readers of
+    # one grammar cannot disagree: the herbalist's parts are ingredients (the bench module
+    # has no `materials()`, and this reader answered nothing for them), and a tag the
+    # validator refuses — a hide on a humanoid, another colour's dragonhide on a true
+    # dragon — gives nothing here either.
+    from . import harvest
+
+    shelf = harvest._shelf(str(track or "").lower())
+    if not shelf:
         return []
+    refused = harvest.refused_tags(harvest.block_of(creature), tags)
     out, seen = [], set()
     for tag in tags:
+        if tag in refused:
+            continue
         for branch in branches:
             root = f"harvest.{branch}"
             if not states.matches(tag, root) or tag == root:

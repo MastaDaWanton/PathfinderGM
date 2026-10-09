@@ -354,15 +354,10 @@ ACQUISITION: dict[str, dict] = {
         "blurb": "Bar stock from the ironmonger, charcoal from the collier, fittings "
                  "from the joiner. Anything with a price and a settlement to pay it in.",
     },
-    "salvage": {
-        "id": "salvage",
-        "label": "Harvest from a carcass",
-        "obtain": "harvested",
-        "requires": "carcass",
-        "verb": "harvesting",
-        "blurb": "Blood, bone, hide and stranger things, taken off what was killed. "
-                 "What can be had depends entirely on what is lying there.",
-    },
+    # `salvage` (Harvest from a carcass) left the hub with the other three carcass
+    # excursions (leatherworking lane C, plan §5.1): a carcass is harvested once, across
+    # every craft, by rules/harvest.py — the smith's quench bloods are `harvest.blood.*`
+    # tags on the beasts that carry them.
     "gather": {
         "id": "gather",
         "label": "Gather from the land",

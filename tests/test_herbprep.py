@@ -208,9 +208,18 @@ def test_every_new_field_explains_itself_or_is_obvious():
 # --- salt (asked for 2026-08-23) ---------------------------------------------------------
 
 class Carrier:
-    def __init__(self, **goods):
+    """Carried goods by name, and the satchel by material id (where a counter's curing salt
+    lands, `goods.deliver`)."""
+    def __init__(self, inventory=None, **goods):
         self.goods = goods
-        self.inventory = {}
+        self.inventory = dict(inventory or {})
+
+    def spend(self, key, n):
+        took = min(int(self.inventory.get(key, 0)), int(n))
+        self.inventory[key] = self.inventory.get(key, 0) - took
+        if self.inventory[key] <= 0:
+            self.inventory.pop(key)
+        return took
 
 
 def test_carrying_salt_preserves_it_without_being_asked():
@@ -218,7 +227,7 @@ def test_carrying_salt_preserves_it_without_being_asked():
     player remembering on the turn they pick a gland up, which is the turn they are
     least likely to be thinking about the 48 hours that start now."""
     gland = H.Prep(animal=True)
-    ok, cost, why = H.preserve_automatically(Carrier(**{"rock salt": 2}), gland)
+    ok, cost, why = H.preserve_automatically(Carrier({"curing-salt": 2}), gland)
     assert ok and cost < 0 and "salt" in why
 
 
@@ -228,10 +237,17 @@ def test_without_salt_it_says_how_long_there_is():
     assert "48 hours" in why
 
 
-def test_salt_is_recognised_by_the_name_a_player_would_buy():
+def test_salt_is_curing_salt_by_id_never_a_word_in_a_name():
+    """Re-pinned 2026-10-08 (leatherworking lane C; plan §6 and the owner's answer 8, "salt
+    costs salt"): this matched name fragments ("salt", "Sea Salt", "saltpetre") over
+    everything carried, the shape law 1 refuses, and preserved for nothing. The one reader
+    counts curing salt by material id (`materials.is_salt`) in measures, and spends them."""
     for name in ("salt", "Sea Salt", "a pouch of curing salt"):
-        assert H.has_salt(Carrier(**{name: 1})), name
+        assert not H.has_salt(Carrier(**{name: 1})), name
     assert not H.has_salt(Carrier(lantern=1))
+    pack = Carrier({"curing-salt": 3})
+    assert H.has_salt(pack) and H.salt_measures(pack) == 3
+    assert H.spend_salt(pack, 2) == 2 and H.salt_measures(pack) == 1
 
 
 # --- the tags actually survive the trip in (found by applying them, 2026-08-23) ------
@@ -389,8 +405,11 @@ def test_salt_carried_at_the_time_keeps_it():
     from rules.sheet import load_pc
 
     pc = load_pc("fixtures/pc-kesst.json")
-    pc.goods["rock salt"] = 1
+    # Curing salt by id, a measure an animal part (owner, 2026-10-08: "salt costs salt";
+    # this pinned "rock salt" in the goods, a name fragment, salting three for nothing).
+    pc.inventory["curing-salt"] = 3
     pc.carry("wyrmfang-venom", 3, at_minute=0)      # salted on the way in
+    assert "curing-salt" not in pc.inventory        # three parts, three measures
     got = crafting.preview(
         "herbalist", 3,
         crafting.Chain(track="herbalist", methods=["brew"],
@@ -538,8 +557,9 @@ def test_the_clock_starts_when_it_changes_hands():
 
 def test_salt_in_the_pack_preserves_what_is_handed_over_too():
     eng = _scene_at()
-    eng.scene.pc().goods["rock salt"] = 1
+    eng.scene.pc().inventory["curing-salt"] = 1      # by id, and it is spent
     _give(eng, "wyrmfang venom")
+    assert "curing-salt" not in eng.scene.pc().inventory
     assert eng.scene.pc().preserved.get("wyrmfang-venom") is True
 
 

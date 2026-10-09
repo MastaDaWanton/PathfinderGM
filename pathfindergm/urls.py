@@ -34,7 +34,7 @@ from django.urls import path, re_path
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
                   works_views, enchant_views, alchemy_views, tradecraft_views,
-                  leather_views)
+                  leather_views, harvest_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -176,6 +176,12 @@ urlpatterns = [
     path("api/leather/seen", leather_views.leather_seen, name="leather_seen"),
     path("api/leather/material/<str:material_id>", leather_views.leather_material,
          name="leather_material"),
+    # The harvest of a carcass (docs/leatherworking-contracts.md §5.2; lane C): the fixed
+    # names above the `<ref>` route, or "take" would be read as a carcass's ref.
+    path("api/harvest", harvest_views.harvest_here, name="harvest_here"),
+    path("api/harvest/take", harvest_views.harvest_take, name="harvest_take"),
+    path("api/harvest/finish", harvest_views.harvest_finish, name="harvest_finish"),
+    path("api/harvest/<str:ref>", harvest_views.harvest_sheet, name="harvest_sheet"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
     # `api/bench/<bench_id>`: Django takes the first match, and below it "state" was read
     # as a homebrew bench id and answered 404 "no bench 'state'" (Lane D, 2026-10-02).
