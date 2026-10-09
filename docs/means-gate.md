@@ -134,6 +134,15 @@ refusal in 18 s and 8 s (no planner call; the turn was not spent); "I convince t
 was never here" went to the planner, asked for a Bluff roll, and the page wrote the lie
 hanging in the air with the guard unconvinced — no memory touched.
 
+**Skills are held (2026-10-08).** "I use the Heal skill on the porter" was read
+`means: power, power: Heal` and refused as "no spell, ability or item by that name … has no
+powers yet" (the deeds lane, local model). Every skill of `tables.SKILLS` is now on the
+sheet's held list (`means._skill_names`; "skill" is filler in a power's name), backs a
+`check` (`HELD_OPS`), and is kept out of `which_power`'s enum. Fly is not: the Fly skill is
+for a creature that already flies. Re-run on all three corpora with fresh readings: no deed
+in dev, held-out or psychic is backed by a skill (dev 86/87 refused, 89/89 spared; held-out
+43/47, 41/41 — the documented finals or better).
+
 ## Not done
 
 - The page check has no bench of its own; it is measured on the live turns only.

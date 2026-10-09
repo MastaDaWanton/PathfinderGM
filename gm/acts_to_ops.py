@@ -45,7 +45,7 @@ import re
 from dataclasses import dataclass, field
 
 # The acts whose ops are built here, whole.
-GOODS_ACTS = frozenset({"take", "drop", "give", "sell"})
+GOODS_ACTS = frozenset({"take", "drop", "give", "sell", "steal"})
 # The acts under which coin leaves the player's purse. `rest` because a room is paid for
 # ("I take a room for the night": the act list's own words for `rest`).
 PAYING_ACTS = frozenset({"give", "buy", "drop", "rest"})
@@ -252,6 +252,17 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
         row.note = f"{thing!r} is not a thing to carry"
         return
     source = " ".join(str(a.get("target") or "").split())
+    if not source:
+        # A take that names no holder, right after a take that did, comes out of the same
+        # hands — the frame's own structure, as "it" is the object before it. Measured
+        # live on this branch (2026-10-08): "I take one of the pears from the fruit
+        # seller, then a melon" read the melon with no target, nobody here carried one,
+        # and the world-never-runs-out rule minted it ("Kesst Vayr takes the melon")
+        # where a melon from the seller is refused: she has none.
+        prev = next((p for p in reversed(frame["actions"][:i])
+                     if p.get("act") in ("take", "steal")), None)
+        if prev is not None and prev.get("target"):
+            source = " ".join(str(prev["target"]).split())
     params: dict = {"item": _plain(thing) or thing, "to": pc.ref}
     if source and holding.is_container(source):
         params["from_"] = _plain(source)
@@ -381,7 +392,15 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             continue
         if act in GOODS_ACTS and pc is not None:
             row.thing = _object(frame, i, pc, recent)
-            if act == "take":
+            if act == "steal" and getattr(scene, "in_encounter", False):
+                # In a fight a steal is the combat manoeuvre (CMB against CMD, the
+                # `attack` op's `maneuver: steal`), which the fight's own plan writes.
+                row.note = "a steal in a fight is a manoeuvre: the fight's plan writes it"
+            elif act in ("take", "steal"):
+                # Out of a fight a steal is a take the holder never agreed to — the same
+                # `give` a take builds, which the engine reads as taken because the player
+                # is the one acting (`Engine._op_give`); never asked whether it was
+                # offered (`confirm_takes`): the words already said.
                 _take(row, frame, i, scene, pc, recent)
                 coming += [str(t["params"]["item"]) for t in row.intents]
             elif act == "drop":
@@ -390,7 +409,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _give(row, frame, i, scene, pc, recent, coming)
             else:
                 _sell(row, frame, i, scene, pc, sentence, recent, coming)
-            if act != "take":
+            if act not in ("take", "steal"):
                 # A thing an earlier deed of the sentence already parted with is not
                 # parted with twice. Measured on the items save's last line, read live:
                 # "I also drop the Brunt of the weight on the ground and leave it behind"
@@ -487,6 +506,117 @@ def confirm_sales(rows: list[Row], frame: dict | None, scene, *, sentence: str =
     return notes
 
 
+def confirm_takes(rows: list[Row], frame: dict | None, scene, *, recent=(),
+                  ask=None) -> list[str]:
+    """A take from a person, asked whether that person gave or offered it
+    (`interpret.confirm_take`, shown the last beat). "offered" makes the holder the one
+    acting — they hand it over, and `Engine._op_give` reads a hand-over; anything else
+    leaves the player acting, which the engine reads as a take: owner kept, `stolen` set.
+    A `steal` is never asked (the words said it), nor a take out of a container. `ask`
+    None (no model: the test suite, or the reader off) leaves every take a take — the
+    engine's own rule (docs/items-have-owners.md). Returns a line per take turned into a
+    hand-over, for the turn log.
+
+    Measured 2026-10-08 (the deeds lane): "I take an apple from the fruit seller without
+    paying" came out as the seller handing the apple over. The engine now reads the
+    player taking from a person as a take; this asks only so that "I take the purse he
+    holds out" stays the reward it was."""
+    notes: list[str] = []
+    if ask is None or not frame or scene is None:
+        return notes
+    actions = frame.get("actions") or []
+    people = getattr(scene, "actors", {}) or {}
+    beat = " ".join(str(b or "") for b in list(recent or ())[-2:])[-700:]
+    for row in rows:
+        if row.act != "take" or row.commit != "done":
+            continue
+        for built in row.intents:
+            p = built.get("params") or {}
+            holder = people.get(str(p.get("from_") or ""))
+            if built.get("op") != "give" or holder is None or getattr(holder, "is_pc", False):
+                continue
+            a = actions[row.index] if row.index < len(actions) else {}
+            said = ask(beat, str(a.get("span") or row.thing or p.get("item") or ""))
+            if said != "offered":
+                continue
+            built["actor"] = holder.ref
+            built["because"] = f"{holder.name} handed it over"
+            row.note = "asked again: offered, so handed over"
+            notes.append(f"{p.get('item')}: offered by {holder.name}, handed over")
+    return notes
+
+
+_TENDING_ACTS = frozenset({"use", "other"})
+
+
+def first_aid(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str]:
+    """First aid built whole: a deed aimed at somebody here who is DYING becomes the Heal
+    check the Core Rulebook stabilises them with (`rules/firstaid.py`, DC 15) — with its
+    `target`, the patient, which is the one slot the plan kept leaving off.
+
+    Measured 2026-10-08 (the deeds lane, local model): "I give first aid to the wounded
+    porter" was planned `check skill=heal` with no target 3 times of 3, so the engine found
+    no patient and the porter bled on; on this branch's own repro the planner wrote
+    `use_item medical_kit_01` (carried by nobody), `check sense motive`, and
+    `use_item bandage_1` for three phrasings — never once the Heal check aimed at him.
+
+    Detected in code, from the engine's state: an action done now of a kind that can be
+    tending (`use`, `other` — the acts the reader gives "bandage" and "give first aid"),
+    whose target is somebody here `firstaid.dying` says is dying. A Heal named as a skill
+    ("I use the Heal skill on the porter": the `object`/`power` slot is the skill's own
+    name, a closed list) is first aid outright. Anything else is asked ONE question
+    (`interpret.confirm_first_aid`): keeping them alive, or something else? — CLAUDE.md's
+    detect-then-ask. `ask` None (the test suite, the reader off) builds only the
+    skill-named route. Returns a line per check built, for the turn log."""
+    from rules import firstaid, holding
+
+    from . import interpret
+
+    notes: list[str] = []
+    if not frame or scene is None or not hasattr(scene, "pc") or scene.pc() is None:
+        return notes
+    pc = scene.pc()
+    actions = frame.get("actions") or []
+    people = getattr(scene, "actors", {}) or {}
+    tended: set[str] = set()
+    for row in rows:
+        a = actions[row.index] if row.index < len(actions) else {}
+        # Done or tried ("I try to stabilise him" is `tried`, and 1e rolls it).
+        if row.act not in _TENDING_ACTS or row.intents or not interpret.acting(a):
+            continue
+        ref = person(scene, " ".join(str(a.get("target") or "").split()))
+        if not ref:
+            # Aimed at a wound, not a person ("bandage his wound", read live with
+            # `target: his wound`), or at nobody: the one creature here who is dying, when
+            # there is exactly one — the engine's state, as `firstaid.patient_of` reads it.
+            # The question below still decides whether the deed is first aid at all.
+            dying_here = [x for x in people.values()
+                          if x is not pc and firstaid.dying(x)]
+            ref = dying_here[0].ref if len(dying_here) == 1 else ""
+        patient = people.get(ref) if ref else None
+        if (patient is None or patient is pc or not firstaid.dying(patient)
+                or patient.ref in tended):
+            # One first aid per patient a turn: "I kneel by the porter and try to
+            # stabilise him" is two actions of the reading and one Heal check.
+            continue
+        named = any(" ".join(w for w in holding.plain(a.get(slot)).split()
+                             if w not in ("skill", "skills")) == firstaid.SKILL
+                    for slot in ("object", "power") if a.get(slot))
+        if not named:
+            if ask is None or ask(str(a.get("span") or ""), patient.name) != "first aid":
+                continue
+        tended.add(patient.ref)
+        # The band is there because a check must name something to beat (the parse
+        # refuses one without); with the patient dying when it resolves it is never read
+        # — first aid is the rule's DC 15, whatever the band (`Engine._op_check`).
+        row.intents.append({"op": "check", "actor": pc.ref, "target": patient.ref,
+                            "params": {"skill": firstaid.SKILL, "dc": {"band": "average"}},
+                            "because": "the player gave first aid"})
+        row.note = f"first aid to {patient.name}"
+        notes.append(row.note)
+    return notes
+
+
 def declared(rows: list[Row]) -> list[str]:
     """The op names the plan must carry, in the order the words do them — the `declared`
     block's keys (`prompts.turn_schema`). Ops built whole are not asked of the model."""
@@ -573,8 +703,17 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
                  for a in acting)
     out: list = []
     placed: set[int] = set()
+    checks = {str((b.get("params") or {}).get("skill") or "").lower()
+              for b in built if b.get("op") == "check"}
     for r in raw:
         op = _op(r)
+        if op == "check" and checks and str(
+                ((r or {}).get("params") or {}).get("skill") or "").lower() in checks:
+            # The table built this check whole (`first_aid`): the plan's own copy of it,
+            # usually without the patient, would roll a second Heal against nobody.
+            if notes is not None:
+                notes.append("the plan's check replaced by the reading's first aid")
+            continue
         if op not in ("give", "sell"):
             out.append(r)
             continue

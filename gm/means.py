@@ -59,7 +59,7 @@ def _words(text) -> tuple[str, ...]:
 # is a ring. Structure, not meaning — the same list a catalogue lookup strips.
 _FILLER = frozenset({"my", "the", "a", "an", "his", "her", "their", "own", "spell",
                      "spells", "ability", "abilities", "power", "powers", "magic",
-                     "cantrip", "trait", "feat", "item", "of"})
+                     "cantrip", "trait", "feat", "item", "of", "skill", "skills"})
 
 
 def _contains(hay: tuple[str, ...], needle: tuple[str, ...]) -> bool:
@@ -95,7 +95,25 @@ def _held_names(pc) -> list[tuple[str, str]]:
     for key, stock in (getattr(pc, "stock", None) or {}).items():
         out += [("item", str(getattr(stock, "name", "") or key)),
                 ("item", str(getattr(stock, "base", "") or ""))]
+    out += [("skill", s) for s in _skill_names()]
     return [(k, n) for k, n in out if _words(n)]
+
+
+def _skill_names() -> list[str]:
+    """Every skill of the rules, held by every character. Measured 2026-10-08 (the deeds
+    lane, local model): "I use the Heal skill" was read `means: power, power: Heal`, no
+    spell, ability, feat or item was called Heal, and the gate refused it as "no spell,
+    ability or item by that name" — the turn printed "Kesst Vayr has no powers yet". A
+    skill is not a permission the sheet has to grant: the Core Rulebook lets anyone try
+    an untrained skill, and the trained-only ones are refused by the check itself, with
+    the reason (`Engine._op_check`: "cannot attempt … untrained. Nothing is rolled."), so
+    this gate never has to know which is which."""
+    from rules.tables import SKILLS
+
+    # Not Fly: the Core Rulebook's Fly skill is for "a creature with a fly speed", so the
+    # skill backs no flight on its own — the wings or the spell are what the sheet must
+    # hold, and "I fly up to the bell tower" still asks for them.
+    return [s for s in SKILLS if s != "fly"]
 
 
 def held_power(scene, words, *, named: bool = True) -> tuple[str, str]:
@@ -118,6 +136,12 @@ def held_power(scene, words, *, named: bool = True) -> tuple[str, str]:
     said = _words(words)
     if pc is None or not said:
         return "", ""
+    if named and ({"skill", "skills"} & set(said)):
+        # "the Heal skill" is the skill, whatever spell shares its name (a cleric's Heal).
+        core = tuple(w for w in said if w not in _FILLER)
+        for name in _skill_names():
+            if core and _words(name) == core:
+                return "skill", name
     spell = interpret.spell_named(scene, " ".join(said))
     if spell is not None:
         return "spell", str(getattr(spell, "name", "") or getattr(spell, "id", ""))
@@ -220,7 +244,9 @@ def which_power(scene, deed: str, *, chat=None, model: str = "", host: str = "",
     # behind a deed it does not do is the very leak this module is for: a wizard's "make
     # the smith forget he saw me" answered "Charm Person" would cast a charm and leave the
     # forgetting to the prose. A spell the deed's words name was found by name already.
-    held = list(dict.fromkeys(_held_names(pc)))
+    # Nor the skills: every character has every one, so "anyone could try this" already
+    # answers for them, and thirty-odd more names would drown the sheet's own.
+    held = [h for h in dict.fromkeys(_held_names(pc)) if h[0] != "skill"]
     names = [n for n in dict.fromkeys(n for _k, n in held)
              if n not in (ANYONE, "none")][:60]
     if chat is None:
@@ -391,7 +417,7 @@ def claim_kind(claim: str, *, chat=None, model: str = "", host: str = "",
 # The op a held power's use is, for the plan's must-contain list: a spell used is a
 # `cast` the engine resolves, an ability a `use_ability`, a thing carried a `use_item`.
 # A trait or a feat is the character's own body or training and has no door of its own.
-HELD_OPS = {"spell": "cast", "ability": "use_ability"}
+HELD_OPS = {"spell": "cast", "ability": "use_ability", "skill": "check"}
 
 
 def backed_ops(judged: list[dict]) -> list[str]:

@@ -346,10 +346,26 @@ class GMAgent:
         held_back = acts_to_ops.confirm_sales(
             self.rows, read_ok, self.engine.scene, sentence=player_input,
             ask=interpret.confirm_sale if interpret.ENABLED else None)
+        # A take from a person is asked, with the last beat in front of it, whether that
+        # person offered it (`acts_to_ops.confirm_takes`): offered is handed over, anything
+        # else is a take the engine marks stolen. Off with the reader.
+        handed = acts_to_ops.confirm_takes(
+            self.rows, read_ok, self.engine.scene, recent=getattr(self, "recent", ()),
+            ask=interpret.confirm_take if interpret.ENABLED else None)
+        # A deed aimed at somebody dying that is first aid is built whole, the patient
+        # named (`acts_to_ops.first_aid`); asked of the reader only when the words did not
+        # name the Heal skill.
+        tended = acts_to_ops.first_aid(
+            self.rows, read_ok, self.engine.scene,
+            ask=interpret.confirm_first_aid if interpret.ENABLED else None)
         if read_ok is not None:
+            if tended:
+                read_ok["first_aid"] = tended
             read_ok["table"] = [r.record() for r in self.rows]
             if held_back:
                 read_ok["sales_held_back"] = held_back
+            if handed:
+                read_ok["takes_handed"] = handed
         # Every deed the words declared moves a thing and not one of them can — "I sell
         # the crate" with no crate: the turn is the refusal, and no model is asked.
         stop = acts_to_ops.refusal(self.rows)
@@ -443,8 +459,12 @@ class GMAgent:
             # an act of the table is: its refusal ("did not prepare Charm Person today")
             # is the player's to hear, never dropped as the plan's invention
             # (`means.backed_ops`).
+            # Less what the table already built whole: a Heal skill named at somebody
+            # dying is the table's first aid, never a second check asked of the model.
+            built_here = set(acts_to_ops.built_ops(self.rows))
             declared = list(dict.fromkeys([*declared, *by_reading,
-                                           *means.backed_ops(self.judged)]))
+                                           *(op for op in means.backed_ops(self.judged)
+                                             if op not in built_here)]))
         else:
             # No reading: the plan alone. Only a chip the player attached declares (a
             # spell or a place picked from a list is not English), so the words are read
