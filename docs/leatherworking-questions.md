@@ -712,3 +712,12 @@ proposal stands. These override the plan and the contracts wherever they differ.
   the forge loses its tannin); forge_views._card names no marks; the mordant "dye lost on
   soaking" rule unbuilt; finishing a step never reveals a consumable's working traits;
   tests/test_forge_api.py errors when run alone (its fake rules.materials lacks CATALOGUES).
+- From lane C (harvest): **approved by the lead** — `tidy_the_fallen` no longer sweeps away a
+  beast's carcass while parts are left (measured: a wolf that bled out after a fight was departed
+  in the same call, so no fight kill could ever be skinned; dead persons still go). Still open:
+  lane E's `_has(doc, "thick")` should also ask `harvest.working_traits(hide.creature)`; the tag
+  grammar has no branch for fats, galls and tannins (troll fat, wyvern fat, wyrm gall untagged;
+  the forge's fuels, alloy and fittings unmapped) — lane W; trolls are humanoid (giant), so troll
+  blood is unobtainable from a carcass (owner); `Actor._creature_doc` uses `bestiary.raw` not
+  `raw_block`, so an alias-spawned creature gets no `type.*` tags; the core bestiary's "magical"
+  type reads as `type.magical`; the faces system gave a dead wolf a people ("of the Korvu people").

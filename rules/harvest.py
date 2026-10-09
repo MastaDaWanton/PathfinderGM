@@ -193,29 +193,15 @@ def natural_armour(block: dict | None) -> int:
                if typ == "natural armour")
 
 
-def printed_alignment(block: dict | None) -> str:
-    """The block's printed alignment: `bestiary.printed_alignment`, the one reader, once the
-    deeds lane's move of it out of the engine is on this branch; the field until then."""
-    from . import bestiary
-
-    fn = getattr(bestiary, "printed_alignment", None)
-    if callable(fn):
-        return str(fn(block or {}) or "")
-    return str((block or {}).get("alignment") or "").strip()
-
-
 def side_of(block: dict | None) -> str:
-    """"good", "evil" or "" from the printed alignment: good is `bestiary.printed_good`
-    (every alternative printed is good, so "NG/CN" is neither) where it exists."""
+    """"good", "evil" or "" from the printed alignment, read through the one reader,
+    `bestiary.printed_alignment` (good is `bestiary.printed_good`: every alternative printed
+    is good, so "NG/CN" is neither)."""
     from . import bestiary
 
-    words = re.findall(r"[A-Z]{2}", printed_alignment(block).upper())
-    good = getattr(bestiary, "printed_good", None)
-    if callable(good):
-        if good(block or {}):
-            return "good"
-    elif words and all(w in ("LG", "NG", "CG") for w in words):
+    if bestiary.printed_good(block or {}):
         return "good"
+    words = re.findall(r"[A-Z]{2}", bestiary.printed_alignment(block or {}).upper())
     if words and all(w in ("LE", "NE", "CE") for w in words):
         return "evil"
     return ""
