@@ -239,6 +239,36 @@ def test_wait_for_it_passes_the_time_through_the_one_clock_door(client, where):
     assert cm.current().scene.clock_minutes >= before + got.json()["waited"]
 
 
+def test_a_level_1_field_bark_tan_waits_a_week_in_the_pack_and_the_market_lives_it(client,
+                                                                                   where):
+    """The owner's two rulings of 2026-10-09 through the bench's own routes. "sure why not":
+    a level-1 leatherworker with the field kit bark-tans a wolf pelt with oak bark — no vat,
+    no rent, In progress in the pack for 7 days (it was level 2 and a tannery's vat). "if I
+    wait then people should go about their day": Wait for it on that week, standing in the
+    market at 10:00 among two keepers and the bread seller, tells on the bench's own page
+    that the keepers shut up and came back, and leaves nothing queued for the next act to
+    tell a second time (`survival.told_on_page`'s defect: a bench's fortnight told on the
+    next act read as though putting on armour took a fortnight)."""
+    _carry(oak_bark=1)
+    _pc().goods.update({"trail rations": 10})        # the town feeds nobody; its well waters
+    pelt = _put("pelt", "wolf-pelt", quarters=4, grade=2)
+    chk, _, done = step(client, "tan", {"hide": pelt, "tannin": "inv:oak-bark"}, hair=False)
+    assert chk["vat_rent_cp"] == 0 and not (chk.get("wait") or {}).get("vats")
+    assert not done.get("paid")
+    row = done["works"][0]
+    assert row["state"] == "working" and int(row["ready_in"]) == 7 * 24 * 60
+    c = cm.current()
+    before = len(c.transcript)
+    got = post(client, "/api/leather/collect", {"key": row["key"], "wait": True})
+    assert got.status_code == 200, got.content[:300]
+    assert got.json()["waited"] == 7 * 24 * 60
+    said = " ".join(t["text"] for t in cm.current().transcript[before:])
+    assert "comes back to the market to open it" in said, said
+    assert cm.current().scene._comings_said == []
+    assert any(r["form"] == "leather" and r["tannage"] == "oak-bark"
+               for r in got.json()["rack"])
+
+
 # --- the Craft rule, the score, the reservation ----------------------------------------------------
 
 def test_a_miss_by_five_ruins_half_and_says_what(client):

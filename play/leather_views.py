@@ -1100,9 +1100,12 @@ def leather_collect(request):
             # a 21-day bark tannage through `advance` killed the character twice, the
             # second time carrying 40 waterskins, and this route said only "You waited 21
             # days" (master's fix/long-waits-eat-and-drink; alchemy_collect's shape).
+            # The engine lent first, so the people here go about their day through the
+            # wait (the owner, 2026-10-09; `Engine.settle_on_clock`), and told on this page.
+            engine = c.engine()
             passed = c.scene.wait(left)
             waited = int(passed["minutes"])
-            lived = survival.told_on_page(c.scene, passed, pc.ref)
+            lived = survival.told_on_page(c.scene, passed, pc.ref) + engine.comings_on_page()
             if waited:
                 c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
                     [f"{pc.name} waits {sky.span_words(waited)} for the {item.name}."]

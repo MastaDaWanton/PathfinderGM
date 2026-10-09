@@ -1412,10 +1412,12 @@ def alchemy_collect(request):
             # `Scene.wait`, not `advance`: a wait of a day or more is lived through on
             # what the pack carries and stops where it runs out (measured 2026-10-08: a
             # 21-day tannage through `advance` killed a character carrying 40 waterskins,
-            # and this page said only how long they had waited).
+            # and this page said only how long they had waited). The engine lent first, so
+            # the people here go about their day through it (`Engine.settle_on_clock`).
+            engine = c.engine()
             passed = c.scene.wait(left)
             waited = int(passed["minutes"])
-            lived = survival.told_on_page(c.scene, passed, pc.ref)
+            lived = survival.told_on_page(c.scene, passed, pc.ref) + engine.comings_on_page()
             if waited:
                 c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
                     [f"{pc.name} waits {sky.span_words(waited)} for the {row.get('name')}."]

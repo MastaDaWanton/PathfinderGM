@@ -708,10 +708,12 @@ def enchant_wait(request):
         # `Scene.wait`, the player's chosen wait: under a day (a phase is always under a
         # day) it is `advance` exactly; the door is shared so a longer one cannot forget
         # the pack (measured 2026-10-08: long waits through `advance` killed characters
-        # carrying food and water).
+        # carrying food and water). The engine lent first, so the people here go about
+        # their day through it (`Engine.settle_on_clock`), told on this page.
+        engine = c.engine()
         ended = c.scene.wait(minutes) or {}
         minutes = int(ended.get("minutes", minutes))
-        lived = survival.told_on_page(c.scene, ended, pc.ref)
+        lived = survival.told_on_page(c.scene, ended, pc.ref) + engine.comings_on_page()
         c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
             [f"{pc.name} waits {sky.span_words(minutes)} for {phase}."] + lived)})
         c.save()

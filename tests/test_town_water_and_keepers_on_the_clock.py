@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from rules import keepers, places, population, residency, survival
+from rules import keepers, places, population, residency, states, survival
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import from_dict, load_pc, to_dict
@@ -247,19 +247,156 @@ def test_a_keeper_coming_back_gets_a_square_and_nobody_else_moves():
         assert s.positions.get("pc") == before.get("pc")
 
 
-def test_somebody_standing_with_the_party_who_keeps_no_counter_still_stays():
-    """The doorway ruling of 2026-09-25 holds on the clock: a resident in the party's
-    place stays there through the slots a wait crosses; only a keeper's counter moves a
-    keeper."""
+def _stallholder(s, *, talking=False):
+    """A resident met in the market, whose day (`residency`'s day-work key: home 21:00 to
+    6:00, at the market from 6:00, company or home from 18:00) is the market's."""
     from gm import judgement
 
-    s, e, market = _in_vormoor(17 * HOUR)
     rec = population.note(s, "a stallholder with a ledger")
-    rec["life"].update(work="stallholder", work_name="stallholder", mobility="resident")
+    rec["life"].update(work="stallholder", work_name="stallholder", mobility="resident",
+                       sociability=0)
     ref = judgement.embody_sought(s, "I talk to the stallholder with a ledger.", WORLD)
     s.people[ref].remove_effects(source="talk")
-    _wait(e, 8)                                            # 01:00, home time for her day
+    if talking:
+        s._engine.join_talk(s.people[ref])
+    return ref
+
+
+def _comings(res):
+    return " ".join(o.tell for o in res.outcomes if o.op == "comings")
+
+
+# --- 3. a wait the player chose: people go about their day ---------------------------------
+#
+# The owner, 2026-10-09: "if I wait then people should go about their day. if its a shop
+# owner and the store isnt closed they shouldnt go home just because i waited in their
+# shop". Until then the doorway ruling (2026-09-25, the woman in the doorway "should stay
+# there until i leave or something moves them") held through every stretch of clock, a
+# chosen wait included: measured on master 095c5095, a stallholder met at the market at
+# 17:00 was still standing beside the party at 01:00 after an eight-hour wait, in the
+# scene, the panel and the brief, though her own day had her at home from 21:00.
+
+def test_a_wait_sends_the_stallholder_with_the_party_about_her_day():
+    """Re-pinned with the owner's words: the same eight hours from 17:00 to 01:00 that
+    `test_somebody_standing_with_the_party_who_keeps_no_counter_still_stays` used to pin
+    her in place now send her home (offstage), told "goes about their day", and the scene,
+    the conversation panel and the narrator's brief agree she is gone."""
+    from gm import prompts
+
+    s, e, market = _in_vormoor(17 * HOUR)
+    ref = _stallholder(s, talking=True)
+    name = s.people[ref].name
+    assert e.talking_to() and ref in s.actors
+    res = _wait(e, 8)                                       # 01:00, home time for her day
+    assert ref not in s.actors and residency.is_offstage(s.people[ref].at)
+    said = _comings(res)
+    assert "goes about their day and leaves the market" in said, \
+        [o.tell for o in res.outcomes]
+    # She held the conversation; her leaving is its third exit (ruling 2026-09-24), said in
+    # the same tell, and the talk panel (`talking_to`) is empty at once.
+    assert "The conversation with them is over." in said
+    assert e.talking_to() == [] and not s.people[ref].has_state(states.TALKING)
+    brief = prompts.scene_brief(WORLD, s, WORLD.get(VORMOOR), here=market, known=e.places())
+    assert str(name) not in brief.split("WHO IS HERE", 1)[1].split("\n\n", 1)[0]
+
+
+def test_any_other_stretch_of_clock_still_keeps_her_where_she_stands():
+    """The doorway ruling stands for clock the player did not spend waiting — a craft's
+    hours, a walk, a minute's op across 6:00 — because nothing in those says the party
+    stood about long enough for the town to move on. The same eight hours through
+    `Scene.advance` (no `waited`) leave her beside the party."""
+    s, e, market = _in_vormoor(17 * HOUR)
+    ref = _stallholder(s)
+    out = s.advance(8 * HOUR)
+    assert ref in s.actors and ref not in out["moved"]
+
+
+def test_an_open_keeper_stays_behind_the_counter_through_a_two_hour_wait():
+    """The owner's second clause: "if its a shop owner and the store isnt closed they
+    shouldnt go home just because i waited in their shop". At the market at 10:00, two
+    hours waited across the noon slot, in conversation with the general store's keeper:
+    she is still at her counter, the counter is open, nothing is told of her coming or
+    going, and the conversation is still open (a wait is not an exit)."""
+    s, e, market = _in_vormoor(10 * HOUR)
+    keeper = keepers.seller_in(s, market.id)
+    assert keeper is not None and keeper.ref in s.actors
+    e.join_talk(keeper)
+    square = s.positions.get(keeper.ref)
+    res = _wait(e, 2)
+    assert (s.clock_minutes % DAY) // HOUR == 12
+    assert keeper.ref in s.actors and keepers.shut_here(s) == ""
+    assert str(keeper.name) not in _comings(res)
+    assert keeper in e.talking_to()
+    assert s.positions.get(keeper.ref) == square, "people keep their square"
+
+
+def test_the_open_keeper_still_shuts_up_at_the_counters_hour_in_a_wait():
+    """And leaves only when the counter shuts, on its own hours: the same keeper, a wait
+    from 10:00 to 21:00, packs up — in conversation or not."""
+    s, e, market = _in_vormoor(10 * HOUR)
+    keeper = keepers.seller_in(s, market.id)
+    e.join_talk(keeper)
+    res = _wait(e, 11)
+    assert keeper.ref not in s.actors
+    said = _comings(res)
+    assert "shuts the counter and leaves the market" in said
+    assert "The conversation with them is over." in said and e.talking_to() == []
+
+
+def test_a_companion_never_goes_about_their_day():
+    """A companion travels with the party (`bond.travels-with-you`): no wait sends them
+    off, though their own day would."""
+    from rules.activeeffect import ActiveEffect
+    from rules import states
+
+    s, e, market = _in_vormoor(17 * HOUR)
+    ref = _stallholder(s)
+    s.people[ref].apply_effect(ActiveEffect(
+        name="travelling with you", kind="bond", key="company", source="company",
+        origin="author:test", duration="until-dismissed",
+        tags=(states.TRAVELS_WITH_YOU,)))
+    _wait(e, 8)
     assert ref in s.actors
+
+
+def test_a_talker_whose_day_keeps_them_here_stays_in_the_conversation():
+    """A wait is not itself an exit (Everweave's implicit exits are the conversation
+    ruling's warning): at 10:00, two hours waited, the stallholder's day keeps her at the
+    market, so she stays, on her square, and the conversation is still open."""
+    s, e, market = _in_vormoor(10 * HOUR)
+    ref = _stallholder(s, talking=True)
+    square = s.positions.get(ref)
+    res = _wait(e, 2)
+    assert ref in s.actors and s.people[ref] in e.talking_to()
+    assert s.people[ref].name not in _comings(res)
+    assert s.positions.get(ref) == square
+
+
+def test_a_night_waited_out_at_her_stall_is_told_as_a_night_she_went_home():
+    """The stretch is settled once, at its end (Exult's teleport to the current slot), so
+    a wait from 17:00 to 07:00 found her at the market at both ends — her day has her there
+    from 6:00 — and the narrator would have been handed the same face in the same place and
+    nothing else: the woman who stood all night beside the party, which is what the ruling
+    is against. She went home at 21:00 and came back at first light, and is told so."""
+    s, e, market = _in_vormoor(17 * HOUR)
+    ref = _stallholder(s, talking=True)
+    res = _wait(e, 14)
+    assert (s.clock_minutes % DAY) // HOUR == 7
+    assert ref in s.actors
+    said = _comings(res)
+    assert "goes about their day and is back at the market" in said, said
+    assert "The conversation with them is over." in said and e.talking_to() == []
+
+
+def test_a_nights_rest_is_a_wait_too():
+    """A night's sleep is a wait the player chose: resting at the market from 17:00 (to
+    the dawn, 6:00) sends the stallholder home for the night and back, told."""
+    s, e, market = _in_vormoor(17 * HOUR)
+    ref = _stallholder(s)
+    res = e.run(e.validate([{"op": "rest", "actor": "pc", "because": "I sleep",
+                             "params": {"kind": "night"}}], origin="author:test"))
+    assert (s.clock_minutes % DAY) // HOUR == 6, [o.tell for o in res.outcomes]
+    assert "goes about their day and is back at the market" in _comings(res)
 
 
 def test_a_slot_crossed_in_a_fight_is_settled_once_the_fight_is_over():

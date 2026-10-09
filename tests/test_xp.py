@@ -115,7 +115,11 @@ def test_sleeping_on_enough_xp_takes_the_level(tmp_path):
         res = e.run(e.validate([{"op": "rest", "params": {"kind": "night"}}]))
         cm._LIVE.clear()
     assert pc.level == was + 1
-    assert f"level {was + 1} settles" in res.outcomes[-1].tell
+    # The night's own outcome, not the batch's last: since 2026-10-09 a night's rest is a
+    # wait in which the people about the sleeper go about their day, told after it ("The
+    # innkeeper goes about their day and leaves the tavern." came last on this start).
+    night = next(o for o in res.outcomes if o.op == "rest")
+    assert f"level {was + 1} settles" in night.tell
 
 
 def test_sleeping_without_the_xp_levels_nobody(tmp_path):

@@ -537,6 +537,28 @@ Built in `rules/keepers.py`:
   Somebody standing with the party who keeps no counter stays (the doorway ruling); a
   slot crossed mid-fight is settled when the fight is over. Stardew's schedule entries
   begin "at the time", whoever is watching; Exult's off-screen teleport is the move.
+- **A wait moves the people with the party too** (the owner, 2026-10-09: "if I wait then
+  people should go about their day. if its a shop owner and the store isnt closed they
+  shouldnt go home just because i waited in their shop"). Measured before it: a
+  stallholder met at the market at 17:00 still stood beside the party at 01:00 after an
+  eight-hour wait, though her day had her home from 21:00. A wait the player CHOSE —
+  `Scene.wait` (advance_time, every bench's Wait for it) and a night's rest, which pass
+  `waited` through `Scene.advance` — now settles everybody with a day, the party's own
+  place included: whoever's day takes them elsewhere goes, told "<name> goes about their
+  day and leaves the market."; whoever's day keeps them stays on their square; somebody
+  whose day took them away and back inside the one wait (home at dusk, at the stall again
+  at first light) is told "goes about their day and is back at the market", because the
+  stretch is settled once, at its end, and the narrator would otherwise see the same face
+  in the same place and nothing else. A keeper keeps the counter's hours exactly as
+  before: open, they stay behind it however long the party waits in the shop; shut, they
+  go. A companion (`bond.travels-with-you`) never goes; nor anybody down, helpless or held.
+  Every other stretch of clock (a craft's hours, a walk, a minute's op across 6:00) keeps
+  the doorway ruling. In conversation: a wait is not an exit (the conversation ruling
+  of 2026-09-24 refuses implicit exits), so a talker whose day keeps them here is still
+  talking afterwards; one whose day takes them away has LEFT, the ruling's third exit,
+  and the same tell says "The conversation with them is over." A bench writes these on its
+  own page (`Engine.comings_on_page`), so the next act does not tell them again. Pinned in
+  tests/test_town_water_and_keepers_on_the_clock.py, section 3.
 
 Two defects the shop hours exposed, both fixed:
 

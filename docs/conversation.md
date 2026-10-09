@@ -43,6 +43,13 @@ panel's button), walks out of the place (`travel`, `journey`, `venture` say "You
 mid-sentence"), or the other party leaves it — walks out, goes down, or draws
 (`_settle_talk` at the end of every batch, said).
 
+A wait is not an exit (2026-10-09). When the player waits (advance_time, a bench's Wait
+for it) the people with the party go about their day (docs/the-population.md, "A wait
+moves the people with the party too"): a talker whose day keeps them here is still in the
+conversation when the wait ends; one whose day takes them away has left it, which is the
+third exit, said in the same tell as their going ("... The conversation with them is
+over."). Rest stays refused mid-conversation, as before.
+
 ## What it shuts, and what it does not
 
 | | combat | conversation |

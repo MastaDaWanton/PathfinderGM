@@ -331,7 +331,10 @@ class Scene:
     # the party arrives, and when the clock crosses a slot (`Engine.settle_on_clock`,
     # 2026-10-09) — but never anybody standing with the party except a keeper whose
     # counter's hours move them: the ruling that the woman in the doorway "should stay
-    # there until i leave or something moves them".
+    # there until i leave or something moves them". A wait the player chose is what moves
+    # them (the owner, 2026-10-09: "if I wait then people should go about their day"):
+    # `Scene.wait` and a night's rest settle the people with the party too, keepers still
+    # by their counter's hours.
     # `settled` is the arrival `Engine.settle_people` last answered; `came_along` the
     # people moved WITH the party since, whom the plan moved and who stay moved until
     # the party leaves them.
@@ -1307,7 +1310,8 @@ class Scene:
     ROUNDS_PER_MINUTE = 10
 
     def advance(self, minutes: int = 0, rounds: int | None = None,
-                charge_body: bool = True, live: bool | None = None) -> dict:
+                charge_body: bool = True, live: bool | None = None,
+                waited: bool = False) -> dict:
         """Move the world clock, and expire what that much time expires.
 
         The one door. Six places moved `clock_minutes` and two of them expired anything:
@@ -1331,6 +1335,12 @@ class Scene:
         stretch of a day or more (`survival.LIVED_MINUTES`) is lived through, anything
         shorter is spent exactly as before. A chosen wait goes through `wait`, which also
         stops it where the pack runs out.
+
+        `waited`: the stretch is a wait the player CHOSE — `wait` (advance_time, a bench's
+        Wait for it) and a night's rest pass it. Then a slot crossed sends everybody with a
+        day about it, the people standing with the party included, where any other stretch
+        (a craft's hours, a walk, a minute's op at 5:59) keeps them (the doorway ruling;
+        `Engine.settle_on_clock`).
         """
         minutes = max(0, int(minutes))
         if live is None:
@@ -1505,14 +1515,16 @@ class Scene:
         # keeper to come to their counter or pack up and go, and for anybody with a day to
         # be where it puts them. Once per stretch, at its end: where the clock STOPS is
         # where everybody is, Exult's off-screen teleport to the current slot
-        # (`residency`). Nothing on a scene with no engine lent to it.
+        # (`residency`). Nothing on a scene with no engine lent to it. `waited` says the
+        # stretch is a wait the player chose, in which the people standing with the party
+        # go about their day too (the owner, 2026-10-09; `Engine.settle_on_clock`).
         from . import residency as _residency
 
         moved: list[str] = []
         if (self._engine is not None and minutes
                 and started // _residency.SLOT_MINUTES
                 != int(self.clock_minutes) // _residency.SLOT_MINUTES):
-            moved = self._engine.settle_on_clock()
+            moved = self._engine.settle_on_clock(waited=waited, since=started)
         return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body,
                 "ready": ready, "moved": moved}
 
@@ -1567,16 +1579,16 @@ class Scene:
         pc = self.pc()
         if (pc is None or minutes < survival.LIVED_MINUTES or self._dice is None
                 or pc.has_state("state.down.dead")):
-            passed = self.advance(minutes, rounds=rounds)
+            passed = self.advance(minutes, rounds=rounds, waited=True)
             return {**passed, "asked": minutes, "stopped": "", "unwaited": 0}
         # In a settlement with a well, water never ends the wait (`survival.lasts`); only
         # food can, since the town feeds nobody (the owner, 2026-10-09).
         covered, short = survival.lasts(pc, minutes, biome=self.biome,
                                         water=self._water_at_hand(minutes))
         if not short:
-            passed = self.advance(minutes, rounds=rounds, live=True)
+            passed = self.advance(minutes, rounds=rounds, live=True, waited=True)
             return {**passed, "asked": minutes, "stopped": "", "unwaited": 0}
-        passed = (self.advance(covered, live=True) if covered
+        passed = (self.advance(covered, live=True, waited=True) if covered
                   else {"minutes": 0, "rounds": 0, "ended": [], "body": [], "ready": []})
         # The stop rides on the player's own body record for the stretch, so the narrator
         # hears one toll — what the wait cost, then why it ended — and not two.
@@ -9775,17 +9787,24 @@ class Engine:
                     or getattr(actor, "world_entity_id", None)
                     or attitude_mod._regard_effect(actor) is not None)
 
-    def _keeper_goes(self, a, here_loc: str) -> bool:
+    def _keeper_goes(self, a, here_loc: str, waited: bool = False) -> bool:
         """Move a stall's keeper home when the counter shuts and back when it opens —
         to their own house once the party has called there (`_home_of`) — and a
         character the world wrote between their house and their day, once they have one.
+
+        `waited` (a wait the player chose, `settle_on_clock`): a conversation no longer
+        holds them — their leaving is the conversation's third exit, "the other party
+        leaves" (the ruling of 2026-09-24) — and one the plan brought to where the party
+        waits goes back to their day. Anybody travelling with the party never goes.
         """
         from . import keepers
         from . import places as places_mod
         from . import residency
 
         wid = str(getattr(a, "world_entity_id", "") or "")
-        if not wid or a.is_down or a.has_state(states.TALKING):
+        if not wid or a.is_down or a.has_state(states.TRAVELS_WITH_YOU):
+            return False
+        if a.has_state(states.TALKING) and not waited:
             return False
         callee = self._callee_of_body(a)
         house = self._house_of(callee)
@@ -9796,7 +9815,7 @@ class Engine:
             allowed = {place, residency.offstage(here_loc, f"home-{a.ref}")}
             if house is not None:
                 allowed.add(house["id"])
-            if a.at not in allowed:
+            if a.at not in allowed and not (waited and a.at == self.scene.at):
                 return False     # somewhere the plan took them; theirs to come back from
         elif house is None or places_mod.location_of(house["id"]) != here_loc:
             return False
@@ -9838,7 +9857,7 @@ class Engine:
         scene.came_along = []
         return moved
 
-    def settle_on_clock(self) -> list[str]:
+    def settle_on_clock(self, waited: bool = False, since: int | None = None) -> list[str]:
         """The clock crossed one of residency's three-hour slots: whoever keeps hours goes
         where the new hour puts them, with the party standing still. Called by the clock's
         one door (`Scene.advance`, through the engine it is lent) and nowhere else.
@@ -9863,6 +9882,36 @@ class Engine:
         `_keeper_goes` guards). Whoever came along with the party stays moved. Nobody in a
         fight is settled, and nothing at all happens while one is on.
 
+        **A wait the player chose is different** (`waited`; the owner, 2026-10-09: "if I
+        wait then people should go about their day. if its a shop owner and the store isnt
+        closed they shouldnt go home just because i waited in their shop"). `Scene.wait`
+        (advance_time, a bench's Wait for it) and a night's rest pass it, and then the
+        doorway ruling gives way: anybody standing with the party who keeps no counter goes
+        where their own day puts them now — told "<name> goes about their day" — and a
+        keeper keeps their counter's hours exactly as on any clock: open, they stay behind
+        it however long the party waits there; shut, they go. Nobody travelling with the
+        party ever goes (`TRAVELS_WITH_YOU`), nor anybody down, helpless or held. Anybody
+        whose day keeps them here stays, on their own square (people keep their square,
+        2026-09-28). The doorway ruling still holds for every other stretch of clock — a
+        craft's hours, a walk, a minute's op that happens to cross 6:00 — because nothing
+        in those says the party stood about long enough for the town to move on.
+
+        Somebody in conversation when the wait begins: the conversation ruling of
+        2026-09-24 is that a conversation ends only when the player takes their leave,
+        walks off, or **the other party leaves** — never by silence. A long wait is not
+        itself an exit (it would be an implicit one, Everweave's failure), so a talker whose
+        day keeps them here stays in the conversation; but one whose day takes them
+        elsewhere goes, and their going is that third exit, said in the same sentence. (A
+        night's `rest` is refused mid-conversation already, so this is advance_time and the
+        benches.)
+
+        Precedent: Stardew Valley's keeper holds the counter for its hours and leaves it at
+        closing whoever is in the shop — "The player can enter the building until 9pm, but
+        Pierre leaves the sales counter at 5pm every day" (stardewvalleywiki.com, "Pierre's
+        General Store"). Skyrim's wait is said to run the NPCs' AI packages, queued once
+        the wait ends (a modding summary; not confirmed against a primary source), which is
+        the shape of this pass: once per stretch, at its end.
+
         Who came into or went out of the party's place is told (`_comings_said`, law 3):
         the party watched it happen, which an arrival's settle never does.
         """
@@ -9870,18 +9919,23 @@ class Engine:
         if scene.in_encounter:
             # Owed, not dropped: a slot crossed inside a fight (a round's worth of clock an
             # op moved at 5:59) is settled at the end of the first batch after it ends
-            # (`_tick_schemes`), or the keeper would stay home until the NEXT slot.
+            # (`_tick_schemes`), or the keeper would stay home until the NEXT slot. Owed as
+            # an ordinary slot: nobody waits through a fight.
             scene._hours_due = True
             return []
         scene._hours_due = False
         kept = list(scene.came_along)
         before = {ref: a.at for ref, a in scene.people.items()}
         try:
-            moved = self._settle(set(kept), on_clock=True)
+            # On a wait whoever came along goes about their day like anybody else (the
+            # plan moved them here; it did not make them the party's).
+            moved = self._settle(set() if waited else set(kept), on_clock=True,
+                                 waited=waited)
         finally:
             # `Scene.move` files every non-player it moves under `came_along`; these moves
-            # are the clock's, and the plan's own list is put back as it was.
-            scene.came_along = kept
+            # are the clock's, and the plan's own list is put back as it was — less
+            # anybody the wait took off about their day.
+            scene.came_along = [r for r in kept if not (waited and r in moved)]
         for ref in moved:
             a = scene.people.get(ref)
             if a is None:
@@ -9890,12 +9944,97 @@ class Engine:
             if now == scene.at and was != scene.at:
                 scene._comings_said.append(self._coming_said(a, came=True))
             elif was == scene.at and now != scene.at:
-                scene._comings_said.append(self._coming_said(a, came=False))
+                # Their leaving ends any conversation with them (the third exit), said here
+                # so the talk panel and the tell agree at once, not a batch later.
+                talked = waited and a.has_state(states.TALKING)
+                if talked:
+                    a.remove_effects(source="talk")
+                scene._comings_said.append(self._coming_said(
+                    a, came=False, waited=waited, talked=talked))
+        if waited and since is not None:
+            self._back_again(set(moved), before, int(since))
         return moved
 
-    def _coming_said(self, a, came: bool) -> dict:
+    def comings_on_page(self) -> list[str]:
+        """Who the clock brought or took, as sentences for a bench that writes its own wait
+        into the transcript (the forge's, the alchemist's, the enchanter's, the tanner's Wait
+        for it), and off the queue so the next batch does not tell them again —
+        `survival.told_on_page`'s reason: a bench's fortnight told on the next act read as
+        though putting on armour took a fortnight. The bench lends this engine BEFORE it
+        waits, so the clock's door has the world to settle people against."""
+        return [o.tell for o in self._comings_settles()]
+
+    def _back_again(self, moved: set, before: dict, since: int) -> None:
+        """Somebody the wait found here and leaves here, whose day took them away and
+        brought them back inside it — the stallholder who went home at dusk and is at her
+        stall again at first light — told as such, because the clock is settled once, at
+        the stretch's end (Exult's teleport to the current slot), and the narrator would
+        otherwise be handed the same face in the same place and nothing else: the woman who
+        stood all night beside the party, the exact thing the owner's ruling of 2026-10-09
+        ("if I wait then people should go about their day") was against. Their going was
+        the conversation's third exit, so a conversation with them is over as well."""
+        from . import keepers
+        from . import places as places_mod
+
+        scene = self.scene
+        fighting = {ref for ref, _ in scene.initiative}
+        for ref, a in list(scene.actors.items()):
+            if (a.is_pc or ref in moved or ref in fighting or before.get(ref) != scene.at
+                    or a.is_down or a.is_helpless or a.has_state("state.held")
+                    or a.has_state(states.TRAVELS_WITH_YOU)):
+                continue
+            if not self._away_between(a, since, int(scene.clock_minutes)):
+                continue
+            talked = a.has_state(states.TALKING)
+            if talked:
+                a.remove_effects(source="talk")
+            here = places_mod.find(self.places(), scene.at)
+            where = str(getattr(here, "name", "") or "") or keepers.label_of(scene.at)
+            who = str(a.name or "Somebody")
+            who = who[:1].upper() + who[1:]
+            keeps = keepers.is_keeper(str(getattr(a, "world_entity_id", "") or ""))
+            said = (f"{who} shuts the counter, goes home, and comes back to {where} to "
+                    f"open it." if keeps
+                    else f"{who} goes about their day and is back at {where}.")
+            if talked:
+                said += " The conversation with them is over."
+            scene._comings_said.append({"ref": a.ref, "came": True, "back": True,
+                                        "at": scene.at, "said": said})
+
+    def _away_between(self, a, start: int, end: int) -> bool:
+        """Whether this person's day put them somewhere other than where they stand in any
+        slot the stretch from `start` to `end` crossed before its last — read from the one
+        reckoning their position is (`residency.whereabouts` for anybody with a record, a
+        keeper's counter hours for a keeper), never from a second store. A day at most: a
+        week's wait asks of the last eight slots only, which is where a day's round trip
+        shows."""
+        from . import keepers
+        from . import population
+        from . import residency
+
+        slot = residency.SLOT_MINUTES
+        last = int(end) // slot
+        first = max(int(start) // slot + 1, last - residency.SLOTS)
+        rec = population.of_ref(self.scene, a.ref)
+        wid = str(getattr(a, "world_entity_id", "") or "")
+        for n in range(first, last):
+            t = n * slot
+            if rec is not None:
+                where = residency.whereabouts(rec, t, self.world, self.scene.founded)
+                if residency.place_for(where, rec) != a.at:
+                    return True
+            elif keepers.is_keeper(wid):
+                shop = keepers.place_of(wid)
+                if (shop == a.at and not keepers.lives_in(shop)
+                        and not keepers.open_now(shop, t, self.scene.founded)):
+                    return True
+        return False
+
+    def _coming_said(self, a, came: bool, waited: bool = False, talked: bool = False) -> dict:
         """One person coming to or leaving the party's place on the clock, as a record and
-        its sentence: a keeper opens or shuts their counter, anybody else comes or goes."""
+        its sentence: a keeper opens or shuts their counter, anybody else comes or goes —
+        on a wait the player chose, "goes about their day" (the owner's own words,
+        2026-10-09), and `talked` adds that the conversation with them is over."""
         from . import keepers
         from . import places as places_mod
 
@@ -9910,7 +10049,10 @@ class Engine:
                     else f"{who} comes to {where}.")
         else:
             said = (f"{who} shuts the counter and leaves {where}." if keeps
+                    else f"{who} goes about their day and leaves {where}." if waited
                     else f"{who} leaves {where}.")
+            if talked:
+                said += " The conversation with them is over."
         return {"ref": a.ref, "came": came, "at": self.scene.at, "said": said}
 
     def _comings_settles(self) -> list:
@@ -9929,16 +10071,20 @@ class Engine:
                 == bool(r.get("came"))]
         if not held:
             return []
-        fx = [{"kind": "arrives" if r["came"] else "leaves", "ref": r["ref"],
+        fx = [{"kind": "back" if r.get("back") else "arrives" if r["came"] else "leaves",
+               "ref": r["ref"],
                "at": r["at"], "origin": "rule:hours"} for r in held]
         return [self._articled(Outcome(
             intent_id="", op="comings", effects=fx,
             tell=" ".join(str(r["said"]) for r in held), because=""))]
 
-    def _settle(self, came: set, on_clock: bool) -> list[str]:
+    def _settle(self, came: set, on_clock: bool, waited: bool = False) -> list[str]:
         """Everybody with a life where it puts them now; the pass both doors share. Returns
         the refs moved. `came` stays where it is; `on_clock` keeps everybody but keepers who
-        is in the party's place where they are (`settle_on_clock`)."""
+        is in the party's place where they are (`settle_on_clock`) — unless `waited`, a wait
+        the player chose, when the people with the party go about their day as well, a
+        conversation no longer holds them, and only the party's own company, the fighting,
+        the down, helpless and held stay put (the owner, 2026-10-09)."""
         from . import keepers
         from . import places as places_mod
         from . import population
@@ -9953,17 +10099,19 @@ class Engine:
             rec = by_ref.get(ref)
             if a.is_pc or ref in came or ref in fighting:
                 continue
-            if on_clock and a.at == scene.at and not keepers.is_keeper(
+            if on_clock and not waited and a.at == scene.at and not keepers.is_keeper(
                     str(getattr(a, "world_entity_id", "") or "")):
                 continue
             if rec is None:
                 # A keeper keeps their counter's hours (rules/keepers.py): a stall in the
                 # open is packed up and its keeper goes home; a keeper under a roof lives
                 # on the premises and stays to be talked to, with the counter shut.
-                if self._keeper_goes(a, here_loc):
+                if self._keeper_goes(a, here_loc, waited=waited):
                     moved.append(ref)
                 continue
-            if (a.at == scene.at
+            # Seen here since the party arrived: the arrival's settle leaves them (they are
+            # the company the party walked in on). A wait does not: that is the point of it.
+            if (not waited and a.at == scene.at
                     and int(rec.get("last_seen") or 0) >= int(scene.arrived or 0)):
                 continue
             # A resident of another town lives their day where nobody is looking, and is
@@ -9983,7 +10131,7 @@ class Engine:
             # somebody who would otherwise move.
             if (a.is_down or a.is_helpless or a.has_state("state.held")
                     or a.has_state(states.TRAVELS_WITH_YOU)
-                    or a.has_state(states.TALKING)):
+                    or (a.has_state(states.TALKING) and not waited)):
                 continue
             # Living their day, they ate, drank and slept. The clock's one door charges
             # every body it holds (`Scene.advance`), and a baker the party left for a
@@ -21364,7 +21512,8 @@ class Engine:
         # How long the night runs (to the dawn) is `_camp_for`'s, worked out before the
         # rest so the night's check could be rolled over the same hours.
         minutes, hours = (camp["minutes"], camp["hours"]) if result["hours"] else (0, 0)
-        ended = self.scene.advance(minutes, charge_body=False)["ended"]
+        # A night slept is a wait the player chose: the people with them go about their day.
+        ended = self.scene.advance(minutes, charge_body=False, waited=True)["ended"]
 
         bits = [f"{actor.name} rests for {hours} hours."]
         # What the ground did to them, after the healing: the cold (a Fortitude save an
@@ -21492,7 +21641,7 @@ class Engine:
         door and the fight opens, as a road meeting's does."""
         slept = min(camp["hours"], int(met.after) * ontheway.WATCH_HOURS)
         survival.sleep(actor, slept)
-        self.scene.advance(slept * 60, charge_body=False)
+        self.scene.advance(slept * 60, charge_body=False, waited=True)
         fx, rolls, said = self._camp_morning(actor, camp, slept, stiff=False)
         made = self._meet_on_the_way(met, zone="near")
         if made:
