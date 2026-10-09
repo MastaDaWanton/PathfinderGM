@@ -128,16 +128,106 @@ def is_spoiled(prep: Prep, hours_old: int, preserved: bool = False) -> bool:
     return not preserved and int(hours_old or 0) >= spoils_after(prep)
 
 
-# What preserving takes. Salt by any of the names a shelf might use for it, because the
-# player buys "a bag of salt" and the goods table has never heard of an id.
-SALT = ("salt", "rock salt", "sea salt", "curing salt", "saltpetre", "saltpeter")
+# What preserving takes: curing salt, read by MATERIAL ID AND DOCUMENT through the one door
+# (`materials.is_salt`: `curing-salt`, or a document saying `"salt": true`), never by a
+# word in a name. Until 2026-10-08 this matched name fragments ("salt", "rock salt",
+# "saltpetre") over everything carried — the shape law 1 refuses (leatherworking plan §6),
+# and the alchemist's "salt" kind (vitriol, brimstone) is no curing salt at all. And it
+# cost nothing: lanes U5-U7 found a hide carried with a minute was marked salted for free
+# whenever any salt was in the pack, against the owner's "salt costs salt" (answer 8,
+# 2026-10-08). One reader now, for herbalism's animal parts and the leatherworker's hides
+# alike: `salt_measures` counts, `spend_salt` spends, `preserve_on_pick` decides.
+
+
+def _is_salt_id(key: str) -> bool:
+    try:
+        from . import materials
+
+        return bool(materials.is_salt(str(key)))
+    except Exception:          # noqa: BLE001 - no door (a bare test double) is no salt
+        return str(key).strip().lower() == "curing-salt"
+
+
+def salt_ids(actor) -> list[str]:
+    """The satchel keys that hold curing salt, by id (a counter's purchase lands in
+    `inventory` under its material id, `goods.deliver`)."""
+    return [k for k, n in sorted((getattr(actor, "inventory", {}) or {}).items())
+            if int(n or 0) > 0 and _is_salt_id(k)]
+
+
+def salt_measures(actor) -> int:
+    """How many measures of curing salt this character carries."""
+    inv = getattr(actor, "inventory", {}) or {}
+    return sum(int(inv.get(k, 0) or 0) for k in salt_ids(actor))
+
+
+def spend_salt(actor, n: int) -> int:
+    """Spend up to `n` measures, curing salt first by id order. Returns how many were spent."""
+    left, spent = max(0, int(n)), 0
+    for key in salt_ids(actor):
+        if left <= 0:
+            break
+        took = actor.spend(key, left) if hasattr(actor, "spend") else 0
+        spent += int(took or 0)
+        left -= int(took or 0)
+    return spent
 
 
 def has_salt(actor) -> bool:
-    """Whether this character is carrying something they could cure with."""
-    carried = list(getattr(actor, "goods", {}) or {}) + \
-        list(getattr(actor, "inventory", {}) or {})
-    return any(any(s in str(name).lower() for s in SALT) for name in carried)
+    """Whether this character is carrying curing salt (herbalism's callers, unchanged)."""
+    return salt_measures(actor) > 0
+
+
+def salt_needed(key: str, count: int = 1) -> int:
+    """Measures it costs to salt `count` of this as it is picked: a leatherworker's hide one
+    per hide unit (the Salt method's `salt_per_unit`), a herbalist's animal part
+    `animal_part_salt` each (content/rules/harvest.json), anything else — a plant — nothing:
+    the owner's answer named hides and animal parts, and a pressed leaf in a salted pack
+    stays the free preservation it always was."""
+    import math
+
+    key = str(key or "").strip().lower()
+    try:
+        from . import materials
+
+        doc = materials.get(key)
+    except Exception:          # noqa: BLE001
+        doc = None
+    if doc and str(doc.get("kind") or "") == "hide":
+        from . import leatherworker as lw
+
+        per = float((lw.method_row("salt") or {}).get("salt_per_unit", 1) or 1)
+        units = lw.units_of_size(lw.hide_size(key))
+        return int(math.ceil(units * per)) * max(0, int(count))
+    try:
+        from . import ingredients
+
+        ing = ingredients.all_ingredients().get(key)
+    except Exception:          # noqa: BLE001
+        ing = None
+    if ing is not None and Prep.of(ing).animal:
+        try:
+            from . import harvest
+
+            each = int(harvest.rules().get("animal_part_salt", 1))
+        except Exception:      # noqa: BLE001
+            each = 1
+        return each * max(0, int(count))
+    return 0
+
+
+def preserve_on_pick(actor, key: str, count: int = 1) -> bool:
+    """Whether what was just picked is salted, spending what that costs (`salt_needed`).
+    Not enough salt for all of it salts none of it and spends nothing: the satchel keeps one
+    flag per pile, so a half-salted pile cannot be said."""
+    if not has_salt(actor):
+        return False
+    need = salt_needed(key, count)
+    if need <= 0:
+        return True
+    if salt_measures(actor) < need:
+        return False
+    return spend_salt(actor, need) >= need
 
 
 def preserve_automatically(actor, prep: Prep) -> tuple[bool, float, str]:
@@ -145,8 +235,9 @@ def preserve_automatically(actor, prep: Prep) -> tuple[bool, float, str]:
 
     "preservation can be automatic if i have salt" — so it is not an action the player
     has to remember on the turn they pick a gland up, which is the turn they are least
-    likely to be thinking about the forty-eight hours that start now. Carrying salt is
-    the whole condition; the potency it costs is the price, and it is charged once.
+    likely to be thinking about the forty-eight hours that start now. Carrying curing salt
+    is the condition; the potency it costs is the price, and it is charged once. (The salt
+    itself is spent where the thing is picked, `preserve_on_pick`.)
     """
     if not has_salt(actor):
         return False, 0.0, ("no salt: this keeps for "

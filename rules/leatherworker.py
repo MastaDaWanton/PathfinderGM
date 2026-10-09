@@ -2409,20 +2409,13 @@ def _by_creature(creature_name: str, keep) -> list[Material]:
 
 # --- acquisition ----------------------------------------------------------------------------
 #
-# The play page's craft-action hub, the track's half of it. `skin` is lane C's to remove
-# (the harvest replaces it, plan §5.1); left as it was until then, so the hub does not lose
-# its only carcass door before the new one exists.
+# The play page's craft-action hub, the track's half of it. The `skin` excursion left it
+# (lane C, plan §5.1): a carcass is harvested once, across every craft, by
+# `rules/harvest.py` and its sheet (play/harvest_views.py). Its reader matched the
+# creature's name and its yield ignored the creature (a wolf offered feathered, scaled and
+# chitin hides, lanes U5-U7), and it could be run again on the same body.
 
 ACQUISITION: dict[str, dict] = {
-    "skin": {
-        "id": "skin", "label": "Skin the carcass", "obtain": "harvested",
-        "requires": "creature",
-        "requires_note": "A fallen creature in the scene. What it yields is read off "
-                         "its name, so the beast decides the hide.",
-        "method": "skin",
-        "blurb": "Take the hide, and the sinew and tallow with it. The spoilage "
-                 "clock starts now — 48 hours to cure or tan.",
-    },
     "gather": {
         "id": "gather", "label": "Strip bark and gather", "obtain": "gathered",
         "requires": "biome",

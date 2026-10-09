@@ -90,5 +90,41 @@
     "dice_per_unit": "1d6",
     "type": "untyped",
     "lethality": "nonlethal"
+  },
+  "contact-acid": {
+    "name": "the acid in a carcass",
+    "source": "CRB, Acid Effects — 1d6 per round of exposure; a dead acid body touched once while skinning it (docs/deeds-plan.md §13.4: the extension to a carcass is this app's, not the book's)",
+    "slot": {"name": "rounds", "min": 1, "max": 1, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "acid"
+  },
+  "contact-fire": {
+    "name": "a carcass hot to the touch",
+    "source": "Burn (Ex) and Heat (Ex), Bestiary universal monster rules — the creature's own printed dice, else 1d6; one touch while skinning (the extension to a carcass is this app's, docs/deeds-plan.md §13.4)",
+    "slot": {"name": "rounds", "min": 1, "max": 1, "per": 1},
+    "dice_per_unit": "1d6",
+    "dice_from_creature": true,
+    "type": "fire"
+  },
+  "contact-cold": {
+    "name": "a carcass that freezes the hand",
+    "source": "The book's small energy die, 1d6, for one touch of a cold body while skinning it (docs/deeds-plan.md §13.4; house extension)",
+    "slot": {"name": "rounds", "min": 1, "max": 1, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "cold"
+  },
+  "contact-electricity": {
+    "name": "a carcass that still holds a charge",
+    "source": "The book's small energy die, 1d6, for one touch of a charged body while skinning it (docs/deeds-plan.md §13.4; house extension)",
+    "slot": {"name": "rounds", "min": 1, "max": 1, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "electricity"
+  },
+  "contact-sonic": {
+    "name": "a carcass whose throat still rings",
+    "source": "The book's small energy die, 1d6, for one touch of a sonic breather's throat while skinning it (docs/deeds-plan.md §13.4; house extension)",
+    "slot": {"name": "rounds", "min": 1, "max": 1, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "sonic"
   }
 }

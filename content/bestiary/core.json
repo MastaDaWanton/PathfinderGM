@@ -279,7 +279,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "adaro",
@@ -687,7 +691,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "ahuizotl",
@@ -757,7 +766,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "akaname",
@@ -965,7 +979,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.cold"
+   ]
   },
   {
    "id": "allip",
@@ -1100,7 +1120,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "alp",
@@ -1400,7 +1425,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "amphiptere",
@@ -1467,7 +1497,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "android",
@@ -1891,7 +1927,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.ankheg-shell-leather",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.ankheg-acid-sac",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "annis-hag",
@@ -2031,7 +2074,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "ant-lion-giant-adult",
@@ -2101,7 +2149,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "ant-giant",
@@ -2261,7 +2314,13 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "ant-megapon",
@@ -2349,7 +2408,13 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "anunnaki",
@@ -2586,7 +2651,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence"
+   ]
   },
   {
    "id": "apocalypse-horse",
@@ -2665,7 +2733,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "archon-gate",
@@ -2736,7 +2807,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.celestial-tears",
+    "harvest.essence.holy-essence",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "archon-harbinger",
@@ -2811,7 +2888,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.celestial-tears",
+    "harvest.essence.holy-essence",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "archon-hound",
@@ -2891,7 +2974,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.celestial-tears",
+    "harvest.essence.holy-essence"
+   ]
   },
   {
    "id": "archon-lantern",
@@ -2971,7 +3059,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.celestial-tears",
+    "harvest.essence.holy-essence"
+   ]
   },
   {
    "id": "archon-legion",
@@ -3049,7 +3142,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.celestial-tears",
+    "harvest.essence.holy-essence",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "archon-trumpet",
@@ -3119,7 +3218,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.celestial-tears",
+    "harvest.essence.holy-essence"
+   ]
   },
   {
    "id": "ascomoid",
@@ -3261,7 +3365,13 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "assassin-bug-great",
@@ -3336,7 +3446,13 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "assassin-vine",
@@ -3630,7 +3746,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "axe-beak",
@@ -3703,7 +3825,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged"
+   ]
   },
   {
    "id": "azruverda",
@@ -3932,7 +4059,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "bandersnatch",
@@ -4000,7 +4132,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "banelight",
@@ -4162,7 +4299,11 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "barghest",
@@ -4249,7 +4390,11 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "barghest-greater",
@@ -4336,7 +4481,11 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "basidirond",
@@ -4467,7 +4616,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.basilisk-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.basilisk-eye"
+   ]
   },
   {
    "id": "bat",
@@ -4529,7 +4684,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.bat-wing-leather",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "bat-swarm",
@@ -4677,7 +4837,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.bat-wing-leather",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "baykok",
@@ -4814,7 +4979,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.polar-bear-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.bear-hairs"
+   ]
   },
   {
    "id": "bear-grizzly",
@@ -4879,7 +5050,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.grizzly-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.bear-hairs"
+   ]
   },
   {
    "id": "bear-polar",
@@ -4944,7 +5121,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.polar-bear-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.bear-hairs"
+   ]
   },
   {
    "id": "bebilith",
@@ -5009,7 +5192,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "beetle-fire",
@@ -5081,7 +5268,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.fire-beetle-gland"
+   ]
   },
   {
    "id": "beetle-giant-stag",
@@ -5153,7 +5346,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "behemoth-tempest",
@@ -5246,7 +5444,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.behemoth-hide"
+   ]
   },
   {
    "id": "behemoth-thalassic",
@@ -5327,7 +5531,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.behemoth-hide"
+   ]
   },
   {
    "id": "behemoth-thunder",
@@ -5420,7 +5630,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.behemoth-hide"
+   ]
   },
   {
    "id": "behir",
@@ -5484,7 +5700,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.behir-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "berbalang",
@@ -5639,7 +5860,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "bhuta",
@@ -6599,7 +6825,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dire-boar-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.dire-boar-tusk"
+   ]
   },
   {
    "id": "bogeyman",
@@ -7111,7 +7343,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "brain-mole-monarch",
@@ -7174,7 +7411,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "brain-ooze",
@@ -7355,7 +7597,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.bulette-plate",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "caller-in-darkness",
@@ -7568,7 +7815,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "capramace",
@@ -7699,7 +7951,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "carnivorous-crystal",
@@ -7914,7 +8171,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.cat-pelt",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.cat-fur"
+   ]
   },
   {
    "id": "caterpillar-blood",
@@ -7978,7 +8241,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "caterpillar-horn",
@@ -8042,7 +8311,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "catfolk",
@@ -8258,7 +8533,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "cecaelia",
@@ -8525,7 +8805,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "centipede-giant",
@@ -8590,7 +8876,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "cephalophore",
@@ -8788,7 +9080,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "cerebric-fungus",
@@ -8933,7 +9229,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "cetus",
@@ -9007,7 +9308,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "charnel-god",
@@ -9163,7 +9470,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "chimera",
@@ -9224,7 +9537,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.chimera-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.chimera-horn"
+   ]
   },
   {
    "id": "choker",
@@ -9360,7 +9679,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "chuul",
@@ -9498,7 +9822,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "cloaker",
@@ -10482,7 +10811,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.cockatrice-wattle",
+    "harvest.part.cockatrice-beak"
+   ]
   },
   {
    "id": "cold-rider",
@@ -11185,7 +11521,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "corpse-lotus",
@@ -11391,7 +11732,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "crab-giant",
@@ -11449,7 +11795,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "crab-shark-eating",
@@ -11511,7 +11862,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "crab-shipwrecker",
@@ -11573,7 +11929,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "crocodile-dire",
@@ -11637,7 +11998,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.crocodile-hide",
+    "harvest.sinew",
+    "harvest.plan.long"
+   ]
   },
   {
    "id": "crone-queen",
@@ -12320,7 +12686,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "daitengu",
@@ -12691,7 +13063,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "death-coach",
@@ -12822,7 +13199,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "deathsnatcher",
@@ -13377,7 +13759,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "demilich",
@@ -13543,7 +13931,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "demodand-shaggy",
@@ -13621,7 +14013,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "demodand-slimy",
@@ -13699,7 +14095,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "demodand-stringy",
@@ -13777,7 +14178,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "demodand-tarry",
@@ -13855,7 +14260,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "demon-shadow",
@@ -14271,7 +14680,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "devil-contract",
@@ -14354,7 +14768,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.fiend-ash",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "devilfish",
@@ -14417,7 +14836,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "devourer",
@@ -14618,7 +15043,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "dire-corby",
@@ -14760,7 +15190,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "dog",
@@ -14829,7 +15264,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dog-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "dog-riding",
@@ -14898,7 +15338,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dog-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "dolphin",
@@ -14962,7 +15407,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "domovoi",
@@ -15259,7 +15709,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dragon-turtle-shell",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "dragon-faerie",
@@ -15328,7 +15784,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "dragonkin",
@@ -15392,7 +15854,14 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "dragonne",
@@ -15458,7 +15927,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dragonne-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "drake-desert",
@@ -15524,7 +15998,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.electricity"
+   ]
   },
   {
    "id": "drake-ether",
@@ -15598,7 +16079,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "drake-jungle",
@@ -15664,7 +16151,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "drake-rift",
@@ -15731,7 +16225,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "drake-river",
@@ -15803,7 +16304,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "drider",
@@ -16516,7 +17023,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.eagle-feathers"
+   ]
   },
   {
    "id": "eagle-giant",
@@ -16579,7 +17092,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.eagle-feathers"
+   ]
   },
   {
    "id": "echeneis",
@@ -16650,7 +17169,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "ecorche",
@@ -16803,7 +17327,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.electric-eel-skin",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "eel-giant-moray",
@@ -16879,7 +17408,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "egregore",
@@ -17126,7 +17660,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "elemental-aether",
@@ -17294,7 +17834,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.reagent.bottled-thunderhead"
+   ]
   },
   {
    "id": "elemental-earth",
@@ -17459,7 +18002,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.reagent.fire-elemental-ember",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "elemental-water",
@@ -17603,7 +18150,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "emotion-ooze",
@@ -18092,7 +18644,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "eurypterid-spiny",
@@ -18155,7 +18713,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "exiled-shade",
@@ -18927,7 +19491,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "flail-snail",
@@ -18992,7 +19562,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "flumph",
@@ -19198,7 +19773,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.toad-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "frog-giant",
@@ -19263,7 +19843,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.toad-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.giant-frog-mucus"
+   ]
   },
   {
    "id": "frog-goliath",
@@ -19325,7 +19911,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.toad-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "frog-poison",
@@ -19390,7 +19981,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.toad-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "froghemoth",
@@ -21534,7 +22130,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.shadow-girallon-pelt",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "girtablilu",
@@ -22004,7 +22605,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dog-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "goblin-snake",
@@ -22230,7 +22836,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "golem-bone",
@@ -23513,7 +24124,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.gorgon-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "gorynych",
@@ -23597,7 +24213,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "gowrow",
@@ -23668,7 +24291,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.sonic"
+   ]
   },
   {
    "id": "gravebound",
@@ -24193,7 +24823,11 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.reagent.gray-ooze-core",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "green-hag",
@@ -24488,7 +25122,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.griffon-hide",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.part.griffon-talon"
+   ]
   },
   {
    "id": "grim-reaper",
@@ -24791,7 +25431,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "grootslang",
@@ -24870,7 +25515,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "guardian-scroll",
@@ -25305,7 +25955,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged"
+   ]
   },
   {
    "id": "heikegani",
@@ -25441,7 +26096,15 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.hell-hound-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.essence.axiomatic-essence",
+    "harvest.essence.unholy-essence",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "hellwasp-swarm",
@@ -25643,7 +26306,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "hollow-serpent",
@@ -25782,7 +26450,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "horla",
@@ -25909,7 +26583,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.horse-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "huecuva",
@@ -26364,7 +27043,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.hydra-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.hydra-gall"
+   ]
   },
   {
    "id": "hyena-dire",
@@ -26436,7 +27121,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "ichthyocentaur",
@@ -26864,7 +27554,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "jackalwere",
@@ -26943,7 +27638,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "jellyfish-crimson",
@@ -27027,7 +27727,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "jellyfish-death-s-head",
@@ -27105,7 +27811,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "jellyfish-sapphire",
@@ -27183,7 +27895,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "jellyfish-whaler",
@@ -27267,7 +27985,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "jorogumo",
@@ -27403,7 +28127,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "kamadan",
@@ -27465,7 +28195,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "kamaitachi",
@@ -27676,7 +28411,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "kawa-akago",
@@ -27876,7 +28617,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "khala",
@@ -27968,7 +28714,14 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.cold"
+   ]
   },
   {
    "id": "kikimora",
@@ -28200,7 +28953,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "kobold",
@@ -28340,7 +29099,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.sonic"
+   ]
   },
   {
    "id": "kraken",
@@ -28410,7 +29176,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.kraken-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.kraken-ink"
+   ]
   },
   {
    "id": "krampus",
@@ -28649,7 +29421,10 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "lamhigyn",
@@ -28716,7 +29491,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "lamia",
@@ -28842,7 +29622,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "leech-swarm",
@@ -28922,7 +29707,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "leech-giant",
@@ -29002,7 +29792,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "leechroot",
@@ -29641,7 +30436,10 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.lich-dust"
+   ]
   },
   {
    "id": "liminal-sprite",
@@ -29802,7 +30600,15 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.reagent.linnorm-venom",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "linnorm-crag",
@@ -29884,7 +30690,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.reagent.linnorm-venom"
+   ]
   },
   {
    "id": "linnorm-fjord",
@@ -29967,7 +30780,11 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.reagent.linnorm-venom",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "linnorm-ice",
@@ -30050,7 +30867,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.reagent.linnorm-venom"
+   ]
   },
   {
    "id": "linnorm-taiga",
@@ -30131,7 +30955,15 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.reagent.linnorm-venom",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "linnorm-tarn",
@@ -30204,7 +31036,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.reagent.linnorm-venom"
+   ]
   },
   {
    "id": "linnorm-tor",
@@ -30281,7 +31120,15 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.reagent.linnorm-venom",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "lion",
@@ -30340,7 +31187,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.cat-fur"
+   ]
   },
   {
    "id": "living-mirage",
@@ -30482,7 +31335,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.monitor-lizard-hide",
+    "harvest.sinew",
+    "harvest.plan.long"
+   ]
   },
   {
    "id": "lizard-giant-frilled",
@@ -30545,7 +31403,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.frilled-lizard-hide",
+    "harvest.sinew",
+    "harvest.plan.long"
+   ]
   },
   {
    "id": "lizard-monitor",
@@ -30608,7 +31471,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.monitor-lizard-hide",
+    "harvest.sinew",
+    "harvest.plan.long"
+   ]
   },
   {
    "id": "lizardfolk",
@@ -30960,7 +31828,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "lusca",
@@ -31025,7 +31898,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "maftet",
@@ -31523,7 +32402,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.manticore-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.part.manticore-spine"
+   ]
   },
   {
    "id": "mantis-giant",
@@ -31585,7 +32470,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "mapinguari",
@@ -31651,7 +32541,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "medusa",
@@ -32470,7 +33365,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "mobogo",
@@ -32539,7 +33439,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "mockingfey",
@@ -32729,7 +33634,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "moldwretch",
@@ -32935,7 +33845,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "moon-dog",
@@ -33000,7 +33915,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.holy-essence"
+   ]
   },
   {
    "id": "moon-beast",
@@ -33298,7 +34216,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "mosquito-giant",
@@ -33362,7 +34285,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "mosslord",
@@ -33677,7 +34605,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "muckdweller-giant",
@@ -33748,7 +34681,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "muhuru",
@@ -33818,7 +34756,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "mummy",
@@ -35140,7 +36083,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "nemhain",
@@ -35519,7 +36467,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "nightmare-cauchemar",
@@ -35585,7 +36536,14 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.nightmare-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.essence.unholy-essence",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "ningen",
@@ -35951,7 +36909,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "nulmind",
@@ -36226,7 +37190,11 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.reagent.gray-ooze-core",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "octopus-giant",
@@ -36288,7 +37256,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "ogre",
@@ -36564,7 +37538,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "orang-pendak",
@@ -36755,7 +37734,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "otyugh",
@@ -36887,7 +37872,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "ovinnik",
@@ -37049,7 +38040,13 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.owl-feathers"
+   ]
   },
   {
    "id": "owl-giant",
@@ -37116,7 +38113,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.owl-feathers"
+   ]
   },
   {
    "id": "owl-great-horned",
@@ -37183,7 +38186,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.owl-feathers"
+   ]
   },
   {
    "id": "owlbear",
@@ -37244,7 +38253,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.owlbear-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "pale-stranger",
@@ -37451,7 +38465,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "penanggalen",
@@ -37695,7 +38714,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "phantom-fungus",
@@ -37973,7 +38997,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "phoenix",
@@ -38051,7 +39082,17 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.phoenix-feather-hide",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.phoenix-ash",
+    "harvest.essence.phoenix-ember",
+    "harvest.essence.phoenix-quill-ink",
+    "harvest.part.phoenix-feather",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "pixie",
@@ -38211,7 +39252,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "plankta",
@@ -38579,7 +39625,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "porcupine-giant",
@@ -38645,7 +39697,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "pseudodragon",
@@ -38709,7 +39767,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "psoglav",
@@ -39133,7 +40198,14 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.purple-worm-plate",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.purple-worm-venom",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "putrid-ooze",
@@ -39291,7 +40363,14 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "quickling",
@@ -39578,7 +40657,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "rast",
@@ -39717,7 +40801,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "rat-swarm",
@@ -39841,7 +40930,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "ratfolk",
@@ -39991,7 +41085,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged"
+   ]
   },
   {
    "id": "raven-swarm",
@@ -40161,7 +41260,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged"
+   ]
   },
   {
    "id": "ravener",
@@ -40382,7 +41486,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.remorhaz-hide",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.remorhaz-thermal-gland",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "reptoid",
@@ -40573,7 +41684,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "rhinoceros-woolly",
@@ -40632,7 +41748,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "rhu-chalik",
@@ -40839,7 +41960,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged",
+    "harvest.reagent.eagle-feathers"
+   ]
   },
   {
    "id": "roiling-oil",
@@ -40982,7 +42109,13 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood"
+   ]
   },
   {
    "id": "roper",
@@ -41533,7 +42666,14 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.salamander-hide",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.reagent.salamander-ash",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "samsaran",
@@ -42169,7 +43309,14 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "scorpion-deadfall",
@@ -42229,7 +43376,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "scorpion-ghost",
@@ -42289,7 +43442,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.ectoplasm-residuum",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "scorpion-giant",
@@ -42357,7 +43517,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "scorpion-giant-emperor",
@@ -42418,7 +43584,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "scorpion-greensting",
@@ -42479,7 +43651,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "sea-anemone-giant",
@@ -42550,7 +43728,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "sea-bonze",
@@ -42747,7 +43930,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "sea-serpent-deep",
@@ -42810,7 +43998,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "seilenos",
@@ -42943,7 +44136,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "shabti",
@@ -43173,7 +44371,14 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.shadow-mastiff-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.umbral-distillate",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "shadow-greater",
@@ -43445,7 +44650,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.sharkskin",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "shasalqu",
@@ -43518,7 +44728,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.cold"
+   ]
   },
   {
    "id": "shedu",
@@ -43604,7 +44820,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "shen",
@@ -43674,7 +44895,14 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.cold"
+   ]
   },
   {
    "id": "shinigami",
@@ -43766,7 +44994,10 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.axiomatic-essence"
+   ]
   },
   {
    "id": "shocker-lizard",
@@ -43839,7 +45070,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.long",
+    "harvest.reagent.shocker-lizard-node"
+   ]
   },
   {
    "id": "shoggoth",
@@ -43992,7 +45229,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "siabrae",
@@ -44162,7 +45404,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "siyokoy",
@@ -44609,7 +45857,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.electricity"
+   ]
   },
   {
    "id": "skulk",
@@ -44738,7 +45992,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.skunk-musk-gland"
+   ]
   },
   {
    "id": "skunk-giant",
@@ -44803,7 +46063,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.skunk-musk-gland"
+   ]
   },
   {
    "id": "sleipnir",
@@ -44869,7 +46135,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "slime-mold",
@@ -45131,7 +46402,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "slurk",
@@ -45193,7 +46470,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "snake-swarm",
@@ -45395,7 +46677,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.viper-skin",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "snake-venomous",
@@ -45459,7 +46746,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.viper-skin",
+    "harvest.sinew",
+    "harvest.plan.serpent"
+   ]
   },
   {
    "id": "solifugid-albino-cave",
@@ -45528,7 +46820,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "solifugid-giant",
@@ -45597,7 +46894,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "somalcygot",
@@ -45742,7 +47044,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "soulbound-doll",
@@ -45820,7 +47125,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spectre",
@@ -45956,7 +47267,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spider-swarm",
@@ -46026,7 +47344,14 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spider-giant",
@@ -46096,7 +47421,14 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spider-giant-black-widow",
@@ -46167,7 +47499,14 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spider-giant-crab",
@@ -46231,7 +47570,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.shell",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spider-ogre",
@@ -46295,7 +47641,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "spriggan",
@@ -46490,7 +47843,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "starfish-giant",
@@ -46555,7 +47913,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace"
+   ]
   },
   {
    "id": "stirge",
@@ -46618,7 +47981,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "storm-hag",
@@ -46917,7 +48285,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "su",
@@ -46982,7 +48355,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "suli",
@@ -47440,7 +48818,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "tanuki",
@@ -47828,7 +49212,14 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.tarrasque-plate",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.tarrasque-humour",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "tatzlwyrm",
@@ -48278,7 +49669,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "termite-giant",
@@ -48344,7 +49741,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "terra-cotta-soldier",
@@ -48704,7 +50107,13 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.fire"
+   ]
   },
   {
    "id": "thriae-constructor",
@@ -49243,7 +50652,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.sabre-tooth-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "tiyanak",
@@ -49373,7 +50787,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "toad",
@@ -49453,7 +50872,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.toad-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "tojanida",
@@ -50137,7 +51561,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "troop-cultist",
@@ -50938,7 +52367,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.unicorn-hide",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.unicorn-horn-shaving",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "unrisen",
@@ -51083,7 +52519,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "urannag",
@@ -51298,7 +52740,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "vahana",
@@ -51383,7 +52830,12 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "valkyrie",
@@ -51706,7 +53158,11 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "ved",
@@ -52068,7 +53524,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "vescavor-swarm",
@@ -52140,7 +53601,11 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.anarchic-essence",
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "vespergaunt",
@@ -52431,7 +53896,13 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.viper-skin",
+    "harvest.sinew",
+    "harvest.plan.serpent",
+    "harvest.reagent.adder-venom-gland"
+   ]
   },
   {
    "id": "vishap",
@@ -52524,7 +53995,15 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.scale",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.danger.poison",
+    "harvest.danger.acid"
+   ]
   },
   {
    "id": "vishkanya",
@@ -52719,7 +54198,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "vrykolakas",
@@ -52936,7 +54420,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged"
+   ]
   },
   {
    "id": "vulture-giant",
@@ -52996,7 +54485,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.feather",
+    "harvest.sinew",
+    "harvest.plan.winged"
+   ]
   },
   {
    "id": "wakandagi",
@@ -53201,7 +54695,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "wasp-giant",
@@ -53263,7 +54763,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "water-leaper",
@@ -53323,7 +54829,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "weasel",
@@ -53403,7 +54914,12 @@
    ],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.weasel-pelt",
+    "harvest.sinew",
+    "harvest.plan.long"
+   ]
   },
   {
    "id": "whale-blue",
@@ -53468,7 +54984,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.smooth",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "whip-spider-titanic",
@@ -53538,7 +55059,14 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.chitin",
+    "harvest.sinew",
+    "harvest.plan.carapace",
+    "harvest.reagent.cellar-spider",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "whisperer",
@@ -54251,7 +55779,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "wizard-s-shackle",
@@ -54372,7 +55905,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.wolf-pelt",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "wolf-in-sheep-s-clothing",
@@ -54512,7 +56050,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "wolverine-dire",
@@ -54576,7 +56119,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.dire-wolverine-hide",
+    "harvest.sinew",
+    "harvest.plan.long"
+   ]
   },
   {
    "id": "worg-winter-wolf",
@@ -54641,7 +56189,13 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.winter-wolf-pelt",
+    "harvest.sinew",
+    "harvest.plan.quadruped",
+    "harvest.reagent.winter-wolf-humour"
+   ]
   },
   {
    "id": "wraith",
@@ -54929,7 +56483,16 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.wyvern-hide",
+    "harvest.plan.quadruped",
+    "harvest.blood.dragon-blood",
+    "harvest.blood.wyvern-blood",
+    "harvest.sinew.wyvern-sinew",
+    "harvest.reagent.wyvern-venom-gland",
+    "harvest.danger.poison"
+   ]
   },
   {
    "id": "xiao",
@@ -55002,7 +56565,12 @@
    ],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "xill",
@@ -55074,7 +56642,10 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "xorn",
@@ -55439,7 +57010,10 @@
    "climates": [],
    "biomes_any": true,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.essence.unholy-essence"
+   ]
   },
   {
    "id": "yeti",
@@ -55973,7 +57547,12 @@
    "climates": [],
    "biomes_any": false,
    "biomes_inferred": false,
-   "biomes_from": "environment"
+   "biomes_from": "environment",
+   "tags": [
+    "harvest.hide.generic.fur",
+    "harvest.sinew",
+    "harvest.plan.quadruped"
+   ]
   },
   {
    "id": "zuvembie",

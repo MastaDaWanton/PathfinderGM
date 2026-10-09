@@ -17,7 +17,8 @@
      "treasure": "none", "playable": true,
      "source": "Bestiary, Horse (heavy horse variant)", "notes": "CR 2 animal",
      "biomes": ["grassland"], "climates": ["temperate"], "biomes_any": false,
-     "biomes_inferred": false, "biomes_from": "environment"},
+     "biomes_inferred": false, "biomes_from": "environment",
+     "tags": ["harvest.hide.horse-hide", "harvest.sinew", "harvest.plan.quadruped"]},
     {"id": "pony", "name": "Pony", "kind": "npc", "cr": "1/2", "cr_value": 0.5,
      "size": "medium", "creature_type": "animal", "subtype": "", "alignment": "N",
      "abilities": {"str": 13, "dex": 13, "con": 14, "int": 2, "wis": 11, "cha": 4},
@@ -32,7 +33,8 @@
      "treasure": "none", "playable": true,
      "source": "Bestiary, Horse (pony variant)", "notes": "CR 1/2 animal",
      "biomes": ["grassland"], "climates": ["temperate"], "biomes_any": false,
-     "biomes_inferred": false, "biomes_from": "environment"},
+     "biomes_inferred": false, "biomes_from": "environment",
+     "tags": ["harvest.hide.generic.fur", "harvest.sinew", "harvest.plan.quadruped"]},
     {"id": "donkey", "name": "Donkey", "kind": "npc", "cr": "1/2", "cr_value": 0.5,
      "size": "medium", "creature_type": "animal", "subtype": "", "alignment": "N",
      "abilities": {"str": 13, "dex": 13, "con": 14, "int": 2, "wis": 11, "cha": 4},
@@ -48,7 +50,8 @@
      "source": "Ultimate Equipment: 'Donkeys and mules have the same statistics as ponies.'",
      "notes": "CR 1/2 animal",
      "biomes": ["grassland"], "climates": ["temperate"], "biomes_any": false,
-     "biomes_inferred": false, "biomes_from": "environment"},
+     "biomes_inferred": false, "biomes_from": "environment",
+     "tags": ["harvest.hide.generic.fur", "harvest.sinew", "harvest.plan.quadruped"]},
     {"id": "mule", "name": "Mule", "kind": "npc", "cr": "1/2", "cr_value": 0.5,
      "size": "medium", "creature_type": "animal", "subtype": "", "alignment": "N",
      "abilities": {"str": 13, "dex": 13, "con": 14, "int": 2, "wis": 11, "cha": 4},
@@ -64,7 +67,8 @@
      "source": "Ultimate Equipment: 'Donkeys and mules have the same statistics as ponies.'",
      "notes": "CR 1/2 animal",
      "biomes": ["grassland"], "climates": ["temperate"], "biomes_any": false,
-     "biomes_inferred": false, "biomes_from": "environment"},
+     "biomes_inferred": false, "biomes_from": "environment",
+     "tags": ["harvest.hide.generic.fur", "harvest.sinew", "harvest.plan.quadruped"]},
     {"id": "camel", "name": "Camel", "kind": "npc", "cr": "1", "cr_value": 1.0,
      "size": "large", "creature_type": "animal", "subtype": "", "alignment": "N",
      "abilities": {"str": 18, "dex": 16, "con": 14, "int": 2, "wis": 11, "cha": 4},
@@ -80,6 +84,7 @@
      "treasure": "none", "playable": true,
      "source": "Bestiary 2, Herd Animal (Camel)", "notes": "CR 1 animal",
      "biomes": ["desert"], "climates": ["warm"], "biomes_any": false,
-     "biomes_inferred": false, "biomes_from": "environment"}
+     "biomes_inferred": false, "biomes_from": "environment",
+     "tags": ["harvest.hide.generic.fur", "harvest.sinew", "harvest.plan.quadruped"]}
   ]
 }

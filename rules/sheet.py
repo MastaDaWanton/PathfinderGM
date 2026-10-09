@@ -501,6 +501,15 @@ class Actor:
     # contradict pockets that were never opened, and the watcher gets the whole
     # player turn to garnish the claim before it collapses.
     kit_pending: dict = field(default_factory=dict)
+    # The carcass's own record (leatherworking contracts §5.2; rules/harvest.py): the world
+    # minute this body died (stamped by `harvest.mark_the_dead` from `Engine._drive`; a
+    # carcass is harvestable for 24 hours after it, owner answer 5 of 2026-10-08), and
+    # each part taken off it, `{"hide:wolf-pelt": minute}` — plus `danger:<kind>` for a
+    # dangerous body's second round, faced once per carcass. On the body, so it goes where
+    # the body goes and leaves with it; a part taken never reappears ("six skinnings of one
+    # wolf"). Written only when set, so an old save round-trips byte for byte.
+    died_at: int | None = None
+    harvested: dict[str, int] = field(default_factory=dict)
     spellbook: list[str] = field(default_factory=list)
     # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
     # in several slots, which is why this counts rather than being a set.
@@ -4266,7 +4275,11 @@ class Actor:
             self.picked_at[key] = int(at_minute)
             from . import herbprep
 
-            if herbprep.has_salt(self):
+            # Salt costs salt (owner, 2026-10-08, leatherworking answer 8): an animal part
+            # or a hide is salted only by spending what it takes, through the one salt
+            # reader. It was `has_salt` — any salt in the pack, nothing spent — which marked
+            # a hide salted for free (found by leather lanes U5-U7).
+            if herbprep.preserve_on_pick(self, key, count):
                 self.preserved[key] = True
         return self.inventory[key]
 
@@ -6926,6 +6939,11 @@ def to_dict(actor: Actor) -> dict:
         "picked_at": dict(actor.picked_at),
         "preserved": {k: bool(v) for k, v in actor.preserved.items() if v},
         "kit_pending": dict(actor.kit_pending),
+        # A carcass's record (rules/harvest.py), only once there is one: every save
+        # written before it round-trips byte for byte.
+        **({"died_at": int(actor.died_at)} if actor.died_at is not None else {}),
+        **({"harvested": {k: int(v) for k, v in actor.harvested.items()}}
+           if actor.harvested else {}),
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
         "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -7451,6 +7469,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         picked_at={str(k): int(v) for k, v in (data.get("picked_at") or {}).items()},
         preserved={str(k): bool(v) for k, v in (data.get("preserved") or {}).items()},
         kit_pending=dict(data.get("kit_pending") or {}),
+        died_at=(int(data["died_at"]) if data.get("died_at") is not None else None),
+        harvested={str(k): int(v) for k, v in (data.get("harvested") or {}).items()},
         goods={str(k): int(v) for k, v in (data.get("goods") or {}).items()
                if int(v) > 0},
         purse={str(k): int(v) for k, v in (data.get("purse") or {}).items()

@@ -3944,6 +3944,12 @@ class Engine:
 
                 outcome = dataclasses.replace(outcome, effects=list(outcome.effects) + found)
             outcomes.append(outcome)
+            # A body that has just died gets its minute (rules/harvest.py, plan §5.9: a
+            # carcass is harvestable for 24 hours after it), here because this loop is the
+            # one place every intent passes, before the next one can move the clock.
+            from . import harvest as _harvest
+
+            _harvest.mark_the_dead(self.scene)
             # What the hours this op spent did to the body, told right behind it. At the
             # batch's end only, a wait that put the player to sleep was told AFTER the
             # `rest` the same plan ran next — "Sammy rests for 8 hours" and then "falls
@@ -8073,6 +8079,16 @@ class Engine:
         target = self.scene.actors[ref]
         plan = hazards.plan(str(intent.params["rule"]), intent.params)
         origin = f"rule:{plan['rule']}"
+        # A contact row (a dangerous carcass touched, docs/deeds-plan.md §13.4) rolls the
+        # creature's own printed burn or heat dice, read off the stat block the intent's
+        # stamped origin names. The origin is engine-stamped (`validate(origin=...)`) and
+        # never a model's, so this is a stat block's number, not anybody's say-so.
+        if (hazards.get(plan["rule"]) or {}).get("dice_from_creature") \
+                and str(intent.origin or "").startswith("creature:"):
+            from . import harvest as _harvest
+
+            plan["dice"] = _harvest.contact_dice(intent.origin.split(":", 1)[1],
+                                                 plan["type"]) or plan["dice"]
         if (hazards.get(plan["rule"]) or {}).get("save"):
             # A row the book gives a save to (cold: "a Fortitude save each hour (DC 15,
             # +1 per previous check)") is rolled an hour at a time, the save in the roll
@@ -9322,7 +9338,25 @@ class Engine:
                 # just above. A prisoner, a spared thug and a fallen companion are all
                 # still somebody; they stay where they lie until they wake or die.
                 if a.has_state("state.down.dead"):
-                    self.scene.depart(ref)
+                    # A carcass with parts still on it stays while it can be harvested
+                    # (24 hours after death, rules/harvest.py; leatherworking plan §5.9).
+                    # Measured live 2026-10-08 (lane C): a wolf dropped in a fight lies
+                    # dying, bleeds out here two turns later, and departed in the same
+                    # call — so a fight's kill was never once a carcass anybody could
+                    # skin. Persons never are carcasses, so a dead merchant still goes.
+                    from . import harvest as _harvest
+
+                    harvest_left = False
+                    try:
+                        harvest_left = _harvest.harvestable(
+                            a, now=self.scene.clock_minutes)[0] and any(
+                            p["taken"] is None for p in _harvest.parts(
+                                a, self.scene.pc() or a, now=self.scene.clock_minutes,
+                                every_craft=True))
+                    except Exception:      # noqa: BLE001 - a body with no block simply goes
+                        harvest_left = False
+                    if not harvest_left:
+                        self.scene.depart(ref)
                 self.scene.fallen.pop(ref, None)
         return tells
 

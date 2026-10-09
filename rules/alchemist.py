@@ -1931,15 +1931,10 @@ ACQUISITION: dict[str, dict] = {
                  "cistern. The alchemist's answer to foraging, and the reason this "
                  "track has no forage panel of its own.",
     },
-    "harvest-reagents": {
-        "id": "harvest-reagents",
-        "label": "Harvest reagents from a kill",
-        "obtain": "harvested",
-        "needs": "creature",
-        "blurb": "The gland, sac or humour comes off something that was alive, and the "
-                 "creature has to have been in the scene. An ankheg acid sac should come "
-                 "from an ankheg the table actually killed.",
-    },
+    # `harvest-reagents` left the hub with the other three carcass excursions
+    # (leatherworking lane C, plan §5.1): a kill is harvested once, across every craft, by
+    # rules/harvest.py, and the ankheg's acid sac is a `harvest.reagent.ankheg-acid-sac`
+    # tag on the ankheg's own stat block, never a fragment of its name.
 }
 
 

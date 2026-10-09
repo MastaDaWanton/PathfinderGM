@@ -570,7 +570,9 @@ def test_buying_and_gathering_are_offered_and_populated():
     assert "water" in anywhere
     assert "peat" not in anywhere          # peat is a bog thing
     assert "quenching-brine" not in anywhere   # and brine is a tideline thing
-    assert {"salvage", "gather", "buy"} <= set(blacksmith.ACQUISITION)
+    assert {"gather", "buy"} <= set(blacksmith.ACQUISITION)
+    # `salvage` left with the other carcass excursions (leatherworking lane C).
+    assert "salvage" not in blacksmith.ACQUISITION
 
 
 def test_a_novel_alloy_is_one_band_rarer_and_gated_by_what_it_makes():

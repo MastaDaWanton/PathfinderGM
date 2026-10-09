@@ -123,7 +123,9 @@ def test_every_craft_reaches_the_hub_whatever_shape_it_declares(client):
     for track in ("herbalist", "blacksmith", "leatherworker", "alchemist", "enchanter"):
         assert any(k.startswith(f"{track}:") for k in keys), f"{track} never reached the hub"
     assert "enchanter:vessel-commission" in keys
-    assert len(d["actions"]) == 18
+    # 18 until 2026-10-08, when the four carcass excursions (skin, salvage,
+    # harvest-reagents, reliquary-harvest) left for the one harvest (leatherworking lane C).
+    assert len(d["actions"]) == 14
 
 
 def test_every_excursion_declares_a_gate_the_hub_understands():
@@ -194,45 +196,17 @@ def test_an_empty_purse_cannot_shop(client):
     assert "cannot afford" in why and "cheapest" in why
 
 
-def test_an_excursion_that_needs_a_carcass_says_so(client):
+def test_the_carcass_excursions_left_the_hub(client):
+    """Leatherworking plan §5.1 (lane C, 2026-10-08): the skin excursion could be run again
+    and again on one body ("six skinnings of one wolf ran, three succeeded") and read the
+    creature's name. A carcass is harvested once, across the crafts, through
+    /api/harvest (tests/test_harvest.py); the hub no longer offers the old door."""
     d = client.get("/api/craft/actions").json()
-    skin = next(a for a in d["actions"] if a["key"] == "leatherworker:skin")
-    assert skin["available"] is False
-    assert "fallen" in skin["why"].lower() or "nothing" in skin["why"].lower()
-
+    assert not [a for a in d["actions"] if a.get("requires") in ("creature", "carcass")]
     r = client.post("/api/craft/excursion",
                     data=json.dumps({"action": "leatherworker:skin"}),
                     content_type="application/json")
-    assert r.status_code == 409
-
-
-def test_skinning_a_carcass_puts_the_hide_in_the_satchel(client):
-    """The excursion's whole point: material that reaches the bench. Before this the
-    hides existed in a catalogue and there was no way to come by one."""
-    from rules.bestiary import instantiate
-
-    c = cm.current()
-    for ref in [r for r in c.scene.actors if r != "pc"]:
-        c.scene.depart(ref)
-    wolf = instantiate("guard dog", scene=c.scene, name="a dire wolf")
-    c.scene.add(wolf)
-    # A carcass, not a creature at exactly 0 hit points — which in 1e is *disabled*:
-    # conscious, upright and able to act. `hp = 0` was shorthand for "dead" that the
-    # state machine never agreed with, and it let the player skin a living animal.
-    wolf.hp = -20
-    wolf.apply_hp_state()
-    c.save()
-
-    before = dict(c.scene.pc().inventory)
-    r = client.post("/api/craft/excursion",
-                    data=json.dumps({"action": "leatherworker:skin"}),
-                    content_type="application/json")
-    assert r.status_code == 200, r.content[:200]
-    body = r.json()
-    assert body["roll"] and body["dc"]
-    if body["succeeded"]:
-        after = dict(cm.current().scene.pc().inventory)
-        assert after != before, "a successful skinning gave nothing"
+    assert r.status_code == 404
 
 
 def test_a_crafted_item_can_be_worn_and_taken_off(client):
@@ -411,50 +385,6 @@ def test_the_old_leatherworking_tab_is_a_card_that_opens_the_bench():
     assert 'href="/play/#leather"' in card and "Open the leather bench" in card
     assert "Leatherworking is at the table now" in card
     assert "—" not in card and "–" not in card
-
-
-def test_a_skinned_hide_lands_green_with_its_clock(client, monkeypatch):
-    """Contracts §9: `craft_excursion` never passed `at_minute`, so a skinned hide was a
-    bare count in the satchel, and the leather bench reads a bare count as a counter's
-    purchase, sold tanned. Measured 2026-10-08: a wolf pelt carried that way reached the
-    rack as "Wolf Fur (oak bark)", form fur; it must reach it as a green hide whose 48-hour
-    clock started at the skinning. Skinning stays on the hub until the harvest lane
-    replaces it (leatherworking contracts §1, lane C)."""
-    from rules import leatherworker as lw
-    from rules.bestiary import instantiate
-    from rules.dice import Dice
-
-    monkeypatch.setattr(Dice, "d20", lambda self, modifiers=None, label="", visibility="hidden":
-                        self.given(20, modifiers, label))
-    c = cm.current()
-    for ref in [r for r in c.scene.actors if r != "pc"]:
-        c.scene.depart(ref)
-    wolf = instantiate("wolf", scene=c.scene, name="a wolf")
-    c.scene.add(wolf)
-    wolf.hp = -20
-    wolf.apply_hp_state()
-    pc = c.scene.pc()
-    pc.inventory.clear()
-    pc.picked_at.clear()
-    pc.preserved.clear()
-    c.save()
-    skinned_at = c.scene.clock_minutes
-
-    r = client.post("/api/craft/excursion", data=json.dumps({"action": "leatherworker:skin"}),
-                    content_type="application/json")
-    assert r.status_code == 200, r.content[:300]
-    assert r.json()["succeeded"] is True
-    pc = cm.current().scene.pc()
-    hides = [mid for mid in pc.inventory if (lw.material(mid) or {}).get("kind") == "hide"]
-    assert hides, f"a natural 20 skinned no hide: {r.json()['found']}"
-    for mid in hides:
-        assert pc.picked_at.get(mid) == skinned_at, mid
-    rows = [p for p in lw.rack(pc, cm.current().scene.clock_minutes) if p.material in hides]
-    assert rows and all(p.form in ("green", "salted") for p in rows), \
-        [(p.name, p.form) for p in rows]
-    assert all(p.hide.tannage == "" for p in rows), [p.name for p in rows]
-    # Anything else the carcass gave (sinew, tallow) keeps no clock of its own.
-    assert all(mid in hides for mid in pc.picked_at)
 
 
 # --- herbalism moved to the table's step bench (2026-10-02) ---------------------------
