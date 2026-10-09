@@ -107,6 +107,26 @@ def test_a_days_work_runs_once_per_day_crossed_and_never_per_round():
     assert pc.hp == pc.hp_max - 4
 
 
+def test_a_counted_burn_does_not_cap_the_entries_after_it():
+    """`run_periodic` capped a `times_left` entry by reassigning `times` itself, so every
+    entry after it in the same call inherited the cap: one fire left on a burn, and a
+    three-day stretch ran the next effect's daily mending once instead of three times
+    (noted 2026-10-08 by the leatherworking metal-readers lane)."""
+    scene, pc = _scene()
+    pc.hp = pc.hp_max - 20
+    pc.apply_effect(ActiveEffect(name="last ember", kind="buff",
+                                 periodic=[{"damage": 1, "damage_type": "fire",
+                                            "per": "day", "times_left": 1}]))
+    pc.apply_effect(ActiveEffect(name="slow mending", kind="buff",
+                                 periodic=[{"heal": 2, "per": "day"}]))
+    said = pc.run_periodic("day", 3, scene._dice)
+    fire = [r for r in said if r.get("kind") == "damage"]
+    heal = [r for r in said if r.get("kind") == "heal"]
+    assert fire and fire[0]["amount"] == 1, "the ember burns its one fire, not three"
+    assert heal and heal[0]["amount"] == 6, "three days of mending, uncapped by the ember"
+    assert not any(e.name == "last ember" for e in pc.effects), "its last fire put it out"
+
+
 def test_a_daily_save_gate_rolls_and_lands_on_failure():
     """Viridium's daily price (a carried `save_gate`) is an `effect` entry on the day
     clock: the save is rolled with the body's own modifiers and the d20's face read by

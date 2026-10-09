@@ -1692,8 +1692,12 @@ class Actor:
                     # tick runs BEFORE this executor at the top of a round
                     # (`Scene._next_able`): a one-round clock expired the fire before it
                     # ever burned.
+                    # Capped in its own name: this reassigned `times` itself, so a burn
+                    # with one fire left capped every entry after it in the same call —
+                    # a two-day stretch ran the next effect's day once.
+                    fires = times
                     if "times_left" in p:
-                        times = min(times, max(0, int(p.get("times_left") or 0)))
+                        fires = min(times, max(0, int(p.get("times_left") or 0)))
                     # `schedule`: a curve, one entry per firing, taken from the front —
                     # heat metal's 1d4, 2d4, 2d4, 2d4, 1d4, 0 (CRB), chill metal's the same
                     # in cold (leatherworking plan §18.5, `casting.metal_curve`). `damage`
@@ -1701,11 +1705,11 @@ class Actor:
                     # as `times_left` does.
                     sched = p.get("schedule")
                     if isinstance(sched, list):
-                        due = sched[:times]
-                        del sched[:times]
+                        due = sched[:fires]
+                        del sched[:fires]
                         total = sum(_amount_of(x, dice) for x in due)
                     else:
-                        total = sum(_amount_of(p.get("damage"), dice) for _ in range(times))
+                        total = sum(_amount_of(p.get("damage"), dice) for _ in range(fires))
                     if total > 0:
                         d = self.take_damage(total, dtype)
                         out.append({"kind": "damage", "ref": self.ref,
@@ -1714,10 +1718,10 @@ class Actor:
                                     "origin": e.origin, "hp_after": self.hp,
                                     "hp_max": self.hp_max})
                     spent = ("times_left" in p and max(
-                        0, int(p.get("times_left") or 0) - times) <= 0) or (
+                        0, int(p.get("times_left") or 0) - fires) <= 0) or (
                         isinstance(sched, list) and not sched)
                     if "times_left" in p:
-                        p["times_left"] = max(0, int(p.get("times_left") or 0) - times)
+                        p["times_left"] = max(0, int(p.get("times_left") or 0) - fires)
                     if spent:
                         if self.remove_effects(match=lambda x, e=e: x is e):
                             out.append({"kind": "effect_ended", "ref": self.ref,
