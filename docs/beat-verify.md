@@ -331,3 +331,25 @@ written lunging at the wagon an hour later, were "someone not listed" and never 
 - Bench, 2 runs, 55 beats: `absent` P 1.00 R 5/6; clean beats falsely alarmed 0 of 76;
   every earlier category as on master. An `attacks` slot was tried and taken out: it cost
   harm claims 12/14 → 8/14 on the same beats.
+
+## Somebody here, written gone (2026-10-09)
+
+docs/departed-beast-and-species-name.md has the defect and the runs: a creature the engine
+kept on its seam, written *"The Aelzeldra is gone."* while the player slept.
+
+- The `left` slot read it — once the readers were told what the creature is
+  (`mentions.what_they_are`: told "human", 0 of 3 reads found a departure; told "monstrous
+  humanoid", 3 of 3).
+- The second read refused it: *"does this sentence say that Aelzeldra goes out of the
+  place?"* was answered no 3 of 3. It asks *"…has gone — left, or no longer here?"* now
+  (`question`), probed against both a departure told as a state and one told as an act.
+- The `absent` second read (`_shows`) lists the people as the first read does — what they
+  are, and "not here" — not by name alone: a goblin standing here was the away "goblin
+  with a scarred cheek" 16 of 16 by name, 2 of 16 so.
+- The `left` line of the instruction says "or whom it says is no longer there": on our own
+  server, the fixed branch's first live rest turn wrote "the beast is no longer within
+  your immediate sight" and the reader filed it as an hour (dropped). With the line it is
+  read as a departure 2 of 2 on the bench, and the second read refuses it 2 of 2 — out of
+  sight is not quite gone, and the engine holds the creature "far"; labelled either way.
+- Bench, 2 runs, 59 beats: `presence` R 2/2, `absent` R 6/6, clean beats falsely alarmed 0
+  of 82; every other category as on master.

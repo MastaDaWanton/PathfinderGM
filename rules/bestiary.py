@@ -263,6 +263,15 @@ def instantiate(
     # lost every link back to its stat block, so a creature that died was worth nothing
     # the moment anybody named it — measured in real play: a bear awarded 0 XP.
     data["from_template"] = key
+    # A kind with no name of its own goes by its kind, lower-case (`kind_word`): asked to
+    # spawn a "Wyvern" and handed nothing more personal than the block's own name, the
+    # creature is a wyvern, not somebody called Wyvern.
+    # Only a printed kind: a hand-written template already reads lower-case ("thug"), and
+    # a spreadsheet row ("Thug", "Guard") is left exactly as the caller or the block had it.
+    block = {} if key in TEMPLATES else (raw_block(key) or {})
+    if ground_stated(block) and (not name or " ".join(str(name).split()).lower()
+                                 == str(block.get("name") or "").lower()):
+        name = kind_word(block)
     if name:
         data["name"] = name
     # A resident of the world is somebody in particular and keeps their own name; a
@@ -741,10 +750,100 @@ def suggestion(key: str) -> str:
     return f" There are {len(_INDEX)} creatures and none is close to that name."
 
 
+def is_a_person(template: str) -> bool:
+    """Whether a creature made from `template` is one of the local people, and so gets a
+    true name and a face from their pools (`Engine._a_person` has the measurement: on
+    Pangrella a giant scorpion spawned wearing a Korvu's face). A humanoid is a person;
+    every other type — monstrous humanoids too, because a people's body line is always
+    wrong for a harpy — is not. A template the imported bestiary does not hold (the
+    hand-written townsfolk, guildhand and watchman) is a person by construction.
+
+    Asked by both doors that hand out names and faces: `Engine._bring_in` at the arrival,
+    and `judgement.name_the_nameless` on every turn after. The second had no copy of the
+    rule until 2026-10-09: the owner's forage creature, Aelzeldra (a monstrous humanoid),
+    arrived faceless as it should and was given a Goblin's body line and her template's
+    name as a true name on the next turn, and the narrator, told she was "Goblin: Small, wiry,
+    sharp-toothed", wrote "The Aelzeldra stands there, its small, wiry frame" (sammy.json,
+    the beat after the rest)."""
+    row = imported().get(str(template or "").strip().lower())
+    if row is None:
+        return True
+    return str(row.get("creature_type") or "").strip().lower() == "humanoid"
+
+
+def kind_names(template: str) -> set[str]:
+    """What a creature made from `template` IS, lowercased — the words that name its kind
+    and never anybody's own name: the hand-written template's own word ("guildhand",
+    "watchman", "dog"), the creature type ("magical beast"), and the stat block's name
+    when that block is a kind — a printed Bestiary block, whose ground is stated
+    (`ground_stated`). A spreadsheet row's name is not offered: that is where the
+    adventures' named individuals live, and "Thora Petska" is who she is.
+
+    Read by `beat_reader.what_not_who` (the reader's names on the page) — the 2026-10-09
+    report, a creature met as a kind that "introduced itself as its species like it was a
+    name"."""
+    key = str(template or "").strip().lower()
+    out: set[str] = set()
+    if key in TEMPLATES:
+        out |= {key, str(TEMPLATES[key].get("name") or "").lower()}
+    row = imported().get(key) or imported().get(key.replace(" ", "-"))
+    if row:
+        if row.get("creature_type"):
+            out.add(str(row["creature_type"]).lower())
+        if ground_stated(row) and row.get("name"):
+            out.add(str(row["name"]).lower())
+    return {" ".join(n.split()) for n in out if n.strip()}
+
+
+def kind_word(row: dict) -> str:
+    """What a creature of this stat block is called when it has no name of its own: the
+    kind, lower-case, the way the hand-written townsfolk read ("guildhand", "watchman") —
+    "wyvern", which the page and the brief give its article ("the wyvern"), never
+    "Wyvern", which every name reader in the app takes for a proper name
+    (`beat_reader.name_refusal`'s "already named", `judgement.name_the_nameless`,
+    `names.with_articles`). Only for a block that IS a kind (`ground_stated`: the printed
+    Bestiary's own, or a homebrew author's); a spreadsheet row's name is left as written,
+    because that is where the adventures' named individuals live and "Thora Petska" is
+    who she is.
+
+    The owner, 2026-10-09: a creature spawned on an ore seam under its stat block's name
+    "introduced itself as its species like it was a name"."""
+    name = " ".join(str(row.get("name") or "").split())
+    if not name or not ground_stated(row):
+        return name
+    # The printed index's "Head, Qualifier" ("Wolf, Dire", "Archon, Lantern": 190 of the
+    # 782 printed blocks) said the way prose says it — the same one swap `_index_order`
+    # makes for ids — or the tell reads "you find a wolf, dire there".
+    head, _, qualifier = name.partition(", ")
+    if qualifier:
+        name = f"{qualifier} {head}"
+    return name.lower()
+
+
+def ground_stated(row: dict) -> bool:
+    """Whether the creature's ground is somebody's own words — a printed Bestiary block's
+    Environment line, or a homebrew author's — rather than `tag_creature_biomes`'s guess.
+
+    The one test for "what lives on this ground", asked by every door that draws a
+    creature out of the land (`gathering.creature_for`, `ontheway.road` and `night`,
+    `openings.land_foes`). Every one of the 6,406 spreadsheet rows is a guess, and the
+    spreadsheet is where the adventures' named individuals live: measured 2026-10-09 in
+    the hills at fifth level, 151 of the 197 creatures a forage could draw were
+    spreadsheet rows — Aelzeldra (a hag of PFS 1-50), Thora Petska, Doctor Oathsday,
+    Mrs. Pedipalp, a Restraining Chair, a Supply Sack. The owner's forage drew Aelzeldra,
+    the engine called her "an Aelzeldra" (`gathering.describe`), and when she gave her
+    name the owner read it as a species introducing itself as a name. The Bestiary's own
+    encounter tables list kinds only — "1d6 trolls", "1 vampire", never a named somebody
+    (legacy.aonprd.com/bestiary/encounterTables.html) — and every printed block with an
+    Environment line is a kind. With the guesses out the same window holds 46 in those
+    hills, and 26 to 116 on every biome but the planes from first to twelfth level."""
+    return bool(row.get("biomes")) and not row.get("biomes_inferred")
+
+
 def search(text: str = "", creature_type: str = "", size: str = "",
            cr_min: float | None = None, cr_max: float | None = None,
            biome: str = "", climate: str = "", specialists: bool = False,
-           limit: int = 120) -> list[dict]:
+           stated: bool = False, limit: int = 120) -> list[dict]:
     """Filter the bestiary. Every argument narrows; none widens.
 
     `biome` and `climate` are the two axes a Bestiary Environment line carries, and they
@@ -762,6 +861,9 @@ def search(text: str = "", creature_type: str = "", size: str = "",
     (7,133, not the 7,188 the two source files hold between them — 55 names appear in both
     and the printed block wins. Counting the sum is the mistake that made the first three
     figures in this module disagree with each other.)
+
+    `stated` keeps only the creatures whose ground is their own words (`ground_stated`):
+    what the land holds, as opposed to who could be standing on it.
     """
     out = []
     needle = (text or "").strip().lower()
@@ -780,6 +882,8 @@ def search(text: str = "", creature_type: str = "", size: str = "",
         if climate and c.get("climates") and climate not in c["climates"]:
             continue
         if specialists and c.get("biomes_any"):
+            continue
+        if stated and not ground_stated(c):
             continue
         if needle and needle not in c["name"].lower():
             continue

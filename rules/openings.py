@@ -851,7 +851,11 @@ def foes_from_the_land(biome: str, level: int, most: int,
     level = max(1, int(level or 1))
     low = max(1 / 3, level - ontheway.BELOW)
     high = max(1, level + ontheway.ABOVE)
-    rows = [r for r in bestiary.search(biome=biome, cr_min=low, cr_max=high, limit=5000)
+    # `stated` as well as not "any": a spreadsheet row's ground is a guess even when it is
+    # one biome, and the guesses are where the adventures' named individuals live
+    # (`bestiary.ground_stated`).
+    rows = [r for r in bestiary.search(biome=biome, cr_min=low, cr_max=high, stated=True,
+                                       limit=5000)
             if r.get("cr_value") is not None and not r.get("biomes_any")
             and r.get("creature_type") in RAIDER_TYPES
             and str(r.get("size") or "").lower() not in TOO_SMALL

@@ -200,21 +200,54 @@ def _head(name: str) -> str:
     return head.lower()
 
 
+def what_they_are(a) -> str:
+    """What a person or creature is, as the readers are shown them beside the name: the
+    template they came from and their race — or, for a creature that is no person
+    (`bestiary.is_a_person`), its creature type instead of a race. One copy, for the beat
+    reader's cast and the read-back's people (`beat_verify.facts_from`).
+
+    Why the type: an imported creature's sheet keeps the sheet's default race, "human",
+    and both readers were shown the owner's forage hag as "c28: Aelzeldra — human"
+    (2026-10-09) — a human somebody with a name, when the engine had met her as a kind of
+    thing on a seam."""
+    what = []
+    name = str(getattr(a, "name", "") or "").lower()
+    template = str(getattr(a, "from_template", "") or "")
+    if template and template.lower() not in name:
+        what.append(template.replace("_", " "))
+    kind = ""
+    if template and not getattr(a, "is_pc", False):
+        from rules import bestiary
+
+        if not bestiary.is_a_person(template):
+            row = bestiary.imported().get(template.strip().lower()) or {}
+            kind = str(row.get("creature_type") or "").strip().lower()
+    # A person of the world's own people is shown as that people (`heritage`, the
+    # world's; `race` is the stat block's rules term and "human" by default — memory: the
+    # world owns its own races). Measured 2026-10-09 replaying the owner's name turn: the
+    # figure c29 was a Goblin to the narrator ("Looks: Goblin: …") and "guildhand, human"
+    # to the readers, so "the goblin grins" was read as the goblin with a scarred cheek
+    # held across town, and the absent check rewrote the man standing there into "The
+    # goblin is nowhere to be seen" — an `absent` finding on the goblin in 6 of 6 replays.
+    race = kind or str(getattr(a, "heritage", "") or "") or str(getattr(a, "race", "") or "")
+    if race and race.lower() not in name:
+        what.append(race)
+    return ", ".join(what)
+
+
 def people(scene) -> list[dict]:
     """Everyone here, as the labeller is shown them: ref, name, what they are."""
     out = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
-        what = []
-        template = str(getattr(a, "from_template", "") or "")
-        if template and template.lower() not in str(a.name).lower():
-            what.append(template.replace("_", " "))
-        race = str(getattr(a, "race", "") or "")
-        if race and race.lower() not in str(a.name).lower():
-            what.append(race)
+        what = what_they_are(a)
         dead = bool(getattr(a, "hp", 1) < 0 or (hasattr(a, "has_state")
                                                  and a.has_state("state.down.dead")))
         out.append({"ref": ref, "name": str(a.name), "true": str(getattr(a, "true_name", "") or ""),
-                    "pc": bool(getattr(a, "is_pc", False)), "what": ", ".join(what),
+                    "pc": bool(getattr(a, "is_pc", False)), "what": what,
+                    # The rules race, for the finder's head words only (`find`): the
+                    # readers are shown the world's people now, and the words a beat may
+                    # call somebody by did not shrink with it.
+                    "race": str(getattr(a, "race", "") or ""),
                     "dead": dead})
     return out
 
@@ -269,7 +302,7 @@ def find(text: str, cast: list[dict]) -> list[Mention]:
     for p in cast:
         if not _proper(p["name"]) and _head(p["name"]):
             heads.add(_head(p["name"]))
-        for w in re.findall(r"[A-Za-z]+", p["what"]):
+        for w in re.findall(r"[A-Za-z]+", f"{p['what']} {p.get('race', '')}"):
             if len(w) > 2:
                 heads.add(w.lower())
     heads.discard("you")

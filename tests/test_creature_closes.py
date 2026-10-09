@@ -40,7 +40,12 @@ def _owners_board(spy_at=(0, 13), pc_at=(5, 7), seed: int = 3, template="clockwo
     the player at (5, 7), the creature holding the turn in a running fight."""
     scene = Scene(location_id="5bbd0c40345f")
     scene.add(load_pc("fixtures/pc-kesst.json"))
-    scene.add(instantiate(template, scene=scene, name=name))
+    spy = instantiate(template, scene=scene, name=name)
+    # As saved: the owner's spy carried its stat block's name, "Clockwork Spy", as every
+    # spawn did until 2026-10-09; a printed kind spawned now goes by "clockwork spy"
+    # (`bestiary.kind_word`). The measured board keeps the name it was measured with.
+    spy.name = name
+    scene.add(spy)
     engine = Engine(scene, Dice(seed=seed))
     engine._ensure_encounter("c1", "pc")
     scene.grid = Grid(width=20, height=14,

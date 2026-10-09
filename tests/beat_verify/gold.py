@@ -76,8 +76,20 @@ XY_RAIDER2 = ["c5", "the second raider", "", False, "away"]
 XY_PEOPLE = (XY_TAM, XY_MASTER, XY_DROVER, XY_DROVER2, XY_RAIDER, XY_RAIDER2)
 
 
+# The owner's ore seam on the ridgelines above an Aurvantis town (sammy.json, 2026-10-09):
+# a creature holding the seam (`state.holding-ground`), the player asleep in front of it
+# for twelve hours. The engine kept it there; the narrator wrote it gone.
+RG_PLACES = ("the ridgelines", "the outskirts", "the road to Blackline")
+RG_SAMMY = ["pc", "Sammy", "", True]
+RG_HOLDER = ["c28", "Aelzeldra", "monstrous humanoid"]
+RG_REST = {"intent_id": "i1", "op": "rest", "status": "resolved",
+           "tell": "Sammy rests for 12 hours.",
+           "effects": [{"ref": "pc", "kind": "rest", "hours": 12}]}
+
+
 def places_of(beat) -> tuple[str, ...]:
-    return {"VM": VM_PLACES, "PG": PG_PLACES, "XY": XY_PLACES}.get(beat["world"], ZH_PLACES)
+    return {"VM": VM_PLACES, "PG": PG_PLACES, "XY": XY_PLACES,
+            "RG": RG_PLACES}.get(beat["world"], ZH_PLACES)
 
 
 def facts(beat):
@@ -802,4 +814,48 @@ GOLD = [
       world="XY", start="the road to Kalixiri", people=XY_PEOPLE, clock=780,
       player="I take no action.",
       claims=[C("harm", opt=True, who="pc", how="hurt"), C("shown", opt=True, who="c1")]),
+    # --- somebody the engine keeps here, written gone (2026-10-09, the owner's report: "I
+    # was told it left by the narration … but it stayed in the scene") ---------------------
+    B("gone-while-you-slept", "sammy:rest draft",
+      "You wake on the hard ground, the taste of dust and dry earth still in your mouth. The "
+      "air of the morning is sharp and thin, smelling of mineral and old stone. The "
+      "Aelzeldra is gone. There is no sign of the beast, no scrap of fur or iron left "
+      "behind; only the long, jagged scar of the vein you sought remains, cold and silent in "
+      "the dawn light. You are alone on the ridge as the first light of day touches the "
+      "rolling hills.",
+      world="RG", start="the ridgelines", people=(RG_SAMMY, RG_HOLDER), clock=36360,
+      player="i lay on the ground and rest watching the aelzeldra", outcomes=[RG_REST],
+      claims=[C("left", who="c28"), C("left", opt=True, who="c28"),
+              C("hour", opt=True, part=["dawn", "morning"]),
+              C("hour", opt=True, part=["dawn", "morning"]),
+              C("hour", opt=True, part=["dawn", "morning"])],
+      alarms=["presence"]),
+    B("out-of-sight", "sammy:rest live (the fixed branch, own server)",
+      "Somewhere in the distance, the low, rhythmic rumble of the Aelzeldra's breathing has "
+      "faded into the morning haze, and the beast is no longer within your immediate sight. "
+      "The sun is a pale, rising coin on the horizon, casting long shadows across the rocky "
+      "ground. You are still here, still alive, and the first light is your only companion.",
+      world="RG", start="the ridgelines", people=(RG_SAMMY, RG_HOLDER), clock=36360,
+      player="i lay on the ground and rest watching the aelzeldra", outcomes=[RG_REST],
+      # Out of sight is not quite gone (the engine holds it "far"): reading it as a
+      # departure, and alarming, are both defensible; neither is required.
+      claims=[C("left", opt=True, who="c28"),
+              C("hour", opt=True, part=["dawn", "morning"]),
+              C("hour", opt=True, part=["dawn", "morning"]),
+              C("hour", opt=True, part=["dawn", "morning"])],
+      may_alarm=["presence"]),
+    B("still-there-at-dawn", "sammy:rest replay",
+      "You wake as the first gray light of morning filters through the haze, the air tasting "
+      "of dust and ancient stone. The Aelzeldra is still there, a silhouette of iron against "
+      "the waking world, its presence a constant, looming weight.",
+      world="RG", start="the ridgelines", people=(RG_SAMMY, RG_HOLDER), clock=36360,
+      player="i lay on the ground and rest watching the aelzeldra", outcomes=[RG_REST],
+      claims=[C("hour", opt=True, part=["dawn", "morning"])]),
+    B("has-not-moved", "sammy:rest replay",
+      "A few feet away, the Aelzeldra remains a silent, looming shadow against the morning "
+      "light. It has not moved in the time you were unconscious, though it seems to have "
+      "settled deeper into its stance, its presence a constant, oppressive weight in the air.",
+      world="RG", start="the ridgelines", people=(RG_SAMMY, RG_HOLDER), clock=36360,
+      player="i lay on the ground and rest watching the aelzeldra", outcomes=[RG_REST],
+      claims=[C("hour", opt=True, part=["dawn", "morning"])]),
 ]
