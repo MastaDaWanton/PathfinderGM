@@ -42,6 +42,9 @@ class _Reply:
         self.text = json.dumps(data)
         self.seconds = 0.1
         self.model = "fake-watcher"
+        self.done_reason = "stop"
+        self.cut_off = False
+        self.reply_tokens = 20
 
     def json(self):
         return self._data

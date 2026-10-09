@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
-from gm import prompts
+from gm import prompts, window
 
 # Reasoning models emit their working before their answer. Qwen3 and its tunes do it by
 # default, and DeepSeek-R1 always does — both are in the user's Ollama already.
@@ -152,6 +152,18 @@ class Reply:
     text: str
     seconds: float
     model: str
+    # What Ollama said about the call: why it stopped ("stop", or "length" for a reply the
+    # token limit cut), and the two counts. Empty for a hosted provider. A caller that
+    # retries must be able to tell a reply that ran out of room from one that was wrong:
+    # the watcher's thinking-on attempt hit its 900-token cap four calls in four with an
+    # empty answer (measured 2026-10-08), and was retried as if it had merely misspoken.
+    done_reason: str = ""
+    prompt_tokens: int | None = None
+    reply_tokens: int | None = None
+
+    @property
+    def cut_off(self) -> bool:
+        return self.done_reason == "length"
 
     def json(self) -> dict:
         """Parse a JSON reply, tolerating the wrappers models add around it.
@@ -293,6 +305,26 @@ def chat(
         return _hosted(messages, model, host, provider, api_key, as_json,
                        temperature, timeout, num_predict)
 
+    # The window, held here for every call and not only the ones `prompts.pack` builds
+    # (gm/window.py). The turn prompts are packed to the budget, and then a retry
+    # appends the failed reply and a correction to them: a whole reply over a prompt
+    # that was already full. Ollama's answer to that is to drop messages off the front,
+    # or to keep half the window, and to say nothing (`window.fit`'s note has the
+    # measurements). So the call is cut here, oldest conversation first, and the cut
+    # is said; the budget leaves room for THIS call's own `num_predict`.
+    budget = window.prompt_budget_chars(model, completion=num_predict)
+    messages, cut = window.fit(messages, budget)
+    if cut["dropped"] or cut["over"]:
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "%s: the prompt was cut to fit the window: %d message(s), %d characters, "
+            "dropped from the front against a %d-character budget (%.2f characters a "
+            "token, %d tokens kept for the reply)%s", model, cut["dropped"],
+            cut["dropped_chars"], budget, window.chars_per_token(model), num_predict,
+            "; the parts that are never cut are still over it" if cut["over"] else "")
+    sent_chars = sum(len(m.get("content") or "") for m in messages)
+
     payload = {
         "model": model,
         "messages": messages,
@@ -427,13 +459,18 @@ def chat(
         import logging
 
         logging.getLogger("pathfindergm").warning(
-            "%s stopped at its token limit (prompt %s tokens of %s, reply %s tokens) — "
-            "the reply is cut off", model, body.get("prompt_eval_count"),
-            prompts.NUM_CTX, body.get("eval_count"))
+            "%s stopped at its token limit (prompt %s tokens of %s, reply %s tokens of "
+            "%s asked) — the reply is cut off", model, body.get("prompt_eval_count"),
+            prompts.NUM_CTX, body.get("eval_count"), num_predict)
+    # What this model really counts our characters as, for the next prompt's budget.
+    window.observe(model, sent_chars, body.get("prompt_eval_count"), len(messages))
     return Reply(
         text=strip_thinking(body.get("message", {}).get("content", "")),
         seconds=time.monotonic() - started,
         model=model,
+        done_reason=str(body.get("done_reason") or ""),
+        prompt_tokens=body.get("prompt_eval_count"),
+        reply_tokens=body.get("eval_count"),
     )
 
 

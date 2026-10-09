@@ -313,3 +313,21 @@ seconds, and the error if there was one. The live failure rate can be read off s
 - `arrived` and `left` are read, but only a `left` of somebody the engine keeps here is
   judged, and the bench has a single `left` claim. That is too few to say anything.
 - The regex checks without a bench row remain English readers.
+
+## The people not here (2026-10-09)
+
+docs/narrator-after-defeat.md has the defect and the runs. The reader had no code for
+anybody the engine holds elsewhere, so the raiders who had robbed the player and gone,
+written lunging at the wagon an hour later, were "someone not listed" and never judged.
+
+- The people held elsewhere in town (`beat_reader.away_people`) are offered as codes,
+  marked "not here" (`Person.here`).
+- On a beat with anybody away, and only then, the reader is asked `shown_here`: which of
+  them the passage shows here and now. A beat with nobody away is asked word for word
+  what it was asked before (all 50 earlier bench beats: identical messages and schema).
+- An away person shown here, hurt here, or arriving with no arrival the engine made is an
+  `absent` contradiction (`beat-absent`, weight 3). Its second read asks WHO the
+  sentence shows, from the codes, and compares in code.
+- Bench, 2 runs, 55 beats: `absent` P 1.00 R 5/6; clean beats falsely alarmed 0 of 76;
+  every earlier category as on master. An `attacks` slot was tried and taken out: it cost
+  harm claims 12/14 → 8/14 on the same beats.

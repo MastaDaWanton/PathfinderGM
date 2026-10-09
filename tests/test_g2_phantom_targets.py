@@ -150,10 +150,14 @@ def test_an_aim_at_somebody_introduced_earlier_in_the_plan_is_legal_and_lands():
     the cast runs; and `_rename_refs` rewrote no aim, so `at=new1` validated and then
     resolved at "new1", a ref nobody holds. The introduced person is caught now."""
     s, e, *_ = _room()
+    # Trusted (`author:test`): since 2026-10-09 an untrusted list brings nobody into a
+    # fight (`Engine.validate`, "top of his skull"), and the planner's fight schema never
+    # offered `introduce`. What is pinned here is the placeholder's order, not who may
+    # make people.
     intents = e.validate([
         {"op": "introduce", "params": {"who": "a drover warming his hands"}},
         {"op": "cast", "actor": "pc", "params": {"spell": "magic-missile", "at": "new1"}},
-    ])
+    ], origin="author:test")
     outs = e.run(intents).outcomes
     made = next(x["bound"]["new1"] for o in outs for x in o.effects
                 if x.get("kind") == "introduce")

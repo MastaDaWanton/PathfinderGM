@@ -358,9 +358,18 @@ class GMAgent:
         tended = acts_to_ops.first_aid(
             self.rows, read_ok, self.engine.scene,
             ask=interpret.confirm_first_aid if interpret.ENABLED else None)
+        # A blow lands on a real person here — "the closest person", "a civilian", a
+        # rampage — or the turn says there is nobody to strike (`acts_to_ops.victims`; the
+        # owner, 2026-10-09). Who the words could mean is asked once, of the people
+        # standing here; the nearest of them is the engine's answer.
+        struck = acts_to_ops.victims(
+            self.rows, read_ok, self.engine.scene,
+            ask=interpret.confirm_victims if interpret.ENABLED else None)
         if read_ok is not None:
             if tended:
                 read_ok["first_aid"] = tended
+            if struck:
+                read_ok["struck"] = struck
             read_ok["table"] = [r.record() for r in self.rows]
             if held_back:
                 read_ok["sales_held_back"] = held_back
@@ -412,6 +421,14 @@ class GMAgent:
         if missing:
             brief += ("\n\nNOT HERE (fact — the turn says so, and nothing is made to fill "
                       "it): " + "; ".join(missing) + ".")
+        aimed = [(i["target"], self.engine.scene.actors[i["target"]].name)
+                 for r in self.rows if r.act in acts_to_ops.VIOLENT_ACTS
+                 for i in r.intents if i["target"] in self.engine.scene.actors]
+        if aimed:
+            # Who the blow lands on is settled before the plan (`acts_to_ops.victims`),
+            # so the plan and the prose are told it as fact rather than left to pick.
+            brief += ("\n\nTHE PLAYER'S BLOW (fact — the engine aims it; attack this ref, "
+                      "bring nobody in): " + "; ".join(f"{n} ({r})" for r, n in aimed) + ".")
         if beyond:
             brief += ("\n\nBEYOND THEIR MEANS (fact — nothing on the sheet does it; no op "
                       "for it, the engine prints the refusal): "
@@ -426,7 +443,10 @@ class GMAgent:
         self.packed: dict = {}
         base = build(brief, history, player_input, in_combat=fighting,
                      enemy=self._current_enemy(), report=self.packed,
-                     ledger=getattr(self, "ledger", None))
+                     ledger=getattr(self, "ledger", None),
+                     # The budget is measured on the planner's own tokeniser
+                     # (gm/window.py); a fallback model is held to it by client.chat.
+                     model=self.model)
         messages = base
 
         attempts: list[Attempt] = []
@@ -604,15 +624,20 @@ class GMAgent:
                 # an untargeted attack with a `legality` error and legality errors
                 # regenerate rather than repair: five attempts, then the turn is gone.
                 #
-                # Three mechanical repairs, in dependency order. The misaim check first,
-                # because it reads the *model's* target before anything fills one in: an
-                # attack aimed at a valid ref that is not the person the player named
-                # gets the named person spawned and the attack moved onto them — the
-                # playtest stabbed a dying gatekeeper three scenes away because the
-                # winged woman in the narration had never been made real. Then the
-                # lone-candidate fill, then the survival injection, which appends `rest`,
-                # `eat` and `drink` for the sleep and meals both models narrate and
-                # neither ever proposes, worked example notwithstanding.
+                # The lone-candidate fill, then the survival injection, which appends
+                # `rest`, `eat` and `drink` for the sleep and meals both models narrate
+                # and neither ever proposes, worked example notwithstanding.
+                #
+                # An attack's target is RESOLVED against the people here, never minted
+                # from the player's words. The misaim repair that stood first in this list
+                # (2026-08-22, the winged woman never made real) read the victim out of the
+                # sentence with a regex and spawned whoever it found there; on 2026-10-08
+                # it read "I attack the top of his skull" and spawned a thug called "top of
+                # his skull", which joined the fight and killed the player. Its own case is
+                # the beat reader's now: anybody the narration shows out of a fight is a
+                # full actor at once (seen people are real, 2026-10-01), so the plan's
+                # schema already offers her ref; in a fight nobody comes in on a turn's
+                # words at all (`Engine.validate`, the fight rule).
                 raw = data.get("intents")
                 # The ops the player's words committed the turn to, which the schema asks
                 # for as required keys because Ollama does not enforce `contains`
@@ -626,8 +651,8 @@ class GMAgent:
                 if conjured:
                     self.reading.setdefault("dropped_gifts", []).extend(conjured)
                 # First, because everything downstream reads the shapes this
-                # straightens: a target pocketed in params is invisible to the misaim
-                # check, and an invented param is a schema refusal five lines later.
+                # straightens: a target pocketed in params is invisible to the target
+                # checks, and an invented param is a schema refusal five lines later.
                 raw = judgement.split_plural_targets(raw)
                 # An introduce placeholder nothing introduced (`attack new1`) is the
                 # person the plan plainly meant, before anything fills a target or
@@ -649,11 +674,9 @@ class GMAgent:
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 # A thing thrown or swung is an improvised-weapon attack that names
-                # the thing — before the misaim check reads "the man" it was thrown
+                # the thing — before the target fill reads "the man" it was thrown
                 # at, and before anything can dress the throw as a spell.
                 raw = judgement.inject_improvised(raw, player_input, self.engine.scene)
-                raw = judgement.repair_misaimed_attack(
-                    raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 # The stat block a person the plan introduces walks on with, read off
                 # their words the way the prose's people always were (`template_for`).
@@ -796,10 +819,12 @@ class GMAgent:
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
                 raw = judgement.bulk_give_is_a_loot(raw, self.engine.scene)
                 raw = judgement.inject_loot(raw, player_input, self.engine.scene)
-                # Last, and after the target fills: a fight the player declared and the
-                # GM only described. Runs once there is certainly nobody to fight, so it
-                # cannot steal a turn from `fill_obvious_targets`.
-                raw = judgement.inject_fight(raw, player_input, self.engine.scene)
+                # Last, and after the target fills: the blow the reading declared, on the
+                # person the table found for it (`acts_to_ops.victims`) — the plan's own
+                # blow aimed there, or the table's added — and nobody made to receive it.
+                raw = judgement.inject_fight(raw, player_input, self.engine.scene,
+                                             rows=self.rows, frame=read_ok,
+                                             notes=own_words)
                 # Somebody's house: the engine's knock, in place of a walk into a
                 # place that is not one yet (docs/the-population.md, calling on people).
                 # Breaking in first: "I break into her house" is not a knock.
@@ -1107,7 +1132,8 @@ class GMAgent:
         does NOT skip is a single line of the engine's bookkeeping. It also skips the
         injector chain `plan_turn` runs, deliberately: those read the player's words as a
         declaration of what THEIR CHARACTER does, and `/cheat I defeat all the enemies`
-        run through `inject_fight` would spawn somebody to fight.
+        run through the injectors would have spawned somebody to fight (`inject_fight`
+        did, until 2026-10-09).
         """
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places(),
@@ -1992,6 +2018,10 @@ class GMAgent:
             text, truth, truth_attempts = self._truth_pass(ctx)
             repairs += truth
             attempts += truth_attempts
+            # What the checks found false against the engine and took off the page: the
+            # aftermath makes nobody out of it (docs/narrator-after-defeat.md).
+            if isinstance(self.attribution, beat_reader.Reading):
+                self.attribution.strike(text)
         # A name on the wrong person — the words name one man, the sentence is about
         # another: one targeted rewrite (stage 3 of the note).
         if self.attribution.misnamed():
@@ -2042,6 +2072,8 @@ class GMAgent:
                                f"and wrote the world's answer")
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
+            if isinstance(attribution, beat_reader.Reading):
+                attribution.strike_sentences(risen)
         # A door the dice held, opened anyway after the rewrite: cut from the opening on.
         text, forced = narration_mod.hold_the_door(text, getattr(self, "doors", None))
         if forced:
@@ -2226,6 +2258,8 @@ class GMAgent:
         if alone:
             text, ghosts = narration_mod.cut_phantom_opposition(text)
             if ghosts:
+                if isinstance(attribution, beat_reader.Reading):
+                    attribution.strike_sentences(ghosts)
                 repairs.append(
                     f"phantom opposition: cut {len(ghosts)} sentence(s) of enemies "
                     f"who are not in the scene")
@@ -3207,8 +3241,12 @@ class GMAgent:
                      pull: dict | None = None,
                      claim: str = "",
                      shown: list[str] | None = None,
-                     beat: int = 0) -> tuple[str, list[str], list[Attempt]]:
+                     beat: int = 0,
+                     since: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
+
+        `since`: the engine's lines that carried the scene on after the last narrated beat
+        (`narration.since_narrated`), for the prompt (docs/narrator-after-defeat.md).
 
         The other half of `intents_first`. Here the prose call is the only one there is,
         so every check that used to run over call 1's narration runs over this instead —
@@ -3253,7 +3291,8 @@ class GMAgent:
             # What the player did before setting off, in their words: on an arrival it
             # opens the block, so the beat starts where they were (owner, 2026-10-01).
             before_leaving=[str(d.get("span")) for d in self._deeds_for_the_page(
-                player_input, outcomes) if d.get("before_move") and d.get("span")])
+                player_input, outcomes) if d.get("before_move") and d.get("span")],
+            since=since, model=self.prose_model)
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200,

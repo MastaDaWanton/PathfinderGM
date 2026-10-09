@@ -679,6 +679,12 @@ def _state(c) -> dict:
             # What companions have told the player about their own lives (gm/confide.py),
             # for the Journal: known to the player, so shown; a hint shown as a hint.
             "confided": _confided_state(c),
+            # The player cannot take a turn (dying, senseless, held): the combat bar has
+            # nothing to offer them — every button is the 409 "… is in no condition to
+            # act." the 2026-10-08 report's player clicked into — and Say or Continue
+            # carries them on through the downed door (`say`). Appended last, as the
+            # state's key order is a contract (tests/test_s3_aftermath_and_api.py).
+            "pc_down": downed.state_of(pc) not in ("fine", "disabled") if pc else False,
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -700,6 +706,10 @@ def _state(c) -> dict:
         # turn's state lands, without a fetch of its own. The rows themselves are
         # `GET api/works`, asked only while the panel or a bench's group is on screen.
         "works": _works_summary(c, pc),
+        # A campaign that ended inside this request — the player killed on the creatures'
+        # turns — says so in the state every door returns, not only in the say door's own
+        # payload: the page shows the death with the turn that dealt it (02-state.js).
+        **(_ended_payload(c) if getattr(c, "ended", "") else {}),
     }
 
 
@@ -2725,7 +2735,15 @@ def say(request):
         c.transcript.append(beat)
         outcome = downed.resolve(c)
         for line in outcome.lines:
-            c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+            # `moved_on`: the scene was carried on here by the engine with no narrated
+            # beat — an hour gone, the winners robbing the player and leaving — so the
+            # next prose call is shown these lines as where the scene now stands
+            # (`narration.since_narrated`). Without them it was shown only the fight, as
+            # "the scene as it stands, which you are continuing", and wrote the raiders
+            # lunging at the wagon an hour after they had gone (2026-10-09,
+            # docs/narrator-after-defeat.md).
+            c.transcript.append({"who": "gm", "text": line, "kind": "consequence",
+                                 "moved_on": True})
         # On the record, which this path never was: the owner's save of 2026-10-04 has
         # the bleeding, the hour and "whoever was standing over you has gone" in its
         # transcript and not one turn-log entry for any of it, so nothing said which
@@ -2756,6 +2774,32 @@ def say(request):
     if place is not None:
         return _the_way_there(c, place, text, typed, acting, claim, beat)
     return _keep_the_spell(c, acting, _plan_and_run(c, text, acting, claim, attached))
+
+
+def _gone_since_narrated(c) -> list[str]:
+    """The names of everybody the engine moved out of the scene since the narrator's last
+    beat, and who is still not here: its own `left` records on the turn log after the last
+    `prose` row (the downed door writes them when the winners rob the player and go,
+    `rules/defeat.py`). For `prompts.scene_now`, which says it once, on the beat after.
+    Read off the engine's record of what it did, never the page."""
+    log = list(getattr(c, "turn_log", None) or [])
+    last = max((i for i, r in enumerate(log) if isinstance(r, dict)
+                and r.get("kind") == "prose"), default=-1)
+    refs: list[str] = []
+    for row in log[last + 1:]:
+        if not isinstance(row, dict):
+            continue
+        effects = list(row.get("effects") or [])
+        for o in row.get("outcomes") or []:
+            if isinstance(o, dict):
+                effects += list(o.get("effects") or [])
+        for e in effects:
+            if isinstance(e, dict) and e.get("kind") == "left" and e.get("ref"):
+                refs.append(str(e["ref"]))
+    here = getattr(c.scene, "actors", {}) or {}
+    people = getattr(c.scene, "people", {}) or {}
+    return [str(people[r].name) for r in dict.fromkeys(refs)
+            if r in people and r not in here]
 
 
 def _keep_the_spell(c, acting: tuple, resp):
@@ -4081,7 +4125,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 # prompt with the scene as it stands (the ruling, 2026-09-18).
                 scene_now=(prompts.scene_now(
                                c.scene, was_clock=getattr(resolution, "clock_before", None),
-                               outcomes=resolution.outcomes)
+                               outcomes=resolution.outcomes,
+                               gone=_gone_since_narrated(c))
                            + (("\n\n" + judgement.standing_action(c.scene))
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
                               else "")
@@ -4095,7 +4140,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 shown=narration_mod.own_prose(c.transcript, tagged=True),
                 # How far in this beat is: which of the table's intimate-scene passages
                 # are shown turns over with it (gm/intimate.py `select`).
-                beat=len(c.transcript))
+                beat=len(c.transcript),
+                # Where the engine carried the scene after the last narrated beat (the
+                # downed door), shown as where it stands now (docs/narrator-after-defeat.md).
+                since=narration_mod.since_narrated(c.transcript))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first
@@ -4850,9 +4898,24 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     location = c.location
     events = _recent_events(world, location)
 
+    # The player down is not the fight over, and it is not a licence for the order to run
+    # its whole budget either. Measured 2026-10-08 in the caravan ambush (gemma-4-12B,
+    # reproduced live): the player fell on the first raider's blow, the order skipped them
+    # from then on, and this loop gave three creatures four rounds each in one reply —
+    # twelve turns, two model calls apiece, 180 s — the player killed in the second and
+    # struck as a corpse for two more ("You are already dead; the blow falls on a corpse"),
+    # every beat the same three attacks again. So: the downed player's slot still ends the
+    # round (`advance_turn(halt_on=…)`), and nobody acts once the player is dead.
+    pc_ref = getattr(scene.pc(), "ref", None)
+
+    def player_down() -> bool:
+        return downed.state_of(scene.pc()) not in ("fine", "disabled")
+
     # Twice the order: one full round, plus room for the arrivals a spawn mid-fight
     # inserts into it.
     for _ in range(max(limit, len(scene.initiative) * 2)):
+        if _the_player_died(c):
+            return
         # A side with nobody standing means the fight is over.
         if scene.sides and scene.sides_standing() <= 1:
             # Settled while the sides are still declared — the same payout the
@@ -4864,7 +4927,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             scene.end_encounter()
             return
 
-        ref = scene.advance_turn()
+        ref = scene.advance_turn(halt_on=pc_ref if player_down() else None)
         # Anyone bleeding out at the top of the round gets said out loud. A character
         # losing a hit point a round towards death, silently, is the sort of thing a
         # player finds out about only when they are dead.
@@ -4878,8 +4941,18 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # A construct saved "dying" before the house rule, settled on its tick.
                 "broken": f"{name} is broken: inert, but not destroyed.",
             }[b["outcome"]]
+            # The player is "you" here as in every other line on the page: this read
+            # "Aldric Vane is bleeding out." about the one reading it.
+            if who is not None and who.is_pc:
+                line = {"dead": "You stop moving.",
+                        "stable": "You are still down, but the bleeding has stopped.",
+                        "dying": "You are bleeding out.",
+                        "broken": "You are broken: inert, but not destroyed."
+                        }[b["outcome"]]
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
         scene.bleeding = []
+        if _the_player_died(c):
+            return
 
         # And whatever is standing in the scene did at the top of the round: the fire in
         # an incendiary cloud, the squeeze of black tentacles, a fog lifting. The same
@@ -4899,7 +4972,15 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             return
         actor = scene.get(ref)
         if actor is None or actor.is_pc:
-            return                       # back to the player; stop and wait for input
+            # Back to the player; stop and wait for input. Down, they are told so once:
+            # their next line, or Continue, goes through the downed door (`say`), which
+            # carries them on by the rules — the bleeding, the waking, what the winners do.
+            if actor is not None and player_down():
+                line = downed.still_down_line(actor)
+                if line and not any(b.get("text") == line for b in c.transcript[-4:]):
+                    c.transcript.append({"who": "gm", "text": line,
+                                         "kind": "consequence"})
+            return
         # A creature holding its ground neither attacks nor flees while it holds
         # (`state.holding-ground`, playtest 2026-09-30 item 8): its turn is that, said,
         # and no model is asked to invent a reason it would do otherwise. The engine
@@ -5058,7 +5139,31 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     # rather than advanced, because advancing ticks rounds and expires holds — the
     # skipped creatures lose their turn, which is a mercy to the player, not a
     # round of free time for anyone.
+    if _the_player_died(c):
+        return
     _hand_the_turn_back(c, "The scuffle blurs; the moment comes back to you.")
+
+
+def _the_player_died(c) -> bool:
+    """The player's character is dead: the campaign ends here, in this reply, and the
+    page shows the death with the turn that dealt it (`_state` carries `ended`).
+
+    It used to end only on the player's NEXT request, through `say`'s downed door: the
+    2026-10-08 report's character was killed on the creatures' turns, the combat panel
+    stayed live, its Attack came back 409 "… is in no condition to act." (51 bytes), and
+    only a typed line reached the death screen. Settled once; True whenever it is so."""
+    if getattr(c, "ended", ""):
+        return True
+    pc = c.scene.pc()
+    if pc is None or downed.state_of(pc) != "dead":
+        return False
+    c.transcript.append({"who": "gm", "text": downed.death_notice(pc), "kind": "consequence"})
+    c.turn_log.append(history_mod.stamp(c, {"kind": "downed", "state": "dead",
+                                            "lines": [downed.death_notice(pc)],
+                                            "effects": []}))
+    c.suggestions = []
+    _end_campaign(c, pc)
+    return True
 
 
 def _log_mentions(c, agent) -> None:

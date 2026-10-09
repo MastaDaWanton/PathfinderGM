@@ -138,16 +138,16 @@ def test_nobody_is_created_for_a_person_the_player_named_who_is_not_here(scene):
         all(a.is_pc for a in scene.actors.values()), "the scene gained nobody"
 
 
-def test_the_prose_describing_an_arrival_still_creates_them(scene):
-    """The narrow exception, and the reason the repair exists: the NARRATION describing
-    people arriving is an arrival. The test is whose word it was — the player naming
-    somebody is a question, and a question may be answered no."""
+def test_an_invented_ref_makes_nobody_even_beside_an_arrival(scene):
+    """The narrow exception this repair kept until 2026-10-09 — an invented `bravo1` beside
+    an arrival in the player's sentence spawned the bravos — is closed with the rest: the
+    misaim repair's twin made a thug called "top of his skull" on 2026-10-08, and the
+    owner ruled that nobody is minted from words. Arrivals are the beat reader's to make
+    from its closed "new" answer; a ref nobody holds is validation's refusal."""
     raw = [{"op": "attack", "actor": "pc", "target": "bravo1", "params": {}}]
-    amended = judgement.repair_unknown_refs(
+    assert judgement.repair_unknown_refs(
         raw, "two guild bravos come round the corner and I swing at one", scene,
-        world=WORLD)
-    assert amended is not None
-    assert amended[0]["op"] == "spawn"
+        world=WORLD) is None
 
 
 def test_the_brief_states_the_answer_before_the_prose_is_written(scene):

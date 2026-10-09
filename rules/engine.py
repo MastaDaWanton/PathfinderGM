@@ -921,13 +921,20 @@ class Scene:
         a = self.actors.get(ref)
         return a is not None and not a.is_down
 
-    def advance_turn(self) -> str | None:
+    def advance_turn(self, halt_on: str | None = None) -> str | None:
         """Move to the next combatant who can still act, and return their ref.
 
         Skips the dead and unconscious rather than stalling on them, and ends the
         encounter when only one side is left standing. Without this a fight had no way
         to proceed past the player's first swing: initiative was rolled and then nothing
         ever consulted it.
+
+        `halt_on` is a ref whose slot stops the walk whether or not they can act — the
+        player's, when they are down. Their turn still comes round (1e has the dying act
+        on their own initiative, if only to bleed), and it is where one request's share of
+        the fight ends. Without it the order skipped the downed player and the enemy loop
+        ran its whole budget: measured 2026-10-08, twelve creature turns, four rounds, 180 s
+        of model calls in one reply, the player killed and then struck as a corpse.
         """
         if not self.initiative:
             return None
@@ -936,7 +943,7 @@ class Scene:
         self.hazards = []
         self.bleeding = []
         for _ in range(self.MAX_SKIPPED_ROUNDS):
-            ref = self._next_able()
+            ref = self._next_able(halt_on)
             if ref is not None:
                 return ref
             # Nobody could act this round. If anybody is still in the fight the holds
@@ -959,7 +966,7 @@ class Scene:
     # any hold the game ships.
     MAX_SKIPPED_ROUNDS = 20
 
-    def _next_able(self) -> str | None:
+    def _next_able(self, halt_on: str | None = None) -> str | None:
         """One pass down the initiative order from wherever the turn is."""
         # The holder left and their successor sits in this slot (`leave_order`): the pass
         # starts ON it. Step 0 cannot roll the round over — `reached` is `turn` itself —
@@ -1020,6 +1027,9 @@ class Scene:
                 # narrated and the fight simply ended with no reason given.
                 self.hazards.extend(self.tick_standing(1))
             ref = self.initiative[nxt][0]
+            if halt_on is not None and ref == halt_on:
+                self.turn = nxt          # their slot, able or not (`advance_turn`)
+                return ref
             # The one caller that wants "can act now" rather than "still in the fight":
             # a stunned combatant stays in the initiative order and on the panel, and
             # loses this turn. Asked separately since `conscious` stopped conflating
@@ -2670,6 +2680,25 @@ class Engine:
             # Only on the trusted path, before anything reorders the list: a door's raw
             # dicts pair one-for-one with what `parse_all` made of them here.
             _link_gates(raw_intents, intents, str(origin))
+        elif self.scene.in_encounter:
+            # No bodies in a fight on a turn's words. The people in a fight are the ones
+            # in it: a turn's plan aims at their refs and brings nobody in. The planner's
+            # fight schema never offered `spawn` or `introduce` (prompts._FIGHT_OPS) and
+            # the beat reader makes no body mid-fight (seen_people) — but code repairs
+            # did, behind both: on 2026-10-08 the misaim repair turned "I attack the top
+            # of his skull" into `spawn name="top of his skull"`, a thug that joined the
+            # fight and killed the player. This is the one structural check under every
+            # such door, present and future, whatever words they read: an untrusted
+            # list (no `origin` — a start, a scheme, the author's cheat carry one) may not
+            # make anybody while a fight is on.
+            for i, intent in enumerate(intents):
+                if intent.op in ("spawn", "introduce"):
+                    here = ", ".join(r for r in self.scene.actors) or "nobody"
+                    raise IntentError(
+                        f"{intent.op}: nobody comes into a fight on a turn's plan. The "
+                        f"people in it are the ones here ({here}): aim at one of their "
+                        f"refs, and bring nobody in.", "legality", i,
+                        code="no_bodies_in_a_fight")
         # A place the plan founds, then goes to: the founding first. Measured live
         # 2026-09-26, a plan wrote `travel` to "the tavern" BEFORE the `found` that made
         # it — the list resolves in order, so the walk went looking for a place that did
@@ -4639,6 +4668,16 @@ class Engine:
         who = self.scene.people.get(ref) if hasattr(self.scene, "people") else None
         at = str(getattr(self.scene, "at", "") or "")
         if who is None or not at or who.at == at:
+            return False
+        # Never a foe. Somebody hostile to the player comes back through the engine's own
+        # doors — an encounter, the battle gate, `defeat.settle` walking the robbers in
+        # when their hideout exists — and never on the prose's word: measured 2026-10-09
+        # (docs/narrator-after-defeat.md), the raiders who had robbed the player and gone
+        # were narrated lunging at the wagon an hour later, and this door is the one the
+        # page's people come through. Read off the attitude track, the one source of truth.
+        from . import attitude as attitude_mod
+
+        if attitude_mod.of(who, default="") == attitude_mod.HOSTILE:
             return False
         self.scene.move(ref, at)
         return True

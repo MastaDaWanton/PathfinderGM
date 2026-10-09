@@ -1421,6 +1421,12 @@ SAFETY_TOKENS = 600
 # the model's own `prompt_eval_count`, which counts the chat template's wrapping too
 # while we only count message content — so the ratio already absorbs that overhead and
 # errs low. 3.6 keeps a margin under the worst case on top of SAFETY_TOKENS.
+#
+# Since 2026-10-08 this is the CEILING, not the ratio: a player's world ran 3.2 on the
+# same model and the full budget filled the window to 16,250 of 16,384 tokens.
+# `gm/window.py` reads each call's real count and sizes the next prompt from the worst
+# recent reading, never above this. PROMPT_BUDGET_CHARS below is therefore the most a
+# prompt is ever given; `pack` asks `window.prompt_budget_chars(model)` for the real one.
 CHARS_PER_TOKEN = 3.6
 PROMPT_BUDGET_CHARS = int(
     (NUM_CTX - MAX_COMPLETION_TOKENS - SAFETY_TOKENS) * CHARS_PER_TOKEN)
@@ -1446,9 +1452,9 @@ def _from_a_user(messages: list[dict]) -> list[dict]:
 
 
 def pack(head: list[dict], examples: list[dict], history: list[dict],
-         tail: list[dict], *, budget: int = PROMPT_BUDGET_CHARS,
+         tail: list[dict], *, budget: int | None = None,
          keep: int = KEEP_EXCHANGES, report: dict | None = None,
-         ledger: list[dict] | None = None) -> list[dict]:
+         ledger: list[dict] | None = None, model: str | None = None) -> list[dict]:
     """Fit the turn into the budget, deciding what goes rather than letting the server.
 
     The order is stated and tested: the system message and the player's own line are
@@ -1463,8 +1469,19 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     (tests/test_undercurrent_survives_packing.py). NovelAI's Memory and SillyTavern's
     story string are the same answer: standing notes in their own slot, outside the
     history that gets trimmed.
+
+    `budget`, when not given, is the window measured for `model` (gm/window.py): the
+    shipped `PROMPT_BUDGET_CHARS` until the model has been seen to tokenise worse than
+    our fixture world, and smaller from then on. Measured 2026-10-08: a player's world ran
+    3.2 characters a token against the 3.6 this was sized with, and the full budget filled
+    the window to 16,250 of 16,384 tokens, leaving the reply 134.
     """
     from play.opening import NOTE_PREFIX
+
+    if budget is None:
+        from . import window
+
+        budget = window.prompt_budget_chars(model)
 
     original = history
     pinned = [m for m in history if str(m.get("content", "")).startswith(NOTE_PREFIX)]
@@ -1591,7 +1608,8 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
                       extra_briefing: str = "",
                       player_message: dict | None = None,
                       ledger: list[dict] | None = None,
-                      briefing: str | None = None) -> list[dict]:
+                      briefing: str | None = None,
+                      model: str | None = None) -> list[dict]:
     """The turn prompt, in one of two modes.
 
     Out of a fight the model is shown long examples and asked to build a scene. In one it
@@ -1621,7 +1639,9 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
         shown.append({"role": "assistant",
                       "content": fill_enemy(json.dumps(ex["reply"]), enemy)})
     tail = [player_message or {"role": "user", "content": player_input}]
-    return pack(head, shown, list(history), tail, report=report, ledger=ledger)
+    # `model`: whose tokeniser the budget is measured on (gm/window.py).
+    return pack(head, shown, list(history), tail, report=report, ledger=ledger,
+                model=model)
 
 
 # --- intents first, prose afterwards -----------------------------------------------------
@@ -1653,7 +1673,8 @@ know what actually happened, which you do not. Emit only the intents.
 def call_one_intents_only(briefing_scene: str, history: list[dict], player_input: str,
                           in_combat: bool = False, enemy: str | None = None,
                           report: dict | None = None,
-                          ledger: list[dict] | None = None) -> list[dict]:
+                          ledger: list[dict] | None = None,
+                          model: str | None = None) -> list[dict]:
     """The same turn prompt, with the prose taken out of the examples as well.
 
     The first cut left the examples' narration in place and measured 26.8s a turn against
@@ -1669,7 +1690,7 @@ def call_one_intents_only(briefing_scene: str, history: list[dict], player_input
     """
     messages = call_one_messages(briefing_scene, history, player_input,
                                  in_combat=in_combat, enemy=enemy, report=report,
-                                 ledger=ledger)
+                                 ledger=ledger, model=model)
     messages[0] = {"role": "system",
                    "content": messages[0]["content"] + "\n" + INTENTS_ONLY_EXTRA}
     out = [messages[0]]
@@ -1900,7 +1921,7 @@ EARLIER_BEATS = 2
 EARLIER_CHARS = 1400
 
 
-def scene_now(scene, was_clock: int | None = None, outcomes=None) -> str:
+def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> str:
     """The scene as it stands this moment, derived from engine state, for the END of
     the prose prompt.
 
@@ -1945,6 +1966,16 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None) -> str:
     for mood in ("hostile", "unfriendly", "friendly", "helpful"):
         if mood in moods:
             facts.append(f"{mood} towards the player: {', '.join(moods[mood])}")
+    # Who left since the narrator last spoke (`gone`, the engine's own `left` records —
+    # `views._gone_since_narrated`): not here, so nothing they do is in this beat. Only on
+    # the beat after they went, never as a standing line (`hour_now`'s reasoning: a line
+    # that is always there is a formula). Measured 2026-10-09: the raiders who robbed the
+    # player and went were written lunging at the wagon on the next Continue
+    # (docs/narrator-after-defeat.md).
+    gone = [str(g) for g in gone or () if g]
+    if gone:
+        facts.append(f"GONE from here since the last passage, and taking no part in this "
+                     f"one: {', '.join(gone)}")
     heat = getattr(scene, "heat", None) or {}
     if heat.get("note"):
         facts.append(f"what the crowd just saw: {heat['note']}")
@@ -2145,8 +2176,14 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
                         scene_now_block: str = "", pull: str = "",
                         claim: str = "", scene_mode: str = "",
                         demonstrations: list[dict] | None = None,
-                        before_leaving: list[str] | None = None) -> list[dict]:
+                        before_leaving: list[str] | None = None,
+                        since: list[str] | None = None,
+                        model: str | None = None) -> list[dict]:
     """Write the whole turn, after the dice.
+
+    `since` is the engine's own lines that carried the scene on after the narrator's last
+    beat (`narration.since_narrated`): shown after the earlier beats, as where the scene
+    now stands, and the earlier beats are then called what they are — before it.
 
     `before_leaving` is the player's own words for each deed they declared before a move
     this turn (`narration.owed_deeds`, `before_move`); on an arrival it opens the block.
@@ -2237,9 +2274,24 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     # scene an arrival owes.
     if arriving:
         stood = []
-    scene = ("What you narrated just before this — the scene as it stands, which you "
-             "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
-             if stood else "")
+    moved_on = [s for s in (since or []) if s] if not arriving else []
+    if moved_on:
+        # The engine carried the scene on with no narrated beat (the downed door: the
+        # hour, the robbery, who went). Measured 2026-10-09 (docs/narrator-after-defeat.md):
+        # shown only the fight, under "the scene as it stands, which you are continuing",
+        # the Continue after the robbery had the departed raiders lunge at the wagon. The
+        # fight stays in view — the road, the wagons, the wagon master are still the
+        # scene — but is called what it is, and the engine's lines come after it, last
+        # of the scene, as where it stands now.
+        scene = (("What you narrated earlier — the scene as it was then:\n\n"
+                  + "\n\n".join(stood) + "\n\n" if stood else "")
+                 + "SINCE THEN (the engine's own lines, already read by the player — do not "
+                 "repeat them; the scene stands HERE now, and goes on from this):\n"
+                 + "\n".join(f"- {s}" for s in moved_on) + "\n\n")
+    else:
+        scene = ("What you narrated just before this — the scene as it stands, which you "
+                 "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
+                 if stood else "")
     # Built BEFORE packing, both of them. This function used to call
     # `call_one_messages` and then rewrite its system message and its last user message
     # to bigger ones, which meant the prompt grew after the budget had already decided
@@ -2271,12 +2323,12 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
             briefing_scene, history, player_input, in_combat=False, enemy=enemy,
             examples=list(demonstrations or []),
             extra_briefing=SAY_TAGS, player_message=final, ledger=ledger,
-            briefing=INTIMATE_BRIEFING)
+            briefing=INTIMATE_BRIEFING, model=model)
     return call_one_messages(
         briefing_scene, history, player_input, in_combat=in_combat, enemy=enemy,
         examples=(CARRY_ON_EXAMPLES if player_input == CARRY_ON else None),
         extra_briefing=PROSE_AFTER_EXTRA + content_line(fade=scene_mode == "fade"),
-        player_message=final, ledger=ledger)
+        player_message=final, ledger=ledger, model=model)
 
 
 def content_line(fade: bool = False) -> str:

@@ -198,42 +198,25 @@ def test_there_is_no_fallback_for_a_creature_that_cannot_act(scene):
 
 # --- Creating the people the GM was already talking about ------------------------------
 
-def test_invented_refs_become_a_spawn(scene):
-    """The recurring loss: the player writes "two guild bravos come round the corner",
-    the GM answers with `attack thug1`, the registry refuses it — correctly, people must
-    not be inventable by naming them — and five attempts later the turn is gone. It has
-    an example and a hint pointing at spawn and still does this, so the repair is done in
-    code rather than asked for a third time.
-    """
-    raw = [{"op": "attack", "actor": "pc", "target": "thug1"},
-           {"op": "attack", "actor": "thug2", "target": "pc"}]
-    out = judgement.repair_unknown_refs(
-        raw, "I put my back to the wall and draw.", scene)
-
-    assert out[0]["op"] == "spawn"
-    # Two, because the GM named two — not because the player said a number. How many
-    # enemies there are is the GM's to decide.
-    assert out[0]["params"]["count"] == 2
-    assert out[1]["target"] == "c2" and out[2]["actor"] == "c3"
-
-
-def test_the_repair_reaches_opposed_by_as_well(scene):
-    """A turn was lost to `opposed_by: {ref: "thug1"}` while only actor and target were
-    being repaired — the ref registry refuses every place a ref can appear, so the repair
-    has to reach every one of them too."""
-    raw = [{"op": "check", "actor": "pc",
-            "params": {"skill": "stealth",
-                       "opposed_by": {"ref": "thug1", "skill": "perception"}}}]
-    out = judgement.repair_unknown_refs(raw, "I keep to the shadows.", scene)
-    assert out[0]["op"] == "spawn"
-    assert out[1]["params"]["opposed_by"]["ref"] == "c2"
-
-
-def test_the_repair_reads_the_creature_from_the_players_words(scene):
-    raw = [{"op": "attack", "actor": "watch1", "target": "pc"}]
-    out = judgement.repair_unknown_refs(
-        raw, "I back away from the watchman coming down the alley.", scene)
-    assert out[0]["params"]["template"] == "watchman"
+@pytest.mark.parametrize("raw,said", [
+    ([{"op": "attack", "actor": "pc", "target": "thug1"},
+      {"op": "attack", "actor": "thug2", "target": "pc"}],
+     "I put my back to the wall and draw."),
+    ([{"op": "check", "actor": "pc",
+       "params": {"skill": "stealth", "opposed_by": {"ref": "thug1",
+                                                     "skill": "perception"}}}],
+     "I keep to the shadows."),
+    ([{"op": "attack", "actor": "watch1", "target": "pc"}],
+     "I back away from the watchman coming down the alley."),
+])
+def test_invented_refs_make_nobody(scene, raw, said):
+    """Until 2026-10-08 an invented ref (`thug1`, `watch1`) was turned into a spawn here,
+    named and templated from the ref's and the player's words. It was the twin of the
+    misaim repair that made a thug called "top of his skull" and killed the player that
+    day; the owner's ruling (2026-10-09) is that no door mints a person from words. A ref
+    nobody holds is validation's refusal, which names the refs that exist; the people
+    who arrive are the beat reader's to make, from its closed "new" answer."""
+    assert judgement.repair_unknown_refs(raw, said, scene) is None
 
 
 def test_a_real_ref_that_is_simply_wrong_is_left_alone(scene):
@@ -355,51 +338,28 @@ def test_a_conscious_thug_still_is(scene):
     assert judgement.fill_obvious_targets(raw, scene)[0]["target"] == "c1"
 
 
-def test_an_attack_on_somebody_who_does_not_exist_creates_them(stale_scene):
-    """The playtest turn, replayed: the narration had introduced a winged woman, she was
-    never spawned, the player wrote "I rush the winged woman and run her through", and
-    the GM answered `attack c1` — a valid ref belonging to the dying gatekeeper three
-    scenes away. Every check passed and the wrong man was stabbed to -4."""
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    amended = judgement.repair_misaimed_attack(
-        raw, "I don't trust her. I rush the winged woman and run her through.",
-        stale_scene)
-    assert amended is not None
-    assert amended[0]["op"] == "spawn"
-    assert amended[0]["params"]["name"] == "winged woman"
-    assert amended[1]["op"] == "attack"
-    assert amended[1]["target"] == "c2"          # the ref the spawn will mint
-
-
-def test_naming_the_actual_target_repairs_nothing(scene):
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    assert judgement.repair_misaimed_attack(
-        raw, "I attack the thug before he can move.", scene) is None
-
-
-def test_a_pronoun_repairs_nothing(stale_scene):
-    """"I attack him" names nobody, so there is no disagreement to detect — and spawning
-    a creature called "him" would be worse than the misaim."""
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    assert judgement.repair_misaimed_attack(raw, "I attack him now.", stale_scene) is None
-
-
-def test_the_spawned_victim_survives_validation(stale_scene):
-    """The repair's output must pass the engine's own checks, projected ref and all —
-    otherwise the repair is a different way of losing the turn."""
-    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    amended = judgement.repair_misaimed_attack(
-        raw, "I charge the winged woman.", stale_scene)
-    engine = Engine(stale_scene, Dice(seed=7))
-    intents = engine.validate(amended, origin="author:test")
-    assert [i.op for i in intents] == ["spawn", "attack"]
-
-
-def test_the_template_follows_the_players_wording(stale_scene):
-    amended = judgement.repair_misaimed_attack(
-        [{"op": "attack", "actor": "pc", "target": "c1"}],
-        "I rush the guard dog and stab it.", stale_scene)
-    assert amended[0]["params"]["template"] == "guard dog"
+@pytest.mark.parametrize("raw,said", [
+    ([{"op": "attack", "actor": "pc", "target": "c1"}],
+     "I don't trust her. I rush the winged woman and run her through."),
+    ([{"op": "attack", "actor": "pc"}], "I spin and rush the careful walker, blade out."),
+    ([{"op": "attack", "actor": "pc"}], "I rush the guard dog and stab it."),
+])
+def test_the_victim_the_player_names_is_never_made_from_their_words(stale_scene, raw, said):
+    """The misaim repair (2026-08-22 to 2026-10-08) spawned whoever the player's sentence
+    named that the board did not hold: the winged woman, the careful walker, a guard dog.
+    On 2026-10-08 the same door read "I attack the top of his skull" and spawned a thug
+    called "top of his skull" that killed the player, and the owner ruled it fixed without
+    regex (2026-10-09): it is retired. A person the narration showed is a full actor the
+    moment the beat reader reads them (seen people are real, 2026-10-01) and in the plan's
+    ref enum; a person nobody showed is nobody, and nothing here makes them."""
+    assert not hasattr(judgement, "repair_misaimed_attack")
+    out = judgement.fill_obvious_targets([dict(r) for r in raw], stale_scene)
+    out = judgement.check_the_target(out, said, stale_scene) or out
+    assert not [r for r in out if r.get("op") in ("spawn", "introduce")]
+    # (`inject_fight` made an opponent out of a fight when nobody fightable was here — the
+    # one word door left, flagged to the owner on 2026-10-09 and closed the same day: a
+    # declared blow lands on a real person here or the turn says there is nobody,
+    # tests/test_declared_violence.py.)
 
 
 # --- sleep and meals declared at the table (playtest, 2026-08-22) --------------------------
@@ -462,28 +422,6 @@ def test_a_rest_the_model_proposed_is_not_doubled(scene):
         [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}],
         "I go to sleep.", scene)
     assert [r["op"] for r in out].count("rest") == 1
-
-
-def test_an_untargeted_attack_on_a_named_stranger_creates_them(scene):
-    """Found in the confirmation session, live: "I rush the careful walker, blade out"
-    came back as an attack with no target at all. The misaim repair declined it — it only
-    read targeted attacks — and `fill_obvious_targets` then handed the blow to the only
-    body in the yard, all over again. An attack with nobody on it, on a turn where the
-    player named somebody who does not exist, is aimed at that somebody."""
-    amended = judgement.repair_misaimed_attack(
-        [{"op": "attack", "actor": "pc"}],
-        "I spin and rush the careful walker, blade out.", scene)
-    assert amended is not None
-    assert amended[0]["op"] == "spawn"
-    assert amended[0]["params"]["name"] == "careful walker"
-    assert amended[1]["target"] == "c2"
-
-
-def test_an_untargeted_attack_with_no_named_victim_is_left_for_the_fill(scene):
-    """"I attack" names nobody; the lone-conscious-candidate fill is the right reading
-    there, and the misaim repair must stay out of its way."""
-    assert judgement.repair_misaimed_attack(
-        [{"op": "attack", "actor": "pc"}], "I attack!", scene) is None
 
 
 def test_a_declared_journey_moves_the_engines_ground(scene):
@@ -631,49 +569,66 @@ def _empty_room():
     return scene
 
 
-def test_a_fight_the_player_starts_actually_starts(scene):
-    """Measured in live play, four turns in a row with `outcomes: []`. "I shoulder my way
-    into the worst tavern on the street and pick a fight with the biggest bruiser in the
-    room" came back as a paragraph about a hulking mass of muscle and tattoos, no actor
-    in the scene and no encounter. The GM has a spawn op, a begin_encounter op, a worked
-    example of both and a briefing line, and narrated the fight instead of proposing it.
+def test_a_fight_declared_with_nobody_here_is_refused_never_conjured(scene):
+    """Rewritten 2026-10-09 to the owner's ruling ("if i say I attack the closest person or i
+    go on a rampage or i assault a civilian etc. it should be able to start a fight").
 
-    Same defence as `repair_unknown_refs`: the player is not deciding who exists, they
-    are declaring what they do, and the world owes them an opponent."""
-    for text in ("I shoulder my way into the tavern and pick a fight with the bruiser.",
-                 "I attack the man at the bar.", "I punch him.",
+    It used to assert the opposite: measured in live play, "I shoulder my way into the
+    worst tavern on the street and pick a fight with the biggest bruiser in the room" came
+    back as prose with nobody in the scene, so the template-thug repair made a 13-hp thug
+    from these words. The same repair, measured live on 2026-10-09 in a market of three
+    bystanders, made two bandits for "I attack the closest person" while the planner had
+    already aimed at the fruit seller beside the player. A blow lands on somebody real now
+    (`acts_to_ops.victims`), and with not a soul here the turn says so in words."""
+    from tests._violence import through_the_reading
+
+    for text in ("I attack the man at the bar.", "I punch him.",
                  "I take a swing at the nearest drunk.", "We charge the camp.",
-                 # The app writes its own suggestion chips as imperatives, and they
-                 # arrive in the box verbatim when clicked. The chip under the tavern
-                 # scene read exactly this, and a rule demanding "I" ignored the app's
-                 # own offer to start the fight.
-                 "Just start swinging at him", "Attack the watchman.",
-                 "Start swinging."):
-        out = judgement.inject_fight([{"op": "narrate_only"}], text, _empty_room())
-        ops = [i.get("op") for i in out]
-        assert "spawn" in ops and "begin_encounter" in ops, text
+                 "Just start swinging at him", "Attack the watchman.", "Start swinging.",
+                 "I attack the closest person.", "I go on a rampage."):
+        out, stop = through_the_reading([{"op": "narrate_only"}], text, _empty_room())
+        assert not [i for i in out if i.get("op") in ("spawn", "introduce",
+                                                      "begin_encounter")], text
+        assert stop == "There is nobody here to attack.", (text, stop)
+    # Into another room first: who is there is not known yet, so nothing is refused or
+    # decided here — and still nobody is made from the words.
+    out, stop = through_the_reading(
+        [{"op": "narrate_only"}],
+        "I shoulder my way into the tavern and pick a fight with the bruiser.",
+        _empty_room())
+    assert stop == "" and not [i for i in out if i.get("op") == "spawn"]
 
 
 def test_an_idiom_does_not_conjure_a_thug(scene):
-    """Each of these is a sentence a player will type, and each would otherwise create a
-    creature and roll initiative. Kept per verb: written as one shared noun list, "We
-    charge the camp" stopped being a fight because "camp" was there for "strike camp"."""
+    """Each of these is a sentence a player will type, and each used to create a creature
+    and roll initiative through the regex door. Since 2026-10-09 the reading decides: the
+    live reader read every one of them as something other than an attack (`tests._violence`),
+    so nothing is aimed at the bystander standing right there and nothing is made."""
+    from tests._violence import everyone, through_the_reading
+
     for text in ("I hit the road at first light.", "I strike a match.", "I strike camp.",
                  "I jump the queue.", "I attack the problem from another angle.",
                  "I shove the door open.", "I charge the toll and let him pass.",
                  "Should I attack him?", "I think about attacking him."):
-        out = judgement.inject_fight([{"op": "narrate_only"}], text, _empty_room())
-        assert all(i.get("op") != "spawn" for i in out), text
+        room = _empty_room()
+        room.add(instantiate("guildhand", scene=room, name="a porter")).add_condition(
+            "bystander", source="test")
+        out, stop = through_the_reading([{"op": "narrate_only"}], text, room, ask=everyone)
+        assert [i.get("op") for i in out] == ["narrate_only"] and not stop, text
 
 
 def test_being_attacked_is_not_attacking(scene):
-    """"The thug attacks me" has a violence verb and a first-person pronoun in it and is
-    a report of being hit. Co-occurrence is not enough — the pronoun has to come before
-    the verb with no other subject between them."""
+    """"The thug attacks me" has a violence verb and a first-person pronoun in it and is a
+    report of being hit. The regex needed a subject-before-verb rule to know that; the live
+    reader reads none of these as the player's attack (2026-10-09), so nothing is added."""
+    from tests._violence import everyone, through_the_reading
+
     for text in ("The thug attacks me.", "I watch as the thug attacks me.",
                  "He punches me in the ribs.", "They start fighting each other."):
-        out = judgement.inject_fight([{"op": "narrate_only"}], text, _empty_room())
-        assert all(i.get("op") != "spawn" for i in out), text
+        room = _empty_room()
+        room.add(instantiate("thug", scene=room, name="a thug"))
+        out, stop = through_the_reading([{"op": "narrate_only"}], text, room, ask=everyone)
+        assert all(i.get("op") not in ("spawn", "attack") for i in out), text
 
 
 def test_swinging_at_somebody_already_there_rolls_an_attack():
@@ -688,11 +643,12 @@ def test_swinging_at_somebody_already_there_rolls_an_attack():
     that moved were the player's when the thug swung back.
 
     So a declared attack on somebody standing there becomes an attack intent, and a
-    second opponent is never spawned."""
-    from rules.bestiary import instantiate
+    second opponent is never spawned (since 2026-10-09 from the reading, not a regex)."""
+    from tests._violence import through_the_reading
+
     room = _empty_room()
     room.add(instantiate("thug", scene=room, name="a thug"))
-    out = judgement.inject_fight([{"op": "narrate_only"}], "I attack the thug.", room)
+    out, _ = through_the_reading([{"op": "narrate_only"}], "I attack the thug.", room)
     ops = [i["op"] for i in out]
     assert "attack" in ops, ops
     assert "spawn" not in ops, "a second opponent was conjured"
@@ -708,7 +664,7 @@ def test_a_declared_attack_never_lands_on_the_players_own_companion():
     is never the obvious reading of "I attack"."""
     from rules.activeeffect import ActiveEffect
     from rules import states
-    from rules.bestiary import instantiate
+    from tests._violence import through_the_reading
 
     room = _empty_room()
     drover = room.add(instantiate("guildhand", scene=room, name="the young drover"))
@@ -717,7 +673,7 @@ def test_a_declared_attack_never_lands_on_the_players_own_companion():
         origin="test", duration="until-dismissed", tags=(states.TRAVELS_WITH_YOU,)))
     thug = room.add(instantiate("thug", scene=room, name="the thug"))
     assert drover.ref < thug.ref, "the premise: the companion is the lowest ref"
-    out = judgement.inject_fight([{"op": "narrate_only"}], "I shoot the thug again.", room)
+    out, _ = through_the_reading([{"op": "narrate_only"}], "I shoot the thug again.", room)
     hits = [i for i in out if i["op"] == "attack"]
     assert hits and all(h["target"] == thug.ref for h in hits), hits
 
@@ -734,7 +690,6 @@ def _travels_with_you(actor):
 def _the_replay_room():
     """The 2026-10-01 replay's fight, reduced: two companions who travel with the
     player, and the thug the drover's club has just left at exactly 0 hp."""
-    from rules.bestiary import instantiate
     room = _empty_room()
     drover = _travels_with_you(room.add(instantiate("guildhand", scene=room,
                                                     name="a young drover")))
@@ -755,17 +710,21 @@ def test_the_declared_blow_is_not_added_twice_when_its_target_is_disabled():
     resolved both: "Sam hits a young drover with the shortbow for 5 piercing ... a young
     drover is unconscious and dying", and the prose wrote "your second shot catches the
     young drover in the shoulder". Two blows for one declared, the second at a friend."""
+    from tests._violence import through_the_reading
+
     room, drover, bob, thug = _the_replay_room()
     assert drover.ref < thug.ref, "the premise: the companion is the lowest ref"
     raw = [{"op": "attack", "actor": "pc", "target": thug.ref, "because": ""}]
-    out = judgement.inject_fight(raw, "I shoot the thug again.", room)
-    assert out == raw, "the declared blow was already in the plan; nothing may be added"
+    out, _ = through_the_reading(raw, "I shoot the thug again.", room)
+    assert [(i["op"], i["target"]) for i in out] == [("attack", thug.ref)], \
+        "the declared blow was already in the plan; nothing may be added"
 
     # And once he is down and dying, the blow the player named stays on him: it is not
     # moved onto whoever else is standing, and both of those are the player's people.
     thug.hp = -1
     thug.add_condition("dying", source="the second arrow")
-    assert judgement.inject_fight(raw, "I shoot the thug again.", room) == raw
+    out, _ = through_the_reading(raw, "I shoot the thug again.", room)
+    assert out == raw
     assert judgement.redirect_attacks_off_corpses(raw, "I shoot the thug again.",
                                                   room) is None
 
@@ -774,6 +733,8 @@ def test_a_companion_is_only_hit_when_the_player_names_them():
     """The other half of the same replay's rule: the player's own people are never the
     reading of an unnamed blow — the drover went down dying for a sentence about the
     thug — but "I attack Bob" means Bob, and must not spawn a stranger instead."""
+    from tests._violence import through_the_reading
+
     room, drover, bob, thug = _the_replay_room()
     thug.hp = -9                                      # long past fighting
     thug.add_condition("dying", source="the second arrow")
@@ -783,37 +744,38 @@ def test_a_companion_is_only_hit_when_the_player_names_them():
     assert not moved or all(r.get("target") not in (drover.ref, bob.ref)
                             for r in moved), moved
 
-    out = judgement.inject_fight([{"op": "narrate_only"}], "I attack Bob.", room)
+    out, _ = through_the_reading([{"op": "narrate_only"}], "I attack Bob.", room)
     assert [i["op"] for i in out] == ["narrate_only", "attack"], out
     assert out[-1]["target"] == bob.ref
 
 
-def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
+def test_a_brawl_opens_on_the_man_beside_you_and_rolls_the_first_punch():
     """Reported from play: "thug is still 15ft away from you and no rolls have been
-    tracked in the roll tracker".
+    tracked in the roll tracker" — the conjured thug was laid out three squares off, and
+    starting the fight proposed no attack, so nothing was ever rolled.
 
-    Two causes, both here. `begin_encounter` lays an unplaced combatant out by zone and
-    everything spawned defaulted to `near`, which is three squares — fifteen feet, out
-    of reach of the punch that started the fight. And starting the fight proposed no
-    attack, so nothing was ever rolled: the roll tracker was empty because there was no
-    roll, not because it failed to display one."""
+    Rewritten 2026-10-09 (the owner's ruling: a declared blow lands on a real person): the
+    bruiser is a bystander standing beside the player, the blow is aimed at HIM, the fight
+    opens on him where he stands, and the player's own d20 is asked for in the same turn."""
     from rules.dice import Dice
-    from rules.engine import Engine, Scene
-    from rules.sheet import load_pc
+    from rules.engine import Engine
+    from tests._violence import through_the_reading
 
-    scene = Scene()
-    scene.add(load_pc("fixtures/pc-kesst.json"))
-    raw = judgement.inject_fight([], "I punch the bruiser in the face.", scene)
-    assert [i["op"] for i in raw] == ["spawn", "begin_encounter", "attack"]
+    scene = _empty_room()
+    bruiser = scene.add(instantiate("thug", scene=scene, name="the bruiser"),
+                        zone="engaged")
+    bruiser.add_condition("bystander", source="test")
+    raw, stop = through_the_reading([], "I punch the bruiser in the face.", scene)
+    assert not stop and [(i["op"], i["target"]) for i in raw] == [("attack", bruiser.ref)]
 
     engine = Engine(scene, Dice(seed=5))
-    res = engine.run(engine.validate(raw, origin="author:test"))
-    assert scene.zones["c1"] == "engaged"
-    assert scene.distance_between("pc", "c1") == 5, "not within reach of a punch"
+    res = engine.run(engine.validate(raw))
+    assert set(scene.actors) == {"pc", bruiser.ref}, "nobody new walked on"
+    assert scene.in_encounter and scene.grid is not None
+    assert scene.distance_between("pc", bruiser.ref) == 5, "not within reach of a punch"
     # The swing asks for the player's own d20 in the same turn (owner, 2026-10-01: an
     # arrow shot with "no to hit roll or dmg roll"). What the 2026-08-27 playtest forbade
     # still holds: nothing is rolled for the player and nobody is hurt before they roll.
-    assert scene.in_encounter and scene.grid is not None
     assert scene.awaiting and scene.awaiting["label"].startswith("Attack")
     assert any("Battle is joined" in (o.tell or "") for o in res.outcomes)
     assert all(e.get("kind") != "damage" for o in res.outcomes for e in o.effects)
@@ -828,77 +790,32 @@ def test_engaged_is_closer_than_near():
     assert SQUARES_BY_ZONE["engaged"] == 1
 
 
-def test_a_thrown_weapon_opens_at_a_throwing_distance():
-    """Asked during play: "what if i throw something, am i going to start at the correct
-    range". Two bugs behind it. "throw" was not in the violence list at all, so throwing
-    a knife started no fight; and once it did, `inject_fight` hardcoded `engaged`, which
-    is the one range a thrown dagger is not for."""
+# Retired 2026-10-09 with the template thug: `test_a_thrown_weapon_opens_at_a_throwing_
+# distance`, `test_a_distance_the_player_stated_is_the_distance`, `test_the_board_grows_to_
+# hold_a_bowshot` and `test_a_named_weapon_opens_at_its_own_range`. Each measured where a
+# CONJURED opponent was put down (`opening_feet`, the weapon's increment, a stated range).
+# Nobody is conjured now: the person struck already stands on their own square (the ruling
+# of 2026-09-28, people keep their square), and whether a thrown dagger reaches them is the
+# engine's reach and range rule, not a placement. What replaces them is below.
+
+def test_the_one_struck_stays_where_they_stand():
+    """The fight opens on the person at the distance they actually are — a dagger thrown
+    at a watchman forty feet off does not pull him to ten (the ruling of 2026-09-28: people
+    keep their square, and a fight never re-lays anyone)."""
     from rules.dice import Dice
-    from rules.engine import Engine, Scene
-    from rules.sheet import load_pc
+    from rules.engine import Engine
+    from tests._violence import through_the_reading
 
-    def opens_at(said):
-        scene = Scene()
-        scene.add(load_pc("fixtures/pc-kesst.json"))
-        raw = judgement.inject_fight([], said, scene)
-        assert any(i["op"] == "spawn" for i in raw), f"no fight started: {said}"
-        engine = Engine(scene, Dice(seed=5))
-        engine.run(engine.validate(raw, origin="author:test"))
-        return scene.distance_between("pc", "c1")
-
-    # Each opens at its own range now rather than one generic fifteen feet: the weapon
-    # named in the sentence decides, and a stated distance beats the weapon.
-    for said, feet in (("I throw my dagger at him.", 10),
-                       ("I hurl a bottle at the bruiser.", 10),
-                       ("I shoot him with my crossbow.", 80),
-                       ("I sling a stone at it.", 50)):
-        assert opens_at(said) == feet, said
-    # A ranged verb with no weapon named still opens with ground between you.
-    assert opens_at("I loose an arrow at the watchman.") >= 15
-    for said in ("I punch the bruiser in the face.", "I charge him."):
-        assert opens_at(said) == 5, said
-
-
-def _opens_at(said):
-    from rules.dice import Dice
-    from rules.engine import Engine, Scene
-    from rules.sheet import load_pc
-
-    scene = Scene()
-    scene.add(load_pc("fixtures/pc-kesst.json"))
-    raw = judgement.inject_fight([], said, scene)
-    assert any(i["op"] == "spawn" for i in raw), f"no fight started: {said}"
+    scene = _empty_room()
+    scene.grid = None
+    watchman = scene.add(instantiate("watchman", scene=scene, name="the watchman"),
+                         zone="far")
+    raw, _ = through_the_reading([], "I throw my dagger at the watchman", scene)
+    assert [(i["op"], i["target"]) for i in raw] == [("attack", watchman.ref)]
     engine = Engine(scene, Dice(seed=5))
-    engine.run(engine.validate(raw, origin="author:test"))
-    return scene.distance_between("pc", "c1"), scene.grid.width
-
-
-def test_a_distance_the_player_stated_is_the_distance():
-    """Asked during play: "what if i shoot someone with a bow at 120ft". It opened at
-    forty — the `far` default — because a zone word has no way to say anything past
-    `far`, and `begin_encounter` builds the grid *after* `spawn` runs, so the spawn could
-    not place anybody and its distance was simply dropped."""
-    assert _opens_at("I shoot him with my bow at 120 feet.")[0] == 120
-    assert _opens_at("I loose an arrow at the watchman from 200 ft.")[0] == 200
-    assert _opens_at("I shoot at him from 40 yards.")[0] == 120       # yards are tripled
-
-
-def test_the_board_grows_to_hold_a_bowshot():
-    """The default map is 20x20 — a hundred feet square — and a bowshot is not. Clamping
-    put the target at the edge of the map and called it a hundred feet, which is a
-    different fight from the one the player described."""
-    feet, width = _opens_at("I loose an arrow at the watchman from 200 ft.")
-    assert feet == 200
-    assert width * 5 >= 200, f"the board is only {width * 5} feet across"
-
-
-def test_a_named_weapon_opens_at_its_own_range():
-    """No distance stated, so the weapon decides. The weapons table carries `crit_range`
-    and no range increment at all, so these are the Core Rulebook's."""
-    assert _opens_at("I shoot him with my longbow.")[0] == 100
-    assert _opens_at("I shoot him with my crossbow.")[0] == 80
-    assert _opens_at("I throw my dagger at him.")[0] == 10
-    assert _opens_at("I punch the bruiser in the face.")[0] == 5
+    engine.run(engine.validate(raw))
+    assert scene.in_encounter
+    assert scene.zones.get(watchman.ref) == "far"
 
 
 def test_swinging_when_everyone_is_down_ends_the_fight():
@@ -909,7 +826,7 @@ def test_swinging_when_everyone_is_down_ends_the_fight():
     Saying the fight is over is the one thing that pays: XP and treasure settle on the
     way *out* of an encounter. Spawning fresh reinforcements instead would be inventing
     an enemy the GM never called for."""
-    from rules.bestiary import instantiate
+    from tests._violence import everyone, through_the_reading
 
     room = _empty_room()
     thug = instantiate("thug", scene=room, name="a thug")
@@ -919,10 +836,12 @@ def test_swinging_when_everyone_is_down_ends_the_fight():
     # than asserted.
     room.initiative = [("pc", 15), ("c1", 9)]
     room.turn = 0
-    out = judgement.inject_fight([{"op": "narrate_only"}], "I keep hitting him.", room)
+    out, stop = through_the_reading([{"op": "narrate_only"}], "I keep hitting him.", room,
+                                    ask=everyone)
     ops = [i["op"] for i in out]
     assert "end_encounter" in ops, ops
     assert "spawn" not in ops, "reinforcements nobody called for"
+    assert not stop
 
 
 def test_a_turn_that_fails_every_attempt_degrades_to_narration():
@@ -1085,11 +1004,13 @@ def test_the_gm_cannot_end_the_fight_it_is_starting():
 
 
 
-def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
+def test_an_attack_on_a_corpse_makes_nobody_from_the_players_words():
     """Live save: both refs were corpses, the prose had guardsmen for three turns, and
-    every swing was aimed at a body — one living combatant, so no encounter could
-    form and the combat bar never appeared. When the player's words name opposition,
-    the attack gets a real target; a swing at the corpse with no such words stands."""
+    every swing was aimed at a body. This repair used to spawn a Guard out of "punch the
+    closest guard" — a person minted from the player's words, the door that made a thug
+    called "top of his skull" on 2026-10-08 (owner's ruling 2026-10-09: no such door).
+    The guardsmen the prose shows are the beat reader's to make real; a swing with
+    nobody living stands as kicking the fallen."""
     from gm import judgement
     from rules.bestiary import instantiate
 
@@ -1101,75 +1022,49 @@ def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
 
     raw = [{"op": "attack", "actor": "pc", "target": body.ref, "params": {},
             "because": "swinging"}]
-    fixed = judgement.redirect_attacks_off_corpses(
-        raw, "i charge at them and punch the closest guard", scene)
-    assert fixed is not None
-    # A Guard out of the corpus since 2026-09-19, not the hand-written 11-hp watchman:
-    # `judgement.template_for` asks `npcs.choose` first and takes its pick when the block
-    # IS the role word (item 30). The watchman remains the floor for guard-shaped words the
-    # corpus has no block for.
-    assert fixed[0]["op"] == "spawn" and fixed[0]["params"]["template"] == "guard"
-    assert fixed[1]["target"] not in (body.ref,)
-
-    # No opposition named: kicking the fallen is a thing a player may mean.
-    assert judgement.redirect_attacks_off_corpses(
-        raw, "I kick him while he is down", scene) is None
+    for said in ("i charge at them and punch the closest guard",
+                 "I kick him while he is down"):
+        assert judgement.redirect_attacks_off_corpses(raw, said, scene) is None
 
 
-
-def test_an_attack_on_a_corpse_does_not_satisfy_the_fight_the_player_wants():
+def test_an_attack_on_a_corpse_makes_nobody_to_fight():
     """Live: "I attack it" — a well-creature the prose had described for two turns —
-    arrived as an attack on a long-dead ref. inject_fight read "attack", stood aside,
-    and the player swung at a body while the monster existed only in sentences. An
-    attack aimed at the dead means the fight still needs making."""
+    arrived as an attack on a long-dead ref, and the player swung at a body while the
+    monster existed only in sentences. The template thug answered that by spawning
+    somebody for the blow; rewritten 2026-10-09 to the owner's rulings (nobody is made
+    from a turn's words; seen people are real, so a creature the prose showed already has
+    a body): with only the dead here, the turn says there is nobody to attack."""
     from gm import judgement
-    from rules.bestiary import instantiate
+    from tests._violence import through_the_reading
 
     scene = Scene(location_id="pangrella")
     scene.add(load_pc("fixtures/pc-kesst.json"))
     corpse = instantiate("thug", scene=scene, name="the stranger")
     scene.add(corpse)
-    corpse.hp = -9
+    corpse.hp = -30
+    corpse.die(source="a fight long over")
 
     raw = [{"op": "attack", "actor": "pc", "target": corpse.ref, "params": {},
             "because": "swinging"}]
-    out = judgement.inject_fight(raw, "I attack it", scene)
-    ops = [r["op"] for r in out]
-    assert "spawn" in ops, ops
+    out, stop = through_the_reading(raw, "I attack it", scene)
+    assert "spawn" not in [r["op"] for r in out]
+    assert stop == "There is nobody here to attack."
 
-    # A living target: the guard holds, no second fight is made.
-    corpse.hp = 9
-    assert judgement.inject_fight(raw, "I attack it", scene) == raw
-
-
-def test_a_group_in_the_players_sentence_spawns_a_group():
-    """Measured live: "I move towards the group of guards and clansmen and get ready
-    to fight" spawned exactly one watchman, and the player fought the crowd one man
-    at a time, fight after fight, because inject_fight hard-coded count=1."""
-    out = judgement.inject_fight(
-        [{"op": "narrate_only"}],
-        "I move towards the group of guards and clansmen and get ready to fight",
-        _empty_room())
-    spawn = next(i for i in out if i.get("op") == "spawn")
-    enc = next(i for i in out if i.get("op") == "begin_encounter")
-    assert spawn["params"]["count"] == 4
-    assert len(enc["params"]["sides"]["them"]) == 4
-    atk = next(i for i in out if i.get("op") == "attack")
-    assert atk["target"] == enc["params"]["sides"]["them"][0]
+    # A living target: the plan's blow at him stands, and nothing is added.
+    scene2 = Scene(location_id="pangrella")
+    scene2.add(load_pc("fixtures/pc-kesst.json"))
+    alive = scene2.add(instantiate("thug", scene=scene2, name="the stranger"))
+    raw2 = [{"op": "attack", "actor": "pc", "target": alive.ref, "params": {},
+             "because": "swinging"}]
+    out, stop = through_the_reading(raw2, "I attack it", scene2)
+    assert out == raw2 and not stop
 
 
-def test_opponent_count_reads_the_players_own_words():
-    """A stated number is honoured in full — the player's own ruling: "if i run
-    into a deadly situation I should have to reap what I've sown." A collective
-    noun means four, a bare plural three, a lone man one. No cap: death is
-    survivable by design (the patron pays for the raising), so the injector owes
-    the player the fight they picked."""
-    cases = (("I attack the two bravos", 2), ("I fight both of them", 2),
-             ("I charge the gang", 4), ("I swing at the man", 1),
-             ("I attack all 10 wolves", 10), ("I punch him", 1),
-             ("I take on the whole dozen", 12))
-    for text, want in cases:
-        assert judgement.opponent_count(text) == want, text
+# Retired 2026-10-09 with the template thug: `test_a_group_in_the_players_sentence_spawns_
+# a_group` and `test_opponent_count_reads_the_players_own_words` measured how MANY
+# opponents to conjure from the sentence ("the group of guards and clansmen" spawned one
+# watchman, then four). Nobody is conjured: a group that is here is people with refs, and
+# the battle gate brings in the struck one's own kind (`Engine.rally`) and the law.
 
 
 def test_press_the_death_writes_the_kill_the_prose_flinched_from():
@@ -1499,13 +1394,10 @@ def test_a_figure_of_speech_is_not_a_person_in_the_scene():
     assert cast_from("One of the men turns to look at you.") == []
 
 
-def test_a_ledger_merchant_promotes_to_a_civilian_not_a_bruiser():
-    """Attacking the merchant the prose introduced must spawn a commoner
-    statline: promoting shopkeepers to warriors makes every stall a fight club."""
-    out = judgement.inject_fight([{"op": "narrate_only"}],
-                                 "I attack the merchant", _empty_room())
-    spawn = next(i for i in out if i.get("op") == "spawn")
-    assert spawn["params"]["template"] == "guildhand"
+# Retired 2026-10-09: `test_a_ledger_merchant_promotes_to_a_civilian_not_a_bruiser`
+# asked which stat block the template thug's spawn gave "the merchant". The
+# merchant who is here is struck as he is; `template_for`'s civilian floor for the
+# prose's people is pinned in tests/test_nobody_is_invented.py.
 
 
 def test_the_dead_cannot_talk_their_way_past_the_scrubber():

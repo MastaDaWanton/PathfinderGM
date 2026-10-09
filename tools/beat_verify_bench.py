@@ -33,8 +33,8 @@ sys.path.insert(0, str(ROOT))
 from gm import beat_verify as bv  # noqa: E402
 from tests.beat_verify import gold as G  # noqa: E402
 
-CATS = ("move", "hands", "trade", "harm", "arrived", "left", "hour")
-ALARM_CATS = ("move", "hands", "trade", "harm", "presence", "hour", "omission")
+CATS = ("move", "hands", "trade", "harm", "shown", "arrived", "left", "hour")
+ALARM_CATS = ("move", "hands", "trade", "harm", "absent", "presence", "hour", "omission")
 
 
 # --- the engine's side, as the game builds it ---------------------------------------------
@@ -161,6 +161,8 @@ def regex_ctx(beat):
     end, start = by_name[beat["end"]], by_name[beat["start"]]
     actors = {}
     for p in beat["people"]:
+        if len(p) > 4 and p[4] == "away":
+            continue                  # held elsewhere: not on the scene's actor list
         pc = bool(p[3]) if len(p) > 3 else False
         actors[p[0]] = _Actor(ref=p[0], name=p[1], is_pc=pc, from_template="", race=p[2],
                               true_name="", hp=10, hp_max=10,

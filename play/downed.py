@@ -124,22 +124,29 @@ def resolve(campaign) -> Outcome:
         return Outcome(state="stable", playable=woke, lines=lines)
 
     if state == "dying":
-        # Round by round, so the player watches it happen rather than being told the
-        # result. This is the most frightening thing that can happen to a character and
-        # it should not be a single line.
+        # Every round is rolled, and the rounds are said once. This wrote one line a round
+        # — "You are bleeding out. (-6 hit points)", "(-7 hit points)", "(-8 …)", "(-9 …)"
+        # — and the 2026-10-08 report read four near-identical lines and then a death as
+        # "the same events like four times". The hit points it fell through are the news;
+        # the repetition was not (`bleeding_line`).
+        fell_from = pc.hp
+        rounds = 0
         for _ in range(24):
             result = pc.bleed_out(engine.dice)
             if result is None:
                 break
             scene.round += 1
-            if result["outcome"] == "dying":
-                lines.append(f"You are bleeding out. ({pc.hp} hit points)")
-            elif result["outcome"] == "stable":
-                lines.append("The bleeding stops. You are still down, but you are alive.")
+            rounds += 1
+            if result["outcome"] == "stable":
+                lines.append(bleeding_line(rounds, fell_from, pc.hp, stopped=True))
                 break
-            elif result["outcome"] == "dead":
+            if result["outcome"] == "dead":
+                lines.append(bleeding_line(rounds, fell_from, pc.hp, stopped=False))
                 lines.append(death_notice(pc))
                 return Outcome(state="dead", playable=False, lines=lines)
+        else:
+            if rounds:
+                lines.append(bleeding_line(rounds, fell_from, pc.hp, stopped=False))
         if pc.has_condition("dead"):
             lines.append(death_notice(pc))
             return Outcome(state="dead", playable=False, lines=lines)
@@ -290,6 +297,38 @@ def _wait_it_out(campaign, pc) -> Outcome:
     lines.append("You have yourself back." if not still
                  else f"You are still {still.lower()}.")
     return Outcome(state="held", playable=not still, lines=lines)
+
+
+_ROUNDS = {1: "a round", 2: "two rounds", 3: "three rounds", 4: "four rounds",
+           5: "five rounds", 6: "six rounds", 7: "seven rounds", 8: "eight rounds",
+           9: "nine rounds", 10: "ten rounds"}
+
+
+def bleeding_line(rounds: int, fell_from: int, now: int, *, stopped: bool) -> str:
+    """The rounds a dying character bled through, said once, with the hit points they
+    fell through — every round still rolled (`Actor.bleed_out`), one line for all of them."""
+    span = _ROUNDS.get(rounds, f"{rounds} rounds")
+    if fell_from != now:
+        where = f", from {fell_from} to {now} hit points"
+    else:
+        where = f", at {now} hit points"
+    if stopped:
+        return (f"You bleed for {span}{where}, and then the bleeding stops. "
+                f"You are still down, but you are alive.")
+    return f"You bleed for {span}{where}."
+
+
+def still_down_line(pc) -> str:
+    """One line for the player whose turn has come round while they cannot take it: the
+    fight goes on, and they are told so once (`views._run_npc_turns`)."""
+    state = state_of(pc)
+    if state == "dying":
+        return "You are down and bleeding. The fight goes on without you."
+    if state == "stable":
+        return "You are down and senseless. The fight goes on without you."
+    if state == "held":
+        return "You cannot act. The fight goes on around you."
+    return ""
 
 
 def death_notice(pc) -> str:

@@ -44,25 +44,23 @@ def _scene(*names):
 
 @pytest.mark.parametrize("label", ["npc1", "enemy1", "target1", "enemy_2", "foe1"])
 def test_a_label_is_never_the_name_of_whoever_is_made(label):
-    """`npc1` spawned somebody called "npc": the digit-stripping that rightly keeps
-    `kaldrimia` and `winged_woman` also kept a slot's label. With nobody in the room to
-    have meant, the spawn still happens (the GM described an arrival) — nameless, so the
-    minter names them from the template."""
-    out = judgement.repair_unknown_refs(
+    """`npc1` spawned somebody called "npc" (2026-09-27), then a nameless thug once the
+    label check landed. Since 2026-10-09 the refs repair makes nobody at all — the misaim
+    repair's twin made a thug called "top of his skull" on 2026-10-08 — so a label is
+    neither a name nor a body: validation's refusal names the refs that exist."""
+    assert judgement.repair_unknown_refs(
         [{"op": "attack", "actor": label, "target": "pc"}],
-        "Somebody comes at me out of the alley.", _scene())
-    assert out[0]["op"] == "spawn"
-    assert "name" not in out[0]["params"], out[0]
+        "Somebody comes at me out of the alley.", _scene()) is None
 
 
 def test_a_ref_that_describes_somebody_still_names_them():
-    """The rule the label check must not break: the GM's `winged_woman` is the fiction's
-    own description of her, and "the thug steps forward" about her was the bug that made
-    the ref a name in the first place."""
-    out = judgement.repair_unknown_refs(
+    """The GM's `winged_woman` was made a thug called "winged woman" here until
+    2026-10-09. The owner's ruling: nobody is minted from words. A winged woman the
+    narration showed is the beat reader's newcomer, a full actor whose ref the plan's
+    enum offers; a ref nobody holds is refused with the real refs named."""
+    assert judgement.repair_unknown_refs(
         [{"op": "attack", "actor": "winged_woman", "target": "pc"}],
-        "Somebody drops out of the sky at me.", _scene())
-    assert out[0]["params"]["name"] == "winged woman"
+        "Somebody drops out of the sky at me.", _scene()) is None
 
 
 def test_a_placeholder_is_never_spawned_at_all():
@@ -109,13 +107,13 @@ def test_the_player_naming_one_of_two_decides_it():
 def test_somebody_arriving_is_not_bound_to_the_man_already_there():
     """The case the invented-ref repair exists for: the player describes an arrival and
     the GM names the newcomer with a label. "Him" is the newcomer, so the label is left
-    for the repair to make — nameless — and never turned into the man at the bar."""
+    for the plan to fix — never turned into the man at the bar, and (since 2026-10-09)
+    never made by the refs repair either: nobody is minted from words."""
     scene = _scene("Borin Lyraxys")
     raw = [{"op": "attack", "actor": "pc", "target": "enemy1"}]
     text = "A second man bursts in through the door and I hit him."
     assert judgement.bind_placeholders(raw, text, scene) == raw
-    out = judgement.repair_unknown_refs(raw, text, scene)
-    assert out[0]["op"] == "spawn" and "name" not in out[0]["params"]
+    assert judgement.repair_unknown_refs(raw, text, scene) is None
 
 
 def test_a_placeholder_written_for_a_spawn_is_that_spawn():
