@@ -598,6 +598,19 @@ amount of data to keep stable across exports for very little gain.
   Chymists' Hall" with `"kind": "laboratory"` — and its keeper is an alchemist. Bare
   "alchemy" is not a cue ("the strange alchemy of trade" is a metaphor), and "apothecary"
   is not one either: it is the herbal healer's shop.
+- **Every settlement needs its water, and please keep authoring it.** The owner's ruling
+  of 2026-10-09, "yes they should drink from the well": a character living through time
+  anywhere inside a settlement — the market, the inn, not only standing at the well —
+  drinks at the settlement's well or cistern, free, when their pack is dry, and is told
+  so ("drinks at the well"). Food is never free: a town feeds nobody. The water is read
+  off the settlement's own places (`water_sources` in `docs/place-vocabulary.json`: a
+  place named "the well" or "the cistern", or any name with `"kind": "well"` or
+  `"kind": "cistern"`), and it is **not** appended to an authored list the way the way in
+  is: a settlement whose author lists no water has none, and a wait in it stops where the
+  pack runs out, as on the road. Measured the same day, all 76 authored settlements of
+  Aurvantis and Pangrella list one, and `check_places.py` notes any that does not. A
+  fountain in a settlement's prose already mints its well when the consumer generates
+  the places (the `the well` cue row).
 - **Size a settlement by its own `scale`** — a village of six rooms, a town of nine, a
   city of eighteen. One ceiling for every settlement is what this app did until
   2026-09-15, and it was wrong in the way that matters: Aurvantis ships 16 villages, 32

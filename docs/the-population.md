@@ -525,6 +525,18 @@ Built in `rules/keepers.py`:
   brief ("COUNTER SHUT (fact)").
 - **A stall's keeper goes home** when it shuts and comes back when it opens. A keeper
   under a roof lives there and can be talked to.
+- **On the clock, not only on arrival** (the owner, 2026-10-09). Until then the going and
+  coming happened only when the party ARRIVED somewhere (`Engine.settle_people`), so a
+  player who waited the night out at a shut stall found it still shut and empty in
+  daylight — the leather final pass's "the general store stayed shut next morning with
+  her standing at it". The clock's one door (`Scene.advance`) now calls
+  `Engine.settle_on_clock` whenever a stretch crosses one of residency's three-hour
+  slots: keepers open and shut their counters with the party standing there, anybody
+  out of the party's sight goes where their day puts them, and who came or went is told
+  ("The keeper of the general store comes to the market and opens the counter.").
+  Somebody standing with the party who keeps no counter stays (the doorway ruling); a
+  slot crossed mid-fight is settled when the fight is over. Stardew's schedule entries
+  begin "at the time", whoever is watching; Exult's off-screen teleport is the move.
 
 Two defects the shop hours exposed, both fixed:
 

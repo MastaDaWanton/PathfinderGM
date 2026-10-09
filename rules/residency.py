@@ -8,7 +8,9 @@ move around and their lives should evolve". Design record: docs/the-population.m
 
 Nothing here is simulated and nothing iterates the population on a clock. Where a person
 is is a FUNCTION of their record and the time, asked when somebody needs the answer — the
-party arriving somewhere, or the player asking after them:
+party arriving somewhere, the clock crossing one of the slots below (`Engine.settle_on_clock`,
+the owner's ruling of 2026-10-09 that keepers keep their hours whether or not the party
+moves), or the player asking after them:
 
   residents   a schedule key: Ultima VII's eight three-hour slots, each naming an activity
               (home, work, gather, temple, market), the activity resolved against the

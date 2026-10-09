@@ -2281,6 +2281,35 @@ def kind_works_leather(kind: str) -> bool:
 # workroom is one row here and one occupation tag, nothing else.
 _WORK_TAGS = ((FORGE_WORK, SMITHY), (ALCHEMY_WORK, LAB), (LEATHER_WORK, TANNERY))
 
+# --- where a settlement drinks (the owner, 2026-10-09) ----------------------------------------
+#
+# "yes they should drink from the well": in the leather final pass's playthrough a character
+# waited overnight in a market with an empty pack and "died of thirst standing in a market
+# with a well". A settlement's water is a PLACE it holds, read off its place set like the
+# smithy and the laboratory are — never off the player's words and never off prose — and a
+# body living through time anywhere in that settlement drinks there, free, when the day's
+# water comes due and the pack cannot pay (`survival._provide`, `Engine.water_at_hand`).
+#
+# The kinds that are a settlement's drinking water, by the settlement table's own rows
+# (`KINDS`): the well ("where the water is") and the city's cistern. A fountain is not a
+# kind of its own: the settlement's words "fountain" already mint the well (`IMPLIED`). Not
+# the docks or the bridge (`WATER_KINDS`): they stand ON water, which is the harbour and the
+# river, not a drink. Every generated settlement has a well at every scale
+# (`ALWAYS_BY_SCALE`); an AUTHORED one drinks from what its author listed, and measured
+# 2026-10-09 all 76 authored settlements of the two shipped exports (Aurvantis 64,
+# Pangrella 12) list a well or a cistern. One that lists none has no free water — the
+# author has said what the town has (`_authored`) — and a wait there stops where the pack
+# runs out, as it does on the road; `tools/check_places.py` notes it.
+#
+# Prior art for the shape, read 2026-10-09: Fallout: New Vegas's Hardcore mode has thirst
+# and treats a settlement's pump or sink as renewable free water beside the bought and
+# carried kind (fallout.fandom.com, "Purified water (Fallout: New Vegas)"; the GameFAQs
+# Hardcore threads name the Goodsprings water source and the Freeside pump); food there is
+# never free, and it is not here either: a town does not feed you.
+WATER = "place.water"
+WATER_SOURCES = frozenset({"well", "cistern"})
+assert WATER_SOURCES <= set(KINDS), "a water source must be a settlement kind"
+
 
 def place_tags(place) -> frozenset[str]:
     """The tags a place answers to, derived from its kind and never stored."""
@@ -2291,7 +2320,16 @@ def place_tags(place) -> frozenset[str]:
     for work, tag in _WORK_TAGS:
         if _kind_works(kind, work):
             out.add(tag)
+    if kind in WATER_SOURCES:
+        out.add(WATER)
     return frozenset(out)
+
+
+def water_in(known) -> Place | None:
+    """The first place in `known` a body can drink at for nothing — a well or a cistern —
+    or None. `known` is a settlement's own set (`Engine.water_at_hand` passes only the
+    places inside the settlement the party stands in)."""
+    return next((p for p in known or () if WATER in place_tags(p)), None)
 
 
 def has_place_tag(place, query: str) -> bool:

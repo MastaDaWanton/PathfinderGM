@@ -327,9 +327,11 @@ class Scene:
     # ref. The user's ruling of 2026-09-25: the database may grow; it must be findable.
     population: dict = field(default_factory=dict)
     # When the party last arrived somewhere, and how many times it has: residency
-    # (rules/residency.py) moves people to where their day or their road puts them only
-    # when the party arrives, never while it stands with them — the ruling that the woman
-    # in the doorway "should stay there until i leave or something moves them".
+    # (rules/residency.py) moves people to where their day or their road puts them when
+    # the party arrives, and when the clock crosses a slot (`Engine.settle_on_clock`,
+    # 2026-10-09) — but never anybody standing with the party except a keeper whose
+    # counter's hours move them: the ruling that the woman in the doorway "should stay
+    # there until i leave or something moves them".
     # `settled` is the arrival `Engine.settle_people` last answered; `came_along` the
     # people moved WITH the party since, whom the plan moved and who stay moved until
     # the party leaves them.
@@ -483,6 +485,23 @@ class Scene:
     # round tick, so stabilisation rolls come from the same seeded stream as
     # everything else and a scene stays reproducible.
     _dice: Any = None
+    # And the engine itself, lent the same way and for the same kind of reason: the clock's
+    # door (`advance`) is the scene's, but what the hour MEANS for the world around the
+    # party — whose counter opens at first light, whether there is a well to drink at —
+    # is read off the world's places and people, which only the engine holds. Before
+    # 2026-10-09 the scene could not ask, so a keeper came back to their counter only when
+    # the party ARRIVED somewhere (`Engine.settle_people`), and a character who waited the
+    # night out at a shut stall found it still shut, with nobody behind it, in daylight.
+    # None for a scene built without an engine, which then moves its clock exactly as
+    # before. Never copied by `snapshot` (it would copy the world) and never saved.
+    _engine: Any = None
+    # Who came to or left the party's place on the clock (`Engine.settle_on_clock`): a
+    # keeper opening their counter at first light, a stallholder packing up at dusk —
+    # waiting to be told at the end of the batch (`Engine._comings_settles`), for
+    # `_body_said`'s reason. Not saved: the move itself is, on the person.
+    _comings_said: list = field(default_factory=list)
+    # A slot crossed while a fight was on, owed a `settle_on_clock` once it is over.
+    _hours_due: bool = False
     # What the body's hours did since somebody last told the player (`advance` writes,
     # `take_body_said` empties): the checks the clock's door rolled, waiting to become an
     # outcome at the end of the batch (`Engine._body_settles`) or a line on the knockout
@@ -523,11 +542,14 @@ class Scene:
         # The engine lends the scene its dice for the round tick. It is shared,
         # seeded state that belongs to the engine, not the scene; copying it
         # would restore a rewound random stream along with the board.
+        # The engine is lent the same way (`_engine`), and copying it would copy the world.
         dice, self._dice = self._dice, None
+        engine, self._engine = self._engine, None
         try:
             return copy.deepcopy(self.__dict__)
         finally:
             self._dice = dice
+            self._engine = engine
 
     def restore(self, snap: dict) -> None:
         """Put the scene back as `snapshot` found it, in place.
@@ -538,10 +560,11 @@ class Scene:
         """
         import copy
 
-        dice = self._dice
+        dice, engine = self._dice, self._engine
         self.__dict__.clear()
         self.__dict__.update(copy.deepcopy(snap))
         self._dice = dice
+        self._engine = engine
 
     @property
     def actors(self) -> Mapping[str, Actor]:
@@ -1327,6 +1350,10 @@ class Scene:
         hours = (int(self.clock_minutes) + minutes) // 60 - int(self.clock_minutes) // 60
         days = (int(self.clock_minutes) + minutes) // 1440 - int(self.clock_minutes) // 1440
         started = int(self.clock_minutes)
+        # The settlement's well, when the player stands inside a settlement that has one
+        # and their day's water can come due inside this stretch (`survival._provide`).
+        # Asked before the clock moves, of where the party is now.
+        water = self._water_at_hand(minutes) if charge_body else ""
         self.clock_minutes += minutes
         ended: list[str] = []
         body: list[dict] = []
@@ -1356,7 +1383,8 @@ class Scene:
             if charge_body and minutes:
                 toll = survival.charge(a, minutes, self._dice, biome=self.biome,
                                        clock=started if rolls else None, roll=rolls,
-                                       live=bool(live and rolls))
+                                       live=bool(live and rolls),
+                                       water=water if rolls else "")
                 if toll.happened:
                     record = {"ref": a.ref, "kind": "body", **toll.as_dict(),
                               "said": survival.said(a, toll, self.biome)}
@@ -1472,8 +1500,34 @@ class Scene:
                               "said": f"{a.name}'s {name} is ready to collect."}
                     ready.append(record)
                     self._works_said.append(record)
+        # People with hours keep them on the clock, not only when the party arrives (the
+        # owner, 2026-10-09): every three-hour slot the stretch crossed is a chance for a
+        # keeper to come to their counter or pack up and go, and for anybody with a day to
+        # be where it puts them. Once per stretch, at its end: where the clock STOPS is
+        # where everybody is, Exult's off-screen teleport to the current slot
+        # (`residency`). Nothing on a scene with no engine lent to it.
+        from . import residency as _residency
+
+        moved: list[str] = []
+        if (self._engine is not None and minutes
+                and started // _residency.SLOT_MINUTES
+                != int(self.clock_minutes) // _residency.SLOT_MINUTES):
+            moved = self._engine.settle_on_clock()
         return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body,
-                "ready": ready}
+                "ready": ready, "moved": moved}
+
+    def _water_at_hand(self, minutes: int) -> str:
+        """The settlement's well the player can drink at over the next `minutes`, or "":
+        asked of the lent engine (`Engine.water_at_hand`) only when the day's water could
+        come due inside the stretch, so the minute-long ops that move the clock all day
+        never derive a place set for it."""
+        pc = self.pc()
+        if self._engine is None or pc is None or self._dice is None:
+            return ""
+        if int(getattr(pc, "watered_minutes", 0) or 0) + max(0, int(minutes)) \
+                < survival.DAY_MINUTES:
+            return ""
+        return self._engine.water_at_hand()
 
     def _mended_said(self, a: "Actor", mended: list[dict], body: list[dict]) -> None:
         """What fast healing mended over a stretch, as the stretch's body record: folded
@@ -1515,7 +1569,10 @@ class Scene:
                 or pc.has_state("state.down.dead")):
             passed = self.advance(minutes, rounds=rounds)
             return {**passed, "asked": minutes, "stopped": "", "unwaited": 0}
-        covered, short = survival.lasts(pc, minutes, biome=self.biome)
+        # In a settlement with a well, water never ends the wait (`survival.lasts`); only
+        # food can, since the town feeds nobody (the owner, 2026-10-09).
+        covered, short = survival.lasts(pc, minutes, biome=self.biome,
+                                        water=self._water_at_hand(minutes))
         if not short:
             passed = self.advance(minutes, rounds=rounds, live=True)
             return {**passed, "asked": minutes, "stopped": "", "unwaited": 0}
@@ -2640,6 +2697,9 @@ class Engine:
         self.scene = scene
         self.dice = dice or Dice()
         self.scene._dice = self.dice
+        # Lent like the dice, so the clock's door can ask what the hour means for the world
+        # around the party (`Scene._engine`): keepers on their hours, the town's well.
+        self.scene._engine = self
         # Optional, and only money reads it: what the coins are called belongs to the
         # world, and an engine built without one falls back to the Core Rulebook's own
         # names rather than refusing to do arithmetic.
@@ -3618,6 +3678,8 @@ class Engine:
         resolution.outcomes.extend(self._body_settles())
         # Work In progress the clock turned ready, the same way (`_works_settles`).
         resolution.outcomes.extend(self._works_settles())
+        # Who the clock brought to the party's place or took from it (`settle_on_clock`).
+        resolution.outcomes.extend(self._comings_settles())
         # An ability's effect that a state ends: a rage when its barbarian falls, a smite
         # when its mark dies (`_ability_ends_settle`).
         resolution.outcomes.extend(self._ability_ends_settle())
@@ -3643,6 +3705,10 @@ class Engine:
         # of who is in the room, and it simply has them or does not.
         if not self.scene.in_encounter:
             self.settle_people()
+            # A slot the clock crossed while a fight was on, settled now it is over.
+            if self.scene._hours_due:
+                self.settle_on_clock()
+                resolution.outcomes.extend(self._comings_settles())
         # A scheme that fails half-way leaves nothing of itself behind. Measured
         # 2026-09-25: the tick reads and CHANGES the scene (steps advance, people are
         # brought in, bodies fall), and a failure part-way kept whatever it had already
@@ -9745,7 +9811,8 @@ class Engine:
 
         Ultima VII's off-screen rule, confirmed in the Exult source
         (`teleport_offscreen_to_schedule`): nobody is walked to their slot, they are
-        simply there. Asked once per arrival, never per turn and never on a clock — the
+        simply there. Asked once per arrival and never per turn (the clock has its own
+        pass, `settle_on_clock`, once per slot crossed) — the
         same answer `population.where_now` gives the finder for people with no body, so a
         body and a record cannot disagree about where somebody is.
 
@@ -9756,17 +9823,128 @@ class Engine:
         in conversation or in a fight; and anybody with no population record — a keeper
         at their counter, a world character, a thug the plan spawned. Returns the refs
         moved.
-        """
-        from . import places as places_mod
-        from . import population
-        from . import residency
 
+        The CLOCK settles people too since 2026-10-09 (`settle_on_clock`), which is this
+        pass with the party standing still.
+        """
         scene = self.scene
         if scene.settled == scene.moves:
             return []
         scene.settled = scene.moves
         came = set(scene.came_along)
         scene.came_along = []
+        moved = self._settle(came, on_clock=False)
+        # The moves above are residency's own, not the plan's.
+        scene.came_along = []
+        return moved
+
+    def settle_on_clock(self) -> list[str]:
+        """The clock crossed one of residency's three-hour slots: whoever keeps hours goes
+        where the new hour puts them, with the party standing still. Called by the clock's
+        one door (`Scene.advance`, through the engine it is lent) and nowhere else.
+
+        The owner's ruling of 2026-10-09, from the leather final pass's playthrough ("the
+        general store stayed shut next morning with her standing at it"): keepers arrive at
+        and leave their places as the clock passes their hours, not only when the party
+        arrives. Before it, `settle_people` was the only pass and it ran once per ARRIVAL
+        (`scene.settled == scene.moves`), so a stallholder sent home at dusk stayed home
+        through any wait in place — the scene listed nobody at the counter, the trade panel
+        refused, and the narrator's brief, which states who is here, described an empty
+        stall in daylight. Stardew Valley is the precedent for the clock rather than the
+        visit: a schedule entry is "the time at which the schedule event begins"
+        (stardewvalleywiki.com, "Modding:Schedule data"), whoever is watching; Exult puts
+        an off-screen person straight into the current slot (`residency`), which is what a
+        move here is.
+
+        What the ruling of 2026-09-25 keeps (the woman in the doorway "should stay there
+        until i leave or something moves them"): anybody who is not a keeper and is in the
+        party's place stays in it. A keeper's counter is what moves a keeper, so a keeper
+        is the exception the owner named; one in conversation, down or held stays (the
+        `_keeper_goes` guards). Whoever came along with the party stays moved. Nobody in a
+        fight is settled, and nothing at all happens while one is on.
+
+        Who came into or went out of the party's place is told (`_comings_said`, law 3):
+        the party watched it happen, which an arrival's settle never does.
+        """
+        scene = self.scene
+        if scene.in_encounter:
+            # Owed, not dropped: a slot crossed inside a fight (a round's worth of clock an
+            # op moved at 5:59) is settled at the end of the first batch after it ends
+            # (`_tick_schemes`), or the keeper would stay home until the NEXT slot.
+            scene._hours_due = True
+            return []
+        scene._hours_due = False
+        kept = list(scene.came_along)
+        before = {ref: a.at for ref, a in scene.people.items()}
+        try:
+            moved = self._settle(set(kept), on_clock=True)
+        finally:
+            # `Scene.move` files every non-player it moves under `came_along`; these moves
+            # are the clock's, and the plan's own list is put back as it was.
+            scene.came_along = kept
+        for ref in moved:
+            a = scene.people.get(ref)
+            if a is None:
+                continue
+            was, now = before.get(ref), a.at
+            if now == scene.at and was != scene.at:
+                scene._comings_said.append(self._coming_said(a, came=True))
+            elif was == scene.at and now != scene.at:
+                scene._comings_said.append(self._coming_said(a, came=False))
+        return moved
+
+    def _coming_said(self, a, came: bool) -> dict:
+        """One person coming to or leaving the party's place on the clock, as a record and
+        its sentence: a keeper opens or shuts their counter, anybody else comes or goes."""
+        from . import keepers
+        from . import places as places_mod
+
+        wid = str(getattr(a, "world_entity_id", "") or "")
+        here = places_mod.find(self.places(), self.scene.at)
+        where = str(getattr(here, "name", "") or "") or keepers.label_of(self.scene.at)
+        who = str(a.name or "Somebody")
+        who = who[:1].upper() + who[1:]
+        keeps = keepers.is_keeper(wid) and keepers.place_of(wid) == self.scene.at
+        if came:
+            said = (f"{who} comes to {where} and opens the counter." if keeps
+                    else f"{who} comes to {where}.")
+        else:
+            said = (f"{who} shuts the counter and leaves {where}." if keeps
+                    else f"{who} leaves {where}.")
+        return {"ref": a.ref, "came": came, "at": self.scene.at, "said": said}
+
+    def _comings_settles(self) -> list:
+        """Who came to or left the party's place on the clock, told (law 3) — one outcome
+        for the batch, beside `_works_settles` and for its reason: benches and forges move
+        the clock outside a batch and drop `Scene.advance`'s return."""
+        rows = self.scene._comings_said
+        self.scene._comings_said = []
+        # Only what still holds: somebody who came at first light and left at dusk inside
+        # one long wait is not told as either.
+        last: dict[str, dict] = {}
+        for r in rows:
+            last[str(r.get("ref"))] = r
+        held = [r for ref, r in last.items()
+                if (getattr(self.scene.people.get(ref), "at", None) == self.scene.at)
+                == bool(r.get("came"))]
+        if not held:
+            return []
+        fx = [{"kind": "arrives" if r["came"] else "leaves", "ref": r["ref"],
+               "at": r["at"], "origin": "rule:hours"} for r in held]
+        return [self._articled(Outcome(
+            intent_id="", op="comings", effects=fx,
+            tell=" ".join(str(r["said"]) for r in held), because=""))]
+
+    def _settle(self, came: set, on_clock: bool) -> list[str]:
+        """Everybody with a life where it puts them now; the pass both doors share. Returns
+        the refs moved. `came` stays where it is; `on_clock` keeps everybody but keepers who
+        is in the party's place where they are (`settle_on_clock`)."""
+        from . import keepers
+        from . import places as places_mod
+        from . import population
+        from . import residency
+
+        scene = self.scene
         by_ref = {r.get("ref"): r for r in (scene.population or {}).values() if r.get("ref")}
         fighting = {ref for ref, _ in scene.initiative}
         moved: list[str] = []
@@ -9774,6 +9952,9 @@ class Engine:
         for ref, a in list(scene.people.items()):
             rec = by_ref.get(ref)
             if a.is_pc or ref in came or ref in fighting:
+                continue
+            if on_clock and a.at == scene.at and not keepers.is_keeper(
+                    str(getattr(a, "world_entity_id", "") or "")):
                 continue
             if rec is None:
                 # A keeper keeps their counter's hours (rules/keepers.py): a stall in the
@@ -9814,8 +9995,6 @@ class Engine:
             moved.append(ref)
             if a.at == scene.at:
                 population.seen(scene, rec)
-        # The moves above are residency's own, not the plan's.
-        scene.came_along = []
         return moved
 
     def leave_behind(self) -> list[str]:
@@ -9899,6 +10078,38 @@ class Engine:
                                     terrain_hint=self._terrain_hint(found),
                                     founded=self.scene.founded,
                                     ring=self._ring(found, self.scene.at))
+
+    def water_at_hand(self) -> str:
+        """The name of the free water — a well, a cistern (`places.water_in`) — of the
+        settlement the party is standing in, or "" when they are not inside one that has
+        any: out on the ring, on the road, on open ground, or in a settlement whose author
+        listed no water (the owner's ruling of 2026-10-09, `survival._provide`).
+
+        Inside means any place of the settlement's own set or one founded in it, not only
+        standing at the well: the owner's case was the market. Read off the id grammar the
+        place module owns: the floor taken off (`base_of`), then up the founded chain
+        (`child_id` hangs a founded place off its parent with "/") until a place of the
+        settlement's own set is reached."""
+        from . import places as places_mod
+
+        at = str(self.scene.at or "")
+        loc = str(self.scene.location_id or "")
+        if not at or not loc or places_mod.location_of(at) != loc or places_mod.is_ring(at):
+            return ""
+        found = self.world.get(loc) if self.world else None
+        home = places_mod.home_set(found or loc, self._terrain_hint(found))
+        ids = {p.id for p in home}
+        pid = places_mod.base_of(at)
+        while pid and pid not in ids:
+            pid = pid.rsplit("/", 1)[0] if "/" in pid else ""
+        if not pid:
+            return ""
+        # Founded places count when they hang off the settlement: a well the player dug in
+        # their own yard is a well.
+        inside = [p for p in self.places()
+                  if p.id in ids or str(p.id).split("/", 1)[0] in ids]
+        well = places_mod.water_in(inside)
+        return str(well.name or "the well") if well is not None else ""
 
     def _ring(self, found, at: str = "") -> tuple:
         """The settlement's outside places (`rules/outskirts.py`), or () with no world.

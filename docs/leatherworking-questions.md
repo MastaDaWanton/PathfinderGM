@@ -749,8 +749,11 @@ proposal stands. These override the plan and the contracts wherever they differ.
   "Its known drawbacks" of hides; the Harvest button's label.
 - Left, design for the owner: troll blood from a carcass; more traits for short consumables;
   numbers on the review page; the town smith's paid finishing (everyone holds Blacksmith 1,
-  so a base can be studded at any smithy, verified live for 10 cp); whether a town's well
-  waters a character waiting in it; keepers return only when the party arrives somewhere.
+  so a base can be studded at any smithy, verified live for 10 cp). Answered by the owner
+  2026-10-09 and built on `fix/town-water-and-keepers-on-the-clock`: a town's well waters a
+  character living through time in it ("yes they should drink from the well";
+  `places.water_in`, `survival._provide`), and keepers keep their hours on the clock, not
+  only when the party arrives (`Engine.settle_on_clock`).
 - Left, out of this build's scope: dragon scales stock (no step); rust stored on the suit, a
   shield's rust (needs an item-aimed touch); `body.metal` on stat blocks; the player's own die
   for gear saves vs heat/chill metal; the plan marks still unwritten (need effect types); the
