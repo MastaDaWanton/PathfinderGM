@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from rules.blacksmith import GROUPS, METHODS
+from rules.blacksmith import GROUPS, LEATHER_GROUPS, METHODS
 
 ROOT = Path(__file__).resolve().parent.parent
 JS = ROOT / "play" / "static" / "js"
@@ -47,7 +47,10 @@ def _read(p: Path) -> str:
 
 def _promised() -> set[str]:
     """Every forge sound UI plan §11 names, its placeholders filled from the engine's own
-    vocabularies: the bench's METHODS and the rack's forms (GROUPS' keys)."""
+    vocabularies: the bench's METHODS and the rack's forms (GROUPS' keys, and the leather
+    bench's forms the rack carries, LEATHER_GROUPS: a base and a lacing set dropped on the
+    anvil were silent until the leather final pass, 2026-10-09, because lane H moved them
+    out of GROUPS and nothing then asked for their sound)."""
     text = _read(UI_PLAN)
     i = text.index("## 11. Sound")
     sect = text[i:text.index("## 12.", i)]
@@ -57,7 +60,8 @@ def _promised() -> set[str]:
         if not m:
             names.add(raw)
             continue
-        fill = {"name": METHODS, "form": sorted(GROUPS)}[m.group(1)]
+        fill = {"name": METHODS, "form": sorted(set(GROUPS) | set(LEATHER_GROUPS))}[
+            m.group(1)]
         names.update(raw.replace(m.group(0), v) for v in fill)
     return names
 

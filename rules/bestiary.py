@@ -109,6 +109,10 @@ TEMPLATES: dict[str, dict] = {
         # so the hand-written one says its bite the same way.
         "melee": "bite +2 (1d4+1)",
         "notes": "Scent. Barks first.",
+        # The Bestiary dog's type. The three hand-made people above print none and are
+        # people by construction (`has_a_people`); the dog printed none either, so it read
+        # as a person too and could be handed a local people's face.
+        "creature_type": "animal",
     },
 }
 
@@ -624,7 +628,11 @@ def raw(key: str) -> dict | None:
     key = (key or "").strip().lower()
     if key in TEMPLATES:
         return TEMPLATES[key]
-    return imported().get(key) or imported().get(key.replace(" ", "-"))
+    # The imported store through `raw_block`, the one resolution of a name (its alias
+    # included): this read the two spellings itself and missed the index-order alias, so
+    # a creature spawned as "goblin troop" (`troop-goblin` in the store) had no block for
+    # `Actor._creature_doc`, and so no `type.*` tags and no harvest (lane C, 2026-10-08).
+    return raw_block(key)
 
 
 # Names the corpus files index-style: "Troop, Goblin" rather than "Goblin Troop", which
@@ -870,6 +878,29 @@ def body_is(creature, tag: str) -> bool:
         tags += [str(t) for t in (creature.get("tags") or ()) if str(t).strip()]
         return any(states.matches(t, tag) for t in tags)
     return bool(hasattr(creature, "has_state") and creature.has_state(tag))
+
+
+def has_a_people(creature) -> bool:
+    """Whether this body can be one of the local people, and so carry a true name and a
+    face from their pools (`names.appearance_for`). Takes an Actor, a block, or a
+    template name.
+
+    No stat block (a PC, a world resident, somebody the fiction made) or a block that
+    prints no type (the hand-made civilians: guildhand, watchman, thug) is a person by
+    construction; any printed type but humanoid is not. One reader for the spawn
+    (`Engine._a_person`) and for the load-time sweep (`judgement.name_the_nameless`):
+    the sweep asked nothing, and measured live by lane C (2026-10-08) a wolf killed on the
+    road was named "of the Korvu people" with a Korvu body line. Animals have no people."""
+    if isinstance(creature, str):
+        block = raw(creature) if creature.strip() else None
+    elif isinstance(creature, dict):
+        block = creature
+    else:
+        doc = getattr(creature, "_creature_doc", None)
+        block = doc() if callable(doc) else None
+    if not block or not str(block.get("creature_type") or "").strip():
+        return True
+    return body_is(block, "type.humanoid")
 
 
 def never_harvested(creature) -> bool:

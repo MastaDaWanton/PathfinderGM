@@ -1896,6 +1896,13 @@ KIND_WORDS: dict[str, str] = {
     "lab": "laboratory", "alchemy lab": "laboratory", "alchemist's lab": "laboratory",
     "alchemist's laboratory": "laboratory", "alchemical laboratory": "laboratory",
     "alchemists' laboratory": "laboratory",
+    # A tanner's place, the trade's own words for it (the same words `TANNERY_CUES` reads in
+    # a settlement's description), so `found kind="tanyard"` mints a tannery rather than
+    # being refused as no such kind (leather final pass, 2026-10-09). Not "tanner": that is
+    # the person, and `_said_as` reads these as words naming a PLACE.
+    "tanyard": "tannery", "tan yard": "tannery", "tan-yard": "tannery",
+    "tan pits": "tannery", "tan-pits": "tannery", "tanpits": "tannery",
+    "tanner's yard": "tannery", "tannery yard": "tannery",
 }
 
 
@@ -2726,8 +2733,9 @@ def tannery_line(scene, known=(), location=None) -> str:
         return ("There is no tannery out here. The field kit works common and uncommon "
                 "hides anywhere; the vats, the lime pit and rare hides wait for a tannery.")
     where = name or "This place"
+    # No em-dash: this sentence is UI copy on the bench (found by leather lane U1).
     return (f"{where} has no tannery. The field kit works common and uncommon hides "
-            f"anywhere; bark tanning, the lime pit and rare hides need a tannery — another "
+            f"anywhere; bark tanning, the lime pit and rare hides need a tannery: another "
             f"town's, or one of your own.")
 
 

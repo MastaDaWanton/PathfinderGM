@@ -108,6 +108,11 @@
   display: grid; column-gap: var(--bench-gap);
   grid-template-columns: var(--bench-satchel-w) minmax(560px, 1fr) var(--bench-tag-w);
   grid-template-areas: "satchel stage tag";
+  /* `clip` on x, as under 1180 below: the framed panels' clasp box reaches 34px past each
+     panel and the frame's gutter is 28px, so every bench layer measured 6px wider than the
+     window (leather lane U1, 2026-10-08: scrollWidth 1606 in a 1600 layer). The metal
+     itself starts 29px into that box, inside the gutter; only the empty 6px is cut. */
+  overflow-x: clip;
 }
 .bench-satchel { grid-area: satchel; }
 .bench-stage { grid-area: stage; }

@@ -623,6 +623,24 @@
     return L.api("/api/leather/check", L.body()).then(function (c) {
       if (seq !== checkSeq) return null;
       L.check = c;
+      // The slots follow what is being made (boots have no Fastenings): a piece left in a
+      // slot the product does not have comes off, said, and the server is asked again, so
+      // nothing sits on the order where no slot shows it.
+      if (c && c.slots && c.slots.length) {
+        var have = {}, gone = [];
+        c.slots.forEach(function (s) { have[s.id] = true; });
+        Object.keys(L.order.slots).forEach(function (s) {
+          if (have[s]) return;
+          var it = L.item(L.order.slots[s]);
+          delete L.order.slots[s];
+          if (it) gone.push(it.name);
+        });
+        if (gone.length) {
+          L.say(gone.join(", ") + " came off the bench: what you are making has no slot for it.");
+          L.emit("order");
+          return L.runCheck();
+        }
+      }
       L.emit("check", c);
       stageWork();
       renderStage();
@@ -1457,6 +1475,25 @@
     if (r && r.clock) tickClock(r.clock);
     L.refresh();
   });
+  // Wait for it from an In progress row (37's `Works.waiters`): a tannage whose first wait was
+  // cut short by an empty pack, or whose page was reloaded, had no door to wait out its days
+  // (the final pass, live, 2026-10-09: fifteen days of vat left and no button). The bench's
+  // own wait, opened first when it is shut, with the cut test when the work is a tannage.
+  if (window.Works && window.Works.waiters) {
+    window.Works.waiters.leatherworker = function (row) {
+      var go = function () {
+        return L.waitFor(row.key, row.doing === "tanning", row.ready_in);
+      };
+      if (L.open && L.state) return go();
+      L.openBench($id("open-leather"));
+      var tries = 0;
+      (function later() {
+        if (L.open && L.state && !L.loading) { go(); return; }
+        if (++tries < 40) setTimeout(later, 250);
+      })();
+      return null;
+    };
+  }
   // Collect or Stop on the rack's In progress group (37): the rack is read again.
   document.addEventListener("works:collected", function () { if (L.open && !L.busy) L.refresh(); });
   document.addEventListener("works:stopped", function () { if (L.open) L.refresh(); });

@@ -102,6 +102,7 @@
         if (!r.ok || !data) {
           var e = new Error((data && data.error) || ("The server failed (HTTP " + r.status + ")."));
           e.status = r.status;
+          e.data = data;
           throw e;
         }
         return data;
@@ -156,6 +157,10 @@
       groups: { weapon: "In a weapon", armour: "In armour", shield: "In a shield",
                 working: "At the bench", mark: "On the finished item" },
       unknownGrouped: false, hide: [],
+      // A hide's or a tannin's known drawbacks are drawbacks, not dangers: no hide bites
+      // back (the owner's answer 10). The Journal read "You know this is dangerous: Tans
+      // slowly" and "...: Weighs 20% more" (the final pass, live, 2026-10-09).
+      drawbacksSaid: "Its known drawbacks: ",
       list: "Hides and supplies you have met",
       empty: "No hides or supplies yet. Take one from a carcass or buy one and it appears here.",
       readFailed: "Couldn't read the tanner's ledger. ",
@@ -339,7 +344,8 @@
         esc(e.name) + '</button></h3>' +
         '<p class="why">' + esc([e.kind, e.known + " of " + e.total + " known",
           Number(e.carried) > 0 ? e.carried + " carried" : ""].filter(Boolean).join(" · ")) + '</p>' +
-        (e.danger_known ? '<p class="why">You know this is dangerous: ' + esc(e.danger_known) + '.</p>' : "") +
+        (e.danger_known ? '<p class="why">' + (T.drawbacksSaid || "You know this is dangerous: ") +
+          esc(e.danger_known) + '.</p>' : "") +
         '<div id="' + bodyId + '" class="fl-jr-body"' + (open ? "" : " hidden") + '>' +
           (open ? journalBody(st, e.id) : "") + '</div></li>';
     }).join("") + '</ul>';
@@ -491,6 +497,15 @@
       cache[key] = c;
       return c;
     }).catch(function (err) {
+      // The server says this card is another track's (the forge's 409 for a tanner's
+      // material names `track` and `card`): open that ledger's card in its place. Before
+      // this it read "Couldn't load this material" with a Retry that could only fail
+      // again (the leather final-pass list, 2026-10-08).
+      var d = err && err.data;
+      if (err && err.status === 409 && d && d.track && d.track !== track && TRACKS[d.track]) {
+        if (open && open.track === track && open.id === id) open.track = d.track;
+        return fetchCard(d.track, id);
+      }
       cache[key] = { error: err.message || String(err), transient: true };
       return cache[key];
     }).then(function (c) {

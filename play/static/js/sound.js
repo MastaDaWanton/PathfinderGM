@@ -878,6 +878,20 @@
     old: function (c) {          // pre-revamp work: an iron clunk, nothing fancy
       return knock(c, { f: k(c, [160, 150, 170]), peak: 0.08, lp: 900, d: 0.05 });
     },
+    // The leather bench's forms the forge rack carries (rules/blacksmith.py LEATHER_GROUPS).
+    // They were silent until here (the leather final pass, 2026-10-09: lane H moved them
+    // out of GROUPS, so no `forge.drop.base` or `.lacing` existed). Leather on iron is
+    // dull: no ping, a low-passed thump.
+    base: function (c) {         // a suit of hardened leather laid on the anvil: a heavy flap
+      knock(c, { f: k(c, [190, 175, 205]), peak: 0.06, lp: 900, d: 0.05, wave: "sine" });
+      return noise(c, { at: 0.012, src: "pink", f: 700, f2: 400, q: 0.9, peak: 0.03,
+                        a: 0.006, d: 0.09 });
+    },
+    lacing: function (c) {       // a coil of thongs dropped: a soft slither and a tap
+      grains(c, { n: k(c, [4, 5, 4]), span: 0.09, f: 1200, q: 0.9, peak: 0.022, d: 0.02 });
+      return knock(c, { at: 0.06, f: k(c, [300, 280, 320]), peak: 0.03, lp: 1500, d: 0.03,
+                        wave: "sine" });
+    },
   };
   // The fittings' own words (rules/blacksmith.py _FITTING_FORMS) all sound as a fitting.
   ["haft", "grip", "guard", "binding", "core", "lining", "fastening", "fastenings",

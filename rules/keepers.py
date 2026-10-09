@@ -218,6 +218,24 @@ def label_of(place_id: str) -> str:
     return spot.replace("-", " ")
 
 
+def given_name(actor) -> str:
+    """The keeper's own name when the player has it, else "".
+
+    Until a keeper is introduced their `name` is a descriptor ("the tanner", owner ruling
+    F1, 2026-09-30) and `true_name` holds the name to give. A bench footer that wrote
+    `f"{name}'s tannery"` from the descriptor read "At the tanner's tannery" (measured live
+    by leather lane U1, 2026-10-08; the forge's "the smith's smithy" is the same shape).
+    The test is the record's own, never a word list: a name that is not the true name is
+    not given yet, and a descriptor is written in lower case where a name never is."""
+    if actor is None:
+        return ""
+    name = " ".join(str(getattr(actor, "name", "") or "").split())
+    true = " ".join(str(getattr(actor, "true_name", "") or "").split())
+    if not name or (true and name != true) or not name[0].isupper():
+        return ""
+    return name
+
+
 def keeps_a_counter(actor) -> bool:
     """Whether this person is somebody the trade panel may open across.
 

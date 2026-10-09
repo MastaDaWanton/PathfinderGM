@@ -83,6 +83,11 @@
   }
 
   var W = window.Works = { esc: esc };
+  // How a craft's bench waits its own work out, by craft id: `function (row)`. A bench
+  // registers one (55-leather-shell.js: the tannery's Wait for it, through its collect with
+  // `wait`); a row offers "Wait for it" only when its craft has one and the server says the
+  // player can stay with it (`can_wait`).
+  W.waiters = {};
 
   // --- what the server last said ---------------------------------------------------------
   var rows = null;           // null until the first answer; [] is "nothing in progress"
@@ -216,7 +221,12 @@
       }
       var stop = r.can_stop ? '<button type="button" class="v2-btn is-small is-quiet" data-works-stop="' +
         esc(r.key) + '">Stop</button>' : "";
-      if (collect || stop) acts = '<div class="wk-acts">' + collect + stop + '</div>';
+      // Wait for it, where the bench that made it registered how to wait (`W.waiters`) and
+      // the server says the player can stay with it here (`can_wait`).
+      var wait = (!ready && r.can_wait && typeof W.waiters[r.craft] === "function")
+        ? '<button type="button" class="v2-btn is-small" data-works-wait="' + esc(r.key) +
+          '">Wait for it</button>' : "";
+      if (collect || wait || stop) acts = '<div class="wk-acts">' + collect + wait + stop + '</div>';
     }
     // What is being done and where, on one quiet line ("Steeping, carried"; "Curing in the
     // vat, at Brannoc's tannery"). The countdown is its own line under it, in ink, with the
@@ -467,6 +477,12 @@
         return;
       }
       collect(key, t);
+      return;
+    }
+    if ((key = t.getAttribute("data-works-wait")) != null) {
+      var row = (rows || []).filter(function (r) { return r.key === key; })[0];
+      var fn = row && W.waiters[row.craft];
+      if (fn) { W.close(); fn(row); }
       return;
     }
     if ((key = t.getAttribute("data-works-stop")) != null) { asking = key; drawAll(); focusIn(key, "data-works-keep"); return; }

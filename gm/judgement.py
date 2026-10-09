@@ -8679,9 +8679,16 @@ def name_the_nameless(scene, world) -> list[str]:
         return []
     from rules import names as names_mod
 
+    from rules import bestiary
+
     done = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
         if a.is_pc or getattr(a, "true_name", ""):
+            continue
+        # A beast has no people: no true name from their pools and no face of theirs
+        # (`bestiary.has_a_people`, the spawn's own reader). Measured by leather lane C,
+        # 2026-10-08: a dead wolf read "of the Korvu people" after a reload.
+        if not bestiary.has_a_people(a):
             continue
         name = str(a.name or "")
         descriptor = not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))

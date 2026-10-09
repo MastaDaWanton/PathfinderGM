@@ -22474,10 +22474,9 @@ def _a_person(template: str) -> bool:
     """
     from . import bestiary
 
-    row = bestiary.imported().get(str(template or "").strip().lower())
-    if row is None:
-        return True
-    return str(row.get("creature_type") or "").strip().lower() == "humanoid"
+    # `bestiary.has_a_people`, the one reader, which the load-time sweep shares; it
+    # resolves the name through the bestiary's one resolution (aliases too).
+    return bestiary.has_a_people(str(template or ""))
 
 
 def _damage_note(d: dict) -> str:

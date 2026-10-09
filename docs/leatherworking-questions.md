@@ -721,3 +721,37 @@ proposal stands. These override the plan and the contracts wherever they differ.
   blood is unobtainable from a carcass (owner); `Actor._creature_doc` uses `bestiary.raw` not
   `raw_block`, so an alias-spawned creature gets no `type.*` tags; the core bestiary's "magical"
   type reads as `type.magical`; the faces system gave a dead wolf a people ("of the Korvu people").
+
+**Final pass, outcomes (build/leather-final, 2026-10-09).** Pinned by tests/test_leather_final.py.
+- Fixed: Assemble's slots follow the product (`lw.slots_for`: boots are body and lining; a
+  suit's fastenings required); keepers' names only once given (`keepers.given_name`; the
+  forge's "the smith's smithy" too) and "the tannery at the tannery" (both benches); the
+  advice line from the bench's own tannery reading, no em-dash; creature-derived lines and
+  specs held back on both benches until a Grade of that beast's hide finds them
+  (`knowledge.grade` keeps `creature:<id>`); crafted armour and shields on Equipment carry
+  their build's numbers, one worn row, with Take off; the frame says "Score N of 5" with no
+  names; the danger tell ("skins the Karkadann without harm, wary of ..."); thick from the
+  beast (`Piece.working`, and natural armour as AC less touch on the 828 blocks with no
+  breakdown: the bulette is thick); a leather grip's or lacing set's marks reach the forged
+  item (styx mordant); the forge card names known marks and creature lines; working a
+  consumable reveals its working traits; `forge.drop.base` and `.lacing`; the forge ledger
+  follows a 409 to the Tanner's card; tanyard/tan pits; the market comment; `bestiary.raw`
+  through `raw_block`; one type reader (`states.type_word`, harvest's fragment table gone);
+  `bestiary.has_a_people` for the spawn and the load sweep (wolves and the guard dog have no
+  people); test_forge_api alone; domain powers' `ability_type` (CRB: 15 Sp, 4 Su); the
+  bench clasps' 6px (overflow-x clip on the frame).
+- Found in the playthrough and fixed: a blow read at a dying beast does something
+  (`acts_to_ops.victims`: out of a fight the coup de grâce); a market whose general store
+  keeper is home opens the first staffed counter; "Wait for it" on every In-progress row the
+  player can stay with (`can_wait`, `Works.waiters`); a bench's wait toll is not told twice
+  (`survival.told_on_page`); the forge's worn check reads the slots; a forge-finished suit is
+  worn from its own row; a plated pattern's lining goes next to Stitch; the Journal says
+  "Its known drawbacks" of hides; the Harvest button's label.
+- Left, design for the owner: troll blood from a carcass; more traits for short consumables;
+  numbers on the review page; the town smith's paid finishing (everyone holds Blacksmith 1,
+  so a base can be studded at any smithy, verified live for 10 cp); whether a town's well
+  waters a character waiting in it; keepers return only when the party arrives somewhere.
+- Left, out of this build's scope: dragon scales stock (no step); rust stored on the suit, a
+  shield's rust (needs an item-aimed touch); `body.metal` on stat blocks; the player's own die
+  for gear saves vs heat/chill metal; the plan marks still unwritten (need effect types); the
+  mordant's "lost on soaking"; the fats/galls tag branch (lane W).

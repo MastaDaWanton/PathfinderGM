@@ -424,6 +424,14 @@ def _row(key: str, item, now: int, here: str | None) -> dict:
         "ready_when": (f"day {int(end) // sky.DAY + 1}, {residency.day_part(int(end))}"
                        if end is not None else ""),
         "fraction": fraction, "can_collect": can_collect, "why_not": why_not,
+        # Work still going, where the player can stay with it (carried, or left HERE): the
+        # bench that registered a wait (37-works.js `Works.waiters`) offers "Wait for it",
+        # which passes the clock through `Scene.wait`. Before this the tannery's Wait for it
+        # lived only on the step's own result: a wait cut short by an empty waterskin, or a
+        # page reloaded, left fifteen days of vat with no door to wait them out (the leather
+        # final pass, live, 2026-10-09).
+        "can_wait": state != "ready" and _where_ok(block, here),
+        "doing": str(block.get("doing") or ""),
         "can_stop": craft.cancel is not None, "stop_words": _stop_words(craft, item),
     }
 

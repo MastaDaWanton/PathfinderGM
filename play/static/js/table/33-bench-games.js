@@ -1502,7 +1502,11 @@
     } else {
       var pips = r.dom.band.children;
       for (var k = 0; k < pips.length; k++) pips[k].className = k <= i ? "is-on" : "";
-      r.dom.live.textContent = "Rough quality " + (i + 1) + " of " + r.bounds.length;
+      // No names from the server: the pips are the game's own running score in even
+      // shares, never a quality. A game the server grades some other way (the harvest's
+      // defect area, the tannery's cut test) read "Rough quality 3 of 5", a tier nobody
+      // computed (leather lane U1, 2026-10-08).
+      r.dom.live.textContent = "Score " + (i + 1) + " of " + r.bounds.length;
     }
     // A tier up brightens the word once for 180ms (UI plan §10, "Tier up"); reduced
     // motion moves it instantly.

@@ -87,13 +87,15 @@ def _coins(cp: int) -> str:
 
 
 def _keeper_name(c, ref) -> str:
+    """The tanner's name when the player has been given it, else "" (`keepers.given_name`:
+    an unintroduced keeper's name is a descriptor, and "the tanner's tannery" read wrong)."""
     if not ref:
         return ""
     try:
+        from rules import keepers
         from rules import places as places_mod
 
-        who = places_mod._actor(c.scene, ref)
-        return str(getattr(who, "name", "") or "")
+        return keepers.given_name(places_mod._actor(c.scene, ref))
     except Exception:      # noqa: BLE001 - a name is never worth failing for
         return ""
 
@@ -121,9 +123,12 @@ def _where(c, pc) -> dict:
         keeper = _keeper_name(c, tannery.get("keeper"))
         rate = int(tannery.get("rate_cp_per_hour") or 0)
         vat = int(tannery.get("vat_rate_cp_per_day") or 0)
+        # The place the party stands in IS the tannery (`tannery_here` reads the scene's
+        # own coordinate), so its own name says where: "the tannery at the tannery" was
+        # the footer in Zhilgoroth's (the final pass, live, 2026-10-09).
         whose = (f"{keeper}'s tannery" if keeper and tannery.get("kind") == "town"
                  else "your tannery" if tannery.get("kind") == "owned" and not rate
-                 else (f"the tannery at {place}" if place else "the tannery"))
+                 else (place or "the tannery"))
         out["name"] = whose
         try:
             from rules import places as places_mod
@@ -152,7 +157,13 @@ def _where(c, pc) -> dict:
     try:
         from rules import places as places_mod
 
-        out["advice"] = places_mod.tannery_line(c.scene, known)
+        # The settlement itself, so the line names it ("Kestwick has no tannery") and
+        # knows open ground from a town; without it every place read "This place".
+        engine = c.engine()
+        location = (engine.world.get(c.scene.location_id)
+                    if getattr(engine, "world", None) else None)
+        out["advice"] = ("" if tannery else
+                         places_mod.tannery_line(c.scene, known, location))
     except Exception:      # noqa: BLE001
         out["advice"] = ""
     return out
@@ -249,9 +260,11 @@ _SLOT_EMPTY = {"hide": "Drop a hide here, or press Enter on one in the rack",
                "lining": "Optional: a stitched lining"}
 
 
-def _slot_view(method: str) -> list[dict]:
-    names = lw.METHOD_SLOTS.get(method, ())
-    optional = set(lw.OPTIONAL.get(method, ()))
+def _slot_view(method: str, product: str = "") -> list[dict]:
+    """The work order's slots, following the product (`lw.slots_for`): boots have no
+    Fastenings slot, and a suit's fastenings are not optional."""
+    names, opt = lw.slots_for(method, product)
+    optional = set(opt)
     return [{"id": s, "label": _SLOT_LABEL.get(s, s.title()), "optional": s in optional,
              "empty": _SLOT_EMPTY.get(s, f"Fill the {s} slot")} for s in names]
 
@@ -493,24 +506,49 @@ def _marks_card(build: dict | None, pc) -> list[dict]:
     return out
 
 
-def _page_build(build: dict | None, pc) -> dict | None:
+def _creature_unknown(pieces: dict | None, pc) -> set[str]:
+    """The `creature:<id>` sources of a build whose inheritance the character has not
+    graded (`knowledge.knows_creature`): the generic hide's beast, read off the main piece,
+    which is the only piece an inherited number comes from (`forge_items.build`)."""
+    kn = lw._lane("knowledge")
+    out = set()
+    for piece in (pieces or {}).values():
+        if not isinstance(piece, dict) or not piece.get("creature"):
+            continue
+        creature = str(piece["creature"])
+        known = False
+        if kn is not None and hasattr(kn, "knows_creature"):
+            try:
+                known = kn.knows_creature(pc, str(piece.get("material") or ""), creature)
+            except Exception:  # noqa: BLE001 - unknown is the safe answer
+                known = False
+        if not known:
+            out.add(f"creature:{creature}")
+    return out
+
+
+def _page_build(build: dict | None, pc, pieces: dict | None = None) -> dict | None:
     """The build as the page may see it: every mark the character has not learned taken
     out of `marks` and `specs` (its source names the consumable and its spec says what it
-    does). The item's own numbers (`gear`: a hardness the troll fat added) stay, as they
-    stay on the sheet: the number is the item's, the mark's name is the secret. Measured
-    before this (leather lane "marks", 2026-10-08): the finish response sent the build
-    whole, so an ungraded salamander oil's "resistance fire 1, source salamander-oil" was
-    in the page's JSON though no card drew it."""
+    does), and so is what a generic hide inherited from its beast until a Grade has found
+    it (`_creature_unknown`). The item's own numbers (`gear`: a hardness the troll fat
+    added) stay, as they stay on the sheet: the number is the item's, the mark's name is
+    the secret. Measured before this (leather lane "marks", 2026-10-08): the finish
+    response sent the build whole, so an ungraded salamander oil's "resistance fire 1,
+    source salamander-oil" was in the page's JSON though no card drew it; lane U1 found the
+    build card's `from_creature` lines the same way, the same day."""
     if not isinstance(build, dict):
         return build
     hidden = {str(r.get("material") or "") for r in build.get("marks") or []
               if not _mark_known(pc, r.get("material", ""))}
-    if not hidden:
+    beasts = _creature_unknown(pieces, pc)
+    if not hidden and not beasts:
         return build
     out = dict(build)
     out["marks"] = [r for r in build.get("marks") or [] if r.get("material") not in hidden]
     out["specs"] = [s for s in build.get("specs") or []
-                    if not (s.get("mark") and s.get("source") in hidden)]
+                    if not (s.get("mark") and s.get("source") in hidden)
+                    and str(s.get("source") or "") not in beasts]
     return out
 
 
@@ -549,8 +587,12 @@ def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "",
                             "amount": int(s["final"]), "bonus_type": "material"})
             summary.append(line + (" (when it applies)" if s.get("when") else ""))
     powers = [_render(e) for e in build.get("book") or []]
+    # What the creature gave, only once a Grade has found it (`_creature_unknown`): the
+    # page never holds a creature-derived property before then (lane U1, 2026-10-08).
+    beasts = _creature_unknown(pieces, pc)
     creature = [_render(e) for e in build.get("specs") or []
-                if str(e.get("source") or "").startswith("creature:")]
+                if str(e.get("source") or "").startswith("creature:")
+                and str(e.get("source") or "") not in beasts]
     q = mult.get("quality")
     cut = mult.get("negative_cut")
     return {
@@ -604,7 +646,7 @@ def _preview(plan, pc) -> dict | None:
             marks=marks)
     top = worldclass.quality_name(max(0, plan.step_ceiling))
     card = _card(by_tier.get(top), pieces, gear, top, pc)
-    by_tier = {k: _page_build(v, pc) for k, v in by_tier.items()}
+    by_tier = {k: _page_build(v, pc, pieces) for k, v in by_tier.items()}
     return {"at": top, "build": by_tier.get(top), "by_tier": by_tier,
             "card": card,
             "as": "" if isinstance(first, dict) else
@@ -664,7 +706,7 @@ def _check_body(c, plan, items, rent, vat, where, pc) -> dict:
     row = lw.method_row(plan.method) or {}
     return {
         "fits": lw.fits_for(plan.method, items, product=plan.product),
-        "slots": _slot_view(plan.method),
+        "slots": _slot_view(plan.method, plan.product),
         "product": plan.product,
         "gear": plan.gear,
         "problems": list(plan.problems),
@@ -846,9 +888,13 @@ def _next_step(thing) -> str:
     if f in ("leather", "fur", "rawhide"):
         return "cut"
     if f == "panel":
-        if "stitch" not in thing.worked and not lw._plated(thing.pattern):
+        # Only a plated pattern's BODY is hardened; its lining is stitched panels like any
+        # other. Seen live (the final pass, 2026-10-09): leather armour's wolf lining said
+        # "Next: Harden" when cut, and again when stitched.
+        plated = lw._plated(thing.pattern) and (thing.part or "body") == "body"
+        if "stitch" not in thing.worked and not plated:
             return "stitch"
-        if lw._plated(thing.pattern):
+        if plated:
             return "harden"
         return "assemble"
     if f in ("plate", "lacing"):
@@ -935,11 +981,19 @@ def leather_finish(request):
         if _first(progress, f"hide:{mid}"):
             bonus(f"first work with {lw.doc_name(mid)}")
 
-    # Working a hide reveals its working traits: you watched it behave (plan §16).
+    # Working a hide reveals its working traits: you watched it behave (plan §16). So does
+    # working WITH a consumable: the tannin that slowed the tan, the oil that made the hide
+    # supple. Measured by the marks lane (2026-10-08): only the hides were asked, so a
+    # tannin's `slow_tan` stayed unknown however many hides went through it. A consumable's
+    # mark is not a working trait and stays Grade's to find (`working_keys` is the "t" list).
+    used = list(worked)
+    for p, _ in plan.consumes:
+        if p.hide is None and p.record is None and p.material and p.material not in used:
+            used.append(p.material)
     discoveries = []
     how = f"worked it, day {now // 1440 + 1}"
     kn = lw._lane("knowledge")
-    for mid in worked:
+    for mid in used:
         doc = lw.material(mid)
         if doc is None or kn is None:
             continue
@@ -985,7 +1039,7 @@ def leather_finish(request):
         if rec is not None:
             build = fi.build(rec)
             entry.update({"name": rec["name"], "form": "item", "record": rec,
-                          "build": _page_build(build, pc),
+                          "build": _page_build(build, pc, rec.get("pieces")),
                           "card": _card(build, rec.get("pieces"), rec.get("gear"), tier_name,
                                         pc),
                           "color": _color(((rec.get("pieces") or {}).get("body") or {})
@@ -1048,7 +1102,7 @@ def leather_collect(request):
             # days" (master's fix/long-waits-eat-and-drink; alchemy_collect's shape).
             passed = c.scene.wait(left)
             waited = int(passed["minutes"])
-            lived = survival.wait_lines(passed, pc.ref)
+            lived = survival.told_on_page(c.scene, passed, pc.ref)
             if waited:
                 c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
                     [f"{pc.name} waits {sky.span_words(waited)} for the {item.name}."]
@@ -1146,6 +1200,11 @@ def leather_grade(request):
     found = []
     for k in revealed:
         text = str((rows.get(k) or {}).get("text") or "")
+        if creature and hasattr(kn, "creature_key") and k == kn.creature_key(creature):
+            # What this beast's hide inherited (`knowledge.grade`), said as the build card
+            # will say it from now on.
+            text = "from the creature: " + ", ".join(
+                _render(e) for e in kn.inherited_of(creature))
         found.append({"key": k, "text": text, "row": rows.get(k)})
     for f in found:
         # A point for each property the grading turned up (`worldclass.STUDY_MP`).

@@ -92,6 +92,17 @@ SHELF = {d["id"]: d for d in [
 
 def fake_materials() -> types.ModuleType:
     mod = types.ModuleType("rules.materials")
+    # The shelf above is the fake; every other name answers from the real module, as
+    # `fake_forge_items` does. Run alone, tests/test_forge_api.py errored on its first state
+    # request: the market's price check reads `materials.CATALOGUES`, which this stand-in
+    # lacked (`AttributeError ... no attribute 'CATALOGUES'`, the marks lane, 2026-10-08);
+    # in the full suite something had imported the market first and cached its answer.
+    import importlib
+
+    real = sys.modules.get("rules.materials")
+    real = getattr(real, "_real", None) or importlib.import_module("rules.materials")
+    mod._real = real
+    mod.__getattr__ = lambda name: getattr(real, name)
     mod.get = lambda mid: dict(SHELF[mid]) if mid in SHELF else None
     mod.all = lambda: {k: dict(v) for k, v in SHELF.items()}
     mod.of_kind = lambda kind: [dict(v) for v in SHELF.values() if v["kind"] == kind]

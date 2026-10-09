@@ -77,14 +77,6 @@ PLAIN_SINEW = "sinew-thread"
 GENERIC_TYPES = {"animal": "fur", "magical beast": "fur", "vermin": "chitin",
                  "dragon": "scale"}
 
-# core.json's Type column came out of a PDF split on whitespace ("magical" for magical
-# beast); the same fix table as tools/tag_creature_biomes.py's `_CORE_TYPE_FIX` (which a
-# frozen app cannot import), plus the two two-letter fragments measured 2026-10-08.
-_TYPE_FIX = {"magical": "magical beast", "monstrous": "monstrous humanoid",
-             "construc": "construct", "ve": "vermin", "advanced magical beast": "magical beast",
-             "augmented magical beast": "magical beast", "outsider familiar": "outsider",
-             "augmented plant": "plant"}
-
 SIZES = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge", "gargantuan",
          "colossal")
 
@@ -139,11 +131,18 @@ def template_of(creature) -> str:
 
 
 def creature_kind(block: dict | None) -> str:
-    """"magical beast", "vermin", ...: the block's type, normalised (`_TYPE_FIX`)."""
+    """"magical beast", "vermin", ...: the block's type, read as the book's closed list of
+    thirteen (`states.type_word`, the one reader the `type.*` tags share). core.json's Type
+    column came out of a PDF split on whitespace ("magical", "monstrous", "construc",
+    "ve", "animal companion 5"); this module kept its own table of those fragments until
+    the leather final pass (2026-10-09), a second reader that the tags did not share, so
+    107 magical beasts were `type.magical` on the sheet and "magical beast" here. A type
+    outside the thirteen keeps its words."""
+    from .states import type_word
+
     raw = " ".join(str((block or {}).get("creature_type") or "").lower().split())
-    if raw.startswith("animal companion"):
-        return "animal"          # "animal companion 5": the level in the Type column
-    return _TYPE_FIX.get(raw, raw)
+    word = type_word(raw)
+    return word.replace("-", " ") if word else raw
 
 
 def subtypes(block: dict | None) -> set[str]:
@@ -187,10 +186,27 @@ def ability_mod(block: dict | None, ability: str) -> int:
 
 
 def natural_armour(block: dict | None) -> int:
+    """The block's natural armour: its printed breakdown's "+N natural", or, on a block that
+    prints no breakdown but its touch AC ("touch 10, flat-footed 20", 828 imported blocks),
+    its AC less its touch AC, which is what a touch attack ignores: armour, shield and
+    natural armour (CRB, Touch Attacks). Only a beast's hide is generic (`GENERIC_TYPES`:
+    animals, magical beasts, vermin, dragons wear no armour), so for the bodies this is
+    asked of the difference is the natural armour. Measured 2026-10-09: 255 such beasts
+    print no breakdown, the bulette among them (AC 22, touch 10), and every one read as
+    natural armour 0, so not one could give a thick hide; 132 of them are +5 or more."""
     from . import bestiary
 
-    return sum(v for v, src, typ in bestiary.ac_parts(str((block or {}).get("ac_note") or ""))
-               if typ == "natural armour")
+    note = str((block or {}).get("ac_note") or "")
+    parts = bestiary.ac_parts(note)
+    if parts:
+        return sum(v for v, src, typ in parts if typ == "natural armour")
+    nums = bestiary.ac_numbers(note)
+    if not nums or creature_kind(block) not in GENERIC_TYPES:
+        return 0
+    try:
+        return max(0, int((block or {}).get("flat_ac") or 0) - int(nums[0]))
+    except (TypeError, ValueError):
+        return 0
 
 
 def side_of(block: dict | None) -> str:
@@ -1210,8 +1226,11 @@ def face_danger(engine, actor, creature, kind: str, roll_total: int, *, now: int
     who = str(getattr(actor, "name", "") or "You")
     body = str(getattr(creature, "name", "") or "the carcass")
     if not exposed:
-        out["tells"].append(f"{who} works around the {DANGER_WORDS.get(kind, kind)} of the "
-                            f"{body} without harm.")
+        # The danger's words stand alone ("a body hot to the touch", as the harvest sheet
+        # shows them), so the tell never wraps them in an article of its own: lane U2 read
+        # "works around the a body hot to the touch of the Karkadon" live, 2026-10-08.
+        out["tells"].append(f"{who} skins {_the(body)} without harm, wary of "
+                            f"{DANGER_WORDS.get(kind, kind)}.")
         return out
     if kind == "poison" and actor.has_state("trait.poison-use"):
         out["tells"].append(f"{who} slips with the venom sac, and shrugs it off: they handle "

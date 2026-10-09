@@ -119,6 +119,9 @@
         if (!r.ok || !data) {
           var e = new Error((data && data.error) || ("The server failed (HTTP " + r.status + ")."));
           e.status = r.status;
+          // The refusal's own fields (a 409 that names where to go instead: the forge's
+          // card for a tanner's material sends `track` and `card`).
+          e.data = data;
           throw e;
         }
         return data;

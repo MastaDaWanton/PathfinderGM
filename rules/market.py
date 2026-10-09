@@ -998,10 +998,11 @@ def consumable_goods(crafts) -> list:
 # nearly every zone (wowhead, "Salt", item 4289).
 #
 # Priced rows only, as the consumables are: `price_gp` absent means "the world does not sell
-# this" (`rules/pricing.py`), and deriving a price here would erase that. Measured
-# 2026-10-08: none of the 14 common hides and none of the 5 common dyes in
-# leatherworker-materials.json has a price, so today the line names them and shelves none;
-# they come on the counter the day the catalogue prices them, with nothing here changed.
+# this" (`rules/pricing.py`), and deriving a price here would erase that. Lane D's data
+# pass priced the catalogue: measured 2026-10-09, 15 common hides and 5 common dyes are on
+# every leatherworker's counter (wolf pelt 2 gp, cowhide 4 gp, the dyes 1 gp). The six
+# `generic-*` hides stay unpriced on purpose: they are what a harvest yields from a
+# creature with no hide of its own (lane C), never a thing a tanner stocks.
 _KIND_STAPLES: dict[tuple, list] | None = None
 
 

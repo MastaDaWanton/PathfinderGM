@@ -1061,19 +1061,11 @@ def _type_word(raw) -> str | None:
     CREATURE_TYPES`: "magical-beast"), or None. The two bestiary files spell it three
     ways: "magical beast", "advanced magical beast", and core.json's truncated "magical"
     (107 blocks) and "monstrous" (55) — measured 2026-10-08. A type contained in the words
-    wins (longest first), then a type the words begin; anything else is no type."""
-    from .effectspec import CREATURE_TYPES
+    wins (longest first), then a type the words begin; anything else is no type. The one
+    reader is `states.type_word`, which the `type.*` tag writer shares."""
+    from .states import type_word
 
-    words = " ".join(re.findall(r"[a-z]+", str(raw or "").lower()))
-    if not words:
-        return None
-    for t in sorted(CREATURE_TYPES, key=len, reverse=True):
-        if f" {t.replace('-', ' ')} " in f" {words} ":
-            return t
-    for t in CREATURE_TYPES:
-        if t.replace("-", " ").startswith(words):
-            return t
-    return None
+    return type_word(raw)
 
 
 def creature_type_of(creature) -> str | None:
@@ -1313,7 +1305,46 @@ def grade(actor, material_id: str, total: int, *, clock: int, creature=None) -> 
     if not is_leather(doc):
         raise ValueError(f"{_field(doc, 'name', material_id)} is not a leatherworker's "
                          f"material: assay it at the forge instead.")
-    return assay(actor, material_id, total, clock=clock, creature=creature)
+    got = assay(actor, material_id, total, clock=clock, creature=creature)
+    # What a generic hide took from its beast (`harvest.inherited`: a fire resistance, a
+    # reduced DR) is a property of THIS beast's hide, learned the way the hide's own are: a
+    # successful Grade of a scrap taken off it. It has no key in the document (it is
+    # derived from the stat block on read, never stored), so it is kept under the hide's
+    # entry as `creature_key(creature)`, beside the document's own keys and never counted
+    # among them. Before this nothing could ever learn it, and the bench sent it to the
+    # page anyway (leather final pass, 2026-10-09).
+    if got.get("success") and creature and inherited_of(creature):
+        new = reveal(actor, got["material"], [creature_key(creature)],
+                     f"graded, day {day_of(clock)}")
+        if new:
+            got["revealed"] = list(got.get("revealed") or []) + new
+            got["mp"] = _study_mp() * len(got["revealed"])
+    return got
+
+
+def creature_key(creature) -> str:
+    """The knowledge key of what one beast's generic hide inherited from it."""
+    return f"creature:{str(creature or '').strip().lower()}"
+
+
+def inherited_of(creature) -> list[dict]:
+    """`harvest.inherited(creature)`, or [] where the harvest is not in this build."""
+    try:
+        from . import harvest
+    except ImportError:
+        return []
+    try:
+        return list(harvest.inherited(str(creature or "")) or [])
+    except Exception:  # noqa: BLE001 - an unknown beast inherits nothing
+        return []
+
+
+def knows_creature(actor, material_id: str, creature) -> bool:
+    """Whether this actor has graded what `creature`'s hide inherited from it (`grade`)."""
+    if actor is None or not creature:
+        return False
+    entry = _entry(actor, _store_id(material_id)) or {}
+    return creature_key(creature) in set(entry.get("keys") or ())
 
 
 def apply_danger(engine, actor, material_id: str, effect: dict | None,

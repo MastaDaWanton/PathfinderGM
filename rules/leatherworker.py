@@ -801,6 +801,31 @@ class Piece:
     def doc(self) -> dict | None:
         return material(self.material)
 
+    @property
+    def working(self) -> list[str]:
+        """The piece's working traits: its document's, and for a generic hide what its
+        beast gave it (`harvest.working_traits`: `thick` at natural armour +5, plan §5.4).
+        Asked wherever a trait decides a step, so a thick generic hide (a bulette's, an
+        ankylosaurus's) can make hide armour and limes in the pit like a named thick hide.
+        Before this every check read the document alone (`_has(doc, "thick")`), and the
+        generic documents are thin, so no harvested beast's hide could ever be hide armour
+        (lane C's finding, 2026-10-08)."""
+        return _traits(self.doc, self.hide)
+
+
+def _traits(doc: dict | None, hide=None) -> list[str]:
+    """`_working(doc)` plus a generic hide's beast's traits (`Piece.working`)."""
+    out = _working(doc)
+    creature = str(getattr(hide, "creature", "") or "")
+    if creature:
+        try:
+            from . import harvest
+
+            out = list(dict.fromkeys(out + list(harvest.working_traits(creature) or [])))
+        except Exception:      # noqa: BLE001 - an unknown beast gives nothing
+            pass
+    return out
+
 
 def _bought_hide(mid: str, doc: dict, n: int, actor, now: int) -> Hide:
     """A hide in the satchel as a bare count: a counter's purchase (`goods.deliver` puts a
@@ -1175,7 +1200,7 @@ def fit_reason(method: str, slot: str, p: Piece, *, product: str = "",
                                              _hardening_kinds()):
             return (f"a {_pattern_word(product).lower()} is hardened plates, and only "
                     f"bark- or planar-tanned leather hardens")
-        if product == "hide armour" and not _has(doc, "thick"):
+        if product == "hide armour" and "thick" not in p.working:
             return "hide armour wants a thick hide: this one is too thin"
         return ""
     if method == "stitch":
@@ -1283,11 +1308,36 @@ def _assemble_fit(slot: str, p: Piece, product: str) -> str:
     return "no such slot"
 
 
+def slots_for(method: str, product: str = "") -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(the slots, the optional ones) of a method, following what is being made.
+
+    Assemble's slots are the product's pieces, the forge's own table (`forge_items.PIECES`
+    by the product's gear): a suit or a shield is body, fastenings and lining, and the
+    fastenings are then REQUIRED (`_build_assemble` refuses without them); worn and
+    carried goods are body and lining only. Measured live by lane U1 (2026-10-08): the
+    bench drew an optional Fastenings slot for boots, which `fit_reason` then refused
+    whatever was dropped in it. Before a product is known Assemble shows all three, the
+    fastenings optional, as it always did."""
+    slots = tuple(METHOD_SLOTS.get(method, ()))
+    optional = tuple(OPTIONAL.get(method, ()))
+    info = PRODUCTS.get(product or "") if method == "assemble" else None
+    if info is None:
+        return slots, optional
+    from . import forge_items as fi
+
+    pieces = tuple(fi.PIECES.get(info.get("gear", "armour"), slots))
+    if not info.get("fastenings"):
+        pieces = tuple(s for s in pieces if s != "fastenings")
+    keep_optional = tuple(s for s in optional
+                          if s in pieces and not (s == "fastenings" and info.get("fastenings")))
+    return pieces, keep_optional
+
+
 def fits_for(method: str, items: list[Piece], *, product: str = "") -> dict:
     """`{slot: {key: reason or ""}}` for every rack entry and every slot of the method,
     which is what dims rows (contracts §7 `check`)."""
     return {slot: {p.key: fit_reason(method, slot, p, product=product) for p in items}
-            for slot in METHOD_SLOTS.get(method, ())}
+            for slot in slots_for(method, product)[0]}
 
 
 # --- one step -------------------------------------------------------------------------------
@@ -1524,7 +1574,7 @@ def _common(plan: LeatherPlan, p: Piece, noun: str) -> None:
     plan.lead_id = p.material
     plan.rank_in = max(plan.rank_in, p.rank)
     plan.rank_out = max(plan.rank_out, p.rank)
-    plan.working = list(dict.fromkeys(plan.working + _working(p.doc)))
+    plan.working = list(dict.fromkeys(plan.working + p.working))
     plan.noun = noun
     if not plan.dc:
         plan.dc = dc_of(p.doc, p.tier)
@@ -1564,7 +1614,7 @@ def _build_flense(plan: LeatherPlan, row: dict, actor) -> None:
     plan.units = n
     _common(plan, p, "pelt")
     plan.minutes = _minutes(row, p.quarters * n)
-    if _has(p.doc, "thick"):
+    if "thick" in p.working:
         # Liming a thick hide (plan §7): a lime pit for days, which is a tannery's.
         if not plan.where.get("tannery"):
             plan.problems.append(f"{p.name} is thick: liming it takes a tannery's lime "
@@ -1634,14 +1684,14 @@ def _build_tan(plan: LeatherPlan, row: dict, actor) -> None:
                                        if k in trow}}, total_q)
     if p.hide.salted and not _has(tdoc, "salt_proof"):
         plan.minutes += int(row.get("desalt_minutes", 480))
-    wait = int(trow.get("thick_wait_minutes") if _has(doc, "thick")
+    wait = int(trow.get("thick_wait_minutes") if "thick" in p.working
                and trow.get("thick_wait_minutes") else trow.get("wait_minutes", 0) or 0)
     if wait:
         traits = rules.get("traits") or {}
         scale = 1.0
         # A tannin's and the hide's fast_tan and slow_tan move a TANNAGE; rawhide is
         # not tanned at all, only dried, and dries in its day whatever the hide.
-        for trait in (_working(tdoc) + _working(doc)) if kind != "rawhide" else ():
+        for trait in (_working(tdoc) + p.working) if kind != "rawhide" else ():
             scale *= float((traits.get(trait) or {}).get("time", 1.0))
         plan.wait_minutes = max(1, int(round(wait * scale)))
         plan.wait_where = "tannery" if trow.get("where") == "tannery" else "carried"
@@ -1851,7 +1901,7 @@ def _build_assemble(plan: LeatherPlan, row: dict, actor) -> None:
         why = fit_reason("assemble", slot, p, product=product)
         if why and f"{p.name}: {why}." not in plan.problems:
             plan.problems.append(f"{p.name}: {why}.")
-    if info.get("thick") and not _has(body.doc, "thick"):
+    if info.get("thick") and "thick" not in body.working:
         plan.problems.append(f"{info['word']} wants a thick hide, and "
                              f"{doc_name(b.material).lower()} is not one.")
     if plan.problems:
@@ -1899,7 +1949,7 @@ def _build_assemble(plan: LeatherPlan, row: dict, actor) -> None:
     plan.lead_id = b.material
     plan.rank_in = max(p.rank for p, _ in plan.slots.values())
     plan.rank_out = body.rank
-    plan.working = _working(doc)
+    plan.working = body.working
     plan.minutes = int(row.get("minutes_suit" if plan.gear in ("armour", "shield")
                                else "minutes", 30))
     plan.noun = "item"

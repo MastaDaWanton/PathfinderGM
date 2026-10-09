@@ -711,7 +711,7 @@ def enchant_wait(request):
         # carrying food and water).
         ended = c.scene.wait(minutes) or {}
         minutes = int(ended.get("minutes", minutes))
-        lived = survival.wait_lines(ended, pc.ref)
+        lived = survival.told_on_page(c.scene, ended, pc.ref)
         c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
             [f"{pc.name} waits {sky.span_words(minutes)} for {phase}."] + lived)})
         c.save()

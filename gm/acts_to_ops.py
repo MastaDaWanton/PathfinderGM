@@ -793,9 +793,26 @@ def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str
                 row.note = "nobody resolved; the plan's own blow stands"
             continue
         if victim.is_down or victim.has_state("state.helpless"):
-            # A body on the floor is a finishing blow, which is its own rule
-            # (`judgement.declare_coup_de_grace`) and opens no fight: the plan's stands.
-            row.note = f"{victim.name} is down: the plan's own blow stands"
+            if victim.has_state("state.down.dead"):
+                row.note = f"{victim.name} is dead: the plan's own blow stands"
+                continue
+            # A blow the reader read at a body on the floor is a blow, whatever words the
+            # player used. Before, this left "the plan's own blow", and a plan that wrote
+            # none (it took the dying wolf for dead and wrote `narrate_only`) left the wolf
+            # breathing at -2 while the prose killed it: measured in the leather final
+            # pass's playthrough, 2026-10-09, "I finish the dying wolf with a thrust of my
+            # rapier" (read `attack`, target "the dying wolf") changed nothing, and the
+            # harvest stayed shut ("still breathing: finish it first"). Out of a fight it
+            # is the coup de grâce (CRB p.197; no time is short out of a fight, and it
+            # opens none); in one, an ordinary blow at helpless AC, the engine's own rule.
+            # `judgement.inject_fight` adds it only when the plan aimed nothing at them.
+            params = {} if fighting else {"coup_de_grace": True}
+            row.intents.append({"op": "attack", "actor": pc.ref, "target": victim.ref,
+                                "because": f"the player strikes {victim.name}, who is down",
+                                "params": params})
+            row.note = f"{victim.name} is down: " + (
+                "a blow at helpless AC" if fighting else "a coup de grâce")
+            notes.append(row.note)
             continue
         row.intents.append({"op": "attack", "actor": pc.ref, "target": victim.ref,
                             "because": f"the player attacks {victim.name}"})

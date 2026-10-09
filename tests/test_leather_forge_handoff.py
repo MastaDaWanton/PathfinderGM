@@ -159,6 +159,9 @@ def test_the_forge_refuses_a_leather_base_for_full_plate():
     by = rack(pc)
     assert hide not in by, "a finished suit that is nobody's base stays on the leather bench"
     pc.worn["fine-deer-leather-armour"] = dict(by[base].base)
+    # Worn is the slot holding it, not the kept record alone (`Actor.worn` keeps a record
+    # after it comes off; the final pass found the forge reading that store, 2026-10-09).
+    pc.slots["armor"] = ["fine-deer-leather-armour"]
     assert bs.fit_reason("assemble", "body", rack(pc)[base], gear="armour") == \
         "you are wearing it: take it off before the smith works it"
 

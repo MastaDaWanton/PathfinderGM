@@ -1592,6 +1592,15 @@ def _carried(pc) -> list[dict]:
     for table, kind, attr, slot in ((ARMOUR, "armour", "armour", "armor"),
                                     (SHIELDS, "shield", "shield", "shield")):
         on = str(getattr(pc, attr, "none") or "none").strip().lower()
+        # A made suit or shield being worn is its own row (the stock loop below, its
+        # build's numbers and its Take off): the table key it is worn under ("leather")
+        # is not a second suit. Measured in the leather final pass (2026-10-09): the worn
+        # Crude Deer Leather Armour read twice, once as "Leather armour, worn, max Dex +6,
+        # Take off" (the plain table row) and once as itself with no act at all. A plain
+        # suit of the same key carried in the pack is still its own row, not worn.
+        made_on = (pc.armour_record() if kind == "armour" else pc.shield_record())
+        if made_on is not None:
+            on = "none"
         stored = {goods.canonical(k): k for k in (pc.goods or {})
                   if goods.kind_of(k) == kind}
         keys = list(stored)
@@ -1725,6 +1734,17 @@ def _carried(pc) -> list[dict]:
                          "body": {"item": "unarmed", "op": "wield"}} if in_hand else
                         {"label": "Wield", "api": "/api/wear",
                          "body": {"item": d["id"], "op": "wield"}})
+        elif on and forged is not None and str(forged.get("gear") or "") in ("armour",
+                                                                             "shield"):
+            # A made suit or shield being worn comes off from its own row (the engine's
+            # `take_off` finds it by its record's name); the plain table row that used to
+            # carry the Take off is no longer drawn for it (above).
+            if str(forged.get("gear")) == "armour" and in_fight:
+                no_target = "Not in the middle of a fight: only a shield comes off mid-fight."
+            else:
+                acts.append({"label": "Take off", "api": "/api/wear",
+                             "body": {"item": str(forged.get("name") or d["name"]),
+                                      "op": "take_off"}})
         elif slot and not on:
             if d.get("wearable"):
                 acts.append({"label": "Wear", "api": "/api/wear",
@@ -1800,8 +1820,31 @@ def _carried(pc) -> list[dict]:
                 where = ("Harm to whoever drinks it" if route == "ingest" else
                          "Harm " + consumables_mod.ROUTE_USE[route][0].lower())
                 harm.append(f"{where}: {'; '.join(lines)}")
+        # A made suit or shield (the forge's or the leather bench's) says what it does when
+        # worn: its build's own numbers on the base suit (`forge_items.armour_row`, the row
+        # `Actor.armour_stats` reads once it is on). Measured live by leather lane U1,
+        # 2026-10-08: a crafted Wolf Leather Armour read "for show, no effect in play,
+        # goes at the armor" while wearing it set the armour slot and moved AC.
+        crafted_armour = None
+        if forged is not None and str(forged.get("gear") or "") in ("armour", "shield"):
+            ckind, ckey = armour_mod.key_for(str(forged.get("base") or ""))
+            table = ARMOUR if ckind == "armour" else SHIELDS if ckind == "shield" else {}
+            if ckey in table:
+                try:
+                    arow = forge_items_mod.armour_row(table[ckey], pc._live_build(forged))
+                except Exception:  # noqa: BLE001 - a row in words is never worth failing for
+                    arow = None
+                if arow is not None:
+                    ccost = armour_mod.change_cost(ckind, ckey, off=bool(on))
+                    crafted_armour = {
+                        "ac": arow.get("ac", 0), "acp": arow.get("acp", 0),
+                        "max_dex": arow.get("max_dex"), "weight": arow.get("weight", ""),
+                        "asf": arow.get("asf"), "lb": arow.get("lb"),
+                        "proficient": armour_mod.proficient_with(pc, ckind, ckey),
+                        "takes": ccost.get("said", "")}
         rows.append({
             "id": f"stock:{d['id']}", "key": d["id"], "name": d["name"],
+            "armour": crafted_armour,
             "count": int(d.get("count") or 0), "unit": goods.unit_for(d["name"]),
             # A forged weapon is a weapon, held in the hand (the slot filter's "hand"), not
             # a wearable at the gloves' slot its record's "hands" would name.
@@ -5328,11 +5371,25 @@ def wear_item(request):
     if op == "take_off":
         # Armour or a shield off again: the engine's `take_off` op (2026-09-30, E4).
         return _wear_by_the_engine(c, pc, item_id, op="take_off")
-    held = pc.stock.get(item_id)
+    # By its shelf key, or by the stock entry's own id, which is what the Equipment tab sends
+    # (`_stock_row`'s "id"). A forge item's shelf key is not its id, so the forge-finished
+    # Crude Deer Studded Leather's own Wear was refused "you are not carrying" (the leather
+    # final pass, live, 2026-10-09).
+    held = pc.stock.get(item_id) or next(
+        (s for s in (pc.stock or {}).values()
+         if str(getattr(s, "id", "") or "").strip().lower() == item_id), None)
     if held is None:
         return JsonResponse({"error": f"you are not carrying {item_id!r}"}, status=400)
 
+    from rules import forge_items as _fi
+
+    # A forged suit or shield's record (`forge_items.record_of`: a forge item kept as a
+    # plain Stock rebuilds its record from its tags); anything else as the entry stands,
+    # weapons included (they keep this door's old behaviour, below).
     record = held.as_dict()
+    forged_rec = _fi.record_of(held)
+    if forged_rec is not None and str(forged_rec.get("gear") or "") in ("armour", "shield"):
+        record = forged_rec
     # A crafted suit or shield is put on through the engine's `wear` op, whatever
     # button asked (leatherworking plan §18.1, contracts §4.3). Measured (inventory §0.1):
     # this path put the record's NAME in the armour slot and left `armour` alone, so a
@@ -5671,7 +5728,19 @@ def _counter_pick(c, want: str = "", line: str = ""):
                 if chosen is not None:
                     break
     if chosen is None:
-        chosen = next((x for x in choices if x.id == "general"), choices[0])
+        # Nothing named: the general store, unless its keeper is not here (gone home for
+        # the night, not back yet), when the first counter whose keeper IS here opens
+        # instead. Measured in the leather final pass (2026-10-09, Zhilgoroth, 7:32 in the
+        # morning): the general store's keeper was still at home while the leatherworker
+        # stood at her counter, and the panel answered "Nobody is at the general store
+        # just now" with no counters at all, so no counter in the market could be opened.
+        order = sorted(choices, key=lambda x: x.id != "general")
+        chosen = order[0]
+        for x in order:
+            who = keepers.stand_up(c.scene, c.world, at, x)
+            if who is not None and who.ref in c.scene.actors and not who.is_down:
+                chosen = x
+                break
     seller = keepers.stand_up(c.scene, c.world, at, chosen)
     if seller is not None and (seller.ref not in c.scene.actors or seller.is_down):
         seller = None

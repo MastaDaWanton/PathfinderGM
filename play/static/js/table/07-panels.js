@@ -265,7 +265,9 @@ function harvestBoardPaint(s) {
       b.className = "v2-btn is-quiet is-small who-harvest";
       b.setAttribute("data-harvest-open", a.ref);
       b.textContent = "Harvest";
-      b.setAttribute("aria-label", `Harvest the ${a.name}`);
+      // The body's name as the scene gives it, never wrapped in an article of ours: a name
+      // that carries its own read "Harvest the a grey wolf" (the final pass, live, 2026-10-09).
+      b.setAttribute("aria-label", `Harvest: ${a.name}`);
       row.classList.add("has-harvest");
       row.appendChild(b);
     } else if (breathing.has(a.ref)) {

@@ -877,6 +877,23 @@ def wait_lines(passed: dict, ref: str) -> list[str]:
             if str(r.get("ref")) == str(ref) for s in r.get("said") or ()]
 
 
+def told_on_page(scene, passed: dict, ref: str) -> list[str]:
+    """`wait_lines`, for a bench that writes them into the transcript itself: the creature's
+    records are then TOLD, and come off the scene's queue (`Scene._body_said`) so the next
+    batch does not tell them a second time. Measured in the leather final pass's playthrough
+    (2026-10-09): the tannery's 15-day wait was written by the bench ("waits 15 days ...
+    eats 14 pounds of food ..."), stayed queued, and came back on the next act, putting the
+    armour on: "puts on the Crude Deer Leather Armour (1 minute). Through the wait Kesst
+    Vayr eats 14 pounds of food ...", as though dressing took a fortnight of rations. The
+    works queue had the same defect and the same cure (`alchemy_collect`, 2026-10-07)."""
+    lines = wait_lines(passed, ref)
+    mine = [r for r in (passed or {}).get("body") or () if str(r.get("ref")) == str(ref)]
+    queue = getattr(scene, "_body_said", None)
+    if mine and isinstance(queue, list):
+        queue[:] = [r for r in queue if not any(r is m for m in mine)]
+    return lines
+
+
 def refused(actor, wanted: int, had: int) -> int:
     """Of the non-lethal a heal set out to take off, how much a need's hold refused.
 

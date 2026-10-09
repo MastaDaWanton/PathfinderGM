@@ -1,10 +1,10 @@
 {
   "class": "domain",
-  "_source": "Core Rulebook, Cleric: Domains (d20pfsrd.com/classes/core-classes/cleric/domains/paizo-domains). The numbers are the ones content/domains/powers.json already carries for these powers; this file adds what using one DOES. A druid with the domain through nature bond uses her druid level (Core Rulebook, Nature Bond).",
+  "_source": "Core Rulebook, Cleric: Domains (d20pfsrd.com/classes/core-classes/cleric/domains/paizo-domains). The numbers are the ones content/domains/powers.json already carries for these powers; this file adds what using one DOES. A druid with the domain through nature bond uses her druid level (Core Rulebook, Nature Bond). Each power's `ability_type` is the tag the Core Rulebook prints after its name (legacy.aonprd.com/coreRulebook/classes/cleric.html, read 2026-10-09): fifteen Sp, four Su; a druid in metal armour loses both (rules/classfeatures.py).",
   "_grammar": "rules/class_abilities.py, module docstring. `power` is the key in content/domains/powers.json; a character has the ability exactly when `domains.powers_had` lists that power, and spends the pool that file already defines.",
   "abilities": [
     {
-      "key": "lightning arc", "power": "lightning arc", "name": "Lightning Arc", "level": 1,
+      "key": "lightning arc", "ability_type": "sp", "power": "lightning arc", "name": "Lightning Arc", "level": 1,
       "source": "Air domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 electricity + 1 per two cleric levels; 3 + Wis times a day.",
       "text": "Ranged touch, 30 ft: 1d6 electricity + 1 per two levels.",
       "action": "standard", "cost": {"pool": "lightning arc", "amount": 1},
@@ -15,7 +15,7 @@
       "tell": "Lightning leaps from {name}'s hand."
     },
     {
-      "key": "acid dart", "power": "acid dart", "name": "Acid Dart", "level": 1,
+      "key": "acid dart", "ability_type": "sp", "power": "acid dart", "name": "Acid Dart", "level": 1,
       "source": "Earth domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 acid + 1 per two cleric levels; 3 + Wis times a day.",
       "text": "Ranged touch, 30 ft: 1d6 acid + 1 per two levels.",
       "action": "standard", "cost": {"pool": "acid dart", "amount": 1},
@@ -25,7 +25,7 @@
       "tell": "{name} flings a dart of acid."
     },
     {
-      "key": "fire bolt", "power": "fire bolt", "name": "Fire Bolt", "level": 1,
+      "key": "fire bolt", "ability_type": "sp", "power": "fire bolt", "name": "Fire Bolt", "level": 1,
       "source": "Fire domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 fire + 1 per two cleric levels; 3 + Wis times a day.",
       "text": "Ranged touch, 30 ft: 1d6 fire + 1 per two levels.",
       "action": "standard", "cost": {"pool": "fire bolt", "amount": 1},
@@ -35,7 +35,7 @@
       "tell": "{name} hurls a bolt of fire."
     },
     {
-      "key": "icicle", "power": "icicle", "name": "Icicle", "level": 1,
+      "key": "icicle", "ability_type": "sp", "power": "icicle", "name": "Icicle", "level": 1,
       "source": "Water domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 cold + 1 per two cleric levels; 3 + Wis times a day.",
       "text": "Ranged touch, 30 ft: 1d6 cold + 1 per two levels.",
       "action": "standard", "cost": {"pool": "icicle", "amount": 1},
@@ -45,7 +45,7 @@
       "tell": "{name} looses a shard of ice."
     },
     {
-      "key": "storm burst", "power": "storm burst", "name": "Storm Burst", "level": 1,
+      "key": "storm burst", "ability_type": "sp", "power": "storm burst", "name": "Storm Burst", "level": 1,
       "source": "Weather domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 nonlethal + 1 per two cleric levels, and the target takes -2 on attack rolls for 1 round; 3 + Wis times a day.",
       "text": "Ranged touch, 30 ft: 1d6 nonlethal + 1 per two levels, and -2 to its attacks for a round.",
       "action": "standard", "cost": {"pool": "storm burst", "amount": 1},
@@ -59,7 +59,7 @@
       "tell": "{name} calls a burst of wind and rain down on {target}."
     },
     {
-      "key": "wooden fist", "power": "wooden fist", "name": "Wooden Fist", "level": 1,
+      "key": "wooden fist", "ability_type": "su", "power": "wooden fist", "name": "Wooden Fist", "level": 1,
       "source": "Plant domain: a free action, for 3 + Wis rounds a day: unarmed strikes deal lethal damage, provoke no attack of opportunity, and add +1 per two cleric levels (minimum +1) to damage.",
       "text": "Fists hard as wood: + half your level to unarmed damage (min +1), a round a round.",
       "action": "free", "cost": {"pool": "wooden fist", "amount": 1},
@@ -74,7 +74,7 @@
       "not_yet": ["Lethal unarmed damage without the -4, and no attack of opportunity for striking unarmed: neither rides the stance yet."]
     },
     {
-      "key": "dazing touch",
+      "key": "dazing touch", "ability_type": "sp",
       "power": "dazing touch",
       "name": "Dazing Touch",
       "level": 1,
@@ -98,7 +98,7 @@
       }
     },
     {
-      "key": "touch of evil",
+      "key": "touch of evil", "ability_type": "sp",
       "power": "touch of evil",
       "name": "Touch of Evil",
       "level": 1,
@@ -120,7 +120,7 @@
       }
     },
     {
-      "key": "touch of good",
+      "key": "touch of good", "ability_type": "sp",
       "power": "touch of good",
       "name": "Touch of Good",
       "level": 1,
@@ -172,7 +172,7 @@
       }
     },
     {
-      "key": "aura of madness",
+      "key": "aura of madness", "ability_type": "su",
       "power": "aura of madness",
       "name": "Aura of Madness",
       "level": 8,
@@ -206,7 +206,7 @@
       }
     },
     {
-      "key": "inspiring word",
+      "key": "inspiring word", "ability_type": "sp",
       "power": "inspiring word",
       "name": "Inspiring Word",
       "level": 1,
@@ -259,7 +259,7 @@
       }
     },
     {
-      "key": "aura of protection",
+      "key": "aura of protection", "ability_type": "su",
       "power": "aura of protection",
       "name": "Aura of Protection",
       "level": 8,
@@ -356,7 +356,7 @@
       }
     },
     {
-      "key": "gentle rest",
+      "key": "gentle rest", "ability_type": "sp",
       "power": "gentle rest",
       "name": "Gentle Rest",
       "level": 1,
@@ -378,7 +378,7 @@
       }
     },
     {
-      "key": "strength surge",
+      "key": "strength surge", "ability_type": "sp",
       "power": "strength surge",
       "name": "Strength Surge",
       "level": 1,
@@ -429,7 +429,7 @@
       }
     },
     {
-      "key": "battle rage",
+      "key": "battle rage", "ability_type": "sp",
       "power": "battle rage",
       "name": "Battle Rage",
       "level": 1,
@@ -461,7 +461,7 @@
       }
     },
     {
-      "key": "artificer's touch", "power": "artificer's touch", "name": "Artificer's Touch",
+      "key": "artificer's touch", "ability_type": "sp", "power": "artificer's touch", "name": "Artificer's Touch",
       "level": 1,
       "source": "Artifice domain (d20pfsrd, read 2026-10-05): \"you can cause damage to objects and construct creatures by striking them with a melee touch attack. Objects and constructs take 1d6 points of damage +1 for every two cleric levels you possess. This attack bypasses an amount of damage reduction and hardness equal to your cleric level.\" 3 + Wis times a day.",
       "text": "Melee touch, constructs only: 1d6 + 1 per two levels, passing DR up to your level.",
@@ -476,7 +476,7 @@
                   "Mending at will: the cantrip is the cast door's, not this one."]
     },
     {
-      "key": "rebuke death", "power": "rebuke death", "name": "Rebuke Death", "level": 1,
+      "key": "rebuke death", "ability_type": "sp", "power": "rebuke death", "name": "Rebuke Death", "level": 1,
       "source": "Healing domain: touch a living creature below 0 hit points: heal 1d4 + 1 per two cleric levels; 3 + Wis times a day.",
       "text": "Touch the dying: heal 1d4 + 1 per two levels.",
       "action": "standard", "cost": {"pool": "rebuke death", "amount": 1},
@@ -488,7 +488,7 @@
       "tell": "{name} lays a hand on {target} and rebukes death."
     },
     {
-      "key": "calming touch", "power": "calming touch", "name": "Calming Touch", "level": 1,
+      "key": "calming touch", "ability_type": "sp", "power": "calming touch", "name": "Calming Touch", "level": 1,
       "source": "Community domain: touch a creature: it heals 1d6 + your cleric level in nonlethal damage, and is no longer fatigued, shaken or sickened (exhausted creatures are not helped); 3 + Wis times a day.",
       "text": "Touch: heal 1d6 + your level in non-lethal damage, and lift fatigued, shaken and sickened.",
       "action": "standard", "cost": {"pool": "calming touch", "amount": 1},
@@ -498,7 +498,7 @@
       "tell": "{name}'s touch settles {target}."
     },
     {
-      "key": "destructive smite", "power": "destructive smite", "name": "Destructive Smite",
+      "key": "destructive smite", "ability_type": "su", "power": "destructive smite", "name": "Destructive Smite",
       "level": 1,
       "source": "Destruction domain: declared before a single melee attack: + half your cleric level (minimum +1) as a morale bonus on its damage; 3 + Wis times a day.",
       "text": "Your next melee attack this round: + half your level (min +1) morale damage.",

@@ -985,8 +985,8 @@ GROUPS = {"ore": "Ore", "ingot": "Ingots", "bar": "Bars", "blank": "Blanks and p
           "treatment": "Treatments", "item": "Finished work", "old": "Old work"}
 # The leather forms' rack groups, kept out of GROUPS: GROUPS' keys are the forge's own form
 # vocabulary, which the sound bank voices one `forge.drop.<form>` each
-# (tests/test_forge_sound.py). A lacing set or a base dropped on the anvil is silent until
-# the sound lane gives them a voice ("unknown events are silent", contracts §11).
+# (tests/test_forge_sound.py). The leather forms are voiced too (`forge.drop.base`,
+# `.lacing`, `.grip` in sound.js; the test asks GROUPS and these both, leather final pass).
 LEATHER_GROUPS = {"grip": "Hafts, grips and fittings", "lacing": "Hafts, grips and fittings",
                   "base": "Leather bases"}
 
@@ -1905,9 +1905,16 @@ class Piece:
 
 
 def _worn_ids(actor) -> set[str]:
+    """The ids of the records being worn now. `Actor.worn` keeps a record after it comes
+    off ("the record is kept: the thing still exists, it is simply not being worn"); the
+    slots say what is on. Measured in the leather final pass (2026-10-09): a leather base
+    taken off at the smithy still read "you are wearing it: take it off before the smith
+    works it", for good, because this read the kept records and not the slots."""
+    on = {str(w or "").strip().lower() for names in (getattr(actor, "slots", None) or {}).values()
+          for w in names or () if w}
     out = set()
-    for rec in (getattr(actor, "worn", None) or {}).values():
-        if isinstance(rec, dict) and rec.get("id"):
+    for name, rec in (getattr(actor, "worn", None) or {}).items():
+        if isinstance(rec, dict) and rec.get("id") and str(name).strip().lower() in on:
             out.add(str(rec["id"]).strip().lower())
     return out
 
@@ -2900,6 +2907,16 @@ def _build_assemble(plan: ForgePlan, row: dict) -> None:
                       "perks": {"potency": plan.perks.get("potency", 0),
                                 "hardening": plan.perks.get("hardening", 0)}},
                tier=wc.TIERS[max(p.rank for p, _ in plan.slots.values()) - 1])
+    # A leather grip or lacing set carries the tanner's marks onto the item, as a leather
+    # base does (`_build_from_base`): the consumables it was worked with, read live by
+    # `forge_items.mark_rows`. Measured by the marks lane (2026-10-08): a styx-mordant-tanned
+    # grip fitted here kept its tannage in the piece and gave no mark at all, so the
+    # tannin's weapon mark (+1 damage against outsiders) could never land on any weapon.
+    leather = [p.leather for p, _ in plan.slots.values() if p.leather is not None]
+    if leather:
+        from . import leatherworker as _lw
+
+        out.marks = _lw._marks_of(leather)
     plan.consumes = [(p, 1) for p, _ in plan.slots.values()]
     plan.outputs = [(out, 1)]
     plan.units = 1

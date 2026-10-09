@@ -515,16 +515,42 @@ OWNED_BY_YOU = "bond.owned-by-you"
 TRAIT_TYPES: dict[str, str] = {"construct traits": "construct", "undead traits": "undead"}
 
 
+def type_word(raw) -> str | None:
+    """A stat block's creature type as the book's closed vocabulary spells it
+    (`effectspec.CREATURE_TYPES`, "magical-beast"), or None when the words name none of the
+    thirteen. The bestiary files spell it several ways: "magical beast", "advanced magical
+    beast", and core.json's truncated "magical" (107 blocks) and "monstrous" (55), measured
+    2026-10-08. A type contained in the words wins (longest first), then a type the words
+    begin. Lane F wrote this reader for Grade (`knowledge._type_word`); it lives here so the
+    tag writer below reads a type the same way (lane C found `type.magical` on 107 beasts)."""
+    import re as _re
+
+    from .effectspec import CREATURE_TYPES
+
+    words = " ".join(_re.findall(r"[a-z]+", str(raw or "").lower()))
+    if not words:
+        return None
+    for t in sorted(CREATURE_TYPES, key=len, reverse=True):
+        if f" {t.replace('-', ' ')} " in f" {words} ":
+            return t
+    for t in CREATURE_TYPES:
+        if t.replace("-", " ").startswith(words):
+            return t
+    return None
+
+
 def type_tags(creature_type="", subtype="", immunities=()) -> tuple[str, ...]:
     """`type.<x>` / `subtype.<y>` for a stat block's own words — the one writer of the
-    tag text, so a reader and a writer cannot spell a type differently."""
+    tag text, so a reader and a writer cannot spell a type differently. A type is the
+    book's word when the words name one (`type_word`); a type outside the thirteen (a
+    world's own) keeps its words."""
     import re as _re
 
     def leaf(word) -> str:
         return "-".join(_re.findall(r"[a-z0-9]+", str(word or "").lower()))
 
     out: list[str] = []
-    kind = leaf(creature_type)
+    kind = type_word(creature_type) or leaf(creature_type)
     if kind:
         out.append(f"{TYPE}.{kind}")
     for word in _re.split(r"[,;]", str(subtype or "")):

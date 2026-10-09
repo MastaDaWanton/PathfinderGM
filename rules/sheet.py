@@ -880,7 +880,13 @@ class Actor:
                 if not (getattr(item, "weapon", None) or getattr(item, "armour", None)):
                     continue
                 rec = item.as_dict()
-            if want == str(sid).lower() or want in names(rec):
+            # By its shelf key, its record, or the stock entry's own id: the Equipment tab
+            # names a thing by the stock id (`_stock_row`'s "id"), and a forge item kept as
+            # a plain Stock rebuilds a record whose id is not that id. Measured in the leather
+            # final pass (2026-10-09): the forge's Crude Deer Studded Leather's Wear answered
+            # "you are not carrying 'crude-deer-studded-leather#1'" from its own row.
+            if (want in (str(sid).lower(), str(getattr(item, "id", "") or "").lower())
+                    or want in names(rec)):
                 return rec
         return None
 

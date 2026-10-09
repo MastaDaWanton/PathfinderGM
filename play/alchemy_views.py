@@ -1415,7 +1415,7 @@ def alchemy_collect(request):
             # and this page said only how long they had waited).
             passed = c.scene.wait(left)
             waited = int(passed["minutes"])
-            lived = survival.wait_lines(passed, pc.ref)
+            lived = survival.told_on_page(c.scene, passed, pc.ref)
             if waited:
                 c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
                     [f"{pc.name} waits {sky.span_words(waited)} for the {row.get('name')}."]

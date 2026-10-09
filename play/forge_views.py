@@ -264,15 +264,16 @@ def _place_line(c, where: dict) -> str:
         ref = smithy.get("keeper")
         if ref:
             try:
+                from rules import keepers
                 from rules import places as places_mod
 
-                who = places_mod._actor(c.scene, ref)
-                keeper = str(getattr(who, "name", "") or "")
+                # Never the descriptor ("the smith's smithy"): `keepers.given_name`.
+                keeper = keepers.given_name(places_mod._actor(c.scene, ref))
             except Exception:      # noqa: BLE001 - a name is never worth failing for
                 keeper = ""
+        # The place the party stands in IS the smithy, so its own name says where ("the
+        # smithy at the smithy" was the leather bench's twin, "the tannery at the tannery").
         whose = f"{keeper}'s smithy" if keeper else (where.get("place") or "the smithy")
-        if not keeper and where.get("place"):
-            whose = f"the smithy at {where['place']}"
         return f"At {whose}, {_coins(rate)} an hour" if rate else f"At {whose}"
     if where.get("kit"):
         return "At the field kit"
@@ -434,11 +435,17 @@ def _render(spec: dict) -> str:
         return str(spec.get("type") or "")
 
 
-def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "") -> dict | None:
+def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "",
+          pc=None) -> dict | None:
     """The build card (UI plan §6.6) and the build summary (§6.5), every number lane B's
     and formatted here, so the page draws it and adds nothing: one row per target, one
     column per piece, the bonuses after quality, the drawbacks after the cut, and the
-    final number, rounded toward zero. Book effects and what it strikes as, in words."""
+    final number, rounded toward zero. Book effects and what it strikes as, in words.
+
+    The tanner's marks the character KNOWS, and what a generic hide's beast gave once a
+    Grade found it, through the leather bench's own readers (`leather_views._marks_card`,
+    `_creature_unknown`): a leather base or a grip carries its marks onto the anvil, and
+    before this the forge's card named none of them (the marks lane, 2026-10-08)."""
     if not build or build.get("problems"):
         return None
     try:
@@ -479,8 +486,15 @@ def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "")
             powers.append(line)
     q = mult.get("quality")
     cut = mult.get("negative_cut")
+    from . import leather_views as lv
+
+    beasts = lv._creature_unknown(pieces, pc)
     return {
         "columns": cols, "rows": rows, "summary": summary, "powers": powers,
+        "marks": lv._marks_card(build, pc),
+        "from_creature": [_render(e) for e in build.get("specs") or []
+                          if str(e.get("source") or "").startswith("creature:")
+                          and str(e.get("source") or "") not in beasts],
         "masterwork": bool(build.get("masterwork")),
         "quality": quality,
         "bonus_head": f"Bonuses ×{q:g}" if q is not None else "Bonuses",
@@ -657,10 +671,16 @@ def _preview(plan, pc) -> dict | None:
             return None
         by_tier[worldclass.quality_name(t)] = got
     top = worldclass.quality_name(max(0, plan.step_ceiling))
+    from . import leather_views as lv
+
+    card = _card(by_tier.get(top), pieces, gear, top, pc)
+    # An unknown mark or an ungraded beast's inheritance never reaches the page in the
+    # build either (`leather_views._page_build`).
+    by_tier = {k: lv._page_build(v, pc, pieces) for k, v in by_tier.items()}
     return {"at": top, "build": by_tier.get(top), "by_tier": by_tier,
             # The card and the summary line the work order draws (UI plan §6.5, §6.6),
             # at the step's ceiling, formatted here so the page adds nothing.
-            "card": _card(by_tier.get(top), pieces, gear, top),
+            "card": card,
             "as": ("" if out_w.form == "item" else
                    f"As the {bs.PIECES.get(gear, bs.PIECES['weapon'])[0]} of "
                    f"{_a(bs._shape_name(base).lower())}, at {top}")}
@@ -1032,9 +1052,12 @@ def forge_finish(request):
         if w.form == "item":
             rec = bs.record(w, n)
             entry["record"] = rec
-            entry["build"] = bs.build_of(rec)
-            entry["card"] = _card(entry["build"], (rec or {}).get("pieces"),
-                                  (rec or {}).get("gear") or w.gear, tier_name)
+            from . import leather_views as lv
+
+            built_now = bs.build_of(rec)
+            entry["card"] = _card(built_now, (rec or {}).get("pieces"),
+                                  (rec or {}).get("gear") or w.gear, tier_name, pc)
+            entry["build"] = lv._page_build(built_now, pc, (rec or {}).get("pieces"))
         entry["color"] = material_color(w.material)
         entry["next"] = _next_step(w)
         products.append(entry)
