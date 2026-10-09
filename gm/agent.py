@@ -426,7 +426,10 @@ class GMAgent:
         self.packed: dict = {}
         base = build(brief, history, player_input, in_combat=fighting,
                      enemy=self._current_enemy(), report=self.packed,
-                     ledger=getattr(self, "ledger", None))
+                     ledger=getattr(self, "ledger", None),
+                     # The budget is measured on the planner's own tokeniser
+                     # (gm/window.py); a fallback model is held to it by client.chat.
+                     model=self.model)
         messages = base
 
         attempts: list[Attempt] = []
@@ -3253,7 +3256,8 @@ class GMAgent:
             # What the player did before setting off, in their words: on an arrival it
             # opens the block, so the beat starts where they were (owner, 2026-10-01).
             before_leaving=[str(d.get("span")) for d in self._deeds_for_the_page(
-                player_input, outcomes) if d.get("before_move") and d.get("span")])
+                player_input, outcomes) if d.get("before_move") and d.get("span")],
+            model=self.prose_model)
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200,

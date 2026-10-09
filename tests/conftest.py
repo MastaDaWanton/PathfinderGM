@@ -321,6 +321,20 @@ def _unseeded_dice_are_seeded_per_test(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _the_window_starts_at_the_shipped_ratio():
+    """Every test sizes prompts at the shipped characters-a-token, whatever an earlier
+    test's fake Ollama reported (gm/window.py keeps the readings per process, and in a
+    file in the data folder). Without this, one test answering `prompt_eval_count` at
+    3.2 characters a token shrinks every later test's budget in that worker, and
+    `test_prompt_budget.py`'s exact-budget assertions pass or fail by test order."""
+    from gm import window
+
+    window._reset()
+    yield
+    window._reset()
+
+
+@pytest.fixture(autouse=True)
 def _house_rules_start_at_the_defaults():
     """Every test begins with the shipped rules, whatever the last one chose.
 
