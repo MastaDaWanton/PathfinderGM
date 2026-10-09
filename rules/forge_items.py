@@ -297,6 +297,92 @@ def _parts_label(parts, made: str = "forged") -> str:
                         else ", ".join(words[:-1]) + " and " + words[-1])
 
 
+def _mark_strength(eff: dict) -> float:
+    """How big a mark is, for "the higher applies": its size in the item's own better
+    direction (`effectspec.GEAR_TARGETS`' `better` for an item number, so a tenth off the
+    weight is a bigger lightening than a twentieth)."""
+    n = _number(eff.get("amount")) or 0
+    if str(eff.get("type") or "") == "gear_mod":
+        better = _effectspec.gear_target_row(eff.get("target")).get("better", 1) or 1
+        return n * better
+    return n
+
+
+def mark_rows(rec: dict, gear: str, base_key: str = "", problems: list | None = None
+              ) -> list[dict]:
+    """The tanner's marks on this record (leatherworking plan §14.6), one row per consumable
+    the record lists, each `{material, kind, step, effect, applied, why}`.
+
+    The record's `marks` names the consumables, one per kind (the tannin, oil, wax, thread
+    and dye the item was worked with, `leatherworker._marks_of`); the mark itself is read
+    LIVE from the consumable's document (`materials.mark_effects`), never copied onto the
+    item, so a correction to the catalogue reaches every item made with it. Applied once and
+    unscaled, like the quench mark (§13.3): quality, potency and laminations do not touch it.
+
+    Two rules decide `applied`. At most one mark per consumable kind: a hand-edited record
+    naming two oils keeps the first. And marks of one kind of effect do not stack with each
+    other: two fire-resistance marks give the higher (a tie keeps the first), the other row
+    stays on the card with the reason. A consumable with no mark, or none for this gear,
+    gives a row with no effect, which the card leaves out."""
+    from .materials import MARK_KINDS, MARK_STEP, mark_effects
+
+    out: list[dict] = []
+    kinds: set[str] = set()
+    for raw in rec.get("marks") or ():
+        mid = str(raw or "").strip()
+        if not mid:
+            continue
+        doc = material(mid)
+        if doc is None:
+            if problems is not None:
+                problems.append(f"marks: no consumable called {mid!r}.")
+            continue
+        kind = str(doc.get("kind") or "")
+        row = {"material": mid, "kind": kind, "step": MARK_STEP.get(kind, ""),
+               "effect": None, "applied": False, "why": ""}
+        if kind not in MARK_KINDS:
+            row["why"] = f"a {kind or 'thing'} leaves no mark"
+        elif kind in kinds:
+            row["why"] = f"one mark per {kind}: the first {kind} listed gives it"
+        else:
+            kinds.add(kind)
+            effs = [e for e in (at_build(dict(x), gear, base_key)
+                                for x in mark_effects(doc, gear)) if e is not None]
+            if effs:
+                row["effect"] = effs[0]
+                row["applied"] = True
+        out.append(row)
+    # The same effect twice: the higher alone (plan §14.6, "two fire-resistance marks give
+    # the higher"). `_key` without the bonus type: a circumstance Stealth +1 from a thread
+    # and one from a dye are one kind of mark, whatever their channel.
+    best: dict[tuple, dict] = {}
+    for row in out:
+        if not row["applied"]:
+            continue
+        k = _key(dict(row["effect"], bonus_type=""))
+        held = best.get(k)
+        if held is None:
+            best[k] = row
+        elif _mark_strength(row["effect"]) > _mark_strength(held["effect"]):
+            held["applied"] = False
+            held["why"] = (f"the {doc_word(row['material'])} mark is higher, and marks of one "
+                           f"kind do not stack")
+            best[k] = row
+        else:
+            row["applied"] = False
+            row["why"] = (f"the {doc_word(held['material'])} mark is "
+                          + ("the same" if _mark_strength(row["effect"])
+                             == _mark_strength(held["effect"]) else "higher")
+                          + ", and marks of one kind do not stack")
+    return out
+
+
+def doc_word(mid: str) -> str:
+    """A material's name in lower case, for a sentence ("the salamander oil mark")."""
+    doc = material(mid) or {}
+    return str(doc.get("name") or mid.replace("-", " ")).lower()
+
+
 def build(record: dict) -> dict:
     """Everything a forged item does, from its record (contract §4).
 
@@ -529,6 +615,11 @@ def build(record: dict) -> dict:
             if isinstance(eff, dict):
                 _unscaled(eff, quench)
 
+    marks = mark_rows(rec, gear, base_key, problems)
+    for row in marks:
+        if row["applied"]:
+            _unscaled(dict(row["effect"], mark=True), row["material"])
+
     for fin in rec.get("finish") or []:
         fid = str(fin.get("material") if isinstance(fin, dict) else fin or "").strip()
         doc = material(fid)
@@ -584,6 +675,7 @@ def build(record: dict) -> dict:
         "gear": gear_out, "riders": riders, "sum": sums, "masterwork": masterwork,
         "always_masterwork": always_masterwork, "as_base": as_base,
         "floors": floors,
+        "marks": marks,
         "quality_index": quality_index,
         "multipliers": {"quality": round(q_mult, 4), "negative_cut": round(cut, 4)},
         "problems": problems,
@@ -644,9 +736,10 @@ def _listed(words: list[str]) -> str:
 def preview(pieces: dict, *, gear: str, base: str, quality_index: int, level: int,
             perks: dict | None = None, quench: str | None = None, finish=(), flaws=(),
             masterwork: bool | None = None, item_id: str = "preview",
-            name: str = "") -> dict:
+            name: str = "", marks=()) -> dict:
     """The build of an item not yet made — what Assemble would give, same shape (§4)."""
     return build({
+        "marks": list(marks or ()),
         "id": item_id, "name": name or item_id, "gear": gear, "base": base,
         "pieces": dict(pieces or {}), "quality_index": quality_index,
         "masterwork": bool(masterwork) if masterwork is not None else False,

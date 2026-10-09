@@ -57,12 +57,12 @@ How to read it:
 
 ## Your rulings this pass follows (2026-10-08)
 
-- **Marks are on hold.** A consumable (tannin, oil, wax, thread, dye, treatment) carries
-  working traits only. The marks the plan proposed (§14.6) are kept in the catalogue's
-  `marks_on_hold` block, which nothing reads; "Marks on hold" below lists them. To enable:
-  `ENABLE_MARKS` in tools/leather_data_pass.py and `materials.MARKS_HELD` to False, then
-  re-run the pass. To delete: remove `MARKS_ON_HOLD` there and re-run. One decision, one
-  place.
+- **Marks, kept as planned** (held that morning, decided the same day). A tannin, oil,
+  wax, thread or dye carries working traits and at most one small mark (plan §14.6): an
+  item effect it leaves, once and unscaled, on what it was worked into, by the step that
+  used it (Tan, Curry, Tool, Stitch, Dye). One mark per consumable kind on an item, the
+  body's first; two marks of one kind give the higher. "The marks" below lists them; each
+  is a house number for your review, and a property the player discovers by Grade.
 - **Reduced DR.** A hand-written DR on a named hide follows your generic-hide rule: the
   creature's printed DR N/x gives `DR max(1, N/5)/x`, on rare-and-up hides only, as one of
   the hide's house modifiers. Four hides carry one (salamander, noble salamander, phoenix,
@@ -140,7 +140,10 @@ def render() -> str:
     generic = [d for d in hides if d["id"].startswith("generic-")]
     named = [d for d in hides if d not in dragons and d not in generic]
     raw = json.loads(FILE.read_text(encoding="utf-8"))
-    held = {k: v for k, v in (raw.get("marks_on_hold") or {}).items() if not k.startswith("_")}
+    marked = [d for d in docs if d.get("mark")]
+    consumables = [d for d in docs if d["kind"] in materials.LEATHER_CONSUMABLES]
+    short = [d for d in consumables
+             if materials.properties(d) < materials.CONSUMABLE_PROPERTIES]
 
     out = [HEAD]
     house = book = 0
@@ -172,7 +175,11 @@ def render() -> str:
     thick = [d for d in hides if any(w['trait'] == 'thick' for w in d['working'])]
     out.append(f"- **{len(thick)} thick hides** can be the body of hide armour (plan §14.4): "
                f"{', '.join(d['name'] for d in _order(thick))}.")
-    out.append(f"- **{len(held)} marks on hold** (below); no shipped document carries a mark.")
+    out.append(f"- **{len(marked)} consumables carry a mark** (below).")
+    out.append(f"- **{len(consumables) - len(short)} of {len(consumables)} consumables** reach "
+               f"the plan's {materials.CONSUMABLE_PROPERTIES} discoverable properties with "
+               f"their mark counted; {len(short)} do not (listed under \"What the data could "
+               f"not say\").")
     out.append("")
 
     # --- book fixes ------------------------------------------------------------------------
@@ -284,11 +291,12 @@ def render() -> str:
 
     # --- consumables ------------------------------------------------------------------------
     out.append("## Consumables (working traits only)\n")
-    out.append("No consumable carries an item effect, so no tannin, wax or thread prose "
+    out.append("No consumable carries an item list, so no tannin, wax or thread prose "
                "reaches a finished item again (measured before: a boar-hide suit listed "
-               "\"The standard tanning agent\" as an effect). Each trait is one that is true "
-               "of the thing. With marks held, most dyes, oils and threads have one or two "
-               "(\"Props\" counts them; the plan's three counted the mark).\n")
+               "\"The standard tanning agent\" as an effect); what one leaves is its one "
+               "mark, below. Each trait is one that is true of the thing. Most dyes, oils "
+               "and threads have one or two (\"Props\" counts them, the mark included; the "
+               "plan's target is three).\n")
     titles = {"tannin": "Tannins", "oil": "Oils", "wax": "Waxes", "thread": "Threads",
               "dye": "Dyes", "treatment": "Treatments"}
     for kind in ("tannin", "oil", "wax", "thread", "dye", "treatment"):
@@ -309,19 +317,32 @@ def render() -> str:
                            f"{materials.properties(d)} | {_price(d)} |")
         out.append("")
 
-    # --- marks on hold ----------------------------------------------------------------------
-    out.append("## Marks on hold\n")
-    out.append("Not read by anything. Each is the one small effect the consumable would "
-               "leave on a finished item (plan §14.6): the old typed `effects` line the chain "
-               "bench laid on every item, or the plan's proposal. Mink oil's \"weatherproof\" "
-               "and ghost wax's \"an incorporeal creature can wear it\" have no effect "
-               "vocabulary and are not here; dragonblood tannin's \"resistance 2 to the "
-               "dragon's energy\" is not here because the tannin names no dragon.\n")
-    out.append("| Consumable | Mark |")
-    out.append("|---|---|")
-    for mid, mark in sorted(held.items()):
-        name = (shelf.get(mid) or {}).get("name", mid)
-        out.append(f"| {name} | {_line(mark)} |")
+    # --- the marks ----------------------------------------------------------------------------
+    out.append("## The marks\n")
+    out.append("Each is the one small effect the consumable leaves on a finished item (plan "
+               "§14.6), from the step that used it, once and never scaled "
+               "(`forge_items.build`; `materials.MARK_LIMIT` keeps it small: energy "
+               "resistance 1 or 2, a skill +1 or +2, one point of an item number, a save or "
+               "a grip's blow +1). Written from the old typed `effects` line the chain bench "
+               "laid on every item, the plan's proposal, or the consumable's own text "
+               "(wire silk's \"cannot be cut with a knife\", ghost wax's \"weighs less than "
+               "it should\"). Not written: mink oil's \"weatherproof\" (soaking is not "
+               "modelled; it is mink oil's working trait instead), ghost wax's \"an "
+               "incorporeal creature can wear it\" (nothing reads it), dragonblood tannin's "
+               "\"resistance 2 to the dragon's energy\" (the tannin names no dragon), and the "
+               "plan's light clauses on shadow-black and void dye (the sheet has no dim-light "
+               "test; both are standing Stealth marks).\n")
+    out.append("| Consumable | Kind | Step | Mark |")
+    out.append("|---|---|---|---|")
+    for d in sorted(marked, key=lambda d: (materials.MARK_KINDS.index(d["kind"]), d["name"])):
+        mark = d["mark"]
+        if "type" in mark:
+            said = _line(mark)
+        else:
+            said = "; ".join(f"{_line(e)} (on a {'grip' if g == 'weapon' else g})"
+                             for g, e in mark.items())
+        out.append(f"| {d['name']} | {d['kind']} | "
+                   f"{materials.MARK_STEP[d['kind']].capitalize()} | {said} |")
     out.append("")
 
     # --- the leatherworker's counter --------------------------------------------------------
@@ -381,12 +402,18 @@ def render() -> str:
         "**`as_base` and `object_immunity`** wait on lane B's readers (effectspec's honesty "
         "ledger); **the enchanting discount** on the Enchanting price "
         "(`magic_layer._price`).",
-        "**The working-trait vocabulary is narrow for consumables.** With marks held a dye is "
-        "fast or fugitive and nothing else the leather list says. Prior art §1.5 makes "
-        "Unchained's material traits (easily worked, flawless, malleable, pure) rules for "
-        "leather; `effectspec.LEATHER_SHARED_TRAITS` admits only flawless and forgiving. "
-        "Widening it (with leather wording for each) would let every consumable carry three "
-        "true traits; until then `materials.CONSUMABLE_PROPERTIES_WHILE_HELD` is 1.",
+        "**Consumables short of three properties.** With marks on, "
+        + f"{len(short)} of {len(consumables)} consumables have fewer than "
+        f"{materials.CONSUMABLE_PROPERTIES} true things to discover: "
+        + ", ".join(f"{d['name']} {materials.properties(d)}" for d in _order(short))
+        + ". A dye is fast or fugitive and nothing else the leather list says; a treatment "
+        "carries no mark. Prior art §1.5 makes Unchained's material traits (easily worked, "
+        "flawless, malleable, pure) rules for leather, but they describe the raw hide, and "
+        "giving a dye \"pure\" (the check rolled twice) to make up a count would teach the "
+        "player something false and hand cheap dyes a strong bench rule. So the validator's "
+        "floor is one working trait (`materials.CONSUMABLE_PROPERTIES_FLOOR`) and the three "
+        "is your call: more marks from the texts (glowcap's glimmer, moonlight silver's "
+        "light), new leather traits with a bench reader, or a lower target for consumables.",
         "**The field kit** is a goods row like `smith's field kit`: it needs a leatherworker "
         "row in `rules/goods.py` (skinning knife, fleshing beam, round knife, awl and "
         "needles, mallet, and a small kettle that hardens common and uncommon hides) and the "
@@ -434,7 +461,7 @@ def render() -> str:
                    f"wants a worn-good positive.")
     out.append("")
     out.append(f"Totals: {house} house modifiers, {book} book effects, {len(docs)} "
-               f"materials, {len(held)} marks on hold.\n")
+               f"materials, {len(marked)} marks.\n")
     return "\n".join(out)
 
 

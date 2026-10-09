@@ -202,11 +202,11 @@ def test_the_leather_drawback_traits_read_as_drawbacks():
                                                          knowledge.DRAWBACK]
 
 
-def test_the_shield_list_is_read_and_marks_wait_for_the_owner(monkeypatch):
+def test_the_shield_list_and_the_mark_are_properties():
     """`materials.properties` counted `shield` and `mark`; the store read neither. A hide's
-    shield list is now "s" keys; a mark is a "k" key that is skipped while
-    `materials.MARKS_HELD` stands (the owner's open point 13) and appears the moment it
-    is lifted, with no existing key moving."""
+    shield list is "s" keys and a consumable's mark one "k" key, with no existing key
+    moving. The mark was skipped for a day while the owner held marks (open point 13,
+    2026-10-08) and is read now they are kept as planned."""
     raw = {"id": "test-shield-hide", "name": "Test Hide", "kind": "hide", "tier": "common",
            "armour": [{"type": "gear_mod", "target": "acp", "amount": 1}],
            "shield": [{"type": "gear_mod", "target": "hardness", "amount": 1},
@@ -215,20 +215,23 @@ def test_the_shield_list_is_read_and_marks_wait_for_the_owner(monkeypatch):
            "mark": {"type": "combat_mod", "target": "ac", "amount": 1,
                     "bonus_type": "material"}}
     doc = materials.normalise(raw, materials.LEATHER_CATALOGUE)
-    assert materials.MARKS_HELD is True
-    assert knowledge.property_keys(doc) == ["a0", "s0", "s1", "t0"]
-    rows = knowledge.properties(_pc(), doc)
-    assert [r["group"] for r in rows] == ["armour", "shield", "shield", "working"]
-    monkeypatch.setattr(materials, "MARKS_HELD", False)
+    assert not hasattr(materials, "MARKS_HELD"), "the hold is gone, not merely off"
     assert knowledge.property_keys(doc) == ["a0", "s0", "s1", "t0", "k0"]
+    rows = knowledge.properties(_pc(), doc)
+    assert [r["group"] for r in rows] == ["armour", "shield", "shield", "working", "mark"]
     assert materials.properties(doc) == len(knowledge.property_keys(doc))
 
 
 def test_every_leather_document_has_as_many_keys_as_the_door_counts():
-    """One count of a material's properties, two readers: the door's and the store's."""
+    """One count of a material's properties, two readers: the door's and the store's. Every
+    marked consumable included (11 of them, 2026-10-08): a mark the door counted and the
+    store did not would be a property no Grade could ever find."""
+    marked = 0
     for d in materials.all().values():
-        if materials.is_leather(d) and not d.get("mark"):
+        if materials.is_leather(d):
             assert len(knowledge.property_keys(d)) == materials.properties(d), d["id"]
+            marked += bool(d.get("mark"))
+    assert marked >= 11
 
 
 # --- manuals ------------------------------------------------------------------------------

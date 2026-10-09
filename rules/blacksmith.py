@@ -1413,6 +1413,11 @@ class Work:
     # A suit finished from a leatherworker's base (plan §4.3): the base's id, name, craft,
     # quality index and maker's level, for provenance. Never read for a number.
     from_base: dict = field(default_factory=dict)
+    # The base's marks (leatherworking plan §14.6): the consumables the tanner worked it
+    # with, one per kind, carried onto the finished suit so studded leather keeps the
+    # salamander oil its leather was curried in. Ids only; `forge_items.build` reads the
+    # marks live.
+    marks: list = field(default_factory=list)
 
     def copy(self) -> "Work":
         return _copy.deepcopy(self)
@@ -1443,6 +1448,7 @@ class Work:
             if self.from_base.get(k) not in (None, ""):
                 t.append(f"forge.base.{k}.{_enc(self.from_base[k])}")
         t += [f"forge.finish.{f}" for f in self.finish]
+        t += [f"forge.mark.{m}" for m in self.marks]
         if self.smith:
             t.append(f"forge.smith.level.{int(self.smith.get('level', 1))}")
             for k, n in sorted((self.smith.get("perks") or {}).items()):
@@ -1506,6 +1512,8 @@ class Work:
                                         and v.lstrip("-").isdigit() else v)
             elif head == "finish":
                 w.finish.append(val)
+            elif head == "mark":
+                w.marks.append(val)
             elif head == "smith" and rest:
                 if rest[0] == "level":
                     w.smith["level"] = int(rest[1])
@@ -1739,6 +1747,8 @@ def record(item, count: int | None = None) -> dict | None:
     }
     if w.from_base:
         rec["from_base"] = dict(w.from_base)
+    if w.marks:
+        rec["marks"] = list(w.marks)
     return rec
 
 
@@ -1762,13 +1772,18 @@ def build_of(rec: dict | None) -> dict | None:
 
 
 def preview_of(pieces: dict, *, gear: str, base: str, quality_index: int, level: int,
-               perks: dict) -> dict | None:
-    """Lane B's `forge_items.preview` (contracts §4), or None while it is not merged."""
+               perks: dict, marks=()) -> dict | None:
+    """Lane B's `forge_items.preview` (contracts §4), or None while it is not merged.
+    `marks`: a leather base's tanner's marks, carried onto the suit (`Work.marks`)."""
     fi = _lane("forge_items")
     if fi is None or not hasattr(fi, "preview") or not pieces:
         return None
+    # `marks` only when there are some: a forge suit of the smith's own has none, and the
+    # call then stays the contract's §4 shape (the forge bench's tests stand a fake
+    # `preview` with exactly that signature in for lane B).
+    extra = {"marks": list(marks)} if marks else {}
     return fi.preview(pieces, gear=gear, base=base, quality_index=int(quality_index),
-                      level=int(level), perks=dict(perks))
+                      level=int(level), perks=dict(perks), **extra)
 
 
 # --- the rack ---------------------------------------------------------------------------
@@ -3011,7 +3026,8 @@ def _build_from_base(plan: ForgePlan, row: dict, main: Piece) -> None:
                from_base={"id": str(rec.get("id") or ""), "name": main.name,
                           "craft": str(rec.get("craft") or "leatherworker"),
                           "quality": base_q,
-                          "level": int((smith or {}).get("level", 1) or 1)})
+                          "level": int((smith or {}).get("level", 1) or 1)},
+               marks=[str(m) for m in rec.get("marks") or () if m])
     plan.consumes = [(main, 1), (piece, 1)]
     plan.outputs = [(out, 1)]
     plan.units = 1

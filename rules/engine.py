@@ -22305,6 +22305,13 @@ def _damage_note(d: dict) -> str:
     explanation is the failure this exists to prevent.
     """
     bits = []
+    if d.get("resisted"):
+        # Energy resistance, the first way damage vanishes (`take_damage` takes it off
+        # before DR), was the one this note never said: a salamander-oiled coat's fire
+        # resistance 1 (leatherworking plan §14.6) took a point off every burn in silence,
+        # measured by leather lane "marks" 2026-10-08, and so did every worn and racial
+        # resistance before it.
+        bits.append(f"less {d.get('type') or 'energy'} resistance ({d['resisted']})")
     if d["reduced"]:
         bits.append(f"less {d['reduced_by']} ({d['reduced']})")
     if d.get("factored"):

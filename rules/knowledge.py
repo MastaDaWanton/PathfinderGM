@@ -80,16 +80,15 @@ LEATHERWORKER = "leatherworker"
 # and a consumable's one `mark` ("k"). Measured before they joined (lane D's finding,
 # 2026-10-08): `materials.properties` counted both and this tuple neither, so a hide written
 # with a shield list would have had properties the card could never show nor a Grade
-# reveal. Marks are ON HOLD (`materials.MARKS_HELD`, the owner's open point 13): the "k"
-# list is skipped while the door says so, so no mark is ever learned, shown or taught, and
-# enabling marks is that one flag. New letters only: no existing key moves.
+# reveal. A mark is a property like any other (plan §14.6, §16): learned by Grade, a
+# teacher or a manual, never by working the consumable (`worked` reveals "t" keys only).
+# It was held back here for a day (the owner's open point 13, 2026-10-08) and is not now.
+# New letters only: no existing key moves.
 MATERIAL_LISTS = (("product", "p"), ("weapon", "w"), ("armour", "a"), ("shield", "s"),
                   ("working", "t"), ("quench_mark", "q"), ("mark", "k"), ("mishap", "m"),
                   ("toxic", "x"))
 # The lists that hold one document rather than a list of them.
 _SINGLE_LISTS = frozenset({"quench_mark", "mark", "mishap", "toxic"})
-# Lists a rule holds back (`_held_lists`): read by nobody while the hold stands.
-_HOLDABLE = {"mark": "MARKS_HELD"}
 _PREFIX_ORDER = {p: i for i, (_, p) in enumerate(MATERIAL_LISTS)}
 GROUP_OF_PREFIX = {p: g for g, p in MATERIAL_LISTS}
 # Routes on which a product trait lands on whoever the product is used AGAINST (alchemy
@@ -442,25 +441,19 @@ def _essence_specs(doc: dict) -> list[tuple[str, dict, str]]:
     return out
 
 
-def _held_lists() -> frozenset:
-    """The lists a standing rule holds back, read off the door each time (so a test, or
-    the owner's decision, flips it in one place): `mark` while `materials.MARKS_HELD`.
-    A door that does not say holds it: a mark is never shown by default."""
-    door = _door()
-    return frozenset(group for group, flag in _HOLDABLE.items()
-                     if door is None or bool(getattr(door, flag, True)))
-
-
 def _material_specs(doc: dict) -> list[tuple[str, dict, str]]:
     """(key, spec, group) per property, in key order."""
     if is_essence(doc):
         return _essence_specs(doc)
     out: list[tuple[str, dict, str]] = []
-    held = _held_lists()
     for group, prefix in MATERIAL_LISTS:
-        if group in held:
-            continue
         raw = doc.get(group)
+        if group == "mark" and isinstance(raw, dict) and "type" not in raw:
+            # A mark keyed by gear (styx-mordant's is a grip's alone): one property, said
+            # with where it acts (`line`).
+            gear, eff = next(((g, e) for g, e in raw.items() if isinstance(e, dict)),
+                             ("", None))
+            raw = dict(eff, mark_gear=gear) if eff is not None else None
         if group in _SINGLE_LISTS:
             raw = [raw] if isinstance(raw, dict) else []
         for i, spec in enumerate(raw or ()):
@@ -670,6 +663,11 @@ _GEAR_WORDS = {
 }
 
 
+# Where a per-gear mark acts, as the card says it (`_material_specs`).
+_MARK_GEAR_WORDS = {"weapon": "on a grip", "armour": "on a suit", "shield": "on a shield",
+                    "worn": "on worn goods"}
+
+
 def line(spec: dict) -> str:
     """One property as a card's words. The effect vocabulary's renderer first; for the
     smith's three types, until lane A's renderer speaks them (it answers with the bare
@@ -682,6 +680,8 @@ def line(spec: dict) -> str:
         said = effectspec.render(spec)
     except Exception:  # noqa: BLE001 — a spec the renderer cannot read still has a line
         said = ""
+    if said and spec.get("mark_gear"):
+        return f"{said} ({_MARK_GEAR_WORDS.get(spec['mark_gear'], spec['mark_gear'])})"
     if said and said not in (kind, str(spec.get("note") or "")):
         return said
     amount = spec.get("amount")

@@ -461,11 +461,66 @@ def _render(spec: dict) -> str:
         return str(spec.get("type") or "")
 
 
-def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "") -> dict | None:
+def _mark_known(pc, mid: str) -> bool:
+    """Whether the character knows this consumable's mark (its "k" key, rules/knowledge.py):
+    learned by Grade, a teacher or a manual, never by working it. A mark is a discoverable
+    property (plan §14.6, §16), so the page names one only once it is known."""
+    kn = lw._lane("knowledge")
+    doc = lw.material(mid)
+    if pc is None or kn is None or doc is None:
+        return False
+    try:
+        return any(k.startswith("k") for k in kn.known_keys(pc, doc))
+    except Exception:      # noqa: BLE001 - unknown is the safe answer
+        return False
+
+
+def _marks_card(build: dict | None, pc) -> list[dict]:
+    """The build card's marks (plan §14.6: "listed under the item's build"): one line per
+    KNOWN mark, the step and the consumable it came from, what it does, and, when a higher
+    mark of the same kind stands over it, why it does nothing. A mark the character has not
+    learned is not sent at all (not even as a blank: "this oil leaves something" is the
+    discovery), and neither is a consumable with no mark."""
+    out = []
+    for row in (build or {}).get("marks") or []:
+        eff = row.get("effect")
+        if not eff or not _mark_known(pc, row.get("material", "")):
+            continue
+        out.append({"step": str(row.get("step") or "").capitalize(),
+                    "material": lw.doc_name(row.get("material", "")),
+                    "text": _render(eff), "applied": bool(row.get("applied")),
+                    "why": str(row.get("why") or "")})
+    return out
+
+
+def _page_build(build: dict | None, pc) -> dict | None:
+    """The build as the page may see it: every mark the character has not learned taken
+    out of `marks` and `specs` (its source names the consumable and its spec says what it
+    does). The item's own numbers (`gear`: a hardness the troll fat added) stay, as they
+    stay on the sheet: the number is the item's, the mark's name is the secret. Measured
+    before this (leather lane "marks", 2026-10-08): the finish response sent the build
+    whole, so an ungraded salamander oil's "resistance fire 1, source salamander-oil" was
+    in the page's JSON though no card drew it."""
+    if not isinstance(build, dict):
+        return build
+    hidden = {str(r.get("material") or "") for r in build.get("marks") or []
+              if not _mark_known(pc, r.get("material", ""))}
+    if not hidden:
+        return build
+    out = dict(build)
+    out["marks"] = [r for r in build.get("marks") or [] if r.get("material") not in hidden]
+    out["specs"] = [s for s in build.get("specs") or []
+                    if not (s.get("mark") and s.get("source") in hidden)]
+    return out
+
+
+def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "",
+          pc=None) -> dict | None:
     """The build card (UI plan §6.6), the forge's shape for leather: one row per target, one
     column per piece, the bonuses after quality, the drawbacks after the cut, the final
-    number rounded toward zero; book effects and what the creature gave, in words. Every
-    number is `forge_items.build`'s, formatted here so the page adds nothing."""
+    number rounded toward zero; book effects and what the creature gave, in words; the
+    marks the character knows (`_marks_card`). Every number is `forge_items.build`'s,
+    formatted here so the page adds nothing."""
     if not build or build.get("problems"):
         return None
     from rules import forge_items as fi
@@ -501,6 +556,7 @@ def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "")
     return {
         "columns": cols, "rows": rows, "summary": summary, "powers": powers,
         "from_creature": creature,
+        "marks": _marks_card(build, pc),
         "masterwork": bool(build.get("masterwork")),
         "by_nature": bool(build.get("always_masterwork")),
         "quality": quality,
@@ -513,7 +569,8 @@ def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "")
                 + ", drawbacks cut by your level and perks"
                 + (f" (×{cut:g})" if cut is not None else "")
                 + ". Each row is added up, then rounded toward zero. What the creature "
-                  "itself resisted is never scaled."),
+                  "itself resisted is never scaled, and neither is a mark: each applies "
+                  "once, and of two marks of one kind only the higher."),
     }
 
 
@@ -531,9 +588,11 @@ def _preview(plan, pc) -> dict | None:
     if isinstance(first, dict):
         product = first["product"]
         pieces = first["pieces"]
+        marks = list(first.get("marks") or [])
     elif getattr(first, "pattern", "") and first.part == "body":
         product = first.pattern
         pieces = {"body": lw._piece_spec(first)}
+        marks = lw._marks_of([first])
     else:
         return None
     info = lw.PRODUCTS.get(product) or {}
@@ -541,10 +600,13 @@ def _preview(plan, pc) -> dict | None:
     by_tier = {}
     for t in range(0, max(0, plan.step_ceiling) + 1):
         by_tier[worldclass.quality_name(t)] = fi.preview(
-            pieces, gear=gear, base=base, quality_index=t, level=plan.level, perks=perks)
+            pieces, gear=gear, base=base, quality_index=t, level=plan.level, perks=perks,
+            marks=marks)
     top = worldclass.quality_name(max(0, plan.step_ceiling))
+    card = _card(by_tier.get(top), pieces, gear, top, pc)
+    by_tier = {k: _page_build(v, pc) for k, v in by_tier.items()}
     return {"at": top, "build": by_tier.get(top), "by_tier": by_tier,
-            "card": _card(by_tier.get(top), pieces, gear, top),
+            "card": card,
             "as": "" if isinstance(first, dict) else
             f"As the body of {info.get('word', product).lower()}, at {top}"}
 
@@ -923,8 +985,9 @@ def leather_finish(request):
         if rec is not None:
             build = fi.build(rec)
             entry.update({"name": rec["name"], "form": "item", "record": rec,
-                          "build": build,
-                          "card": _card(build, rec.get("pieces"), rec.get("gear"), tier_name),
+                          "build": _page_build(build, pc),
+                          "card": _card(build, rec.get("pieces"), rec.get("gear"), tier_name,
+                                        pc),
                           "color": _color(((rec.get("pieces") or {}).get("body") or {})
                                           .get("material", "")),
                           "next": ""})

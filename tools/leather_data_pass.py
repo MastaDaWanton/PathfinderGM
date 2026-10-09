@@ -21,10 +21,10 @@ Two kinds of number, kept apart on purpose, as the forge's pass did:
   vocabulary, ±2 base, the tier ceilings, a drawback in every list) for the owner to review
   as a table (docs/leatherworking-review.md, written by tools/leather_review.py).
 
-**Marks are on hold** (the owner, 2026-10-08). The proposed marks (plan §14.6) are kept in
-`MARKS_ON_HOLD` below and written to the catalogue's top-level `marks_on_hold` block, which
-nothing reads. Enabling them is one decision: set `ENABLE_MARKS` here and
-`materials.MARKS_HELD` to False; deleting them is deleting that dict.
+**Marks** (plan §14.6; the owner, 2026-10-08: "keep as planned"). A tannin, oil, wax, thread
+or dye may carry one small mark, written from `MARKS` below into the consumable's own `mark`
+field. Held for a day in a `marks_on_hold` block nothing read; the block is gone, and a
+re-run removes it from the catalogue.
 
 Every entry is run through `rules.materials.validate` before anything is written, and the
 run refuses to write if any entry has a problem. Dry run by default.
@@ -57,8 +57,6 @@ from rules import materials  # noqa: E402
 MAT_DIR = ROOT / "content" / "materials"
 LEATHER_FILE = MAT_DIR / "leatherworker-materials.json"
 FORGE_FILE = MAT_DIR / "blacksmith-materials.json"
-
-ENABLE_MARKS = False
 
 # --- notation (the forge pass's, so the two tables read alike) ------------------------------
 
@@ -540,7 +538,10 @@ HIDES["darkleaf-cloth"] = dict(
     # Book (prior art §1.3): ASF -10% (min 5%), max Dex +2, ACP 3 better (min 0), half
     # weight, hardness 10 (+8), 20 hp per inch (+15). Every printed effect is a benefit, so
     # the house drawback the validator asks for: dry leaves crackle.
-    armour=[B(gm("asf", -10)), B(gm("max_dex", 2)), B(gm("acp", 3)),
+    # "To a minimum of 5%" is the effect's `minimum` (`forge_items` floors, lane H): written
+    # into the JSON by hand on 2026-10-08 and lost the next time this pass ran, which a
+    # darkleaf leather suit's spell failure (0% again) caught. Here, so a re-run keeps it.
+    armour=[B(gm("asf", -10, minimum=5)), B(gm("max_dex", 2)), B(gm("acp", 3)),
             B(gm("weight_pct", -50)), B(gm("hardness", 8)), B(gm("hp_per_inch", 15)),
             sk("stealth", -2)],
     always_masterwork=True,
@@ -608,7 +609,7 @@ FITTING_PIECES = {"armour": ["fastenings"], "shield": ["fastenings"]}
 
 # --- the consumables -----------------------------------------------------------------------------
 #
-# Working traits only (the owner, Q3.2, with marks held). Each trait is one the leather
+# Working traits (the owner, Q3.2), and below them the marks. Each trait is one the leather
 # vocabulary means (effectspec.LEATHER_TRAITS); none is given that is not true of the thing,
 # so a dye is fast or fugitive and usually nothing else (materials.CONSUMABLE_PROPERTIES).
 # `price` is set where a counter sells it and the shelf had none; every price sits on or above
@@ -647,9 +648,15 @@ con("tawing-alum", "#f0f0ec", "tans_white", "ceiling_down", "forgiving", tannage
     kind="tannin")
 # Oils.
 con("neatsfoot-oil", "#d8b860", "supple", "forgiving")
-con("currier-tallow", "#e8dcb0", "rancid", "forgiving")
+# Tallow is dubbin: "boots and harness dubbed with tallow live wet and survive it" (its own
+# text), so it sheds water as sinew does. Added with marks on (plan §14.6's three
+# properties), because it is true, not to make up a count.
+con("currier-tallow", "#e8dcb0", "rancid", "forgiving", "weatherproof")
 con("fish-oil", "#b8a060", "supple", "rancid")
-con("mink-oil", "#c8a870", "supple", "flawless", price=5)
+# Mink oil is the waterproofing dressing; plan §14.6 proposed "weatherproof" as its mark,
+# and the leather vocabulary already says it as a trait (a mark is an item number, and
+# shedding water is not one the engine reads on an item).
+con("mink-oil", "#c8a870", "supple", "flawless", "weatherproof", price=5)
 con("troll-fat", "#6a7a4a", "rancid")
 con("salamander-oil", "#c86a2a", "supple")
 con("wyvern-fat", "#a89a6a", "supple", "flawless")
@@ -693,22 +700,39 @@ con("liming-quicklime", "#e8e8e0", "forgiving")
 con("mordant-salts", "#d8d0e0", "fast_colour", price=5)
 con("planar-quench", "#6a5a8a", "forgiving")
 
-# --- the marks the owner holds (plan §14.6; not read by anything) ------------------------------
+# --- the marks (plan §14.6; the owner kept them as planned, 2026-10-08) ------------------------
 #
 # Each is the old typed effect the consumable carried in `effects` (which the old chain bench
-# laid on every finished item, plan §14.1's measured leak) or the plan's proposal. Kept whole
-# so the owner's ruling can enable or delete them in one place.
+# laid on every finished item, plan §14.1's measured leak), the plan's proposal, or what the
+# consumable's own text already claims. One small effect each (`materials.MARK_LIMIT`),
+# applied once and unscaled by `forge_items.build` from the step that used it.
+#
+# Proposed by the plan and NOT written, with the reason:
+#   mink-oil "weatherproof (no Dye loss on soaking)": soaking is not modelled; written as the
+#     working trait `weatherproof` instead.
+#   dragonblood-tannin "resistance 2 to the dragon's energy": which energy depends on the hide
+#     it tans, and a mark is one fixed effect. Left for the owner.
+#   ghost-wax "can be worn by an incorporeal creature (house)": nothing reads it; its text
+#     ("sealed work weighs less than it should") gives the mark below instead.
+#   shadow-black "in dim light", void-dye "in darkness": the light clause is dropped (the
+#     sheet's `daylight` fact is not a dim-light test), so both are standing Stealth marks.
 
-MARKS_ON_HOLD: dict[str, dict] = {
+MARKS: dict[str, dict] = {
     "salamander-oil": res("fire", 1),
     "fireproof-wax": res("fire", 1),
     "troll-fat": gm("hardness", 1),
     "spider-silk-cord": gm("hardness", 1),
+    # "Seams of it cannot be cut with a knife" (its text): the spider-silk cord's mark.
+    "wire-silk": gm("hardness", 1),
+    # "Sealed work weighs less than it should" (its text): a tenth off the weight.
+    "ghost-wax": gm("weight_pct", -10),
     "shadow-silk": sk("stealth", 1, bonus="circumstance"),
     "shadow-black": sk("stealth", 1, bonus="circumstance"),
     "void-dye": sk("stealth", 2, bonus="circumstance"),
     "umbral-oil": sk("stealth", 1, bonus="circumstance"),
-    "styx-mordant": cm("damage", 1, when={"target": {"type": "outsider"}}),
+    # "+1 damage vs outsiders on a grip" (plan §14.6): keyed to a weapon, so a suit tanned in
+    # it does not make its wearer's sword bite (`materials.mark_problems`).
+    "styx-mordant": {"weapon": cm("damage", 1, when={"target": {"type": "outsider"}})},
 }
 
 # --- the forge's four leather pieces (plan §4.4) -----------------------------------------------
@@ -761,9 +785,9 @@ NOTE = ("Tier follows the worldclass ladder (a deer is common work, a dragon leg
         "price of the form it is sold in (`sold_as`). `effects` is the pre-revamp flat list "
         "the old chain bench still reads until its replacement lands: its narrative lines "
         "are gone and a consumable's is empty. `from_creatures` is the old name-fragment "
-        "join, superseded by harvest tags on the creature (leather lane C). "
-        "`marks_on_hold` is the consumables' proposed marks, held by the owner's ruling of "
-        "2026-10-08 and read by nothing.")
+        "join, superseded by harvest tags on the creature (leather lane C). `mark` on a "
+        "tannin, oil, wax, thread or dye is the one small effect it leaves on an item it was "
+        "worked into (plan §14.6), applied once and unscaled; a house number for review.")
 
 # The fields this pass owns on a leather entry; everything else is passed through.
 LEATHER_FIELDS = ("pieces", "armour", "weapon", "shield", "working", "surface", "color",
@@ -839,8 +863,8 @@ def build_leather(raw: dict, forge_by_id: dict[str, dict]) -> dict:
             out["salt"] = True
         if spec.get("price") is not None:
             out["price_gp"] = spec["price"]
-        if ENABLE_MARKS and mid in MARKS_ON_HOLD:
-            out["mark"] = copy.deepcopy(MARKS_ON_HOLD[mid])
+        if mid in MARKS:
+            out["mark"] = copy.deepcopy(MARKS[mid])
     elif mid in FITTINGS_NEW:
         spec = FITTINGS_NEW[mid]
         out.update({k: copy.deepcopy(v) for k, v in spec.items()})
@@ -969,12 +993,11 @@ def main() -> int:
         problems.extend(materials.validate(shelf[d["id"]], shelf=shelf))
     for m in forge_new:
         problems.extend(materials.validate(shelf[m["id"]], shelf=shelf))
-    from rules import effectspec, pricing
+    from rules import pricing
 
-    for mid, mark in MARKS_ON_HOLD.items():
+    for mid in MARKS:
         if mid not in shelf:
-            problems.append(f"marks_on_hold: {mid} is no material")
-        problems.extend(effectspec.leather_effect_problems(mark, f"marks_on_hold {mid}"))
+            problems.append(f"MARKS: {mid} is no material")
     problems.extend(pricing.material_price_problems(out, "leatherworker-materials.json"))
     problems.extend(pricing.material_price_problems(forge_new, "blacksmith-materials.json"))
     if problems:
@@ -993,14 +1016,7 @@ def main() -> int:
 
     data["note"] = NOTE
     data["materials"] = out
-    data["marks_on_hold"] = {
-        "_note": ("The owner's ruling of 2026-10-08 holds marks until explained: each row is "
-                  "the one small effect plan §14.6 proposes the consumable leaves on a "
-                  "finished item. Nothing reads this block. To enable: set ENABLE_MARKS in "
-                  "tools/leather_data_pass.py and materials.MARKS_HELD to False, and re-run "
-                  "the pass. To delete: remove MARKS_ON_HOLD there and re-run."),
-        **{k: v for k, v in MARKS_ON_HOLD.items()},
-    }
+    data.pop("marks_on_hold", None)
     LEATHER_FILE.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n",
                             encoding="utf-8")
     forge["materials"] = forge_new

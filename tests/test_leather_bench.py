@@ -405,7 +405,9 @@ def test_assemble_writes_the_forges_record_with_a_table_key(pc):
     assert rec["pieces"]["body"]["material"] == "deer-hide"
     assert rec["pieces"]["fastenings"]["form"] == "lacing"
     assert rec["base_for"] == ["studded leather", "armored coat"]
-    assert rec["marks"] == [], "marks are on hold (materials.MARKS_HELD)"
+    # The consumables it was worked with, one per kind (plan §14.6): oak bark has no mark,
+    # and the record does not say so, which is the tanner's to learn by Grade.
+    assert rec["marks"] == ["oak-bark"]
     assert not forge_items.build(rec)["problems"]
     st = next(s for s in pc.stock.values() if getattr(s, "record", None))
     back = from_dict(to_dict(pc))

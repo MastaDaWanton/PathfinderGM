@@ -332,12 +332,15 @@
     var card = got.card;
     var lines = card.summary && card.summary.length ? card.summary.join(", ") : "No numbers from the hide.";
     var canCard = !!(window.BuildCard && typeof BuildCard.open === "function");
+    // The marks the character knows (plan §14.6), in the forge card's words when it is loaded.
+    var marks = window.BuildCard && typeof BuildCard.markLines === "function" ? BuildCard.markLines(card) : [];
     buildEl.innerHTML =
       '<h3 class="fo-h">Build</h3>' +
       (got.as ? '<p class="fo-as">' + esc(got.as) + ':</p>' : "") +
       '<p class="fo-sum">' + esc(lines) + '</p>' +
       (card.powers && card.powers.length ? '<p class="fo-powers">By the book: ' + esc(card.powers.join(", ")) + '</p>' : "") +
       (card.by_nature ? '<p class="fo-powers">Masterwork by its nature.</p>' : "") +
+      (marks.length ? '<p class="fo-powers">Marks: ' + esc(marks.join("; ")) + '</p>' : "") +
       (canCard ? '<button type="button" class="v2-btn is-small is-quiet" id="leather-sum" aria-haspopup="dialog">Show the sum</button>' : "");
   }
   buildEl.addEventListener("click", function (e) {

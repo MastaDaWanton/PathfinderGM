@@ -44,9 +44,11 @@ many things are crafting"): vats are rented per tannage as the work needs
 teaches); firsts pay 3 (a product kind made, a hide worked, a property learned by working);
 grading pays `STUDY_MP` (1) for each property it reveals, 0 if none.
 
-**Marks are on hold** (`materials.MARKS_HELD`, the owner asked for an explanation first,
-2026-10-08): the consumables a step uses are recorded on the stock (`uses`) and the item
-(`marks` stays empty), and nothing here applies a mark.
+**Marks** (plan §14.6; the owner kept them as planned, 2026-10-08): the consumables a step
+uses are recorded on the stock (`uses`, and the tannin as `tannage`), and Assemble writes the
+item's `marks`, one consumable per kind (`_marks_of`). Nothing here applies a mark: the
+record names the consumables and `forge_items.build` reads each one's mark live, once and
+unscaled.
 
 **The shelf library** (the bottom of the file): `Material`, `materials()`, `get`,
 `KIND_GLYPH`, `ACQUISITION`, `obtainable` and `hides_from` still serve the market's
@@ -712,7 +714,7 @@ def record_of_hide(item) -> dict | None:
     return {"id": h.material, "kind": "leather-stock", "craft": TRACK_ID,
             "count": int(getattr(item, "count", 1) or 1), "material": h.material,
             "form": h.form, "units": h.units, "grade": h.grade,
-            "tannage": h.tannage or None, "passes": h.passes, "marks": [],
+            "tannage": h.tannage or None, "passes": h.passes, "marks": _marks_of([h]),
             "quality_index": h.quality, "hardened": h.form == "plate",
             "harvested_at": h.harvested_at, "salted": h.salted, "salted_at": h.salted_at,
             "creature": h.creature or None, "schema": 1}
@@ -1888,8 +1890,10 @@ def _build_assemble(plan: LeatherPlan, row: dict, actor) -> None:
             pieces["fastenings"] = {"material": fast.material, "passes": 0}
     if lining is not None:
         pieces["lining"] = _piece_spec(lining.hide)
+    marks = _marks_of([b, lining.hide if lining is not None else None,
+                       fast.hide if fast is not None else None])
     plan.consumes = [(p, 1) for p, _ in plan.slots.values()]
-    plan.outputs = [({"product": product, "pieces": pieces}, 1)]
+    plan.outputs = [({"product": product, "pieces": pieces, "marks": marks}, 1)]
     plan.units = 1
     plan.lead = doc
     plan.lead_id = b.material
@@ -1899,6 +1903,27 @@ def _build_assemble(plan: LeatherPlan, row: dict, actor) -> None:
     plan.minutes = int(row.get("minutes_suit" if plan.gear in ("armour", "shield")
                                else "minutes", 30))
     plan.noun = "item"
+
+
+def _marks_of(hides) -> list[str]:
+    """The consumables whose mark an item carries (plan §14.6): one per kind, the tannin,
+    oil, wax, thread and dye, in that order, each the BODY's when the body was worked with
+    one, else the lining's, else the lacing's. "At most one mark per consumable kind": the
+    owner's 2026-10-08 ruling, with the body first because the body is the suit (its book
+    effects are the main piece's alone, §6.3). A consumable is listed whether or not it has
+    a mark: which ones do is a property to discover, so the record says only what the
+    tanner already knows they used, and `forge_items.build` reads the marks live."""
+    from .materials import MARK_KINDS
+
+    got: dict[str, str] = {}
+    for h in hides or ():
+        if h is None:
+            continue
+        have = {**{k: h.uses.get(k, "") for k in MARK_KINDS}, "tannin": h.tannage}
+        for kind in MARK_KINDS:
+            if have.get(kind) and kind not in got:
+                got[kind] = str(have[kind])
+    return [got[k] for k in MARK_KINDS if k in got]
 
 
 def _piece_spec(h: Hide) -> dict:
@@ -1936,7 +1961,8 @@ def _record(plan: LeatherPlan, spec: dict, tier: int) -> dict:
         "gear": info["gear"], "base": info["base"],
         "slot": info.get("slot") or "",
         "quality": wc.quality_name(q).lower(), "quality_index": q, "masterwork": mw,
-        "pieces": pieces, "quench": None, "finish": [], "flaws": [], "marks": [],
+        "pieces": pieces, "quench": None, "finish": [], "flaws": [],
+        "marks": list(spec.get("marks") or []),
         "base_for": list(info.get("base_for") or []), "product": product,
         "tier": plan.tier,
         "smith": {"level": plan.level,

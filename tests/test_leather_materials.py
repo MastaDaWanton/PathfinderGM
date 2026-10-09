@@ -122,8 +122,8 @@ def test_no_leather_effect_is_narrative(leather):
     for m in raw["materials"]:
         found += [f"{m['id']} effects" for e in m.get("effects") or []
                   if e.get("type") == "narrative"]
-    found += [f"marks_on_hold {k}" for k, v in raw["marks_on_hold"].items()
-              if isinstance(v, dict) and v.get("type") == "narrative"]
+    found += [f"{d['id']} mark" for d in leather.values() if d.get("mark")
+              for nested in materials._walk(d["mark"]) if nested.get("type") == "narrative"]
     assert not found, found
 
 
@@ -322,15 +322,19 @@ def test_no_consumables_prose_reaches_an_item(leather):
     """Measured before the pass: a boar-hide suit listed "The standard tanning agent for
     common and uncommon hides" as an effect, because the old chain bench gathered every
     material's flat `effects` on the bench, tannins and threads included (inventory §0.6).
-    No consumable now carries an item effect, a piece or a mark, and its legacy list is
-    empty; and a boar hide suit built through the forge's build names no consumable."""
+    No consumable now carries an item effect or a piece, and its legacy list is empty; what
+    one leaves on an item is at most its one small mark (plan §14.6), never a treatment's;
+    and a boar hide suit built through the forge's build, worked with neatsfoot oil and oak
+    bark (neither has a mark), names no consumable outside its list of marks, where each
+    row has no effect."""
     raw = {m["id"]: m for m in _raw()["materials"]}
     for k, d in leather.items():
         if d["kind"] not in materials.LEATHER_CONSUMABLES:
             continue
         assert not any(d[g] for g in materials.EFFECT_GEARS), k
         assert not any(d["pieces"][g] for g in materials.GEARS), k
-        assert d["mark"] is None and raw[k]["effects"] == [], k
+        assert raw[k]["effects"] == [], k
+        assert d["mark"] is None or d["kind"] in materials.MARK_KINDS, k
         assert d["working"], k
     rec = {"id": "probe-boar-suit", "gear": "armour", "base": "hide armour",
            "quality_index": 2,
@@ -340,7 +344,9 @@ def test_no_consumables_prose_reaches_an_item(leather):
            "marks": ["neatsfoot-oil", "oak-bark"],
            "smith": {"level": 1, "perks": {}}}
     b = forge_items.build(rec)
-    text = json.dumps(b)
+    assert [(r["material"], r["effect"], r["applied"]) for r in b["marks"]] == [
+        ("neatsfoot-oil", None, False), ("oak-bark", None, False)]
+    text = json.dumps({k: v for k, v in b.items() if k != "marks"})
     consumables = [k for k, d in leather.items() if d["kind"] in materials.LEATHER_CONSUMABLES]
     assert "tanning agent" not in text
     assert not any(f'"{k}"' in text for k in consumables)
@@ -361,30 +367,52 @@ def test_every_tannin_says_how_it_tans(leather):
     assert "salt_proof" in {w["trait"] for w in tannins["mangrove-bark"]["working"]}
 
 
-def test_marks_are_held_in_one_block_nothing_reads(leather):
-    """The owner held marks on 2026-10-08 ("explain before deciding"). The proposed marks
-    live in the catalogue's `marks_on_hold` block, every row a valid leather effect so
-    enabling them is safe, no shipped document carries one, the validator refuses one while
-    held, and no reader in the app names the block (a grep, so a later reader that starts
-    applying them fails here first)."""
+def test_the_marks_are_on_their_consumables_and_the_held_block_is_gone(leather):
+    """The owner held marks on the morning of 2026-10-08 and kept them as planned the same
+    day (questions, "Deeds and marks" 13). While held, the nine proposed marks sat in a
+    top-level `marks_on_hold` block nothing read, and salamander oil's fire resistance 1
+    never reached an item. Now each is on its consumable's own `mark`, written by the data
+    pass, and the block is gone from the catalogue (a re-run of the pass removes it)."""
     raw = _raw()
-    held = {k: v for k, v in raw["marks_on_hold"].items() if not k.startswith("_")}
-    assert held and all(k in leather for k in held)
-    for k, mark in held.items():
-        assert effectspec.leather_effect_problems(mark, k) == [], k
-        assert leather[k]["kind"] in materials.LEATHER_CONSUMABLES
-    assert materials.MARKS_HELD
-    assert not any(d["mark"] for d in leather.values())
-    doc = copy.deepcopy(leather["salamander-oil"])
-    doc["mark"] = held["salamander-oil"]
-    assert any("marks are on hold" in p for p in materials.validate(doc))
-    # A reader indexes the block by its key; a comment or a message naming it is not one.
-    reads = re.compile(r"""(\[\s*|get\(\s*)["']marks_on_hold["']""")
-    root = Path(settings.BASE_DIR)
-    readers = [p for folder in ("rules", "play", "gm", "pathfindergm")
-               for p in (root / folder).rglob("*.py")
-               if reads.search(p.read_text(encoding="utf-8", errors="ignore"))]
-    assert readers == [], readers
+    assert "marks_on_hold" not in raw
+    marked = {k: d["mark"] for k, d in leather.items() if d.get("mark")}
+    assert marked["salamander-oil"] == {"type": "resistance", "target": "fire", "amount": 1}
+    assert marked["fireproof-wax"] == {"type": "resistance", "target": "fire", "amount": 1}
+    # The nine the hold kept, and the two the consumables' own texts give.
+    assert {"salamander-oil", "fireproof-wax", "troll-fat", "spider-silk-cord",
+            "shadow-silk", "shadow-black", "void-dye", "umbral-oil", "styx-mordant",
+            "wire-silk", "ghost-wax"} == set(marked)
+    assert all(leather[k]["kind"] in materials.MARK_KINDS for k in marked)
+
+
+def test_a_mark_is_small_and_only_a_marking_kind_carries_one(leather):
+    """Plan §14.6: at most one SMALL mark, on a tannin, oil, wax, thread or dye. Each refusal
+    names its fix: a treatment leaves nothing on the item; DR is an enchantment's, not a
+    mark's; fire resistance 5 is the size of a spell (resist energy starts at 10), not a
+    mark (at most 2); a +1 to damage on a suit would reach every blow its wearer strikes, so
+    a blow's mark is keyed to a weapon; and no book prints a tanner's mark."""
+    oil = copy.deepcopy(leather["salamander-oil"])
+
+    def problems(mark, kind=None):
+        doc = dict(oil, mark=mark, kind=kind or oil["kind"])
+        return materials.mark_problems(doc)
+
+    assert problems({"type": "resistance", "target": "fire", "amount": 1}) == []
+    assert any("leaves nothing on the item" in p for p in problems(
+        {"type": "resistance", "target": "fire", "amount": 1}, kind="treatment"))
+    assert any("enchantment" in p for p in problems(
+        {"type": "damage_reduction", "amount": 1, "bypass": "silver"}))
+    assert any("at most 2" in p for p in problems(
+        {"type": "resistance", "target": "fire", "amount": 5}))
+    assert any("Key it" in p for p in problems(
+        {"type": "combat_mod", "target": "damage", "amount": 1, "bonus_type": "material"}))
+    assert problems({"weapon": {"type": "combat_mod", "target": "damage", "amount": 1,
+                                "bonus_type": "material"}}) == []
+    assert any("remove \"book\"" in p for p in problems(
+        {"type": "resistance", "target": "fire", "amount": 1, "book": True}))
+    # The validator calls it: a shipped document with a big mark is refused on load.
+    bad = dict(oil, mark={"type": "resistance", "target": "fire", "amount": 5})
+    assert any("at most 2" in p for p in materials.validate(bad))
 
 
 # --- the forge's side -----------------------------------------------------------------------------

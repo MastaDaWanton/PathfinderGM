@@ -34,10 +34,11 @@
 // carry no group). The leather card files unknown lines under no heading of their own
 // kind, whatever the server sends with them.
 //
-// MARKS ARE ON HOLD (the owner's open point 13, 2026-10-08): the leather card shows no mark
-// row even if one reaches it. rules/knowledge.py already skips the `mark` list while
-// `materials.MARKS_HELD` stands; the page drops the group as well, so lifting the hold is a
-// decision taken on the server and here together, never by a document that grew a mark.
+// MARKS (leatherworking plan §14.6; held for a day, kept as planned by the owner 2026-10-08):
+// a tannin's, oil's, wax's, thread's or dye's one small mark is a property like any other,
+// under its own heading ("On the finished item") once known. Unknown, it is a blank row with
+// no group like every other unknown on the tanner's card, so the page never learns that a
+// consumable has a mark before Grade finds it.
 //
 // EVERY NUMBER IS THE SERVER'S (UI plan §12). The DC, the count carried, the hide units, the
 // minutes, the roll and its total, the mastery are read from responses and printed; nothing
@@ -124,7 +125,7 @@
   // Which list a property sits in (rules/knowledge.py MATERIAL_LISTS). `shield` is lane F's
   // (leatherworking, 2026-10-08): a hide written with a shield list has properties the card
   // must be able to head, and before this no UI labelled it.
-  var GROUP_ORDER = ["product", "weapon", "armour", "shield", "working", "quench_mark", "mishap", "toxic", ""];
+  var GROUP_ORDER = ["product", "weapon", "armour", "shield", "working", "quench_mark", "mark", "mishap", "toxic", ""];
   var TRACKS = {
     blacksmith: {
       api: "/api/forge", test: "assay", testWord: "Assay", testRoute: "/api/forge/assay",
@@ -153,8 +154,8 @@
       // fast_tan, supple, strong_seam: leatherworking contracts §2), read at the beam, the
       // vat and the bench alike, so the heading names the bench rather than one tool.
       groups: { weapon: "In a weapon", armour: "In armour", shield: "In a shield",
-                working: "At the bench" },
-      unknownGrouped: false, hide: ["mark"],
+                working: "At the bench", mark: "On the finished item" },
+      unknownGrouped: false, hide: [],
       list: "Hides and supplies you have met",
       empty: "No hides or supplies yet. Take one from a carcass or buy one and it appears here.",
       readFailed: "Couldn't read the tanner's ledger. ",
