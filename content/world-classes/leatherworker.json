@@ -3,7 +3,7 @@
  "name": "Leatherworker",
  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (every step at the tanner's beam and the vat), opening methods and rarer hides at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, hardening, quality or yield.",
  "grantable_at_creation": true,
- "_ruling_2026_10_05_note": "The owner's leatherworking revamp (docs/leatherworking-questions.md, nine rounds answered 2026-10-05, and the plan's open points answered 2026-10-08; docs/leatherworking-revamp-plan.md §7, §8, §10, §11, §17). Three unlock levels replace five: level 1 is field work on common and uncommon hides (Salt, Flense, Tan by brain or as rawhide, Cut, Stitch, Harden, Assemble, Grade); level 2 the tannery's work and rare and exotic hides (bark, alum and mineral tannages, Curry, Tool, Dye, Laminate); level 3 legendary hides and the planar tannages. Harden is a level-1 method because the owner put 'a small kettle' in the field kit (answer 3, 2026-10-08): 'plain leather armour is therefore makeable at level 1 in the field'. Skin became the cross-craft harvest (rules/harvest.py, lane C), Cure became Salt (which really takes salt), Oil folded into Curry, and Line became the lining piece at Assemble. The level 4 and 5 rows, the `legendary-hide` milestone and its deed are gone. Old saves keep their level: an old Leatherworker 4 holds one pair of perk picks, an old 5 two (`worldclass.migrate_leatherworker`).",
+ "_ruling_2026_10_05_note": "The owner's leatherworking revamp (docs/leatherworking-questions.md, nine rounds answered 2026-10-05, and the plan's open points answered 2026-10-08; docs/leatherworking-revamp-plan.md §7, §8, §10, §11, §17). Three unlock levels replace five: level 1 is field work on common and uncommon hides (Salt, Flense, Tan by brain, by bark or as rawhide, Cut, Stitch, Harden, Assemble, Grade); level 2 the tannery's work and rare and exotic hides (alum and mineral tannages, Curry, Tool, Dye, Laminate); level 3 legendary hides and the planar tannages. Harden is a level-1 method because the owner put 'a small kettle' in the field kit (answer 3, 2026-10-08): 'plain leather armour is therefore makeable at level 1 in the field'. Skin became the cross-craft harvest (rules/harvest.py, lane C), Cure became Salt (which really takes salt), Oil folded into Curry, and Line became the lining piece at Assemble. The level 4 and 5 rows, the `legendary-hide` milestone and its deed are gone. Bark tanning moved to level 1, in the field kit, on the owner's \"sure why not\" of 2026-10-09 (docs/leatherworking-questions.md, \"Bark tanning at level 1 in the field\"). Old saves keep their level: an old Leatherworker 4 holds one pair of perk picks, an old 5 two (`worldclass.migrate_leatherworker`).",
  "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's and the Blacksmith's numbers on purpose: the crafts are meant to pace the same.",
  "thresholds": [
   25,
@@ -40,7 +40,7 @@
    ],
    "max_tier": "uncommon / volatile",
    "ceiling": 2,
-   "note": "Field work on common and uncommon hides: salt a green hide before it spoils, flense it, tan it with brain or dry it as rawhide, cut and stitch it, boil bark-tanned panels hard in the kit's small kettle, and lace the pieces into a suit, a madu or a cloak."
+   "note": "Field work on common and uncommon hides: salt a green hide before it spoils, flense it, tan it with brain or oak bark (a week soaking in the pack) or dry it as rawhide, cut and stitch it, boil the bark-tanned panels hard in the kit's small kettle, and lace the pieces into a suit, a madu or a cloak."
   },
   {
    "level": 2,
@@ -58,7 +58,7 @@
    ],
    "max_tier": "exotic / planar",
    "ceiling": 3,
-   "note": "The tannery's work: bark tanning in a vat for days, alum tawing, mineral tanning, currying, tooling, dyeing and laminating two leathers into one. Rare and exotic hides; Superior work is masterwork."
+   "note": "The tannery's work: alum tawing, mineral tanning, currying, tooling, dyeing and laminating two leathers into one. Rare and exotic hides; Superior work is masterwork."
   },
   {
    "level": 3,
@@ -74,7 +74,7 @@
  "method_descriptions": {
   "salt": "Rubs curing salt into a green hide. A salted hide keeps for weeks instead of rotting in two days, which buys the time to reach a beam or a vat.",
   "flense": "Scrapes the flesh and fat off the inside of a hide over the beam, hair on for a fur, off for leather. A thick hide is limed in a tannery's pit for days before the hair and flesh will come away.",
-  "tan": "Turns a fleshed hide into leather or fur. Brain tanning is a day's work at the kit; alum tawing takes a day and more in a sealed bag; mineral, bark and planar tannages sit in a tannery's vat for hours or days while you go about your business. With no tannin at all the hide is stretched and dried as rawhide.",
+  "tan": "Turns a fleshed hide into leather or fur. Brain tanning is a day's work at the kit; alum tawing takes a day and more in a sealed bag; bark tans for days, in the pack from the field kit or in a tannery's vat when you begin it at one; mineral and planar tannages sit in a tannery's vat for hours or days while you go about your business. With no tannin at all the hide is stretched and dried as rawhide.",
   "curry": "Works oil and tallow into tanned leather until it is supple and sheds water. A soft good needs it before it can be Superior work.",
   "cut": "Cuts panels to a pattern, a lacing set or a grip strip, combining hides of one kind and grade until there is enough.",
   "stitch": "Sews cut panels into a body or a lining with thread or sinew.",
@@ -99,7 +99,7 @@
   },
   "tan": {
    "does": "Makes leather or fur (or rawhide with no tannin). The tannin decides the wait, where it happens and whether the leather can later be hardened, and its working traits move the quality ceiling.",
-   "needs": "A pelt and a tannin within one tier of the hide, one measure a hide unit. Bark, mineral and planar tannins need a tannery's vat.",
+   "needs": "A pelt and a tannin within one tier of the hide, one measure a hide unit. Mineral and planar tannins need a tannery's vat; bark tans in the pack from the field kit, or in a tannery's vat when begun at one.",
    "for": "Leather that never spoils again."
   },
   "curry": {
@@ -253,7 +253,7 @@
     "takes": "a scrap of a material", "makes": "knowledge"
    }
   },
-  "_tannages_note": "Plan §8.1 (proposed times), every wait divided by six on the owner's word of 2026-10-09 (\"shorten the tan\"): the final pass measured an oak-bark leather armour at 42 days in the vat (bark's 4 weeks x oak's slow_tan 1.5), now 7. One divisor for all six, so their order and their ratios stay: rawhide 1 day -> 4 hours, mineral 3 days -> 12 hours, alum 1 week -> 28 hours, bark 4 weeks -> 4 days 16 hours (8 weeks -> 9 days 8 hours thick), planar 6 weeks -> 7 days; brain had no wait. The vat rent is per day, so it fell with the wait (oak bark, one vat: 42 days, 8 gp 4 sp -> 7 days, 1 gp 4 sp). `minutes` is bench time (a flat setup, or per hide unit where `per_unit`); `wait_minutes` is how long it then waits In progress (rules/inprogress.py), `thick_wait_minutes` for a thick hide. `where` is where the wait happens: `kit` travels with you (a brain tan needs no wait at all; rawhide dries and alum ages in the pack), `tannery` sits in a vat at the tannery and is collected there. `hardens`: whether the leather takes Harden (vegetable and planar only; alum softens in water). `vat`: false for work that fills no vat. `shrink_c` is the tannage's shrinkage temperature (prior art §3.9), shown, never a game. A tannin's own `fast_tan` and `slow_tan` traits, and the hide's, scale the wait (`traits`).",
+  "_tannages_note": "Plan §8.1 (proposed times), every wait divided by six on the owner's word of 2026-10-09 (\"shorten the tan\"): the final pass measured an oak-bark leather armour at 42 days in the vat (bark's 4 weeks x oak's slow_tan 1.5), now 7. One divisor for all six, so their order and their ratios stay: rawhide 1 day -> 4 hours, mineral 3 days -> 12 hours, alum 1 week -> 28 hours, bark 4 weeks -> 4 days 16 hours (8 weeks -> 9 days 8 hours thick), planar 6 weeks -> 7 days; brain had no wait. The vat rent is per day, so it fell with the wait (oak bark, one vat: 42 days, 8 gp 4 sp -> 7 days, 1 gp 4 sp). `minutes` is bench time (a flat setup, or per hide unit where `per_unit`); `wait_minutes` is how long it then waits In progress (rules/inprogress.py), `thick_wait_minutes` for a thick hide. `where` is where the wait happens: `kit` travels with you (a brain tan needs no wait at all; rawhide dries, alum ages and, away from a tannery, bark tans in the pack), `tannery` sits in a vat at the tannery and is collected there. `vat_at_tannery`: a kit tannage that a tannery still puts in a rented vat when the work is begun there, collected there (bark: the owner's \"sure why not\" of 2026-10-09 put bark tanning at Leatherworker 1 in the field kit, the hide soaking in a sealed skin of liquor in the pack, so a level-1 leatherworker can make bark-tanned, hardened leather armour from a hide they flensed themselves; before it bark was level 2 and a tannery's only, and leather armour at level 1 needed a bought hide). The wait is the same in the pack and in the vat: the plan gives the vat no advantage for bark but holding the hide while you travel and the room for thick and rare hides, which stay the tannery's through Flense's lime pit and the kit's tiers. `hardens`: whether the leather takes Harden (vegetable and planar only; alum softens in water). `vat`: false for work that fills no vat. `shrink_c` is the tannage's shrinkage temperature (prior art §3.9), shown, never a game. A tannin's own `fast_tan` and `slow_tan` traits, and the hide's, scale the wait (`traits`).",
   "tannages": {
    "brain": {"name": "brain and smoke", "level": 1, "where": "kit", "minutes": 480,
              "per_unit": true, "wait_minutes": 0, "hardens": false, "shrink_c": [60, 65]},
@@ -263,9 +263,9 @@
    "alum": {"name": "alum tawing", "level": 2, "where": "kit", "minutes": 60,
             "per_unit": false, "wait_minutes": 1680, "hardens": false, "vat": false,
             "shrink_c": [55, 60]},
-   "bark": {"name": "bark (vegetable)", "level": 2, "where": "tannery", "minutes": 60,
-            "per_unit": false, "wait_minutes": 6720, "thick_wait_minutes": 13440,
-            "hardens": true, "shrink_c": [75, 85]},
+   "bark": {"name": "bark (vegetable)", "level": 1, "where": "kit", "vat_at_tannery": true,
+            "minutes": 60, "per_unit": false, "wait_minutes": 6720,
+            "thick_wait_minutes": 13440, "hardens": true, "shrink_c": [75, 85]},
    "mineral": {"name": "mineral", "level": 2, "where": "tannery", "minutes": 60,
                "per_unit": false, "wait_minutes": 720, "hardens": false,
                "shrink_c": [100, 120]},
@@ -331,7 +331,7 @@
   "line": "assemble",
   "skin": ""
  },
- "_portable_note": "Where you work is read from the scene (rules/places.py `leather_bench_here`) and the pack (the leatherworker's field kit), never from the player's words (plan §10). The kit works common and uncommon hides anywhere, Harden included (the owner's small kettle, 2026-10-08); a tannery, a town's you pay for by the hour and its vats by the day, or one you found and own, adds the vats (bark, mineral and planar tannages), the lime pit for thick hides and rare-and-up hides. A tannery never refuses a tannage for want of a vat: vats are rented as the work needs (the lead's ruling, 2026-10-08).",
+ "_portable_note": "Where you work is read from the scene (rules/places.py `leather_bench_here`) and the pack (the leatherworker's field kit), never from the player's words (plan §10). The kit works common and uncommon hides anywhere, Harden included (the owner's small kettle, 2026-10-08); a tannery, a town's you pay for by the hour and its vats by the day, or one you found and own, adds the vats (mineral and planar tannages, and a bark tannage begun there), the lime pit for thick hides and rare-and-up hides. Bark tans in the field kit too, in the pack (the owner, 2026-10-09). A tannery never refuses a tannage for want of a vat: vats are rented as the work needs (the lead's ruling, 2026-10-08).",
  "fixed_tools": [
   "tannery vats",
   "lime pit",

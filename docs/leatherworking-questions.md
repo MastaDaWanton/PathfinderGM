@@ -801,3 +801,29 @@ waits and every tannin's are on docs/leatherworking-review.md, "Tanning times".
     only printed yield (one dragon, one suit for a wearer one size smaller) is exactly this
     ratio, so changing it leaves the book; the Yield perk (+50% on a 5% chance a pick) is the
     only thing that moves it today.
+
+**Bark tanning at level 1 in the field, 2026-10-09.** The owner, on the open point above
+("Your call whether answer 3 meant harvested hides too (e.g. bark tanning at level 1, or a
+field bark tan in the kit)"): **"sure why not"**. Built on
+fix/field-bark-tan-and-waits-move-people; pinned by
+`tests/test_leather_bench.py::test_bark_tanning_is_level_1_in_the_field_kit_and_waits_in_the_pack`.
+- **Bark is a Leatherworker 1 tannage the field kit works** (`bench.tannages.bark`: `level`
+  1, `where` kit, and `vat_at_tannery`), for the hides the kit reaches: common and uncommon
+  (`places.kit_reaches`, the kit's `tiers`, the one rarity gate every step already asks).
+  Begun in the field it waits In progress **in the pack** for the bark wait (oak bark 7
+  days, a fast bark tannin 2 days 8 hours, a thick hide's 10 days), `result.vat` false, no
+  vat and no rent; it is collected anywhere, with the same cut test. So a level-1
+  leatherworker flenses a wolf pelt, bark-tans it, hardens it in the kit's kettle and
+  assembles leather armour from a harvested hide, without a tannery or a bought hide.
+- **What the tannery keeps.** Begun at a tannery, bark still goes into a rented vat and is
+  collected there, exactly as before. The plan gives the vat no advantage for bark beyond
+  that (the wait, the ceiling and the cut test are the same in the pack and in the vat), and
+  this says so rather than inventing one. The tannery still holds what the kit cannot reach:
+  rare-and-up hides, the lime pit a thick hide's Flense needs (so a thick hide reaches the
+  field kit's bark only already limed), the mineral and planar tannages, and the hardening
+  kettle for rare-and-up hides.
+- Changed with it: the tannage's level and place, the level-1 and level-2 notes, Tan's
+  description and help, the field kit's goods line, the "no tannery" bench sentence, the
+  review page's tanning table (docs/leatherworking-review.md), and the test that pinned
+  "Bark tanning is learned at Leatherworker 2" (now the level-1 field test; mineral is the
+  level-2 tannage that test now asks after).

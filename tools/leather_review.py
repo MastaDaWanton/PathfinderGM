@@ -145,9 +145,20 @@ def _tanning_times(tannins) -> list[str]:
         return sky.span_words(m) if m else "none"
 
     def rent(kind: str, m: int) -> str:
-        if rows[kind].get("where") != "tannery" or rows[kind].get("vat", True) is False:
+        row = rows[kind]
+        if row.get("vat_at_tannery"):
+            # Bark since 2026-10-09: the pack in the field, a rented vat when begun at one.
+            return f"none in the pack; {_cp(market.vat_cost(m / 1440, 1))} at a tannery"
+        if row.get("where") != "tannery" or row.get("vat", True) is False:
             return "no vat"
         return _cp(market.vat_cost(m / 1440, 1))
+
+    def where(row: dict) -> str:
+        if row.get("where") == "tannery":
+            return "tannery vat"
+        if row.get("vat_at_tannery"):
+            return "kit (carried), or a tannery vat when begun at one"
+        return "kit (carried)"
 
     out = ["## Tanning times (shortened 2026-10-09)\n",
            "Your word after the final pass: \"shorten the tan\". The pass measured a harvested "
@@ -159,6 +170,15 @@ def _tanning_times(tannins) -> list[str]:
            "with the wait. A tannin's and "
            "the hide's `fast_tan` (x0.5) and `slow_tan` (x1.5) still scale the wait; rawhide "
            "is only dried, so nothing moves it.\n",
+           "Bark tanning at level 1 in the field (your \"sure why not\", 2026-10-09): bark is a "
+           "Leatherworker 1 tannage the field kit works, for the common and uncommon hides the "
+           "kit reaches. Begun in the field the hide soaks in the pack for the same wait, with "
+           "no vat and no rent, so a level-1 leatherworker can flense a wolf pelt, bark-tan "
+           "it, harden it and assemble leather armour without a tannery or a bought hide. "
+           "Begun at a tannery it still goes into a rented vat and is collected there. The "
+           "plan gave the vat no advantage for bark beyond holding the hide while you travel; "
+           "the tannery keeps rare-and-up hides, the lime pit a thick hide's Flense needs, and "
+           "the mineral and planar tannages.\n",
            "| Tannage | Level | Where | Wait | Thick hide | Vat rent, one vat |",
            "|---|---|---|---|---|---|"]
     for kind, row in sorted(rows.items(), key=lambda kv: (int(kv[1].get("wait_minutes", 0)),
@@ -166,7 +186,7 @@ def _tanning_times(tannins) -> list[str]:
         m = lw.tan_wait(kind)
         thick = lw.tan_wait(kind, thick=True)
         out.append(f"| {row.get('name', kind)} | {row.get('level', 1)} | "
-                   f"{'tannery vat' if row.get('where') == 'tannery' else 'kit (carried)'} | "
+                   f"{where(row)} | "
                    f"{span(m)} | {span(thick) if thick != m else '-'} | {rent(kind, m)} |")
     out.append("")
     out.append("Each tannin on a hide with no time trait of its own (a wolf pelt); a deer "

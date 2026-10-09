@@ -239,15 +239,76 @@ def test_the_cut_test_decides_the_tier_with_the_setup_half(pc):
     assert lw.Hide.from_stock(item).quality == p.step_ceiling
 
 
-def test_bark_tanning_needs_a_tannerys_vat_and_level_2(pc):
-    """Plan §8.1: bark sits in a tannery vat for days; it is a level-2 tannage. Each
-    refusal says why in words."""
-    put(pc, "pelt", "deer-hide", quarters=4, grade=2)
+def test_bark_tanning_is_level_1_in_the_field_kit_and_waits_in_the_pack(pc):
+    """The owner's "sure why not" (2026-10-09). Until then this test pinned "Bark tanning is
+    learned at Leatherworker 2" and "needs a tannery": leather armour's body is hardened
+    plates, Harden takes only bark- or planar-tanned leather, and bark was a level-2 tannage
+    in a tannery's vat, so the final pass measured that a level-1 field leatherworker could
+    make leather armour only from a BOUGHT hide (sold oak-bark tanned), never one they
+    harvested. Now a level-1 leatherworker with the field kit bark-tans a fleshed wolf pelt
+    with oak bark: In progress in the pack for the bark wait (oak's slow_tan, 7 days), no vat,
+    no rent, collected anywhere — then cuts, hardens in the kit's kettle and assembles
+    leather armour, every step at level 1 in the field."""
+    assert lw.tannage_row("bark")["level"] == 1 and lw.tannage_row("bark")["where"] == "kit"
+    for n in range(3):
+        put(pc, "green", "wolf-pelt", quarters=4, grade=2, harvested_at=0)
+        do(pc, plan(pc, "flense", {"hide": _key(pc, "green")}))
+    pc.carry("oak-bark", 3)
+    pelt = _key(pc, "pelt")
+    p = plan(pc, "tan", {"hide": (pelt, 3), "tannin": "inv:oak-bark"}, batch=3, hair=False)
+    assert p.problems == [], p.problems
+    assert p.wait_minutes == 7 * 1440 and p.wait_where == "carried" and p.vats == 0
+    assert "Then 7 days in your pack." in p.info, p.info
+    assert lw.vat_rent_cp(None, FIELD, p.wait_minutes, p.vats) == 0
+    got = do(pc, p, now=0)
+    key, ready = got[0]["key"], got[0]["ready_at"]
+    block = inprogress.work_of(pc.stock[key], 0)
+    assert block["where"] == "carried" and block["result"]["vat"] is False
+    assert inprogress.collect(pc, key, now=ready - 1, here="loc~wild:anywhere")["ok"] is False
+    done = inprogress.collect(pc, key, now=ready, here="loc~wild:anywhere")
+    assert done["ok"], done
+    leather = _key(pc, "leather", material="wolf-pelt", now=ready)
+    assert lw.Hide.from_stock(pc.stock[leather.split(":", 1)[1]]).tannage == "oak-bark"
+
+    # Cut the suit's body (two wolves, Medium) and the lacing, harden the body, assemble.
+    do(pc, plan(pc, "cut", {"hide": (leather, 2)}, product="leather armour", now=ready),
+       now=ready)
+    do(pc, plan(pc, "cut", {"hide": _key(pc, "leather", material="wolf-pelt", now=ready)},
+                product="lacing", now=ready), now=ready)
+    body = _key(pc, "panel", pattern="leather armour", now=ready)
+    do(pc, plan(pc, "harden", {"piece": body}, now=ready), now=ready)
+    plates = _key(pc, "plate", pattern="leather armour", now=ready)
+    lacing = _key(pc, "lacing", now=ready)
+    p = plan(pc, "assemble", {"body": plates, "fastenings": lacing}, masterwork=False,
+             now=ready)
+    assert p.problems == [], p.problems
+    rec = do(pc, p, now=ready)[0]["record"]
+    assert rec["base"] == "leather" and not forge_items.build(rec)["problems"]
+
+
+def test_a_bark_tan_begun_at_a_tannery_still_goes_in_its_vat(pc):
+    """What the tannery keeps for bark (2026-10-09): begun there, at level 1 now, the tan
+    goes into a rented vat and is collected there, as before the ruling. The plan gave the
+    vat no other advantage for bark — the wait is the pack's to the minute."""
+    put(pc, "pelt", "wolf-pelt", quarters=4, grade=2)
     pc.carry("oak-bark", 1)
-    p = plan(pc, "tan", {"hide": _key(pc, "pelt"), "tannin": "inv:oak-bark"})
+    slots = {"hide": _key(pc, "pelt"), "tannin": "inv:oak-bark"}
+    vat = plan(pc, "tan", slots, where=TANNERY, hair=False)
+    pack = plan(pc, "tan", slots, hair=False)
+    assert vat.problems == [] and (vat.wait_where, vat.vats) == ("tannery", 1)
+    assert vat.wait_minutes == pack.wait_minutes and vat.step_ceiling == pack.step_ceiling
+    assert "in the vat" in vat.info
+
+
+def test_mineral_tanning_is_still_level_2_and_a_tannerys(pc):
+    """What stayed the tannery's when bark moved to the kit: mineral (and planar) still sit
+    in a tannery's vat, mineral at Leatherworker 2. Each refusal says why in words."""
+    put(pc, "pelt", "deer-hide", quarters=4, grade=2)
+    pc.carry("salamander-ash-lye", 1)
+    p = plan(pc, "tan", {"hide": _key(pc, "pelt"), "tannin": "inv:salamander-ash-lye"})
     assert any("Leatherworker 2" in x for x in p.problems), p.problems
     _level(pc, 2)
-    p = plan(pc, "tan", {"hide": _key(pc, "pelt"), "tannin": "inv:oak-bark"})
+    p = plan(pc, "tan", {"hide": _key(pc, "pelt"), "tannin": "inv:salamander-ash-lye"})
     assert any("needs a tannery" in x for x in p.problems), p.problems
 
 

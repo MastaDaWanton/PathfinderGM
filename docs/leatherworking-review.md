@@ -207,13 +207,15 @@ A fitting fills a fastening. The eight that are forms of a forge metal carry tha
 
 Your word after the final pass: "shorten the tan". The pass measured a harvested hide to leather armour at 42 days in the vat (bark's 4 weeks x oak bark's `slow_tan` 1.5, 8 gp 4 sp of vat rent). Every wait was divided by six, one divisor for all six tannages, so their order and ratios stand: rawhide 1 day, mineral 3 days, alum 1 week, bark 4 weeks (8 thick), planar 6 weeks before. The vat rent is 2 sp a vat a day, a day begun a day paid, so it fell with the wait. A tannin's and the hide's `fast_tan` (x0.5) and `slow_tan` (x1.5) still scale the wait; rawhide is only dried, so nothing moves it.
 
+Bark tanning at level 1 in the field (your "sure why not", 2026-10-09): bark is a Leatherworker 1 tannage the field kit works, for the common and uncommon hides the kit reaches. Begun in the field the hide soaks in the pack for the same wait, with no vat and no rent, so a level-1 leatherworker can flense a wolf pelt, bark-tan it, harden it and assemble leather armour without a tannery or a bought hide. Begun at a tannery it still goes into a rented vat and is collected there. The plan gave the vat no advantage for bark beyond holding the hide while you travel; the tannery keeps rare-and-up hides, the lime pit a thick hide's Flense needs, and the mineral and planar tannages.
+
 | Tannage | Level | Where | Wait | Thick hide | Vat rent, one vat |
 |---|---|---|---|---|---|
 | brain and smoke | 1 | kit (carried) | none | - | no vat |
 | rawhide | 1 | kit (carried) | 4 hours | - | no vat |
 | mineral | 2 | tannery vat | 12 hours | - | 2 sp |
 | alum tawing | 2 | kit (carried) | 1 day 4 hours | - | no vat |
-| bark (vegetable) | 2 | tannery vat | 5 days | 10 days | 1 gp |
+| bark (vegetable) | 1 | kit (carried), or a tannery vat when begun at one | 5 days | 10 days | none in the pack; 1 gp at a tannery |
 | planar | 3 | tannery vat | 7 days | - | 1 gp 4 sp |
 
 Each tannin on a hide with no time trait of its own (a wolf pelt); a deer hide's `fast_tan` halves these, a boar's `slow_tan` and `thick` lengthen them.
@@ -221,15 +223,15 @@ Each tannin on a hide with no time trait of its own (a wolf pelt); a deer hide's
 | Tannin | Tannage | Time trait | Wait | Vat rent, one vat |
 |---|---|---|---|---|
 | Brain Tan Paste | brain and smoke | fast_tan | none | no vat |
-| Hemlock Bark | bark (vegetable) | fast_tan | 3 days | 6 sp |
-| Oak Bark | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
-| Sumac Leaf | bark (vegetable) | fast_tan | 3 days | 6 sp |
+| Hemlock Bark | bark (vegetable) | fast_tan | 3 days | none in the pack; 6 sp at a tannery |
+| Oak Bark | bark (vegetable) | slow_tan | 7 days | none in the pack; 1 gp 4 sp at a tannery |
+| Sumac Leaf | bark (vegetable) | fast_tan | 3 days | none in the pack; 6 sp at a tannery |
 | Tawing Alum | alum tawing | - | 1 day 4 hours | no vat |
-| Willow Bark | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
-| Bog Liquor | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
-| Mangrove Bark | bark (vegetable) | fast_tan | 3 days | 6 sp |
-| Tara Pod | bark (vegetable) | fast_tan | 3 days | 6 sp |
-| Ironbark Tannin | bark (vegetable) | slow_tan | 7 days | 1 gp 4 sp |
+| Willow Bark | bark (vegetable) | slow_tan | 7 days | none in the pack; 1 gp 4 sp at a tannery |
+| Bog Liquor | bark (vegetable) | slow_tan | 7 days | none in the pack; 1 gp 4 sp at a tannery |
+| Mangrove Bark | bark (vegetable) | fast_tan | 3 days | none in the pack; 6 sp at a tannery |
+| Tara Pod | bark (vegetable) | fast_tan | 3 days | none in the pack; 6 sp at a tannery |
+| Ironbark Tannin | bark (vegetable) | slow_tan | 7 days | none in the pack; 1 gp 4 sp at a tannery |
 | Wyrm Gall | planar | fast_tan | 4 days | 8 sp |
 | Salamander Ash Lye | mineral | fast_tan | 6 hours | 2 sp |
 | Styx Mordant | planar | slow_tan | 11 days | 2 gp 2 sp |

@@ -32,9 +32,11 @@ crafted record (plan §13.1) in a `forge_items.ForgedStock`, read by `forge_item
 and `Actor.armour_stats` (lane B), so leather armour is the forge's armour model.
 
 **Where you work** (plan §10; owner Q6.4 and answer 3 of 2026-10-08): the field kit works
-common and uncommon hides anywhere, Harden included ("add a small kettle to the field kit");
-a tannery adds the vats (bark, mineral, planar), the lime pit (a thick hide's Flense) and
-rare-and-up hides. Asked of lane G's `places.leather_bench_here`, never of the player's
+common and uncommon hides anywhere, Harden included ("add a small kettle to the field kit"),
+and bark tanning in the pack (the owner's "sure why not" of 2026-10-09, which moved bark to
+Leatherworker 1 so leather armour can be made at level 1 from a hide you flensed yourself);
+a tannery adds the vats (mineral, planar, and bark begun there), the lime pit (a thick
+hide's Flense) and rare-and-up hides. Asked of lane G's `places.leather_bench_here`, never of the player's
 words. **No vat cap** (the lead's ruling of 2026-10-08, from the owner's "no limit to how
 many things are crafting"): vats are rented per tannage as the work needs
 (`places.vats_for`), the count shown, never a refusal.
@@ -1072,8 +1074,8 @@ def vats_for(quarters_total: int) -> int:
 def methods_view(level: int, where: dict | None = None) -> list[dict]:
     """The method strip (UI plan §6.1): every method in a tanner's order, with its lock in
     words: "Leatherworker 2", "Needs a tannery", "Needs a field kit or a tannery". A
-    tannage's own place is Tan's to say at check, because one Tan is a kit's (brain) and
-    another a vat's (bark)."""
+    tannage's own place is Tan's to say at check, because one Tan is a kit's (brain, bark)
+    and another a vat's (mineral, planar)."""
     where = where or dict(_NOWHERE)
     rules = bench_rules()
     out = []
@@ -1710,7 +1712,15 @@ def _build_tan(plan: LeatherPlan, row: dict, actor) -> None:
     wait = tan_wait(kind, _working(tdoc) + p.working, thick="thick" in p.working)
     if wait:
         plan.wait_minutes = wait
-        plan.wait_where = "tannery" if trow.get("where") == "tannery" else "carried"
+        # Where it waits: a tannery-only tannage in the tannery's vat; a kit tannage in the
+        # pack — except one the row puts in a vat when it is begun AT a tannery
+        # (`vat_at_tannery`): bark, since the owner's "sure why not" of 2026-10-09 moved it
+        # to Leatherworker 1 in the field kit. Begun in the field it soaks in the pack, no
+        # vat and no rent (`land` then writes `vat: False`, as for rawhide); begun at a
+        # tannery it goes into a rented vat and is collected there, exactly as before.
+        in_vat = (trow.get("where") == "tannery"
+                  or (trow.get("vat_at_tannery") and plan.where.get("tannery")))
+        plan.wait_where = "tannery" if in_vat else "carried"
         if plan.wait_where == "tannery" and trow.get("vat", True) is not False:
             plan.vats = vats_for(total_q)
     _ceiling_for(plan, [p.hide], t.material if t is not None else "")
@@ -2111,11 +2121,12 @@ def land(actor, plan: LeatherPlan, made: list[tuple], *, now: int,
         place = f"place:{tannery['place']}" if at_tannery else "carried"
         result = {"method": plan.method, "setup_score": setup_score,
                   "ceiling": plan.step_ceiling, "quarters": thing.quarters * int(n)}
-        if at_tannery:
-            if plan.vats:
-                result["vats"] = int(plan.vats)
-            else:
-                result["vat"] = False        # the lime pit fills no vat
+        if at_tannery and plan.vats:
+            result["vats"] = int(plan.vats)
+        else:
+            # The lime pit fills no vat, and neither does work in the pack: rawhide drying,
+            # alum ageing, and a bark tan begun from the field kit (the owner, 2026-10-09).
+            result["vat"] = False
         if plan.method == "tan":
             label = (f"{doc_name(thing.material)} in {doc_name(thing.tannage).lower()}"
                      if thing.tannage else f"{doc_name(thing.material)} drying as rawhide")

@@ -2200,8 +2200,9 @@ ALCHEMY_WORK = "alchemy"
 #
 # The same kit-and-workroom rule a third time. The leatherworker's field kit does the
 # common and uncommon work anywhere — including Harden, since the owner's answer of
-# 2026-10-08 put "a small kettle" in it. A TANNERY adds the lime pit, the vats (bark,
-# mineral and planar tannages) and the hardening kettle for rare-and-above hides. It is
+# 2026-10-08 put "a small kettle" in it, and bark tanning in the pack since the owner's
+# "sure why not" of 2026-10-09. A TANNERY adds the lime pit, the vats (mineral and planar
+# tannages, and bark begun there) and the hardening kettle for rare-and-above hides. It is
 # the town's (a place whose keeper is a tanner by occupation: `content/people/
 # occupations.json`'s `tanner` row carries the `leather` tag), rented by the hour with its
 # vats by the day, or the player's own (founded with kind `tannery`, held as
@@ -2711,7 +2712,8 @@ def tannery_here(scene, known=()) -> dict | None:
     each vat by the day (`market.vat_rate`). A town tannery may stand on the settlement's
     outskirts (`outskirts.ring`), so outside ground counts as the town's; under it (the
     sewers) never does. A tannery is where the lime pit, the vats and the hardening kettle
-    are: Flense for thick hides, the bark, mineral and planar tannages, and Harden for
+    are: Flense for thick hides, the mineral and planar tannages (and a bark tannage begun
+    here, which the field kit also tans in the pack since 2026-10-09), and Harden for
     rare-and-above hides (plan §10, the owner's 2026-10-08 answer 3).
 
     `vats_free` is `vats` less what the party's own work already fills here
@@ -2773,8 +2775,8 @@ def tannery_line(scene, known=(), location=None) -> str:
     where = name or "This place"
     # No em-dash: this sentence is UI copy on the bench (found by leather lane U1).
     return (f"{where} has no tannery. The field kit works common and uncommon hides "
-            f"anywhere; bark tanning, the lime pit and rare hides need a tannery: another "
-            f"town's, or one of your own.")
+            f"anywhere; the mineral and planar vats, the lime pit and rare hides need a "
+            f"tannery: another town's, or one of your own.")
 
 
 # The leatherworker's field kit (plan §10: skinning knife, fleshing beam, round knife, awl
