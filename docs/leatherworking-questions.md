@@ -705,3 +705,10 @@ proposal stands. These override the plan and the contracts wherever they differ.
 | 5 | The words | **The plan's seven** (Cruel, Callous, Rough-handed, Unremarkable, Decent, Kind, Selfless) and cut-offs, as rule rows, **tuned after play**. |
 | 6 | Dangerous skinning | **Exposed only on a fail by 5 or more** (the book's harvesting-poison rule). |
 | 13 | Marks | **Keep as planned**: at most one mark per consumable kind (up to five per item); same-type marks do not stack. `materials.MARKS_HELD` comes off. |
+- From the marks lane: 32 of 54 consumables have fewer than 3 true properties even with marks
+  (floor set to 1, listed on the review page, nothing padded — owner may want more traits
+  authored); plan marks not written (mink oil, dragonblood tannin's energy, ghost wax's
+  incorporeal wear, the dim-light dyes); styx-mordant's grip mark never lands (a grip fitted at
+  the forge loses its tannin); forge_views._card names no marks; the mordant "dye lost on
+  soaking" rule unbuilt; finishing a step never reveals a consumable's working traits;
+  tests/test_forge_api.py errors when run alone (its fake rules.materials lacks CATALOGUES).
