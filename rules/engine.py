@@ -4621,6 +4621,16 @@ class Engine:
         at = str(getattr(self.scene, "at", "") or "")
         if who is None or not at or who.at == at:
             return False
+        # Never a foe. Somebody hostile to the player comes back through the engine's own
+        # doors — an encounter, the battle gate, `defeat.settle` walking the robbers in
+        # when their hideout exists — and never on the prose's word: measured 2026-10-09
+        # (docs/narrator-after-defeat.md), the raiders who had robbed the player and gone
+        # were narrated lunging at the wagon an hour later, and this door is the one the
+        # page's people come through. Read off the attitude track, the one source of truth.
+        from . import attitude as attitude_mod
+
+        if attitude_mod.of(who, default="") == attitude_mod.HOSTILE:
+            return False
         self.scene.move(ref, at)
         return True
 

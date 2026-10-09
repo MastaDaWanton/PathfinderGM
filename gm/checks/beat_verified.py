@@ -45,7 +45,8 @@ from ._page import cut, cut_from
 
 ORDER = 9
 KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
-                   "beat-harms", "beat-presence", "beat-hour", "beat-omits-outcome"})
+                   "beat-harms", "beat-absent", "beat-presence", "beat-hour",
+                   "beat-omits-outcome"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -53,6 +54,10 @@ DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 # a thing or a sale for as long as the pack is read, the hour until the next beat.
 _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          "trade": ("beat-settles-trade", 3), "harm": ("beat-harms", 3),
+         # Somebody acting here whom the engine holds elsewhere: as wrong as a wound the
+         # dice never gave (2026-10-09, the raiders narrated lunging an hour after they
+         # robbed the player and went; docs/narrator-after-defeat.md).
+         "absent": ("beat-absent", 3),
          "presence": ("beat-presence", 2), "hour": ("beat-hour", 2)}
 
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair

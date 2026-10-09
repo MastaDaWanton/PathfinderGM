@@ -9217,8 +9217,15 @@ def embody_seen(scene, *, turn: int, world=None, beat: str = "", engine=None) ->
         if known is not None:
             # Through the engine's door, never `Scene.move` from here (the one-spatial-
             # authority ratchet): `engine` is None only for a caller with no campaign.
-            if known.at != at and engine is not None:
-                engine.walk_in(known.ref)
+            if known.at != at and engine is not None and not engine.walk_in(known.ref):
+                # The door refused them — a foe comes back by the engine's doors, never
+                # the prose's (`Engine.walk_in`) — and the words were still them, so this
+                # record is nobody new either (docs/narrator-after-defeat.md).
+                (getattr(scene, "population", {}) or {}).pop(rec["id"], None)
+                rows.append({"kind": "seen-people", "made": "", "same_as": known.ref,
+                             "record": rec["id"], "phrase": said_as, "walked_in": False,
+                             "why": "the engine did not walk them in"})
+                continue
             theirs = population.of_ref(scene, known.ref)
             if theirs is not None:
                 population.seen(scene, theirs)

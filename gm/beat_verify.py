@@ -107,6 +107,13 @@ class Person:
     pc: bool = False
     down: bool = False
     dead: bool = False
+    # False for somebody the engine holds elsewhere in this town (`beat_reader.away_people`,
+    # the list the beat reader is shown): offered to the reader so a beat that brings them
+    # on stage is read as THEM, and judged — "someone not listed" is never judged.
+    # Measured 2026-10-09 (docs/narrator-after-defeat.md): the two raiders who robbed the
+    # player and went were narrated lunging at the wagon an hour later, and the read back
+    # had no code for them, so nothing on the page was wrong to it.
+    here: bool = True
 
 
 @dataclass(frozen=True)
@@ -133,6 +140,11 @@ class Facts:
     def refs(self) -> tuple[str, ...]:
         return tuple(p.ref for p in self.people)
 
+    def absent(self, ref: str) -> Person | None:
+        """The person with this code when the engine holds them somewhere else, or None."""
+        p = self.person(ref)
+        return p if p is not None and not p.here else None
+
     @property
     def things(self) -> tuple[str, ...]:
         """The pack, what lies here, and what this turn's outcomes moved — the crate sold
@@ -154,7 +166,7 @@ class Facts:
 
 @dataclass
 class Claim:
-    category: str          # move | hands | trade | harm | arrived | left | hour
+    category: str          # move | hands | trade | harm | shown | arrived | left | hour
     slots: dict
     quote: str
     sentence: str = ""     # the page sentence the quote stands in, as written
@@ -229,6 +241,12 @@ def facts_from(ctx) -> Facts:
         people.append(Person(ref=str(ref), name=str(a.name), what=", ".join(what),
                              pc=bool(getattr(a, "is_pc", False)),
                              down=bool(getattr(a, "is_down", False)), dead=dead))
+    # And the people held elsewhere in this town: the beat reader's own list of them, one
+    # definition, so the two readers of a beat cannot disagree about who is away.
+    from . import beat_reader
+
+    for p in beat_reader.away_people(scene):
+        people.append(Person(ref=str(p["ref"]), name=str(p["name"]), here=False))
     clock = getattr(scene, "clock_minutes", None)
     return Facts(start=start, end=end,
                  places=tuple(dict.fromkeys(n for n in (_name_of(p) for p in known) if n)),
@@ -259,6 +277,7 @@ def schema(facts: Facts) -> dict:
     nothing here is optional — an optional property gets skipped, so each list is
     required and may be empty, and code filters."""
     things = [*facts.things, OTHER_THING]
+    away = [p.ref for p in facts.people if not p.here]
     s = {"type": "string"}
 
     def lst(props: dict) -> dict:
@@ -288,8 +307,27 @@ def schema(facts: Facts) -> dict:
         # the slot had no room for it (sammy.json's beat-verify rows: 2 of 2 beats with a
         # wrong "morning" kept it in a sentence the reader never named).
         "time_of_day": lst({"part": {"type": "string", "enum": list(PARTS)}}),
+        # Somebody held elsewhere whom the page shows here anyway, doing anything at all —
+        # only on a beat where the engine holds somebody away, so every other beat is
+        # asked exactly what it was. The departed raider "lunges again … at the axle of
+        # the wagon" hurt nobody and arrived nowhere, and stood on the page all the same
+        # (2026-10-09, docs/narrator-after-defeat.md).
+        #
+        # Offered every code, and only the away are judged: with the away codes alone the
+        # first live run read "Vyraxys is busy at the front" as the raider — the reader
+        # wanted to list the wagon master and the enum had no room for him (an enum
+        # guarantees the vocabulary, not the reading: docs/beat-reader.md).
+        #
+        # Tried and taken out: an `attacks` slot (who goes at whom, landing or not). On
+        # the bench it took the blows the reader had been reporting as harm — harm claims
+        # recall 12/14 -> 8/14 on the same beats, the harm alarm 2/6 -> 1/6 — the slot
+        # competing with its neighbour (CLAUDE.md: a model asked for N things answers in
+        # parallel), and `shown_here` alone caught the departed raiders (6/6, then 5/6 on
+        # the final bench run; docs/narrator-after-defeat.md).
+        **({"shown_here": lst({"who": {"type": "string", "enum": _who(facts)}})}
+           if away else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
-                    "left", "time_of_day"]}
+                    "left", "time_of_day", *(["shown_here"] if away else [])]}
 
 
 _SYSTEM = (
@@ -378,7 +416,9 @@ def _ask(text: str, facts: Facts) -> str:
     people = []
     for p in facts.people:
         desc = "the player (\"you\")" if p.pc else (p.what or "")
-        if p.dead:
+        if not p.here:
+            desc = (desc + ", not here").strip(", ")
+        elif p.dead:
             desc = (desc + ", dead").strip(", ")
         elif p.down:
             desc = (desc + ", down").strip(", ")
@@ -390,12 +430,38 @@ def _ask(text: str, facts: Facts) -> str:
             f"Passage:\n{text}")
 
 
+# When the engine holds somebody away (`Person.here` False), and only then, the question
+# grows the `shown_here` slot: one paragraph of instruction and the second demonstration
+# with an away man in it. Every other beat is asked word for word what it was asked
+# before. Measured on the bench (2026-10-09): with the paragraph and the demonstration
+# shown on every beat, the beats with nobody away lost harm claims they had read before
+# (12 -> 9 of 14; "the commoner lunges forward, slamming their weight into you" no
+# longer hurt the player) — the slot competed even where it could not apply. Split like
+# this, the 50 earlier bench beats get identical messages and scored as on master.
+_SYSTEM_AWAY = (
+    "\nPeople marked \"not here\" are somewhere else. shown_here: only those of them the "
+    "passage nonetheless shows here and now, doing or saying anything — not one only "
+    "remembered, spoken of or imagined; usually nobody. Report what it has them do under "
+    "the other lists with their code too.")
+_DEMO2_AWAY_USER = (_DEMO2_USER.replace(
+    "c5: the drover — commoner\n", "c5: the drover — commoner; c6: the bargeman — not here\n")
+    .replace("A watchman comes in", "The bargeman leans on the rail of the gangway, watching "
+             "you. A watchman comes in"))
+# Something the away man does that is no harm and no arrival: a first cut had him swing a
+# boathook at the player and miss, and a demonstrated miss teaches "a blow at you is no
+# harm". Leaning on a rail teaches only the new slot.
+_DEMO2_AWAY_ANSWER = dict(_DEMO2_ANSWER, shown_here=[
+    {"who": "c6", "quote": "The bargeman leans on the rail of the gangway"}])
+
+
 def messages(text: str, facts: Facts) -> list[dict]:
-    return [{"role": "system", "content": _SYSTEM},
+    away = any(not p.here for p in facts.people)
+    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")},
             {"role": "user", "content": _DEMO_USER},
             {"role": "assistant", "content": json.dumps(_DEMO_ANSWER)},
-            {"role": "user", "content": _DEMO2_USER},
-            {"role": "assistant", "content": json.dumps(_DEMO2_ANSWER)},
+            {"role": "user", "content": _DEMO2_AWAY_USER if away else _DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(
+                _DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)},
             {"role": "user", "content": _ask(text, facts)}]
 
 
@@ -478,6 +544,7 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
     for key, cat, slots in (("changed_hands", "hands", ("item", "from", "to")),
                             ("trades", "trade", ("item", "seller", "buyer", "settled")),
                             ("harmed", "harm", ("who", "how")),
+                            ("shown_here", "shown", ("who",)),
                             ("arrived", "arrived", ("who",)),
                             ("left", "left", ("who",))):
         for row in answer.get(key) or ():
@@ -588,6 +655,7 @@ class Discrepancy:
     sentence: str = ""     # the page sentence (contradictions)
     line: str = ""         # the engine's own sentence, for the backstop
     claim: Claim | None = None
+    ref: str = ""          # who an `absent` contradiction is about
 
 
 def _resolved(facts: Facts) -> list[dict]:
@@ -641,6 +709,16 @@ def _refusal_line(o: dict) -> str:
 
 def _hour(facts: Facts) -> int | None:
     return None if facts.clock is None else (int(facts.clock) % (24 * 60)) // 60
+
+
+def _not_here(p: Person, c: Claim) -> Discrepancy:
+    """The page has somebody the engine holds elsewhere here: hurt, arriving or in a fight.
+    The fact the repair names is where they are not, and that nothing brought them back —
+    the engine's own doors (an arrival, an encounter, `defeat.settle`) bring people."""
+    return Discrepancy(
+        "contradiction", "absent",
+        f"{p.name} is not here: they are somewhere else, and nothing has brought them back. "
+        f"Nothing {p.name} does happens in this place.", c.sentence, "", c, ref=p.ref)
 
 
 def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]:
@@ -722,6 +800,9 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             p = facts.person(who)
             if p is None:
                 continue
+            if not p.here:
+                out.append(_not_here(p, c))
+                continue
             how = s["how"]
             if how == "dead" and not p.dead:
                 out.append(Discrepancy(
@@ -741,10 +822,23 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                         "contradiction", "harm",
                         f"Nothing the engine resolved hurt {p.name}: they are untouched.",
                         c.sentence, "", c))
+        elif c.category == "shown":
+            # Somebody the engine holds elsewhere cannot act here, whatever they do: the
+            # departed raiders' lunges (2026-10-09). Somebody here, listed by the reader
+            # all the same, is not judged — the slot offers every code (`schema`).
+            gone = facts.absent(str(s["who"]))
+            if gone is not None:
+                out.append(_not_here(gone, c))
         elif c.category in ("arrived", "left"):
             who = str(s["who"])
             p = facts.person(who)
             if p is None or p.pc:
+                continue
+            if not p.here:
+                # Gone and not brought back by anything the engine did: they are not here.
+                # A `left` of somebody already away is simply true.
+                if c.category == "arrived":
+                    out.append(_not_here(p, c))
                 continue
             came = any(str(e.get("ref") or "") == who
                        and e.get("kind") in ("introduce", "spawn", "arrive", "enter",
@@ -845,6 +939,9 @@ def question(d: Discrepancy, facts: Facts) -> str:
                 "down": "unconscious or collapsed and unable to fight",
                 "dead": "dead"}[s["how"]]
         return f"Does this sentence say that {_name(facts, s['who'])} is {what}?"
+    if c.category == "shown":
+        return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
+                f"something now — not only remembered or spoken of?")
     if c.category in ("arrived", "left"):
         way = "comes into" if c.category == "arrived" else "goes out of"
         return f"Does this sentence say that {_name(facts, s['who'])} {way} the place?"
@@ -892,6 +989,10 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             continue
         at = sentences.index(d.sentence) if d.sentence in sentences else -1
         before = sentences[at - 1] if at > 0 else ""
+        if d.category == "absent" and d.ref:
+            (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
         ask = ((f"The sentence before it, for context: {before}\n" if before else "")
                + f"The sentence: {d.sentence}\n\nQuestion: {q}")
         msgs = [{"role": "system", "content": _CONFIRM_SYSTEM},
@@ -910,6 +1011,39 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             yes = True
         (kept if yes else refuted).append(d)
     return kept, refuted, round(time.monotonic() - started, 2)
+
+
+def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+           api_key) -> bool:
+    """The second read of an `absent` contradiction: not "does this sentence show the
+    raider?" — asked that way of "Vyraxys is busy at the front, his voice now low and
+    raspy", gemma answered yes twice of twice (the first live run after the fix,
+    2026-10-09) — but WHO it shows, from the codes, compared in code with the person the
+    first read named. QAGS's shape: answer the question from the text, then compare.
+    A call that fails keeps the contradiction, as every second read does."""
+    codes = [*facts.refs, NEW_PERSON, NOBODY]
+    people = "; ".join(f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else "")
+                       for p in facts.people)
+    ask = ((f"The sentence before it, for context: {before}\n" if before else "")
+           + f"The sentence: {d.sentence}\n\nPeople: {people}\n\nQuestion: which of these "
+           f"people does this sentence show doing or saying something, here and now? "
+           f"Every one it shows; \"{NEW_PERSON}\" for somebody else, \"{NOBODY}\" if none. "
+           f"Not somebody only remembered, spoken of or imagined.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=60, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"shown": {
+                         "type": "array", "maxItems": 6,
+                         "items": {"type": "string", "enum": codes}}},
+                         "required": ["shown"]})
+        return d.ref in [str(x) for x in (reply.json() or {}).get("shown") or []]
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
 
 
 # --- the cache: a beat is read once, however many times the repair asks ----------------

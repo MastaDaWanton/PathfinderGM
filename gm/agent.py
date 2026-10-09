@@ -1998,6 +1998,10 @@ class GMAgent:
             text, truth, truth_attempts = self._truth_pass(ctx)
             repairs += truth
             attempts += truth_attempts
+            # What the checks found false against the engine and took off the page: the
+            # aftermath makes nobody out of it (docs/narrator-after-defeat.md).
+            if isinstance(self.attribution, beat_reader.Reading):
+                self.attribution.strike(text)
         # A name on the wrong person — the words name one man, the sentence is about
         # another: one targeted rewrite (stage 3 of the note).
         if self.attribution.misnamed():
@@ -2048,6 +2052,8 @@ class GMAgent:
                                f"and wrote the world's answer")
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
+            if isinstance(attribution, beat_reader.Reading):
+                attribution.strike_sentences(risen)
         # A door the dice held, opened anyway after the rewrite: cut from the opening on.
         text, forced = narration_mod.hold_the_door(text, getattr(self, "doors", None))
         if forced:
@@ -2232,6 +2238,8 @@ class GMAgent:
         if alone:
             text, ghosts = narration_mod.cut_phantom_opposition(text)
             if ghosts:
+                if isinstance(attribution, beat_reader.Reading):
+                    attribution.strike_sentences(ghosts)
                 repairs.append(
                     f"phantom opposition: cut {len(ghosts)} sentence(s) of enemies "
                     f"who are not in the scene")
@@ -3213,8 +3221,12 @@ class GMAgent:
                      pull: dict | None = None,
                      claim: str = "",
                      shown: list[str] | None = None,
-                     beat: int = 0) -> tuple[str, list[str], list[Attempt]]:
+                     beat: int = 0,
+                     since: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
+
+        `since`: the engine's lines that carried the scene on after the last narrated beat
+        (`narration.since_narrated`), for the prompt (docs/narrator-after-defeat.md).
 
         The other half of `intents_first`. Here the prose call is the only one there is,
         so every check that used to run over call 1's narration runs over this instead —
@@ -3260,7 +3272,7 @@ class GMAgent:
             # opens the block, so the beat starts where they were (owner, 2026-10-01).
             before_leaving=[str(d.get("span")) for d in self._deeds_for_the_page(
                 player_input, outcomes) if d.get("before_move") and d.get("span")],
-            model=self.prose_model)
+            since=since, model=self.prose_model)
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200,

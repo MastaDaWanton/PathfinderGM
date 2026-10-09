@@ -1921,7 +1921,7 @@ EARLIER_BEATS = 2
 EARLIER_CHARS = 1400
 
 
-def scene_now(scene, was_clock: int | None = None, outcomes=None) -> str:
+def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> str:
     """The scene as it stands this moment, derived from engine state, for the END of
     the prose prompt.
 
@@ -1966,6 +1966,16 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None) -> str:
     for mood in ("hostile", "unfriendly", "friendly", "helpful"):
         if mood in moods:
             facts.append(f"{mood} towards the player: {', '.join(moods[mood])}")
+    # Who left since the narrator last spoke (`gone`, the engine's own `left` records —
+    # `views._gone_since_narrated`): not here, so nothing they do is in this beat. Only on
+    # the beat after they went, never as a standing line (`hour_now`'s reasoning: a line
+    # that is always there is a formula). Measured 2026-10-09: the raiders who robbed the
+    # player and went were written lunging at the wagon on the next Continue
+    # (docs/narrator-after-defeat.md).
+    gone = [str(g) for g in gone or () if g]
+    if gone:
+        facts.append(f"GONE from here since the last passage, and taking no part in this "
+                     f"one: {', '.join(gone)}")
     heat = getattr(scene, "heat", None) or {}
     if heat.get("note"):
         facts.append(f"what the crowd just saw: {heat['note']}")
@@ -2167,8 +2177,13 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
                         claim: str = "", scene_mode: str = "",
                         demonstrations: list[dict] | None = None,
                         before_leaving: list[str] | None = None,
+                        since: list[str] | None = None,
                         model: str | None = None) -> list[dict]:
     """Write the whole turn, after the dice.
+
+    `since` is the engine's own lines that carried the scene on after the narrator's last
+    beat (`narration.since_narrated`): shown after the earlier beats, as where the scene
+    now stands, and the earlier beats are then called what they are — before it.
 
     `before_leaving` is the player's own words for each deed they declared before a move
     this turn (`narration.owed_deeds`, `before_move`); on an arrival it opens the block.
@@ -2259,9 +2274,24 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     # scene an arrival owes.
     if arriving:
         stood = []
-    scene = ("What you narrated just before this — the scene as it stands, which you "
-             "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
-             if stood else "")
+    moved_on = [s for s in (since or []) if s] if not arriving else []
+    if moved_on:
+        # The engine carried the scene on with no narrated beat (the downed door: the
+        # hour, the robbery, who went). Measured 2026-10-09 (docs/narrator-after-defeat.md):
+        # shown only the fight, under "the scene as it stands, which you are continuing",
+        # the Continue after the robbery had the departed raiders lunge at the wagon. The
+        # fight stays in view — the road, the wagons, the wagon master are still the
+        # scene — but is called what it is, and the engine's lines come after it, last
+        # of the scene, as where it stands now.
+        scene = (("What you narrated earlier — the scene as it was then:\n\n"
+                  + "\n\n".join(stood) + "\n\n" if stood else "")
+                 + "SINCE THEN (the engine's own lines, already read by the player — do not "
+                 "repeat them; the scene stands HERE now, and goes on from this):\n"
+                 + "\n".join(f"- {s}" for s in moved_on) + "\n\n")
+    else:
+        scene = ("What you narrated just before this — the scene as it stands, which you "
+                 "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
+                 if stood else "")
     # Built BEFORE packing, both of them. This function used to call
     # `call_one_messages` and then rewrite its system message and its last user message
     # to bigger ones, which meant the prompt grew after the budget had already decided

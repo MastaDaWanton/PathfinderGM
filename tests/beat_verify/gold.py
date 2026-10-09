@@ -63,8 +63,21 @@ REFUSED_SALE = {"intent_id": "i2", "op": "sell", "status": "refused", "effects":
                 "tell": "The smith's counter is not open yet; it opens at first light."}
 
 
+# The caravan ambush on the road out of Xylorvotha (the fixture world), 2026-10-09: the
+# player beaten, robbed and left, and the Continue after (docs/narrator-after-defeat.md).
+# The raiders are held off stage ("made-off") — "away" to the read back.
+XY_PLACES = ("the road to Kalixiri",)
+XY_TAM = ["pc", "Tam a", "", True]
+XY_MASTER = ["c1", "Vyraxys Vexarion", "trader"]
+XY_DROVER = ["c2", "the drover", "commoner"]
+XY_DROVER2 = ["c3", "the second drover", "commoner"]
+XY_RAIDER = ["c4", "the raider", "", False, "away"]
+XY_RAIDER2 = ["c5", "the second raider", "", False, "away"]
+XY_PEOPLE = (XY_TAM, XY_MASTER, XY_DROVER, XY_DROVER2, XY_RAIDER, XY_RAIDER2)
+
+
 def places_of(beat) -> tuple[str, ...]:
-    return {"VM": VM_PLACES, "PG": PG_PLACES}.get(beat["world"], ZH_PLACES)
+    return {"VM": VM_PLACES, "PG": PG_PLACES, "XY": XY_PLACES}.get(beat["world"], ZH_PLACES)
 
 
 def facts(beat):
@@ -75,7 +88,9 @@ def facts(beat):
     people = tuple(bv.Person(ref=p[0], name=p[1], what=p[2],
                              pc=bool(p[3]) if len(p) > 3 else False,
                              down=len(p) > 4 and p[4] in ("down", "dead"),
-                             dead=len(p) > 4 and p[4] == "dead")
+                             dead=len(p) > 4 and p[4] == "dead",
+                             # "away": held elsewhere in town (`beat_reader.away_people`).
+                             here=not (len(p) > 4 and p[4] == "away"))
                    for p in beat["people"])
     return bv.Facts(start=beat["start"], end=beat["end"], places=places_of(beat),
                     went_by=tuple(beat["went_by"]), pack=tuple(beat["pack"]),
@@ -728,4 +743,63 @@ GOLD = [
                  "effects": [{"kind": "biome", "place": "p~urban:the-gate",
                               "was_place": "p~urban:the-market", "went_by": ["the market"]}]}],
       claims=[C("move", opt=True, place=["the gate", "the market"])]),
+    # --- after the defeat (2026-10-09, before the fix; docs/narrator-after-defeat.md) ---
+    B("defeat-lunges", "defeat:before-a-1",
+      "The raider, his jaw bruised and swelling from your blow, ignores the pain and lunges "
+      "again, his rapier whistling through the air toward the edge of the wagon's frame. "
+      "Vyraxys is a whirlwind of motion on the box, shouting orders that are half-lost to "
+      "the wind. The second raider is a blur of motion further down the line, and the sound "
+      "of steel meeting wood rings out like a hammer on an anvil. The raider in front of you "
+      "lunges again, his blade aimed not at your chest, but at the axle of the wagon.",
+      world="XY", start="the road to Kalixiri", people=XY_PEOPLE, clock=780,
+      player="I take no action.",
+      claims=[C("shown", who="c4"), C("shown", who="c5"),
+              C("shown", opt=True, who="c1"),
+              C("harm", opt=True, who="c4", how="hurt")],
+      alarms=["absent"]),
+    B("defeat-buckler", "defeat:before-a-4",
+      "The raider is close now, his shadow falling over you as he lunges with the rapier. "
+      "You throw your weight into a desperate parry, the blade clanging against your "
+      "buckler, the vibration numbing your arm. Vyraxys shouts a command, and the horses "
+      "rear, their heavy hooves churning the dirt into a choking cloud. The second raider is "
+      "visible now, a blur of motion as he leaps from the dunes toward the lead wagon.",
+      world="XY", start="the road to Kalixiri", people=XY_PEOPLE, clock=780,
+      player="I take no action.",
+      claims=[C("shown", who="c4"), C("shown", who="c5"),
+              C("shown", opt=True, who="c1"),
+              C("arrived", opt=True, who="c5")],
+      alarms=["absent"]),
+    B("defeat-replayed", "defeat:before-a-2",
+      "The raider's blade is a blur of motion, and you feel the steel bite deep into your "
+      "side, carving through the leather of your doublet and the flesh beneath. You throw "
+      "your fist in a desperate reflex; your knuckles slam into the raider's jaw with a "
+      "sickening crunch. He grunts, his head snapping back slightly, but the impact doesn't "
+      "break his grip or his stride. The raider is closing the distance, his rapier held low "
+      "and ready, his eyes locked on yours.",
+      world="XY", start="the road to Kalixiri", people=XY_PEOPLE, clock=780,
+      player="I take no action.",
+      claims=[C("shown", who="c4"), C("harm", who="pc", how="hurt"),
+              C("harm", opt=True, who="c4", how="hurt")],
+      alarms=["absent"]),
+    B("defeat-backed-away", "defeat:before-a-3",
+      "Vyraxys is still on the box, his face tight with the strain of the defense, his voice "
+      "hoarse from shouting. The raider who struck you has backed away into the haze of the "
+      "dust, and the second raider is nowhere to be seen, likely having escaped into the "
+      "scrub with the stolen coin.",
+      world="XY", start="the road to Kalixiri", people=XY_PEOPLE, clock=780,
+      player="I take no action.",
+      claims=[C("shown", opt=True, who="c4"), C("shown", opt=True, who="c1"),
+              C("left", opt=True, who=["c4", "c5"])],
+      # Backing away into the dust an hour after he left is him here, just; saying so is
+      # defensible, not required.
+      may_alarm=["absent"]),
+    B("defeat-gone", "defeat:after-a-4",
+      "You are slumped against the wooden frame of the second wagon, your breath coming in "
+      "shallow, ragged hitches. Vyraxys is atop the lead wagon, his hands raw from gripping "
+      "the reins, watching the horizon where the raiders vanished. He looks down at you, his "
+      "expression a mix of grim relief and frustration. 'We'll find those bastards "
+      "eventually; they can't have taken your coin and gotten away with it.'",
+      world="XY", start="the road to Kalixiri", people=XY_PEOPLE, clock=780,
+      player="I take no action.",
+      claims=[C("harm", opt=True, who="pc", how="hurt"), C("shown", opt=True, who="c1")]),
 ]

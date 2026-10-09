@@ -2716,7 +2716,15 @@ def say(request):
         c.transcript.append(beat)
         outcome = downed.resolve(c)
         for line in outcome.lines:
-            c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+            # `moved_on`: the scene was carried on here by the engine with no narrated
+            # beat — an hour gone, the winners robbing the player and leaving — so the
+            # next prose call is shown these lines as where the scene now stands
+            # (`narration.since_narrated`). Without them it was shown only the fight, as
+            # "the scene as it stands, which you are continuing", and wrote the raiders
+            # lunging at the wagon an hour after they had gone (2026-10-09,
+            # docs/narrator-after-defeat.md).
+            c.transcript.append({"who": "gm", "text": line, "kind": "consequence",
+                                 "moved_on": True})
         # On the record, which this path never was: the owner's save of 2026-10-04 has
         # the bleeding, the hour and "whoever was standing over you has gone" in its
         # transcript and not one turn-log entry for any of it, so nothing said which
@@ -2747,6 +2755,32 @@ def say(request):
     if place is not None:
         return _the_way_there(c, place, text, typed, acting, claim, beat)
     return _keep_the_spell(c, acting, _plan_and_run(c, text, acting, claim, attached))
+
+
+def _gone_since_narrated(c) -> list[str]:
+    """The names of everybody the engine moved out of the scene since the narrator's last
+    beat, and who is still not here: its own `left` records on the turn log after the last
+    `prose` row (the downed door writes them when the winners rob the player and go,
+    `rules/defeat.py`). For `prompts.scene_now`, which says it once, on the beat after.
+    Read off the engine's record of what it did, never the page."""
+    log = list(getattr(c, "turn_log", None) or [])
+    last = max((i for i, r in enumerate(log) if isinstance(r, dict)
+                and r.get("kind") == "prose"), default=-1)
+    refs: list[str] = []
+    for row in log[last + 1:]:
+        if not isinstance(row, dict):
+            continue
+        effects = list(row.get("effects") or [])
+        for o in row.get("outcomes") or []:
+            if isinstance(o, dict):
+                effects += list(o.get("effects") or [])
+        for e in effects:
+            if isinstance(e, dict) and e.get("kind") == "left" and e.get("ref"):
+                refs.append(str(e["ref"]))
+    here = getattr(c.scene, "actors", {}) or {}
+    people = getattr(c.scene, "people", {}) or {}
+    return [str(people[r].name) for r in dict.fromkeys(refs)
+            if r in people and r not in here]
 
 
 def _keep_the_spell(c, acting: tuple, resp):
@@ -4072,7 +4106,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 # prompt with the scene as it stands (the ruling, 2026-09-18).
                 scene_now=(prompts.scene_now(
                                c.scene, was_clock=getattr(resolution, "clock_before", None),
-                               outcomes=resolution.outcomes)
+                               outcomes=resolution.outcomes,
+                               gone=_gone_since_narrated(c))
                            + (("\n\n" + judgement.standing_action(c.scene))
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
                               else "")
@@ -4086,7 +4121,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 shown=narration_mod.own_prose(c.transcript, tagged=True),
                 # How far in this beat is: which of the table's intimate-scene passages
                 # are shown turns over with it (gm/intimate.py `select`).
-                beat=len(c.transcript))
+                beat=len(c.transcript),
+                # Where the engine carried the scene after the last narrated beat (the
+                # downed door), shown as where it stands now (docs/narrator-after-defeat.md).
+                since=narration_mod.since_narrated(c.transcript))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first

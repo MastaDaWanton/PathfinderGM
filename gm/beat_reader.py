@@ -156,6 +156,26 @@ class Reading(Attribution):
     asked: bool = False       # a call was made at all (False: nothing to read, or off)
     timings: dict = field(default_factory=dict)
     who_said: dict = field(default_factory=dict)   # mention id -> answer as given
+    # The read sentences (their `mentions._key`) that the guards then found false against
+    # the engine and rewrote or cut (`GMAgent._groom`, `strike`). What stood only in them
+    # is not on the page the player reads, so nothing is made from it
+    # (`play/aftermath/seen_people.py`; docs/narrator-after-defeat.md).
+    struck: set = field(default_factory=set)
+
+    def strike(self, text: str) -> set:
+        """Mark every read sentence that is no longer in `text` as struck; returns them.
+        Called right after a guard has run over the beat, so a sentence missing now is one
+        that guard took off the page, not one a later step reworded."""
+        from .narration import _sentences
+
+        now = {mentions._key(s) for s in _sentences(speech.unquoted(str(text or "")))}
+        gone = set(self.sentences or ()) - now
+        self.struck |= gone
+        return gone
+
+    def strike_sentences(self, sentences) -> None:
+        """Mark these sentences, as a cutter returned them, as struck."""
+        self.struck |= {mentions._key(s) for s in sentences or () if s}
 
     def mention(self, mid: str) -> Mention | None:
         return next((m for m in self.mentions if m.id == mid), None)

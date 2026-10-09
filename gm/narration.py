@@ -4176,6 +4176,34 @@ def own_prose(transcript, n: int = 12, tagged: bool = False) -> list[str]:
     return out[-n:]
 
 
+def since_narrated(transcript, max_chars: int = 1400) -> list[str]:
+    """The engine's lines that carried the scene on after the narrator's last beat, oldest
+    first: the beats a door wrote with `moved_on` (the downed door — the hour, the
+    robbery, who went), after the last "setup" beat. Empty when the narrator spoke last.
+
+    Measured 2026-10-09 (docs/narrator-after-defeat.md): after the player was robbed and
+    left, the Continue's prose call was shown only the fight, framed as "the scene as it
+    stands, which you are continuing", and the departed raiders were back on the page in
+    8 of 8 replays; shown these lines, in 0 of 11. `own_prose` leaves these lines out on
+    purpose — an engine
+    sentence shown back as "what you narrated" is a template taught (narrator-guards D4)
+    — so they reach the prompt in a block of their own, as the engine's facts.
+
+    Only beats marked `moved_on`, not every consequence beat: award lines and tells after
+    a narrated beat are that beat's, already narrated around, and carry numbers the prose
+    has no use for. Trimmed from the front to `max_chars`, as the earlier beats are."""
+    beats = list(transcript or [])
+    last = max((i for i, b in enumerate(beats)
+                if isinstance(b, dict) and b.get("who") == "gm" and b.get("kind") == "setup"),
+               default=-1)
+    out = [str(b.get("text") or "").strip() for b in beats[last + 1:]
+           if isinstance(b, dict) and b.get("who") == "gm" and b.get("moved_on")]
+    out = [t for t in out if t]
+    while out and sum(len(t) for t in out) > max_chars and len(out) > 1:
+        out.pop(0)
+    return out
+
+
 def strip_added(text: str, added) -> str:
     """The beat as the model wrote it, with the pipeline's own appended sentences
     taken back out.
