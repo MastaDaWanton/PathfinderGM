@@ -90,7 +90,9 @@ def test_every_method_lane_e_tunes_has_a_game_and_grade_has_none():
     banded = sorted(m for m, r in rows.items() if (r.get("tuning") or {}).get("band"))
     assert banded == sorted(METHODS)
     assert "grade" in rows and not (rows["grade"].get("tuning") or {}).get("band")
-    files = sorted(p.stem for p in GAMES.glob("*.js") if p.stem != "00-kit")
+    # harvest.js is lane U2's game, played from the harvest sheet and never from the bench (no
+    # bench method tunes it); tests/test_harvest_ui.py holds it.
+    files = sorted(p.stem for p in GAMES.glob("*.js") if p.stem not in ("00-kit", "harvest"))
     assert files == sorted(GAMES_ALL)
 
 

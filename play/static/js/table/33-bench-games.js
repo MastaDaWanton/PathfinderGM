@@ -1604,6 +1604,11 @@
     // The enchanter's sound contract (contracts §13): enchant events carry the day phase.
     // Only an hour adds it, and only an enchant game with HOUR has one.
     if (r.hour) voice.phase = r.hour.phase || r.hour.now;
+    // The harvest's knife is pitched by the hide's surface (leather UI plan §11: "leather.knife
+    // (the harvest and Cut; pitch by hide surface: fur soft, scale sharp)"); the harvest sheet
+    // sends `tuning.surface` (play/harvest_views.py `_tuning`). Only a tuning that carries one
+    // adds it, so no other game's voice changes.
+    if (tuning.surface) voice.surface = tuning.surface;
     return {
       // The enchant games' inputs (contracts §13), the opts first, the server's tuning second:
       // the glyph sequence for Prepare, Unbind and Cleanse, the seats for Attune, the hour.
@@ -1908,8 +1913,14 @@
     if (run === r) run = null;
     // `reheats` is what /api/forge/finish charges world minutes for (forge_views, plan §11);
     // 0 for a game without heat, so the herb bench's result only gains a zero.
-    r.resolve({ score: score, stopped: !!stopped, hits: r.hits, misses: r.misses,
-      reheats: r.heat ? r.heat.reheats : 0 });
+    var out = { score: score, stopped: !!stopped, hits: r.hits, misses: r.misses,
+      reheats: r.heat ? r.heat.reheats : 0 };
+    // The harvest game also reports its DEFECT AREA, 0..1 (leather contracts §11.1: "The harvest
+    // game also reports `defects` (0..1 area) so the server can grade it; the server, not the
+    // page, turns that into a grade"). Only a game with `defects` adds the key, so every other
+    // bench's result is exactly what it was.
+    if (typeof r.game.defects === "function") out.defects = clamp(+r.game.defects() || 0, 0, 1);
+    r.resolve(out);
   }
 
   // --- the API ----------------------------------------------------------------------------
@@ -2034,8 +2045,10 @@
       button: function () { if (r.game.button) r.game.button.press(); },
       hint: function () { return hintNow(r); },
       result: function () {
-        return { score: clamp(+r.game.score() || 0, 0, 1), hits: r.hits, misses: r.misses,
+        var res = { score: clamp(+r.game.score() || 0, 0, 1), hits: r.hits, misses: r.misses,
           reheats: r.heat ? r.heat.reheats : 0 };
+        if (typeof r.game.defects === "function") res.defects = clamp(+r.game.defects() || 0, 0, 1);
+        return res;
       }
     };
   }
