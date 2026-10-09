@@ -1295,6 +1295,9 @@ class Scene:
         4,800 rounds, and calling the ward hazards or the pool upkeep that many times
         would empty every pool and roll thousands of saves, while calling them once would
         under-resolve. Time passing ends things; it does not make them happen again.
+        The one exception is healing by the round — fast healing is a rate of time, and a
+        heal is capped at full and needs no roll against anybody — which runs over the
+        stretch's rounds through `Actor.run_periodic(elapsed=True)` (2026-10-09).
 
         Returns what ended, so the caller can say so — four of the six threw that away.
 
@@ -1357,6 +1360,21 @@ class Scene:
                               "said": survival.said(a, toll, self.biome)}
                     body.append(record)
                     self._body_said.append(record)
+            # Fast healing heals by the round of time, not of combat: the stretch's rounds,
+            # the heals only, each effect for what it had left to run — so BEFORE the tick
+            # below expires a draught that ends inside the stretch (`Actor.run_periodic`,
+            # `elapsed`). Said as a body record, so it is told once behind whatever op
+            # spent the time, folded with the stretch's other tolls (`Toll.rested`).
+            # Not inside a fight: there the played rounds fire it (`_next_able`), and a
+            # round's worth of clock moved by an op mid-fight would heal it twice.
+            mended: list[dict] = []
+            if rounds and not a.is_dead and not self.in_encounter:
+                # What heals by the round is granted first (a race's, a ring's), or the
+                # first stretch after it is granted heals nothing (`sync_carried`).
+                mended = a.sync_carried(self._dice, only_heals=True)
+                mended += a.run_periodic("round", rounds, self._dice, elapsed=True)
+            if mended:
+                self._mended_said(a, mended, body)
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
@@ -1445,6 +1463,23 @@ class Scene:
                     self._works_said.append(record)
         return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body,
                 "ready": ready}
+
+    def _mended_said(self, a: "Actor", mended: list[dict], body: list[dict]) -> None:
+        """What fast healing mended over a stretch, as the stretch's body record: folded
+        into the one this stretch already made for `a`, or one of its own. One sentence
+        per source, in `_ward_tell`'s voice, with where they now stand."""
+        said = [t for t in (_ward_tell(self, r) for r in mended) if t]
+        if not said:
+            return
+        if any(r.get("amount") for r in mended if r.get("kind") == "heal"):
+            said[-1] = said[-1].rstrip(".") + f" ({a.hp}/{a.hp_max})."
+        record = next((r for r in body if r.get("ref") == a.ref), None)
+        if record is None:
+            record = {"ref": a.ref, "kind": "body", **survival.Toll().as_dict(), "said": []}
+            body.append(record)
+            self._body_said.append(record)
+        record["rested"] = list(record.get("rested") or []) + said
+        record["said"] = list(record.get("said") or []) + said
 
     def wait(self, minutes: int, rounds: int | None = None) -> dict:
         """A wait the player chose — the benches' Wait for it, "I wait three days" — lived
@@ -8697,7 +8732,10 @@ class Engine:
                                     ("thirst", survival.drink(pc))):
                     if freed:
                         told.append(survival.released_said(pc, need, freed))
-                survival.sleep(pc)
+                # The camp's night through the night's one door: natural healing, pools
+                # and slots with the awake clock (`survival.night`). `sleep` alone reset
+                # the clock and healed nothing across a week's work or a month's road.
+                told.extend(survival.night(pc, self.dice))
                 self.scene.advance((24 - day) * survival.MINUTES_PER_HOUR,
                                    charge_body=False)
         return worked, "; ".join(told)
@@ -9844,7 +9882,10 @@ class Engine:
                                     ("thirst", survival.drink(pc))):
                     if freed:
                         told.append(survival.released_said(pc, need, freed))
-                survival.sleep(pc)
+                # The camp's night through the night's one door: natural healing, pools
+                # and slots with the awake clock (`survival.night`). `sleep` alone reset
+                # the clock and healed nothing across a week's work or a month's road.
+                told.extend(survival.night(pc, self.dice))
                 self.scene.advance((24 - day) * survival.MINUTES_PER_HOUR,
                                    charge_body=False)
         return True, "; ".join(told)
@@ -20592,8 +20633,9 @@ class Engine:
                                 "origin": "rule:night-check"})
             bits.append(self._night_said(met, made, at_dawn=True))
         if result["healed"]:
-            bits.append(f"{actor.name} recovers {result['healed']} hit points "
-                        f"({actor.hp}/{actor.hp_max}).")
+            # With the rate beside it: 1 a night at level 1 read as "my health is not
+            # going up" (the owner, 2026-10-09) — the rule was working and unsaid.
+            bits.append(survival.heal_said(actor, result["healed"], kind))
         elif actor.hp >= actor.hp_max:
             bits.append(f"{actor.name} was already unhurt.")
         if result["woke"]:
@@ -22036,6 +22078,9 @@ def _ward_tell(scene: Scene, e: dict) -> str:
         return f"{name} is carrying the {e.get('what', 'thing')}; it takes its toll each day."
     if kind == "worn":
         return f"The {e.get('what', 'thing')} {name} wears grants {e.get('grants', 'its power')}."
+    if kind == "trait":
+        # A race's standing gift (`Actor.race_effects`), said once, when it is granted.
+        return f"{name} has {e.get('grants', 'a gift')}, as the {e.get('what', 'race')} do."
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
     return ""

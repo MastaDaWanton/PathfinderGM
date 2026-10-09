@@ -655,12 +655,12 @@
       "name": "Fast healing",
       "points": 4,
       "group": "defence",
-      "takes": 1,
+      "takes": 5,
       "line": "fast healing 1",
       "tags": [
         "fast-healing.1"
       ],
-      "not_yet": "fast healing waits on a periodic effect executor"
+      "source": "APG, eidolon evolutions: fast healing 1, increased by 1 per round for every 2 additional evolution points spent (maximum 5). Each pick here is one point of it; rules/races.py resolves the count into `fast-healing.<n>`, and Actor.sync_carried grants it as a standing effect the round executor runs (2026-10-09)."
     },
     {
       "id": "spell-resistance",
