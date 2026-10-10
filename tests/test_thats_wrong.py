@@ -17,7 +17,6 @@ beats. Each test here names the defect it prevents:
 """
 from __future__ import annotations
 
-import inspect
 import json
 from pathlib import Path
 
@@ -232,6 +231,23 @@ def test_the_record_is_whole_and_moving_on_keeps_the_remake_implicitly(table):
     assert _post(beat=i, do="fix").status_code == 409
 
 
+def test_our_sentence_left_in_the_players_version_stays_ours(table):
+    """Measured live 2026-10-09: the player's own version kept the 87-character face line
+    the pipeline had appended, and the record called it the player's words — so the
+    narrator would have been shown our template as its own prose, and trained on it."""
+    c, turn = table["c"], table["turn"]
+    i = turn(WRONG)
+    face = "The guard is broad, with a nose broken more than once."
+    c.transcript[i]["text"] = WRONG + " " + face
+    c.transcript[i]["added"] = [face]
+    mine = "Your blade flashes and misses; the guard laughs. " + face
+    assert _post(beat=i, do="write", text=mine).status_code == 200
+    assert c.transcript[i]["added"] == [face]
+    assert face not in narration.own_prose(c.transcript)[-1]
+    v = _log(table["root"])[-1]["versions"][-1]
+    assert v["text"] == mine and face not in v["model_text"]
+
+
 def test_an_explicit_keep_is_not_implicit(table):
     turn = table["turn"]
     i = turn(WRONG)
@@ -344,7 +360,8 @@ def test_the_log_lives_in_the_data_folder_never_beside_the_code(table, monkeypat
 
     import ast
 
-    tree = ast.parse(inspect.getsource(corrections))
+    # Read off disk and walked, not `getsource` (the suite's source-pin ratchet).
+    tree = ast.parse(Path("play/corrections.py").read_text(encoding="utf-8"))
     assert not [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == "__file__"]
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", str(table["root"] / "_MEI12345"), raising=False)

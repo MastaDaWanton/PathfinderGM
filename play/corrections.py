@@ -574,11 +574,20 @@ def write(c, i: int, text: str, sentences=None, note: str = "") -> dict:
         raise Refused("That is the beat as it stands. Change it, or keep it.", status=400)
     _flag(rec, on, _picked(current["text"], sentences), str(note or "")[:MAX_NOTE].strip())
     said = _kept_said(current.get("said") or [], text)
-    version = {"text": text, "by": "player", **({"said": said} if said else {})}
+    # Our own appended sentences (a face, a death line) the player left standing stay
+    # marked ours, so they are never shown back to the narrator as its prose — and the
+    # training text is the player's words, not ours (measured live 2026-10-09: the
+    # player's version kept the 87-character face line the pipeline had added).
+    from gm import narration as narration_mod
+
+    added = [s for s in (current.get("added") or []) if s in narration_mod._sentences(text)]
+    version = {"text": text, "by": "player",
+               **({"added": added} if added else {}), **({"said": said} if said else {})}
     fix["versions"].append(version)
     fix["on"] = len(fix["versions"]) - 1
     rec["versions"].append({"n": fix["on"], "by": "player", "text": text,
-                            "model_text": text, "at": _now(),
+                            "model_text": narration_mod.strip_added(text, added),
+                            "at": _now(),
                             "flagged_sentences": [], "note": "",
                             # Saved by the player's own hand: an explicit keep.
                             "verdict": "kept", "implicit": False})
