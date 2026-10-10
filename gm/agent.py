@@ -817,6 +817,9 @@ class GMAgent:
                 raw = judgement.inject_found(raw, player_input, self.engine.scene, self.world)
                 raw = judgement.inject_venture(raw, player_input, self.engine.scene)
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
+                # The waking time of a sleep is the reading's `time` slot, or none
+                # (`acts_to_ops.timed_rests`): after every door that can add a rest.
+                raw = acts_to_ops.timed_rests(raw, read_ok, notes=own_words)
                 raw = judgement.bulk_give_is_a_loot(raw, self.engine.scene)
                 raw = judgement.inject_loot(raw, player_input, self.engine.scene)
                 # Last, and after the target fills: the blow the reading declared, on the
@@ -871,6 +874,10 @@ class GMAgent:
                     raw, player_input,
                     self.reading if isinstance(self.reading, dict) else None,
                     notes=own_words)
+                # And the line goes to whom the words name (`acts_to_ops.address_the_named`):
+                # never the plan's pick of somebody else here.
+                raw = acts_to_ops.address_the_named(raw, read_ok, self.engine.scene,
+                                                    notes=own_words)
                 # The ops the reading owes, in the order the words do them — after every
                 # injector has appended its own, and before a chip's op is put where the
                 # words put it (which then has the last word on order).

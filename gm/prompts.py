@@ -743,6 +743,9 @@ where they actually are is where they actually are.
 When the player searches the ground for herbs or useful growing things:
 {"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
 puts what turns up in their satchel — do not decide what they find.
+When the player looks for tracks or a trail: {"op": "track", "actor": "pc"}. The engine
+rolls Survival against the ground and says whose tracks are there, if anybody's — never
+a trail it did not name.
 A place the player makes theirs — a friend's house as a base, a rented room, the alley
 behind the market as their own — is founded, from where they stand, and is a place
 from then on: {"op": "found", "actor": "pc", "params": {"name": "Marra's house",

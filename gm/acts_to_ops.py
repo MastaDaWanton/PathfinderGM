@@ -441,6 +441,13 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act in ("go", "seek") and a.get("object") and pc is not None:
                 _carry(row, frame, i, scene, pc, recent)
                 coming += [str(t["params"]["item"]) for t in row.intents]
+            if act == "track" and pc is not None:
+                # Built whole: the op takes nothing the plan could get wrong — the ground
+                # and the trails are the scene's (rules/tracking.py). Measured live
+                # 2026-10-09: read as a `search`, the line owed no op, and no Survival
+                # was rolled at all.
+                row.intents.append({"op": "track", "actor": pc.ref, "params": {},
+                                    "because": "the player looks for tracks"})
         rows.append(row)
     return rows
 
@@ -933,8 +940,19 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     placed: set[int] = set()
     checks = {str((b.get("params") or {}).get("skill") or "").lower()
               for b in built if b.get("op") == "check"}
+    tracking = any(b.get("op") == "track" for b in built)
     for r in raw:
         op = _op(r)
+        if tracking and (op == "track" or (op == "check" and str(
+                ((r or {}).get("params") or {}).get("skill") or "").lower() == "survival")
+                or (op == "forage" and "gather" not in acts)):
+            # The reading's look for tracks is the table's `track`, built whole: the
+            # plan's own copy, its Survival check for the same look, or the forage it
+            # reached for (turn 10 of the 2026-10-09 run planned one) would roll twice
+            # or search for herbs instead.
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's look for tracks")
+            continue
         if op == "check" and checks and str(
                 ((r or {}).get("params") or {}).get("skill") or "").lower() in checks:
             # The table built this check whole (`first_aid`): the plan's own copy of it,
@@ -996,6 +1014,108 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         if k not in placed:
             out.append(b)
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
+def address_the_named(raw, frame: dict | None, scene, *,
+                      notes: list | None = None) -> list:
+    """The player's line goes to the person the reading's `talk` names — never to
+    somebody else the plan picked.
+
+    Measured live 2026-10-09 (gemma-4-12B, Pangrella, turn 8): "I ask the gate guard what
+    lies north" was read `talk, target: the gate guard`; the plan introduced the guard
+    (new1, made c6) and then wrote the `say` to c4, the smith — the last conversation
+    partner, standing at the gate only because the prose had walked him there — and the
+    engine opened a conversation with the smith. Nothing checked the say's addressee
+    against the words.
+
+    Structure and the engine's finders only, no English read:
+      * the target found among the people here (`person`, i.e. `scope.in_the_room`, a
+        bare pronoun by `addressed`) is who the line goes to;
+      * a target found nobody here, in a plan that introduces somebody, is the person the
+        plan brings in — the introduce's first placeholder (one introduce per plan,
+        `Engine.validate`) — and the say is put after it so the placeholder exists;
+      * anything else is left as the plan wrote it.
+    Only when the reading has exactly one spoken-to target and the plan one say by the
+    player: two of either is a pairing this does not guess."""
+    from rules.intents import INTRODUCED_REFS
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
+        return raw
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw
+    named = [str(a.get("target") or "").strip()
+             for a in frame.get("actions") or []
+             if a.get("act") in ("talk", "insult") and interpret.acting(a)
+             and str(a.get("target") or "").strip()]
+    says = [k for k, r in enumerate(raw) if _op(r) == "say"
+            and str(r.get("actor") or "pc").lower() in ("pc", pc.ref.lower(), "none", "")]
+    if len(named) != 1 or len(says) != 1:
+        return raw
+    want = person(scene, named[0])
+    intro = next((k for k, r in enumerate(raw) if _op(r) == "introduce"), None)
+    if not want:
+        # A pronoun the engine could not settle names nobody new either.
+        if intro is None or named[0].lower() in _PRONOUNS:
+            return raw
+        want = INTRODUCED_REFS[0]
+    k = says[0]
+    say = raw[k]
+    params = dict(say.get("params") or {})
+    if params.get("to") == want:
+        return raw
+    was = params.get("to") or "nobody named"
+    params["to"] = want
+    out = list(raw)
+    # The plan writes the addressee twice as often as not (turn 8: `target: c4` and
+    # `params.to: c4`); both, or the target's ref check refuses the say.
+    out[k] = dict(say, params=params, **({"target": want} if say.get("target") else {}))
+    if want == INTRODUCED_REFS[0] and intro is not None and k < intro:
+        out.insert(intro, out.pop(k))
+    if notes is not None:
+        notes.append(f"the say to {was} goes to {want}: the one the player's words name")
+    return out
+
+
+def timed_rests(raw, frame: dict | None, *, notes: list | None = None) -> list:
+    """A sleep the words put a waking time on carries it: the reading's `time` slot,
+    verbatim ("until dawn"), as the rest's `until`, which the engine reads against the
+    clock (`Engine._camp_for`). Measured live 2026-10-09 (gemma-4-12B, Pangrella, turn
+    11): "I make camp and sleep until dawn" was read `rest, time: until dawn`, the rest
+    was planned `kind: night` with nothing else, and the party slept eight hours from
+    11:57 and woke at 7.57 pm. The slot had nowhere to go.
+
+    The time is the player's words or nothing: an `until` the plan wrote with no rest of
+    the reading's behind it is struck — a model choosing when the player wakes is a model
+    authoring the clock (law 3). Structure only: the reading's act and slot, never the
+    sentence."""
+    from . import interpret
+
+    if not isinstance(raw, list):
+        return raw
+    said = ""
+    if frame and not frame.get("error"):
+        said = next((str(a.get("time") or "").strip()
+                     for a in frame.get("actions") or []
+                     if a.get("act") == "rest" and interpret.acting(a)
+                     and str(a.get("time") or "").strip()), "")
+    out = []
+    for r in raw:
+        if _op(r) != "rest":
+            out.append(r)
+            continue
+        params = dict(r.get("params") or {})
+        if said:
+            if params.get("until") != said:
+                params["until"] = said
+                if notes is not None:
+                    notes.append(f"the rest runs {said!r}, the player's own time")
+        elif params.pop("until", None) is not None and notes is not None:
+            notes.append("the plan's waking time struck: the player named none")
+        out.append(dict(r, params=params))
+    return out
 
 
 def order(raw, rows: list[Row]) -> list:

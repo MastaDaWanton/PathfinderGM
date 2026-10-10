@@ -38,11 +38,24 @@ import time
 ENABLED = True
 
 ACTS = (
-    "go", "journey", "leave", "look", "search", "seek", "talk", "insult", "buy", "sell",
-    "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
-    "rest", "call_on", "break_in", "stealth", "athletics", "gather", "follow", "claim",
-    "other",
+    "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
+    "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
+    "rest", "rise", "call_on", "break_in", "stealth", "athletics", "gather", "follow",
+    "claim", "other",
 )
+# `rise` and `track` since 2026-10-09, both from one live run (gemma-4-12B, Pangrella):
+#
+# * "I break camp and head back to town" was read `rest, go` — the vocabulary had a word
+#   for making camp (`rest`) and none for breaking it, and the sampler, held to the enum,
+#   took the nearest — and the engine slept the party nine more hours. Probed again before
+#   the change: "I break camp at first light and walk to the ford" came back `rest, time:
+#   at first light`, a sleep. `rise` is the end of a rest; it owes no op. The fix is the
+#   enum, not a word list: nothing in code reads "break".
+# * "I look for tracks in the grass" was read `search` (the gloss listed tracks under it),
+#   which owes no op, so no Survival check was ever rolled and the narrator invented a
+#   cart's ruts. Looking for tracks is 1e's Survival to find tracks (CRB p.107, Follow
+#   Tracks), a deed of its own: `track` owes the engine's `track` op, built whole
+#   (`acts_to_ops.table`).
 # `drop` since 2026-10-03, because the act→op table (gm/acts_to_ops.py) needs it and the
 # vocabulary did not have it: "I also drop the Brunt of the weight on the ground" was read
 # `give, target: the Brunt of the weight, place: the ground` on the owner's items save, and
@@ -117,6 +130,8 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     # came with them — the replay of the owner's items save then had nothing to sell.
     "go": ("place", "object", "time"), "journey": ("place",), "leave": ("place",),
     "look": ("object", "target", "place", "time"), "search": ("object", "place"),
+    # Whose tracks (a person or a creature named) and where the ground is looked over.
+    "track": ("target", "object", "place"), "rise": (),
     "seek": ("target", "place", "object"), "talk": ("target", "says"),
     "insult": ("target", "says"),
     "buy": ("object", "target", "place"), "sell": ("object", "target"),
@@ -146,7 +161,8 @@ journey   take the road or a ship to another town
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
 look      look, watch, listen, read, examine
-search    look for a THING or a PLACE (water, a way in, somewhere to sleep, tracks)
+search    look for a THING or a PLACE (water, a way in, somewhere to sleep)
+track     look for tracks, a trail or footprints; read the ground for who passed
 seek      look for, ask around for, wave down, head for or turn to a PERSON
 talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
@@ -164,6 +180,7 @@ use       draw a weapon, put on, show, use, bandage, light
 consume   eat or drink
 wait      wait, sit, stand, stay, keep watch, pass time
 rest      sleep, lie down, make camp, rest, take a room
+rise      get up, wake, break camp, pack up: the end of a rest
 call_on   go to somebody's house, knock at their door, visit them at home
 break_in  kick in, force or pick the lock of a door
 stealth   sneak, hide, slip past

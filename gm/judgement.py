@@ -2733,7 +2733,9 @@ def inject_checks(raw_intents, player_text: str, scene) -> list:
     if "?" in player_text:
         return raw_intents
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
-    if present & {"check", "attack", "manoeuvre", "save"}:
+    # `track` rolls Survival itself (2026-10-09, `Engine._op_track`): "I track the boar"
+    # matched the survival verbs below and would have rolled it twice.
+    if present & {"check", "attack", "manoeuvre", "save", "track"}:
         return raw_intents
     pc = scene.pc()
     if pc is None:
@@ -5435,47 +5437,15 @@ _UNIT_HOURS = {"hour": 1, "hours": 1, "day": 10, "days": 10, "morning": 4, "afte
                "evening": 3, "night": 8, "watch": 4}
 
 
-_UNTIL_WORD = {"dark": 19, "nightfall": 19, "dusk": 19, "sunset": 19, "evening": 19,
-               "dawn": 6, "first light": 6, "sunrise": 6, "daybreak": 6, "morning": 8,
-               "noon": 12, "midday": 12, "midnight": 0}
-_UNTIL = re.compile(
-    r"\buntil\s+(?:it\s+is\s+)?(?:fully\s+|well\s+after\s+|after\s+)?(?:the\s+)?"
-    r"(?:(?P<word>first light|nightfall|daybreak|sunrise|sunset|midnight|midday|morning|"
-    r"evening|dark|dusk|dawn|noon)"
-    r"|(?P<n>\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
-    r"(?:\s*o'clock)?\s*(?P<half>am|pm|a\.m\.|p\.m\.|in the morning|in the afternoon|"
-    r"in the evening|at night|tonight)?)\b", re.I)
-
-
 def minutes_until(player_text: str, clock: int) -> int | None:
     """Minutes from `clock` to the time the player named ("until ten at night", "until
     dawn"), or None. Measured live 2026-09-27: "I wait at the well until ten at night"
     at mid-morning was planned as 140 minutes — the model's arithmetic, and the hour now
-    decides who is home and which counters are open."""
-    m = _UNTIL.search(str(player_text or ""))
-    if not m:
-        return None
-    if m.group("word"):
-        hour = _UNTIL_WORD[m.group("word").lower()]
-    else:
-        n = m.group("n").lower()
-        hour = int(n) if n.isdigit() else _WORDS_TO_N.get(n, 0)
-        half = (m.group("half") or "").lower().replace(".", "")
-        if hour > 24:
-            return None
-        if half in ("pm", "in the afternoon", "in the evening", "at night", "tonight")                 and hour < 12:
-            hour += 12
-        elif half in ("am", "in the morning") and hour == 12:
-            hour = 0
-        elif not half and hour < 12:
-            # A bare "until ten": the next ten o'clock to come.
-            now_h = (int(clock) % 1440) / 60
-            if hour <= now_h and hour + 12 > now_h:
-                hour += 12
-        hour %= 24
-    day = 24 * 60
-    now = int(clock) % day
-    return ((hour * 60 - now) % day) or day
+    decides who is home and which counters are open. The table is `rules.timewords`' since
+    2026-10-09, shared with the sleep door (`Engine._camp_for`): one copy of the rule."""
+    from rules import timewords
+
+    return timewords.minutes_until(player_text, clock)
 
 
 def repair_rest_kind(raw_intents, player_text: str) -> list:
