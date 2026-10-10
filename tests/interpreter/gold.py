@@ -25,7 +25,8 @@ Conventions, so labels are consistent:
     intended (a purpose clause, "who will…", "I'm going to…", "I want to…"); asked ("would
     you buy it?"). "I'm going to the chapel" is going, done; "I'm going to light a candle"
     is intended.
-  * looking for a PERSON is `seek` (target); for a thing or a place, `search` (object).
+  * looking for a PERSON is `seek` (target); for a thing or a place, `search` (object);
+    for tracks or a trail, `track`. Breaking camp or getting up is `rise`.
   * asking somebody something is `talk` with the question in `says`; `target` only when
     the sentence names who ("her", "the guard"), never guessed.
   * slots are verbatim spans, trimmed of the leading article only when the sentence has
@@ -64,7 +65,9 @@ GOLD = [
       [A("leave", place="the shop"), A("go", place="the gate")], "script:town"),
     G("I ask the gate guard what lies north.", [A("talk", target="the gate guard", says="what lies north")], "script:town"),
     G("I walk out into the grassland beyond the wall.", [A("go", place="the grassland beyond the wall")], "script:town"),
-    G("I look for tracks in the grass.", [A("search", object="tracks in the grass")], "script:town"),
+    # Relabelled 2026-10-09 from `search, object: tracks in the grass`: looking for tracks
+    # is its own act now (`interpret.ACTS`, `track`), the Survival check 1e makes of it.
+    G("I look for tracks in the grass.", [A("track", place="the grass")], "script:town"),
     G("I make camp and sleep until dawn.", [A("rest", time="until dawn")], "script:town"),
     # --- script:strangers ----------------------------------------------------------------
     G("I look along the street for someone who knows the roads north, and ask them.",

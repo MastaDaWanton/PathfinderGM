@@ -48,6 +48,8 @@ from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from .grid import Grid
 from . import hazards
 from . import deeds
+from . import sky
+from . import timewords
 from .bestiary import printed_alignment
 from . import provocation as _provocation
 from . import intents as intents_mod
@@ -242,6 +244,14 @@ class Scene:
     # square actually changed counts — a zone relabel moves no body (docs/fix-interfaces
     # §3.4) and must not cost the step that would.
     move_spent: dict[str, int] = field(default_factory=dict)
+    # What the player's character last struck with this encounter — the weapon and the
+    # lethality their own words chose — and what was in hand then, by ref. A blow that
+    # names no means carries on with these (`Engine._standing_means`), as a standing action
+    # does. Measured live 2026-10-09 (the fight script): "I punch him in the face", "I punch
+    # him again", then "I keep hitting him" — and the third swung the rapier for 7
+    # piercing, because a blow with no weapon named meant whatever was in hand. Cleared
+    # with the fight (`end_encounter`).
+    means: dict[str, dict] = field(default_factory=dict)
     round: int = 0
     clock_minutes: int = 0
     # The narrative thread: what the player is engaged in when no op carries it —
@@ -2011,6 +2021,8 @@ class Scene:
         self.round = 0
         self.acted = set()
         self.attacked = set()
+        # The next fight's first blow is the player's to choose afresh.
+        self.means = {}
         # The next fight starts at round one again, and a walk from this one's round one
         # would read as already spent.
         self.move_spent = {}
@@ -2841,6 +2853,7 @@ class Engine:
         # swings are left to the floor in `_op_attack`, which asks after the move.
         moved: set[str] = set()
         for i, intent in enumerate(intents):
+            self._standing_means(intent)
             self._check_refs(intent, i, extra=pending | introduced)
             self._check_legality(intent, i, moved=moved)
             self._force_visibility(intent)
@@ -2871,6 +2884,42 @@ class Engine:
                 self._planned_places.add(_place_key(intent.params["name"]))
         self._planned_places = set()
         return intents
+
+    def _standing_means(self, intent: Intent) -> None:
+        """A blow by the player's character that names no weapon, in the fight it already
+        struck in, carries on with what it last struck with (`Scene.means`): the weapon and
+        the lethality, filled into the params here so every reader of them — the reach, the
+        reactions, the swing — sees the same blow. Only while the same thing is in hand: a
+        weapon drawn since is a change of means the player made. A manoeuvre is its own
+        means and is left alone. Measured live 2026-10-09: "I keep hitting him" after two
+        punches swung the rapier for 7 piercing."""
+        if intent.op != "attack" or not self.scene.in_encounter:
+            return
+        p = intent.params
+        if p.get("weapon") or p.get("manoeuvre") or p.get("mode") or p.get("coup_de_grace"):
+            return
+        actor = self.scene.actors.get(str(intent.actor or ""))
+        if actor is None or not actor.is_pc:
+            return
+        last = self.scene.means.get(actor.ref) or {}
+        if not last.get("weapon") or last.get("wielded") != actor.wielded_key():
+            return
+        p["weapon"] = last["weapon"]
+        if last.get("lethality") and not p.get("lethality"):
+            p["lethality"] = last["lethality"]
+
+    def _remember_means(self, actor, intent: Intent, weapon_key: str) -> None:
+        """What the player's character struck with, for `_standing_means`."""
+        # Not a manoeuvre, a thrown flask, a reaction, or a thing picked up and swung or
+        # thrown once (the stool is on the floor after it).
+        if not actor.is_pc or intent.params.get("manoeuvre") \
+                or intent.params.get("mode") or intent.params.get("reaction") \
+                or str(weapon_key or "").lower() == "improvised":
+            return
+        self.scene.means[actor.ref] = {
+            "weapon": str(weapon_key or ""),
+            "lethality": str(intent.params.get("lethality") or ""),
+            "wielded": actor.wielded_key()}
 
     def _projected_refs(self, intents: list[Intent]) -> set[str]:
         """The refs `spawn` intents in this list are going to mint.
@@ -6041,6 +6090,8 @@ class Engine:
                         for s, refs in self.scene.sides.items() if s != mine
                         for r in refs if r in self.scene.actors
                         and not self.scene.actors[r].is_down]
+                # The blow declared is the fight's means from here (`_standing_means`).
+                self._remember_means(actor, intent, weapon_key)
                 return Outcome(
                     intent_id=intent.id, op="attack",
                     # The declared params ride along, so the initiator's blow that
@@ -7038,6 +7089,8 @@ class Engine:
         # First blood is remembered only once the attack completes, so the decision
         # "is this a subsequent attack?" cannot flip between a suspension and its resume.
         self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
+        if self.scene.in_encounter:
+            self._remember_means(actor, intent, weapon_key)
         if coup:
             # No AC was rolled against; the only number set against anybody was the save.
             dc = ({"value": coup_dc, "explain": "Fortitude, 10 + damage dealt"}
@@ -12052,6 +12105,57 @@ class Engine:
         and prospect ops are this with the key fixed."""
         return self._gather(intent, partial, str(intent.params.get("key") or ""))
 
+    def _op_track(self, intent: Intent, partial: dict) -> Outcome:
+        """Look for tracks here: 1e's Survival to find tracks (CRB p.107) against the
+        ground's DC, and what the engine knows has crossed the ground (rules/tracking.py).
+
+        Measured live 2026-10-09 (Pangrella, turn 10): "I look for tracks in the grass"
+        rolled nothing and the narrator wrote a cart's ruts no part of the engine held.
+        Now the roll is the player's (the dice popup, as a forage's is), each trail the
+        engine knows is found when the roll beats its own DC, and a roll that beats the
+        ground with nothing to find says there is nothing — the tell is the whole of what
+        the page may say was found (law 3)."""
+        from . import tracking
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("track: nobody here to look", "refs")
+        surface, base = tracking.ground(self.scene)
+        light = self.scene.ambient_light()
+        mods = actor.skill_modifiers("survival")
+        dc_shown = base + tracking.LIGHT_DC.get(light, 0)
+        if actor.is_pc:
+            if "player_face" in partial:
+                face = int(partial.pop("player_face"))
+            else:
+                raise _NeedsPlayerRoll({
+                    "label": f"Survival check — finding tracks ({surface} ground)",
+                    "die": "1d20", "actor": actor.name, "min": 1, "max": 20,
+                    "modifier": sum(m.value for m in mods),
+                    "breakdown": [m.as_dict() for m in mods],
+                    "dc": dc_shown, "because": intent.because, "intent_id": intent.id,
+                }, {})
+            roll = self.dice.given(face, mods, label=f"{actor.name} Survival (tracks)")
+        else:
+            roll = self.dice.d20(mods, label=f"{actor.name} Survival (tracks)",
+                                 visibility="hidden")
+        found = [t for t in tracking.trails(self.scene)
+                 if roll.total >= tracking.dc_of(base, t, light)]
+        return Outcome(
+            intent_id=intent.id, op="track", rolls=[roll],
+            dc={"value": dc_shown, "explain": f"{surface} ground"
+                + (" in poor light" if light in tracking.LIGHT_DC else "")},
+            verdict="success" if roll.total >= dc_shown else "failure",
+            margin=roll.total - dc_shown,
+            effects=[{"ref": actor.ref, "kind": "tracks", "ground": surface, "dc": dc_shown,
+                      "found": [{"ref": t["ref"], "name": t["name"],
+                                 "hours_ago": t["hours_ago"], "here": t["here"]}
+                                for t in found],
+                      "origin": "rule:track"}],
+            tell=tracking.said(actor.name, roll.total, base, surface, found, light),
+            because=intent.because)
+
     # The word for a refused excursion, by op: "No foraging happens."
     _GATHER_NOUN = {"forage": "foraging", "prospect": "prospecting"}
 
@@ -13053,6 +13157,18 @@ class Engine:
     def join_talk(self, who, how: str = "") -> str:
         """Bring somebody into the conversation; the tell, or "" if they were in it."""
         if who is None or who.is_pc or who.has_state(states.TALKING):
+            return ""
+        # Nobody hostile is in a conversation (`_settle_talk` closes one the moment it
+        # finds them so). Opening one here only for the end of the batch to close it was
+        # a contradiction on the page: measured live 2026-10-09 (the fight script), "I
+        # stand over him and tell him to stay down" mid-grapple printed "You are in
+        # conversation with the one behind the bar" and then "the one behind the bar has
+        # turned hostile; the conversation with them is over", straight after a
+        # successful Intimidate check. He had been hostile all fight; nothing turned.
+        # Words thrown at a foe are said (the `say` tell stands); no conversation opens.
+        from . import attitude as _attitude
+
+        if _attitude.of(who) == _attitude.HOSTILE:
             return ""
         # Spoken with: the record's `last_met`, which the finder's `met` ring and the
         # coming "since last we met" catch-up read (rules/population.py, `met`).
@@ -21481,7 +21597,19 @@ class Engine:
         # ground"). Read off content/rules/gear.json's `camp` rows, and only where the
         # sleeper is out on the ground (`places.setting_of`: outside, or under a town —
         # the sewers, a crypt): a bed in the town is a bed.
-        camp = self._camp_for(actor, kind)
+        camp = self._camp_for(actor, kind, str(intent.params.get("until") or ""))
+        # Awake at the camp first, when the time they will wake is more than a night off
+        # (`_camp_for`, "until dawn" said at noon): the hours pass as a wait the player
+        # chose — the body charged for them, the people here going about their day — and
+        # the night's eight are slept at the end of them.
+        kept_awake: list[str] = []
+        before_ended: list[str] = []
+        if camp["before"] and actor.is_pc:
+            before_ended = self.scene.wait(camp["before"])["ended"]
+            kept_awake.append(
+                f"{actor.name} keeps the camp awake for {sky.span_words(camp['before'])} "
+                f"first: it is {sky.span_words(camp['before'] + camp['minutes'])} "
+                f"{camp['until']}, and a night's sleep is eight hours.")
         if camp["night"] is not None:
             met = camp["night"]
             if met.aggressive and met.after * ontheway.WATCH_HOURS < camp["hours"]:
@@ -21489,7 +21617,14 @@ class Engine:
                 # broken, and 1e's natural healing is for "a full night's rest (8 hours
                 # of sleep or more)" — so none of it, and no spells back. The player can
                 # sleep again once it is dealt with.
-                return self._broken_night(intent, actor, camp, met)
+                broken = self._broken_night(intent, actor, camp, met)
+                if kept_awake:
+                    broken.tell = " ".join(kept_awake + [broken.tell])
+                return broken
+        if camp["short"]:
+            # Woken when they said, short of the book's eight hours: the hours pass and
+            # the ground has its say, and nothing a full night gives is given.
+            return self._short_night(intent, actor, camp)
 
         # The whole night through one door (`Actor.sleep_through`), shared with the sleep
         # a body drops into when it will not be refused any longer (`survival._wake`):
@@ -21513,9 +21648,11 @@ class Engine:
         # rest so the night's check could be rolled over the same hours.
         minutes, hours = (camp["minutes"], camp["hours"]) if result["hours"] else (0, 0)
         # A night slept is a wait the player chose: the people with them go about their day.
-        ended = self.scene.advance(minutes, charge_body=False, waited=True)["ended"]
+        ended = before_ended + self.scene.advance(minutes, charge_body=False,
+                                                  waited=True)["ended"]
 
-        bits = [f"{actor.name} rests for {hours} hours."]
+        bits = kept_awake + [f"{actor.name} rests for {hours} hours"
+                             + (f", {camp['until']}." if camp["until"] else ".")]
         # What the ground did to them, after the healing: the cold (a Fortitude save an
         # hour, the blanket and the bedroll counting), then the stiffness of a night with
         # nothing between them and the ground. Both through the one applicator.
@@ -21575,8 +21712,29 @@ class Engine:
             because=intent.because,
         )
 
-    def _camp_for(self, actor, kind: str) -> dict:
+    def _camp_for(self, actor, kind: str, until: str = "") -> dict:
         """The night ahead: how long it runs, where it is slept, and the camp's check.
+
+        `until` is the time the sleeper said they would wake, in words ("until dawn"),
+        read against the clock by `timewords.minutes_until`: the NEXT time of that name,
+        never a fixed eight hours. Measured live 2026-10-09 (gemma-4-12B, Pangrella, turn 11): "I
+        make camp and sleep until dawn" at 11:57 slept eight hours and woke the party at
+        7.57 pm, because the night ran to the dawn only when the dawn was eight to sixteen
+        hours off and the reader's `time: until dawn` reached nothing. What the time asks
+        for, by the rules (CRB p.191: natural healing is for "a full night's rest (8 hours
+        of sleep or more)"; PF2e and 5e both make rest a once-a-day thing that can be taken
+        by day or by night):
+          * the waking time eight to sixteen hours off: asleep the whole way, as a night
+            run to the dawn always was;
+          * more than sixteen hours off (noon to the next dawn): nobody sleeps eighteen
+            hours. The sleeper keeps the camp awake (`before`, a wait the player chose,
+            charged to the body like any wait) and sleeps the last eight — a full night,
+            once, healing once;
+          * less than eight hours off (one in the morning to dawn): they sleep only that
+            long and wake when they said, and it is NOT a full night (`short`): no
+            healing, no slots, no preparation — the book's eight hours are not met.
+        A time the words do not name is no time: the night is the night it always was.
+        Bed rest is a day and night whatever is said.
 
         Hours first, because the check is rolled over them. A night's sleep begun in the
         evening runs to the morning, not to a fixed eight hours. Measured live
@@ -21596,11 +21754,23 @@ class Engine:
 
         hours = 24 if kind == "bed rest" else 8
         minutes = hours * 60
-        if kind == "night":
+        before, short = 0, False
+        wake = (timewords.minutes_until(until, self.scene.clock_minutes)
+                if kind == "night" and until else None)
+        if wake is not None:
+            if wake > 16 * 60:
+                before = wake - minutes          # kept awake; the last eight are slept
+            else:
+                minutes = wake
+                short = wake < 8 * 60
+            hours = max(1, round(minutes / 60))
+        elif kind == "night":
             now = self.scene.clock_minutes
-            dawn = (now // (24 * 60)) * 24 * 60 + 6 * 60
+            # The engine's dawn (`sky.DAWN_MINUTE`), which was a second copy of six
+            # o'clock typed in here until 2026-10-09.
+            dawn = (now // sky.DAY) * sky.DAY + sky.DAWN_MINUTE
             if dawn <= now:
-                dawn += 24 * 60
+                dawn += sky.DAY
             if now + minutes < dawn <= now + 16 * 60:
                 minutes = dawn - now
                 hours = round(minutes / 60)
@@ -21614,7 +21784,8 @@ class Engine:
             night = ontheway.night(self.dice, hours, ground or "grassland",
                                    int(getattr(actor, "level", 1) or 1), scale=scale)
         return {"hours": hours, "minutes": minutes, "setting": setting, "ground": ground,
-                "night": night, "scale": scale, "scaled_by": by}
+                "night": night, "scale": scale, "scaled_by": by, "before": before,
+                "short": short, "until": until if wake is not None else ""}
 
     def _night_said(self, met, made: list[dict], *, at_dawn: bool = False,
                     hours: int = 0) -> str:
@@ -21658,6 +21829,39 @@ class Engine:
                       "met_refs": [m["ref"] for m in made],
                       "origin": "rule:night-check"}] + fx,
             tell=" ".join(b for b in bits if b), because=intent.because)
+
+    def _short_night(self, intent: Intent, actor, camp: dict) -> Outcome:
+        """A sleep the player ended before eight hours ("until dawn" said at one in the
+        morning): the hours pass, slept — the awake clock resets after six, as any sleep's
+        does (`survival.sleep`) — and the ground has its say over them, but none of a full
+        night is given: 1e's natural healing, a caster's slots and the morning's
+        preparation are all for "a full night's rest (8 hours of sleep or more)" (CRB
+        p.191), and `Actor.sleep_through` is the door for a night slept through only."""
+        hours = camp["hours"]
+        survival.sleep(actor, hours)
+        ended = self.scene.advance(camp["minutes"], charge_body=False, waited=True)["ended"]
+        fx, rolls, said = self._camp_morning(actor, camp, hours)
+        bits = [f"{actor.name} sleeps {sky.span_words(camp['minutes'])}, {camp['until']}: "
+                f"short of a full night's rest (8 hours of sleep), so nothing heals and "
+                f"nothing is recovered."] + said
+        if camp["night"] is not None:
+            # The camp's check, at the waking, as a full night's is (`_op_rest`).
+            met = camp["night"]
+            made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
+            if made:
+                self._ensure_encounter(actor.ref, target=made[0]["ref"])
+                fx.append({"kind": "night-check", "met": met.kind, "at_dawn": True,
+                           "met_refs": [m["ref"] for m in made],
+                           "origin": "rule:night-check"})
+            bits.append(self._night_said(met, made, at_dawn=True))
+        if ended:
+            bits.append("Ended: " + ", ".join(ended) + ".")
+        return Outcome(
+            intent_id=intent.id, op="rest", rolls=rolls,
+            effects=[{"ref": actor.ref, "kind": "rest", "healed": 0, "hours": hours,
+                      "hp_after": actor.hp, "origin": "rule:rest", "short": True,
+                      "setting": camp["setting"]}] + fx,
+            tell=" ".join(bits), because=intent.because)
 
     def _camp_morning(self, actor, camp: dict, hours: int, *,
                       stiff: bool = True) -> tuple[list[dict], list, list[str]]:

@@ -479,6 +479,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Ore, not herbs: the same expedition against the blacksmith's stock list, in
     # ground that carries it — mountain, hills, underground, a bog for bog iron.
     "prospect": ((), ("actor", "hours"), "player"),
+    # Looking for tracks: 1e's Survival to find tracks against the ground's DC, and what
+    # the engine knows crossed it (rules/tracking.py). No params: the ground and the trails
+    # are the scene's, never the plan's.
+    "track": ((), ("actor",), "player"),
     # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
     # "leatherworker:gather", content/rules/gathering.json): the one gathering door
     # forage and prospect also run through (`Engine._gather`). The same hours, the same
@@ -632,7 +636,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # whatever of it it can — the rest is narrated, and the outcome says which was
     # which rather than implying the whole thing was mechanised.
     "use_ability": (("ability",), ("actor", "to"), "player"),
-    "rest": ((), ("kind",), "hidden"),
+    # `until` is the time the sleeper means to wake, in the player's own words ("until
+    # dawn"), never minutes: the engine reads it against the clock
+    # (`timewords.minutes_until`, `Engine._camp_for`). The turn writes it from the reading's time slot
+    # (`acts_to_ops.timed_rests`); no model authors the number.
+    "rest": ((), ("kind", "until"), "hidden"),
     # Eating and drinking reset the hunger and thirst clocks, which `rest` deliberately
     # does not: a night's sleep is not a meal. Two ops rather than one with flags,
     # because a model reliably emits {"op": "eat"} and reliably mangles booleans.
@@ -1470,6 +1478,12 @@ def _check_params(intent: Intent, index: int) -> None:
                 "schema", index,
             )
         p["kind"] = kind
+        if p.get("until") is not None:
+            if not isinstance(p["until"], str):
+                raise IntentError(
+                    "rest: until is the time to wake in words, like \"until dawn\" — got "
+                    f"{p['until']!r}", "schema", index)
+            p["until"] = " ".join(p["until"].split())[:60]
 
     elif op == "spawn":
         # Validation has to cover everything resolution accepts. It did not here, and an

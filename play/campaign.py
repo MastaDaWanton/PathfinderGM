@@ -334,6 +334,9 @@ class Campaign:
             # reason `reacted` is: a fight put down mid-turn would otherwise hand back a
             # move action already walked.
             "move_spent": (dict(self.scene.move_spent), {}),
+            # What the player last struck with this fight (`Scene.means`, 2026-10-09):
+            # saved for the reason `move_spent` is, a fight put down mid-turn.
+            "means": ({k: dict(v) for k, v in self.scene.means.items()}, {}),
             # Where the party has stood (the fog-of-war place chart). Its default is what
             # `load` reads a save without it as — where the party stands now — so a
             # campaign that has not moved since the update is written exactly as before.
@@ -414,6 +417,8 @@ class Campaign:
             acted=set(s.get("acted", [])),
             attacked=set(s.get("attacked", [])),
             move_spent={k: int(v) for k, v in (s.get("move_spent") or {}).items()},
+            means={k: dict(v) for k, v in (s.get("means") or {}).items()
+                   if isinstance(v, dict)},
             turn=s.get("turn", -1),
             turn_is_next=bool(s.get("turn_is_next", False)),
             sides={k: list(v) for k, v in (s.get("sides") or {}).items()},

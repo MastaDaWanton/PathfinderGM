@@ -74,7 +74,28 @@ def step(ctx) -> list[dict]:
         keys = [_key_of(reading.mention(mid)) for mid in mention_ids]
         return not keys or not all(k in struck for k in keys)
 
+    # The places this turn's own walk left (`was_place` on a travel's or a journey's
+    # effect). Somebody standing there was left there BY THE ENGINE this turn — who comes
+    # along is the travel's to say (its escorts, `Engine._op_travel`), and it said. Measured
+    # live 2026-10-09 (gemma-4-12B, Pangrella, turn 7): "You turn your back on the smith's
+    # heat and begin the walk out, leaving the apprentice to their forge" was read as both
+    # of them ARRIVING at the gate, and they walked in behind the party — the smith was
+    # then the one the next turn's question went to, and the two of them went on to stand
+    # at the gate for the rest of the run. A departure the prose describes is not an
+    # arrival, and the engine's outcome, not the reader, decides who moved.
+    walked_from = {str(fx.get("was_place")) for o in (ctx.outcomes or ())
+                   for fx in (getattr(o, "effects", None) or ())
+                   if isinstance(fx, dict) and fx.get("was_place")
+                   and fx.get("was_place") != fx.get("place")}
     for ref in reading.arrived:
+        left_there = (getattr((getattr(scene, "people", {}) or {}).get(ref), "at", None)
+                      in walked_from)
+        if left_there:
+            rows.append({"kind": "seen-people", "made": "", "same_as": ref,
+                         "walked_in": False,
+                         "why": "left behind by this turn's own walk: the travel says who "
+                                "came along"})
+            continue
         if not still_said([m.id for m in reading.mentions if m.model == ref]):
             rows.append({"kind": "seen-people", "made": "", "same_as": ref,
                          "why": "the sentences that showed them were taken off the page"})
