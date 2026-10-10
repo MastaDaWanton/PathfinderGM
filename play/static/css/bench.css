@@ -44,7 +44,7 @@
 /* `!important` because a layer's own rule outranks this one by specificity: 0.2.13 shipped
    59-harvest.js's `#harvest.bench{display:grid}` (id + class beats class + attribute), so the
    hidden harvest sheet, built at page load, stayed laid out over the whole table at z 35 and
-   opacity 0 — invisible, and it took every click on the table. Hidden has to mean hidden
+   opacity 0: invisible, and it took every click on the table. Hidden has to mean hidden
    whatever a layer says about its own display. */
 .bench[hidden] { display: none !important; }
 .bench.is-in { opacity: 1; }
