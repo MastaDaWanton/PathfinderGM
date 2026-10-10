@@ -399,6 +399,12 @@ build rather than trusting it.
 2. `python -m PyInstaller --noconfirm --clean pathfindergm.spec`
 3. `cd electron && npm run dist`
 4. `prove_build.py`, then `prove_shell.py` and `prove_shell.py --packaged`.
+   Then **hit-test the table**: start `dist/PathfinderGM.exe --no-browser` with
+   `PATHFINDER_GM_DATA` on a scratch copy holding a campaign, open its `/play/` in a real
+   browser, and run `tools/table_hit_test.js` in the page. `covered` must be empty. 0.2.13
+   shipped with an invisible full-screen layer over the table that took every click
+   (`#harvest`, whose own `display:grid` outranked `.bench[hidden]`); every check above
+   passed, because none of them asks the browser what is under the pointer.
 5. **Tag after building, never before.** v0.1.3's installer was rebuilt hours after its tag
    while `package.json` still read 0.1.3, so the artifact on disk was not that tag's code
    and the release had to ship without one.
