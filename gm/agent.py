@@ -874,6 +874,15 @@ class GMAgent:
                     raw, player_input,
                     self.reading if isinstance(self.reading, dict) else None,
                     notes=own_words)
+                # A walk no deed of the player's asked for is struck
+                # (`acts_to_ops.unasked_travel`); a chip's place is the player's own ask.
+                # Not in a fight, where a walk is a withdrawal and "I flee" may be read
+                # as `other`: striking it there would hold the player in the fight.
+                if not getattr(self, "attachments", ()) \
+                        and not self.engine.scene.in_encounter:
+                    raw = acts_to_ops.unasked_travel(
+                        raw, read_ok, self.engine.scene, self.engine.places(),
+                        notes=own_words)
                 # And the line goes to whom the words name (`acts_to_ops.address_the_named`):
                 # never the plan's pick of somebody else here.
                 raw = acts_to_ops.address_the_named(raw, read_ok, self.engine.scene,

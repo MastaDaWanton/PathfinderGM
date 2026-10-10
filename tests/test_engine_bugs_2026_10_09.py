@@ -219,6 +219,21 @@ def test_the_readings_time_reaches_the_rest():
     assert got[0]["params"] == {"kind": "night", "until": "until dawn"}
 
 
+def test_a_sleep_the_player_did_not_walk_to_walks_nowhere():
+    """Found replaying turn 11 live on the branch: "I make camp and sleep until dawn", read
+    as one `rest`, was planned `travel` to the outskirts and then the rest — an hour's walk
+    nobody asked for. A travel stands only behind a walking act or a place the words name."""
+    plan = [{"op": "travel", "params": {"place": "the outskirts"}},
+            {"op": "rest", "actor": "pc", "params": {"kind": "night", "until": "until dawn"}}]
+    got = acts_to_ops.unasked_travel([dict(p) for p in plan], TURN_11_FRAME)
+    assert [r["op"] for r in got] == ["rest"]
+    at_the_inn = {"actions": [{"act": "rest", "place": "the inn", "span": "sleep at the inn"}]}
+    assert [r["op"] for r in acts_to_ops.unasked_travel(
+        [dict(p) for p in plan], at_the_inn)] == ["travel", "rest"]
+    walking = {"actions": [{"act": "go", "place": "town"}, {"act": "rest"}]}
+    assert len(acts_to_ops.unasked_travel([dict(p) for p in plan], walking)) == 2
+
+
 def test_a_waking_time_the_player_never_named_is_struck():
     frame = {"actions": [{"act": "rest", "span": "make camp"}]}
     plan = [{"op": "rest", "actor": "pc", "params": {"kind": "night", "until": "noon"}}]
@@ -476,6 +491,20 @@ def test_somewhere_quiet_is_looked_for_next_door_not_outside_the_walls():
     named = {"actions": [{"act": "go", "place": "the outskirts"}]}
     assert "the outskirts" in interpret.travel_choices(named, s, e.places(),
                                                        WORLD.get(vyl.id))
+    # And the plan's OWN travel, which no enum holds (the places enum binds only a
+    # declared travel): turn 8's walk to the outskirts is struck; next door stands; a
+    # place the plan founds for the search stands.
+    out = acts_to_ops.unasked_travel(
+        [{"op": "travel", "params": {"place": "the outskirts"}},
+         {"op": "narrate_only"}], frame, s, e.places())
+    assert [r["op"] for r in out] == ["narrate_only"]
+    door = acts_to_ops.unasked_travel(
+        [{"op": "travel", "params": {"place": "the guildhall"}}], frame, s, e.places())
+    assert [r["op"] for r in door] == ["travel"]
+    made = acts_to_ops.unasked_travel(
+        [{"op": "found", "params": {"name": "a quiet back room", "kind": "room"}},
+         {"op": "travel", "params": {"place": "a quiet back room"}}], frame, s, e.places())
+    assert [r["op"] for r in made] == ["found", "travel"]
 
 
 # --- 9. the biggest man in the room is the man in the room --------------------------------

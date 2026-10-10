@@ -1060,6 +1060,62 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
 
 
+# The acts that choose where a walk goes: a move, a person sought or followed, a door
+# forced (`interpret._MOVING_ACTS`). A search stands behind a walk only to the places next
+# door (`interpret._sought_nearby`).
+def unasked_travel(raw, frame: dict | None, scene=None, places=(), *,
+                   notes: list | None = None) -> list:
+    """A walk no deed of the player's stands behind is the plan's, and is struck.
+
+    Two measurements, one rule:
+      * the fight run, 2026-10-09, turn 8: "I find somewhere quiet and sit down", read
+        `search: somewhere quiet` and `wait`, was planned as a travel to the outskirts —
+        half an hour through the guildhall, the market and the gate into the desert. The
+        plan's own travel is free text the sampler holds to nothing (the places enum binds
+        only a `declared` travel, `prompts.turn_schema`), so a search may walk only to a
+        place next door (`interpret._sought_nearby`), inside the walls;
+      * verifying these fixes live on the town save: "I make camp and sleep until dawn",
+        one `rest`, was planned as a travel to the outskirts AND the rest — an hour's walk
+        nobody asked for.
+    The rule the detectors already answer to (`interpret.supported`), held to the plan's
+    own walk: it stands when an act done now moves (`interpret._MOVING_ACTS`) or names a
+    place (`rest` at the inn, `wait` at the well). Structure only — the reading's acts and
+    slots, and the engine's place finder. With no reading, the plan stands."""
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error"):
+        return raw
+    acting_acts = [a for a in frame.get("actions") or [] if interpret.acting(a)]
+    if not acting_acts or any(a.get("act") in interpret._MOVING_ACTS or a.get("place")
+                              for a in acting_acts):
+        return raw
+    here = str(getattr(scene, "at", "") or "")
+    nearby = set(interpret._sought_nearby(frame, here, places)) if places else set()
+    # A place the plan founds for the search is where the search found it: "I look for a
+    # tavern where the dockhands drink" is `found` and a walk in (`Engine.validate`'s
+    # `_found_before_travel`), and the found door places it by its own rules.
+    founded = {" ".join(str(((r or {}).get("params") or {}).get("name") or "").lower().split())
+               for r in raw if _op(r) == "found"}
+    searching = any(a.get("act") == "search" for a in acting_acts)
+
+    def allowed(r) -> bool:
+        if _op(r) == "journey":
+            return False
+        want = str(((r or {}).get("params") or {}).get("place") or "")
+        if searching and " ".join(want.lower().split()) in founded - {""}:
+            return True
+        found = places_mod.find(places, want) if want and places else None
+        return found is not None and found.name in nearby
+
+    out = [r for r in raw if _op(r) not in ("travel", "journey") or allowed(r)]
+    if len(out) != len(raw) and notes is not None:
+        notes.append("the plan's walk struck: no deed of the player's asked for it"
+                     + (f" (a search reaches {', '.join(sorted(nearby))})" if nearby else ""))
+    return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
 def address_the_named(raw, frame: dict | None, scene, *,
                       notes: list | None = None) -> list:
     """The player's line goes to the person the reading's `talk` names — never to
