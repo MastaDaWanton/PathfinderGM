@@ -1290,7 +1290,43 @@ def travel_choices(frame: dict | None, scene, places, location) -> tuple[str, ..
                        if x in by_id and not places_mod.is_indoors(
                            x, by_id[x].terrain, by_id[x].shape))
         return street or everything
+    nearby = _sought_nearby(frame, here, places)
+    if nearby:
+        return nearby
     return everything
+
+
+# The acts that name where the party goes: with one of these done, the words chose the
+# place (the travel's own enum and refusals hold it). Without, a travel serves a search.
+_MOVING_ACTS = frozenset({"go", "leave", "journey", "seek", "call_on", "follow",
+                          "break_in"})
+
+
+def _sought_nearby(frame: dict | None, here, places) -> tuple[str, ...]:
+    """A place LOOKED FOR, with no place named to go to, is looked for close by: the places
+    one door from here, inside the settlement — never the ground outside its walls.
+
+    Measured live 2026-10-09 (gemma-4-12B, the fight script, after the tavern brawl): "I
+    find somewhere quiet and sit down" was read `search, object: somewhere quiet` and
+    `wait`; the plan, offered every place in town, chose the outskirts, and the party
+    walked half an hour through the guildhall, the market and the gate out into the desert.
+    A search names no place; what it may reach is the engine's to bound, by the map's own
+    exits (`Place.exits`) — the sampler then cannot leave them. "" (no bound) when the
+    words did name a move, or nothing is next door."""
+    from rules import places as places_mod
+
+    acting_acts = [a for a in (frame or {}).get("actions") or [] if acting(a)]
+    if not any(a.get("act") == "search" for a in acting_acts) or any(
+            a.get("act") in _MOVING_ACTS for a in acting_acts):
+        return ()
+    by_id = {p.id: p for p in places or ()}
+    cur = by_id.get(here)
+    if cur is None:
+        return ()
+    near = [by_id[x] for x in (cur.exits or ()) if x in by_id]
+    return tuple(p.name for p in near
+                 if p.id != here and not places_mod.is_ring(p.id)
+                 and places_mod.setting_of(p.id) != "outside")
 
 
 # What a player says when the place they are leaving is the settlement itself, or the

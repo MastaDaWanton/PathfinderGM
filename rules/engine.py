@@ -244,6 +244,14 @@ class Scene:
     # square actually changed counts — a zone relabel moves no body (docs/fix-interfaces
     # §3.4) and must not cost the step that would.
     move_spent: dict[str, int] = field(default_factory=dict)
+    # What the player's character last struck with this encounter — the weapon and the
+    # lethality their own words chose — and what was in hand then, by ref. A blow that
+    # names no means carries on with these (`Engine._standing_means`), as a standing action
+    # does. Measured live 2026-10-09 (the fight script): "I punch him in the face", "I punch
+    # him again", then "I keep hitting him" — and the third swung the rapier for 7
+    # piercing, because a blow with no weapon named meant whatever was in hand. Cleared
+    # with the fight (`end_encounter`).
+    means: dict[str, dict] = field(default_factory=dict)
     round: int = 0
     clock_minutes: int = 0
     # The narrative thread: what the player is engaged in when no op carries it —
@@ -2013,6 +2021,8 @@ class Scene:
         self.round = 0
         self.acted = set()
         self.attacked = set()
+        # The next fight's first blow is the player's to choose afresh.
+        self.means = {}
         # The next fight starts at round one again, and a walk from this one's round one
         # would read as already spent.
         self.move_spent = {}
@@ -2843,6 +2853,7 @@ class Engine:
         # swings are left to the floor in `_op_attack`, which asks after the move.
         moved: set[str] = set()
         for i, intent in enumerate(intents):
+            self._standing_means(intent)
             self._check_refs(intent, i, extra=pending | introduced)
             self._check_legality(intent, i, moved=moved)
             self._force_visibility(intent)
@@ -2873,6 +2884,42 @@ class Engine:
                 self._planned_places.add(_place_key(intent.params["name"]))
         self._planned_places = set()
         return intents
+
+    def _standing_means(self, intent: Intent) -> None:
+        """A blow by the player's character that names no weapon, in the fight it already
+        struck in, carries on with what it last struck with (`Scene.means`): the weapon and
+        the lethality, filled into the params here so every reader of them — the reach, the
+        reactions, the swing — sees the same blow. Only while the same thing is in hand: a
+        weapon drawn since is a change of means the player made. A manoeuvre is its own
+        means and is left alone. Measured live 2026-10-09: "I keep hitting him" after two
+        punches swung the rapier for 7 piercing."""
+        if intent.op != "attack" or not self.scene.in_encounter:
+            return
+        p = intent.params
+        if p.get("weapon") or p.get("manoeuvre") or p.get("mode") or p.get("coup_de_grace"):
+            return
+        actor = self.scene.actors.get(str(intent.actor or ""))
+        if actor is None or not actor.is_pc:
+            return
+        last = self.scene.means.get(actor.ref) or {}
+        if not last.get("weapon") or last.get("wielded") != actor.wielded_key():
+            return
+        p["weapon"] = last["weapon"]
+        if last.get("lethality") and not p.get("lethality"):
+            p["lethality"] = last["lethality"]
+
+    def _remember_means(self, actor, intent: Intent, weapon_key: str) -> None:
+        """What the player's character struck with, for `_standing_means`."""
+        # Not a manoeuvre, a thrown flask, a reaction, or a thing picked up and swung or
+        # thrown once (the stool is on the floor after it).
+        if not actor.is_pc or intent.params.get("manoeuvre") \
+                or intent.params.get("mode") or intent.params.get("reaction") \
+                or str(weapon_key or "").lower() == "improvised":
+            return
+        self.scene.means[actor.ref] = {
+            "weapon": str(weapon_key or ""),
+            "lethality": str(intent.params.get("lethality") or ""),
+            "wielded": actor.wielded_key()}
 
     def _projected_refs(self, intents: list[Intent]) -> set[str]:
         """The refs `spawn` intents in this list are going to mint.
@@ -6043,6 +6090,8 @@ class Engine:
                         for s, refs in self.scene.sides.items() if s != mine
                         for r in refs if r in self.scene.actors
                         and not self.scene.actors[r].is_down]
+                # The blow declared is the fight's means from here (`_standing_means`).
+                self._remember_means(actor, intent, weapon_key)
                 return Outcome(
                     intent_id=intent.id, op="attack",
                     # The declared params ride along, so the initiator's blow that
@@ -7040,6 +7089,8 @@ class Engine:
         # First blood is remembered only once the attack completes, so the decision
         # "is this a subsequent attack?" cannot flip between a suspension and its resume.
         self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
+        if self.scene.in_encounter:
+            self._remember_means(actor, intent, weapon_key)
         if coup:
             # No AC was rolled against; the only number set against anybody was the save.
             dc = ({"value": coup_dc, "explain": "Fortitude, 10 + damage dealt"}
@@ -13106,6 +13157,18 @@ class Engine:
     def join_talk(self, who, how: str = "") -> str:
         """Bring somebody into the conversation; the tell, or "" if they were in it."""
         if who is None or who.is_pc or who.has_state(states.TALKING):
+            return ""
+        # Nobody hostile is in a conversation (`_settle_talk` closes one the moment it
+        # finds them so). Opening one here only for the end of the batch to close it was
+        # a contradiction on the page: measured live 2026-10-09 (the fight script), "I
+        # stand over him and tell him to stay down" mid-grapple printed "You are in
+        # conversation with the one behind the bar" and then "the one behind the bar has
+        # turned hostile; the conversation with them is over", straight after a
+        # successful Intimidate check. He had been hostile all fight; nothing turned.
+        # Words thrown at a foe are said (the `say` tell stands); no conversation opens.
+        from . import attitude as _attitude
+
+        if _attitude.of(who) == _attitude.HOSTILE:
             return ""
         # Spoken with: the record's `last_met`, which the finder's `met` ring and the
         # coming "since last we met" catch-up read (rules/population.py, `met`).

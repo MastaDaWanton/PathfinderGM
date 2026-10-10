@@ -324,3 +324,184 @@ def test_the_reading_builds_the_track_whole_and_the_plans_forage_goes():
     assert [r["op"] for r in got] == ["track"]
     assert "track" in interpret.ACTS and "tracks" not in interpret._WHAT_EACH_IS.split(
         "\nsearch")[1].split("\n")[0]
+
+
+# =========================================================================================
+# The second run, the same day: narrator_audit's `fight` script (master ec1b4281,
+# gemma-4-12B heretic, Pangrella/Vylthysia, fixtures/pc-kesst.json), in "the worst tavern on
+# the street" against "the one behind the bar" (c3, a barkeep: a man, he/him, Medium).
+# =========================================================================================
+
+def _fight(seed=5):
+    from tests._board import face_to_face
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    scene.add(instantiate("thug", scene=scene, name="the one behind the bar"))
+    engine = Engine(scene, Dice(seed=seed))
+    engine.run(engine.validate([{"op": "begin_encounter",
+                                 "params": {"sides": {"you": ["pc"], "them": ["c1"]}}}]))
+    face_to_face(scene)
+    return scene, engine
+
+
+def _swing(engine, **params):
+    scene = engine.scene
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
+    return engine.run(engine.validate([{
+        "op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+        "params": params, "because": "test"}])).outcomes[-1]
+
+
+# --- 5. "I keep hitting him" carries on with the fists ------------------------------------
+
+def test_keep_hitting_him_after_two_punches_is_a_third_punch_not_the_rapier():
+    """Turn 4 of the fight run: after "I punch him in the face" and "I punch him again"
+    (both `weapon: unarmed`), "I keep hitting him" was planned `attack` with no weapon and
+    resolved "Kesst Vayr hits the one behind the bar with the rapier for 7 piercing". The
+    engine keeps what the player last struck with this fight (`Scene.means`), and a blow
+    that names no means carries on with it."""
+    scene, engine = _fight()
+    assert scene.pc().wielded_key() == "rapier"
+    _swing(engine, weapon="unarmed")
+    _swing(engine, weapon="unarmed")
+    plan = [{"op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+             "params": {"full_attack": False}, "because": "test"}]
+    assert engine.validate(plan)[0].params["weapon"] == "unarmed"
+    out = _swing(engine)
+    assert "rapier" not in out.tell
+    assert not any("rapier" in str(e.get("weapon") or "") for e in out.effects)
+
+
+def test_a_weapon_drawn_since_is_the_players_change_of_means():
+    scene, engine = _fight()
+    _swing(engine, weapon="unarmed")
+    scene.pc().equipped = "dagger"
+    plan = [{"op": "attack", "actor": "pc", "target": "c1", "params": {}}]
+    assert not engine.validate(plan)[0].params.get("weapon")
+
+
+def test_the_means_end_with_the_fight():
+    scene, engine = _fight()
+    _swing(engine, weapon="unarmed")
+    assert scene.means["pc"]["weapon"] == "unarmed"
+    scene.end_encounter()
+    assert scene.means == {}
+
+
+# --- 6. a take off a foe in a fight is a Steal, never a minted thing or a swing -----------
+
+TURN_7_TEXT = "I take what he was carrying."
+TURN_7_FRAME = {"question": False, "claims": [], "actions": [
+    {"act": "take", "object": "what he was carrying", "span": "take what he was carrying"}]}
+TURN_7_PLAN = [
+    {"op": "attack", "actor": "pc", "target": "c1", "because": "stealing his belongings",
+     "params": {"item": "the pouch", "manoeuvre": "steal", "full_attack": False}},
+    {"op": "give", "actor": "pc", "because": "the player took it",
+     "params": {"item": "what he was carrying", "to": "pc"}},
+]
+
+
+def test_taking_what_he_was_carrying_mid_fight_is_one_steal_and_nothing_minted():
+    """Turn 7: "Kesst Vayr's attack with the rapier misses the one behind the bar" AND
+    "Kesst Vayr takes the what he was carrying." — the table built a give of the phrase
+    from nobody (the world minted it), and the review stripped the plan's steal to a plain
+    swing because no steal word was in the sentence. Now the reading's take, in a fight, is
+    1e's Steal at the foe, built whole; the plan's attack and give for it are replaced; the
+    review keeps the manoeuvre the reading asked for."""
+    from gm import judgement
+
+    scene, engine = _fight()
+    rows = acts_to_ops.table(TURN_7_FRAME, scene)
+    assert [(i["op"], i["params"].get("manoeuvre")) for i in rows[0].intents] == \
+        [("attack", "steal")]
+    got = acts_to_ops.apply([dict(p) for p in TURN_7_PLAN], rows, TURN_7_FRAME, scene)
+    assert [(r["op"], r.get("params", {}).get("manoeuvre")) for r in got] == \
+        [("attack", "steal")]
+    interpret.remember(TURN_7_TEXT, TURN_7_FRAME)
+    intents = engine.validate(got)
+    verdict = judgement.review(TURN_7_TEXT, intents, scene)
+    assert intents[0].params.get("manoeuvre") == "steal", verdict.corrections
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
+    res = engine.run(intents)
+    while res.awaiting is not None:
+        res = engine.resume(15)
+    tells = " ".join(o.tell for o in res.outcomes)
+    assert "rapier" not in tells
+    assert "what he was carrying" not in scene.pc().goods
+
+
+# --- 7. words at a foe open no conversation -----------------------------------------------
+
+def test_telling_a_foe_to_stay_down_opens_no_conversation_to_close_as_turned_hostile():
+    """Turn 6: "Kesst Vayr makes the intimidate check by 1." then "You are in conversation
+    with the one behind the bar" then "the one behind the bar has turned hostile; the
+    conversation with them is over" — in one batch. He had been hostile all fight; the say
+    opened a conversation that `_settle_talk` closed at the end of the same batch."""
+    from rules import attitude
+
+    scene, engine = _fight()
+    foe = scene.actors["c1"]
+    foe.add_condition(attitude.HOSTILE, None, source="test")
+    out = engine.run(engine.validate([{"op": "say", "actor": "pc", "params": {
+        "words": "stay down", "to": "c1"}}], origin="author:test"))
+    tells = " ".join(o.tell for o in out.outcomes)
+    assert "stay down" in tells
+    assert "in conversation" not in tells and "turned hostile" not in tells
+    assert engine.talking_to() == []
+
+
+# --- 8. somewhere quiet is next door, not the desert --------------------------------------
+
+def test_somewhere_quiet_is_looked_for_next_door_not_outside_the_walls():
+    """Turn 8: "I find somewhere quiet and sit down", read `search: somewhere quiet` and
+    `wait`, travelled half an hour through the guildhall, the market and the gate to the
+    outskirts in the desert — the plan chose from every place in Vylthysia. A search names
+    no place; the travel's choices are the places one door from here, inside the walls."""
+    vyl = WORLD.by_name("Vylthysia")
+    s = Scene(location_id=vyl.id)
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.clock_minutes = 664
+    e = Engine(s, Dice(seed=3), world=WORLD)
+    e.place_party()
+    _run(e, [{"op": "found", "params": {"name": "the worst tavern on the street",
+                                        "kind": "tavern", "parent": "the guildhall"}},
+             {"op": "travel", "params": {"place": "the worst tavern on the street"}}])
+    frame = {"actions": [{"act": "search", "object": "somewhere quiet"},
+                         {"act": "wait", "span": "sit down"}]}
+    choices = interpret.travel_choices(frame, s, e.places(), WORLD.get(vyl.id))
+    assert choices and "the outskirts" not in choices and "the desert" not in choices
+    assert "the guildhall" in choices
+    # A walk the words named is the words', as before.
+    named = {"actions": [{"act": "go", "place": "the outskirts"}]}
+    assert "the outskirts" in interpret.travel_choices(named, s, e.places(),
+                                                       WORLD.get(vyl.id))
+
+
+# --- 9. the biggest man in the room is the man in the room --------------------------------
+
+def test_the_victim_question_is_shown_that_the_one_behind_the_bar_is_a_man():
+    """The fight script's second line, "I pick a fight with the biggest man in the room",
+    came back 422: refused "nobody here answers to the biggest man in the room", with the
+    barkeep — a man on his sheet — the one person in the tavern. The question was shown
+    "the one behind the bar" and nothing else; probed live, it answered [] 2 of 2 times,
+    and ["c3"] 2 of 2 when shown "(a man)" or "(he/him)". The label now carries the
+    sheet's gender (or pronouns) and a size that is not a person's."""
+    scene, engine = _fight()
+    scene.end_encounter()
+    foe = scene.actors["c1"]
+    foe.gender, foe.pronouns = "man", "he/him"
+    assert "a man" in acts_to_ops.label(foe)
+    shown = []
+
+    def ask(span, words, people):
+        shown.extend(people)
+        return [r for r, lab in people if "a man" in lab]
+
+    frame = {"actions": [{"act": "attack", "target": "the biggest man in the room",
+                          "span": "pick a fight with the biggest man in the room"}]}
+    rows = acts_to_ops.table(frame, scene)
+    acts_to_ops.victims(rows, frame, scene, ask=ask)
+    assert shown and "a man" in shown[0][1]
+    assert rows[0].intents and rows[0].intents[0]["target"] == "c1"
+    assert not rows[0].missing

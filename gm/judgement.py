@@ -424,6 +424,21 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
             #    described, so this is corrected rather than argued about.
             cue = MANOEUVRE_CUES.get(man)
             asked_for_this = bool(cue and cue.search(text))
+            # A steal the READING asked for: a take or a steal done now, which in a fight
+            # is 1e's Steal (`acts_to_ops._take` builds it). Measured live 2026-10-09: "I
+            # take what he was carrying", mid-grapple, matched no steal cue, and this
+            # branch turned the plan's steal into a plain rapier swing — "Kesst Vayr's
+            # attack with the rapier misses the one behind the bar" — a blow nobody had
+            # declared. The reading's act, not the words.
+            if man == "steal" and not asked_for_this:
+                from . import interpret as _interpret
+
+                frame = _interpret.reading_of(text) or {}
+                asked_for_this = any(
+                    a.get("act") in ("take", "steal") and _interpret.acting(a)
+                    for a in frame.get("actions") or [])
+            if asked_for_this:
+                continue
             asked_for_other = next(
                 (k for k, rx in MANOEUVRE_CUES.items() if k != man and rx.search(text)),
                 None,

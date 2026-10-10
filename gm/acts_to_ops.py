@@ -263,6 +263,25 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
                      if p.get("act") in ("take", "steal")), None)
         if prev is not None and prev.get("target"):
             source = " ".join(str(prev["target"]).split())
+    if getattr(scene, "in_encounter", False) and not coin \
+            and not (source and holding.is_container(source)):
+        # In a fight, a thing taken off a foe is 1e's Steal (CMB against CMD, the `attack`
+        # op's `manoeuvre: steal`, which picks from what they really carry and refuses in
+        # words what they do not — `Engine._steal_choice`). The foe is the one the words
+        # name, else the one the player is locked with (`addressed`: engaged first).
+        # Measured live 2026-10-09 (the fight script, mid-grapple): "I take what he was
+        # carrying" became a `give` of the item "what he was carrying" from nobody — the
+        # world minted it, "Kesst Vayr takes the what he was carrying" — beside the plan's
+        # own steal, which the review then turned into a rapier swing nobody declared.
+        foe = person(scene, source) if source else addressed(scene)
+        actor = (getattr(scene, "actors", {}) or {}).get(foe) if foe else None
+        if actor is not None and not actor.is_pc:
+            row.intents.append({"op": "attack", "actor": pc.ref, "target": foe,
+                                "params": {"manoeuvre": "steal",
+                                           "item": _plain(thing) or thing},
+                                "because": "the player takes it off them in the fight"})
+            row.note = f"a steal from {actor.name}: {thing}"
+            return
     params: dict = {"item": _plain(thing) or thing, "to": pc.ref}
     if source and holding.is_container(source):
         params["from_"] = _plain(source)
@@ -684,6 +703,23 @@ def label(actor) -> str:
     from rules import states as states_mod
 
     bits = []
+    # Who they are, as the sheet holds it: the gender (a closed field, "man"/"woman") or
+    # else the pronouns, and the size category when it is not a person's. Measured live
+    # 2026-10-09 (the fight script): "I pick a fight with the biggest man in the room",
+    # with one person in the tavern — "the one behind the bar", a man, he/him, Medium on
+    # his sheet — was answered `[]` 2 of 2 times and the turn was refused "nobody here
+    # answers to the biggest man in the room"; shown "(a man)" or "(he/him)" it was
+    # answered `["c3"]` 2 of 2 times, and "(she/her)" still `[]`. The question could not
+    # see the facts that decide "a man".
+    gender = str(getattr(actor, "gender", "") or "").strip().lower()
+    pronouns = str(getattr(actor, "pronouns", "") or "").strip().lower()
+    if gender in ("man", "woman", "boy", "girl"):
+        bits.append(f"a {gender}")
+    elif pronouns and pronouns not in ("they/them", "it/its"):
+        bits.append(pronouns)
+    size = str(getattr(actor, "size", "") or "").strip().lower()
+    if size and size not in ("medium", "small"):
+        bits.append(size)
     if actor.has_state("role.guard") or str(getattr(actor, "from_template", "")) in (
             "watchman", "guard", "soldier"):
         bits.append("a guard")
@@ -941,8 +977,16 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     checks = {str((b.get("params") or {}).get("skill") or "").lower()
               for b in built if b.get("op") == "check"}
     tracking = any(b.get("op") == "track" for b in built)
+    # A steal the table built (`_take` in a fight) is the player's blow at that person:
+    # the plan's own attack on them is the same deed, and is replaced, not rolled beside it.
+    stolen_from = {str(b.get("target")) for b in built if b.get("op") == "attack"}
     for r in raw:
         op = _op(r)
+        if op == "attack" and stolen_from and str((r or {}).get("target")) in stolen_from \
+                and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):
+            if notes is not None:
+                notes.append("the plan's attack replaced by the reading's take, a steal")
+            continue
         if tracking and (op == "track" or (op == "check" and str(
                 ((r or {}).get("params") or {}).get("skill") or "").lower() == "survival")
                 or (op == "forage" and "gather" not in acts)):
