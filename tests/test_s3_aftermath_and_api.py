@@ -54,7 +54,8 @@ OLD_SCENE = ["location", "scale", "what_it_is", "biome", "biome_describe", "roun
              "in_encounter", "talk", "busy", "turn_ref", "initiative", "clock_minutes",
              "actors", "grid", "pools"]
 NEW_TOP = ["spellcasting", "start",
-           "works"]          # In progress: the door's count (enchanting lane U4, 2026-10-05)
+           "works",          # In progress: the door's count (enchanting lane U4, 2026-10-05)
+           "corrections"]    # "That's wrong": what each beat may offer (2026-10-09)
 NEW_SCENE = ["where_label", "where_detail", "setting", "conversation", "day_part",
              "exits",          # I6, the "From here" row (Phase 3)
              "places_found",   # the fog-of-war place chart (2026-09-30)

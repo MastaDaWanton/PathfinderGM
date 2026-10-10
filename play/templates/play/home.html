@@ -2175,6 +2175,7 @@ function buildReportNode() {
     <p class="note">When something goes wrong, this saves one file for the developer: the
       game's logs, the game you are playing, and what you say happened. Nothing is sent
       from here. You choose how to send it afterwards.</p>
+    <p class="note" id="fixline" hidden></p>
     <button type="button" class="quiet" id="reportopen" aria-expanded="false"
       aria-controls="reportcard">Make a report for the developer</button>
     <div class="rolecard reportcard" id="reportcard" hidden>
@@ -2184,8 +2185,9 @@ function buildReportNode() {
       <textarea id="reportwords" rows="5" aria-describedby="reporthint"></textarea>
       <div class="reportapp" id="reportapp" hidden></div>
       <label class="prefrow"><input type="checkbox" id="reportsave" checked>
-        <span>Include the save<div class="why">The whole game as it stands, so the
-          developer sees what you saw. Untick it to keep the game to yourself.</div></span>
+        <span>Include the save<div class="why">The whole game as it stands, and the
+          beats you marked wrong, so the developer sees what you saw. Untick it to keep
+          the game to yourself.</div></span>
       </label>
       <span class="preflabel" id="reportlisthead">What goes in</span>
       <ul class="reportfiles" id="reportfiles" aria-labelledby="reportlisthead"></ul>
@@ -2216,7 +2218,53 @@ function buildReportNode() {
   // The list's "your words, N characters" follows the typing; the textarea is never redrawn.
   node.querySelector("#reportwords").addEventListener("input", () => paintReport());
   node.querySelector("#reportmake").addEventListener("click", saveReport);
+  node.querySelector("#fixline").addEventListener("click", e => {
+    if (e.target.closest("#fixopen")) openFixFolder();
+  });
   return node;
+}
+
+/* "That's wrong" at the table logs each correction for training the narrator
+ * (play/corrections.py). One plain line here says how many, with the folder they are in.
+ * Asked again each time the pane is drawn: a GET of one small count, which never waits
+ * behind a turn (`play/concurrency.py` EXEMPT). */
+const FIXLOG = { at: 0, data: null, said: "" };
+
+async function paintFixLine() {
+  const line = REPORT_NODE && REPORT_NODE.querySelector("#fixline");
+  if (!line) return;
+  if (Date.now() - FIXLOG.at > 4000) {
+    FIXLOG.at = Date.now();
+    try {
+      const r = await fetch("/api/corrections");
+      FIXLOG.data = r.ok ? await r.json() : null;
+    } catch (err) { FIXLOG.data = null; }
+  }
+  const d = FIXLOG.data;
+  if (!d) { line.hidden = true; return; }
+  const n = d.episodes || 0;
+  line.hidden = false;
+  line.innerHTML = (n
+    ? `You have marked ${n} beat${n === 1 ? "" : "s"} wrong at the table. Each is kept,
+       with what replaced it, to train the narrator. `
+    : `Beats you mark wrong at the table are kept here, to train the narrator. None yet. `)
+    + (IN_DESKTOP_APP || location.hostname === "127.0.0.1" || location.hostname === "localhost"
+       ? `<button type="button" class="quiet" id="fixopen">Open the folder</button>` : "")
+    + (FIXLOG.said ? ` <span class="why">${esc(FIXLOG.said)}</span>` : "");
+}
+
+async function openFixFolder() {
+  try {
+    const r = await fetch("/api/corrections", { method: "POST",
+      headers: { "Content-Type": "application/json",
+                 "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: "{}" });
+    const d = await r.json();
+    FIXLOG.said = r.ok ? `Opened ${d.opened}` : (d.error || `HTTP ${r.status}`);
+  } catch (err) {
+    FIXLOG.said = String(err);
+  }
+  paintFixLine();
 }
 
 function paintReport() {
@@ -2240,7 +2288,8 @@ function paintReport() {
   } else {
     const words = n.querySelector("#reportwords").value.length;
     list.innerHTML = REPORT.listing.files.map(f => {
-      const out = f.kind === "save" && !withSave;
+      // The corrections log goes with the save (play/report.py `WITH_THE_SAVE`).
+      const out = (f.kind === "save" || f.kind === "corrections") && !withSave;
       const size = f.kind === "words" ? `your words, ${words} characters`
         : out ? "left out" : reportSize(f.bytes);
       return `<li class="${out ? "out" : ""}"><span>${esc(f.name)}</span>
@@ -2273,6 +2322,7 @@ function mountReport() {
   slot.replaceWith(REPORT_NODE);
   if (had) had.focus();
   paintReport();
+  paintFixLine();
   // Opened from the table's "Make a report" (`?report=1`): brought into view once the
   // model settings above it have arrived. Scrolled on the first mount, it was pushed off
   // screen again when they did (measured at phone width, 2026-10-08).

@@ -13,7 +13,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from gm import (client, intimate as intimate_mod, judgement, ledger as ledger_mod,
                 narration as narration_mod, prompts, speech as speech_mod, watcher)
@@ -706,11 +706,91 @@ def _state(c) -> dict:
         # turn's state lands, without a fetch of its own. The rows themselves are
         # `GET api/works`, asked only while the panel or a bench's group is on screen.
         "works": _works_summary(c, pc),
+        # What "That's wrong" may offer on each narrated beat of the latest turn, and on
+        # any beat with a correction on it (play/corrections.py).
+        "corrections": _corrections_state(c),
         # A campaign that ended inside this request — the player killed on the creatures'
         # turns — says so in the state every door returns, not only in the say door's own
         # payload: the page shows the death with the turn that dealt it (02-state.js).
         **(_ended_payload(c) if getattr(c, "ended", "") else {}),
     }
+
+
+def _corrections_state(c) -> dict:
+    """`corrections.page_state`, and never the reason a state fails to draw."""
+    from . import corrections
+
+    try:
+        return corrections.page_state(c)
+    except Exception as exc:  # noqa: BLE001 — the table draws without the offers
+        return {"beats": {}, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+
+@require_POST
+def beat_correct(request):
+    """"That's wrong" on a narrated beat (play/corrections.py). `{"beat": i, "do": …}`:
+
+      * `fix`      — mark the version on the page wrong and have it remade;
+      * `mark`     — mark it wrong and leave it (an older beat, or the player's choice);
+      * `write`    — the player's own `text` becomes the beat;
+      * `put_back` — the first version back on the page;
+      * `keep`     — the remake on the page is right.
+
+    `sentences` (the ones the player picked) and `note` (their one line) ride with `fix`,
+    `mark` and `write`. Answers with the state, so the page redraws the beat in place."""
+    from gm.client import ModelUnavailable
+
+    from . import corrections
+
+    c = campaign_mod.current()
+    body = read_body(request)
+    try:
+        i = int(body.get("beat"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Which beat?"}, status=400)
+    do = str(body.get("do") or "")
+    sentences = body.get("sentences") if isinstance(body.get("sentences"), list) else []
+    note = str(body.get("note") or "")
+    try:
+        if do == "fix":
+            corrections.remake(c, i, sentences, note)
+        elif do == "mark":
+            corrections.mark(c, i, sentences, note)
+        elif do == "write":
+            corrections.write(c, i, str(body.get("text") or ""), sentences, note)
+        elif do == "put_back":
+            corrections.put_back(c, i)
+        elif do == "keep":
+            corrections.keep(c, i)
+        else:
+            return JsonResponse({"error": f"Nothing to do called {do!r}."}, status=400)
+    except corrections.Refused as exc:
+        return JsonResponse({"error": exc.words}, status=exc.status)
+    except ModelUnavailable as exc:
+        return _model_down(exc)
+    c.save()
+    return JsonResponse(_state(c))
+
+
+@require_http_methods(["GET", "POST"])
+def corrections_info(request):
+    """GET: how many corrections are logged, for the Settings line. POST: open the folder
+    they are in — on this machine only, as the report is (`report_views._refused`): a
+    phone on the Wi-Fi has no business opening the desktop's file browser."""
+    from . import corrections
+
+    if request.method == "POST":
+        from pathfindergm import lan
+
+        if not lan._from_this_machine(request):
+            return JsonResponse({"error": "Open the folder on the machine running the "
+                                          "game."}, status=403)
+        try:
+            return JsonResponse({"opened": corrections.open_folder()})
+        except OSError as exc:
+            return JsonResponse({"error": f"Could not open the folder: {exc}",
+                                 "folder": str(corrections.training_dir())}, status=500)
+    return JsonResponse(corrections.count())
 
 
 def _works_summary(c, pc) -> dict | None:
@@ -4044,6 +4124,12 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
         c.save()
         return JsonResponse(_state(c))
 
+    # The player moved on: a beat they corrected is settled, its version on the page kept
+    # (implicitly — play/corrections.py), before this turn writes the next one.
+    from . import corrections
+
+    corrections.settle(c)
+
     # Which door this turn came through, for the after-the-beat steps (play/aftermath):
     # Continue carries no words of the player's, so a step that logs them logs nothing.
     door = "carry_on" if player_input == CARRY_ON else "turn"
@@ -4510,6 +4596,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
                                  **({"added": added} if added else {}),
                                  **({"said": said} if said else {})})
+            beat_at = len(c.transcript) - 1
             # The measurement the tags are judged by: how many lines the prose call tagged,
             # how many were booked from the page, and who hailed the player.
             c.turn_log.append({"kind": "speech-tags",
@@ -4544,6 +4631,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                             # transcript's length before the beat went onto it.
                             turn=len(c.transcript) - 1)
             c.history.append({"role": "assistant", "content": text})
+            # What wrote this beat, for "That's wrong": the remake is asked with the same
+            # tells and brief, and the training record carries the whole prompt.
+            corrections.remember_input(c, beat_at, agent=agent, player_input=player_input,
+                                       brief=brief, facts=[o.tell for o in outcomes])
             for line in struck_lines:
                 c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
             # What became of a struck item, when the beat did not say. Read off the

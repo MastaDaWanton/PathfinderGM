@@ -236,9 +236,13 @@ function render(s, hold) {
       a.kind === "spell" ? `<span class="vh">Spell: </span>`
         : a.kind === "place" ? `<span class="vh">Going to: </span>` : ""}${
       esc(a.name || a.id || "")}</span> `).join("");
+  // After each of the narrator's own beats (who "gm", kind "setup"), an empty slot that
+  // "That's wrong" fills (23-thats-wrong.js, a render hook). Not a `.beat`: the book
+  // finds beat i as the i-th `.beat` (15-book.js `storyTopOf`).
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
-      i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}</p>`
+      i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}</p>${
+      b.who === "gm" && b.kind === "setup" ? `<div class="beatfix" data-beat="${i}"></div>` : ""}`
   ).join("");
   window._beatsSeen = s.transcript.length;
   // Where the page opens is the book's (15-book.js `storyLand`, a render hook): the new

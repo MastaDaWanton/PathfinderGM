@@ -79,11 +79,15 @@ LEFT_OUT = (
 )
 
 
+# The kinds of member that go only when "Include the save" is ticked.
+WITH_THE_SAVE = ("save", "corrections")
+
+
 @dataclass
 class Member:
     name: str        # the path inside the zip
     data: bytes
-    kind: str        # manifest, words, log, turnlog, transcript, save
+    kind: str        # manifest, words, log, turnlog, transcript, save, corrections
     note: str = ""
 
 
@@ -317,6 +321,21 @@ def members(description: str = "", include_save: bool = True, *,
                               _clean(raw, secrets).encode("utf-8"), "save",
                               "the whole game as it stands"))
 
+    # The beats the player marked wrong and what replaced them (play/corrections.py), with
+    # the save: the same choice, because both carry the story as the player read it. An
+    # intimate beat's prompt is withheld here (`corrections.for_report`).
+    if include_save:
+        try:
+            from . import corrections
+
+            log = corrections.for_report()
+        except Exception:  # noqa: BLE001 — a report never fails over its extras
+            log = None
+        if log:
+            out.append(Member("training/corrections.jsonl",
+                              _clean(log, secrets).encode("utf-8"), "corrections",
+                              "the beats you marked wrong, and what replaced them"))
+
     roles = models()
     manifest = {
         "report": {"made": now.isoformat(timespec="seconds"), "format": 1},
@@ -365,7 +384,8 @@ def listing(include_save: bool = True, **kw) -> dict:
     found = members("", True, **kw)
     return {
         "files": [{"name": m.name, "bytes": len(m.data), "kind": m.kind, "note": m.note,
-                   "included": include_save or m.kind != "save"} for m in found],
+                   "included": include_save or m.kind not in WITH_THE_SAVE}
+                  for m in found],
         "has_save": any(m.kind == "save" for m in found),
         "left_out": list(LEFT_OUT),
     }

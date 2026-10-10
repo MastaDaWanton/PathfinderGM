@@ -3456,6 +3456,32 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0, *,
 GRAMMAR_MAXLENGTH_CEILING = 1800
 
 
+def player_marked_wrong(sentences: list[str] | None = None, note: str = "") -> str:
+    """The repair call's complaint when the PLAYER marked the beat wrong ("That's wrong",
+    play/corrections.py): the sentences they picked and their own line, nothing more.
+
+    The same shape every fix that held here has: what was found, named, and the model
+    asked to mend only that. Without a pick or a note the player has said only that the
+    beat is wrong, so the remake is asked to write it again from the engine's facts —
+    which `narration_repair_messages` puts under this complaint. Never a list of earlier
+    rejected remakes: a retry reading its own rejected attempts anchored to the first
+    one's shape (`agent._with_correction`), so each remake mends the version on the page.
+    """
+    picked = [str(s).strip() for s in (sentences or []) if str(s).strip()]
+    note = str(note or "").strip()
+    out = "The player read this passage and marked it wrong."
+    if picked:
+        out += (" These sentences are wrong:\n" + "\n".join(f"- {s}" for s in picked)
+                + "\nRewrite them so they are true to what the engine decided. Keep the "
+                  "rest of the passage unless it depends on them.")
+    if note:
+        out += f"\nWhat the player says is wrong: {note}"
+    if not picked and not note:
+        out += (" They did not say which part, so write the whole passage again from "
+                "what the engine decided, keeping the same events.")
+    return out
+
+
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",
                               scene_brief: str = "",
                               facts: list[str] | None = None,
