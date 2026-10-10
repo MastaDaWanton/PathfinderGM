@@ -184,6 +184,25 @@ def test_every_z_index_in_bench_css_is_a_documented_layer():
     assert "z-index: 35" in layer
 
 
+def test_a_hidden_bench_layer_is_never_laid_out_over_the_table():
+    """0.2.13 shipped an invisible sheet over the whole table that took every click. The
+    harvest layer (59-harvest.js) is built hidden at page load, and its injected
+    `#harvest.bench{display:grid}` outranked `.bench[hidden]{display:none}` (an id and a class
+    beat a class and an attribute), so the "hidden" layer stayed laid out: fixed, inset 0,
+    z 35, opacity 0, and no pointer-events rule. Found driving the table in a 601x717 pane,
+    where Say and every button under the layer did nothing.
+
+    Hidden must beat any layer's own display rule, which only `!important` guarantees."""
+    css = _src(BENCH_CSS)
+    rule = re.search(r"\.bench\[hidden\]\s*\{([^}]*)\}", css)
+    assert rule, "bench.css has no .bench[hidden] rule"
+    assert re.search(r"display:\s*none\s*!important", rule.group(1)), rule.group(0)
+    # And every layer the table's scripts build in the page is built hidden, so the rule
+    # above is what keeps it off the table until it opens.
+    js = _src(STATIC / "js" / "table" / "59-harvest.js")
+    assert "layer.hidden = true" in js
+
+
 def test_nothing_runs_a_loop_while_the_bench_is_idle():
     """UI plan §10 and §13.6: an idle bench draws zero frames. The browser-side measure is
     a frame counter, which needs a live page; this is the static half. No bench file calls
