@@ -1617,6 +1617,10 @@ function paneRules() {
         "homebrew/style/intimate.txt")}</code>,
       read from the next beat. The model that writes it is the Consequence job in
       Settings.</p>
+    <h2 style="margin-top:22px">How the narrator writes</h2>
+    <p>The narrator is set to ${(r.narration || "free") === "planned" ? "Planned" : "Free"}.
+      That switch lives in Settings, so it can be changed from the table between two
+      beats.</p>
     <div id="ruleserr"></div>`;
 }
 
@@ -2073,8 +2077,54 @@ function paneSettings() {
       <span class="note" id="modelsaid" style="margin-left:12px"></span>
     </div>
     <div id="modelerr"></div>
+    ${narrationPanel()}
     ${soundPanel()}
     ${reportSlot()}`;
+}
+
+/* How the narrator writes (the owner's switch, 2026-10-10; gm/planned.py). A house rule,
+   kept with the others in house-rules.json, but drawn here in Settings rather than on the
+   house-rules bench beside the content switch: the table's Settings button opens this pane
+   (`?tab=settings&embed=1`), so it can be flipped between two beats without leaving the
+   game, which is the point of it. The bench says where it went. Takes effect at once, so
+   it sits after the models' Save button and has none of its own. */
+const NARRATION_MODES = [
+  ["free", "Free",
+   "The narrator writes the whole beat as it likes. Richer and longer, and more often wrong."],
+  ["planned", "Planned",
+   "The engine lays out what happened and the narrator writes only that. Fewer mistakes, plainer and shorter."],
+];
+
+function narrationPanel() {
+  if (!RULES) {
+    // Read once, quietly: the pane draws without it and redraws when it lands.
+    if (!narrationPanel.asked) {
+      narrationPanel.asked = true;
+      fetch("/api/homebrew/rules").then(r => r.json())
+        .then(d => { RULES = d; render(); })
+        .catch(() => { narrationPanel.asked = false; });
+    }
+    return `<h2 class="sect">How the narrator writes</h2>
+      <p class="note">Reading the setting…</p>`;
+  }
+  const mode = RULES.rules.narration || "free";
+  // The grid is held in 34px a side: the card frames' ironmongery reaches 34px past each
+  // card (`.card::after`), and a grid filling the pane put it past the pane's edge, so
+  // Settings scrolled sideways at 601px (by 34px on the page, 18px embedded over the
+  // table; measured 2026-10-10). And the grid's 300px column floor, less the inset, is
+  // wider than a 375px phone's pane, so the column may shrink to what is there.
+  return `
+    <h2 class="sect">How the narrator writes</h2>
+    <p class="note">Changes from the next beat. An intimate scene is always written the
+      free way.</p>
+    <div class="cards" style="padding-inline:34px;
+         grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))">${NARRATION_MODES.map(([v, label, em]) => `
+      <button class="card pick ${mode === v ? "on" : ""}" data-hbnarration="${v}"
+              aria-pressed="${mode === v}">
+        <h3>${label}</h3>
+        <em>${em}</em>
+      </button>`).join("")}</div>
+    <div id="ruleserr"></div>`;
 }
 
 /* --- Playing from a phone -------------------------------------------------------
@@ -3807,6 +3857,8 @@ document.addEventListener("click", async e => {
   if (bpoints) { await setHouseRule({ bonus_ability_points: bpoints.dataset.hbbonuspoints }); return; }
   const cont = e.target.closest("[data-hbcontent]");
   if (cont) { await setHouseRule({ content: RULES.rules.content === "explicit" ? "fade" : "explicit" }); return; }
+  const narr = e.target.closest("[data-hbnarration]");
+  if (narr) { await setHouseRule({ narration: narr.dataset.hbnarration }); return; }
   const imp = e.target.closest("[data-importraces]");
   if (imp) {
     imp.disabled = true;
