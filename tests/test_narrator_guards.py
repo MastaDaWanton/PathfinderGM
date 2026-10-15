@@ -632,7 +632,9 @@ def test_the_fallback_prose_call_does_not_wait_ten_minutes():
 
     assert agent.FALLBACK_TIMEOUT <= 180 < agent.PRIMARY_TIMEOUT
     src = inspect.getsource(agent)
+    # The free narrator's draft, which walks the schedule, is `narrate_turn`'s own
+    # `_free_draft` since the planned narrator came (2026-10-10, gm/planned.py).
     fn = next(n for n in ast.walk(ast.parse(src))
-              if isinstance(n, ast.FunctionDef) and n.name == "narrate_turn")
+              if isinstance(n, ast.FunctionDef) and n.name == "_free_draft")
     body = ast.get_source_segment(src, fn) or ""
     assert "FALLBACK_TIMEOUT" in body and "PRIMARY_TIMEOUT" in body

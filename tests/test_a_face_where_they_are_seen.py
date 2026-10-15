@@ -154,6 +154,17 @@ class TestWhereItGoes:
                                        narration.a_face_for("Ashla Ironvale", BODY))
         assert '"We go. Now." and turns away. Ashla Ironvale is of the Orc people' in out
 
+    def test_the_face_never_goes_inside_the_closing_quote(self):
+        """Live, 2026-10-10: a sentence that ends in speech has its last stop INSIDE the
+        quote marks, and the face went there — "…they are followed here. The master of
+        the market is of the Korvu people: … forearm. '" — the man saying his own face."""
+        beat = ("You wait. The master of the market looks up and says, 'I am the one who "
+                "keeps order here.' What do you do?")
+        line = narration.a_face_for("the master of the market", BODY)
+        out = narration.place_the_face(beat, "the master of the market", line)
+        assert "here.' " + line in out
+        assert "here. " + line not in out
+
 
 class TestTheViewUsesIt:
     def test_the_page_no_longer_capitalises_the_name_away(self):

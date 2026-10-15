@@ -87,6 +87,14 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             # whatever the guards happened to do. Fade is the default; explicit is the
             # table's to turn on.
             "content": "fade",
+            # Who writes the beat's prose (owner, 2026-10-10, "build the switch"): "free",
+            # the narrator as it has always written, or "planned" — the engine lays the
+            # beat out as slots and the narrator writes each slot alone (gm/planned.py).
+            # Measured 2026-10-09 on the owner's model, three live runs hand-scored
+            # against the engine's facts: planned made about a third of the errors and
+            # wrote beats half as long and plainer. Free stays the default; the owner
+            # flips it to try it in play. An intimate beat is always free.
+            "narration": "free",
             # Homebrew level-up grants, asked for 2026-10-04: "1 extra feat and 2 ability
             # points every level, every odd level, or every even level", with the two
             # pickers separate "so i can assign feats to odd levels and ability points to
@@ -95,6 +103,10 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             # level still come (`leveling.owed`).
             "bonus_feats": "off",
             "bonus_ability_points": "off"}
+
+# How the narrator writes a beat: as it likes ("free"), or slot by slot from the engine's
+# plan ("planned", gm/planned.py). The server refuses anything else.
+NARRATION_MODES = ("free", "planned")
 
 # Which levels a homebrew level-up grant lands on. Level 1 is odd: a rule on "every" or
 # "odd" grants at creation too, so the forge's feat budget and its ability-point step
@@ -166,6 +178,11 @@ def active() -> dict:
         said = str(raw.get("content", "") or "").strip().lower()
         if said in ("fade", "explicit"):
             out["content"] = said
+        # The narrator switch, for the same reason: a key left out here is a switch that
+        # can be pressed and never holds.
+        said = str(raw.get("narration", "") or "").strip().lower()
+        if said in NARRATION_MODES:
+            out["narration"] = said
         # The level-up grants, named here for the reason the two comments above give:
         # a key this whitelist leaves out is written and silently never read back.
         for key in ("bonus_feats", "bonus_ability_points"):
@@ -213,6 +230,13 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
                             f"'fade' or 'explicit'.")
         else:
             current["content"] = want
+    if "narration" in updates:
+        want = str(updates["narration"] or "").strip().lower()
+        if want not in NARRATION_MODES:
+            problems.append(f"{updates['narration']!r} is not a narration setting; it is "
+                            f"'free' or 'planned'.")
+        else:
+            current["narration"] = want
     for key, what in (("bonus_feats", "bonus feat"),
                       ("bonus_ability_points", "bonus ability point")):
         if key not in updates:
@@ -285,6 +309,13 @@ def knowledge_offer() -> bool:
 def content() -> str:
     """"fade" or "explicit": what the narrator does when a scene turns to intimacy."""
     return str(active().get("content", "fade") or "fade")
+
+
+def narration() -> str:
+    """"free" or "planned": who lays out the beat's prose (gm/planned.py). Read on every
+    beat, so a change in Settings holds from the next one."""
+    said = str(active().get("narration", "free") or "free")
+    return said if said in NARRATION_MODES else "free"
 
 
 def qualifies(rhythm: str, level: int) -> bool:

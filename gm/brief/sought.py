@@ -82,7 +82,10 @@ def section(ctx) -> tuple[str, dict]:
         if ctx.world is not None else str(life.get("face") or "")
     said = person_words.from_words(rec.get("phrase", ""))
     speak = f" Speak of them as {said['pronouns']}." if said.get("pronouns") else ""
-    looks = f" — {face.rstrip('.')}" if face else ""
+    # Said as "one of the Korvu people: …", not "Korvu: …" (`faces.for_a_model`).
+    from rules import faces as faces_mod
+
+    looks = f" — {faces_mod.for_a_model(face).rstrip('.')}" if face else ""
     text = (f"\nTHE ONE THE PLAYER CAME LOOKING FOR (fact): {rec['phrase']} is here{looks}. "
             f"This is who the player finds; the beat answers the search.{speak}")
     return text, {"sought": phrase, "record": rec["id"], "phrase": rec["phrase"],

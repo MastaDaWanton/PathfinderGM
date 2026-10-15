@@ -168,6 +168,26 @@ def for_the_page(appearance: str, people_seen: bool) -> str:
     return f"{people}: {details}"
 
 
+def for_a_model(face: str) -> str:
+    """A face in the label form, said as what it is for a model's eyes: "one of the Korvu
+    people: Grey-streaked…" for "Korvu: Grey-streaked…". Anything else as it came.
+
+    The label form is the data's own (`narration.a_face_for` and this module read it), and
+    it reads as a speaker line to a model. Measured 2026-10-09, three live runs on the
+    owner's 12B, both narrators: the brief's "Looks (fact — …): Korvu: Grey-streaked…" was
+    taken as the person's NAME — "Korvu looks up from his work", "the Korvu twists its
+    torso" — on beats where the person had a name of their own. The free pipeline has a
+    respelling backstop for it ("a people's name as a person's"); this says it right at
+    the source instead, for every prompt that prints a face (the brief's Looks line, the
+    ALREADY DESCRIBED rows, the one the player came looking for)."""
+    face = str(face or "")
+    people = people_of(face)
+    if not people:
+        return face
+    _, _, body = face.partition(": ")
+    return f"one of the {people} people: {body}"
+
+
 def people_seen_before(actor, everyone) -> bool:
     """Whether another person of this people has already been described here."""
     mine = people_of(getattr(actor, "appearance", ""))

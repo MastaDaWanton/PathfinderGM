@@ -5164,6 +5164,14 @@ def place_the_face(text: str, name: str, line: str, *, ref: str = "",
             return (head + " " + line + " " + text[closing.start():].lstrip()).strip()
         return text.rstrip() + " " + line
     end = found.end()
+    # Never inside somebody's speech. The blanked copy keeps a quotation's last stop so the
+    # sentence ends where the reader's does, and that stop sits BEFORE the closing quote
+    # mark: measured live 2026-10-10, "…they are followed here. The master of the market
+    # is of the Korvu people: … forearm. '" — our face line spoken by the man it describes.
+    for a, b in speech.spans(text):
+        if a < end < b:
+            end = b
+            break
     return (text[:end].rstrip() + " " + line + " " + text[end:].lstrip()).rstrip()
 
 

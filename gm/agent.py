@@ -133,7 +133,8 @@ class GMAgent:
         self.intents_first = (os.environ.get("GM_INTENTS_FIRST", "1").lower()
                               not in ("", "0", "false", "no"))
 
-    def _undeclared_blows(self, text: str, messages: list, schema: dict):
+    def _undeclared_blows(self, text: str, messages: list, schema: dict, *,
+                          shape: str = ""):
         """The prose has somebody strike at the player that the engine never rolled.
 
         Until 2026-09-25 this was a door: `attacked_by` read the blow out of the finished
@@ -165,7 +166,10 @@ class GMAgent:
             f"has anybody strike: no blow was rolled, so none was thrown and none landed. "
             f"Write the same beat again with {names} threatening, squaring up or "
             f"reaching — as close to violence as you like — but with no blow thrown at "
-            f"the player. The same events otherwise.")
+            f"the player. The same events otherwise."
+            # The reply's shape, when the briefing these messages carry does not give it
+            # (a planned beat's plan asks for one slot at a time).
+            + (f" {shape}" if shape else ""))
         attempts = []
         try:
             again = client.chat(
@@ -193,7 +197,8 @@ class GMAgent:
             return cut, f"an undeclared blow by {names}: the sentence was cut", attempts
         return text, f"an undeclared blow by {names}: could not be removed", attempts
 
-    def _undeclared_arrivals(self, text: str, messages: list, schema: dict):
+    def _undeclared_arrivals(self, text: str, messages: list, schema: dict, *,
+                             shape: str = ""):
         """Mid-fight, the prose brings in people the engine never put on the board.
 
         Item 30 (2026-09-19): "a band of twelve raiders" arrived in the prose mid-battle
@@ -222,7 +227,8 @@ class GMAgent:
             f"In this beat {who} {'arrives' if len(newcomers) == 1 else 'arrive'} in the "
             f"fight, and nothing the engine decided brought anybody new in: the people in "
             f"this fight are the ones already on the board. Write the same beat again "
-            f"with only them — the same blows and events otherwise.")
+            f"with only them — the same blows and events otherwise."
+            + (f" {shape}" if shape else ""))
         attempts = []
         try:
             again = client.chat(
@@ -1940,11 +1946,16 @@ class GMAgent:
                acting: str = "",
                changes: list[dict] | None = None,
                ctx: "BeatContext | None" = None,
-               outcomes: list | None = None) -> tuple[str, list[str], list[Attempt]]:
+               outcomes: list | None = None,
+               whole_rewrite: bool = True) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         `acting` names the creature whose turn this prose is, on an NPC's turn; empty on
         the player's. It arms the `wrong-actor` check and its repair.
+
+        `whole_rewrite=False` keeps every repair but the whole-beat one (`polish`): a
+        planned beat (gm/planned.py), which that rewrite would turn back into free prose.
+        `rewrite=False` turns off the sentence-sized repairs too.
 
         `ctx` is the beat as the narrator checks read it (gm/checks, `BeatContext`), built
         by each of the four callers. With it, the registered checks run once the
@@ -1991,7 +2002,7 @@ class GMAgent:
         # A legacy campaign's woven-in people count as known from here down, so the
         # reviewer stops burning rewrites on Vorgath and the un-namer leaves him be.
         extra = narration_mod.established_names(earlier)
-        if rewrite:
+        if rewrite and whole_rewrite:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
@@ -3278,6 +3289,96 @@ class GMAgent:
 
     # --- Call 2 -------------------------------------------------------------------------
 
+    def _narrate_planned(self, outcomes: list, player_input: str, brief: str,
+                         earlier: list[str] | None, *, scene_now: str = "",
+                         pull: dict | None = None, claim: str = "",
+                         shown: list[str] | None = None,
+                         since: list[str] | None = None):
+        """The beat written by the planned narrator (gm/planned.py), or why it was not.
+
+        Returns `(draft, "", [])` — the planned beat's text, notes, attempts, the plan's
+        messages, a schema and the reply's shape, for `narrate_turn`'s tail — or
+        `(None, why, attempts)` when a slot call failed or came back empty: the caller
+        then writes the beat with the free narrator — never an empty page — and logs why,
+        with the slot calls that were made. A wedged Ollama (`ModelStalled`) is not a
+        planned failure and is raised: the free narrator would wait out the same stall.
+
+        The prose role's model, host, provider and key — the `who` the free path uses —
+        so a hosted narrator writes planned beats too. A hosted provider ignores the
+        grammar (`client.chat`); every slot reply is still parsed through `Reply.json`,
+        and a slot that ran past its ceiling is cut back to a whole sentence."""
+        import logging
+
+        from . import planned
+
+        said_before = len(self.last_said)
+        tagged = list(shown if shown is not None else (earlier or []))
+        plain = list(earlier or [])
+
+        def _check(key: str, text: str) -> str:
+            """What is wrong with a slot that a re-ask of that slot alone can mend. The
+            reply slot only, and only narration in a speaker's quotes: measured on the
+            first live planned beat (2026-10-10), the master of the market answered
+            "…but the master of the market maintains the order of these stalls" and
+            `narration-in-quotes` cut the whole answer, leaving the player's question
+            unanswered on the page. The check is the registered one, so the slot is
+            judged exactly as the page will be."""
+            if key != "reply":
+                return ""
+            from .checks.narration_in_quotes import quoted_narration
+
+            found = quoted_narration(text, self.last_said[said_before:],
+                                     dict(self.engine.scene.actors))
+            if not found:
+                return ""
+            return (f"The words in quotes are narration, not speech ({found[0][1]}): the "
+                    f"speaker says \"I\" of themselves and never their own name or title.")
+
+        try:
+            beat = planned.write(
+                self.engine, brief=brief, outcomes=outcomes, player_input=player_input,
+                who=(self.prose_model, self.prose_host, self.prose_provider,
+                     self.prose_key),
+                # The beat before, as the bench showed it: its last 900 characters.
+                last_beat=tagged[-1][-900:] if tagged else "",
+                last_plain=plain[-1][-900:] if plain else "",
+                since=since, scene_now=scene_now,
+                pull=str((pull or {}).get("text") or ""),
+                claim=prompts.false_claim_block(claim) if claim else "",
+                lift=self._lift, check=_check)
+        except client.ModelStalled:
+            raise
+        except Exception as exc:  # noqa: BLE001 — any failure hands the beat to free
+            del self.last_said[said_before:]
+            calls = getattr(exc, "calls", None) or []
+            why = (f"planned narration failed ({type(exc).__name__}: {str(exc)[:140]}): "
+                   f"the free narrator wrote this beat")
+            logging.getLogger("pathfindergm").warning("%s", why)
+            return None, why, [Attempt("plan-slot", c["seconds"], c["model"], c["raw"],
+                                       note=f'{c["key"]}: {c["note"]}')
+                               for c in calls]
+        self.last_narration = "planned"
+        # Who said what, from the slots that stood: a slot asked again (a copied "still",
+        # a reply with narration in its quotes) left its first answer's lines behind.
+        kept = self.last_said[said_before:]
+        del self.last_said[said_before:]
+        self.last_said.extend(r for r in kept if str(r.get("line") or "") in beat.text)
+        # The input that wrote this beat, for "That's wrong" (play/corrections.py): the
+        # plan as one prompt, and every slot call exactly as it was sent.
+        self.last_prose_messages = beat.messages
+        self.last_prose_slots = [{"key": c["key"], "messages": c["messages"],
+                                  "reply": c["raw"], "note": c["note"]}
+                                 for c in beat.calls]
+        self.last_prose_model = beat.model
+        self.last_suggestions = list(beat.suggestions)
+        attempts = [Attempt("plan-slot", c["seconds"], c["model"], c["raw"],
+                            note=c["key"] + (f' — {c["note"]}' if c["note"] else ""))
+                    for c in beat.calls]
+        schema = prompts.prose_schema(max_chars=sum(s["max"] for s in beat.slots))
+        return {"text": beat.text, "notes": list(beat.notes), "attempts": attempts,
+                "messages": beat.messages, "schema": schema,
+                "shape": 'Reply with a JSON object: {"narration": "..."}.'}, "", []
+
     def narrate_turn(self, outcomes: list, player_input: str, brief: str,
                      earlier: list[str] | None = None, *,
                      scene_now: str = "",
@@ -3315,6 +3416,145 @@ class GMAgent:
         self.intimate = intimate_mod.decide(player_input, earlier, self.engine.scene,
                                             beat=beat)
         demos = self.intimate.demonstrations
+        # Which narrator writes this beat (the owner's switch, 2026-10-10; gm/planned.py):
+        # read live, so a change in Settings holds from the next beat. Recorded on the
+        # agent for the turn log and the "That's wrong" input (play/corrections.py), so
+        # training data and comparisons know which narrator wrote what.
+        # Never for an intimate beat: the planned path has no briefing, no demonstrations
+        # and no 3,000-character budget for one, so an intimate beat is always free.
+        self.last_narration = "free"
+        self.last_prose_slots: list[dict] = []
+        fallback: list[str] = []
+        planned_attempts: list[Attempt] = []
+        planned_draft = None
+        if not self._intimate_beat():
+            from rules import houserules
+
+            if houserules.narration() == "planned":
+                planned_draft, why, planned_attempts = self._narrate_planned(
+                    outcomes, player_input, brief, earlier, scene_now=scene_now, pull=pull,
+                    claim=claim, shown=shown, since=since)
+                if planned_draft is None:
+                    fallback.append(why)
+        if planned_draft is not None:
+            text, early = planned_draft["text"], planned_draft["notes"]
+            attempts = planned_draft["attempts"]
+            messages, schema = planned_draft["messages"], planned_draft["schema"]
+            shape, planned = planned_draft["shape"], True
+        else:
+            text, early, attempts, messages, schema = self._free_draft(
+                outcomes, player_input, brief, earlier, scene_now=scene_now, pull=pull,
+                claim=claim, shown=shown, since=since, demos=demos, fighting=fighting,
+                tells=tells, fallback=fallback, planned_attempts=planned_attempts)
+            shape, planned = "", False
+            if not text:
+                return "", early, attempts
+        # Everything below is every narrated beat's, whichever narrator drafted it: one
+        # copy, for the reason `_groom`'s docstring gives (four copies of the grooming
+        # chain drifted). A planned beat (gm/planned.py) differs in exactly three places,
+        # each because the step would write free prose back over the plan:
+        #   * no scene-length floor (`narration.MIN_SCENE_CHARS`, 800): a planned beat
+        #     runs 380-580 characters by design (measured 2026-10-09), and the floor's
+        #     repair is a free-prose rewrite of the whole beat, lengthened — the very
+        #     prose the switch turns off;
+        #   * no whole-beat polish (`_groom(whole_rewrite=False)`): the same rewrite,
+        #     asked for whatever the review finds. Everything sentence-sized stays — the
+        #     truth pass's sentence repairs, the misnamed repair, the asked-and-unanswered
+        #     line, the declared deeds — as do every deterministic backstop and the page
+        #     pass;
+        #   * the undeclared-blow and -arrival retries are asked under the plan's own
+        #     briefing (`messages` is the plan; `shape` names the reply), not the free one.
+        # The hand-back question is kept: every beat in this game ends on one
+        # (`narration.ensure_hand_back`), and the plan's last slot never writes it.
+        #
+        # The narrator's own draft, before any groom or rewrite touched it: what the
+        # model itself wrote for this prompt, beside the page the player judged.
+        self.last_prose_draft = text
+        # A beat the grammar closed mid-word (`maxLength` ends the string cleanly, so the
+        # reply parses): cut back to its last whole sentence before anything reads it.
+        # 2026-09-30, item 6: "…pick it up. They'" shipped as "They'. What do you do?".
+        text, gone = narration_mod.trim_unfinished(text)
+        if gone:
+            early.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")
+        # A blow at the player that nobody declared (docs/declared-not-guessed.md, the
+        # blows door): a check now, not a door into a fight. Not in an intimate scene
+        # between adults, where nobody here is hostile (`intimate.partners`) and the
+        # detector's verbs are the scene's own: probed 2026-10-01, "Mira grabs your hair
+        # and pulls you down to her" and "she drives her hips against you" both read as
+        # undeclared blows, and the repair asks for the beat again "threatening,
+        # squaring up or reaching" — an intimate scene rewritten as a menace, or cut.
+        if not self._intimate_beat():
+            text, note, struck_attempts = self._undeclared_blows(text, messages, schema,
+                                                                 shape=shape)
+            attempts.extend(struck_attempts)
+            if note:
+                early.append(note)
+        # And, in a fight, anybody the prose brings in that nobody declared.
+        text, note, arrival_attempts = self._undeclared_arrivals(text, messages, schema,
+                                                                 shape=shape)
+        attempts.extend(arrival_attempts)
+        if note:
+            early.append(note)
+        # No claim repair here on purpose: the engine has already resolved the turn, so
+        # "the blow lands" is a fact being reported, not an outcome being invented.
+        # Who died, before grooming: the review needs it to ask for the death, the
+        # dead-men cut needs it to spare the killing sentence, and the backstop below
+        # needs it last.
+        deaths = self._deaths_from(outcomes)
+        # The doors this turn forced or picked, for the review's held-door check.
+        self.doors = self._doors_from(outcomes)
+        self.deed_lines = []
+        text, repairs, groom_attempts = self._groom(
+            text, earlier=earlier or [],
+            # No floor on a planned beat (the docstring): its short length is the design.
+            min_chars=(0 if planned else narration_mod.MIN_COMBAT_CHARS if fighting
+                       else narration_mod.MIN_SCENE_CHARS),
+            max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
+            whole_rewrite=not planned,
+            player_input=player_input, brief=brief, hand_back=True, claims=True,
+            backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
+            claim=claim, blows=self._blows_from(outcomes),
+            cast=self._cast_from(outcomes), facts=tells,
+            changes=self._changes_from(outcomes),
+            ctx=self._beat_context("turn", player_input=player_input, brief=brief,
+                                   outcomes=outcomes, tells=tells, pull=pull),
+            outcomes=list(outcomes or []))
+        repairs = early + repairs
+        attempts.extend(groom_attempts)
+        # The backstop, after the rewrite has had its chance: an authored line chosen
+        # by the death's own axes and never the same one twice running. What it adds
+        # is remembered on `last_added`, so the transcript can mark it and the next
+        # prose call is not shown our sentence as its own (docs/narrator-guards.md D4).
+        before = text
+        text, pressed = narration_mod.press_the_death(text, deaths,
+                                                      said=self.engine.scene.said)
+        self.last_added = narration_mod.added_sentences(before, text)
+        # And the body's authored lines, which the truth pass's backstop put on inside the
+        # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
+        from .checks import body_shown, light_shown, power_unbacked, sleep_kept
+
+        self.last_added += [s for s in (*body_shown.authored_in(text),
+                                        *sleep_kept.authored_in(text),
+                                        *power_unbacked.authored_in(text),
+                                        *light_shown.authored_in(text))
+                            if s not in self.last_added]
+        # And the deeds backstop's opening built from the player's own line
+        # (`_show_declared`): ours too.
+        self.last_added += [s for s in self.deed_lines
+                            if s in text and s not in self.last_added]
+        if pressed:
+            repairs.append(f"a kill left off the page: wrote the death of "
+                           f"{', '.join(pressed)}")
+        return text, repairs, attempts
+
+    def _free_draft(self, outcomes: list, player_input: str, brief: str,
+                    earlier: list[str] | None, *, scene_now: str, pull: dict | None,
+                    claim: str, shown: list[str] | None, since: list[str] | None, demos,
+                    fighting: bool, tells: list[str], fallback: list[str],
+                    planned_attempts: list) -> tuple:
+        """The free narrator's draft of the beat (the narrator as it has always written):
+        `(text, early, attempts, messages, schema)`, `text` empty when every model failed.
+        `narrate_turn` runs the beat's tail over it, the same tail a planned draft gets."""
         # This call is handed NO history at all — `[]` — so the ledger is the only
         # thing standing between it and a campaign with no past. It is cheap and it is
         # numberless, and the prose call is the one that actually writes the page.
@@ -3373,7 +3613,8 @@ class GMAgent:
                 schedule.append((spare["model"], spare_host, spare_provider,
                                  spare.get("api_key", "")))
 
-        attempts: list[Attempt] = []
+        # A planned beat that failed hands over here, its calls kept for the log.
+        attempts: list[Attempt] = list(planned_attempts)
         text, reply = "", None
         # The best beat the deflection check rejected, kept for the backstop below.
         best_lost: tuple[str, list[str]] | None = None
@@ -3483,7 +3724,7 @@ class GMAgent:
                                             note=f"retry failed: {str(exc)[:100]}"))
             if declined or lost:
                 text = ""
-        early: list[str] = []
+        early: list[str] = list(fallback)
         if not text and best_lost is not None:
             # The backstop: the beat every model wrote and the check rejected, with the
             # one thing the check can name — the indefinite article — made definite.
@@ -3493,82 +3734,8 @@ class GMAgent:
             early.append(f"lost the scene on every model: kept the beat and made "
                          f"{', '.join(made or lost)} the one already here")
         if not text:
-            return "", ["prose failed on every model"], attempts
-        # The narrator's own draft, before any groom or rewrite touched it: what the
-        # model itself wrote for this prompt, beside the page the player judged.
-        self.last_prose_draft = text
-        # A beat the grammar closed mid-word (`maxLength` ends the string cleanly, so the
-        # reply parses): cut back to its last whole sentence before anything reads it.
-        # 2026-09-30, item 6: "…pick it up. They'" shipped as "They'. What do you do?".
-        text, gone = narration_mod.trim_unfinished(text)
-        if gone:
-            early.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")
-        # A blow at the player that nobody declared (docs/declared-not-guessed.md, the
-        # blows door): a check now, not a door into a fight. Not in an intimate scene
-        # between adults, where nobody here is hostile (`intimate.partners`) and the
-        # detector's verbs are the scene's own: probed 2026-10-01, "Mira grabs your hair
-        # and pulls you down to her" and "she drives her hips against you" both read as
-        # undeclared blows, and the repair asks for the beat again "threatening,
-        # squaring up or reaching" — an intimate scene rewritten as a menace, or cut.
-        if not self._intimate_beat():
-            text, note, struck_attempts = self._undeclared_blows(text, messages, schema)
-            attempts.extend(struck_attempts)
-            if note:
-                early.append(note)
-        # And, in a fight, anybody the prose brings in that nobody declared.
-        text, note, arrival_attempts = self._undeclared_arrivals(text, messages, schema)
-        attempts.extend(arrival_attempts)
-        if note:
-            early.append(note)
-        # No claim repair here on purpose: the engine has already resolved the turn, so
-        # "the blow lands" is a fact being reported, not an outcome being invented.
-        # Who died, before grooming: the review needs it to ask for the death, the
-        # dead-men cut needs it to spare the killing sentence, and the backstop below
-        # needs it last.
-        deaths = self._deaths_from(outcomes)
-        # The doors this turn forced or picked, for the review's held-door check.
-        self.doors = self._doors_from(outcomes)
-        self.deed_lines = []
-        text, repairs, groom_attempts = self._groom(
-            text, earlier=earlier or [],
-            min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
-                       else narration_mod.MIN_SCENE_CHARS),
-            max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
-            player_input=player_input, brief=brief, hand_back=True, claims=True,
-            backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
-            claim=claim, blows=self._blows_from(outcomes),
-            cast=self._cast_from(outcomes), facts=tells,
-            changes=self._changes_from(outcomes),
-            ctx=self._beat_context("turn", player_input=player_input, brief=brief,
-                                   outcomes=outcomes, tells=tells, pull=pull),
-            outcomes=list(outcomes or []))
-        repairs = early + repairs
-        attempts.extend(groom_attempts)
-        # The backstop, after the rewrite has had its chance: an authored line chosen
-        # by the death's own axes and never the same one twice running. What it adds
-        # is remembered on `last_added`, so the transcript can mark it and the next
-        # prose call is not shown our sentence as its own (docs/narrator-guards.md D4).
-        before = text
-        text, pressed = narration_mod.press_the_death(text, deaths,
-                                                      said=self.engine.scene.said)
-        self.last_added = narration_mod.added_sentences(before, text)
-        # And the body's authored lines, which the truth pass's backstop put on inside the
-        # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
-        from .checks import body_shown, light_shown, power_unbacked, sleep_kept
-
-        self.last_added += [s for s in (*body_shown.authored_in(text),
-                                        *sleep_kept.authored_in(text),
-                                        *power_unbacked.authored_in(text),
-                                        *light_shown.authored_in(text))
-                            if s not in self.last_added]
-        # And the deeds backstop's opening built from the player's own line
-        # (`_show_declared`): ours too.
-        self.last_added += [s for s in self.deed_lines
-                            if s in text and s not in self.last_added]
-        if pressed:
-            repairs.append(f"a kill left off the page: wrote the death of "
-                           f"{', '.join(pressed)}")
-        return text, repairs, attempts
+            return "", early + ["prose failed on every model"], attempts, messages, schema
+        return text, early, attempts, messages, schema
 
     def _deaths_from(self, outcomes: list) -> list[dict]:
         """Who the engine killed this turn, and by how far — press_the_death's feed.

@@ -15,6 +15,9 @@ the conversational formats TRL's trainers read (huggingface.co/docs/trl/dataset_
     exactly this: unpaired, and more bad examples than good (Ethayarajh et al., 2024).
   * `repair.kto.jsonl` — the same for the REPAIR call, from each remake's own prompt: a
     remake the player rejected is a failure of the call that wrote it.
+  * `pairs.planned.dpo.jsonl` and `examples.planned.kto.jsonl` — the first two for beats
+    the PLANNED narrator wrote (gm/planned.py), kept apart: their prompt is the plan, not
+    the free narrator's, and `meta.slots` holds every slot call as it was sent.
 
 `prompt` is the narrator's own messages as they were sent (system, examples, the turn), so
 the model is trained on the exact context it failed in. Completions are written as the
@@ -96,12 +99,24 @@ def convert(records: list[dict], *, plain: bool = False,
     """The three sets from the log's records. Pure: no files, so the suite can hold it to
     the record shape `play/corrections.py` writes."""
     dpo, kto, repair = [], [], []
+    # A beat the PLANNED narrator wrote (gm/planned.py, the owner's switch of 2026-10-10)
+    # was not one prompt and one reply: its `messages` are the plan, and the beat is the
+    # slots written one call at a time. Trained as a free beat, its completion would teach
+    # the free prompt a plan's answer — so planned episodes go to sets of their own, with
+    # every slot call in `meta.slots`, and the free narrator's sets stay the free
+    # narrator's.
+    planned_dpo, planned_kto = [], []
     for rec in records:
         prompt = (rec.get("input") or {}).get("messages")
         versions = [v for v in rec.get("versions") or [] if _text(v)]
+        narration = str(rec.get("narration") or "free")
         meta_base = {"episode": rec.get("id"), "outcome": rec.get("outcome"),
                      "narrator_model": rec.get("narrator_model"),
-                     "app_version": rec.get("app_version")}
+                     "app_version": rec.get("app_version"), "narration": narration}
+        if narration == "planned":
+            meta_base["slots"] = (rec.get("input") or {}).get("slots") or []
+        dpo_out, kto_out = ((planned_dpo, planned_kto) if narration == "planned"
+                            else (dpo, kto))
         if prompt:
             chosen = [v for v in versions if _good(v, explicit_only)]
             rejected = [v for v in versions if _bad(v)]
@@ -109,22 +124,22 @@ def convert(records: list[dict], *, plain: bool = False,
                 for bad in rejected:
                     if _text(bad) == _text(good):
                         continue
-                    dpo.append({"prompt": prompt,
-                                "chosen": _completion(_text(good), plain),
-                                "rejected": _completion(_text(bad), plain),
-                                "meta": {**meta_base, "chosen_by": good.get("by"),
-                                         "rejected_by": bad.get("by"),
-                                         "implicit": bool(good.get("implicit")),
-                                         "flagged": bad.get("flagged_sentences") or [],
-                                         "note": bad.get("note") or ""}})
+                    dpo_out.append({"prompt": prompt,
+                                    "chosen": _completion(_text(good), plain),
+                                    "rejected": _completion(_text(bad), plain),
+                                    "meta": {**meta_base, "chosen_by": good.get("by"),
+                                             "rejected_by": bad.get("by"),
+                                             "implicit": bool(good.get("implicit")),
+                                             "flagged": bad.get("flagged_sentences") or [],
+                                             "note": bad.get("note") or ""}})
             for v in versions:
                 if _good(v, explicit_only) or _bad(v):
-                    kto.append({"prompt": prompt,
-                                "completion": _completion(_text(v), plain),
-                                "label": _good(v, explicit_only),
-                                "meta": {**meta_base, "by": v.get("by"),
-                                         "verdict": v.get("verdict"),
-                                         "implicit": bool(v.get("implicit"))}})
+                    kto_out.append({"prompt": prompt,
+                                    "completion": _completion(_text(v), plain),
+                                    "label": _good(v, explicit_only),
+                                    "meta": {**meta_base, "by": v.get("by"),
+                                             "verdict": v.get("verdict"),
+                                             "implicit": bool(v.get("implicit"))}})
         for v in versions:
             if v.get("by") == "remake" and v.get("repair_messages") and (
                     _good(v, explicit_only) or _bad(v)):
@@ -133,7 +148,9 @@ def convert(records: list[dict], *, plain: bool = False,
                                "label": _good(v, explicit_only),
                                "meta": {**meta_base, "verdict": v.get("verdict"),
                                         "model": v.get("model")}})
-    return {"pairs.dpo.jsonl": dpo, "examples.kto.jsonl": kto, "repair.kto.jsonl": repair}
+    return {"pairs.dpo.jsonl": dpo, "examples.kto.jsonl": kto, "repair.kto.jsonl": repair,
+            "pairs.planned.dpo.jsonl": planned_dpo,
+            "examples.planned.kto.jsonl": planned_kto}
 
 
 def main(argv: list[str] | None = None) -> int:

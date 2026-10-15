@@ -750,6 +750,19 @@ _READS_MECHANICS = {
         "past dead the blow went, and a tell is a sentence, not a number. Making the "
         "narrator parse that back out of English would be a second vocabulary built in "
         "the presentation layer.",
+    "gm/planned.py:arriving":
+        "decides only whether a planned beat has a 'still' slot — an arrival has no "
+        "situation to keep — read off the travel outcome's own biome effect, the test "
+        "views._finish makes for already_there, rather than the free prompt's reading of "
+        "the tell's words ('You are at … now.'). Nothing it reads reaches the narrator; "
+        "the arrival reaches it as the tell.",
+    "gm/planned.py:build_plan":
+        "decides whether the first slot asks for the player squaring up instead of "
+        "'doing it and what came of it', read off the engine's own battle_joined effect "
+        "(a fight declared, no dice). The fact reaches the narrator only as the tell "
+        "('Nothing has landed yet'); this keeps the slot's own instruction from "
+        "contradicting it. Measured live 2026-10-10: 'show the player doing it' landed "
+        "the punch, the truth pass cut it, and the beat lost the declaration.",
     "gm/judgement.py:book_introduced":
         "writes the people an `introduce` made onto scene.cast, the ledger note_cast's "
         "definiteness test reads — engine bookkeeping, not prose. It needs their refs, "
