@@ -1197,8 +1197,10 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # rope came back as "an older man with a face like cracked leather" two beats
             # later (item 16.7, 2026-09-28). Every description keeps to it; the page's own
             # first description is ALREADY DESCRIBED (gm/brief/faces.py).
-            looks = (f" Looks (fact — every description of them keeps to it): {face}"
-                     if face else "")
+            # Said as "one of the Korvu people: …", never "Korvu: …", which models read as
+            # the person's name (`faces.for_a_model`, measured 2026-10-09).
+            looks = (f" Looks (fact — every description of them keeps to it): "
+                     f"{_faces.for_a_model(face)}" if face else "")
             # Who this person is TO the player. Both are facts the engine holds and the
             # brief never carried, and without them the narrator writes every non-player
             # as a stranger met just now — which is what the player found after four

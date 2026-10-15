@@ -39,7 +39,11 @@ def section(ctx) -> tuple[str, dict]:
         if said:
             bits.append("the page said: " + " ".join(said))
         if face:
-            bits.append(face)
+            # "one of the Orc people: …", not "Orc: …" after the person's name, which a
+            # model reads as a second name (`faces.for_a_model`, measured 2026-10-09).
+            from rules import faces as faces_mod
+
+            bits.append(faces_mod.for_a_model(face))
         rows.append(f"  {ref} — {actor.name}: " + " | ".join(bits))
         refs.append(ref)
     if not rows:
