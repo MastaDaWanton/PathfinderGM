@@ -196,6 +196,12 @@ def test_one_act_is_one_slot_however_many_tells_it_made():
     blow = planned.acts([Outcome("i1-close", "move", tell="Kesst closes 10 ft to strike."),
                          Outcome("i1", "attack", tell="Kesst hits the guard.")])
     assert len(blow) == 1
+    # Somebody the world made for the act is part of it: live 2026-10-10, an introduced
+    # guard and the question put to him were two slots and the question came twice.
+    met = planned.acts([Outcome("i1", "introduce", tell="In the scene: the guard (c5)."),
+                        Outcome("i2", "say", tell="Kesst speaks to the guard."),
+                        Outcome("i3", "narrate_only", tell="The watch is elsewhere.")])
+    assert [len(g) for g in met] == [2, 1]
     # Separate acts stay separate: a check and a blow are two moments.
     two = planned.acts([Outcome("a", "check", tell="x"), Outcome("b", "attack", tell="y")])
     assert len(two) == 2

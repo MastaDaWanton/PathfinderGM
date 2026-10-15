@@ -96,6 +96,10 @@ _FAMILIES = (
 )
 
 
+# The world's own ops that make somebody or somewhere real for the act that follows them.
+_MADE_FOR_THE_ACT = frozenset({"introduce", "spawn", "found"})
+
+
 class PlanFailed(RuntimeError):
     """A slot call failed or came back empty. The beat goes to the free narrator."""
 
@@ -156,7 +160,21 @@ def acts(outcomes) -> list[list]:
                 groups[-1].append(o)
                 continue
         groups.append([o])
-    return groups
+    # A person or place the world made for the act after it is part of that act: measured
+    # live 2026-10-10, "I find whoever keeps watch on the gate and ask them…" came as
+    # `introduce` (the guard) then `say`, the player's line rode the introduce slot, and
+    # the say slot asked the same question again in the next sentence.
+    merged: list[list] = []
+    carry: list = []
+    for g in groups:
+        if all(getattr(o, "op", "") in _MADE_FOR_THE_ACT for o in g):
+            carry += g
+            continue
+        merged.append(carry + g)
+        carry = []
+    if carry:
+        merged.append(carry)
+    return merged
 
 
 def present(engine) -> list[dict]:
