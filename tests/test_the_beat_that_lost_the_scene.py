@@ -94,7 +94,9 @@ def test_narrate_turn_retries_with_the_present_named_and_then_keeps_the_beat():
     thousand characters of good prose."""
     from gm import agent
 
-    src = inspect.getsource(agent.GMAgent.narrate_turn)
+    # The free narrator's draft (`_free_draft`, narrate_turn's own since 2026-10-10).
+    src = inspect.getsource(agent.GMAgent._free_draft)
+    assert "_free_draft" in agent.GMAgent.narrate_turn.__code__.co_names
     assert "retry, present named" in src
     assert "definite_present" in src
     assert src.index("reintroduces_the_present") < src.index("retry, present named") \

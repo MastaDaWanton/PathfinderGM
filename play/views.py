@@ -4286,6 +4286,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
         c.turn_log.append({
             "kind": "prose",
             "chars": len(text or ""),
+            # Which narrator wrote it — "free" or "planned" (the owner's switch,
+            # gm/planned.py) — so a comparison across a session can split the two. A
+            # planned beat that fell back to free says so in `repairs`.
+            "narration": str(getattr(agent, "last_narration", "") or "free"),
             # Which open matter was put in front of the model, if any, so an audit
             # can say how often the beat carried it.
             "pull": str((pull or {}).get("title") or ""),

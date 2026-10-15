@@ -182,6 +182,12 @@ def remember_input(c, beat_index: int, *, agent, player_input: str, brief: str,
             "player_input": str(player_input or ""), "scene_brief": str(brief or ""),
             "facts": [str(f) for f in (facts or []) if f],
             "intimate": intimate,
+            # Which narrator wrote the beat (gm/planned.py). A planned beat's `messages`
+            # are the plan as one prompt — the bytes every slot call opens with — and
+            # `slots` every slot call as it was sent, with its reply.
+            "narration": str(getattr(agent, "last_narration", "") or "free"),
+            **({"slots": list(getattr(agent, "last_prose_slots", None) or [])}
+               if getattr(agent, "last_narration", "") == "planned" else {}),
         }
         data = _read_inputs(c.id) or {"format": FORMAT, "campaign": c.id, "beats": {}}
         beats = dict(data.get("beats") or {})
@@ -381,9 +387,13 @@ def _open(c, i: int) -> tuple[dict, dict]:
         "narrator_model": (entry or {}).get("narrator_model", ""),
         "campaign": c.id, "beat": i, "started": _now(),
         "intimate": bool((entry or {}).get("intimate")),
+        # "free" or "planned": which narrator wrote version 0 (gm/planned.py). An input
+        # kept before the switch existed was the free narrator's.
+        "narration": str((entry or {}).get("narration") or "free"),
         "input": ({"captured": True,
                    **{k: entry.get(k) for k in ("messages", "player_input", "scene_brief",
-                                                "facts", "draft", "narrator_model")}}
+                                                "facts", "draft", "narrator_model")},
+                   **{k: entry[k] for k in ("narration", "slots") if k in entry}}
                   if entry else {"captured": False,
                                  # What can still be said about it: the player's line it
                                  # answered. The prompt itself was not kept (an NPC's turn,

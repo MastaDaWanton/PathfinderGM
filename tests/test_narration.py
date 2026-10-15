@@ -1596,9 +1596,13 @@ def test_prose_has_the_second_model_call_one_always_had():
     # measured distance from the start rather than the function's own extent, so adding
     # a paragraph of docstring pushed the last assertion out of the window and failed a
     # test about the fallback schedule for a reason with nothing to do with it.
-    fn = next(n for n in ast.walk(ast.parse(src))
-              if isinstance(n, ast.FunctionDef) and n.name == "narrate_turn")
-    body = ast.get_source_segment(src, fn) or ""
+    # The free narrator's draft is its own method since the planned narrator came
+    # (2026-10-10, gm/planned.py): narrate_turn calls `_free_draft`, which holds the
+    # schedule, and the beat's tail stays in narrate_turn for both drafts.
+    fns = {n.name: n for n in ast.walk(ast.parse(src))
+           if isinstance(n, ast.FunctionDef) and n.name in ("narrate_turn", "_free_draft")}
+    assert "self._free_draft(" in (ast.get_source_segment(src, fns["narrate_turn"]) or "")
+    body = ast.get_source_segment(src, fns["_free_draft"]) or ""
     assert 'modelcfg.for_role("fallback")' in body
     assert "for model, host, provider, key in schedule" in body
     assert "reads_as_a_refusal" in body
