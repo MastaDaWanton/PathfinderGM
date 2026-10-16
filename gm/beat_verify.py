@@ -559,18 +559,25 @@ _DEMO2_AWAY_ANSWER = dict(_DEMO2_ANSWER, shown_here=[
 # paragraph and the second demonstration with a hold in it — the `shown_here` split, for
 # the same measured reason. The demonstration shows only a hold that lands ("seizes the
 # drover by the arm and holds him fast"); the attempt that is NOT a condition is the
-# instruction's, in words. Tried and taken out (2026-10-16): a demonstrated grab at the
-# player that missed ("reaches to catch you by the collar, meaning to pull you off your
-# feet, and you step back") — on the bench it cost the harm claims on blows that DID land
-# on the player, "knocks the wind from your lungs" no longer hurt you (ho-shove-lands and
-# ho-blow-lands, 0 of 4 reads), the lesson `_DEMO2_AWAY_ANSWER`'s comment records about a
-# demonstrated miss. Its harm and everything else stay as they were.
+# instruction's, in one clause. Its harm and everything else stay as they were.
+#
+# Tried and taken out, 2026-10-16, both for the same measured cost: on the bench's fight
+# beats the harm claims on blows that landed on the PLAYER went — "knocks the wind from your
+# lungs" no longer hurt you, 0 of 4 reads (ho-shove-lands, ho-blow-lands), harm claims
+# 15/19 on master -> 7/19:
+#   * a demonstrated grab at the player that missed ("reaches to catch you by the collar,
+#     meaning to pull you off your feet, and you step back") — the lesson
+#     `_DEMO2_AWAY_ANSWER`'s comment records about a demonstrated miss;
+#   * then, with that gone and the loss still there, a whole sentence of what is NOT a
+#     condition ("Never an attempt, a near miss, an aim or a threat — reaching to grab
+#     someone is not grappled …").
+# This wording, short and ending on harm, on ten of those beats: harm 5/6, conditions 5/5
+# (docs/beat-verify.md, "The body's conditions").
 _SYSTEM_BODIES = (
-    "\nconditions: a body the NARRATOR says is held or impaired by the end of the passage: "
-    "grappled (held fast in someone's grip), pinned (held down), prone (down on the "
-    "ground), entangled, stunned, dazed, blinded, deafened, paralyzed. Never an attempt, a "
-    "near miss, an aim or a threat — reaching to grab someone is not grappled, aiming to "
-    "knock someone down is not prone — and never unconscious or dead, which are harmed.")
+    "\nconditions: a body the narrator says IS held or impaired at the end of the passage "
+    "— grappled (held fast in someone's grip), pinned, prone (down on the ground), "
+    "entangled, stunned, dazed, blinded, deafened, paralyzed. Not one only reached for or "
+    "aimed at. A blow that lands is reported under harmed as well.")
 _DEMO2_BODIES_TAIL = ("A watchman comes in from the street and seizes the drover by the arm "
                       "and holds him fast.")
 
