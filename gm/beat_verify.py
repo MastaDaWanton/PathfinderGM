@@ -711,6 +711,24 @@ def _moves_of_things(facts: Facts) -> list[tuple[str, str, str]]:
 
 
 _TRADE_OPS = ("sell", "buy")
+# The ops after which the player may truthfully be shown holding something the read-back
+# has no name for: whatever they resolved, the page may describe it loosely.
+_GETTING_OPS = ("loot", "buy", "sell", "forage", "gather", "prospect", "harvest", "craft",
+                "quest", "trade")
+
+
+def _anything_into(facts: Facts, ref: str) -> bool:
+    """Whether anything at all came into `ref`'s hands this turn: a resolved getting op,
+    or any resolved effect that names them as the receiver of a thing or of coin (`to`,
+    or `ref` on an effect written before `to` existed, as `_moves_of_things` reads)."""
+    for o in _resolved(facts):
+        if o.get("op") in _GETTING_OPS:
+            return True
+        for e in _effects(o):
+            got = e.get("to") if "to" in e else e.get("ref")
+            if got == ref and any(k in e for k in ("item", "items", "goods", "purse")):
+                return True
+    return False
 _HARM_OPS = ("attack", "cast", "damage", "full_attack", "maneuver", "coup_de_grace",
              "hazard", "use_ability")
 
@@ -773,7 +791,25 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # "nobody" on the receiving end is a thing used up, tipped out or lost — the
             # pouch whose contents were tipped into a hand read as the pouch given away
             # (first bench run). Nothing the engine records answers it, so it is not judged.
-            if item == OTHER_THING or frm == to or (frm == pc and to == NOBODY):
+            if frm == to or (frm == pc and to == NOBODY):
+                continue
+            if item == OTHER_THING:
+                # A thing the engine has no name for, handed to the player by somebody,
+                # on a turn when nothing the engine resolved put anything into their
+                # hands: the prose gave it. Measured 2026-10-16 (a real player's game,
+                # 0.2.19): "I ask for fair compensation" rolled nothing, and the carter
+                # "pull[s] out a small, weathered coin … handing it over with a grunt" —
+                # read back as exactly this claim, `something else` from c1 to pc, and
+                # skipped here because the thing was unlisted; the next turn "I take the
+                # coin" minted it. Not judged from the floor (a stone picked up is the
+                # world's) or when anything at all came into the player's hands this
+                # turn, so a purchase or a payment the page names loosely still stands.
+                if to == pc and frm != FLOOR and frm != NOBODY \
+                        and not _anything_into(facts, pc):
+                    out.append(Discrepancy(
+                        "contradiction", "hands",
+                        "Nothing was given to the player: nobody here handed them "
+                        "anything, and they hold nothing new.", c.sentence, "", c))
                 continue
             held = any(_same(item, p) for p in facts.pack)
             out_of_pc = any(_same(item, i) and f == pc for i, f, _t in things_moved)
@@ -934,6 +970,11 @@ def question(d: Discrepancy, facts: Facts) -> str:
         # people's name is not plainly the smith (probe of 2026-10-03, 0 of 2 such
         # sentences confirmed). The direction is the first read's; this asks only whether
         # the thing moved at all.
+        if s["to"] == facts.pc_ref and s["item"] == OTHER_THING:
+            # A thing with no name of the engine's: "the something else" is no question
+            # a reader answers. Asked whether anything is put in the player's hands.
+            return ("Does this sentence say that something is handed over or given to "
+                    "you — put into your hands now, not only shown or offered?")
         if s["to"] == facts.pc_ref:
             return (f"Does this sentence say that the {s['item']} is picked up, taken or "
                     f"given to you?")
