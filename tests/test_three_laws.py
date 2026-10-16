@@ -756,6 +756,12 @@ _READS_MECHANICS = {
         "views._finish makes for already_there, rather than the free prompt's reading of "
         "the tell's words ('You are at … now.'). Nothing it reads reaches the narrator; "
         "the arrival reaches it as the tell.",
+    "gm/planned.py:addressee":
+        "decides WHO answers the player on a planned beat — the person the player's own "
+        "`say` was put to, which the engine wrote into the effect as a ref — so the model "
+        "never picks the speaker (rough edge 2, 2026-10-16: an answer shipped with nobody "
+        "saying it). A ref, not a mechanic; the answer's content still comes only from "
+        "the brief, and the speech reaches the narrator as the say tell.",
     "gm/planned.py:build_plan":
         "decides whether the first slot asks for the player squaring up instead of "
         "'doing it and what came of it', read off the engine's own battle_joined effect "
