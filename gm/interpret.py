@@ -167,9 +167,10 @@ seek      look for, ask around for, wave down, head for or turn to a PERSON
 talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
-buy       buy, order, pay for goods
+buy       buy, order, shop for, pay for goods, take goods and pay the seller for them;
+          the object is the goods
 sell      sell, offer for sale, agree a sale, accept a price, close a deal
-give      hand over, pay, buy somebody a drink
+give      hand over, pay a debt or a fee, buy somebody a drink
 take      pick up, loot, take, tip or count out of a container; the target is the
           person or the container it comes out of
 drop      put down, set down, drop or leave a thing behind
@@ -211,6 +212,13 @@ _DEMOS = [
          {"span": "buy three candles from her", "object": "three candles", "target": "her",
           "act": "buy"},
          {"span": "ask where the temple is", "says": "where the temple is", "act": "talk"}]}),
+    # Paying for goods taken off a stall is buying them, not a gift of coin: on 2026-10-15
+    # "I pick up a waterskin and pay for it" and "I ask the smith for a dagger and pay
+    # him" read as take/give, so the counter never opened (3 of 10 purchases missed).
+    ("I take a lantern off the shelf and pay the keeper for it.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "take a lantern off the shelf and pay the keeper for it",
+          "object": "a lantern", "target": "the keeper", "act": "buy"}]}),
     ("I sit on the steps until noon.",
      {"question": False, "claims": [], "actions": [
          {"span": "sit on the steps until noon", "place": "the steps", "time": "until noon",
