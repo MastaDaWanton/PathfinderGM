@@ -41,8 +41,8 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "gather", "follow",
-    "claim", "other",
     "request",
+    "claim", "other",
 )
 # `request` since 2026-10-16, from a real player's game (0.2.19): "…then I ask for fair
 # compensation for helping the carter" was read `talk`, which owes a `say`, so nothing was
@@ -191,7 +191,7 @@ talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebo
           asking a question, for directions or for advice is talk
 request   ask somebody to pay you for your work, reward you, or do you a favour or help
           for nothing in return; `asks_for` is payment (money owed or given to you) or
-          favour (anything else). Buying, ordering, renting a room and paying or bribing
+          favour (anything else). Buying, ordering, taking a room and paying or bribing
           somebody are never a request
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
@@ -256,12 +256,10 @@ _DEMOS = [
          {"span": "ask him his name", "target": "him", "says": "his name", "act": "talk"}]}),
     # A request (2026-10-16): asked to give or do something, beside a question, which
     # stays talk. None of these is a probe line (the probe's 14 are kept apart).
-    ("I thank the netmaker, ask which inn is cheapest, and ask to be paid for mending "
-     "her nets.",
+    ("I ask the netmaker which inn is cheapest and ask to be paid for mending her nets.",
      {"question": False, "claims": [], "actions": [
-         {"span": "thank the netmaker", "target": "the netmaker", "act": "talk"},
-         {"span": "ask which inn is cheapest", "says": "which inn is cheapest",
-          "act": "talk"},
+         {"span": "ask the netmaker which inn is cheapest", "target": "the netmaker",
+          "says": "which inn is cheapest", "act": "talk"},
          {"span": "ask to be paid for mending her nets",
           "object": "to be paid for mending her nets", "asks_for": "payment",
           "act": "request"}]}),
@@ -281,11 +279,13 @@ _DEMOS = [
     ("I order a mug of cider.",
      {"question": False, "claims": [], "actions": [
          {"span": "order a mug of cider", "object": "a mug of cider", "act": "buy"}]}),
-    ("I slip the clerk a silver piece to look the other way.",
+    # One action, no purpose clause: with "…to look the other way" written as a second,
+    # `other` action, the bench's single deeds grew a trailing `other` ("I steal a loaf
+    # while the baker's back is turned" -> steal, other; 5 lines of 302).
+    ("I slip the clerk a silver piece.",
      {"question": False, "claims": [], "actions": [
          {"span": "slip the clerk a silver piece", "target": "the clerk",
-          "object": "a silver piece", "act": "give"},
-         {"span": "to look the other way", "commit": "intended", "act": "other"}]}),
+          "object": "a silver piece", "act": "give"}]}),
     ("I smash the tavern door and everyone inside flees.",
      {"question": False, "claims": ["everyone inside flees"], "actions": [
          {"span": "smash the tavern door", "object": "the tavern door", "act": "break_in"}]}),
