@@ -1227,6 +1227,8 @@ def test_the_thread_brief_and_the_anchor():
     from gm import narration
     from rules.engine import Scene
 
+    from types import SimpleNamespace
+
     s = Scene()
     judgement.update_thread(s, "I follow the two guards in chain shirts")
     brief = judgement.thread_brief(s)
@@ -1234,12 +1236,19 @@ def test_the_thread_brief_and_the_anchor():
 
     haunted = ("You push forward into the house, dust and decay all around. "
                "What do you do next?")
+    # Since 2026-10-16 the anchor names only a person the engine holds, bound to the
+    # thread: unbound, the subject phrase is never printed on the page.
     out, anchored = narration.keep_the_thread(haunted, s.thread)
-    assert anchored and "guards" in out
+    assert out == haunted and not anchored
+    guards = SimpleNamespace(name="the two guards", is_pc=False, hp=10,
+                             has_state=lambda tag: False)
+    s.thread["ref"] = "c1"
+    out, anchored = narration.keep_the_thread(haunted, s.thread, actors={"c1": guards})
+    assert anchored and "the two guards" in out
     assert out.endswith("What do you do next?")
 
     kept = "The guards ahead slow at the market's edge. What do you do?"
-    same, anchored = narration.keep_the_thread(kept, s.thread)
+    same, anchored = narration.keep_the_thread(kept, s.thread, actors={"c1": guards})
     assert same == kept and not anchored
 
 

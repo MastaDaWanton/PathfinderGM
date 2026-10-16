@@ -910,7 +910,8 @@ def owed_deeds(reading: dict | None, sentence: str, outcomes=(), *,
             continue
         owed.append({**a, "index": i, "cues": cues,
                      "before_move": bool(moved and move_at is not None and i < move_at),
-                     "after_move": bool(moved and move_at is not None and i > move_at)})
+                     "after_move": bool(moved and move_at is not None and i > move_at),
+                     "moved": bool(moved)})
     return owed
 
 
@@ -4243,12 +4244,8 @@ _ANCHORS = (
     "In front of you, still: {subject}. You are still {doing} them.",
 )
 
-_WH_SUBJECT = re.compile(r"^(?:who|whom|whose|what|which|where|when|why|how|whether|if)\b",
-                         re.I)
-_FIRST_IN_SUBJECT = re.compile(r"\b(?:i|i'm|i'll|i've|i'd|me|my|mine|myself)\b", re.I)
-
-
-def keep_the_thread(text: str, thread: dict, said: dict | None = None) -> tuple[str, str]:
+def keep_the_thread(text: str, thread: dict, said: dict | None = None,
+                    actors: dict | None = None) -> tuple[str, str]:
     """The subject of a standing engagement cannot vanish from the page.
 
     Measured live: following two guards toward a market, the next beat was a
@@ -4263,14 +4260,30 @@ def keep_the_thread(text: str, thread: dict, said: dict | None = None) -> tuple[
     used), and carry the player's own words in the first person. "I ask who I should
     speak to about work outside the walls" made *who I should speak to…* the subject,
     the anchor placed it in the narration, and `narrator-in-first-person` fired on our
-    own sentence. A subject that is a clause rather than somebody is refused here
-    (belt) and no longer set by `judgement.update_thread` (braces); a first-person
-    token that somehow arrives is turned to the second person before it is placed.
+    own sentence. A subject that is a clause rather than somebody is no longer set by
+    `judgement.update_thread`, and since 2026-10-16 the anchor never prints the subject
+    phrase at all (below), so neither can reach the page.
+
+    And the anchor names only somebody the engine holds (2026-10-16): the thread's bound
+    `ref` among `actors`, by the engine's own name for them — never the subject phrase,
+    which is the player's words cut by patterns. Measured on the planned benches, in the
+    tail both narrators share: every anchor written (3 of 3, in 137 beats) carried a
+    phrase no person answers to — "You have not let their name and out of your sight",
+    "you have not lost about the road out of the city and". No bound person here, no
+    anchor: an unbound subject is a role nobody holds yet, and the brief's thread line
+    already carries it.
     """
     subject = str((thread or {}).get("subject") or "").strip()
     if not subject or not text:
         return text, ""
-    if _WH_SUBJECT.match(subject):
+    who = (actors or {}).get((thread or {}).get("ref")) if (thread or {}).get("ref") else None
+    if who is None or getattr(who, "is_pc", False):
+        return text, ""
+    if getattr(who, "hp", 0) < 0 or (hasattr(who, "has_state")
+                                       and who.has_state("state.down.dead")):
+        return text, ""
+    subject = definite(" ".join(str(getattr(who, "name", "") or "").split()))
+    if not subject:
         return text, ""
     words = [w for w in re.findall(r"[a-z']+", subject.lower())
              if w not in _THREAD_STOP and len(w) > 2]
@@ -4285,13 +4298,9 @@ def keep_the_thread(text: str, thread: dict, said: dict | None = None) -> tuple[
     # and introducing nobody new is continuing with the person already there.
     if re.search(r"\b(she|her|hers|he|him|his|they|them|their)\b", text, re.I):
         return text, ""
-    placed = _FIRST_IN_SUBJECT.sub(
-        lambda m: {"i": "you", "i'm": "you're", "i'll": "you'll", "i've": "you've",
-                   "i'd": "you'd", "me": "you", "my": "your", "mine": "yours",
-                   "myself": "yourself"}.get(m.group(0).lower(), m.group(0)), subject)
     doing = str(thread.get("doing") or "").strip() or "with"
     pick = least_recently_used(said, "anchor", len(_ANCHORS))
-    anchor = _ANCHORS[pick].format(subject=placed, doing=doing)
+    anchor = _ANCHORS[pick].format(subject=subject, doing=doing)
     return _append_before_hand_back(text, anchor), subject
 
 

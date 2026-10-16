@@ -255,10 +255,15 @@ def test_self_repetition_and_compression_measure_a_run():
 def test_the_thread_anchor_no_longer_repeats_itself():
     """One anchor shape, four times in fifty-three beats. Five shapes, least recently
     used."""
-    thread = {"subject": "the two guards", "doing": "following"}
+    from types import SimpleNamespace
+
+    thread = {"subject": "the two guards", "doing": "following", "ref": "c1"}
+    actors = {"c1": SimpleNamespace(name="the two guards", is_pc=False, hp=10,
+                                    has_state=lambda tag: False)}
     said: dict = {}
     outs = {narration.keep_the_thread("You push into the house. What do you do?",
-                                      thread, said=said)[0] for _ in range(5)}
+                                      thread, said=said, actors=actors)[0]
+            for _ in range(5)}
     assert len(outs) == 5
     assert all("the two guards" in o and o.endswith("What do you do?") for o in outs)
 
@@ -277,8 +282,8 @@ def test_a_question_is_not_an_engagement():
 
 
 def test_a_first_person_subject_never_reaches_the_page_as_the_narrators():
-    """Belt and braces: a clause subject is refused outright, and a first-person token
-    that somehow arrives is turned to the second person before it is placed."""
+    """A clause subject, or one carrying the player's own "I", never reaches the page: the
+    anchor names only a person the engine holds, by their own name."""
     out, anchored = narration.keep_the_thread(
         "The room is empty. What do you do?",
         {"subject": "who I should speak to", "doing": "talking to"}, said={})
@@ -286,8 +291,37 @@ def test_a_first_person_subject_never_reaches_the_page_as_the_narrators():
     out, anchored = narration.keep_the_thread(
         "The room is empty. What do you do?",
         {"subject": "the man I saw at the gate", "doing": "following"}, said={})
-    assert anchored and "the man you saw at the gate" in out
+    assert anchored == "" and out == "The room is empty. What do you do?"
     assert not narration.narrator_in_first_person(out)
+
+
+def test_the_anchor_names_only_a_person_the_engine_holds():
+    """Measured 2026-10-16 on the planned benches, in the tail both narrators share: every
+    anchor written — 3 of 3, in 137 beats — carried a phrase no person answers to,
+    because the subject is the player's words cut by patterns: "You have not let their
+    name and out of your sight; you are still talking to them", "you have not lost about
+    the road out of the city and". The anchor now takes the thread's bound ref and the
+    engine's own name for them, or writes nothing."""
+    from types import SimpleNamespace
+
+    gone = "The stalls are busy. What do you do?"
+    loose = {"subject": "their name and", "doing": "talking to"}
+    assert narration.keep_the_thread(gone, loose, said={}) == (gone, "")
+    seller = SimpleNamespace(name="bread seller", is_pc=False, hp=6,
+                             has_state=lambda tag: False)
+    bound = {**loose, "ref": "c3"}
+    out, anchored = narration.keep_the_thread(gone, bound, said={},
+                                              actors={"c3": seller})
+    assert anchored == "the bread seller" and "their name and" not in out
+    dead = SimpleNamespace(name="bread seller", is_pc=False, hp=-12,
+                           has_state=lambda tag: tag == "state.down.dead")
+    assert narration.keep_the_thread(gone, bound, said={}, actors={"c3": dead}) == (gone, "")
+    # The briefs print the bound name too (`judgement.thread_name`).
+    from gm import judgement
+
+    s = SimpleNamespace(thread=dict(bound), actors={"c3": seller})
+    assert "talking to the bread seller" in judgement.thread_brief(s)
+    assert "their name and" not in judgement.thread_brief(s)
 
 
 # --- our lines are never shown back as the model's --------------------------------------
