@@ -5374,9 +5374,11 @@ def _told_by_its_blows(resolution) -> bool:
     page nor shown to the consequence call. See the note where `_run_npc_turns` asks.
 
     The planned-fights lane (fix/planned-fights-richer) has this rule for the planned
-    narrator, reading `Outcome.blows`; here it holds for both narrators, and reads the
-    outcome's own rolls, which every attack that rolled carries."""
-    return any(getattr(o, "op", "") == "attack" and getattr(o, "rolls", None)
+    narrator, reading `Outcome.blows`; here it holds for both narrators, and reads either
+    the outcome's own rolls or its blows — the engine writes both on every swing, and
+    either alone says a swing was made."""
+    return any(getattr(o, "op", "") == "attack"
+               and (getattr(o, "rolls", None) or getattr(o, "blows", None))
                for o in resolution.outcomes)
 
 

@@ -788,8 +788,11 @@ def test_a_miss_names_the_weapon_and_the_wind_up_does_not_reach_the_page(rules_d
     """Measured on the planned fight bench, 2026-10-16: the creature's plan call wound up by
     drawing a weapon it did not have on 6 of 7 of its turns ("pulls a heavy crossbow" — it
     swung a sap), and the consequence call, told only "it misses" and shown the wind-up,
-    wrote "the heavy bolt whistles past". A miss now names its weapon, and with Planned on
-    a turn that struck or missed is told from its blows alone."""
+    wrote "the heavy bolt whistles past". A miss now names its weapon, and a turn that
+    struck or missed is told from its blows alone — on BOTH narrators since the 2026-10-16
+    report (fix/fight-beats-true): under Free the wind-up drew the same crossbow on 4 of 6
+    turns and split one attack into two beats, which the player read as the creature
+    taking several turns."""
     from play import views
     from rules.engine import Resolution
 
@@ -802,7 +805,7 @@ def test_a_miss_names_the_weapon_and_the_wind_up_does_not_reach_the_page(rules_d
     assert not views._told_by_its_blows(Resolution(outcomes=[Outcome("i1", "say",
                                                                      tell="Jarek speaks.")]))
     houserules.set_active({"narration": "free"})
-    assert not views._told_by_its_blows(Resolution(outcomes=[miss]))
+    assert views._told_by_its_blows(Resolution(outcomes=[miss]))
 
 
 def test_a_real_swing_carries_its_blow_on_the_outcome():
