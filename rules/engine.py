@@ -2410,6 +2410,13 @@ class Outcome:
     # the outcome carried no verdict and no mark at all until 2026-10-07, so the sound bus
     # could not tell a thrown flask from anything else.
     mode: str = ""
+    # The tell's structured twin for a weapon blow, in the order the swings fell: each
+    # `{"result": "hit"|"miss", ...}` with the engine's own bands — how heavy the blow
+    # against the one struck (`severity`), how they are left (`left`), a confirmed
+    # critical, the weapon and its wound — or how a miss missed (`how`). Words, never a
+    # number: the planned narrator's fights are written from these (gm/planned.py
+    # `blow_facts`) so the colour has a fact under it. Empty on everything but an attack.
+    blows: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         d = {
@@ -2435,6 +2442,8 @@ class Outcome:
             d["fix"] = self.fix
         if self.mode:
             d["mode"] = self.mode
+        if self.blows:
+            d["blows"] = [dict(b) for b in self.blows]
         return d
 
     def player_visible(self) -> dict:
@@ -6727,6 +6736,9 @@ class Engine:
                 state["natural"] = natural
                 if natural == 1:
                     self._judge(atk, False)
+                    state.setdefault("blows", []).append(
+                        {"result": "miss", "how": "wild",
+                         "weapon": str(weapon.get("name") or weapon_key)})
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
@@ -6740,6 +6752,11 @@ class Engine:
                     continue
                 if not d20_succeeds(atk, swing_ac):
                     self._judge(atk, False)
+                    state.setdefault("blows", []).append(
+                        {"result": "miss", "weapon": str(weapon.get("name") or weapon_key),
+                         # The cover took it only when, without it, the roll would hit.
+                         "how": miss_how(swing_ac - atk.total, bool(cover_mods) and (
+                             swing_ac - atk.total <= sum(m.value for m in cover_mods)))})
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} misses "
                         f"{defender.name} ({atk.total} against {swing_note}).")
@@ -7099,6 +7116,16 @@ class Engine:
                                else "heavy" if int(weapon.get("hands", 1) or 1) >= 2
                                else "one-handed")
                 state["effects"].append(hit)
+                # The blow as the planned narrator writes it (`Outcome.blows`): the
+                # engine's bands, words not numbers, read off what it just did.
+                state.setdefault("blows", []).append({
+                    "result": "hit", "ref": defender.ref,
+                    "weapon": hit["weapon"], "type": str(hit.get("type") or ""),
+                    "nonlethal": hit.get("lethality") == "nonlethal",
+                    "critical": bool(state.get("crit")),
+                    "severity": blow_severity(int(hit.get("amount") or 0),
+                                              int(hit.get("hp_max") or defender.hp_max or 1)),
+                    "left": left_after(defender)})
                 # What the coup de grâce's save is set by: the damage DEALT, after DR.
                 state["dealt"] = int(hit.get("amount") or 0)
                 # Blood drawn, for a requirement curse that must have it daily (lane F):
@@ -7344,6 +7371,7 @@ class Engine:
             effects=effects,
             tell=" ".join(state["tells"]) + self._hp_state_tell(crossed),
             because=intent.because,
+            blows=list(state.get("blows") or []),
         )
 
     def _range_increment(self, actor: Actor, defender: Actor, weapon: dict, weapon_key: str,
@@ -23506,6 +23534,59 @@ def _record_gear(rec: dict) -> str:
     if (rec or {}).get("armour"):
         return "armour"
     return ""
+
+
+def blow_severity(amount: int, hp_max: int) -> str:
+    """How heavy a blow was against the one struck, as a band: "glancing", "solid",
+    "heavy" or "brutal" — the damage dealt against the target's OWN maximum hit points.
+
+    The MUD tradition's damage message (tbaMUD `fight.c`, `dam_message`: nine messages from
+    "misses" to "OBLITERATES") chose by absolute damage — `dam <= 2`, `<= 4` … `> 23` — so a
+    blow read the same against a rat and a dragon. Against the target's maximum, five points
+    is brutal to a goblin and glancing to an ogre, which is what the table sees."""
+    frac = max(0, int(amount)) / max(1, int(hp_max))
+    return ("glancing" if frac < 0.10 else "solid" if frac < 0.25
+            else "heavy" if frac < 0.50 else "brutal")
+
+
+def left_after(defender) -> str:
+    """How the one struck is left, as a band of the engine's own state: "dead" and "down"
+    by its tags, else — for a body carrying bruising — "shaken", "reeling" or
+    "staggering" by the non-lethal damage against the hit points left, and otherwise
+    "marked", "hurt", "bloodied" or "badly hurt" by how much of them is gone. Dungeon
+    Crawl Stone Soup describes a monster by wound level the same way; its exact
+    thresholds I could not confirm, and these are this game's."""
+    hp, hp_max = int(defender.hp), max(1, int(defender.hp_max or 1))
+    bruised = int(getattr(defender, "nonlethal", 0) or 0)
+    # Read off the numbers as well as the tags: the blow is banded as it falls, before
+    # the engine sets the state the hit points imply (`_hp_state_tell`). Measured on the
+    # planned bench, 2026-10-16: a sap that knocked the player out was banded "barely
+    # upright" because the unconscious tag landed after. CRB p.191: non-lethal damage
+    # greater than current hit points is unconscious; at or below 0 hit points is
+    # disabled or dying; dead at the negative of Constitution.
+    con = int(((getattr(defender, "abilities", None) or {}).get("con", 10)) or 10)
+    if defender.has_state("state.down.dead") or hp <= -con:
+        return "dead"
+    if defender.is_down or hp <= 0 or bruised > hp:
+        return "down"
+    if bruised and hp > 0:
+        dazed = bruised / hp
+        return "shaken" if dazed < 0.5 else "reeling" if dazed < 1 else "staggering"
+    gone = 1 - hp / hp_max
+    return ("marked" if gone < 0.10 else "hurt" if gone < 0.40
+            else "bloodied" if gone < 0.70 else "badly hurt")
+
+
+def miss_how(short_by: int, cover: bool) -> str:
+    """How a miss missed: "cover" when the cover between them is what turned it (the
+    caller says so: the roll would have hit without it), else by how far
+    the roll fell short of the AC — "close" within two, "wide" by eight or more, else
+    "plain". A natural 1 is "wild", set where it is rolled. Dungeon Crawl Stone Soup tells
+    a miss by its margin the same way (`evasion_margin_adverb`: "barely", "closely",
+    "completely")."""
+    if cover:
+        return "cover"
+    return "close" if short_by <= 2 else "wide" if short_by >= 8 else "plain"
 
 
 def _instrument(weapon: dict, weapon_key: str) -> str:

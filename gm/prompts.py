@@ -2525,7 +2525,9 @@ CONSEQUENCE_NPC_EXAMPLE = {
 
 def call_two_messages(narration: str, tells: list[str], because: list[str],
                       player_input: str, *, acting: str = "",
-                      pc_name: str = "", manner: str = "") -> list[dict]:
+                      pc_name: str = "", manner: str = "",
+                      blows: list[str] | None = None,
+                      blow_start: str = "") -> list[dict]:
     """The consequence call. `acting` is set on a creature's own turn: then the call
     says whose turn it is instead of "The player said: <creature> acts", shows the
     tells with the player already as "you" (Inform's adaptive text does the same — one
@@ -2557,6 +2559,20 @@ def call_two_messages(narration: str, tells: list[str], because: list[str],
     # standing facts are, and in words — never a number.
     if manner:
         content += f"\n{manner}\n"
+    # The blow as the engine knows it (`planned.blow_facts`, the planned narrator's
+    # fights): a severity, how the one struck is left, how a miss missed — words, never a
+    # number — and the passage is the blow itself, from these alone.
+    if blows:
+        if acting and pc_name:
+            from .narration import pc_to_second_person
+
+            blows = [pc_to_second_person(b, pc_name)[0] for b in blows]
+        content += ("\nTHE BLOW (engine facts, in order):\n"
+                    + "\n".join(f"- {b}" for b in blows)
+                    + "\nWrite the blow itself in two or three sentences from these facts "
+                      "only: how it is struck, how it lands or misses, how the one struck is "
+                      "left. Nothing they do not give, and never a number."
+                    + (f" {blow_start}" if blow_start else "") + "\n")
     return [
         {"role": "system", "content": CONSEQUENCE_BRIEFING},
         {"role": "user", "content": example["user"]},

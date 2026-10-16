@@ -106,6 +106,19 @@ REPLY_WANT = 240
 STILL_WANT = 140
 MATTER_WANT = 160
 ASIDE_WANT = 140
+# A blow written from its facts (`blow_facts`): two or three sentences, and a little more
+# for each further blow in one act; and the fight's surroundings, one clause.
+BLOW_WANT = 300
+BLOW_EACH = 100
+GROUND_WANT = 120
+# What the ground clause looks at (see where `build_plan` asks); None is a beat with no
+# ground clause at all, and two of them follow each aspect, so a fight hears its ground on
+# one beat in three. "What is underfoot" was asked first and wrote "Beneath your feet are
+# heavy wooden tables" on the rerun (the tavern's ground is "tables, benches and a hearth"),
+# so the floor is asked for as the floor itself, and last.
+_GROUND = ("what already stands about here, walls or furniture or whatever is there", None,
+           None, "the light here and what it falls on", None, None,
+           "the floor itself, the ground the feet are on", None, None)
 SLOT_FLOOR = 110
 # Which slots go first when the budget is short: the acts are the beat (never dropped), the
 # answer to the player's own question next, then the state, the open matter, and somebody
@@ -114,8 +127,8 @@ SLOT_FLOOR = 110
 # Generation Planner", IJCAI 1989); the alternative — every slot shortened in proportion —
 # was rejected because a slot squeezed below a sentence is a fragment, and the rule here
 # is that no sentence is ever cut mid-way.
-PRIORITY = {"fact": 0, "doing": 0, "keeps": 0, "reply": 1, "still": 2, "matter": 3,
-            "aside": 4}
+PRIORITY = {"fact": 0, "doing": 0, "keeps": 0, "reply": 1, "still": 2, "ground": 2,
+            "matter": 3, "aside": 4}
 # The grammar ceiling is held above the asked length, so the sampler never closes the
 # string mid-word (item 6, 2026-09-30); the slot is then fitted to whole sentences in code.
 GRAMMAR_ROOM = 1.6
@@ -245,6 +258,145 @@ def _place(engine) -> str:
         return ""
 
 
+# --- the blow, from the engine (planned fights, 2026-10-16) ----------------------------------
+#
+# The owner: "make planned narration fights less plain". Measured on the 2026-10-16 fight
+# benches: planned fight beats were accurate (5 errors in 21) and one sentence long, 120-190
+# characters, because the slot was handed a tell ("Kesst Vayr hits the guard for 5 non-lethal
+# bludgeoning") and told "show it", and a model told nothing more says nothing more.
+#
+# The colour comes from what the engine knows, so it cannot add an error. How the traditions
+# do it, and what was taken:
+#   * DikuMUD's descendants (tbaMUD `fight.c`, `dam_message`): a table of nine messages
+#     chosen by damage — "misses", up to "OBLITERATES". Taken: a severity tier per blow.
+#     Not taken: tbaMUD's thresholds are ABSOLUTE damage (dam <= 2, <= 4 … > 23), so the same
+#     blow reads the same against a rat and a dragon; here the tier is the damage against the
+#     target's own maximum hit points.
+#   * Dungeon Crawl Stone Soup (`attack.cc`): punctuation scaled by damage, and how a miss
+#     missed scaled by the margin (`evasion_margin_adverb`: "barely", "closely",
+#     "completely"); monsters described by wound level. Taken: the miss told by its margin,
+#     and the target's condition after the blow as a band.
+#   * Dwarf Fortress: every layer of every body part, weapon and material in the log. Not
+#     taken: the log runs to pages and players report scrolling and missing what mattered;
+#     the engine here holds no body parts, and inventing one would be the error this avoids.
+# I could not confirm DCSS's exact wound thresholds from its source (`mons_get_damage_level`
+# is not in the files I could read); the bands are this game's own. They are computed by
+# the ENGINE as each swing falls (`rules.engine.blow_severity`, `left_after`, `miss_how`)
+# and carried on `Outcome.blows`, the tell's structured twin — the third law's own answer
+# ("if the narrator needs a fact, the fact becomes part of a tell"): this reads no effect,
+# roll or AC, only the engine's words for them.
+#
+# Every phrase is ours and comes in three wordings, walked least-recently-used
+# (`narration.least_recently_used`, the anchors' and death lines' rule), because a model
+# shown "dryly" writes "dryly" nine beats in nine (the talk bench, 2026-10-16).
+
+# The engine's bands (`rules.engine.blow_severity`, `left_after`, `miss_how`, carried on
+# `Outcome.blows`), each in three wordings.
+_SEVERITY = {
+    "glancing": ("a glancing blow that barely bites", "a light touch, more sting than wound",
+                 "a scrape of a blow"),
+    "solid": ("a solid blow that lands true", "a clean strike with real weight behind it",
+              "a hit that tells"),
+    "heavy": ("a heavy blow that rocks them", "a hard strike that drives deep",
+              "a punishing hit"),
+    "brutal": ("a brutal blow that could end it", "a savage strike that tears into them",
+               "a devastating hit"),
+}
+_NONLETHAL = ("it bruises and stuns rather than cuts", "it hurts without drawing blood",
+              "a blow meant to drop them, not to kill")
+_LEFT = {
+    "marked": ("barely marked", "hardly touched", "still fresh"),
+    "hurt": ("hurt but steady", "marked but still sure on their feet",
+             "wounded, still dangerous"),
+    "bloodied": ("bloodied", "hurt and slowing", "badly marked"),
+    "badly hurt": ("badly hurt, barely holding on", "staggering under it",
+                   "close to falling"),
+    "shaken": ("shaken by it", "rattled", "blinking it away"),
+    "reeling": ("reeling", "unsteady on their feet", "swaying, close to dropping"),
+    "staggering": ("staggering, all but out", "barely upright", "one more and they drop"),
+    "down": ("down",),
+    "dead": ("dead",),
+}
+_MISS = {
+    "wild": ("badly wide, a clumsy miss", "nowhere near, thrown off balance",
+             "a wild swing that finds only air"),
+    "cover": ("the cover between them takes it", "it strikes the cover instead",
+              "it is turned by what stands between them"),
+    "close": ("a near thing, only just turned aside", "it grazes past by a finger's width",
+              "so close it stirs the air at their ear"),
+    "wide": ("well wide of the mark", "it never comes close", "easily avoided"),
+    "plain": ("turned aside", "it misses", "it is evaded"),
+}
+
+
+def _pick(said, key: str, pool) -> str:
+    return pool[narration_mod.least_recently_used(said, key, len(pool))]
+
+
+def blow_facts(outcomes, engine, said=None) -> list[str]:
+    """Each blow an act struck or missed, as facts the engine holds — never a number.
+
+    Read off `Outcome.blows`, the tell's structured twin the engine writes as each swing
+    falls: a hit's weapon and its wound, its severity against the one struck, a confirmed
+    critical, how they are left; a miss's kind. The bands are the engine's; this only
+    words them, three ways each, least recently used."""
+    out: list[str] = []
+    for o in outcomes or []:
+        for b in getattr(o, "blows", None) or []:
+            if b.get("result") == "hit":
+                who = engine.scene.actors.get(b.get("ref"))
+                name = (narration_mod.definite(str(who.name))
+                        if who is not None and not who.is_pc else "you")
+                severity = str(b.get("severity") or "solid")
+                bits = [f"weapon: {b.get('weapon') or 'a blow'}"
+                        + (f" ({b['type']})" if b.get("type") else ""),
+                        _pick(said, f"blow:{severity}",
+                              _SEVERITY.get(severity, _SEVERITY["solid"]))]
+                if b.get("nonlethal"):
+                    bits.append(_pick(said, "blow:nonlethal", _NONLETHAL))
+                if b.get("critical"):
+                    bits.append("a critical: it finds the gap exactly")
+                left = str(b.get("left") or "hurt")
+                bits.append(f"{name} after it: "
+                            + _pick(said, f"blow:left:{left}", _LEFT.get(left, _LEFT["hurt"])))
+                out.append("HIT — " + "; ".join(bits))
+            elif b.get("result") == "miss":
+                how = str(b.get("how") or "plain")
+                # The weapon on a miss too: told only "it misses", the consequence call
+                # took the wind-up's invented crossbow and wrote "the heavy bolt whistles
+                # past" for a swung sap (the 2026-10-16 planned fight bench).
+                out.append("MISS — " + (f"weapon: {b['weapon']}; " if b.get("weapon") else "")
+                           + _pick(said, f"blow:miss:{how}", _MISS.get(how, _MISS["plain"])))
+    return out
+
+
+# Where a blow's telling begins, one a blow, least recently used. Measured on the 2026-10-16
+# fight rerun: with the wind-up gone, 17 of 21 creature beats opened "The figure behind the
+# bar lunges forward, swinging a heavy sap" — the ask ("how it is struck, how it lands, how
+# the one struck is left") was walked in its own order every time, so every passage had the
+# same first clause. The ask's opening is varied instead of asking the model to vary it.
+#
+# The creature's call only. It was asked of the player's act slot too, and on the live check
+# the same day "The rapier lunges forward, delivering a brutal piercing blow that strikes
+# deep into the cutpurse" was cut whole by the dead-men-walking backstop: a blow that drops
+# its target names someone down, and that cut spares a sentence the player leads ("You…",
+# `narration._PLAYER_ACTS`), not one the weapon leads. The player's blows never had the
+# refrain — they open on "you" because the player is the one acting.
+_OPENING =("the weapon already moving", "the one it is aimed at",
+            "the sound it makes", "the instant it ends", "the attacker's footing")
+
+
+def blow_opening(said=None) -> str:
+    """The line that tells a blow passage where to begin (see `_OPENING`).
+
+    It says to name the attacker in the passage. The first wording ("…, not on the
+    attacker's name") was read on the live check as leave the name out: the beat never
+    named the master of the market on his own turn, and the wrong-actor backstop rewrote
+    it."""
+    return (f"Begin on {_pick(said, 'blow:opening', _OPENING)}; name the attacker in the "
+            "passage, only not as its first words.")
+
+
 # --- the plan --------------------------------------------------------------------------
 
 def addressee(engine, outcomes) -> str:
@@ -348,6 +500,26 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
         # trader", the refused-move check cut the beat from there, and the page read "You
         # are still at the market." The tell carries the declaration; nobody moves in it.
         moved = any(getattr(o, "op", "") in ("move", "travel") for o in act)
+        blows = [] if declared else blow_facts(act, engine,
+                                               getattr(engine.scene, "said", None))
+        if blows:
+            # The blow from what the engine knows (`blow_facts`): the slot writes the
+            # strike itself, two or three sentences, and every word of colour has a fact
+            # under it. Measured 2026-10-16 before this: fight beats of 120-190
+            # characters, "You lunge forward and strike at the Korvu, but your blow fails
+            # to connect" — true, and all there was.
+            lead = (f'The player said: "{player_input}". ' if i == 0 and not carry_on
+                    else "")
+            say = (f"{lead}The engine decided this: {decided}\nTHE BLOW (engine facts, "
+                   "in order):\n" + "\n".join(f"- {b}" for b in blows)
+                   + "\nWrite the blow itself, in two or three sentences, from these facts "
+                     "only: how it is struck, how it lands or misses, and how the one struck "
+                     "is left. Nothing the facts and THE SCENE do not give, and never a "
+                     "number.")
+            slots.append({"key": f"fact{i + 1}",
+                          "want": min(FACT_CEILING, BLOW_WANT + BLOW_EACH * (len(blows) - 1)),
+                          "say": say, "tells": tells})
+            continue
         if declared and not moved:
             say = (f"The engine decided this: {decided} Show the player squaring up to "
                    "them from where they stand, and stop there: nobody moves, no blow lands "
@@ -387,6 +559,28 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                           "say": "The player's character does what the player said: "
                                  f'"{player_input}". Show exactly that, in the place they '
                                  "are. Nothing more."})
+    if fighting and any(s["key"].startswith("fact") for s in slots):
+        # Where the fight is, in one clause, from the brief's own words for the place
+        # (UNDERFOOT, HERE): the ground the blows land on. Never a new thing that matters —
+        # a weapon to snatch or a door to run for is the engine's to put there. Lowest
+        # but one in the fight's budget: the blows come first.
+        #
+        # One beat in three, one aspect at a time, walked least-recently-used. The first
+        # cut asked for "the floor, the light, what already stands about" every beat, and
+        # on the 2026-10-16 fight bench the clause came back as the same tables, benches
+        # and hearth on every fight beat. Asking for one aspect a beat (and none every
+        # fourth) did not cure it: the rerun still named all three on 4 of 5 beats,
+        # because a tavern's UNDERFOOT is that one phrase ("tables, benches and a hearth")
+        # and the slot may not invent past it. What varies is how often it is said. A
+        # MUD's fight message carries no ground at all; the room is said once on entry.
+        focus = _GROUND[narration_mod.least_recently_used(
+            getattr(engine.scene, "said", None), "planned.ground", len(_GROUND))]
+        if focus:
+            slots.append({"key": "ground", "want": GROUND_WANT,
+                          "say": "One short sentence of where this fight is happening: "
+                                 f"{focus}, from what THE SCENE says is here and nothing "
+                                 "else. Nothing new that matters: no new person, weapon, "
+                                 "or way out; nobody acts in it."})
     if pull:
         # The engine's fact alone (rough edge 3). It was the pull's whole rendering, whose
         # head is an instruction to the free narrator ("STILL OPEN, NEAREST TO HAND … never
