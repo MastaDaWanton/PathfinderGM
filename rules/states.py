@@ -453,6 +453,9 @@ HOLDING_GROUND_KEY = "holding ground"
 # and the baseline the attitude track falls back to when no check or spell is holding
 # a step. Held as one effect (`attitude.set_regard`) whose `amount` is the score.
 REGARD = "bond.regard"
+# What somebody remembers being asked for today (Diplomacy's Make Request, CRB p.93;
+# `rules/requests.py`): how many requests, which they refused, whether they have paid.
+REQUESTS = "bond.requests"
 # What a lie left behind in the listener (owner ruling 2026-10-01, `rules/bluff.py`).
 # `belief.claim.<kind>`: they believe the player is what the player claimed — held until
 # dismissed, source `lie:<kind>`, so the day the truth comes out removing it by source is

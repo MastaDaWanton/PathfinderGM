@@ -122,9 +122,16 @@ something different about them.
   "when this effect ends" trigger in the engine — wards fire each round or when struck —
   and inventing a third trigger for one rule is how a mechanism ossifies around a special
   case. The friendliness runs out and they are whatever they were.
-- **Requests.** The book's request table (simple advice −5, dangerous aid +10, each extra
-  request +5) is not implemented. What a friendly creature will actually *do* is currently
-  the narrator's judgement, informed by the attitude in the brief.
+- **Requests — built 2026-10-16 for payment and favours** (`rules/requests.py`,
+  `Engine._make_request`). The reader's `request` act (`asks_for`: payment | favour)
+  becomes the player's Diplomacy check at the attitude's DC + Cha + the "simple aid" row
+  (+0), +5 per request already heard that day; refused unrolled below indifferent, and a
+  refused request stays refused for the day. A granted request for payment pays an
+  untrained hireling's day (CRB p.159, 1 sp) out of the payer's real purse. Still open:
+  the −5 advice row (a plain question rolls nothing, by the owner's line), and the
+  +5/+10/+15 rows for lengthy, dangerous or punishable aid, which need a judgement of the
+  aid nothing in the engine holds. What a granted favour *does* is still the narrator's,
+  informed by the tell; nothing changes hands for it.
 - **Aid another, and taking 10 or 20** on a social check.
 - **Nothing sets a starting attitude from the world.** Every creature begins where nobody
   has said anything, which reads as indifferent. A faction the player has wronged, a
