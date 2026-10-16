@@ -387,9 +387,14 @@ _OPENING =("the weapon already moving", "the one it is aimed at",
 
 
 def blow_opening(said=None) -> str:
-    """The line that tells a blow passage where to begin (see `_OPENING`)."""
-    return (f"Begin on {_pick(said, 'blow:opening', _OPENING)}, not on the attacker's "
-            "name.")
+    """The line that tells a blow passage where to begin (see `_OPENING`).
+
+    It says to name the attacker in the passage. The first wording ("…, not on the
+    attacker's name") was read on the live check as leave the name out: the beat never
+    named the master of the market on his own turn, and the wrong-actor backstop rewrote
+    it."""
+    return (f"Begin on {_pick(said, 'blow:opening', _OPENING)}; name the attacker in the "
+            "passage, only not as its first words.")
 
 
 # --- the plan --------------------------------------------------------------------------

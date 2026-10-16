@@ -753,6 +753,9 @@ def test_each_creature_blow_is_asked_to_begin_somewhere_new():
                                      pc_name="Kesst Vayr", blows=["HIT — weapon: sap"],
                                      blow_start=opening)
     assert opening in msgs[-1]["content"]
+    # Measured on the live check: "…, not on the attacker's name" came back without the
+    # attacker named at all, and the wrong-actor backstop rewrote the beat.
+    assert "name the attacker in the passage" in opening
     say = planned.build_plan(engine, "I stab him.", [_hit(engine)],
                              last_beat=LAST_BEAT)[0]["say"]
     assert "Begin on" not in say
