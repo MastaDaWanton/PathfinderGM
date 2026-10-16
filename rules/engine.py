@@ -6495,7 +6495,9 @@ class Engine:
                 state["natural"] = natural
                 if natural == 1:
                     self._judge(atk, False)
-                    state.setdefault("blows", []).append({"result": "miss", "how": "wild"})
+                    state.setdefault("blows", []).append(
+                        {"result": "miss", "how": "wild",
+                         "weapon": str(weapon.get("name") or weapon_key)})
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
@@ -6510,7 +6512,7 @@ class Engine:
                 if not d20_succeeds(atk, swing_ac):
                     self._judge(atk, False)
                     state.setdefault("blows", []).append(
-                        {"result": "miss",
+                        {"result": "miss", "weapon": str(weapon.get("name") or weapon_key),
                          # The cover took it only when, without it, the roll would hit.
                          "how": miss_how(swing_ac - atk.total, bool(cover_mods) and (
                              swing_ac - atk.total <= sum(m.value for m in cover_mods)))})
@@ -23284,12 +23286,19 @@ def left_after(defender) -> str:
     "marked", "hurt", "bloodied" or "badly hurt" by how much of them is gone. Dungeon
     Crawl Stone Soup describes a monster by wound level the same way; its exact
     thresholds I could not confirm, and these are this game's."""
-    if defender.has_state("state.down.dead"):
-        return "dead"
-    if defender.is_down:
-        return "down"
     hp, hp_max = int(defender.hp), max(1, int(defender.hp_max or 1))
     bruised = int(getattr(defender, "nonlethal", 0) or 0)
+    # Read off the numbers as well as the tags: the blow is banded as it falls, before
+    # the engine sets the state the hit points imply (`_hp_state_tell`). Measured on the
+    # planned bench, 2026-10-16: a sap that knocked the player out was banded "barely
+    # upright" because the unconscious tag landed after. CRB p.191: non-lethal damage
+    # greater than current hit points is unconscious; at or below 0 hit points is
+    # disabled or dying; dead at the negative of Constitution.
+    con = int(((getattr(defender, "abilities", None) or {}).get("con", 10)) or 10)
+    if defender.has_state("state.down.dead") or hp <= -con:
+        return "dead"
+    if defender.is_down or hp <= 0 or bruised > hp:
+        return "down"
     if bruised and hp > 0:
         dazed = bruised / hp
         return "shaken" if dazed < 0.5 else "reeling" if dazed < 1 else "staggering"

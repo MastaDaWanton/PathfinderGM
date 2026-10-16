@@ -354,8 +354,11 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
                 out.append("HIT — " + "; ".join(bits))
             elif b.get("result") == "miss":
                 how = str(b.get("how") or "plain")
-                out.append("MISS — " + _pick(said, f"blow:miss:{how}",
-                                             _MISS.get(how, _MISS["plain"])))
+                # The weapon on a miss too: told only "it misses", the consequence call
+                # took the wind-up's invented crossbow and wrote "the heavy bolt whistles
+                # past" for a swung sap (the 2026-10-16 planned fight bench).
+                out.append("MISS — " + (f"weapon: {b['weapon']}; " if b.get("weapon") else "")
+                           + _pick(said, f"blow:miss:{how}", _MISS.get(how, _MISS["plain"])))
     return out
 
 
