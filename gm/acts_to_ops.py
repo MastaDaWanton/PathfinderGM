@@ -493,11 +493,16 @@ def _request(row: Row, a: dict, scene, pc) -> None:
         row.missing = (f"there is nobody here who is {words}" if words
                        else "there is nobody here to ask")
         return
+    # The popup shows `because`: "asks tanner's apprentice" read wrong live; a descriptor
+    # name takes its article.
+    name = str(actor.name)
+    if name[:1].islower() and not name.lower().startswith(("the ", "a ", "an ")):
+        name = f"the {name}"
     row.intents.append({"op": "check", "actor": pc.ref, "target": who,
                         "params": {"skill": "diplomacy", "request": kind},
-                        "because": f"the player asks {actor.name} for "
+                        "because": f"the player asks {name} for "
                                    + ("payment" if kind == "payment" else "a favour")})
-    row.note = f"a request of {actor.name}: {kind}"
+    row.note = f"a request of {name}: {kind}"
 
 
 def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:

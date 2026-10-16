@@ -5746,7 +5746,13 @@ class Engine:
         from .bestiary import collapse_kit
 
         collapse_kit(payer)
-        coins = goods.coinage(getattr(self, "world", None), None)
+        # Named as the page names the purse (`play/views._state`: this town's coin). With
+        # no place the world's own coin answered, and the first live run's tell paid
+        # "1 Saltmakers' silver piece" into a purse the sheet showed as "1 Winged silver
+        # piece" — two names for one coin.
+        world = getattr(self, "world", None)
+        here = world.get(self.scene.location_id) if world is not None else None
+        coins = goods.coinage(world, here)
         owed = requests_mod.wage_cp()
         cp = min(owed, goods.in_copper(payer.purse))
         if cp <= 0:
