@@ -2526,7 +2526,8 @@ CONSEQUENCE_NPC_EXAMPLE = {
 def call_two_messages(narration: str, tells: list[str], because: list[str],
                       player_input: str, *, acting: str = "",
                       pc_name: str = "", manner: str = "",
-                      blows: list[str] | None = None) -> list[dict]:
+                      blows: list[str] | None = None,
+                      blow_start: str = "") -> list[dict]:
     """The consequence call. `acting` is set on a creature's own turn: then the call
     says whose turn it is instead of "The player said: <creature> acts", shows the
     tells with the player already as "you" (Inform's adaptive text does the same — one
@@ -2570,7 +2571,8 @@ def call_two_messages(narration: str, tells: list[str], because: list[str],
                     + "\n".join(f"- {b}" for b in blows)
                     + "\nWrite the blow itself in two or three sentences from these facts "
                       "only: how it is struck, how it lands or misses, how the one struck is "
-                      "left. Nothing they do not give, and never a number.\n")
+                      "left. Nothing they do not give, and never a number."
+                    + (f" {blow_start}" if blow_start else "") + "\n")
     return [
         {"role": "system", "content": CONSEQUENCE_BRIEFING},
         {"role": "user", "content": example["user"]},

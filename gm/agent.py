@@ -4002,17 +4002,19 @@ class GMAgent:
         # write an enemy's turn, so its fights read half-rich without this. Free keeps its
         # call as it was: the owner asked for the planned fights.
         blows: list[str] = []
+        opening = ""
         from rules import houserules
 
         if houserules.narration() == "planned" and self.engine.scene.in_encounter:
             from . import planned
 
-            blows = planned.blow_facts(outcomes, self.engine,
-                                       getattr(self.engine.scene, "said", None))
+            said = getattr(self.engine.scene, "said", None)
+            blows = planned.blow_facts(outcomes, self.engine, said)
+            opening = planned.blow_opening(said) if blows else ""
         reply = client.chat(
             prompts.call_two_messages(narration, tells, because, player_input,
                                       acting=acting, pc_name=pc.name if pc else "",
-                                      manner=manner, blows=blows),
+                                      manner=manner, blows=blows, blow_start=opening),
             # 700 rather than 250, and it is free. `num_predict` is a ceiling, not a
             # target: llama3.1 writes its two sentences and stops either way. A reasoning
             # model does not — measured on R4C3R/qwen3-8b-heretic, every consequence call

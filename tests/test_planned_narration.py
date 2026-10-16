@@ -735,6 +735,26 @@ def test_the_ground_clause_is_said_one_fight_beat_in_three_by_aspect():
     assert all(asks[i] is None or asks[i - 1] is None for i in range(1, 9))
 
 
+def test_each_blow_is_asked_to_begin_somewhere_new():
+    """Measured on the 2026-10-16 fight rerun: 17 of 21 creature beats opened "The figure
+    behind the bar lunges forward, swinging a heavy sap" — the ask was walked in its own
+    order every time. Each blow passage is now told where to begin, least recently used,
+    in the player's act slot and in the creature's consequence call alike."""
+    from gm import prompts
+
+    s, engine = _scene(fighting=True)
+    s.said = {}
+    starts = [planned.build_plan(engine, "I stab him.", [_hit(engine)],
+                                 last_beat=LAST_BEAT)[0]["say"].rsplit("Begin on", 1)[1]
+              for _ in range(len(planned._OPENING))]
+    assert len(set(starts)) == len(planned._OPENING)
+    opening = planned.blow_opening(s.said)
+    msgs = prompts.call_two_messages("", ["Jarek hits you."], [], "", acting="Jarek",
+                                     pc_name="Kesst Vayr", blows=["HIT — weapon: sap"],
+                                     blow_start=opening)
+    assert opening in msgs[-1]["content"]
+
+
 def test_a_blow_that_drops_them_is_banded_down_before_the_state_lands():
     """Measured on the planned fight bench, 2026-10-16: a sap that knocked the player out
     was banded "barely upright" — the blow is banded as it falls, and the unconscious tag

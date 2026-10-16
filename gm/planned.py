@@ -113,11 +113,12 @@ BLOW_EACH = 100
 GROUND_WANT = 120
 # What the ground clause looks at (see where `build_plan` asks); None is a beat with no
 # ground clause at all, and two of them follow each aspect, so a fight hears its ground on
-# one beat in three.
-_GROUND = ("what is underfoot, the floor or ground the blows land on", None, None,
-           "the light here and what it falls on", None, None,
-           "what already stands about here, walls or furniture or whatever is there", None,
-           None)
+# one beat in three. "What is underfoot" was asked first and wrote "Beneath your feet are
+# heavy wooden tables" on the rerun (the tavern's ground is "tables, benches and a hearth"),
+# so the floor is asked for as the floor itself, and last.
+_GROUND = ("what already stands about here, walls or furniture or whatever is there", None,
+           None, "the light here and what it falls on", None, None,
+           "the floor itself, the ground the feet are on", None, None)
 SLOT_FLOOR = 110
 # Which slots go first when the budget is short: the acts are the beat (never dropped), the
 # answer to the player's own question next, then the state, the open matter, and somebody
@@ -369,6 +370,21 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
     return out
 
 
+# Where a blow's telling begins, one a blow, least recently used. Measured on the 2026-10-16
+# fight rerun: with the wind-up gone, 17 of 21 creature beats opened "The figure behind the
+# bar lunges forward, swinging a heavy sap" — the ask ("how it is struck, how it lands, how
+# the one struck is left") was walked in its own order every time, so every passage had the
+# same first clause. The ask's opening is varied instead of asking the model to vary it.
+_OPENING = ("the weapon already moving", "the one it is aimed at",
+            "the sound it makes", "the instant it ends", "the attacker's footing")
+
+
+def blow_opening(said=None) -> str:
+    """The line that tells a blow passage where to begin (see `_OPENING`)."""
+    return (f"Begin on {_pick(said, 'blow:opening', _OPENING)}, not on the attacker's "
+            "name.")
+
+
 # --- the plan --------------------------------------------------------------------------
 
 def addressee(engine, outcomes) -> str:
@@ -487,7 +503,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                    + "\nWrite the blow itself, in two or three sentences, from these facts "
                      "only: how it is struck, how it lands or misses, and how the one struck "
                      "is left. Nothing the facts and THE SCENE do not give, and never a "
-                     "number.")
+                     "number. " + blow_opening(getattr(engine.scene, "said", None)))
             slots.append({"key": f"fact{i + 1}",
                           "want": min(FACT_CEILING, BLOW_WANT + BLOW_EACH * (len(blows) - 1)),
                           "say": say, "tells": tells})
