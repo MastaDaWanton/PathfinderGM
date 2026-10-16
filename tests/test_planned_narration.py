@@ -717,6 +717,44 @@ def test_the_engine_bands_a_blow_against_the_one_struck():
     assert eng.left_after(smith) == "reeling"
 
 
+def test_a_blow_that_drops_them_is_banded_down_before_the_state_lands():
+    """Measured on the planned fight bench, 2026-10-16: a sap that knocked the player out
+    was banded "barely upright" — the blow is banded as it falls, and the unconscious tag
+    lands after it. The band reads the numbers too (CRB: non-lethal damage past current hit
+    points is unconscious; at or below 0 is disabled or dying; dead at -Con)."""
+    from rules import engine as eng
+
+    s, engine = _scene(fighting=True)
+    smith = next(a for a in s.actors.values() if not a.is_pc)
+    smith.hp_max, smith.hp, smith.nonlethal = 10, 6, 7
+    assert eng.left_after(smith) == "down"
+    smith.nonlethal = 6
+    assert eng.left_after(smith) == "staggering"
+    smith.nonlethal, smith.hp = 0, -50
+    assert eng.left_after(smith) == "dead"
+
+
+def test_a_miss_names_the_weapon_and_the_wind_up_does_not_reach_the_page(rules_dir):
+    """Measured on the planned fight bench, 2026-10-16: the creature's plan call wound up by
+    drawing a weapon it did not have on 6 of 7 of its turns ("pulls a heavy crossbow" — it
+    swung a sap), and the consequence call, told only "it misses" and shown the wind-up,
+    wrote "the heavy bolt whistles past". A miss now names its weapon, and with Planned on
+    a turn that struck or missed is told from its blows alone."""
+    from play import views
+    from rules.engine import Resolution
+
+    s, engine = _scene(fighting=True)
+    miss = Outcome("i1", "attack", verdict="miss", tell="Jarek's attack misses you.",
+                   blows=[{"result": "miss", "how": "wide", "weapon": "sap"}])
+    assert "weapon: sap" in planned.blow_facts([miss], engine, said={})[0]
+    houserules.set_active({"narration": "planned"})
+    assert views._told_by_its_blows(Resolution(outcomes=[miss]))
+    assert not views._told_by_its_blows(Resolution(outcomes=[Outcome("i1", "say",
+                                                                     tell="Jarek speaks.")]))
+    houserules.set_active({"narration": "free"})
+    assert not views._told_by_its_blows(Resolution(outcomes=[miss]))
+
+
 def test_a_real_swing_carries_its_blow_on_the_outcome():
     """End to end through the engine's own attack: the swing's bands ride on
     `Outcome.blows`, the tell's structured twin, in words — and the record carries no

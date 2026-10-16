@@ -5221,7 +5221,16 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                  # be found by replaying the recording through `_groom` by hand.
                  "repairs": list(plan.repairs or [])}
         c.turn_log.append(history_mod.stamp(c, entry))
-        if plan.narration:
+        # With the planned narrator on, a creature's turn that struck or missed is told
+        # once, from the blow's facts (`Outcome.blows` -> `planned.blow_facts`, in the
+        # consequence call): the plan call's own wind-up is not put on the page, nor shown
+        # to that call as "already narrated". Measured on the 2026-10-16 planned fight
+        # bench: the wind-up drew a weapon the creature did not have on 6 of 7 of its
+        # turns ("reaches beneath the counter and pulls a heavy crossbow" — it swung a
+        # sap), and the consequence call, told the wind-up, then wrote "the heavy bolt
+        # whistles past". Free keeps both, as it was.
+        blow_turn = _told_by_its_blows(resolution)
+        if plan.narration and not blow_turn:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 
         tells = [o for o in resolution.outcomes if o.tell]
@@ -5240,7 +5249,8 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # cannot pay". This door had it on, measured 2026-09-25.
                 # `acting`: the call is told whose turn it was, and the prose is checked
                 # for being told the wrong way round (narration.wrong_actor).
-                text, attempt = agent.narrate_outcome(plan.narration, tells,
+                text, attempt = agent.narrate_outcome("" if blow_turn else plan.narration,
+                                                      tells,
                                                       f"{actor.name} acts",
                                                       rewrite=False, acting=actor.name,
                                                       manner=manner)
@@ -5314,6 +5324,16 @@ def _log_mentions(c, agent) -> None:
     c.turn_log.extend(rows)
     if rows:
         agent.mention_rows = []
+
+
+def _told_by_its_blows(resolution) -> bool:
+    """Whether a creature's turn is told from its blows alone (the planned narrator, and a
+    swing struck or missed): then its plan call's wind-up is neither put on the page nor
+    shown to the consequence call. See the note where `_run_npc_turns` asks."""
+    from rules import houserules
+
+    return (houserules.narration() == "planned"
+            and any(getattr(o, "blows", None) for o in resolution.outcomes))
 
 
 def _plain_tells(c, outcomes) -> str:
