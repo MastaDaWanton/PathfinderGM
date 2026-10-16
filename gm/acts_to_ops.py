@@ -467,8 +467,86 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 # was rolled at all.
                 row.intents.append({"op": "track", "actor": pc.ref, "params": {},
                                     "because": "the player looks for tracks"})
+            if act == "exert" and pc is not None:
+                _exert(row, frame, i, scene, pc)
         rows.append(row)
     return rows
+
+
+# The band a feat of strength is built at before the plan names one (`apply` carries the
+# plan's own band over): the book's "average" task, DC 10 (rules/tables.py DC_BANDS).
+EXERT_BAND = "average"
+
+
+def _exert(row: Row, frame, i, scene, pc) -> None:
+    """A feat of strength, built whole: the player's Strength check (CRB p.16), or — with
+    somebody here as the target — Aid Another on THEIR effort (CRB p.86): the player's
+    check against the book's 10, and the helped person's own check, +2 if it made it,
+    against the task (`Engine._aid_lands`).
+
+    The owner, 2026-10-16: "a man needed help with his cart. When she helped him the game
+    narrated that i lifted his cart but never gave a strength check." The reader read
+    every such line `other`, which owes no op. The skill and the target are the engine's
+    finders' (`person`); the plan is asked only how hard the task is — the `check` it must
+    declare, whose band `apply` carries over and whose op it replaces. A door forced is
+    `break_in`'s, which keeps its own path (the size bonus is the book's for doors).
+
+    Carrying capacity (CRB p.169, "Lifting and Dragging": overhead up to the maximum
+    load, off the ground twice it, push or drag five times it) is not used: it needs the
+    thing's weight, and nothing a player heaves at — a cart in the mud, a beam, a boulder —
+    is a record with one; what the pack holds is already lifted."""
+    a = frame["actions"][i]
+    words = " ".join(str(a.get("target") or "").split())
+    helped = person(scene, words) if words else ""
+    who = (getattr(scene, "actors", {}) or {}).get(helped) if helped else None
+    params: dict = {"skill": "strength", "dc": {"band": EXERT_BAND}}
+    built: dict = {"op": "check", "actor": pc.ref, "params": params,
+                   "because": "the player puts their strength to it"}
+    if who is not None and not who.is_pc and not who.is_down:
+        params["aid"] = True
+        built["target"] = who.ref
+        built["because"] = f"the player helps {who.name} with it"
+        row.note = f"Aid Another: {who.name}'s own effort, the player's check at DC 10"
+    else:
+        row.note = "a Strength check, the player's own"
+    row.intents.append(built)
+    # The plan names how hard the task is in the check it is required to write; `apply`
+    # takes its band and replaces it with this one.
+    row.ops = list(dict.fromkeys([*row.ops, "check"]))
+
+
+def _effort_check(r, pc) -> bool:
+    """Whether a plan op is the player's own check of the body's strength — a plain
+    ability check, a Strength-keyed skill (`tables.SKILLS`), or the 5e "athletics" a model
+    reaches for — which a built feat of strength replaces rather than rolls beside."""
+    from rules.intents import normalise_skill
+    from rules.tables import SKILLS, ability_check_of
+
+    if _op(r) != "check":
+        return False
+    if str(r.get("actor") or "pc") not in ("pc", pc.ref, "", "None"):
+        return False
+    said = " ".join(str((r.get("params") or {}).get("skill") or "").lower().split())
+    if ability_check_of(said) or said == "athletics":
+        return True
+    skill = normalise_skill(said) if said else None
+    return bool(skill) and SKILLS[skill][0] == "str"
+
+
+def _band_of(r) -> str:
+    """The difficulty band a plan op's `dc` names, or "": a band word as written, a stated
+    number as the band it lands in (`dc._nearest_band`) — the engine resolves the number."""
+    from rules import dc as dc_mod
+    from rules.intents import IntentError, normalise_dc
+
+    spec = (r.get("params") or {}).get("dc")
+    if spec is None or spec == "":
+        return ""
+    try:
+        d = normalise_dc(spec, "check", 0)
+    except (IntentError, TypeError, ValueError):
+        return ""
+    return str(d.get("band") or dc_mod._nearest_band(int(d["value"])))
 
 
 def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
@@ -977,6 +1055,17 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     checks = {str((b.get("params") or {}).get("skill") or "").lower()
               for b in built if b.get("op") == "check"}
     tracking = any(b.get("op") == "track" for b in built)
+    # A feat of strength the table built (`_exert`) takes the plan's word for how hard the
+    # task is — the band of the plan's own check for it, which it then replaces: one roll,
+    # the engine's skill and target, the plan's difficulty. Reset on every call, because
+    # the rows outlive the attempt and a retried plan may name another band or none.
+    exerted = [i for r in rows if r.act == "exert" for i in r.intents if i.get("op") == "check"]
+    if exerted:
+        band = next((b for b in (_band_of(r) for r in raw
+                                 if isinstance(r, dict) and _effort_check(r, pc)) if b),
+                    EXERT_BAND)
+        for b in exerted:
+            b["params"]["dc"] = {"band": band}
     # A steal the table built (`_take` in a fight) is the player's blow at that person:
     # the plan's own attack on them is the same deed, and is replaced, not rolled beside it.
     stolen_from = {str(b.get("target")) for b in built if b.get("op") == "attack"}
@@ -996,6 +1085,12 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             # or search for herbs instead.
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's look for tracks")
+            continue
+        if exerted and _effort_check(r, pc):
+            if notes is not None:
+                notes.append(f"the plan's {((r.get('params') or {}).get('skill'))} check "
+                             f"replaced by the reading's feat of strength (band "
+                             f"{exerted[0]['params']['dc']['band']})")
             continue
         if op == "check" and checks and str(
                 ((r or {}).get("params") or {}).get("skill") or "").lower() in checks:

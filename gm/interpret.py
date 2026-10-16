@@ -40,9 +40,18 @@ ENABLED = True
 ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
-    "rest", "rise", "call_on", "break_in", "stealth", "athletics", "gather", "follow",
-    "claim", "other",
+    "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
+    "follow", "claim", "other",
 )
+# `exert` since 2026-10-16. The owner: "my wife was playing and a man needed help with his
+# cart. When she helped him the game narrated that i lifted his cart but never gave a
+# strength check." Probed the same day (gemma-4-12B heretic): "I help the man lift his
+# cart", "I help him push the cart out of the mud", "I lift the cart so he can fix the
+# wheel" and two more all came back `other`, which owes no op — nothing rolled, and the
+# deeds backstop then wrote the player's own line onto the page as done. A feat of
+# strength is 1e's Strength check (CRB p.16), and helping somebody with theirs is Aid
+# Another (CRB p.86); `exert` owes that check, built whole (`acts_to_ops._exert`). Its
+# `target` is whoever the player helps; a door forced is still `break_in`.
 # `rise` and `track` since 2026-10-09, both from one live run (gemma-4-12B, Pangrella):
 #
 # * "I break camp and head back to town" was read `rest, go` — the vocabulary had a word
@@ -150,7 +159,9 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "cast": ("object", "target", "place"), "use": ("object", "target"), "consume": ("object",),
     "wait": ("place", "time", "target"), "rest": ("place", "time"),
     "call_on": ("target", "place"), "break_in": ("target", "object", "place"),
-    "stealth": ("target", "place"), "athletics": ("place",), "gather": ("object", "time"),
+    "stealth": ("target", "place"), "athletics": ("place",),
+    # What is heaved, and who is helped with it ("join the ferryman in hauling his boat").
+    "exert": ("object", "target", "place"), "gather": ("object", "time"),
     "follow": ("target", "object", "time"), "claim": (), "other": ("target", "object", "place"),
 }
 
@@ -186,7 +197,9 @@ call_on   go to somebody's house, knock at their door, visit them at home
 break_in  kick in, force or pick the lock of a door
 stealth   sneak, hide, slip past
 athletics climb, swim, jump
-gather    forage, gather, fill waterskins
+exert     lift, push, pull, heave, drag, hold up or shift something heavy by main
+          strength, alone or with somebody; the target is whoever you help with it
+gather   forage, gather, fill waterskins
 follow    follow somebody or a trail
 claim     assert who or what you are
 other     anything else
@@ -506,6 +519,18 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "make the shutters fly open by pointing at them",
           "object": "the shutters", "means": "beyond", "act": "other"}]}),
+    # --- 2026-10-16: feats of strength (`exert`) --------------------------------------
+    # Written unlike the probe lines (no cart, no "help him"): one heave alone, one heave
+    # beside somebody, who is the target.
+    ("I set my shoulder to the fallen beam and shove it off the trapdoor.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "set my shoulder to the fallen beam and shove it off the trapdoor",
+          "object": "the fallen beam", "place": "the trapdoor", "act": "exert"}]}),
+    ("I join the old fisherwoman in hauling her boat up the shingle.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "join the old fisherwoman in hauling her boat up the shingle",
+          "object": "her boat", "target": "the old fisherwoman", "place": "the shingle",
+          "act": "exert"}]}),
 ]
 
 
