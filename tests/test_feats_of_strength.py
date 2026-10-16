@@ -225,6 +225,18 @@ def test_the_task_is_decided_by_the_helped_persons_check_not_the_aid_roll():
     assert "the attempt fails" in out.tell
 
 
+def test_nobody_down_is_helped_and_nothing_is_rolled():
+    s, e, carter = _scene()
+    carter.hp = -3
+    carter.add_condition("unconscious", source="test")
+    assert carter.is_down
+    res = e.run(e.validate([{"op": "check", "actor": "pc", "target": carter.ref,
+                             "params": {"skill": "strength", "aid": True, "dc": "tough"}}],
+                           origin="author:test"))
+    assert res.awaiting is None
+    assert not res.outcomes[0].rolls and "no effort of theirs" in res.outcomes[0].tell
+
+
 def test_aid_needs_somebody_to_help_and_is_never_a_contest():
     with pytest.raises(IntentError, match="aid helps somebody else"):
         parse({"op": "check", "actor": "pc",

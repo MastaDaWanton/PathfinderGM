@@ -5495,6 +5495,10 @@ class Engine:
         if helped is not None and helped.is_pc:
             return self._refuse(intent, f"{actor.name} cannot roll {helped.name}'s own "
                                         f"check for them; the player rolls their own.")
+        if helped is not None and helped.is_down:
+            # Nobody on the floor makes a check to be helped with.
+            return self._refuse(intent, f"{helped.name} is in no state to try anything; "
+                                        f"there is no effort of theirs to help with.")
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
