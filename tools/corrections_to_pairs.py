@@ -18,6 +18,9 @@ the conversational formats TRL's trainers read (huggingface.co/docs/trl/dataset_
   * `pairs.planned.dpo.jsonl` and `examples.planned.kto.jsonl` — the first two for beats
     the PLANNED narrator wrote (gm/planned.py), kept apart: their prompt is the plan, not
     the free narrator's, and `meta.slots` holds every slot call as it was sent.
+  * `repair.planned.kto.jsonl` — a planned beat's remake is its slots asked again
+    (gm/planned.py `remake`): one row per slot call it made, judged by the verdict on the
+    remade beat.
 
 `prompt` is the narrator's own messages as they were sent (system, examples, the turn), so
 the model is trained on the exact context it failed in. Completions are written as the
@@ -105,7 +108,7 @@ def convert(records: list[dict], *, plain: bool = False,
     # the free prompt a plan's answer — so planned episodes go to sets of their own, with
     # every slot call in `meta.slots`, and the free narrator's sets stay the free
     # narrator's.
-    planned_dpo, planned_kto = [], []
+    planned_dpo, planned_kto, planned_repair = [], [], []
     for rec in records:
         prompt = (rec.get("input") or {}).get("messages")
         versions = [v for v in rec.get("versions") or [] if _text(v)]
@@ -141,6 +144,20 @@ def convert(records: list[dict], *, plain: bool = False,
                                              "verdict": v.get("verdict"),
                                              "implicit": bool(v.get("implicit"))}})
         for v in versions:
+            calls = v.get("repair_messages") or []
+            if (v.get("by") == "remake" and calls and isinstance(calls[0], dict)
+                    and "messages" in calls[0] and (_good(v, explicit_only) or _bad(v))):
+                # A planned remake (2026-10-16): the slot calls it made, each its own
+                # prompt and reply, judged by the verdict on the remade beat.
+                for call in calls:
+                    planned_repair.append({
+                        "prompt": call["messages"],
+                        "completion": [{"role": "assistant",
+                                        "content": str(call.get("reply") or "")}],
+                        "label": _good(v, explicit_only),
+                        "meta": {**meta_base, "verdict": v.get("verdict"),
+                                 "slot": call.get("key"), "model": call.get("model")}})
+                continue
             if v.get("by") == "remake" and v.get("repair_messages") and (
                     _good(v, explicit_only) or _bad(v)):
                 repair.append({"prompt": v["repair_messages"],
@@ -150,7 +167,8 @@ def convert(records: list[dict], *, plain: bool = False,
                                         "model": v.get("model")}})
     return {"pairs.dpo.jsonl": dpo, "examples.kto.jsonl": kto, "repair.kto.jsonl": repair,
             "pairs.planned.dpo.jsonl": planned_dpo,
-            "examples.planned.kto.jsonl": planned_kto}
+            "examples.planned.kto.jsonl": planned_kto,
+            "repair.planned.kto.jsonl": planned_repair}
 
 
 def main(argv: list[str] | None = None) -> int:
