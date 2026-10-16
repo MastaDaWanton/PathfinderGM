@@ -4695,6 +4695,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     joined = any(e.get("kind") == "battle_joined"
                  and not companions_mod.is_companion(c.scene.get(e.get("ref") or ""))
                  for o in resolution.outcomes for e in (o.effects or []))
+    # Unless the declared blow was rolled in this same batch (`Engine._their_first_blow`:
+    # the arrow since 2026-10-01, the thrown thing since 2026-10-16). Then the action the
+    # announcement promised is spent, and holding the turn gave the player a second blow
+    # before the other side moved at all — the hurled cobblestone, then a full attack at
+    # the panel, with the shopkeeper never acting (live, 2026-10-16). The turn ends here.
+    if joined and _told_by_its_blows(resolution):
+        joined = False
     if hand_over and not joined:
         _run_npc_turns(c, agent)
     if plan is not None:

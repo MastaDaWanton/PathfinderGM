@@ -102,3 +102,40 @@ def test_an_intended_attack_in_the_reading_is_still_no_swing(scene):
         assert not judgement.review(line, parse_all([THROW]), scene).ok
     finally:
         interpret._READINGS.clear()
+
+
+def test_once_the_opening_throw_is_rolled_the_other_side_acts(tmp_path):
+    """Live, 2026-10-16: the hurled cobblestone rolled and missed, and the shopkeeper never
+    acted — the turn stayed with the player ("a battle that just JOINED is not a turn that
+    just ENDED", written for the swing that was deferred), so the panel's full attack came
+    second, before the other side moved at all. A declared blow rolled in the same batch is
+    the action spent: the round goes on to the other side."""
+    import json
+
+    from django.test import Client, override_settings
+
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        c.seed = 20261016
+        for ref in [r for r in c.scene.actors if r != "pc"]:
+            c.scene.depart(ref)
+        thug = instantiate("thug", scene=c.scene, name="the woman with the braid")
+        thug.ref = "c1"
+        c.scene.add(thug)
+        c.scene.pc().goods["hairball"] = 1
+        e = c.engine()
+        e.run(e.validate([THROW]))
+        assert c.scene.awaiting, "the premise: the throw waits on the player's die"
+        c.save()
+        client = Client()
+        for _ in range(4):
+            if not cm.current().scene.awaiting:
+                break
+            client.post("/api/roll", data=json.dumps({"face": 2}),
+                        content_type="application/json")
+        rows = [r for r in cm.current().turn_log if r.get("kind") == "npc-turn"]
+        assert rows and rows[0].get("ref") == "c1", "the woman answers in the same round"
+        cm._LIVE.clear()
