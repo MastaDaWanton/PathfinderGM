@@ -328,7 +328,17 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
         show = ("Show the player squaring up to do it, and stop there: it has not "
                 "happened yet, so no blow lands and nobody is hurt." if declared else
                 "Show the player doing it and what came of it, once.")
-        if i == 0 and not carry_on:
+        # Declared, and the engine moved nobody: the player's own line is left out, because
+        # its words carry the walk the engine did not make. Measured live 2026-10-16: "I walk
+        # over to the packing trader and punch him" came back "You stride toward the packing
+        # trader", the refused-move check cut the beat from there, and the page read "You
+        # are still at the market." The tell carries the declaration; nobody moves in it.
+        moved = any(getattr(o, "op", "") in ("move", "travel") for o in act)
+        if declared and not moved:
+            say = (f"The engine decided this: {decided} Show the player squaring up to "
+                   "them from where they stand, and stop there: nobody moves, no blow lands "
+                   "and nobody is hurt.")
+        elif i == 0 and not carry_on:
             say = (f'The player said: "{player_input}". The engine decided what came of '
                    f"it: {decided} {show}")
         else:

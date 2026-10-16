@@ -235,6 +235,11 @@ def test_a_fight_declared_and_not_struck_is_not_shown_landing():
 
     say = first_act([joined])
     assert "no blow lands" in say and "doing it and what came of it" not in say
+    # And the player's own words stay out of it when the engine moved nobody: live
+    # 2026-10-16, "I walk over to the packing trader and punch him" came back "You stride
+    # toward the packing trader", the refused-move check cut the beat, and the page read
+    # "You are still at the market."
+    assert "I punch him." not in say and "nobody moves" in say
     struck = Outcome("i1", "attack", tell="Kesst Vayr hits Jarek.")
     say = first_act([struck])
     assert "doing it and what came of it" in say
