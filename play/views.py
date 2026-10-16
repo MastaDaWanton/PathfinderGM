@@ -5231,16 +5231,29 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         # its own paragraph, "The heavy club whistles through the air, missing…" — "the npc
         # took multiple turns". And where a repair cut the wind-up down to its filler ("eyes
         # you with a sharp, calculating gaze"), that filler stood alone as a beat in which
-        # nothing happened. The consequence call is already shown the wind-up ("You had
-        # already narrated: …") and continues from it, so the two read as one passage.
-        windup = plan.narration or ""
-
+        # nothing happened.
+        #
+        # And a turn the engine told is told FROM its tells, by the consequence call alone:
+        # the plan call's wind-up is neither put on the page nor shown to that call as
+        # "already narrated" (`_told_by_its_blows`, the planned-fights lane's rule, here
+        # for both narrators). The wind-up is written before the dice and before anything
+        # holds it to the creature's sheet: on the 2026-10-16 fight audits it drew a
+        # weapon the barkeep did not have on 4 of 6 free turns and 6 of 6 planned ones
+        # ("pulls a heavy crossbow from beneath the counter" — he swung a sap), and the
+        # consequence call, told the wind-up, then loosed "the heavy bolt". A move-only turn
+        # is the same (the planned lane's gap: a creature mid-fight "polishing glasses"
+        # while the engine moved it). A companion keeps its wind-up — it carries their
+        # manner and their in-character choice (the owner's rulings of 2026-10-01) — as
+        # does a turn the engine said nothing of, whose wind-up is all there is; either
+        # way it is one beat, the wind-up first.
         tells = [o for o in resolution.outcomes if o.tell]
         # A companion's turn is told HOW they do it (the owner's second ruling,
         # 2026-10-01: "narrated that they did so in a way that was timid and matched
         # their background") — their nature, trade, feeling for the player, and whether
         # it was an order against their grain — as a fact beside the tells.
         friend = companions_mod.is_companion(actor)
+        told = _told_by_its_blows(resolution) or (bool(tells) and not friend)
+        windup = "" if told else (plan.narration or "")
         manner = (companions_mod.manner_line(
             scene, actor, ordered=bool(orders),
             op=plan.intents[0].op if plan.intents else "") if friend else "")
@@ -5253,7 +5266,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # `acting`: the call is told whose turn it was, and the prose is checked
                 # for being told the wrong way round (narration.wrong_actor).
                 agent.last_added = []
-                text, attempt = agent.narrate_outcome(plan.narration, tells,
+                text, attempt = agent.narrate_outcome(windup, tells,
                                                       f"{actor.name} acts",
                                                       rewrite=False, acting=actor.name,
                                                       manner=manner)
@@ -5264,7 +5277,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # sentences about them are repaired (one call, kept only if the act is
                 # unchanged).
                 if friend and text and not companions_mod.shows_manner(
-                        f"{plan.narration} {text}", actor,
+                        f"{windup} {text}", actor,
                         companions_mod.dominant_pole(scene, actor), whole=True):
                     text, notes, _more = agent.manner_of(
                         text, actor, ordered=bool(orders),
@@ -5346,6 +5359,18 @@ def _log_mentions(c, agent) -> None:
     c.turn_log.extend(rows)
     if rows:
         agent.mention_rows = []
+
+
+def _told_by_its_blows(resolution) -> bool:
+    """Whether a creature's turn is told from its blows alone: a swing struck or missed
+    (an attack outcome that rolled). Then its plan call's wind-up is neither put on the
+    page nor shown to the consequence call. See the note where `_run_npc_turns` asks.
+
+    The planned-fights lane (fix/planned-fights-richer) has this rule for the planned
+    narrator, reading `Outcome.blows`; here it holds for both narrators, and reads the
+    outcome's own rolls, which every attack that rolled carries."""
+    return any(getattr(o, "op", "") == "attack" and getattr(o, "rolls", None)
+               for o in resolution.outcomes)
 
 
 def _plain_tells(c, outcomes) -> str:
