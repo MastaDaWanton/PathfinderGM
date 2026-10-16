@@ -375,7 +375,14 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
 # bar lunges forward, swinging a heavy sap" — the ask ("how it is struck, how it lands, how
 # the one struck is left") was walked in its own order every time, so every passage had the
 # same first clause. The ask's opening is varied instead of asking the model to vary it.
-_OPENING = ("the weapon already moving", "the one it is aimed at",
+#
+# The creature's call only. It was asked of the player's act slot too, and on the live check
+# the same day "The rapier lunges forward, delivering a brutal piercing blow that strikes
+# deep into the cutpurse" was cut whole by the dead-men-walking backstop: a blow that drops
+# its target names someone down, and that cut spares a sentence the player leads ("You…",
+# `narration._PLAYER_ACTS`), not one the weapon leads. The player's blows never had the
+# refrain — they open on "you" because the player is the one acting.
+_OPENING =("the weapon already moving", "the one it is aimed at",
             "the sound it makes", "the instant it ends", "the attacker's footing")
 
 
@@ -503,7 +510,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                    + "\nWrite the blow itself, in two or three sentences, from these facts "
                      "only: how it is struck, how it lands or misses, and how the one struck "
                      "is left. Nothing the facts and THE SCENE do not give, and never a "
-                     "number. " + blow_opening(getattr(engine.scene, "said", None)))
+                     "number.")
             slots.append({"key": f"fact{i + 1}",
                           "want": min(FACT_CEILING, BLOW_WANT + BLOW_EACH * (len(blows) - 1)),
                           "say": say, "tells": tells})

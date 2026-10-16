@@ -735,24 +735,33 @@ def test_the_ground_clause_is_said_one_fight_beat_in_three_by_aspect():
     assert all(asks[i] is None or asks[i - 1] is None for i in range(1, 9))
 
 
-def test_each_blow_is_asked_to_begin_somewhere_new():
+def test_each_creature_blow_is_asked_to_begin_somewhere_new():
     """Measured on the 2026-10-16 fight rerun: 17 of 21 creature beats opened "The figure
     behind the bar lunges forward, swinging a heavy sap" — the ask was walked in its own
-    order every time. Each blow passage is now told where to begin, least recently used,
-    in the player's act slot and in the creature's consequence call alike."""
-    from gm import prompts
+    order every time. A creature's blow passage is now told where to begin, least recently
+    used. The player's act slot is not: asked to begin on the weapon, the live check's
+    killing blow "The rapier lunges forward … strikes deep into the cutpurse" was cut whole
+    by the dead-men-walking backstop, which spares a sentence the player leads."""
+    from gm import narration, prompts
 
     s, engine = _scene(fighting=True)
     s.said = {}
-    starts = [planned.build_plan(engine, "I stab him.", [_hit(engine)],
-                                 last_beat=LAST_BEAT)[0]["say"].rsplit("Begin on", 1)[1]
-              for _ in range(len(planned._OPENING))]
+    starts = [planned.blow_opening(s.said) for _ in range(len(planned._OPENING))]
     assert len(set(starts)) == len(planned._OPENING)
     opening = planned.blow_opening(s.said)
     msgs = prompts.call_two_messages("", ["Jarek hits you."], [], "", acting="Jarek",
                                      pc_name="Kesst Vayr", blows=["HIT — weapon: sap"],
                                      blow_start=opening)
     assert opening in msgs[-1]["content"]
+    say = planned.build_plan(engine, "I stab him.", [_hit(engine)],
+                             last_beat=LAST_BEAT)[0]["say"]
+    assert "Begin on" not in say
+    # The measured sentence and its player-led twin, against the backstop itself.
+    led_by_weapon = ("The rapier lunges forward, delivering a brutal piercing blow that "
+                     "strikes deep into the cutpurse.")
+    led_by_you = "You lunge forward, and your rapier strikes deep into the cutpurse."
+    assert narration.cut_dead_men_walking(led_by_weapon, ["the cutpurse"])[1]
+    assert not narration.cut_dead_men_walking(led_by_you, ["the cutpurse"])[1]
 
 
 def test_a_blow_that_drops_them_is_banded_down_before_the_state_lands():
