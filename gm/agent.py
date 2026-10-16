@@ -2179,6 +2179,19 @@ class GMAgent:
                     whole=len(unshown) == len(owed))
                 repairs += deed_notes
                 attempts += deed_attempts
+        # And the player's own blows the engine rolled this turn: every one on the page,
+        # in the beat that answers it (2026-10-16). The deeds above leave a fight's attacks
+        # alone — "the blow's own checks own that page" — and no check did own it: the
+        # report's round two rolled the player's dagger thrust, a miss (6 against AC 10),
+        # and the beat never named the dagger or the miss, writing an invented
+        # grip on the player's throat instead. The same reader, asked of the engine's own
+        # line for each blow; the button turn (combat panel, `player_text` "") included.
+        if rewrite and not acting and outcomes is not None:
+            text, blow_notes, blow_attempts = self._show_blows(
+                text, outcomes, player_input, earlier=earlier, brief=brief,
+                known=self._known_names() | extra)
+            repairs += blow_notes
+            attempts += blow_attempts
         # A band the ledger booked keeps the word it was booked under: soldiers do not
         # become raiders between one paragraph and the next (2026-09-19, item 30). Before
         # the un-namer, which works on names rather than roles.
@@ -3226,6 +3239,107 @@ class GMAgent:
         else:
             fixed = narration_mod.put_the_deeds_in(text, passage, before_move=before)
         return fixed, [note], attempts
+
+    def _blows_unshown(self, text: str, outcomes, player_input: str
+                       ) -> tuple[list[dict], list[dict]]:
+        """(the player's rolled blows this turn, the ones the page does not show).
+
+        The blows are the engine's (`_blows_from`: an attack outcome that rolled, the
+        player's, not the "Battle is joined" declaration), each as its plain second-person
+        tell; whether the page shows each is the deed reader's (`deed_reader.read`), the
+        tell standing as the deed. Nothing is judged with the reader off or failed: whether
+        a sentence shows a blow is not a question for cue words (the owner's direction,
+        2026-10-03: models read, code validates)."""
+        from . import deed_reader
+
+        if not deed_reader.ENABLED:
+            return [], []
+        owed = [b for b in self._blows_from(outcomes)
+                if b.get("pc") and not b.get("joined") and str(b.get("tell") or "").strip()]
+        if not owed:
+            return [], []
+        got = self._read_deeds(text, [b["tell"] for b in owed], player_input)
+        if got.error:
+            return owed, []
+        gone = {v.span for v in got.missing}
+        return owed, [b for b in owed if " ".join(b["tell"].split()) in gone]
+
+    def _show_blows(self, text: str, outcomes, player_input: str, *,
+                    earlier: list[str] | None, brief: str,
+                    known: set[str]) -> tuple[str, list[str], list[Attempt]]:
+        """The player's rolled blow, missing from its beat, written onto it.
+
+        The house shape (`_show_declared`'s, whose call and refusals this reuses): one
+        small call for the blows alone, told what the dice decided — the engine's line is
+        the deed — kept only if the deed reader then finds every blow in it and the
+        structural refusals pass (no hand-back, nobody invented, and nobody hurt by a blow
+        that missed). Otherwise the backstop: the engine's own line for the blow, at the
+        start of the beat — declare, determine, describe; the player's act first — marked
+        ours (`deed_lines` → `last_added`, D4)."""
+        owed, unshown = self._blows_unshown(text, outcomes, player_input)
+        if not unshown:
+            return text, [], []
+        lines = [" ".join(str(b["tell"]).split()) for b in unshown]
+        deeds = [{"act": "attack", "span": line} for line in lines]
+        # Blows that hurt nobody (off the outcome RECORD through `_changes_from`, the one
+        # reader of effect records here — never the tells' words): the passage may not
+        # wound anybody for them.
+        pc = self.engine.scene.pc()
+        harmless = not any(
+            e.get("kind") in ("damage", "condition", "ability_damage")
+            and e.get("ref") != getattr(pc, "ref", "pc")
+            for e in self._changes_from([o for o in outcomes or ()
+                                         if getattr(o, "op", "") == "attack"]))
+        where = (earlier or [""])[-1] if earlier else str(brief or "")[:1400]
+        scene = self.engine.scene
+        lookup = " ".join([where, text, " ".join(lines)])
+        people = [str(a.name) for a in scene.actors.values()
+                  if not a.is_pc and a.name and str(a.name).lower() in lookup.lower()]
+        messages = prompts.deeds_messages(lines, player_input or " ".join(lines), text,
+                                          where, people, before_move=False,
+                                          harmless=harmless)
+        attempts: list[Attempt] = []
+        why, passage = "", ""
+        for _try in range(2):
+            try:
+                reply = client.chat(
+                    messages, self.prose_model, self.prose_host, as_json=True,
+                    think=False, temperature=0.6, num_predict=prompts.DEEDS_NUM_PREDICT,
+                    provider=self.prose_provider, api_key=self.prose_key,
+                    schema=prompts.deeds_schema())
+                attempts.append(Attempt("blows", reply.seconds, reply.model, reply.text,
+                                        note=f"unshown: {'; '.join(lines)}"))
+                passage = " ".join(str((reply.json() or {}).get("passage") or "").split())
+            except Exception as exc:  # noqa: BLE001 — a failed repair must not lose the turn
+                why, passage = f"the call failed ({type(exc).__name__})", ""
+                break
+            why = self._deeds_refusal(passage, deeds, known | set(people),
+                                      before_move=False, harmless=harmless,
+                                      player_input=player_input, pc=scene.pc(),
+                                      by_cues=False)
+            if not why:
+                got = self._read_deeds(passage, lines, player_input)
+                lost = [v.span for v in got.missing]
+                if got.error:
+                    why = f"could not be read back ({got.error[:60]})"
+                elif lost:
+                    why = "does not show " + ", ".join(lost)
+            if not why:
+                break
+            messages = messages + [
+                {"role": "assistant", "content": reply.text},
+                {"role": "user", "content": f"That passage {why}. Write it again: only "
+                                            f"{'; '.join(lines)}, nothing else."}]
+        if why:
+            passage = " ".join(lines)
+            self.deed_lines = list(getattr(self, "deed_lines", None) or []) + \
+                narration_mod._sentences(passage)
+            note = (f"a blow left off the page: {'; '.join(lines)[:120]} — the passage did "
+                    f"not hold ({why}); wrote the engine's own line")
+        else:
+            note = f"a blow left off the page: wrote {'; '.join(lines)[:120]}"
+        return narration_mod.put_the_deeds_in(text, passage, before_move=False), [note], \
+            attempts
 
     @staticmethod
     def _deed_reader_on() -> bool:
