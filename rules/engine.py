@@ -3706,9 +3706,13 @@ class Engine:
         from . import position as position_mod
 
         params = dict(opened.get("params") or {})
+        # A throw closes nothing (`closing_move`'s `thrown`): the hairball hurled across a
+        # market from fifteen feet was read as a melee swing out of reach, so the player's
+        # first blow waited for a combat panel they never used for it (2026-10-16).
         closing = position_mod.closing_move(
             self.scene, a, self.scene.actors[target],
-            params.get("weapon") or a.equipped or "unarmed")
+            params.get("weapon") or a.equipped or "unarmed",
+            thrown=bool(params.get("thrown")))
         if closing is not None and not closing[1]:
             return resolution
         # The player is never walked anywhere they did not say: their blow rolls now only
@@ -6394,7 +6398,16 @@ class Engine:
         # weapon goes where it was thrown unless it returns (`_thrown_lands`, lane C2).
         thrown_real = (bool(intent.params.get("thrown")) and not dancing
                        and weapon_key != "improvised" and bool(weapon.get("range_ft")))
-        if thrown_real:
+        # And a thing picked up and thrown — the stool, the hairball. CRB, Improvised
+        # Weapons: "An improvised thrown weapon has a range increment of 10 feet" (the
+        # `improvised` row's `range_ft`), on top of the -4 every improvised weapon takes. It
+        # is a throw for the roll — Dex to hit, the range increment, ranged for the AC — and
+        # lands by its own rule below (the thing on the ground, `place_prop`), never
+        # `_thrown_lands`. Until 2026-10-16 it rolled as a melee swing with Str, from any
+        # distance (the hairball at fifteen feet, the 2026-10-16 report).
+        thrown_any = thrown_real or (bool(intent.params.get("thrown")) and not dancing
+                                     and weapon_key == "improvised")
+        if thrown_any:
             full = False
         # The range increment (CRB, Combat: "each full range increment imposes a
         # cumulative -2 penalty on the attack roll ... A thrown weapon has a maximum range
@@ -6403,10 +6416,10 @@ class Engine:
         # hit as well at 300 feet as at 30, and distance's doubled increment (lane C) was
         # a number on the sheet that changed nothing.
         range_pen, out_of_range = self._range_increment(actor, defender, weapon, weapon_key,
-                                                        thrown_real)
+                                                        thrown_any)
         if out_of_range and partial.get("attack_state") is None:
             return self._refuse(intent, out_of_range)
-        if thrown_real:
+        if thrown_any:
             # Thrown, it is a ranged attack for everything that asks the blow's kind: the
             # AC it is rolled against (cover, a helpless target's -4 is melee-only),
             # flanking (melee only), arrow catching and deflection, and no thorns for the
@@ -6692,7 +6705,7 @@ class Engine:
                 # A throw is a ranged attack: Dex to hit (`attack_modifiers(thrown=)`).
                 atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
                                                   lethality=lethality, defender=defender,
-                                                  thrown=thrown_real,
+                                                  thrown=thrown_any,
                                                   range_ft=self._gap_ft(actor, defender))
                 # Compulsions are charged here rather than in `attack_modifiers` because
                 # the penalty depends on *who is being attacked*, which the sheet does not
@@ -6884,7 +6897,7 @@ class Engine:
                                                   defender=defender) if dancing
                             else actor.damage_modifiers(weapon_key, power_attack=power,
                                                         defender=defender,
-                                                        thrown=thrown_real,
+                                                        thrown=thrown_any,
                                                         range_ft=self._gap_ft(actor,
                                                                               defender)))
                 rider_col = "" if dancing else str(weapon.get("rider_column") or "")

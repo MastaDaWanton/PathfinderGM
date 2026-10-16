@@ -87,6 +87,25 @@ RG_REST = {"intent_id": "i1", "op": "rest", "status": "resolved",
            "effects": [{"ref": "pc", "kind": "rest", "hours": 12}]}
 
 
+# The market brawl of the 2026-10-16 report, as the engine held it: nobody grappled, nobody
+# down, one blow a turn (gold beats "cond-*").
+FB_WOMAN = ["c4", "woman with the braid", "commoner"]
+FB_MISS = {"intent_id": "i1", "op": "attack", "status": "resolved", "effects": [],
+           "tell": "Kesst Vayr's attack with the dagger misses the woman with the braid "
+                   "(6 against AC 10)."}
+FB_HIT = {"intent_id": "i1", "op": "attack", "status": "resolved",
+          "tell": "Kesst Vayr hits the woman with the braid for 3 bludgeoning.",
+          "effects": [{"ref": "c4", "kind": "damage", "amount": 3}]}
+FB_GRAPPLE = {"intent_id": "n1", "op": "attack", "status": "resolved",
+              "tell": "The woman with the braid grapples Kesst Vayr by 3: both of you gain "
+                      "the grappled condition.",
+              "effects": [{"ref": "pc", "kind": "condition", "condition": "grappled"},
+                          {"ref": "c4", "kind": "condition", "condition": "grappled"}]}
+FB_TRIP = {"intent_id": "i1", "op": "attack", "status": "resolved",
+           "tell": "Kesst Vayr trips the woman with the braid by 4: she is prone.",
+           "effects": [{"ref": "c4", "kind": "condition", "condition": "prone"}]}
+
+
 def places_of(beat) -> tuple[str, ...]:
     return {"VM": VM_PLACES, "PG": PG_PLACES, "XY": XY_PLACES,
             "RG": RG_PLACES}.get(beat["world"], ZH_PLACES)
@@ -102,12 +121,15 @@ def facts(beat):
                              down=len(p) > 4 and p[4] in ("down", "dead"),
                              dead=len(p) > 4 and p[4] == "dead",
                              # "away": held elsewhere in town (`beat_reader.away_people`).
-                             here=not (len(p) > 4 and p[4] == "away"))
+                             here=not (len(p) > 4 and p[4] == "away"),
+                             # The conditions the engine holds on them after the turn.
+                             holds=tuple(p[5]) if len(p) > 5 else ())
                    for p in beat["people"])
     return bv.Facts(start=beat["start"], end=beat["end"], places=places_of(beat),
                     went_by=tuple(beat["went_by"]), pack=tuple(beat["pack"]),
                     props=tuple(beat["props"]), people=people, clock=beat["clock"],
-                    outcomes=tuple(beat["outcomes"]), pc_ref="pc")
+                    outcomes=tuple(beat["outcomes"]), pc_ref="pc",
+                    in_fight=bool(beat.get("fight")))
 
 
 def by_id(beat_id: str) -> dict:
@@ -120,8 +142,9 @@ def C(cat: str, opt: bool = False, **slots) -> dict:
 
 def B(id: str, source: str, text: str, *, start: str, end: str = "", world: str = "ZH",
       people=(), pack=(), props=(), clock=None, outcomes=(), went_by=(), player: str = "",
-      reading=None, claims=(), alarms=(), may_alarm=()) -> dict:
+      reading=None, claims=(), alarms=(), may_alarm=(), fight: bool = False) -> dict:
     return {"id": id, "source": source, "text": text, "start": start, "end": end or start,
+            "fight": fight,
             "world": world, "people": [list(p) for p in people], "pack": list(pack),
             "props": list(props), "clock": clock, "outcomes": list(outcomes),
             "went_by": list(went_by), "player": player, "reading": reading or {},
@@ -562,8 +585,11 @@ GOLD = [
                  "effects": [{"ref": "pc", "kind": "cast", "name": "Burning Hands",
                               "targets": []}]}],
       claims=[C("harm", who="c8", how="hurt"),
-              C("harm", opt=True, who="c8", how="down")],
-      alarms=["harm"]),
+              C("harm", opt=True, who="c8", how="down"),
+              # The body's conditions (2026-10-16), labelled before the slot ran: "He
+              # hits the ground hard" with nothing knocking him down in the engine.
+              C("condition", opt=True, who="c8", condition="prone")],
+      alarms=["harm"], may_alarm=["condition"]),
     B("whetstone", "bobby:10",
       "The man studies you, his gaze lingering on the way your hands rest on your gear. He "
       "gestures with the whetstone toward a fork in the path. He leans back against the "
@@ -609,8 +635,9 @@ GOLD = [
                  "tell": "Kesst Vayr's attack misses Commoner (9 against AC 10).",
                  "effects": []}],
       claims=[C("harm", who=["c2", "c3"], how="hurt"),
-              C("harm", opt=True, who=["c2", "c3"], how="down")],
-      alarms=["harm"]),
+              C("harm", opt=True, who=["c2", "c3"], how="down"),
+              C("condition", opt=True, who=["c2", "c3"], condition="prone")],
+      alarms=["harm"], may_alarm=["condition"]),
     B("ho-sickening-thud", "fight:14 (held out)",
       "The man's head snaps back from your blow, and he falls, the back of his head hitting "
       "the cobblestones with a sickening thud. He doesn't move. The crowd is frozen, a wall "
@@ -621,8 +648,9 @@ GOLD = [
                  "tell": "Kesst Vayr's attack misses Commoner (6 against AC 10).",
                  "effects": []}],
       claims=[C("harm", who=["c2", "c3", "c4"], how=["hurt", "down", "dead"]),
-              C("harm", opt=True, who=["c2", "c3", "c4"], how=["down", "dead", "hurt"])],
-      alarms=["harm"]),
+              C("harm", opt=True, who=["c2", "c3", "c4"], how=["down", "dead", "hurt"]),
+              C("condition", opt=True, who=["c2", "c3", "c4"], condition="prone")],
+      alarms=["harm"], may_alarm=["condition"]),
     B("ho-first-fall", "fight:3 (held out)",
       "The man's head snaps back from the force of your fist, his body reeling into the "
       "heavy crate with a dull thud. He collapses into the mud, the air leaving his lungs in "
@@ -637,7 +665,8 @@ GOLD = [
                  "effects": [{"ref": "c4", "kind": "damage", "amount": 7},
                              {"ref": "c4", "kind": "condition", "condition": "unconscious"},
                              {"ref": "c4", "kind": "condition", "condition": "dying"}]}],
-      claims=[C("harm", who="c4", how="hurt"), C("harm", who="c4", how="down")]),
+      claims=[C("harm", who="c4", how="hurt"), C("harm", who="c4", how="down"),
+              C("condition", opt=True, who="c4", condition="prone")]),
     B("ho-lies-still", "fight:6 (held out)",
       "The man in stained leather lies still beneath you, the dirt of the west crossing "
       "mingling with the blood on his tunic. The crowd has halted; the heavy, rhythmic thump "
@@ -650,7 +679,8 @@ GOLD = [
                 {"intent_id": "n1", "op": "attack", "status": "resolved",
                  "tell": "Commoner's attack misses Kesst Vayr (5 against AC 15).",
                  "effects": []}],
-      claims=[C("harm", opt=True, who="c4", how=["down", "hurt"])]),
+      claims=[C("harm", opt=True, who="c4", how=["down", "hurt"]),
+              C("condition", opt=True, who="c4", condition="prone")]),
     B("ho-stool-misses", "fight:8 npc (held out)",
       "The commoner swings the heavy stool with a desperate, panicked grunt, but the wood "
       "whistles through the air and strikes only empty space. The intruder remains "
@@ -858,4 +888,101 @@ GOLD = [
       world="RG", start="the ridgelines", people=(RG_SAMMY, RG_HOLDER), clock=36360,
       player="i lay on the ground and rest watching the aelzeldra", outcomes=[RG_REST],
       claims=[C("hour", opt=True, part=["dawn", "morning"])]),
+    # --- the body's conditions (2026-10-16, the owner's wife's market brawl on 0.2.19) ----
+    # The report's beats, paraphrased short (the save is never committed): across three
+    # beats a woman's hands reached for the player's throat, dug into it, and tightened
+    # round it, and the engine grappled nobody. Beside them, the true holds and falls the
+    # engine DID make, and the shapes a reader must not take for a condition.
+    *[B(i, s, t, start="the market", world="PG", fight=True, clock=600,
+        # A grapple is both bodies' (CRB p.199: "both you and the target gain the
+        # grappled condition"); a fall is only hers.
+        people=(["pc", "Kesst Vayr", "", True, "",
+                 h4 if "grappled" in (h4 or ()) else ()],
+                ["c4", "woman with the braid", "commoner", False, "", h4 or ()]),
+        outcomes=o, claims=c, alarms=a, may_alarm=m)
+      for i, s, t, o, c, a, m, h4 in (
+        ("cond-grab-attempt", "report:10 (paraphrased)",
+         "The thrown clump of hair passes her cheek. She recoils, her eyes narrowing, and "
+         "lunges at you, her hands reaching to grab you by the throat.",
+         [FB_MISS], [], [], [], None),
+        ("cond-fingers-dig", "report:13 (paraphrased)",
+         "Your dagger skids past her hip and clatters against a clay pot. She is inches "
+         "from you, her fingers digging into your throat, her face twisted in a snarl.",
+         [FB_MISS], [C("condition", who="pc", condition="grappled"),
+                     C("harm", opt=True, who="pc", how="hurt")],
+         ["condition"], ["harm"], None),
+        ("cond-grip-tightens", "report:17 (paraphrased)",
+         "Her fingers tighten around your throat as she leans in close. Her grip is meant "
+         "to crush the wind out of you.",
+         [FB_MISS], [C("condition", who="pc", condition="grappled"),
+                     C("condition", opt=True, who="pc", condition="grappled"),
+                     C("harm", opt=True, who="pc", how="hurt")],
+         ["condition"], ["harm"], None),
+        ("cond-aim-off-feet", "report:npc-45 draft (paraphrased)",
+         "She eyes you coldly. She swings her club at you, aiming to knock you off your "
+         "feet before you can move.",
+         [], [], [], [], None),
+        ("cond-held-true", "synthetic",
+         "She hooks an arm round your neck and drags you into a crushing hold. You strain "
+         "against her, but her grip does not give.",
+         [FB_GRAPPLE], [C("condition", who="pc", condition="grappled"),
+                        C("condition", opt=True, who="c4", condition="grappled"),
+                        C("harm", opt=True, who="pc", how="hurt")], [], [], ("grappled",)),
+        ("cond-trip-true", "synthetic",
+         "Your heel hooks behind her ankle and she lands flat on her back in the dirt.",
+         [FB_TRIP], [C("condition", who="c4", condition="prone"),
+                     C("harm", opt=True, who="c4", how="hurt")], [], [], ("prone",)),
+        ("cond-sprawl-invented", "synthetic",
+         "Your fist cracks into her jaw and sends her sprawling across the stones.",
+         [FB_HIT], [C("harm", who="c4", how="hurt"),
+                    C("condition", who="c4", condition="prone")], ["condition"], [], None),
+        ("cond-stunned-invented", "synthetic",
+         "The pommel catches her temple. She staggers back, momentarily stunned.",
+         [FB_HIT], [C("harm", who="c4", how="hurt"),
+                    C("condition", who="c4", condition=["stunned", "dazed"])],
+         ["condition"], [], None),
+        ("cond-stunned-silence", "synthetic",
+         "Your swing goes wide of her shoulder, and a stunned silence falls over the "
+         "watching crowd.",
+         [FB_MISS], [], [], [], None),
+      )],
+    # Held out: real beats of the grapple fights in the recordings (tests/replay
+    # *-fight-bodies-*), labelled before any run. The engine held both men grappled and
+    # nobody pinned: "pinned" for a grapple is the narrator's word and arguably the
+    # rules' overclaim, so either answer is accepted and an alarm is defensible.
+    B("ho-pinned-in-a-grapple", "fight-bodies-plain:6 npc (held out)",
+      "Pinned and struggling against your grip, the man with a thick grunts with effort, "
+      "trying to wrench his arm free to reach for something closer.",
+      world="PG", start="the market", fight=True,
+      people=(["pc", "Kesst Vayr", "", True, "", ("grappled",)],
+              ["c3", "man with a thick", "commoner", False, "", ("grappled",)]),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved", "effects": [],
+                 "tell": "man with a thick's attack misses Kesst Vayr (13 against AC 13 "
+                         "with cover)."}],
+      claims=[C("condition", opt=True, who="c3", condition=["grappled", "pinned"])],
+      may_alarm=["condition"]),
+    B("ho-pinioned-strikes", "fight-bodies:7 npc (held out)",
+      "Pinioned and struggling against your grip, Borin Lyraxys spits a mouthful of blood "
+      "and lashes out with a desperate, short-range strike, trying to break your hold.",
+      world="PG", start="the market", fight=True,
+      people=(["pc", "Kesst Vayr", "", True, "", ("grappled",)],
+              ["c2", "Borin Lyraxys", "human", False, "", ("grappled",)]),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved", "effects": [],
+                 "tell": "Borin Lyraxys's attack misses Kesst Vayr (12 against AC 13 with "
+                         "cover)."}],
+      claims=[C("condition", opt=True, who="c2", condition=["grappled", "pinned"]),
+              C("harm", opt=True, who="c2", how="hurt")],
+      may_alarm=["condition"]),
+    B("ho-grip-to-pin", "fight:8 npc (held out)",
+      "The commoner slams into you with desperate force, the blow heavy and jarring as "
+      "they aim to pin your arms. Their grip is frantic, intended to pin you against the "
+      "ground and stifle your movements.",
+      world="PG", start="the west crossing", fight=True,
+      people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner hits Kesst Vayr for 2 bludgeoning.",
+                 "effects": [{"ref": "pc", "kind": "damage", "amount": 2}]}],
+      claims=[C("harm", who="pc", how="hurt"),
+              C("condition", opt=True, who="pc", condition=["grappled", "pinned"])],
+      may_alarm=["condition"]),
 ]

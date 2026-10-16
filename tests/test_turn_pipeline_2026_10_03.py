@@ -278,7 +278,7 @@ def test_the_page_pass_runs_again_after_the_repairs(monkeypatch):
     cleaned before the hand-back is judged, as a first draft would have been."""
     agent, _ = scene_at(MARKET)
 
-    def writes_badly(text, changes):
+    def writes_badly(text, changes, **_):
         return text + " The servant (c1) nods toward the water. And then the", ["x"], []
 
     monkeypatch.setattr(agent, "_repair_state_claims", writes_badly)

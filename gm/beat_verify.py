@@ -68,6 +68,48 @@ NOBODY = "nobody"
 UNSTATED = "unstated"
 HOW = ("hurt", "down", "dead")
 
+# The conditions a body can be said to be IN, as the tag vocabulary names them
+# (`rules/states.py` TAGS keys; `states.tags_for(key)[0]` is the leaf `has_state` asks).
+# Added 2026-10-16 for the owner's report: across three beats a woman "lunges forward, her
+# hands reaching out to grab you by the throat", then has "her fingers digging into your
+# throat", then "Her fingers tighten around your throat… her grip intended to crush your
+# wind" — and the engine had grappled nobody: no grapple op, no `state.held.grappled`. The
+# English reader before this (gm/state_claims.py) had no grappled row at all, and its one
+# hit that fight was a false "prone" on "aiming to knock you off your feet" — an aim, cut,
+# which left the wind-up's filler standing alone as a beat.
+#
+# Closed on purpose: the conditions a fight's prose puts on a body that the engine would
+# hold as a state. Not "unconscious" or "dead" — those are `harmed`'s `down`/`dead`, and
+# a second slot for them competes with it (the `attacks` slot measured exactly that:
+# harm recall 12/14 -> 8/14). Not "staggered", "shaken" or "frightened": the commonest
+# words in fight prose for a step back and a face, rarely the condition.
+CONDITIONS = ("grappled", "pinned", "prone", "entangled", "stunned", "dazed", "blinded",
+              "deafened", "paralyzed")
+# What each condition is, in words a reader answers to (the second read's question) and
+# what the engine's NOT holding it means (the fact a repair is given).
+_COND_WHAT = {
+    "grappled": "grappled — held fast in somebody's grip",
+    "pinned": "pinned — held down so that they cannot move",
+    "prone": "prone — down on the ground, lying or knocked flat",
+    "entangled": "entangled — tangled up or bound by something",
+    "stunned": "stunned — senseless for a moment, unable to act",
+    "dazed": "dazed — too dazed to act",
+    "blinded": "blinded — unable to see",
+    "deafened": "deafened — unable to hear",
+    "paralyzed": "paralyzed — unable to move at all",
+}
+_COND_NOT = {
+    "grappled": "nobody has hold of {o} — no grapple was made",
+    "pinned": "nobody holds {o} down",
+    "prone": "{s} {v} still on {p} feet",
+    "entangled": "nothing binds or tangles {o}",
+    "stunned": "{s} can act as ever",
+    "dazed": "{s} can act as ever",
+    "blinded": "{s} can see",
+    "deafened": "{s} can hear",
+    "paralyzed": "{s} can move",
+}
+
 # The parts of the day the reader may name, each with the hours (0-23) at which a narrator
 # may truthfully say it. Generous on purpose — the hour a narrator calls "night" at 19:00
 # is not wrong, and a guard that argues with dusk is noise (the same judgement the regex
@@ -114,6 +156,9 @@ class Person:
     # player and went were narrated lunging at the wagon an hour later, and the read back
     # had no code for them, so nothing on the page was wrong to it.
     here: bool = True
+    # The `CONDITIONS` the engine holds on them after the turn (`has_state` on each key's
+    # leaf tag) — what a `conditions` claim is judged against.
+    holds: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -132,6 +177,20 @@ class Facts:
     outcomes: tuple[dict, ...] = ()   # this turn's outcomes, as dicts
     in_fight: bool = False
     pc_ref: str = "pc"
+    # Not an intimate beat: an intimate scene between adults is not read for the body's
+    # conditions (its own words are the scene's, `GMAgent._repair_state_claims` likewise).
+    intimate: bool = False
+
+    @property
+    def bodies(self) -> bool:
+        """Whether the reader is asked for `conditions`: in a fight, or on a beat where a
+        blow, a spell or a manoeuvre was resolved — the beats where a body's state is
+        what the prose is about. Every other beat is asked exactly what it was before, as
+        `shown_here` is asked only with somebody away (a slot shown where it cannot apply
+        competes with its neighbours: docs/beat-verify.md)."""
+        if self.intimate:
+            return False
+        return self.in_fight or any(o.get("op") in _HARM_OPS for o in self.outcomes)
 
     def person(self, ref: str) -> Person | None:
         return next((p for p in self.people if p.ref == ref), None)
@@ -160,7 +219,9 @@ class Facts:
         beat, however many times the repair asks."""
         return json.dumps([self.start, self.end, self.places, self.pack, self.props,
                            [p.ref for p in self.people], self.clock,
-                           [o.get("intent_id") for o in self.outcomes]],
+                           [o.get("intent_id") for o in self.outcomes],
+                           # The question asked depends on it (`schema`), so the read does.
+                           self.bodies, [p.holds for p in self.people]],
                           default=str, sort_keys=True)
 
 
@@ -247,12 +308,18 @@ def facts_from(ctx) -> Facts:
         props = ()
     from .mentions import what_they_are
 
+    from rules import states
+
     people = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
         dead = bool(getattr(a, "hp", 1) < 0 or a.has_state("state.down.dead"))
+        # Asked by tag (law one), never by a condition string: a homebrew hold that tags
+        # itself `state.held.grappled` is grappled to this as much as the book's is.
+        holds = tuple(k for k in CONDITIONS if a.has_state(states.tags_for(k)[0]))
         people.append(Person(ref=str(ref), name=str(a.name), what=what_they_are(a),
                              pc=bool(getattr(a, "is_pc", False)),
-                             down=bool(getattr(a, "is_down", False)), dead=dead))
+                             down=bool(getattr(a, "is_down", False)), dead=dead,
+                             holds=holds))
     # And the people held elsewhere in this town: the beat reader's own list of them, one
     # definition, so the two readers of a beat cannot disagree about who is away.
     from . import beat_reader
@@ -265,7 +332,23 @@ def facts_from(ctx) -> Facts:
                  went_by=tuple(dict.fromkeys(went_by)), pack=pack, props=props,
                  people=tuple(people), clock=None if clock is None else int(clock),
                  outcomes=outcomes, in_fight=bool(getattr(scene, "in_encounter", False)),
-                 pc_ref=str(getattr(pc, "ref", "pc") or "pc"))
+                 pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
+                 intimate=bool(getattr(ctx, "intimate", False)))
+
+
+def asks_bodies(ctx) -> bool:
+    """Whether this beat's read back asks the body's `conditions` (`Facts.bodies`), read
+    off the context without building the whole of `facts_from`: the read is on, routed to
+    a model, and the beat is a fight's. `GMAgent._repair_state_claims` stands its English
+    body question down when this is true — one reader per question."""
+    if not ENABLED or not dict(getattr(ctx, "reader", None) or {}).get("model"):
+        return False
+    if getattr(ctx, "intimate", False):
+        return False
+    if bool(getattr(getattr(ctx, "scene", None), "in_encounter", False)):
+        return True
+    return any((o if isinstance(o, dict) else o.as_dict()).get("op") in _HARM_OPS
+               for o in getattr(ctx, "outcomes", ()) or ())
 
 
 # --- the question ---------------------------------------------------------------------
@@ -340,6 +423,19 @@ def schema(facts: Facts) -> dict:
            if away else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
                     "left", "time_of_day", *(["shown_here"] if away else [])]}
+
+
+def bodies_schema(facts: Facts) -> dict:
+    """The body's conditions, asked in a call of their own (`read_bodies`), on a fight's
+    beats only (`Facts.bodies`): who, and which of `CONDITIONS`, each with its quote."""
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"conditions": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "who": {"type": "string", "enum": _who(facts)},
+            "condition": {"type": "string", "enum": list(CONDITIONS)}, "quote": s},
+            "required": ["who", "condition", "quote"]}}},
+        "required": ["conditions"]}
 
 
 _SYSTEM = (
@@ -466,6 +562,67 @@ _DEMO2_AWAY_ANSWER = dict(_DEMO2_ANSWER, shown_here=[
     {"who": "c6", "quote": "The bargeman leans on the rail of the gangway"}])
 
 
+# The body's conditions are asked in a call of their own (`read_bodies`), on a fight's
+# beats only (`Facts.bodies`); the read above is asked exactly what it was before on every
+# beat, fight or not. Measured 2026-10-16 on the bench's 22 fight beats, gemma-4-12B x2:
+# folded into that read as one more slot, the conditions read well (claims P 0.91 R 0.83)
+# but the slot competed with `harmed` — the CLAUDE.md rule, a model asked for N things
+# answers in parallel, and the `attacks` slot's lesson above. Three wordings were tried:
+#   * a demonstrated grab at the player that missed, and a sentence of what is NOT a
+#     condition: harm claims 15/19 on master -> 7/19, "knocks the wind from your lungs" no
+#     longer hurt the player (ho-shove-lands, ho-blow-lands, 0 of 4 reads);
+#   * without the demonstrated miss: still 7/19;
+#   * a short clause ending "a blow that lands is reported under harmed as well": claims
+#     back to 16/20, but the harm ALARMS the second read keeps went 3/6 -> 0/6 (the reader
+#     moved "He hits the ground hard" from harm to prone).
+# Apart, the harm read is byte-identical to master's on every beat, and this one can show
+# what the folded slot could not afford to: an attempt that is no condition.
+_BODIES_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") and report every body the "
+    "NARRATOR says IS held or impaired at the end of it, in the codes given: grappled "
+    "(held fast in somebody's grip), pinned (held down), prone (down on the ground), "
+    "entangled, stunned, dazed, blinded, deafened, paralyzed. Copy the passage's own words "
+    "exactly into \"quote\". Never report an attempt, a near miss, an aim or a threat — "
+    "somebody reaching to grab someone is not grappled, aiming to knock someone down is "
+    "not prone — nor what a character only says aloud inside quotation marks. Unconscious "
+    "and dead are not conditions here. Leave the list empty when the passage says none; "
+    "most passages say none.")
+_BODIES_DEMO_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman; "
+    "c5: the drover — commoner\n\n"
+    "Passage:\n"
+    "Dunmar Oake reaches to catch you by the collar, meaning to pull you off your feet, "
+    "and you twist out of his reach. The drover's fist cracks into his jaw and he staggers. "
+    "A watchman comes in from the street, seizes the drover by the arm and holds him fast. "
+    "Dunmar Oake's foot catches on a rope and he goes down flat on the planks.")
+_BODIES_DEMO_ANSWER = {"conditions": [
+    {"who": "c5", "condition": "grappled",
+     "quote": "seizes the drover by the arm and holds him fast"},
+    {"who": "c4", "condition": "prone", "quote": "he goes down flat on the planks"}]}
+_BODIES_DEMO2_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman\n\n"
+    "Passage:\n"
+    "Dunmar Oake lunges with the boathook, aiming to knock you into the river. The hook "
+    "catches your shoulder and knocks the wind out of you, and you stagger a step but keep "
+    "your feet. 'Next time you go in,' he says.")
+_BODIES_DEMO2_ANSWER = {"conditions": []}
+
+
+def bodies_messages(text: str, facts: Facts) -> list[dict]:
+    people = []
+    for p in facts.people:
+        if not p.here:
+            continue
+        desc = "the player (\"you\")" if p.pc else (p.what or "")
+        people.append(f"{p.ref}: {p.name}" + (f" — {desc}" if desc else ""))
+    return [{"role": "system", "content": _BODIES_SYSTEM},
+            {"role": "user", "content": _BODIES_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_BODIES_DEMO_ANSWER)},
+            {"role": "user", "content": _BODIES_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_BODIES_DEMO2_ANSWER)},
+            {"role": "user", "content": f"People: {'; '.join(people)}\n\nPassage:\n{text}"}]
+
+
 def messages(text: str, facts: Facts) -> list[dict]:
     away = any(not p.here for p in facts.people)
     return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")},
@@ -558,7 +715,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("harmed", "harm", ("who", "how")),
                             ("shown_here", "shown", ("who",)),
                             ("arrived", "arrived", ("who",)),
-                            ("left", "left", ("who",))):
+                            ("left", "left", ("who",)),
+                            ("conditions", "condition", ("who", "condition"))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -582,7 +740,7 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "from": set(_holders(facts)), "to": set(_holders(facts)),
                "seller": set(_who(facts)), "buyer": set(_who(facts)),
                "who": set(_who(facts)), "how": set(HOW), "place": set(_places(facts)),
-               "part": set(PARTS)}
+               "part": set(PARTS), "condition": set(CONDITIONS)}
     seen: set[str] = set()
     for c in claims:
         bad = [k for k, v in c.slots.items()
@@ -650,6 +808,18 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                      schema=schema(facts))
         result.raw = reply.text
         answer = reply.json()
+        if facts.bodies:
+            # The second question of a fight's beat, in a call of its own (see
+            # `_BODIES_SYSTEM` for why it is not a slot of the first).
+            msgs = bodies_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            more = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                        num_predict=300, provider=provider, api_key=api_key,
+                        schema=bodies_schema(facts))
+            result.raw += "\n" + more.text
+            answer = dict(answer or {}, conditions=(more.json() or {}).get("conditions")
+                          or [])
         result.claims, result.dropped = validate(claims_of(answer, facts), text, facts)
     except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
@@ -749,6 +919,48 @@ def _not_here(p: Person, c: Claim) -> Discrepancy:
         "contradiction", "absent",
         f"{p.name} is not here: they are somewhere else, and nothing has brought them back. "
         f"Nothing {p.name} does happens in this place.", c.sentence, "", c, ref=p.ref)
+
+
+def _condition_unheld(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A body said to be in a condition the engine does not hold on it, or None.
+
+    Judged only where the engine has the answer outright: somebody here, on their feet
+    (a body on the floor is prone and holdable in every sense, and `harmed` judges the
+    fall), not holding the condition after the turn (`Person.holds`, read by tag), and not
+    named in one of this turn's effects for that condition — a grapple broken this turn,
+    a stand from prone, the hold the engine gave and took inside one batch."""
+    who, cond = str(c.slots["who"]), str(c.slots["condition"])
+    p = facts.person(who)
+    if p is None:
+        return None
+    if not p.here:
+        return _not_here(p, c)
+    if p.down or p.dead or cond in p.holds:
+        return None
+    # "Pinned" said of a body the engine holds grappled is the narrator's word for a hold
+    # that is real, not a hold invented: 2 of the 5 alarms on the committed fight
+    # recordings (99 fight beats replayed, 2026-10-16) were "Pinned and struggling against
+    # your grip" / "still pinned against the table" inside a grapple the engine had made.
+    # The defect this slot exists for is the hold from nowhere; a pin inside a grapple is
+    # degree, and the tells say which it is.
+    if cond == "pinned" and "grappled" in p.holds:
+        return None
+    for o in _resolved(facts):
+        for e in _effects(o):
+            if str(e.get("ref") or "") == who and cond in {
+                    str(v).lower() for v in e.values() if isinstance(v, str)}:
+                return None
+    if p.pc:
+        subject, verb, obj, poss, name = "you", "are", "you", "your", "You (the player)"
+    else:
+        subject, verb, obj, poss = "they", "are", "them", "their"
+        name = _name(facts, who)
+        name = name[:1].upper() + name[1:]
+    why = _COND_NOT[cond].format(s=subject, v=verb, o=obj, p=poss)
+    return Discrepancy(
+        "contradiction", "condition",
+        f"{name} {'are' if p.pc else 'is'} not {cond}: {why}. The rules put no such state "
+        f"on {obj}.", c.sentence, "", c, ref=who)
 
 
 def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]:
@@ -909,6 +1121,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                 verb = "has been here all along" if c.category == "arrived" else "is still here"
                 out.append(Discrepancy(
                     "contradiction", "presence", f"{p.name} {verb}.", c.sentence, "", c))
+        elif c.category == "condition":
+            found = _condition_unheld(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "hour":
             h = _hour(facts)
             if h is not None and h not in PARTS[s["part"]]:
@@ -1005,6 +1221,15 @@ def question(d: Discrepancy, facts: Facts) -> str:
                 "down": "unconscious or collapsed and unable to fight",
                 "dead": "dead"}[s["how"]]
         return f"Does this sentence say that {_name(facts, s['who'])} is {what}?"
+    if c.category == "condition":
+        # Asked as a state at the end of the sentence, with the attempt named as what it
+        # is not: the owner's report's first grab was "her hands reaching out to grab you
+        # by the throat" — an attempt, the prose's to write — and its later beats had the
+        # grip landed, which only the engine may do.
+        who = _name(facts, s["who"])
+        be = "are" if s["who"] == facts.pc_ref else "is"
+        return (f"Does this sentence say that {who} {be} {_COND_WHAT[s['condition']]} — "
+                f"actually so, not only grabbed at, aimed at, threatened or nearly?")
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
@@ -1071,6 +1296,15 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
+        if d.category == "condition" and d.ref:
+            # The passage up to the sentence, not one sentence: "He is dazed" names nobody,
+            # and with only "He hits the wood of the bar…" before it, the read named the
+            # player three times of three (live audit, 2026-10-16) — the "he" was the man
+            # struck two sentences earlier.
+            lead = " ".join(sentences[max(0, at - 4):at]) if at > 0 else ""
+            (kept if _in_condition(d, lead, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
         ask = ((f"The sentence before it, for context: {before}\n" if before else "")
                + f"The sentence: {d.sentence}\n\nQuestion: {q}")
         msgs = [{"role": "system", "content": _CONFIRM_SYSTEM},
@@ -1129,6 +1363,54 @@ def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provide
         return d.ref in [str(x) for x in (reply.json() or {}).get("shown") or []]
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
+
+
+def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                  api_key) -> bool:
+    """The second read of a `condition` contradiction, in `_shows`' shape: not "is the man
+    pinned?" but WHO the sentence says is in that condition, from the codes, compared in
+    code with the person the first read named. Measured on the committed fight recordings
+    (2026-10-16, 99 fight beats replayed): asked yes-or-no, "his weight pins yours against
+    the shattered furniture" kept a pin on a bystander the first read had named — the
+    sentence pins the player, under the man who has hold of him."""
+    cond = str(d.claim.slots.get("condition") if d.claim else "")
+    codes = [*facts.refs, NEW_PERSON, NOBODY]
+    people = "; ".join(
+        f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else
+                                f" — {p.what}" if p.what else "")
+        for p in facts.people if p.here)
+    ask = ((f"The passage before it, for who \"he\", \"she\" and \"they\" are: {before}\n"
+            if before else "")
+           + f"The sentence: {d.sentence}\n\nPeople: {people}\n\nQuestion: which of these "
+           f"people does this sentence say is {_COND_WHAT.get(cond, cond)} — actually so, "
+           f"not only grabbed at, aimed at, threatened or nearly? Every one it says so of; "
+           f"\"{NEW_PERSON}\" for somebody else, \"{NOBODY}\" if none.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=60, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"who": {
+                         "type": "array", "maxItems": 6,
+                         "items": {"type": "string", "enum": codes}}},
+                         "required": ["who"]})
+        named = [str(x) for x in (reply.json() or {}).get("who") or []]
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+    if d.ref in named:
+        return True
+    # A grapple is two bodies' (CRB p.199: "both you and the target gain the grappled
+    # condition"), so a hold is confirmed whichever of the two the read names, so long as
+    # the engine holds that one ungrappled too. Probed on the report's beat (2026-10-16, 3 of
+    # 3): "her fingers digging into your throat" — the first read named the player, the
+    # second the woman doing the gripping, and both are grappled by the book.
+    if cond == "grappled":
+        return any((p := facts.person(code)) is not None and p.here
+                   and "grappled" not in p.holds for code in named)
+    return False
 
 
 # --- the cache: a beat is read once, however many times the repair asks ----------------

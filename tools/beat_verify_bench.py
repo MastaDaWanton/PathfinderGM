@@ -33,8 +33,9 @@ sys.path.insert(0, str(ROOT))
 from gm import beat_verify as bv  # noqa: E402
 from tests.beat_verify import gold as G  # noqa: E402
 
-CATS = ("move", "hands", "trade", "harm", "shown", "arrived", "left", "hour")
-ALARM_CATS = ("move", "hands", "trade", "harm", "absent", "presence", "hour", "omission")
+CATS = ("move", "hands", "trade", "harm", "shown", "arrived", "left", "hour", "condition")
+ALARM_CATS = ("move", "hands", "trade", "harm", "absent", "presence", "hour", "omission",
+              "condition")
 
 
 # --- the engine's side, as the game builds it ---------------------------------------------

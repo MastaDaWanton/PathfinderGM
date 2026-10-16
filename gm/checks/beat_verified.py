@@ -46,7 +46,7 @@ from ._page import cut, cut_from
 ORDER = 9
 KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
-                   "beat-omits-outcome"})
+                   "beat-omits-outcome", "beat-condition"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -58,7 +58,11 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          # dice never gave (2026-10-09, the raiders narrated lunging an hour after they
          # robbed the player and went; docs/narrator-after-defeat.md).
          "absent": ("beat-absent", 3),
-         "presence": ("beat-presence", 2), "hour": ("beat-hour", 2)}
+         "presence": ("beat-presence", 2), "hour": ("beat-hour", 2),
+         # A body said to be held, down or blind that the engine holds no such state on:
+         # the owner's report of 2026-10-16, a grip on the player's throat across three
+         # beats with no grapple ever made. As wrong as a wound the dice never gave.
+         "condition": ("beat-condition", 3)}
 
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair
 # asks `find` again after each rewrite and once more before the backstops; a sentence it

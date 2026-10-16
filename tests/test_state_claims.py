@@ -226,3 +226,51 @@ def test_sound_prose_costs_no_call(monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("called")))
     text, repairs, attempts = gm._repair_state_claims("Your blade flashes. He staggers.", [])
     assert repairs == [] and attempts == []
+
+
+# --- the body question, stood down where the read back asks it (2026-10-16) ----------------
+
+AIM = ("She doesn't wait for a greeting; she strikes out with her club, aiming to knock "
+       "you off your feet and end the threat before it can start.")
+
+
+def test_the_aim_the_body_question_read_as_prone(monkeypatch):
+    """The 2026-10-16 report's npc-turn row 45: an aim read as a fall. The pattern's own
+    false positive, kept as the premise of the stand-down below."""
+    scene, _ = _tavern(pc_disarmed=False)
+    found = state_claims(AIM, scene, None)
+    assert len(found) == 1 and "prone" in found[0][1]
+
+
+def test_where_the_read_back_asks_the_body_it_alone_does(monkeypatch):
+    """`read_back=True` (beat_verify.asks_bodies): no body question here, so no cut and no
+    call — the cut of that aim left "eyes you with a sharp, calculating gaze" standing on
+    the page as a beat of its own. The hands and the weapons are still this module's."""
+    from gm import agent as agent_mod
+
+    scene, engine = _tavern()
+    gm = agent_mod.GMAgent(_World(), engine)
+    monkeypatch.setattr(agent_mod.client, "chat",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("called")))
+    text, repairs, attempts = gm._repair_state_claims(AIM, None, read_back=True)
+    assert text == AIM and repairs == [] and attempts == []
+    # ... the hands still judged: the player's rapier is on the floor.
+    _t, repairs, _a = gm._repair_state_claims(
+        "Your blade whistles past her ear.", None, read_back=True)
+    assert repairs and "cut" in repairs[0]
+
+
+def test_a_sentence_written_after_the_read_back_is_still_judged(monkeypatch):
+    """`unread`: a wrong-actor rewrite or a deed put in later in the groom was never read
+    back, so the English body question judges those sentences, and only those."""
+    from gm import agent as agent_mod
+
+    scene, engine = _tavern(pc_disarmed=False)
+    gm = agent_mod.GMAgent(_World(), engine)
+    late = "Her blow leaves you momentarily stunned."
+    monkeypatch.setattr(agent_mod.client, "chat",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    text, repairs, _ = gm._repair_state_claims(f"{AIM} {late}", None, read_back=True,
+                                               unread=(late,))
+    assert AIM in text and late not in text
+    assert len(repairs) == 1 and "stunned" in repairs[0]
