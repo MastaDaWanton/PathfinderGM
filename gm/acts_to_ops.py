@@ -399,9 +399,12 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
     pc = scene.pc() if hasattr(scene, "pc") else None
     coming: list[str] = []
     gone: list[str] = []
+    bought = sold_not_asked(frame, scene)
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
         row = Row(index=i, act=act, commit=str(a.get("commit") or "done"))
+        if i in bought:
+            row.note = bought[i]
         if not interpret.acting(a):
             # Intended or asked about: context for the plan (`interpret.brief_lines` says
             # so), never an op. Round 1's replay sold the crate a turn early on "I take
@@ -471,6 +474,53 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _request(row, a, scene, pc)
         rows.append(row)
     return rows
+
+
+def sold_not_asked(frame: dict | None, scene) -> dict[int, str]:
+    """A request made of somebody who sells, for something they sell, is a purchase: the
+    reading's action is turned into the `buy` (or, for a bed at an inn, the `rest`) it is,
+    IN PLACE, so every later reader of this turn's reading — the counter's screen
+    (`judgement.purchase_sought` reads `interpret.reading_of`, the same dict), the brief,
+    this table — sees the purchase and nothing rolls Diplomacy for the goods.
+
+    The coordinator's review, 2026-10-16: "ask for a room", "ask for a mug of ale", "ask
+    the smith for a sword" came back `request` from the reader, which would have rolled a
+    favour and let a good roll take the goods for nothing. Decided in code from what the
+    engine holds (`rules/requests.sells` / `offered`: who keeps a counter or lets beds,
+    and what is priced), never from the words: "ask him for fair pay" and "ask the priest
+    to bless my blade" name nothing priced, or nobody who sells, and stay requests.
+    Returns {action index: note} for the turn log."""
+    from rules import requests as requests_mod
+
+    out: dict[int, str] = {}
+    if not frame or scene is None:
+        return out
+    for i, a in enumerate(frame.get("actions") or []):
+        if not isinstance(a, dict) or a.get("act") != "request":
+            continue
+        words = " ".join(str(a.get("target") or "").split())
+        who = person(scene, words) if words else addressed(scene)
+        actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
+        if actor is None or actor.is_pc:
+            continue
+        got = requests_mod.offered(scene, actor, str(a.get("object") or ""))
+        if got is None:
+            continue
+        a.pop("asks_for", None)
+        a["was"] = "request"
+        if got[0] == "lodging":
+            # Taking a room is the reading's `rest` (its gloss: "take a room"; the labelled
+            # set's "I pay for a room at the inn"). What the bed costs is the rest door's
+            # (not charged yet, a known gap, out of this change's scope).
+            a["act"] = "rest"
+            a.pop("object", None)
+            a.pop("target", None)
+            out[i] = f"asked {actor.name} for a bed: taking a room, not a favour"
+        else:
+            a["act"] = "buy"
+            out[i] = (f"asked {actor.name} for {a.get('object')}: a purchase of "
+                      f"{getattr(got[1], 'name', '')}, not a favour")
+    return out
 
 
 def _request(row: Row, a: dict, scene, pc) -> None:

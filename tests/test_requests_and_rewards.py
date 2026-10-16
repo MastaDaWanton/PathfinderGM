@@ -207,6 +207,63 @@ def test_the_built_request_survives_the_plan_doors_to_validation():
         "params"]["dc"] == {"band": "average"}
 
 
+# --- what a seller sells is bought, never begged ----------------------------------------------
+
+def _keeper_scene(spot: str, name: str):
+    """The player standing in a place of the town, and its keeper behind the counter —
+    the facts the trade panel opens on (`keepers.keeps_a_counter`)."""
+    from rules import keepers
+
+    at = f"5bbd0c40345f~urban:{spot}"
+    s = Scene(location_id="5bbd0c40345f")
+    s.at = at
+    s.add(from_dict(dict(SAM), ref="pc"))
+    keeper = instantiate("thug", scene=s, name=name)
+    keeper.world_entity_id = keepers.entity_id(at)
+    s.add(keeper)
+    return s, keeper
+
+
+def _asks(scene, who: str, what: str, asks_for: str = "favour"):
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "request", "target": who, "object": what, "asks_for": asks_for}]}
+    rows, plan = _asked(scene, frame)
+    return frame, rows, [r for r in plan if r.get("op") == "check"]
+
+
+def test_asking_a_seller_for_what_they_sell_is_a_purchase_not_a_favour():
+    """The review of 2026-10-16: on the probe and the 302-line bench the reader read
+    "ask for a room" (and, before the contrast demonstrations, "I order an ale") as a
+    `request` — and a request of a keeper for their own goods would roll Diplomacy and
+    let a good roll take a sword or a bed for nothing. 0 Diplomacy checks may be built
+    for a seller's goods: the action becomes the `buy` the counter's screen opens on (the
+    same dict `judgement.purchase_sought` reads through `interpret.reading_of`), or, for a
+    bed at an inn, the `rest` the reader's own gloss calls taking a room."""
+    s, smith = _keeper_scene("the-smithy", "the smith")
+    frame, rows, checks = _asks(s, "the smith", "a sword")
+    assert checks == [], "a sword from the smith rolled Diplomacy"
+    assert frame["actions"][0]["act"] == "buy" and interpret.bought(frame) == "a sword"
+    assert "a purchase" in rows[0].note
+
+    s, inn = _keeper_scene("the-inn", "the innkeeper")
+    frame, _rows, checks = _asks(s, "the innkeeper", "a mug of ale")
+    assert checks == [] and frame["actions"][0]["act"] == "buy"
+    frame, _rows, checks = _asks(s, "the innkeeper", "a room for the night")
+    assert checks == [] and frame["actions"][0]["act"] == "rest"
+
+
+def test_pay_and_a_blessing_stay_requests_even_of_a_seller():
+    """What names nothing priced, or is asked of nobody who sells, is still the book's
+    Make Request: "fair pay for the help" of the smith, "to bless my blade" of a priest
+    (who keeps a temple, which sells nothing)."""
+    s, smith = _keeper_scene("the-smithy", "the smith")
+    _frame, _rows, checks = _asks(s, "the smith", "fair pay for the help", "payment")
+    assert [c["params"] for c in checks] == [{"skill": "diplomacy", "request": "payment"}]
+    s, priest = _keeper_scene("the-temple", "the priest")
+    _frame, _rows, checks = _asks(s, "the priest", "to bless my blade")
+    assert [c["params"] for c in checks] == [{"skill": "diplomacy", "request": "favour"}]
+
+
 # --- the prose cannot hand over what the engine did not give ---------------------------------
 
 def _facts(outcomes=()):

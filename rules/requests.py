@@ -178,3 +178,77 @@ def refusal(target, kind: str, now: int) -> str:
 def wage_cp(days: int = 1) -> int:
     """The untrained hireling's wage for `days` days of work (CRB p.159)."""
     return WAGE_CP_PER_DAY * max(1, int(days))
+
+
+# --- what somebody who sells is asked for is bought, not begged -------------------------
+#
+# The coordinator's review, 2026-10-16: "ask for a room" at an inn, "ask for a mug of ale",
+# "ask the smith for a sword" are purchases, and a Diplomacy favour for them would let a
+# good roll take the goods for nothing. CircleMUD's shopkeeper answers "list" and "buy"
+# from its own shop file, never a social roll; here the same split is made in code from
+# what the engine already holds: who keeps a counter (`keepers.keeps_a_counter`), who
+# keeps a place that lets beds (`schemes.PLACE_KINDS["lodging"]`), and what is priced —
+# their own shelf (`goods.goods_at`, the trade panel's) and, at a counter, the whole
+# catalogue the outfit page sells (`goods.catalogue_ids`), matched with the counter's own
+# matcher (`goods.match_want`: every word of the want in a row's name). Nothing reads the
+# player's English for intent: a want that names no priced row stays a request.
+
+# The Core Rulebook's "Inn stay" service (CRB p.159: common 5 sp — the price
+# `cards.BED_PRICE_CP` already uses), as a row the counter matcher can find. Named so its
+# words cover how a bed is asked for ("a room", "a bed for the night", "lodging"). A
+# service, not a good: it is never put on a shelf, so no counter sells it as an item.
+INN_STAY = "service:inn-stay"
+_INN_STAY_NAME = "a room or a bed for the night, lodging (inn stay)"
+
+
+def _lodging_kinds() -> frozenset[str]:
+    from . import schemes
+
+    return frozenset(str(x).removeprefix("the ")
+                     for x in schemes.PLACE_KINDS.get("lodging") or ())
+
+
+def sells(scene, actor) -> str:
+    """The counter kind this person sells across, or "" for somebody who sells nothing:
+    a market counter's `market:<id>`, the trade place they keep and stand in, or the
+    inn or tavern they keep. The same facts the trade panel opens on."""
+    from . import keepers, market
+
+    wid = str(getattr(actor, "world_entity_id", "") or "")
+    place = keepers.place_of(wid)
+    if not place or str(getattr(actor, "at", "") or "") != place:
+        return ""
+    cid = keepers.counter_of(wid)
+    if cid:
+        return market.COUNTER_PREFIX + cid
+    kind = keepers.kind_of(place, getattr(scene, "founded", None) or ())
+    if keepers.keeps_a_counter(actor) or kind in _lodging_kinds():
+        return kind
+    return ""
+
+
+def offered(scene, actor, want: str):
+    """What of theirs the words ask for — ("goods", the row) for something priced they
+    sell, ("lodging", None) for a bed at an inn or tavern — or None when the want names
+    nothing they offer (pay, a reward, a blessing, a hand with the anvil)."""
+    from . import goods
+
+    kind = sells(scene, actor)
+    if not kind or not str(want or "").strip():
+        return None
+    if kind in _lodging_kinds():
+        found, _ = goods.match_want(want, [{"id": INN_STAY, "name": _INN_STAY_NAME}])
+        if found is not None:
+            return "lodging", None
+    rows = list(goods.goods_at(kind))
+    if kind not in _lodging_kinds():
+        # At a counter, anything the catalogue prices is asked for as a purchase, stocked
+        # here or not: the counter's own screen says "I don't have that" (`match_want`'s
+        # CircleMUD answer), which a favour roll never would.
+        held = {str(getattr(g, "id", "")) for g in rows}
+        rows += [g for t in ("weapons", "armour", "shields") for g in goods.table_goods(t)
+                 if str(getattr(g, "id", "")) not in held]
+        rows += [g for g in (goods.good(k) for k in goods.GEAR)
+                 if g is not None and g.id not in held]
+    found, _ = goods.match_want(want, rows)
+    return ("goods", found) if found is not None else None
