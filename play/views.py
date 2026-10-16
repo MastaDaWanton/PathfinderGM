@@ -5221,8 +5221,19 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                  # be found by replaying the recording through `_groom` by hand.
                  "repairs": list(plan.repairs or [])}
         c.turn_log.append(history_mod.stamp(c, entry))
-        if plan.narration:
-            c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
+        # ONE beat for the creature's turn: the wind-up and what the dice made of it, said
+        # together. They went onto the page as two beats from the first fight (2026-08-20)
+        # — the split is the intent protocol's (docs/intent-protocol.md §2: call 1 writes
+        # only what is true however the dice land, call 2 the landing), and it is a split
+        # between two CALLS, not two beats. On the page it read as two actions: the
+        # 2026-10-16 report's woman made one attack a round (npc-turn rows 45 and 54) and
+        # the player saw "lunges forward … swings in a desperate, heavy arc" and then, as
+        # its own paragraph, "The heavy club whistles through the air, missing…" — "the npc
+        # took multiple turns". And where a repair cut the wind-up down to its filler ("eyes
+        # you with a sharp, calculating gaze"), that filler stood alone as a beat in which
+        # nothing happened. The consequence call is already shown the wind-up ("You had
+        # already narrated: …") and continues from it, so the two read as one passage.
+        windup = plan.narration or ""
 
         tells = [o for o in resolution.outcomes if o.tell]
         # A companion's turn is told HOW they do it (the owner's second ruling,
@@ -5233,6 +5244,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         manner = (companions_mod.manner_line(
             scene, actor, ordered=bool(orders),
             op=plan.intents[0].op if plan.intents else "") if friend else "")
+        text, ours = "", []
         if tells:
             try:
                 # No polish rewrite on an NPC's turn — the same call `npc_turn` makes for
@@ -5240,6 +5252,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # cannot pay". This door had it on, measured 2026-09-25.
                 # `acting`: the call is told whose turn it was, and the prose is checked
                 # for being told the wrong way round (narration.wrong_actor).
+                agent.last_added = []
                 text, attempt = agent.narrate_outcome(plan.narration, tells,
                                                       f"{actor.name} acts",
                                                       rewrite=False, acting=actor.name,
@@ -5257,12 +5270,28 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                         text, actor, ordered=bool(orders),
                         op=plan.intents[0].op if plan.intents else "", whole=True)
                     entry["repairs"] += notes
+                ours = list(getattr(agent, "last_added", None) or [])
             except ModelUnavailable:
                 text = ""
-            c.transcript.append({
-                "who": "gm", "kind": "consequence",
-                "text": text or _plain_tells(c, tells),
-            })
+            fell_back = not text
+            if fell_back:
+                # The engine's own lines, marked ours (`added`), so the next prose call is
+                # not shown them as what it narrated (docs/narrator-guards.md D4).
+                text = _plain_tells(c, tells)
+                # A descriptor name opens the tell in lower case ("the woman with the
+                # braid's attack…"); after a wind-up it starts a sentence.
+                text = text[:1].upper() + text[1:]
+                ours = narration_mod._sentences(text)
+        else:
+            fell_back = True
+        passage = " ".join(p for p in (windup.strip(), str(text or "").strip()) if p)
+        if passage:
+            # "setup" when any of it is the narrator's prose, as every narrated beat is;
+            # the engine's plain lines alone stay a "consequence", as before.
+            prose = bool(windup.strip()) or not fell_back
+            c.transcript.append({"who": "gm", "text": passage,
+                                 "kind": "setup" if prose else "consequence",
+                                 **({"added": ours} if prose and ours else {})})
         _log_mentions(c, agent)
         # An NPC's turn is not the player speaking, so the ledger gets no speech
         # from it — only whatever the engine decided on their behalf.
