@@ -2049,6 +2049,9 @@ class GMAgent:
             # aftermath makes nobody out of it (docs/narrator-after-defeat.md).
             if isinstance(self.attribution, beat_reader.Reading):
                 self.attribution.strike(text)
+        # The page as the read back last saw it (with its own repairs in), so the state
+        # claims below know which sentences were written after it (`unread`).
+        read_text = text
         # A name on the wrong person — the words name one man, the sentence is about
         # another: one targeted rewrite (stage 3 of the note).
         if self.attribution.misnamed():
@@ -2206,7 +2209,14 @@ class GMAgent:
         # What a hand holds and a body suffers, set against the state and this turn's
         # effect records (gm/state_claims.py). After the name swap, so "your" is the
         # player's; after the rewrite, so the prose it judges is the prose that ships.
-        text, held, held_attempts = self._repair_state_claims(text, changes)
+        from . import beat_verify
+
+        read_back = ctx is not None and beat_verify.asks_bodies(ctx)
+        text, held, held_attempts = self._repair_state_claims(
+            text, changes, read_back=read_back,
+            unread=tuple(s for s in narration_mod._sentences(text)
+                         if s not in set(narration_mod._sentences(read_text)))
+            if read_back else ())
         repairs += held
         attempts += held_attempts
         # Agency is a fact of the tell. When every blow this turn was somebody else's
@@ -2847,8 +2857,9 @@ class GMAgent:
 
         return " ".join(narration.split()), repairs, attempts
 
-    def _repair_state_claims(self, text: str,
-                             changes: list[dict] | None) -> tuple[str, list[str], list[Attempt]]:
+    def _repair_state_claims(self, text: str, changes: list[dict] | None, *,
+                             read_back: bool = False, unread: tuple[str, ...] = ()
+                             ) -> tuple[str, list[str], list[Attempt]]:
         """Prose that says a hand holds or loses something, or a body suffers something,
         the state does not carry: one targeted rewrite of the sentence with the fact
         named, checked again, and cut when it still says it.
@@ -2860,13 +2871,29 @@ class GMAgent:
         of what it is asked to (57.6% in Varshney et al. 2023) — a failed one is cut.
         Two calls a beat at most; a third finding is cut straight away, because a local
         model's minute is the player's minute.
+
+        `read_back`: the beat read back already asked its `conditions` (gm/beat_verify.py,
+        `asks_bodies`), so the body question here stands down and only the hands and the
+        weapons are judged. Measured on the 2026-10-16 report's fight: this question's one
+        hit was a false "prone" on "aiming to knock you off your feet" (an aim; the cut
+        left the wind-up's filler as a beat of its own), and it has no grappled row, so the
+        grip on the player's throat across three beats went through. The read back's
+        numbers are in docs/beat-verify.md, "The body's conditions".
+
+        `unread`: sentences written after the read back ran — a wrong-actor rewrite, a
+        deed or an answer put in later in the groom. The read back never saw them, so the
+        English body question still judges those, and only those.
         """
         from .state_claims import state_claims
 
         scene = self.engine.scene
         # The body's conditions are not judged in an intimate scene (see state_claims).
-        bodies = not self._intimate_beat()
+        bodies = not self._intimate_beat() and not read_back
         found = state_claims(text, scene, changes, conditions=bodies)
+        if read_back and unread and not self._intimate_beat():
+            found += [f for f in state_claims(" ".join(unread), scene, changes,
+                                              conditions=True) if f not in found]
+            bodies = True
         if not found:
             return text, [], []
         pc = scene.pc()

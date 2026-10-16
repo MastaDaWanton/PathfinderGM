@@ -107,3 +107,21 @@ write is their own.
   second model call per beat on a local model is a minute of the player's time.
 - **A corpse's weapon.** The engine keeps a dead man's sap `equipped`; "his club clatters
   to the floor as he falls" is let be.
+
+## The body question moves to the read back (2026-10-16)
+
+The owner's wife's market brawl on 0.2.19: the prose put a woman's fingers round the
+player's throat across three beats ("digging into your throat", "Her fingers tighten
+around your throat") and the engine had grappled nobody. This module has no grappled row,
+so nothing caught it; its one hit in that fight was a false "prone" on an aim ("aiming to
+knock you off your feet"), and the cut left the creature's wind-up down to its filler —
+a beat in which nothing happened.
+
+The question "what condition does the page put on a body?" is now asked of the beat read
+back (gm/beat_verify.py, `conditions`, docs/beat-verify.md "The body's conditions"), in
+the tag vocabulary's closed list, and judged in code with `has_state`. On any beat where
+the read back asks it (`beat_verify.asks_bodies`: the read is on and the beat is a
+fight's), `GMAgent._repair_state_claims` stands its body question down (`read_back`), and
+judges it only on sentences written after the read back ran (`unread`: a wrong-actor
+rewrite, a deed put in later). The hands and the weapons stay here. With the read back
+off (the test suite) or on a beat it does not ask, this module answers as before.
