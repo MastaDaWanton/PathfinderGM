@@ -467,8 +467,37 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 # was rolled at all.
                 row.intents.append({"op": "track", "actor": pc.ref, "params": {},
                                     "because": "the player looks for tracks"})
+            if act == "request" and pc is not None:
+                _request(row, a, scene, pc)
         rows.append(row)
     return rows
+
+
+def _request(row: Row, a: dict, scene, pc) -> None:
+    """Asking somebody for something, built whole: the player's Diplomacy check against
+    the person asked, carrying what is asked for (`interpret.REQUESTS`), which the engine
+    resolves as Make Request (CRB p.93, `Engine._make_request`) — its DC off their
+    attitude, and what a granted request for payment pays its own (`rules/requests.py`).
+
+    Measured 2026-10-16 (a real player's game): "…then I ask for fair compensation for
+    helping the carter" was a `talk`, so a `say`, and nothing was rolled. Who is asked is
+    the engine's finder (`person`) on the words, else the one the player is dealing with
+    (`addressed`) — "ask for fair compensation" names nobody. Nobody here to ask is said,
+    never invented."""
+    kind = str(a.get("asks_for") or "")
+    words = " ".join(str(a.get("target") or "").split())
+    # Somebody named who is not here is not quietly swapped for whoever is.
+    who = person(scene, words) if words else addressed(scene)
+    actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
+    if actor is None or actor.is_pc:
+        row.missing = (f"there is nobody here who is {words}" if words
+                       else "there is nobody here to ask")
+        return
+    row.intents.append({"op": "check", "actor": pc.ref, "target": who,
+                        "params": {"skill": "diplomacy", "request": kind},
+                        "because": f"the player asks {actor.name} for "
+                                   + ("payment" if kind == "payment" else "a favour")})
+    row.note = f"a request of {actor.name}: {kind}"
 
 
 def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
@@ -999,10 +1028,12 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         if op == "check" and checks and str(
                 ((r or {}).get("params") or {}).get("skill") or "").lower() in checks:
-            # The table built this check whole (`first_aid`): the plan's own copy of it,
-            # usually without the patient, would roll a second Heal against nobody.
+            # The table built this check whole (`first_aid`, `_request`): the plan's own
+            # copy of it, usually without the patient, would roll a second Heal against
+            # nobody — or a second Diplomacy, an Influence Attitude beside the request.
             if notes is not None:
-                notes.append("the plan's check replaced by the reading's first aid")
+                notes.append(f"the plan's {((r or {}).get('params') or {}).get('skill')} "
+                             f"check replaced by the reading's own")
             continue
         if op not in ("give", "sell"):
             out.append(r)
