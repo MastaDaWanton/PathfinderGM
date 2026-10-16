@@ -189,9 +189,10 @@ track     look for tracks, a trail or footprints; read the ground for who passed
 seek      look for, ask around for, wave down, head for or turn to a PERSON
 talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody;
           asking a question, for directions or for advice is talk
-request   ask somebody to GIVE you something or DO something for you: pay, a reward,
-          wages, compensation, a favour, help; `asks_for` is payment (money of any kind)
-          or favour (anything else they would do or give)
+request   ask somebody to pay you for your work, reward you, or do you a favour or help
+          for nothing in return; `asks_for` is payment (money owed or given to you) or
+          favour (anything else). Buying, ordering, renting a room and paying or bribing
+          somebody are never a request
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
 buy       buy, order, shop for, pay for goods, take goods and pay the seller for them;
@@ -273,6 +274,18 @@ _DEMOS = [
          {"span": "ask the gatekeeper to hold the gate open for me",
           "target": "the gatekeeper", "object": "to hold the gate open for me",
           "asks_for": "favour", "act": "request"}]}),
+    # …and what is NOT a request, because the first cut took them: on the labelled set
+    # "I order an ale" and "I pay for a room at the inn" came back `request` (they are
+    # buy and rest), and "I try to bribe the gatekeeper with a silver coin" too (a give).
+    # Coin going OUT is never a request. Neither line is in the labelled set.
+    ("I order a mug of cider.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "order a mug of cider", "object": "a mug of cider", "act": "buy"}]}),
+    ("I slip the clerk a silver piece to look the other way.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "slip the clerk a silver piece", "target": "the clerk",
+          "object": "a silver piece", "act": "give"},
+         {"span": "to look the other way", "commit": "intended", "act": "other"}]}),
     ("I smash the tavern door and everyone inside flees.",
      {"question": False, "claims": ["everyone inside flees"], "actions": [
          {"span": "smash the tavern door", "object": "the tavern door", "act": "break_in"}]}),
