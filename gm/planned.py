@@ -60,6 +60,19 @@ over a free draft: the page pass, the deterministic backstops, the targeted sent
 repairs and the hand-back. Not the scene-length floor or the whole-beat polish, which would
 write free prose back over the plan — the comment at that tail says why, step by step.
 
+**The rough edges** (the owner, 2026-10-16, "fix the planned narration rough edges"; each
+measured before and after on the live model, the numbers where the code is):
+
+  1. the "still" slot restated the last beat's action — a state now, and only on a turn
+     whose own act does not move the scene (`build_plan`);
+  2. answers with nobody saying them — who answers is the engine's (`addressee`), and the
+     line is composed in code (`compose_reply`);
+  3. a garbled matter sentence — the matter's fact alone, and the page checks on every
+     slot as it is written (`page_fault`);
+  4. beats of 900 characters — a budget shared out by priority (`allocate`, `_fit`,
+     `_hold_to_budget`);
+  5. a remake that came back as free prose — the marked slots asked again (`remake`).
+
 A reply slot is judged as it is written by the registered `narration-in-quotes` check and
 asked once more if it fails (`write(check=…)`): measured on the first live planned beat
 (2026-10-10), the master of the market answered in the third person ("…the master of the
@@ -67,22 +80,45 @@ market maintains the order…") and the check, run on the page, cut the whole an
 """
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 
 from . import client, prompts
 from . import narration as narration_mod
 
-# The grammar ceiling of each slot, in characters. The bench's numbers; a fact slot grows
-# by `FACT_EACH` for every further tell in its act, up to `FACT_CEILING`.
-STILL_MAX = 260
-FACT_MAX = 480
-FACT_EACH = 160
-FACT_CEILING = 900
-DOING_MAX = 360
-KEEPS_MAX = 360
-MATTER_MAX = 320
-REPLY_MAX = 560
+# The beat's budget, in characters, and how it is shared out (rough edge 4, 2026-10-16).
+# Measured live on 2026-10-10: the gate beat ran to 900 characters across six slots, every
+# slot written to its own generous ceiling. A table GM's beat is a paragraph; the free
+# narrator's own fight ceiling (`narration.MAX_COMBAT_CHARS`) is the fight budget here, so
+# the two narrators share one sense of how long a fight beat is. Out of fights, 650: the
+# bench's planned beats that read best ran 380-580 (2026-10-09), and an arrival or a
+# question answered needs a little more than a blow.
+BEAT_BUDGET = 650
+# What each kind of slot is asked to fill, and the least it is worth writing at all. An act
+# grows by `FACT_EACH` for each further tell in it, to `FACT_CEILING`.
+FACT_WANT = 220
+FACT_EACH = 120
+FACT_CEILING = 460
+DOING_WANT = 220
+KEEPS_WANT = 220
+REPLY_WANT = 240
+STILL_WANT = 140
+MATTER_WANT = 160
+ASIDE_WANT = 140
+SLOT_FLOOR = 110
+# Which slots go first when the budget is short: the acts are the beat (never dropped), the
+# answer to the player's own question next, then the state, the open matter, and somebody
+# going on with their business. Agenda-style priorities over content to be said, the shape
+# planners have used for length control since Hovy's PAULINE ("Controlling a Language
+# Generation Planner", IJCAI 1989); the alternative — every slot shortened in proportion —
+# was rejected because a slot squeezed below a sentence is a fragment, and the rule here
+# is that no sentence is ever cut mid-way.
+PRIORITY = {"fact": 0, "doing": 0, "keeps": 0, "reply": 1, "still": 2, "matter": 3,
+            "aside": 4}
+# The grammar ceiling is held above the asked length, so the sampler never closes the
+# string mid-word (item 6, 2026-09-30); the slot is then fitted to whole sentences in code.
+GRAMMAR_ROOM = 1.6
 # How long a run of words the "still" slot may share with the last beat: five, the length
 # at which the bench's shared runs were all copying and none were "the crowd" or "you".
 COPY_RUN = 5
@@ -211,18 +247,51 @@ def _place(engine) -> str:
 
 # --- the plan --------------------------------------------------------------------------
 
+def _talk_only(outcomes) -> bool:
+    """Whether everything the engine decided this turn was talk (or nothing at all)."""
+    talk = _FAMILIES[0] | {"narrate_only"}
+    return all(getattr(o, "op", "") in talk for o in outcomes or []
+               if getattr(o, "tell", ""))
+
+
+def addressee(engine, outcomes) -> str:
+    """Who answers the player this beat, decided in code (rough edge 2): the person the
+    player's own `say` was put to — the engine wrote it into the effect — or else the one
+    person they are in conversation with. "" when nobody was spoken to."""
+    pc = engine.scene.pc()
+    mine = {"", "pc", getattr(pc, "ref", "pc")}
+    for o in outcomes or []:
+        for e in getattr(o, "effects", None) or []:
+            if e.get("kind") == "said" and str(e.get("who") or "") in mine \
+                    and e.get("to") in engine.scene.actors:
+                return str(e["to"])
+    talking = [a for a in engine.talking_to() if not a.is_pc]
+    return talking[0].ref if len(talking) == 1 else ""
+
+
 def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                last_beat: str = "") -> list[dict]:
-    """The ordered slots, v2 (the module note). `last_beat` is the beat before this one;
-    with none, or on an arrival, there is no "still" slot."""
+    """The ordered slots (the module note), before the budget (`allocate`). `last_beat` is
+    the beat before this one; `pull` the open matter's own fact, never an instruction."""
     slots: list[dict] = []
     carry_on = player_input == prompts.CARRY_ON
-    if last_beat and not arriving(outcomes):
+    fighting = bool(engine.scene.in_encounter)
+    # The "still" slot (rough edge 1). Measured 2026-10-10 on the live fight: the slot was
+    # asked to say where the last beat's situation stands, the last beat was an action, and
+    # it restated the action — "your fist inches from the Korvu's face" before the move
+    # that brought the fist there. A state is only worth a sentence when this turn's own
+    # act does not move the scene: so never in a fight, never on an arrival, and never
+    # when the engine decided a deed of the body (a blow, a step, a take); on a talk turn
+    # or an idle one it says how things stand, as a state from THE SCENE NOW, with the
+    # last beat as reference only.
+    if last_beat and not fighting and not arriving(outcomes) and _talk_only(outcomes):
         slots.append({
-            "key": "still", "max": STILL_MAX,
-            "say": "Whatever was going on at the end of the last thing you wrote is still "
-                   "going on. One sentence on where it stands now, in new words, changing "
-                   "nothing about it. Never reuse a phrase from the last thing you wrote."})
+            "key": "still", "want": STILL_WANT,
+            "say": "How things stand now, in one short sentence, from THE SCENE NOW and the "
+                   "last thing you wrote: who is where, what someone holds, or what is "
+                   "still unresolved. A state, not an event: nobody moves, speaks, strikes "
+                   "or does anything in it. In new words; never reuse a phrase from the "
+                   "last thing you wrote."})
     for i, act in enumerate(acts(outcomes)):
         tells = [o.tell for o in act]
         decided = (tells[0] if len(tells) == 1 else
@@ -247,39 +316,90 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                    + ("Show it as it happens: no blow lands yet." if declared
                       else "Show it as it happens."))
         slots.append({"key": f"fact{i + 1}",
-                      "max": min(FACT_CEILING, FACT_MAX + FACT_EACH * (len(tells) - 1)),
+                      "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
                       "say": say, "tells": tells})
     if not any(s["key"].startswith("fact") for s in slots):
         if carry_on:
             # Continue moves the scene (the ruling of 2026-09-18): with no tells, the
             # standing action goes on, as THE SCENE NOW says it.
-            slots.append({"key": "keeps", "max": KEEPS_MAX,
+            slots.append({"key": "keeps", "want": KEEPS_WANT,
                           "say": "The player's character keeps on with what they were "
                                  "doing, as THE SCENE NOW says: show the next moment of it. "
                                  "Nothing new happens that the engine did not decide."})
         else:
-            slots.append({"key": "doing", "max": DOING_MAX,
+            slots.append({"key": "doing", "want": DOING_WANT,
                           "say": "The player's character does what the player said: "
                                  f'"{player_input}". Show exactly that, in the place they '
                                  "are. Nothing more."})
     if pull:
-        slots.append({"key": "matter", "max": MATTER_MAX,
-                      "say": "The engine keeps this matter open; let it touch the scene "
-                             "in a sentence, as it says: " + " ".join(pull.split())[:600]})
+        # The engine's fact alone (rough edge 3). It was the pull's whole rendering, whose
+        # head is an instruction to the free narrator ("STILL OPEN, NEAREST TO HAND … never
+        # to resolve for the player"), and on 2026-10-10 the slot paraphrased the
+        # instruction into "…fueled by the fact that and few guards can restrain…".
+        slots.append({"key": "matter", "want": MATTER_WANT,
+                      "say": "A matter the engine keeps open: " + " ".join(pull.split())[:300]
+                             + " Let it touch the scene in one sentence, as a fact, "
+                               "without resolving it."})
     people = [p for p in present(engine) if p["can_answer"]]
-    if people and not engine.scene.in_encounter:
-        names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
-        slots.append({
-            "key": "reply", "max": REPLY_MAX,
-            "say": "If the player spoke to or asked one of the people here "
-                   f"({names}), that ONE person answers, in their own voice, as "
-                   "themselves (\"I\", never their own name or title), only from what THE "
-                   "SCENE says they know; if THE SCENE does not say, they do not know and "
-                   "say so. Put what they say inside <say who=REF to=you>'…'</say>, REF "
-                   "being their ref, with a few words of how they say it. If the player "
-                   "spoke to nobody, one of them goes on with what they were already "
-                   "doing."})
+    if people and not fighting:
+        # Who answers is the engine's (rough edge 2): measured live 2026-10-15, "'I have not
+        # seen that particular face before today…' What do you do?" — nobody said it. The
+        # slot returns the words and how they are said; code writes the speaker in.
+        who = addressee(engine, outcomes)
+        speaker = next((p for p in people if p["ref"] == who), None)
+        if speaker is not None:
+            slots.append({
+                "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
+                "speaker_name": speaker["name"],
+                "say": f'{speaker["name"]} answers the player, in their own voice, as '
+                       "themselves (\"I\", never their own name or title), only from what "
+                       "THE SCENE says they know; if THE SCENE does not say, they do not "
+                       "know and say so."})
+        else:
+            names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
+            slots.append({"key": "aside", "want": ASIDE_WANT,
+                          "say": f"Nobody was spoken to. One of the people here ({names}) "
+                                 "goes on with what they were already doing, in one "
+                                 "sentence, without speaking."})
     return slots
+
+
+def budget_for(engine) -> int:
+    """The beat's budget: `narration.MAX_COMBAT_CHARS` in a fight, `BEAT_BUDGET` out of it."""
+    return narration_mod.MAX_COMBAT_CHARS if engine.scene.in_encounter else BEAT_BUDGET
+
+
+def allocate(slots: list[dict], budget: int) -> tuple[list[dict], list[str]]:
+    """The slots that fit the budget, each given its `max`, and what was dropped.
+
+    The acts and the answer to the player are always written. The rest join in priority order (`PRIORITY`) while what
+    they want still fits; a slot that does not fit is dropped whole, never squeezed below a
+    sentence (`SLOT_FLOOR`). When the acts alone are over the budget they share it, none
+    below the floor — many acts make a long beat, and that is the engine's beat to tell."""
+    def prio(s):
+        return PRIORITY.get("fact" if s["key"].startswith("fact") else s["key"], 5)
+
+    core = [s for s in slots if prio(s) <= 1]
+    need = sum(s["want"] for s in core)
+    if need > budget and core:
+        scale = budget / need
+        for s in core:
+            s["want"] = max(SLOT_FLOOR, int(s["want"] * scale))
+        need = sum(s["want"] for s in core)
+    kept = {id(s) for s in core}
+    dropped = []
+    for s in sorted((s for s in slots if prio(s) > 1), key=prio):
+        if need + s["want"] <= budget:
+            kept.add(id(s))
+            need += s["want"]
+        else:
+            dropped.append(s["key"])
+    out = []
+    for s in slots:
+        if id(s) in kept:
+            s["max"] = s["want"]
+            out.append(s)
+    return out, dropped
 
 
 PLAN_SYSTEM = """You write the prose for one turn of a Pathfinder game. The game engine has \
@@ -336,29 +456,76 @@ def plan_messages(brief: str, slots: list[dict], people: list[dict], place: str,
             {"role": "user", "content": "\n\n".join(b for b in blocks if b)}]
 
 
+def _reply_ask() -> str:
+    return ('Reply with a JSON object: {"words": "...", "manner": "..."} — "words" being '
+            'exactly what they say, without quote marks, and "manner" a few words that '
+            "follow 'says,' to show how: what they do or how they sound as they say it "
+            "(for example 'without looking up from the anvil'), or \"\" for nothing.")
+
+
 def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str], *,
                   suggest: bool = False, redo: str = "") -> list[dict]:
     """The call for slot `i`: the plan, what is already written, and this slot alone."""
     so_far = " ".join(w for w in written if w)
     s = slots[i]
+    size = (f" About {s['max']} characters at most: one or two sentences."
+            if s.get("max") else "")
+    shape = (_reply_ask() if s["key"] == "reply"
+             else 'Reply with a JSON object: {"text": "..."}.')
+    if suggest:
+        shape = shape.replace('Reply with a JSON object: {', 'Reply with a JSON object: {'
+                              '"suggestions": ["...", "..."], ', 1) + (
+            ' "suggestions" are two or three short things the player might do next.')
     ask = (plan[1]["content"]
            + ("\n\nWRITTEN SO FAR (do not repeat any of it; carry straight on from it):\n"
               + so_far if so_far else "")
            + f'\n\nNow write slot {i + 1}, "{s["key"]}", and only that slot: {s["say"]}'
+           + size
            + (f"\n\n{redo}" if redo else "")
-           + ('\nReply with a JSON object: {"text": "...", "suggestions": ["...", "..."]} '
-              '— "suggestions" being two or three short things the player might do next.'
-              if suggest else '\nReply with a JSON object: {"text": "..."}.'))
+           + "\n" + shape)
     return [plan[0], {"role": "user", "content": ask}]
 
 
-def slot_schema(max_chars: int, *, suggest: bool = False) -> dict:
-    props: dict = {"text": {"type": "string",
-                            "maxLength": min(int(max_chars),
-                                             prompts.GRAMMAR_MAXLENGTH_CEILING)}}
+def slot_schema(max_chars: int, *, suggest: bool = False, reply: bool = False) -> dict:
+    room = min(int(max_chars * GRAMMAR_ROOM) if max_chars else prompts.GRAMMAR_MAXLENGTH_CEILING,
+               prompts.GRAMMAR_MAXLENGTH_CEILING)
+    if reply:
+        props: dict = {"words": {"type": "string", "maxLength": room},
+                       "manner": {"type": "string", "maxLength": 80}}
+        required = ["words", "manner"]
+    else:
+        props = {"text": {"type": "string", "maxLength": room}}
+        required = ["text"]
     if suggest:
         props["suggestions"] = {"type": "array", "items": {"type": "string"}}
-    return {"type": "object", "properties": props, "required": ["text"]}
+    return {"type": "object", "properties": props, "required": required}
+
+
+def compose_reply(slot: dict, words: str, manner: str) -> str:
+    """The answer as a line of the page, its speaker written in by code (rough edge 2).
+
+    The words are the model's; who says them is the engine's (`addressee`), named by the
+    engine's own name, and the verb is "says". "Said" is the one dialogue verb that does
+    not draw the eye (Elmore Leonard, "10 Rules of Writing", rule 3: never use a verb
+    other than "said" to carry dialogue), and a fixed verb means the composed line is
+    grammatical whatever the model put in `manner` — which only ever follows "says,".
+    The speaker tag goes on, so the line is booked to them exactly as a tagged line is."""
+    from . import speech
+
+    words = " ".join(str(words or "").split()).strip()
+    if words and speech.spans(words) == [(0, len(words))]:
+        words = words[1:-1].strip()
+    if not words:
+        return ""
+    if words[-1] == ".":
+        words = words[:-1] + ","
+    elif words[-1] not in ",!?…":
+        words += ","
+    manner = " ".join(str(manner or "").split()).strip().rstrip(".,;:")
+    manner = manner[:1].lower() + manner[1:]
+    who = narration_mod.definite(str(slot.get("speaker_name") or ""))
+    return (f"<say who={slot.get('speaker')} to=you>'{words}'</say> {who} says"
+            + (f", {manner}" if manner else "") + ".")
 
 
 def copied_from(text: str, last_beat: str, n: int = COPY_RUN) -> list[str]:
@@ -370,9 +537,11 @@ def copied_from(text: str, last_beat: str, n: int = COPY_RUN) -> list[str]:
 
 
 def _fit(text: str, max_chars: int) -> str:
-    """A hosted provider ignores the grammar's `maxLength`: a slot that ran long is cut
-    back to its last whole sentence inside the ceiling (or kept whole if it has none)."""
-    if len(text) <= max_chars * 1.25:
+    """A slot that ran past its share is cut back to its last whole sentence inside it,
+    and is never cut mid-sentence: the first sentence stays whatever its length. The
+    grammar ceiling is held above the share (`GRAMMAR_ROOM`) so it is never what ends the
+    slot, and a hosted provider ignores the grammar altogether."""
+    if not max_chars or len(text) <= max_chars * 1.15:
         return text
     kept, out = 0, []
     for s in narration_mod._sentences(text):
@@ -381,6 +550,18 @@ def _fit(text: str, max_chars: int) -> str:
         out.append(s)
         kept += len(s) + 1
     return " ".join(out)
+
+
+def page_fault(text: str) -> str:
+    """What the house's own page checks find wrong with one slot as written (rough edge 3):
+    the schema bled into the prose, or a sentence the grammar or the model left unfinished
+    (`narration.cut_schema_bleed`, `narration.ends_unfinished`). "" when it is whole."""
+    _, bled = narration_mod.cut_schema_bleed(text)
+    if bled:
+        return f"Part of the reply's own JSON is in the prose ({bled[0][:40]!r})."
+    if narration_mod.ends_unfinished(text):
+        return "The last sentence stops before it is finished."
+    return ""
 
 
 # A quotation inside a second pair of quote marks, and nothing else inside them: the model
@@ -401,7 +582,8 @@ def _unwrap_quotes(text: str) -> str:
 
 def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
           last_beat: str = "", last_plain: str = "", since=None, scene_now: str = "",
-          pull: str = "", claim: str = "", lift=None, check=None) -> Planned:
+          pull: str = "", claim: str = "", lift=None, check=None,
+          budget: int | None = None) -> Planned:
     """Plan the beat and write it slot by slot. `who` is (model, host, provider, key) —
     the prose role's, so a hosted narrator writes planned beats too. `last_beat` is the
     beat before as the model is shown it (speaker tags back on); `last_plain` the same
@@ -409,42 +591,82 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     (`GMAgent._lift`). `check(key, text)` returns what is wrong with a slot as written, or
     "": the slot is asked once more with that named (the house's shape — detect in code,
     repair only what was found), and kept either way, for the pipeline's backstops after.
-    Raises `PlanFailed` (or the client's own error) when a slot call
-    fails or comes back empty: the caller hands the beat to the free narrator."""
+    `budget` is the beat's length in characters (`budget_for` when None).
+    Raises `PlanFailed` (or the client's own error) when a core slot call fails or comes
+    back empty: the caller hands the beat to the free narrator."""
     model, host, provider, key = who
-    slots = build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat)
+    budget = budget if budget is not None else budget_for(engine)
+    slots, dropped = allocate(
+        build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat), budget)
     people = present(engine)
     plan = plan_messages(brief, slots, people, _place(engine), last_beat=last_beat,
                          since=since, scene_now=scene_now, claim=claim)
     out = Planned(text="", slots=[], messages=plan, model=model)
+    if dropped:
+        out.notes.append(f"over the {budget}-character budget: no {', '.join(dropped)} slot")
     try:
         _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check)
     except Exception as exc:
         # The calls made before the failure, for the turn log beside the free beat.
         exc.calls = list(out.calls)
         raise
+    _hold_to_budget(out, budget)
     out.text = " ".join(s["wrote"] for s in out.slots if s.get("wrote")).strip()
     if not out.text:
         raise PlanFailed("every slot came back empty")
     return out
 
 
+def _prio(s: dict) -> int:
+    return PRIORITY.get("fact" if s["key"].startswith("fact") else s["key"], 5)
+
+
+def _hold_to_budget(out: Planned, budget: int) -> None:
+    """Written over the budget by more than a tenth: the lowest-priority slots go whole,
+    lowest first, until it fits or only the acts and the answer are left. Never a cut
+    inside a slot — `_fit` already held each to its share at a sentence's end."""
+    def total():
+        return sum(len(s.get("wrote") or "") + 1 for s in out.slots)
+
+    for s in sorted(out.slots, key=_prio, reverse=True):
+        if total() <= budget * 1.1 or _prio(s) <= 1:
+            break
+        if s.get("wrote"):
+            out.notes.append(f'over the {budget}-character budget once written: dropped '
+                             f'the "{s["key"]}" slot')
+            s["wrote"], s["dropped"] = "", True
+
+
+def _settle(out: Planned, s: dict, text: str) -> None:
+    """The slot as it stands, with the call whose answer stood (for a remake to re-ask)."""
+    call = out.calls[-1] if out.calls else {}
+    out.slots.append({**s, "wrote": text, "messages": call.get("messages") or [],
+                      "reply": call.get("raw") or ""})
+
+
 def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None) -> None:
     written: list[str] = []
     for i, s in enumerate(slots):
         final = i == len(slots) - 1
-        text, data = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift)
+        core = _prio(s) <= 1
+        text, data = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                          core=core)
+        if not text:
+            # Only a slot outside the core can come back empty and live: it is dropped.
+            out.notes.append(f'the "{s["key"]}" slot came back empty: dropped')
+            out.slots.append({**s, "wrote": "", "dropped": True})
+            continue
         if s["key"] == "still":
             copied = copied_from(text, last)
             if copied:
                 # Named, once: the words it took from the last beat. Then dropped, if it
                 # takes them again — the slot changes nothing by definition.
                 named = "; ".join(f'"{c}"' for c in copied[:4])
-                text, data = _ask(out, plan, slots, i, written, who, lift=lift,
+                text, data = _ask(out, plan, slots, i, written, who, lift=lift, core=False,
                                   redo=f"You wrote: {text!r}. It reuses words from the last "
                                        f"thing you wrote ({named}). Write it again in "
                                        f"entirely new words.")
-                again = copied_from(text, last)
+                again = copied_from(text, last) if text else ["(nothing)"]
                 out.calls[-1]["note"] = ("copy named" + (" — still copied, dropped"
                                                          if again else ""))
                 if again:
@@ -454,11 +676,35 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None) ->
                     continue
                 out.notes.append("the still slot copied the last beat: asked again, "
                                  "in new words")
+        # The page's own checks, on the slot as it is written (rough edge 3): asked once
+        # more with the fault named; a slot outside the core that is still broken goes,
+        # and a core slot is cut back to its last whole sentence.
+        fault = page_fault(text)
+        if fault:
+            text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                                core=core,
+                                redo=f"You wrote: {text!r}. {fault} Write it again, whole.")
+            again = page_fault(text2) if text2 else fault
+            out.calls[-1]["note"] = "page fault named" + (" — still there" if again else "")
+            if not again:
+                text, data = text2, (data2 if final else data)
+                out.notes.append(f'the "{s["key"]}" slot: {fault} — asked again, fixed')
+            elif not core:
+                out.notes.append(f'the "{s["key"]}" slot: {fault} — asked again, dropped')
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
+            else:
+                cut, _bled = narration_mod.cut_schema_bleed(text)
+                cut, _gone = narration_mod.trim_unfinished(cut)
+                text = cut or text
+                out.notes.append(f'the "{s["key"]}" slot: {fault} — cut to whole sentences')
         wrong = check(s["key"], text) if check is not None else ""
         if wrong:
-            text, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
-                               redo=f"You wrote: {text!r}. {wrong} Write it again, fixed.")
-            data = data2 if final else data
+            text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                                core=core,
+                                redo=f"You wrote: {text!r}. {wrong} Write it again, fixed.")
+            if text2:
+                text, data = text2, (data2 if final else data)
             again = check(s["key"], text)
             out.calls[-1]["note"] = "fault named" + (" — still there" if again else "")
             out.notes.append(f'the "{s["key"]}" slot: {wrong} — asked again'
@@ -468,22 +714,43 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None) ->
 
             out.suggestions = _suggestions(data)
         written.append(text)
-        out.slots.append({**s, "wrote": text})
+        _settle(out, s, text)
+
+
+def realise(s: dict, data: dict, lift=None) -> str:
+    """A slot's reply as page text: the prose, or the composed answer (`compose_reply`);
+    speaker tags lifted, fitted to the slot's share, doubled quote marks undone."""
+    if s["key"] == "reply" and s.get("speaker"):
+        text = compose_reply(s, data.get("words", ""), data.get("manner", ""))
+    else:
+        text = " ".join(str(data.get("text", "") or "").split())
+    if lift is not None:
+        text = lift(text)
+    return _unwrap_quotes(_fit(text, s.get("max") or 0))
+
+
+def call_slot(s: dict, messages: list[dict], who: tuple, *, suggest: bool = False):
+    """One slot call: (reply, data). The one copy of the call, for a beat and a remake."""
+    model, host, provider, key = who
+    reply = client.chat(messages, model, host, as_json=True, think=False,
+                        temperature=0.8,
+                        num_predict=max(200, int((s.get("max") or 300) * GRAMMAR_ROOM) // 2
+                                        + 120),
+                        provider=provider, api_key=key,
+                        schema=slot_schema(s.get("max") or 0, suggest=suggest,
+                                           reply=s["key"] == "reply" and bool(s.get("speaker"))))
+    return reply, reply.json()
 
 
 def _ask(out: Planned, plan, slots, i, written, who, *, suggest: bool = False,
-         redo: str = "", lift=None) -> tuple[str, dict]:
-    model, host, provider, key = who
+         redo: str = "", lift=None, core: bool = True) -> tuple[str, dict]:
+    model = who[0]
     s = slots[i]
     messages = slot_messages(plan, slots, i, written, suggest=suggest, redo=redo)
     started = time.monotonic()
     reply = None
     try:
-        reply = client.chat(messages, model, host, as_json=True, think=False,
-                            temperature=0.8, num_predict=max(200, s["max"] // 2 + 120),
-                            provider=provider, api_key=key,
-                            schema=slot_schema(s["max"], suggest=suggest))
-        data = reply.json()
+        reply, data = call_slot(s, messages, who, suggest=suggest)
     except Exception as exc:
         out.calls.append({"key": s["key"], "messages": messages,
                           "raw": getattr(reply, "text", "") or "",
@@ -491,15 +758,117 @@ def _ask(out: Planned, plan, slots, i, written, who, *, suggest: bool = False,
                           "note": f"failed: {type(exc).__name__}: {str(exc)[:160]}"})
         if isinstance(exc, client.ModelStalled):
             raise
+        if not core:
+            return "", {}
         raise PlanFailed(f'slot "{s["key"]}": {type(exc).__name__}: '
                          f"{str(exc)[:160]}") from exc
-    text = " ".join(str(data.get("text", "") or "").split())
-    if lift is not None:
-        text = lift(text)
-    text = _unwrap_quotes(_fit(text, s["max"]))
+    text = realise(s, data, lift)
     out.calls.append({"key": s["key"], "messages": messages, "raw": reply.text,
                       "seconds": round(reply.seconds, 1), "model": reply.model or model,
                       "note": ""})
-    if not text:
+    if not text and core:
         raise PlanFailed(f'slot "{s["key"]}" came back empty')
     return text, data
+
+
+# --- a remake of a planned beat (rough edge 5) ------------------------------------------
+
+def _same(s: str) -> str:
+    return " ".join(str(s or "").split())
+
+
+def slot_of(sentence: str, slots: list[dict]) -> int | None:
+    """Which kept slot wrote this sentence of the page: the slot whose text holds it, or —
+    a sentence a backstop touched after — the one sharing the most of its words, if that
+    is most of them. None for a sentence no slot wrote (the hand-back, a face line)."""
+    want = _same(sentence)
+    if not want:
+        return None
+    for n, s in enumerate(slots):
+        if want in _same(s.get("wrote")):
+            return n
+    words = set(narration_mod._words(want))
+    best, share = None, 0.0
+    for n, s in enumerate(slots):
+        mine = set(narration_mod._words(s.get("wrote") or ""))
+        got = len(words & mine) / max(1, len(words))
+        if got > share:
+            best, share = n, got
+    return best if share >= 0.6 else None
+
+
+def kept_slots(entry: dict, lift=None) -> list[dict]:
+    """The slots a planned beat was written from, as "That's wrong" kept them, each with
+    its text. An input kept before the slot text was (0.2.16) gives it from the reply."""
+    out = []
+    for s in entry.get("slots") or []:
+        if not isinstance(s, dict) or s.get("dropped"):
+            continue
+        s = dict(s)
+        if not s.get("wrote"):
+            try:
+                raw = str(s.get("reply") or "")
+                data = json.loads(raw[raw.find("{"):raw.rfind("}") + 1]) if "{" in raw else {}
+            except ValueError:
+                data = {}
+            s["wrote"] = realise(s, data, lift) if data else ""
+        if s.get("wrote") and s.get("messages"):
+            out.append(s)
+    return out
+
+
+def remake(page: str, entry: dict, picked: list[str], complaint: str, who: tuple,
+           lift=None, now: dict | None = None) -> tuple[str, list[dict], float, dict]:
+    """A planned beat the player marked wrong, remade the planned way: only the slots that
+    wrote the sentences they picked are asked again — each its own kept call with the
+    player's complaint added — and every other slot's sentences stay on the page exactly
+    as they are. Nothing picked: every slot is asked again. Returns (text, the slot calls
+    as made, seconds, every slot's text now). `now` is each slot's text as an earlier
+    remake left it, so a second remake knows which slot wrote what. Measured 2026-10-15: the remake went through the whole-beat repair
+    call and a three-sentence planned miss came back as four sentences of free prose."""
+    slots = kept_slots(entry, lift)
+    if not slots:
+        raise PlanFailed("the beat's slots were not kept")
+    for s in slots:
+        if (now or {}).get(s["key"]):
+            s["wrote"] = now[s["key"]]
+    sentences = narration_mod._sentences(page)
+    owner = [slot_of(x, slots) for x in sentences]
+    marked = {_same(p) for p in picked or []}
+    redo = sorted({owner[n] for n, x in enumerate(sentences)
+                   if owner[n] is not None and any(m and m in _same(x) for m in marked)})
+    if not marked or not redo:
+        redo = list(range(len(slots)))
+    calls, new, spent = [], {}, 0.0
+    for n in redo:
+        s = slots[n]
+        msgs = [dict(m) for m in s["messages"]]
+        msgs[-1]["content"] += (f"\n\nYou wrote: {s['wrote']!r}. {complaint} Write this "
+                                f"slot again, fixed, keeping to what the engine decided.")
+        started = time.monotonic()
+        reply, data = call_slot(s, msgs, who)
+        spent += time.monotonic() - started
+        text = realise(s, data, lift)
+        calls.append({"key": s["key"], "messages": msgs, "reply": reply.text,
+                      "model": reply.model or who[0]})
+        if not text:
+            raise PlanFailed(f'the remade "{s["key"]}" slot came back empty')
+        new[n] = text
+    out, done = [], set()
+    for x, n in zip(sentences, owner):
+        if n in new:
+            if n not in done:
+                out.append(new[n])
+                done.add(n)
+            continue
+        out.append(x)
+    # A slot asked again whose sentences no longer stand on the page at all goes where
+    # its order puts it: before the first sentence of a later slot.
+    for n in sorted(set(new) - done):
+        later = next((k for k, o in enumerate(owner) if o is not None and o > n), None)
+        if later is None:
+            out.append(new[n])
+        else:
+            out.insert(later, new[n])
+    return (" ".join(x for x in out if x).strip(), calls, spent,
+            {s["key"]: new.get(n, s["wrote"]) for n, s in enumerate(slots)})

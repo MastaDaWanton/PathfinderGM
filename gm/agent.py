@@ -3343,7 +3343,12 @@ class GMAgent:
                 last_beat=tagged[-1][-900:] if tagged else "",
                 last_plain=plain[-1][-900:] if plain else "",
                 since=since, scene_now=scene_now,
-                pull=str((pull or {}).get("text") or ""),
+                # The open matter's own fact, never `text`: that is the free narrator's
+                # rendering, whose head is an instruction (gm/planned.py, rough edge 3).
+                # A pull that yielded asks nothing of the beat.
+                pull=("" if not pull or pull.get("yielded") else
+                      str(pull.get("title") or "")
+                      + (f" — {pull['fact']}" if pull.get("fact") else "")),
                 claim=prompts.false_claim_block(claim) if claim else "",
                 lift=self._lift, check=_check)
         except client.ModelStalled:
@@ -3366,9 +3371,12 @@ class GMAgent:
         # The input that wrote this beat, for "That's wrong" (play/corrections.py): the
         # plan as one prompt, and every slot call exactly as it was sent.
         self.last_prose_messages = beat.messages
-        self.last_prose_slots = [{"key": c["key"], "messages": c["messages"],
-                                  "reply": c["raw"], "note": c["note"]}
-                                 for c in beat.calls]
+        # One row a slot, the call whose answer stood and the text it put on the page: a
+        # remake asks exactly that call again (`planned.remake`, rough edge 5).
+        self.last_prose_slots = [
+            {k: s[k] for k in ("key", "messages", "reply", "wrote", "max", "speaker",
+                               "speaker_name", "dropped") if k in s}
+            for s in beat.slots]
         self.last_prose_model = beat.model
         self.last_suggestions = list(beat.suggestions)
         attempts = [Attempt("plan-slot", c["seconds"], c["model"], c["raw"],
@@ -3378,6 +3386,31 @@ class GMAgent:
         return {"text": beat.text, "notes": list(beat.notes), "attempts": attempts,
                 "messages": beat.messages, "schema": schema,
                 "shape": 'Reply with a JSON object: {"narration": "..."}.'}, "", []
+
+    def remake_planned(self, page: str, entry: dict, picked: list[str], note: str = "",
+                       earlier: list[str] | None = None, now: dict | None = None
+                       ) -> tuple[str, Attempt, list[dict], dict]:
+        """"That's wrong" on a planned beat (rough edge 5): the slots that wrote what the
+        player picked are asked again, each its own kept call, and the rest of the page
+        stands. Returns (text, attempt, the slot calls, each slot's text now) — the first
+        three as `repair_beat` gives them, so the corrections log keeps the calls as the
+        remake's `repair_messages`. The page pass and the hand-back, as a free remake has."""
+        from . import planned
+
+        complaint = "The player marked this wrong." + (
+            f" What the player says is wrong: {note}" if str(note or "").strip() else "")
+        text, calls, seconds, slots_now = planned.remake(
+            page, entry, picked, complaint,
+            (self.prose_model, self.prose_host, self.prose_provider, self.prose_key),
+            lift=self._lift, now=now)
+        text, notes = self._page_pass(text, earlier)
+        text, _ = narration_mod.ensure_hand_back(text)
+        attempt = Attempt("polish", seconds, calls[-1]["model"] if calls else self.prose_model,
+                          "\n".join(c["reply"] for c in calls),
+                          note="the player marked it wrong — planned slots: "
+                               + ", ".join(c["key"] for c in calls)
+                               + (f" — page: {'; '.join(notes)}" if notes else ""))
+        return text, attempt, calls, slots_now
 
     def narrate_turn(self, outcomes: list, player_input: str, brief: str,
                      earlier: list[str] | None = None, *,

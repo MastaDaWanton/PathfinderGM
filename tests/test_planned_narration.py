@@ -46,8 +46,9 @@ SLOT_TEXT = {
     "doing": "You lean on the doorframe and watch him work.",
     "keeps": "You keep watching the street.",
     "matter": "The debt you carry sits at the back of your mind.",
-    "reply": "<say who=c1 to=you>'Ore comes up from the pits on the third day,'</say> "
-             "Jarek says.",
+    "reply": {"words": "Ore comes up from the pits on the third day.",
+              "manner": "without looking up"},
+    "aside": "Jarek turns the blade in the coals.",
 }
 
 
@@ -101,14 +102,15 @@ def _fake(calls, *, slot_text=None, free="", fail_slots=False):
         schema = kw.get("schema") or {}
         calls.append({"messages": messages, "schema": schema, "model": model})
         props = schema.get("properties") or {}
-        if "text" in props:
+        if "text" in props or "words" in props:
             if fail_slots:
                 raise RuntimeError("the model wrote nothing usable")
             key = re.findall(r'Now write slot \d+, "(\w+)"', messages[-1]["content"])[-1]
             said = texts[key]
             if isinstance(said, list):
                 said = said.pop(0) if len(said) > 1 else said[0]
-            return FakeReply(json.dumps({"text": said,
+            body = dict(said) if isinstance(said, dict) else {"text": said}
+            return FakeReply(json.dumps({**body,
                                          "suggestions": ["Ask about the pits",
                                                          "Leave the forge"]}))
         if "narration" in props:
@@ -148,6 +150,13 @@ def test_the_switch_is_served_and_set_through_the_house_rules_endpoint(rules_dir
 
 # --- the plan ----------------------------------------------------------------------------
 
+def _asked(engine, words="about the ore"):
+    """The player's own `say`, put to Jarek, as the engine writes it."""
+    smith = next(r for r, a in engine.scene.actors.items() if not a.is_pc)
+    return Outcome("i1", "say", tell=f"Kesst Vayr speaks to Jarek, to the effect that {words}",
+                   effects=[{"kind": "said", "who": "pc", "to": smith, "words": words}])
+
+
 def test_the_v2_slots_carry_the_players_line_on_the_first_tell_and_never_close():
     """Bench run 1 (2026-10-09, 12 beats): the player's line and the tell each had a slot
     and said the same thing twice, and a closing slot came back "…stretches out before
@@ -158,10 +167,13 @@ def test_the_v2_slots_carry_the_players_line_on_the_first_tell_and_never_close()
     slots = planned.build_plan(engine, "I ask about the ore.", outcomes,
                                last_beat=LAST_BEAT)
     keys = [x["key"] for x in slots]
-    assert keys == ["still", "fact1", "fact2", "reply"]
-    assert '"I ask about the ore."' in slots[1]["say"]
-    assert "I ask about the ore." not in slots[2]["say"]
+    assert keys == ["fact1", "fact2", "aside"]
+    assert '"I ask about the ore."' in slots[0]["say"]
+    assert "I ask about the ore." not in slots[1]["say"]
     assert not any(k in ("close", "closing", "deed", "doing") for k in keys)
+    talk = [x["key"] for x in planned.build_plan(engine, "I ask about the ore.",
+                                                  [_asked(engine)], last_beat=LAST_BEAT)]
+    assert talk == ["still", "fact1", "reply"]
 
 
 def test_a_doing_slot_only_when_the_engine_decided_nothing_and_a_reply_only_out_of_fights():
@@ -170,12 +182,12 @@ def test_a_doing_slot_only_when_the_engine_decided_nothing_and_a_reply_only_out_
     s, engine = _scene()
     keys = [x["key"] for x in planned.build_plan(engine, "I greet the smith.", [],
                                                   last_beat=LAST_BEAT)]
-    assert keys == ["still", "doing", "reply"]
+    assert keys == ["still", "doing", "aside"]
     s2, fight = _scene(fighting=True)
     keys = [x["key"] for x in planned.build_plan(
         fight, "I punch him.", [Outcome("i1", "attack", tell="Kesst Vayr hits Jarek.")],
         last_beat=LAST_BEAT)]
-    assert "reply" not in keys and "doing" not in keys
+    assert keys == ["fact1"]
 
 
 def test_one_act_is_one_slot_however_many_tells_it_made():
@@ -216,10 +228,15 @@ def test_a_fight_declared_and_not_struck_is_not_shown_landing():
     joined = Outcome("i1", "attack", tell="Battle is joined: Kesst Vayr squares off "
                      "against Jarek. Nothing has landed yet.",
                      effects=[{"kind": "battle_joined", "ref": "pc", "target": "c1"}])
-    say = planned.build_plan(engine, "I punch him.", [joined], last_beat=LAST_BEAT)[1]["say"]
+    def first_act(outcomes):
+        return next(x["say"] for x in planned.build_plan(engine, "I punch him.", outcomes,
+                                                          last_beat=LAST_BEAT)
+                    if x["key"] == "fact1")
+
+    say = first_act([joined])
     assert "no blow lands" in say and "doing it and what came of it" not in say
     struck = Outcome("i1", "attack", tell="Kesst Vayr hits Jarek.")
-    say = planned.build_plan(engine, "I punch him.", [struck], last_beat=LAST_BEAT)[1]["say"]
+    say = first_act([struck])
     assert "doing it and what came of it" in say
 
 
@@ -256,7 +273,7 @@ def test_each_slot_is_its_own_call_shown_the_plan_and_what_is_already_written(mo
     calls: list = []
     monkeypatch.setattr(planned.client, "chat", _fake(calls))
     out = planned.write(engine, brief="BRIEF", player_input="I ask about the ore.",
-                        outcomes=[Outcome("i1", "check", tell="Kesst asks Jarek.")],
+                        outcomes=[_asked(engine)],
                         who=("stub-12b", "http://x", "ollama", ""), last_beat=LAST_BEAT)
     assert [x["key"] for x in out.slots] == ["still", "fact1", "reply"]
     assert len(calls) == 3
@@ -326,8 +343,7 @@ def test_the_length_floor_never_fires_on_a_planned_beat(rules_dir, monkeypatch):
     monkeypatch.setattr(agent_mod.GMAgent, "polish", spy)
     gm = _agent(engine)
     text, repairs, attempts = gm.narrate_turn(
-        [Outcome("i1", "check", tell="Kesst asks Jarek about the ore.")],
-        "I ask about the ore.", "BRIEF", earlier=[LAST_BEAT])
+        [_asked(engine)], "I ask about the ore.", "BRIEF", earlier=[LAST_BEAT])
     assert gm.last_narration == "planned"
     assert len(text) < 800 and SLOT_TEXT["fact1"] in text
     assert polished == [], "no whole-beat rewrite on a planned beat"
@@ -381,21 +397,205 @@ def test_a_reply_with_narration_in_its_quotes_is_asked_again(rules_dir, monkeypa
     with the fault named."""
     houserules.set_active({"narration": "planned"})
     s, engine = _scene()
-    smith = next(r for r, a in s.actors.items() if not a.is_pc)
-    bad = f"<say who={smith} to=you>'Jarek keeps order here, and Jarek alone.'</say>"
-    good = f"<say who={smith} to=you>'I keep order here,'</say> he says, not looking up."
+    bad = {"words": "Jarek keeps order here, and Jarek alone.", "manner": ""}
+    good = {"words": "I keep order here.", "manner": "not looking up"}
     calls: list = []
     monkeypatch.setattr(agent_mod.client, "chat",
                         _fake(calls, slot_text={"reply": [bad, good]}))
     gm = _agent(engine)
-    text, repairs, attempts = gm.narrate_turn([], "I ask who keeps order.", "BRIEF",
-                                              earlier=[LAST_BEAT])
+    text, repairs, attempts = gm.narrate_turn(
+        [_asked(engine, "who keeps order")], "I ask who keeps order.", "BRIEF",
+        earlier=[LAST_BEAT])
     replies = [c for c in calls if '"reply", and only' in c["messages"][1]["content"]]
     assert len(replies) == 2
     assert "narration, not speech" in replies[1]["messages"][1]["content"]
     assert "I keep order here" in text and "Jarek alone" not in text
     assert [r["line"] for r in gm.last_said] == ["I keep order here,"], \
         "the first answer's line is not booked as said"
+
+
+# --- the rough edges (2026-10-16) ----------------------------------------------------------
+
+def test_the_still_slot_is_a_state_and_never_rides_a_body_act():
+    """Rough edge 1, measured live 2026-10-10: the still slot was asked where the last
+    beat's situation stood, the last beat was an action, and it restated the action —
+    "your fist inches from the Korvu's face" before the move that put it there. It is
+    gone from fights, arrivals and every turn whose act is a deed of the body, and where
+    it stays it is asked for a state from THE SCENE NOW, nobody acting in it."""
+    s, engine = _scene()
+    body = [Outcome("i1", "give", tell="Kesst Vayr takes the apple from Jarek.")]
+    assert "still" not in [x["key"] for x in planned.build_plan(
+        engine, "I take the apple.", body, last_beat=LAST_BEAT)]
+    s2, fight = _scene(fighting=True)
+    assert "still" not in [x["key"] for x in planned.build_plan(
+        fight, "I wait.", [], last_beat=LAST_BEAT)]
+    still = planned.build_plan(engine, "I ask about the ore.", [_asked(engine)],
+                               last_beat=LAST_BEAT)[0]
+    assert still["key"] == "still"
+    assert "A state, not an event" in still["say"] and "THE SCENE NOW" in still["say"]
+
+
+def test_who_answers_is_the_engines_and_code_writes_them_in():
+    """Rough edge 2, live 2026-10-15: "'I have not seen that particular face before
+    today…' What do you do?" — nobody said it. The reply slot's schema has no speaker in
+    it: the engine names who was spoken to (the `say` effect's `to`), the model gives the
+    words and how they are said, and code writes the line with the speaker's own name and
+    the speaker tag, so the line is booked to them."""
+    s, engine = _scene()
+    smith = next(r for r, a in s.actors.items() if not a.is_pc)
+    assert planned.addressee(engine, [_asked(engine)]) == smith
+    assert planned.addressee(engine, []) == "", "spoken to nobody: nobody answers"
+    schema = planned.slot_schema(240, reply=True)
+    assert set(schema["properties"]) == {"words", "manner"}
+    slot = {"key": "reply", "speaker": smith, "speaker_name": "Jarek"}
+    line = planned.compose_reply(slot, "'I keep order here.'", "Without looking up.")
+    assert line == (f"<say who={smith} to=you>'I keep order here,'</say> Jarek says, "
+                    "without looking up.")
+    assert planned.compose_reply(slot, "Who's asking?", "") == \
+        f"<say who={smith} to=you>'Who's asking?'</say> Jarek says."
+    descriptor = {"key": "reply", "speaker": "c9", "speaker_name": "master of the market"}
+    assert "</say> the master of the market says." in \
+        planned.compose_reply(descriptor, "No.", "")
+
+
+def test_the_matter_slot_is_given_the_engines_fact_and_never_the_instruction(rules_dir,
+                                                                             monkeypatch):
+    """Rough edge 3, live 2026-10-10: the matter slot was handed the pull's whole
+    rendering, whose head is an instruction to the free narrator ("STILL OPEN, NEAREST TO
+    HAND … never to resolve for the player"), and wrote "…fueled by the fact that and few
+    guards can restrain…". It is given the matter's title and fact, nothing else."""
+    houserules.set_active({"narration": "planned"})
+    s, engine = _scene()
+    calls: list = []
+    monkeypatch.setattr(agent_mod.client, "chat", _fake(calls))
+    pull = {"title": "The bounty", "fact": "the wanted one is still in the market",
+            "text": "STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to "
+                    "let show where it fits, never to resolve for the player): The bounty."}
+    _agent(engine).narrate_turn([], "I wait.", "BRIEF", earlier=[LAST_BEAT], pull=pull)
+    plan = calls[0]["messages"][1]["content"]
+    assert "The bounty — the wanted one is still in the market" in plan
+    assert "STILL OPEN" not in plan and "never to resolve" not in plan
+
+
+def test_a_slot_the_page_checks_find_broken_is_asked_once_then_dropped(monkeypatch):
+    """Rough edge 3's backstop: the house's own page checks (`ends_unfinished`, the schema
+    bleed) run on each slot as it is written. A broken slot is asked once more with the
+    fault named; one outside the acts that is still broken is dropped, never shipped."""
+    s, engine = _scene()
+    broken = "The tension between the winged and the flightless, fueled by the fact that and"
+    calls: list = []
+    monkeypatch.setattr(planned.client, "chat",
+                        _fake(calls, slot_text={"matter": [broken, broken]}))
+    out = planned.write(engine, brief="BRIEF", player_input="I wait.",
+                        outcomes=[], pull="The bounty",
+                        who=("stub-12b", "http://x", "ollama", ""), last_beat=LAST_BEAT)
+    matter = [c for c in calls if '"matter", and only' in c["messages"][1]["content"]]
+    assert len(matter) == 2
+    assert "stops before it is finished" in matter[1]["messages"][1]["content"]
+    assert broken not in out.text and any('"matter" slot' in n for n in out.notes)
+    assert planned.page_fault("He nods.") == ""
+
+
+def test_the_beat_is_held_to_a_budget_by_priority_never_mid_sentence():
+    """Rough edge 4, live 2026-10-10: the gate beat ran to 900 characters across six
+    slots. The beat has a budget (650, or the free narrator's own fight ceiling in a
+    fight); the acts and the answer are written, then the state, the matter and an aside
+    as they fit, and a slot that does not fit goes whole — no sentence is cut mid-way."""
+    s, engine = _scene()
+    assert planned.budget_for(engine) == planned.BEAT_BUDGET == 650
+    s2, fight = _scene(fighting=True)
+    from gm import narration
+
+    assert planned.budget_for(fight) == narration.MAX_COMBAT_CHARS
+    many = [Outcome(f"i{n}", op, tell=f"tell {n}")
+            for n, op in enumerate(("check", "attack", "give"), 1)]
+    slots = planned.build_plan(engine, "I do three things.", many, pull="The bounty",
+                               last_beat=LAST_BEAT)
+    kept, dropped = planned.allocate(slots, 650)
+    assert [x["key"] for x in kept] == ["fact1", "fact2", "fact3"]
+    assert set(dropped) == {"matter", "aside"}
+    assert sum(x["max"] for x in kept) <= 660
+    talk, _ = planned.allocate(planned.build_plan(engine, "I ask.", [_asked(engine)],
+                                                  pull="The bounty", last_beat=LAST_BEAT),
+                               650)
+    assert [x["key"] for x in talk] == ["still", "fact1", "reply"], \
+        "the state before the matter when only one of them fits"
+    long = "One sentence that runs on for a while. " * 6 + "The end."
+    fitted = planned._fit(long, 120)
+    assert len(fitted) <= 120 and fitted.endswith(".") and fitted in long
+    assert planned._fit("A single sentence far longer than its share of the beat is.", 20) \
+        == "A single sentence far longer than its share of the beat is."
+
+
+def test_a_remake_of_a_planned_beat_asks_again_only_the_slot_the_player_marked(monkeypatch):
+    """Rough edge 5, live 2026-10-15: "That's wrong" on a three-sentence planned miss went
+    through the whole-beat repair call and came back as four sentences of free prose. A
+    planned beat is remade the planned way: the slot that wrote the picked sentence is
+    asked again — its own kept call, the player's note as the complaint — and every
+    other slot's sentence stays on the page exactly as it was."""
+    first = "The Korvu stands by the anvil, tongs in hand."
+    second = "You ask the smith about the ore, and he hears you out."
+    entry = {"narration": "planned", "slots": [
+        {"key": "still", "wrote": first, "max": 140,
+         "messages": [{"role": "system", "content": "PLAN"},
+                      {"role": "user", "content": 'Now write slot 1, "still", and only'}],
+         "reply": json.dumps({"text": first})},
+        {"key": "fact1", "wrote": second, "max": 220,
+         "messages": [{"role": "system", "content": "PLAN"},
+                      {"role": "user", "content": 'Now write slot 2, "fact1", and only'}],
+         "reply": json.dumps({"text": second})}]}
+    page = f"{first} {second} What do you do?"
+    calls: list = []
+    monkeypatch.setattr(planned.client, "chat",
+                        _fake(calls, slot_text={"fact1": "You ask about the ore."}))
+    text, made, _secs, now = planned.remake(page, entry, [second], "He never heard me.",
+                                            ("stub-12b", "http://x", "ollama", ""))
+    assert text == f"{first} You ask about the ore. What do you do?"
+    assert [c["key"] for c in made] == ["fact1"] and len(calls) == 1
+    assert "He never heard me." in calls[0]["messages"][-1]["content"]
+    assert now == {"still": first, "fact1": "You ask about the ore."}
+    calls.clear()
+    text, made, _secs, _now = planned.remake(page, entry, [], "",
+                                             ("stub-12b", "http://x", "ollama", ""))
+    assert [c["key"] for c in made] == ["still", "fact1"], "nothing picked: every slot"
+
+
+def test_the_corrections_log_keeps_a_planned_remakes_slot_calls(rules_dir, monkeypatch):
+    """The That's-wrong record of a planned remake carries the slot calls it made as its
+    `repair_messages`, and the exporter turns them into the planned repair set — each
+    call its own prompt — never into the free repair call's set."""
+    from play import corrections
+    from tools.corrections_to_pairs import convert
+
+    beat = "You ask the smith about the ore, and he hears you out. What do you do?"
+    c = SimpleNamespace(id="plan-remake", turn_log=[], ended=False, history=[],
+                        scene=SimpleNamespace(awaiting=None, conversation_log=[]),
+                        transcript=[{"who": "player", "text": "I ask about the ore."},
+                                    {"who": "gm", "kind": "setup", "text": beat}],
+                        save=lambda: None)
+    slots = [{"key": "fact1", "wrote": "You ask the smith about the ore, and he hears you out.",
+              "max": 220, "reply": "{}",
+              "messages": [{"role": "user", "content": 'Now write slot 1, "fact1", and only'}]}]
+    agent = SimpleNamespace(last_narration="planned", last_prose_slots=slots,
+                            last_prose_messages=[{"role": "system", "content": "PLAN"}],
+                            last_prose_model="stub-12b", last_prose_draft=beat,
+                            prose_model="stub-12b", _intimate_beat=lambda: False)
+    corrections.remember_input(c, 1, agent=agent, player_input="I ask about the ore.",
+                               brief="BRIEF", facts=[])
+    s, engine = _scene()
+    real = _agent(engine)
+    monkeypatch.setattr(agent_mod.client, "chat",
+                        _fake([], slot_text={"fact1": "You ask about the ore."}))
+    monkeypatch.setattr(corrections, "_apply", lambda c, i, v: None)
+    rec = corrections.remake(c, 1, [slots[0]["wrote"]], "he never heard me", agent=real)
+    v = rec["versions"][-1]
+    assert v["by"] == "remake" and v.get("narration") == "planned"
+    assert v["text"].startswith("You ask about the ore.")
+    assert [x["key"] for x in v["repair_messages"]] == ["fact1"]
+    v["verdict"] = "wrong"
+    sets = convert([rec])
+    assert sets["repair.kto.jsonl"] == []
+    assert sets["repair.planned.kto.jsonl"][0]["meta"]["slot"] == "fact1"
 
 
 # --- That's wrong ------------------------------------------------------------------------
