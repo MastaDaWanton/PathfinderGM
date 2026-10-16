@@ -146,7 +146,8 @@ def deeds_of(reading: dict | None, sentence: str, outcomes=(), *,
         out.append({**a, "span": span, "index": i,
                     "cues": narration.deed_cues(a),
                     "before_move": bool(moved and move_at is not None and i < move_at),
-                    "after_move": bool(moved and move_at is not None and i > move_at)})
+                    "after_move": bool(moved and move_at is not None and i > move_at),
+                    "moved": bool(moved)})
     return out
 
 

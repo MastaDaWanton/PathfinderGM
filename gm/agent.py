@@ -3118,12 +3118,22 @@ class GMAgent:
         rendering of it that cannot be wrong about what they did."""
         deeds = [str(d.get("span") or d.get("object") or d.get("act")) for d in unshown]
         before = any(d.get("before_move") for d in unshown)
-        moved_first = not before and all(d.get("after_move") for d in unshown)
+        # On a turn the engine moved the party, a deed the reading does not place BEFORE
+        # the move happened where they arrived: the order is the engine's (the travel
+        # resolved) and the reading's (`before_move`), never the page's words. Measured
+        # 2026-10-16 on the planned town bench, in both narrators' tails: "I find an inn
+        # and ask for a room" came back "You approach the counter and ask for a room. You
+        # travel for half an hour…" — the deed put at the start, before the walk to the
+        # inn, because the reading had not marked it `after_move` (2 of 2 inn beats).
+        moved_first = not before and all(d.get("after_move") or d.get("moved")
+                                         for d in unshown)
         harmless = any(d.get("act") == "attack" for d in unshown)
         # Where it happens: the scene the player last read, which on a move turn is the
         # place they LEFT — the prose call is shown none of it on an arrival (`stood = []`
-        # in `call_prose_messages`), which is half of why the deeds were skipped.
-        where = (earlier or [])[-1] if earlier else str(brief or "")[:1400]
+        # in `call_prose_messages`), which is half of why the deeds were skipped. A deed
+        # done after arriving happens where the brief is: the place they reached.
+        where = (str(brief or "")[:1400] if moved_first or not earlier
+                 else (earlier or [])[-1])
         scene = self.engine.scene
         lookup = " ".join([where, text, player_input, " ".join(facts or [])])
         people = [str(a.name) for a in scene.actors.values()
@@ -3350,7 +3360,10 @@ class GMAgent:
                       str(pull.get("title") or "")
                       + (f" — {pull['fact']}" if pull.get("fact") else "")),
                 claim=prompts.false_claim_block(claim) if claim else "",
-                lift=self._lift, check=_check)
+                lift=self._lift, check=_check,
+                # The interpreter's reading of the line (`views` sets it on the agent),
+                # for the slot that must not walk a player the engine did not move.
+                reading=getattr(self, "reading", None))
         except client.ModelStalled:
             raise
         except Exception as exc:  # noqa: BLE001 — any failure hands the beat to free
