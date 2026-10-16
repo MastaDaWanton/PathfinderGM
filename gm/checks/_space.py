@@ -47,12 +47,17 @@ def reading_acts(ctx) -> set[str]:
 
 
 # Quoted speech is a person talking, not the narrator claiming: "the road to Grotburrow
-# isn't for the faint of heart", said by a stranger, is his opinion of a road.
-_QUOTED = re.compile(r"([\"“”])(?:(?!\1).)*\1|(?<![A-Za-z])'[^']{2,}?'(?![A-Za-z])", re.S)
-
-
+# isn't for the faint of heart", said by a stranger, is his opinion of a road — and a road
+# named in an answer is never a position claim (owner, 2026-10-16).
+#
+# Read by `gm.speech`, the one reader of quotations. This module had its own regex, whose
+# single-quote branch stopped at the first apostrophe: 'The road north isn't safe' was not
+# speech to it, so a guard's answer about a road was read as the narrator putting the party
+# on that road, and the repair garbled the answer (planned-narration bench, 2026-10-16).
 def unquoted(sentence: str) -> str:
-    return _QUOTED.sub(" ", str(sentence or ""))
+    from gm import speech
+
+    return speech.unquoted(str(sentence or ""))
 
 
 def settlement(ctx):

@@ -202,9 +202,10 @@ def test_bobby_turn_8_road_and_bearing_found():
 
 @needs_bobby
 def test_bobby_turn_9_pine_and_the_road_to_grotburrow_are_found():
-    """Turn 9: "crushed pine and damp earth" in a forest Vormoor does not have, and a
-    stranger's "The road to Grotburrow isn't for the faint of heart" with no journey
-    begun — the owner's own example of a road claimed (20.5).
+    """Turn 9: "crushed pine and damp earth" in a forest Vormoor does not have. The
+    stranger's "The road to Grotburrow isn't for the faint of heart" was the owner's own
+    example of a road claimed (20.5) until the owner ruled on 2026-10-16 that "a road in
+    an answer isn't a position claim": it is speech now, and not found.
 
     Stood where the fixed engine would hold the party: the forest move is refused now
     (`absent_ground`), so Bobby is still out at the crossroads he walked to on turn 7."""
@@ -215,7 +216,23 @@ def test_bobby_turn_9_pine_and_the_road_to_grotburrow_are_found():
     assert "absent-ground" in kinds
     pine = next(f for f in land_described.find(ctx) if f.kind == "absent-ground")
     assert any("pine" in sentence for sentence in pine.sentences)
-    assert road_claimed.find(ctx)
+    assert not road_claimed.find(ctx)
+
+
+def test_a_road_named_in_an_answer_is_not_a_position_claim():
+    """Owner, 2026-10-16: "a road in an answer isn't a position claim". On the planned-
+    narration bench the gate guard's answer to "what is on the road out of town" was read
+    as the narrator putting the party on that road, and the repairs garbled it ("the road
+    from the outskirts… while the road from the outskirts…"). The old quote reader also
+    stopped at the apostrophe in 'isn't', so single-quoted speech with one was not speech.
+    The narrator saying it is still a claim."""
+    s, e = _engine()
+    said = ("The guard leans on his spear. 'The road to Dustgate isn't kind this time of "
+            "year, and the road to Dustgate runs north past the old mill,' he says.")
+    assert road_claimed.find(_ctx(said, s, e)) == []
+    assert bearing_invented.find(_ctx(said, s, e)) == []
+    narrated = "The road to Dustgate stretches before you, pale under the noon sun."
+    assert [f.kind for f in road_claimed.find(_ctx(narrated, s, e))] == ["road-claimed"]
 
 
 @needs_bobby
