@@ -111,11 +111,12 @@ ASIDE_WANT = 140
 BLOW_WANT = 300
 BLOW_EACH = 100
 GROUND_WANT = 120
-# What the ground clause looks at, one a beat (see where `build_plan` asks); None is a beat
-# with no ground clause at all.
-_GROUND = ("what is underfoot, the floor or ground the blows land on",
-           "the light here and what it falls on",
-           "what already stands about here, walls or furniture or whatever is there",
+# What the ground clause looks at (see where `build_plan` asks); None is a beat with no
+# ground clause at all, and two of them follow each aspect, so a fight hears its ground on
+# one beat in three.
+_GROUND = ("what is underfoot, the floor or ground the blows land on", None, None,
+           "the light here and what it falls on", None, None,
+           "what already stands about here, walls or furniture or whatever is there", None,
            None)
 SLOT_FLOOR = 110
 # Which slots go first when the budget is short: the acts are the beat (never dropped), the
@@ -536,12 +537,14 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
         # a weapon to snatch or a door to run for is the engine's to put there. Lowest
         # but one in the fight's budget: the blows come first.
         #
-        # One aspect a beat, walked least-recently-used, and every fourth beat none. The
-        # first cut asked for "the floor, the light, what already stands about" every beat,
-        # and on the 2026-10-16 fight bench the clause came back as the same tables,
-        # benches and hearth on every fight beat — the shape of the ask was the shape of
-        # the answer. A MUD's fight message carries no ground at all; the room is said once
-        # on entry. This keeps a little of the place in a long fight without a refrain.
+        # One beat in three, one aspect at a time, walked least-recently-used. The first
+        # cut asked for "the floor, the light, what already stands about" every beat, and
+        # on the 2026-10-16 fight bench the clause came back as the same tables, benches
+        # and hearth on every fight beat. Asking for one aspect a beat (and none every
+        # fourth) did not cure it: the rerun still named all three on 4 of 5 beats,
+        # because a tavern's UNDERFOOT is that one phrase ("tables, benches and a hearth")
+        # and the slot may not invent past it. What varies is how often it is said. A
+        # MUD's fight message carries no ground at all; the room is said once on entry.
         focus = _GROUND[narration_mod.least_recently_used(
             getattr(engine.scene, "said", None), "planned.ground", len(_GROUND))]
         if focus:
