@@ -47,6 +47,22 @@ def test_the_reading_says_a_drink_bought_for_a_man_is_a_gift():
     assert judgement.purchase_sought(text2) == "a coil of rope"
 
 
+def test_a_reading_with_no_buy_opens_no_counter():
+    """The trade screen opened on a talking turn in both runs of the planned-narration
+    live check (2026-10-15). The reading had the line right — a walk and a question — but
+    finding no `buy` it fell through to the regex, whose "order" took "keeps order in
+    this market" as buying "in this market". A reading that exists decides; the regex is
+    for a turn with no reading."""
+    text = "I walk up to the master of the market and ask who keeps order in this market."
+    _read(text, [{"act": "go", "place": "the master of the market"},
+                 {"act": "talk", "says": "who keeps order in this market"}])
+    assert judgement.purchase_sought(text) == ""
+    # With no reading, the fallback still finds a plain purchase.
+    plain = "I buy a whetstone from the smith."
+    interpret.remember(plain, {"error": "timed out"})
+    assert judgement.purchase_sought(plain) == "a whetstone"
+
+
 def test_the_reading_grounds_a_walk_only_to_a_place_that_exists():
     s = Scene(location_id=VORMOOR)
     s.add(load_pc("fixtures/pc-kesst.json"))

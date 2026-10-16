@@ -10042,9 +10042,13 @@ def purchase_sought(player_text: str) -> str:
 
     reading = _interpret.reading_of(text)
     if reading and not reading.get("error"):
-        got = _interpret.bought(reading)
-        if got:
-            return got
+        # The reading decides, buy or no buy. It used to fall through to the regex when it
+        # found no `buy`, and the regex's "order" then read "I walk up to the master of the
+        # market and ask who keeps order in this market." as buying "in this market" —
+        # the counter's screen opened on a turn the reading had as a walk and a question
+        # (planned-narration live check, 2026-10-15, both runs). The regex stays for a turn
+        # with no reading at all: no model, or the reading failed.
+        return _interpret.bought(reading)
     if re.search(r"\bsell(?:s|ing)?\b", text, re.I) and not re.search(r"\bbuy", text, re.I):
         return ""
     m = _BUYS.search(text)
