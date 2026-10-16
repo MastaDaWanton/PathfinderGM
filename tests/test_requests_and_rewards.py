@@ -184,6 +184,29 @@ def test_the_reader_schema_holds_what_is_asked_for_to_the_closed_list():
     assert tuple(interpret.REQUESTS) == requests.KINDS
 
 
+def test_the_built_request_survives_the_plan_doors_to_validation():
+    """Measured live 2026-10-16 on this branch: the built `check diplomacy target=c5`
+    went through `aim_the_sway` (which drops a social check's band) and then
+    `fill_bare_checks`, which put `dc: average` straight back — and validation refused
+    it five plans running ("the DC for diplomacy on a named person is the engine's"), the
+    turn degraded to narration, and the narration handed over a pouch. The band filler
+    leaves a targeted Diplomacy or Intimidate check alone, as validation requires."""
+    from gm import judgement
+
+    s, carter = _scene()
+    _rows, plan = _asked(s, PAY_ME)
+    raw = judgement.aim_the_sway(plan, "I ask her for fair pay for the help", s)
+    raw = judgement.fill_bare_checks(raw)
+    check = next(r for r in raw if r.get("op") == "check")
+    assert "dc" not in check["params"]
+    e = Engine(s, Dice(seed=1))
+    e.run(e.validate(raw))
+    assert s.awaiting and s.awaiting["label"] == "Diplomacy check"
+    # And an untargeted check still gets its band (the 60-turn audit's climb lines).
+    assert judgement.fill_bare_checks([{"op": "check", "params": {"skill": "climb"}}])[0][
+        "params"]["dc"] == {"band": "average"}
+
+
 # --- the prose cannot hand over what the engine did not give ---------------------------------
 
 def _facts(outcomes=()):

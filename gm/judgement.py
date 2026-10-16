@@ -2636,7 +2636,17 @@ def fill_bare_checks(raw_intents) -> list:
     for raw in raw_intents:
         if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "check"):
             params = dict(raw.get("params") or {})
-            if not params.get("dc") and not params.get("opposed_by"):
+            # Except a Diplomacy or Intimidate check aimed at somebody: the book prices
+            # it off them (`intents._check_params`'s `social` rule refuses one with a dc),
+            # and `aim_the_sway`, just before this, has dropped the plan's band for that
+            # reason. Filled here, the band came straight back: measured live 2026-10-16,
+            # the reading's request "ask him for fair pay for the help" was built as
+            # `check diplomacy target=c5`, given `dc: average` here, refused five plans
+            # running ("the DC for diplomacy on a named person is the engine's"), and
+            # the turn degraded to narration — which handed over a pouch of coin.
+            social = (str(params.get("skill", "")).strip().lower()
+                      in ("diplomacy", "intimidate") and raw.get("target"))
+            if not params.get("dc") and not params.get("opposed_by") and not social:
                 raw = dict(raw)
                 params["dc"] = {"band": "average"}
                 raw["params"] = params
