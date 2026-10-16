@@ -16,6 +16,12 @@ import re
 
 ABILITIES = ("str", "dex", "con", "int", "wis", "cha")
 
+# Aid Another on a check (CRB p.86): "If you roll a 10 or higher on your check, the
+# character you're helping gets a +2 bonus on his or her check." The book's number, never
+# a band.
+AID_ANOTHER_DC = 10
+AID_ANOTHER_BONUS = 2
+
 ABILITY_NAMES = {
     "str": "Str", "dex": "Dex", "con": "Con",
     "int": "Int", "wis": "Wis", "cha": "Cha",
@@ -27,6 +33,25 @@ ABILITY_FULL = {
     "str": "Strength", "dex": "Dexterity", "con": "Constitution",
     "int": "Intelligence", "wis": "Wisdom", "cha": "Charisma",
 }
+
+# A plain ability check, by the word a `check` names it with: "strength" is the Strength
+# check, d20 + the Strength modifier and nothing a skill adds (CRB p.16: Strength applies
+# to "Strength checks (for breaking down doors and the like)"). The `check` op's `skill`
+# slot carries the word, so a Strength check travels the same door, popup and tell as a
+# Climb. Added 2026-10-16 (the cart nobody rolled for): `normalise_skill("strength")` was
+# None, so a feat of strength had no roll the engine could make at all.
+ABILITY_CHECKS = {full.lower(): key for key, full in ABILITY_FULL.items()}
+
+
+def ability_check_of(name) -> str | None:
+    """The ability key ("str") a check's name means — "strength", "str", "Strength
+    check" — or None when it names no ability. A closed vocabulary, never English."""
+    key = " ".join(str(name or "").strip().lower().split())
+    if key.endswith(" check"):
+        key = key[: -len(" check")].strip()
+    if key in ABILITY_CHECKS:
+        return ABILITY_CHECKS[key]
+    return key if key in ABILITY_FULL else None
 
 
 def ability_modifier(score: int) -> int:

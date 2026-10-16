@@ -58,8 +58,8 @@ from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, Actor, _when_holds, atta
                     current_moment, situated)
 from .tables import (
     CONDITIONS,
-    ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, maneuver_text,
-    normalise_damage_type,
+    ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
+    WEAPONS, ability_check_of, maneuver_text, normalise_damage_type,
 )
 
 
@@ -5481,32 +5481,30 @@ class Engine:
     # check ------------------------------------------------------------------------------
 
     def _op_check(self, intent: Intent, partial: dict) -> Outcome:
-        from .sheet import IllegalSheet
-
         actor = self.scene.actors[intent.actor]
         skill = intent.params["skill"]
-        # A skill an effect on them forbids (`self.forbids`): "While in rage, a barbarian
-        # cannot use any Charisma-, Dexterity-, or Intelligence-based skills (except
-        # Acrobatics, Fly, Intimidate, and Ride)" (CRB p.31). Before this nothing read the
-        # clause (rage's own not_yet), and a raging barbarian's Diplomacy rolled as if
-        # she were calm.
-        barred = _forbidden_skill(actor, str(skill))
-        if barred:
-            return Outcome(intent_id=intent.id, op="check", effects=[], tell=barred,
-                           because=intent.because)
-        # A trained-only skill the character has no ranks in resolves as a refusal, not
-        # an exception. Measured live: a player toggled their class's blood armament out
-        # of combat, the spoken path invited the model to dress it as a Knowledge
-        # (Arcana) check, and `skill_modifiers` raised straight through the turn —
-        # "cannot attempt knowledge (arcana) untrained" cost the whole action. The rule
-        # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
-        # rolled, the player is told why, and the turn survives.
-        try:
-            mods = actor.skill_modifiers(skill)
-        except IllegalSheet as exc:
-            return Outcome(
-                intent_id=intent.id, op="check", effects=[],
-                tell=f"{exc}. Nothing is rolled.", because=intent.because)
+        # A plain ability check ("strength"): d20 + the ability's modifier and what the
+        # funnel adds to ability checks — sickened's -2, a feat's `<ab>_check` term — and
+        # no ranks, no class skill, no armour check penalty (`Actor.ability_check_modifiers`).
+        # No size term: the book gives size to Strength checks "to break open doors" (CRB
+        # p.175), which is break_in's door, not this one. Before 2026-10-16 a check could
+        # only name a skill, so a feat of strength had no roll and the prose decided it.
+        ability = ability_check_of(skill)
+        named = ABILITY_FULL[ability] if ability else str(skill)
+        helped = self._aided(intent)
+        if helped is not None and helped.is_pc:
+            return self._refuse(intent, f"{actor.name} cannot roll {helped.name}'s own "
+                                        f"check for them; the player rolls their own.")
+        if helped is not None and helped.is_down:
+            # Nobody on the floor makes a check to be helped with.
+            return self._refuse(intent, f"{helped.name} is in no state to try anything; "
+                                        f"there is no effort of theirs to help with.")
+        if ability:
+            mods = actor.ability_check_modifiers(ability)
+        else:
+            mods, refused = self._skill_mods_or_refusal(intent, actor, skill)
+            if refused is not None:
+                return refused
         opposed = intent.params.get("opposed_by")
         # A lie told to somebody (owner ruling B1, 2026-09-30): Bluff against their Sense
         # Motive, with the book's believability on the liar's roll (`rules/bluff.py`, CRB
@@ -5559,8 +5557,15 @@ class Engine:
         # is the rulebook's DC 15 to make them stable, whatever DC the plan wrote.
         from . import firstaid
 
-        patient = firstaid.patient_of(self, intent) if not opposed else None
-        if patient is not None:
+        patient = (firstaid.patient_of(self, intent)
+                   if not opposed and helped is None else None)
+        if helped is not None:
+            # Aid Another: the helper's own check against the book's 10 (CRB p.86), the
+            # number the popup shows. The task's difficulty is the helped person's to beat
+            # (`_aid_lands`).
+            resolved_dc = dc_mod.ResolvedDC(value=AID_ANOTHER_DC, band=None,
+                                            basis="aid another")
+        elif patient is not None:
             resolved_dc = dc_mod.ResolvedDC(value=firstaid.DC, band=None)
         elif opposed:
             target = opposing_roll.total
@@ -5583,7 +5588,8 @@ class Engine:
 
         roll = self._roll_or_suspend(
             intent, actor, mods,
-            label=f"{skill.title()} check",
+            label=(f"{named} check to help {helped.name}" if helped is not None
+                   else f"{named} check" if ability else f"{skill.title()} check"),
             dc=resolved_dc.final,
             partial=partial,
             extra_partial={"opposed_roll": opposing_roll.as_dict()} if opposing_roll else {},
@@ -5598,6 +5604,9 @@ class Engine:
         margin = roll.total - resolved_dc.final
         verdict = "success" if margin >= 0 else "failure"
         rolls = [roll] + ([opposing_roll] if opposing_roll else [])
+        if helped is not None:
+            return self._aid_lands(intent, actor, helped, skill, ability, named, roll,
+                                   margin, level)
 
         if opposed and lie:
             # Said as what the listener now believes, with the skills named: the prose
@@ -5618,6 +5627,15 @@ class Engine:
                 if verdict == "success" else
                 f"{other.name}'s {opposed['skill']} beats {actor.name} by {-margin}."
             )
+        elif ability:
+            # Said with what it decided, because an ability check's deed is the player's
+            # own words and nothing else names it: measured 2026-10-16, the cart lifted in
+            # the prose with no roll at all. "The attempt" is the tell's whole claim — what
+            # was tried is the player's line, which the prose already has.
+            tell = (
+                f"{actor.name} makes the {named} check by {margin}: the attempt succeeds."
+                if verdict == "success" else
+                f"{actor.name} misses the {named} check by {-margin}: the attempt fails.")
         else:
             tell = (
                 f"{actor.name} makes the {skill} check by {margin}."
@@ -5653,6 +5671,108 @@ class Engine:
             because=intent.because,
         )
 
+    def _skill_mods_or_refusal(self, intent: Intent, actor, skill: str):
+        """(the skill's modifiers, None), or ([], the Outcome saying why nothing is rolled)."""
+        from .sheet import IllegalSheet
+
+        # A skill an effect on them forbids (`self.forbids`): "While in rage, a barbarian
+        # cannot use any Charisma-, Dexterity-, or Intelligence-based skills (except
+        # Acrobatics, Fly, Intimidate, and Ride)" (CRB p.31). Before this nothing read the
+        # clause (rage's own not_yet), and a raging barbarian's Diplomacy rolled as if
+        # she were calm.
+        barred = _forbidden_skill(actor, str(skill))
+        if barred:
+            return [], Outcome(intent_id=intent.id, op="check", effects=[], tell=barred,
+                               because=intent.because)
+        # A trained-only skill the character has no ranks in resolves as a refusal, not
+        # an exception. Measured live: a player toggled their class's blood armament out
+        # of combat, the spoken path invited the model to dress it as a Knowledge
+        # (Arcana) check, and `skill_modifiers` raised straight through the turn —
+        # "cannot attempt knowledge (arcana) untrained" cost the whole action. The rule
+        # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
+        # rolled, the player is told why, and the turn survives.
+        try:
+            return actor.skill_modifiers(skill), None
+        except IllegalSheet as exc:
+            return [], Outcome(intent_id=intent.id, op="check", effects=[],
+                               tell=f"{exc}. Nothing is rolled.", because=intent.because)
+
+    def _aided(self, intent: Intent):
+        """The person a check with `aid` helps — the intent's own `target` — or None when
+        this is not Aid Another."""
+        if not intent.params.get("aid"):
+            return None
+        refs = [r for r in intent.targets() if r and r != intent.actor]
+        return self.scene.actors.get(refs[0]) if refs else None
+
+    def _aid_lands(self, intent: Intent, actor, helped, skill: str, ability: str | None,
+                   named: str, roll: Roll, margin: int, level: int) -> Outcome:
+        """Aid Another on a check, to its end (CRB p.86): "You can help someone achieve
+        success on a skill check by making the same kind of skill check in a cooperative
+        effort. If you roll a 10 or higher on your check, the character you're helping
+        gets a +2 bonus on his or her check."
+
+        The task is the helped person's, so it is THEIR check that decides it: rolled
+        here, hidden like every roll the player does not make, with the +2 when the
+        player's own roll made 10, against the difficulty the plan named for the task.
+        Chosen over "the player's 10 does the job" because that lets a DC 10 roll settle a
+        task of any difficulty — a cart sunk to the axles would come up for anybody who
+        rolled 10 — and the book has no such rule; the helped person's own check is
+        exactly what the book's +2 is a bonus ON. A failed aid gives no +2 and the helped
+        person still tries, alone, as the book has it; what they could not do alone stays
+        undone. The outcome's verdict is the task's; the player's own roll is judged
+        against its 10 for the popup (`_judge`), and the outcome's `dc` is that 10, the
+        number the player's roll is shown against."""
+        made = margin >= 0
+        self._judge(roll, made)
+        task = dc_mod.resolve(intent.params.get("dc") or {"band": "average"}, level,
+                              intent.params.get("circumstance"))
+        if ability:
+            mods = helped.ability_check_modifiers(ability)
+        else:
+            mods, refused = self._skill_mods_or_refusal(intent, helped, skill)
+            if refused is not None:
+                return Outcome(
+                    intent_id=intent.id, op="check", rolls=[roll],
+                    dc=dc_mod.ResolvedDC(value=AID_ANOTHER_DC, band=None,
+                                         basis="aid another").as_dict(),
+                    verdict="failure", margin=-1, tell=refused.tell,
+                    effects=[{"kind": "aid", "ref": helped.ref, "made": made,
+                              "bonus": 0, "task_dc": task.final}],
+                    because=intent.because)
+        if made:
+            from .dice import stack
+
+            # Untyped: "a +2 bonus", no type named, so two helpers' bonuses add.
+            mods = stack([*mods, Modifier(AID_ANOTHER_BONUS, f"aid from {actor.name}")])
+        theirs = self.dice.d20(mods, label=f"{helped.name} {named} check",
+                               visibility="hidden")
+        task_margin = theirs.total - task.final
+        done = task_margin >= 0
+        what = named if ability else skill
+        helping = (f"{actor.name} lends {helped.name} a hand and makes the {what} check "
+                   f"to help by {margin}: +{AID_ANOTHER_BONUS} to {helped.name}'s own."
+                   if made else
+                   f"{actor.name} misses the {what} check to help {helped.name} by "
+                   f"{-margin}: no help.")
+        result = (f"{helped.name} makes the {what} check by {task_margin}: the attempt "
+                  f"succeeds." if done else
+                  f"{helped.name} misses the {what} check by {-task_margin}: the attempt "
+                  f"fails.")
+        tell = f"{helping} {result}"
+        if made:
+            # The player beat the book's 10, a challenge overcome like any check.
+            tell += self.reward_check(actor, skill, AID_ANOTHER_DC)
+        return Outcome(
+            intent_id=intent.id, op="check", rolls=[roll, theirs],
+            dc=dc_mod.ResolvedDC(value=AID_ANOTHER_DC, band=None,
+                                 basis="aid another").as_dict(),
+            verdict="success" if done else "failure", margin=task_margin,
+            effects=[{"kind": "aid", "ref": helped.ref, "made": made,
+                      "bonus": AID_ANOTHER_BONUS if made else 0, "task_dc": task.final,
+                      "done": done}],
+            tell=tell, because=intent.because)
+
     # --- talking somebody round ----------------------------------------------------------
 
     def _sway_subject(self, intent: Intent, skill: str):
@@ -5664,7 +5784,8 @@ class Engine:
         """
         from . import attitude as attitude_mod
 
-        if skill not in attitude_mod.LEVERS or intent.params.get("opposed_by"):
+        if skill not in attitude_mod.LEVERS or intent.params.get("opposed_by") \
+                or intent.params.get("aid"):
             return None
         refs = [r for r in intent.targets() if r and r != intent.actor]
         return self.scene.actors.get(refs[0]) if refs else None

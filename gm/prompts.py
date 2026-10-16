@@ -3616,9 +3616,15 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
         # A skill is a closed list too (the rules' own, `tables.SKILLS`). Declared since
         # 2026-10-08 by a skill the player named ("I use the Heal skill",
         # `means.HELD_OPS`), where a free string could come back "first aid".
-        from rules.tables import SKILLS
+        from rules.tables import ABILITY_CHECKS, DC_BANDS, SKILLS
 
-        props["skill"] = {"type": "string", "enum": list(SKILLS)}
+        # And the plain ability checks ("strength"), since a feat of strength declares a
+        # check (`acts_to_ops._exert`, 2026-10-16). Its difficulty is a band word from the
+        # rules' own table — the engine resolves the number (rules/dc.py) — where a free
+        # string invited "DC 15" and a model's number.
+        props["skill"] = {"type": "string", "enum": [*SKILLS, *ABILITY_CHECKS]}
+        if "dc" in props:
+            props["dc"] = {"type": "string", "enum": list(DC_BANDS)}
     if op == "cast" and "aim" in props:
         from rules import areas
 

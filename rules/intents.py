@@ -883,7 +883,7 @@ def is_null(value) -> bool:
 # `defensively` is the cast's (2026-10-09): read at last by the concentration check, and
 # "false" written as a word must not cost a caster a spell.
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
-                         "thrown", "quoted", "own", "roll", "defensively"})
+                         "thrown", "quoted", "own", "roll", "defensively", "aid"})
 
 
 def _flag(value) -> bool:
@@ -1168,13 +1168,37 @@ def _check_params(intent: Intent, index: int) -> None:
             )
         skill = normalise_skill(raw_skill)
         if skill is None:
+            # A plain ability check — "strength" — names an ability, not a skill, and
+            # is canonicalised to its full word so the tell and the popup read
+            # "Strength check" (`tables.ability_check_of`).
+            from .tables import ABILITY_FULL, ability_check_of
+
+            ability = ability_check_of(raw_skill)
+            if ability:
+                skill = ABILITY_FULL[ability].lower()
+        if skill is None:
             raise IntentError(
                 f"check: {raw_skill!r} is not a Pathfinder 1e skill."
                 + _suggest(raw_skill, SKILLS)
-                + f" The skills are: {', '.join(sorted(SKILLS))}.",
+                + f" The skills are: {', '.join(sorted(SKILLS))}; a plain ability check "
+                f"names the ability (\"strength\").",
                 "schema", index,
             )
         p["skill"] = skill
+        # Aid Another (CRB p.86): `aid` with the `target` the person helped, whose own
+        # check the effort is. The helper's DC is the book's 10; `dc` is the difficulty of
+        # the task itself, which the helped person rolls against.
+        if p.get("aid"):
+            helped = [t for t in intent.targets() if t and t != intent.actor]
+            if not helped:
+                raise IntentError(
+                    "check: aid helps somebody else's effort. Name them with \"target\" "
+                    "(their ref), and keep \"dc\" for how hard their task is.",
+                    "schema", index)
+            if p.get("opposed_by"):
+                raise IntentError(
+                    "check: aid is help with somebody's own check, never a contest. Drop "
+                    "opposed_by.", "schema", index)
         if p.get("opposed_by"):
             ob = p["opposed_by"]
             if not isinstance(ob, dict) or "ref" not in ob or "skill" not in ob:
@@ -1198,7 +1222,7 @@ def _check_params(intent: Intent, index: int) -> None:
         # their Charisma, or 10 + Hit Dice + Wisdom for a threat (`rules/attitude.py`).
         # A band named here would be the plan setting the price of changing a mind.
         social = (p.get("skill") in ("diplomacy", "intimidate")
-                  and intent.targets() and not p.get("opposed_by"))
+                  and intent.targets() and not p.get("opposed_by") and not p.get("aid"))
         if social and p.get("dc"):
             raise IntentError(
                 f"check: the DC for {p['skill']} on a named person is the engine's — "

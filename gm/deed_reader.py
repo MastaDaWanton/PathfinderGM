@@ -63,9 +63,11 @@ UNSURE = "unsure"
 # The acts a still beat owes the page as the player's own doing. Not the ones the engine
 # writes for itself: a move is its travel tell's (`_op_travel`), looking and searching are
 # written by what they find, waiting and resting by the time passing, buying by the
-# screen, a spell by the cast. Not the checks either — climbing, sneaking, breaking in —
-# whose attempt is the roll's and whose outcome the dice own; asking for the attempt here
-# invites the prose to settle it.
+# screen, a spell by the cast. Not the checks either — climbing, sneaking, breaking in,
+# heaving (`exert`) — whose attempt is the roll's and whose outcome the dice own; asking for
+# the attempt here invites the prose to settle it. Measured 2026-10-16: read `other`, "I
+# help the man lift his cart" was owed here with no roll behind it, and the backstop's echo
+# of the player's own line is a lift done whatever the dice would have said.
 OWED_ACTS = frozenset({"talk", "insult", "give", "take", "drop", "steal", "use",
                        "consume", "sell", "other", "attack"})
 MOVE_ACTS = frozenset({"go", "journey", "leave", "follow", "call_on", "seek"})
