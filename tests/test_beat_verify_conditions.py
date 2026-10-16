@@ -171,6 +171,38 @@ def test_the_second_read_asks_whom_and_refutes_the_wrong_body():
     assert not kept and [d.category for d in refuted] == ["condition"]
 
 
+def test_the_second_read_is_shown_who_he_is_and_a_grip_counts_for_either_body():
+    """Live audit, 2026-10-16: "He is dazed …" asked with one sentence before it — "He hits
+    the wood of the bar…" — named the player 3 of 3; with the passage before it, the
+    barkeep 3 of 3. And "her fingers digging into your throat" names the woman gripping:
+    by the book both bodies in a grapple are grappled, so the hold is confirmed."""
+    asked = []
+
+    def who(answer):
+        def chat(messages, *a, **k):
+            asked.append(messages[-1]["content"])
+            return _reply({"who": answer})
+        return chat
+
+    text = ("Your fist connects with his jaw. He reels back into the shelving. He hits the "
+            "bar with a thud. He is dazed, his hands grasping the edge.")
+    f = facts()
+    found = bv.diff([claim("He is dazed, his hands grasping the edge.", who="c4",
+                           condition="dazed")], f)
+    kept, _r, _s = bv.confirm(found, text, f, chat=who(["c4"]), model="m")
+    assert kept and "Your fist connects with his jaw." in asked[-1], "the passage before it"
+    grip = "She is inches away, her fingers digging into your throat."
+    found = bv.diff([claim(grip, who="pc", condition="grappled")], f)
+    kept, _r, _s = bv.confirm(found, grip, f, chat=who(["c4"]), model="m")
+    assert kept, "a grip confirmed on the gripper is the same invented grapple"
+    # ... but not when the engine really holds the one named in a grapple.
+    held = bv.Person("c4", "woman with the braid", "commoner", holds=("grappled",))
+    f2 = facts(people=(PC, held))
+    found = bv.diff([claim(grip, who="pc", condition="grappled")], f2)
+    kept, _r, _s = bv.confirm(found, grip, f2, chat=who(["c4"]), model="m")
+    assert not kept
+
+
 def test_a_pin_inside_a_grapple_the_engine_made_is_the_narrators_word():
     """2 of the 5 alarms on the recordings were "Pinned and struggling against your grip"
     inside a real grapple: degree, not a hold from nowhere."""

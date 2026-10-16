@@ -1243,7 +1243,12 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
              else refuted).append(d)
             continue
         if d.category == "condition" and d.ref:
-            (kept if _in_condition(d, before, facts, chat, model, host, provider, api_key)
+            # The passage up to the sentence, not one sentence: "He is dazed" names nobody,
+            # and with only "He hits the wood of the bar…" before it, the read named the
+            # player three times of three (live audit, 2026-10-16) — the "he" was the man
+            # struck two sentences earlier.
+            lead = " ".join(sentences[max(0, at - 4):at]) if at > 0 else ""
+            (kept if _in_condition(d, lead, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
         ask = ((f"The sentence before it, for context: {before}\n" if before else "")
@@ -1320,7 +1325,8 @@ def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, 
         f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else
                                 f" — {p.what}" if p.what else "")
         for p in facts.people if p.here)
-    ask = ((f"The sentence before it, for context: {before}\n" if before else "")
+    ask = ((f"The passage before it, for who \"he\", \"she\" and \"they\" are: {before}\n"
+            if before else "")
            + f"The sentence: {d.sentence}\n\nPeople: {people}\n\nQuestion: which of these "
            f"people does this sentence say is {_COND_WHAT.get(cond, cond)} — actually so, "
            f"not only grabbed at, aimed at, threatened or nearly? Every one it says so of; "
@@ -1337,9 +1343,20 @@ def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, 
                          "type": "array", "maxItems": 6,
                          "items": {"type": "string", "enum": codes}}},
                          "required": ["who"]})
-        return d.ref in [str(x) for x in (reply.json() or {}).get("who") or []]
+        named = [str(x) for x in (reply.json() or {}).get("who") or []]
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
+    if d.ref in named:
+        return True
+    # A grapple is two bodies' (CRB p.199: "both you and the target gain the grappled
+    # condition"), so a hold is confirmed whichever of the two the read names, so long as
+    # the engine holds that one ungrappled too. Probed on the report's beat (2026-10-16, 3 of
+    # 3): "her fingers digging into your throat" — the first read named the player, the
+    # second the woman doing the gripping, and both are grappled by the book.
+    if cond == "grappled":
+        return any((p := facts.person(code)) is not None and p.here
+                   and "grappled" not in p.holds for code in named)
+    return False
 
 
 # --- the cache: a beat is read once, however many times the repair asks ----------------
