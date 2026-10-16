@@ -247,6 +247,20 @@ def test_a_paid_request_or_a_floor_pickup_is_not_flagged():
     assert bv.diff([_hand_over(frm=bv.FLOOR)], _facts(), SENTENCE) == []
 
 
+def test_a_paid_request_called_a_deal_done_is_not_cut_as_a_sale():
+    """The trade category reads only sales and purchases: a page calling the engine's own
+    payment "a fair trade" would have been cut as "Nothing was sold or bought". A paid
+    request is coin for work, settled; an unpaid turn still is not."""
+    deal = bv.Claim("trade", {"item": bv.OTHER_THING, "seller": "pc", "buyer": "c1",
+                              "settled": True}, "the deal is done", sentence=SENTENCE,
+                    valid=True)
+    paid = [{"op": "check", "status": "resolved", "effects": [
+        {"kind": "give", "item": "coin", "count": 10, "how": "paid", "from": "c1",
+         "to": "pc"}]}]
+    assert bv.diff([deal], _facts(paid), SENTENCE) == []
+    assert [d.category for d in bv.diff([deal], _facts(), SENTENCE)] == ["trade"]
+
+
 def test_the_page_may_count_out_the_coin_a_granted_request_paid():
     """The claims scrubber backs purse words for a check that paid, as it does for a
     sale: the engine's payment is not cut from the page as invented."""

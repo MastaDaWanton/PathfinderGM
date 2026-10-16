@@ -5732,6 +5732,16 @@ class Engine:
                        dc=resolved_dc.as_dict(), verdict="success" if granted else "failure",
                        margin=margin, effects=effects, tell=tell, because=intent.because)
 
+    def _coins_here(self):
+        """This town's coin, as the page names the purse (`play/views._state`). With no
+        place the world's own coin answered, and the first live run (2026-10-16) told a
+        payment of "1 Saltmakers' silver piece" into a purse the sheet showed as "1 Winged
+        silver piece" — two names for one coin, in the paying tell and in the "already in
+        your purse" tell after it."""
+        world = getattr(self, "world", None)
+        here = world.get(self.scene.location_id) if world is not None else None
+        return goods.coinage(world, here)
+
     def _pay_for_work(self, taker, payer) -> tuple[str, list[dict], int]:
         """A granted request for payment: an untrained hireling's day wage (CRB p.159,
         `requests.wage_cp`), out of the purse the payer really carries — their kit's
@@ -5746,13 +5756,7 @@ class Engine:
         from .bestiary import collapse_kit
 
         collapse_kit(payer)
-        # Named as the page names the purse (`play/views._state`: this town's coin). With
-        # no place the world's own coin answered, and the first live run's tell paid
-        # "1 Saltmakers' silver piece" into a purse the sheet showed as "1 Winged silver
-        # piece" — two names for one coin.
-        world = getattr(self, "world", None)
-        here = world.get(self.scene.location_id) if world is not None else None
-        coins = goods.coinage(world, here)
+        coins = self._coins_here()
         owed = requests_mod.wage_cp()
         cp = min(owed, goods.in_copper(payer.purse))
         if cp <= 0:
@@ -19187,7 +19191,7 @@ class Engine:
         narrator invented became real). Only the author's own word (`origin` `author:*`,
         a cheat) still counts that one coin, rather than a number a model wrote (law 3)
         and rather than the goods line "coins" that this door exists to end."""
-        coins = goods.coinage(getattr(self, "world", None), None)
+        coins = self._coins_here()
         if taker is None or (giver is not None and giver.is_pc and taker is not giver):
             who = giver if giver is not None else taker
             if who is None:

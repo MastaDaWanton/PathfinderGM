@@ -839,7 +839,12 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             trades = [o for o in facts.outcomes if o.get("op") in _TRADE_OPS]
             done = [o for o in trades if o.get("status") != "refused"]
             refused = [o for o in trades if o.get("status") == "refused"]
-            if s["settled"] and not done:
+            # A granted request that paid (`Engine._pay_for_work`, a `check` whose record
+            # moves coin to the player) is coin exchanged for work: a page calling it a
+            # deal done is true, and is not cut as a sale nobody made.
+            paid = any(e.get("kind") == "give" and e.get("how") == "paid"
+                       and e.get("to") == pc for o in _resolved(facts) for e in _effects(o))
+            if s["settled"] and not done and not paid:
                 why = _refusal_line(refused[0]) if refused else ""
                 out.append(Discrepancy(
                     "contradiction", "trade",
