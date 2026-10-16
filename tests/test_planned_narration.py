@@ -245,6 +245,25 @@ def test_a_fight_declared_and_not_struck_is_not_shown_landing():
     assert "doing it and what came of it" in say
 
 
+def test_a_walk_the_engine_did_not_make_is_not_written_as_one():
+    """Measured 2026-10-16 on the planned town bench: "I walk back into town" came with no
+    tell at all, the "doing" slot was asked to show "exactly that", and the beat read "You
+    turn away from the desert and walk back toward the gate" with the party still on the
+    outskirts. The interpreter's reading says the player meant to go; the engine moved
+    nobody; so the slot says they are still here, and the player's words stay out of it."""
+    s, engine = _scene()
+    going = {"question": False, "actions": [{"act": "go", "place": "town"}], "claims": []}
+    slot = next(x for x in planned.build_plan(engine, "I walk back into town.", [],
+                                              last_beat=LAST_BEAT, reading=going)
+                if x["key"] == "doing")
+    assert "moved nobody" in slot["say"] and "I walk back into town." not in slot["say"]
+    seeking = {"question": False, "actions": [{"act": "seek", "object": "bread"}]}
+    slot = next(x for x in planned.build_plan(engine, "I look for bread.", [],
+                                              last_beat=LAST_BEAT, reading=seeking)
+                if x["key"] == "doing")
+    assert '"I look for bread."' in slot["say"], "looking for something is done in place"
+
+
 def test_an_arrival_has_no_still_slot():
     """Arriving somewhere, there is no "what was going on" to keep: the engine's travel
     outcome says so by its biome effect, not by the words of its tell."""

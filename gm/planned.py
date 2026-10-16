@@ -285,8 +285,22 @@ def _master_will_not_answer(engine, ref: str, player_input: str) -> bool:
                                                      reading))
 
 
+def _means_to_go(reading) -> bool:
+    """Whether the interpreter's reading of the player's line commits them to going
+    somewhere: the model's reading, held to its closed acts. Going, journeying, leaving,
+    calling on — not seeking or following, which a beat shows the player doing where
+    they stand ("you scan the stalls for bread")."""
+    from . import interpret
+
+    if not isinstance(reading, dict) or reading.get("error"):
+        return False
+    goes = narration_mod._MOVE_ACTS - {"follow"}
+    return any(isinstance(a, dict) and a.get("act") in goes and interpret.acting(a)
+               for a in reading.get("actions") or ())
+
+
 def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
-               last_beat: str = "") -> list[dict]:
+               last_beat: str = "", reading=None) -> list[dict]:
     """The ordered slots (the module note), before the budget (`allocate`). `last_beat` is
     the beat before this one; `pull` the open matter's own fact, never an instruction."""
     slots: list[dict] = []
@@ -356,6 +370,18 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                           "say": "The player's character keeps on with what they were "
                                  "doing, as THE SCENE NOW says: show the next moment of it. "
                                  "Nothing new happens that the engine did not decide."})
+        elif _means_to_go(reading):
+            # The reading says the player set out to go somewhere, and the engine moved
+            # nobody (no tell at all this turn). Measured 2026-10-16, the planned town
+            # bench: "I walk back into town" came back "You turn away from the desert and
+            # walk back toward the gate" with the party still on the outskirts — the slot
+            # showed "exactly that", a walk the engine never made. So the slot is told
+            # what the engine decided instead, and the player's words stay out of it.
+            slots.append({"key": "doing", "want": DOING_WANT,
+                          "say": "The player meant to go somewhere, and the engine moved "
+                                 "nobody: they are still where they were. Show them still "
+                                 "here, looking where they meant to go, and nothing more: "
+                                 "no walking, no arriving."})
         else:
             slots.append({"key": "doing", "want": DOING_WANT,
                           "say": "The player's character does what the player said: "
@@ -641,7 +667,7 @@ def _unwrap_quotes(text: str) -> str:
 def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
           last_beat: str = "", last_plain: str = "", since=None, scene_now: str = "",
           pull: str = "", claim: str = "", lift=None, check=None,
-          budget: int | None = None) -> Planned:
+          budget: int | None = None, reading=None) -> Planned:
     """Plan the beat and write it slot by slot. `who` is (model, host, provider, key) —
     the prose role's, so a hosted narrator writes planned beats too. `last_beat` is the
     beat before as the model is shown it (speaker tags back on); `last_plain` the same
@@ -655,7 +681,8 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     model, host, provider, key = who
     budget = budget if budget is not None else budget_for(engine)
     slots, dropped = allocate(
-        build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat), budget)
+        build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat,
+                   reading=reading), budget)
     people = present(engine)
     plan = plan_messages(brief, slots, people, _place(engine), last_beat=last_beat,
                          since=since, scene_now=scene_now, claim=claim)
