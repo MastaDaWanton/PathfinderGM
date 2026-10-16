@@ -170,6 +170,17 @@ The split is at the point of mechanical uncertainty. Call 1's narration must con
 what is true regardless of how the dice land — the wind-up, never the landing. That is
 enforceable (§5), which is why the split is here and not somewhere more convenient.
 
+**Two calls, one beat** (2026-10-16). The split is between two *calls*. On a creature's
+turn the page used to show it as two beats as well — the wind-up as one paragraph and the
+consequence as the next — and a player read one swing as two actions ("the npc took
+multiple turns", the owner's report of 2026-10-16, where the engine resolved exactly one
+attack a round). `play/views.py:_run_npc_turns` now writes the wind-up and the consequence
+onto the page as one passage; call 2 is already shown the wind-up ("You had already
+narrated: …") and continues from it. Prior art agrees: CircleMUD's `dam_message` sends one
+message per attack, swing and result together, and has no pre-roll line at all
+(src/fight.c, lib/misc/messages); a search found no text tradition that reports a swing
+before its roll as a separate message (searched, not proven absent).
+
 ---
 
 ## 3. Intent
