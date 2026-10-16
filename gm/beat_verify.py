@@ -874,6 +874,14 @@ def _condition_unheld(c: Claim, facts: Facts) -> Discrepancy | None:
         return _not_here(p, c)
     if p.down or p.dead or cond in p.holds:
         return None
+    # "Pinned" said of a body the engine holds grappled is the narrator's word for a hold
+    # that is real, not a hold invented: 2 of the 5 alarms on the committed fight
+    # recordings (99 fight beats replayed, 2026-10-16) were "Pinned and struggling against
+    # your grip" / "still pinned against the table" inside a grapple the engine had made.
+    # The defect this slot exists for is the hold from nowhere; a pin inside a grapple is
+    # degree, and the tells say which it is.
+    if cond == "pinned" and "grappled" in p.holds:
+        return None
     for o in _resolved(facts):
         for e in _effects(o):
             if str(e.get("ref") or "") == who and cond in {
@@ -1189,6 +1197,10 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
+        if d.category == "condition" and d.ref:
+            (kept if _in_condition(d, before, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
         ask = ((f"The sentence before it, for context: {before}\n" if before else "")
                + f"The sentence: {d.sentence}\n\nQuestion: {q}")
         msgs = [{"role": "system", "content": _CONFIRM_SYSTEM},
@@ -1245,6 +1257,42 @@ def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provide
                          "items": {"type": "string", "enum": codes}}},
                          "required": ["shown"]})
         return d.ref in [str(x) for x in (reply.json() or {}).get("shown") or []]
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+
+
+def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                  api_key) -> bool:
+    """The second read of a `condition` contradiction, in `_shows`' shape: not "is the man
+    pinned?" but WHO the sentence says is in that condition, from the codes, compared in
+    code with the person the first read named. Measured on the committed fight recordings
+    (2026-10-16, 99 fight beats replayed): asked yes-or-no, "his weight pins yours against
+    the shattered furniture" kept a pin on a bystander the first read had named — the
+    sentence pins the player, under the man who has hold of him."""
+    cond = str(d.claim.slots.get("condition") if d.claim else "")
+    codes = [*facts.refs, NEW_PERSON, NOBODY]
+    people = "; ".join(
+        f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else
+                                f" — {p.what}" if p.what else "")
+        for p in facts.people if p.here)
+    ask = ((f"The sentence before it, for context: {before}\n" if before else "")
+           + f"The sentence: {d.sentence}\n\nPeople: {people}\n\nQuestion: which of these "
+           f"people does this sentence say is {_COND_WHAT.get(cond, cond)} — actually so, "
+           f"not only grabbed at, aimed at, threatened or nearly? Every one it says so of; "
+           f"\"{NEW_PERSON}\" for somebody else, \"{NOBODY}\" if none.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=60, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"who": {
+                         "type": "array", "maxItems": 6,
+                         "items": {"type": "string", "enum": codes}}},
+                         "required": ["who"]})
+        return d.ref in [str(x) for x in (reply.json() or {}).get("who") or []]
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
 

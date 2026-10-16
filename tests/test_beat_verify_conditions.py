@@ -132,11 +132,41 @@ def test_a_scripted_read_round_trips_to_a_finding():
     reading = bv.read(text, f, chat=lambda *a, **k: _reply(answer), model="m")
     assert [c.category for c in reading.claims] == ["condition"]
     found = bv.diff(reading.claims, f, text)
-    kept, refuted, _s = bv.confirm(found, text, f, chat=lambda *a, **k: _reply(
-        {"answer": "yes"}), model="m")
+    asked = []
+
+    def who(messages, *a, **k):
+        asked.append(messages[-1]["content"])
+        return _reply({"who": ["pc"]})
+
+    kept, refuted, _s = bv.confirm(found, text, f, chat=who, model="m")
     assert [d.category for d in kept] == ["condition"] and not refuted
+    assert "grappled — held fast" in asked[0] and "not only grabbed at" in asked[0]
     assert "grappled — held fast" in bv.question(kept[0], f)
-    assert "not only grabbed at, aimed at" in bv.question(kept[0], f)
+
+
+def test_the_second_read_asks_whom_and_refutes_the_wrong_body():
+    """Replayed on the committed fight recordings (2026-10-16): "his weight pins yours
+    against the shattered furniture" came back from the first read as a pin on a
+    bystander. Asked WHO the sentence pins, the answer is the player — so the claim about
+    the bystander is refuted in code, as `_shows` refutes an absent person."""
+    text = "He grabs your arms. His weight pins yours against the shattered furniture."
+    f = facts()
+    found = bv.diff([claim("His weight pins yours against the shattered furniture.",
+                           who="c4", condition="pinned")], f)
+    kept, refuted, _s = bv.confirm(found, text, f,
+                                   chat=lambda *a, **k: _reply({"who": ["pc"]}), model="m")
+    assert not kept and [d.category for d in refuted] == ["condition"]
+
+
+def test_a_pin_inside_a_grapple_the_engine_made_is_the_narrators_word():
+    """2 of the 5 alarms on the recordings were "Pinned and struggling against your grip"
+    inside a real grapple: degree, not a hold from nowhere."""
+    held = bv.Person("c4", "woman with the braid", "commoner", holds=("grappled",))
+    assert bv.diff([claim("Pinned and struggling against your grip, she snarls.",
+                          who="c4", condition="pinned")], facts(people=(PC, held))) == []
+    # ... and with no grapple at all, a pin is a hold from nowhere.
+    assert bv.diff([claim("She is pinned to the wall.", who="c4", condition="pinned")],
+                   facts())
 
 
 def test_an_off_vocabulary_condition_is_dropped():
