@@ -187,7 +187,7 @@ def test_a_doing_slot_only_when_the_engine_decided_nothing_and_a_reply_only_out_
     keys = [x["key"] for x in planned.build_plan(
         fight, "I punch him.", [Outcome("i1", "attack", tell="Kesst Vayr hits Jarek.")],
         last_beat=LAST_BEAT)]
-    assert keys == ["fact1"]
+    assert keys == ["fact1", "ground"]
 
 
 def test_one_act_is_one_slot_however_many_tells_it_made():
@@ -680,6 +680,141 @@ def test_the_corrections_log_keeps_a_planned_remakes_slot_calls(rules_dir, monke
     sets = convert([rec])
     assert sets["repair.kto.jsonl"] == []
     assert sets["repair.planned.kto.jsonl"][0]["meta"]["slot"] == "fact1"
+
+
+# --- planned fights, richer from the engine (2026-10-16) ---------------------------------
+
+def _hit(engine, severity="solid", left="hurt", *, crit=False, nonlethal=False):
+    smith = next(r for r, a in engine.scene.actors.items() if not a.is_pc)
+    return Outcome("i1", "attack", verdict="hit", tell="Kesst Vayr hits Jarek.",
+                   blows=[{"result": "hit", "ref": smith, "weapon": "rapier",
+                           "type": "piercing", "nonlethal": nonlethal, "critical": crit,
+                           "severity": severity, "left": left}])
+
+
+def _miss(how):
+    return Outcome("i1", "attack", verdict="miss", tell="Kesst Vayr's attack misses Jarek.",
+                   blows=[{"result": "miss", "how": how}])
+
+
+def test_the_engine_bands_a_blow_against_the_one_struck():
+    """tbaMUD's `dam_message` chose its nine messages by ABSOLUTE damage (`dam <= 2` … `> 23`),
+    so a blow read the same against a rat and a dragon. The engine bands it against the
+    target's own maximum, the one struck by its own state, and a miss by how far short it
+    fell (Dungeon Crawl Stone Soup's `evasion_margin_adverb` scales a miss by its margin)."""
+    from rules import engine as eng
+
+    assert eng.blow_severity(5, 60) == "glancing" and eng.blow_severity(5, 8) == "brutal"
+    assert [eng.blow_severity(n, 20) for n in (1, 3, 7, 12)] == \
+        ["glancing", "solid", "heavy", "brutal"]
+    assert eng.miss_how(1, False) == "close" and eng.miss_how(9, False) == "wide"
+    assert eng.miss_how(4, True) == "cover" and eng.miss_how(4, False) == "plain"
+    s, engine = _scene(fighting=True)
+    smith = next(a for a in s.actors.values() if not a.is_pc)
+    smith.hp_max, smith.hp = 20, 5
+    assert eng.left_after(smith) == "badly hurt"
+    smith.hp, smith.nonlethal = 10, 6
+    assert eng.left_after(smith) == "reeling"
+
+
+def test_a_real_swing_carries_its_blow_on_the_outcome():
+    """End to end through the engine's own attack: the swing's bands ride on
+    `Outcome.blows`, the tell's structured twin, in words — and the record carries no
+    number, so nothing read off it can put one on the page."""
+    from rules.intents import parse
+
+    s, engine = _scene(fighting=True)
+    smith = next(r for r, a in s.actors.items() if not a.is_pc)
+    res = engine.run([parse({"op": "attack", "actor": "pc", "target": smith,
+                             "because": "a test swing"})])
+    outcomes = list(res.outcomes)
+    for face in (15, 4, 3, 2, 2, 2):
+        if not res.awaiting:
+            break
+        res = engine.resume(face)
+        outcomes += list(res.outcomes)
+    blows = [b for o in outcomes for b in getattr(o, "blows", []) or []]
+    assert blows, [o.tell for o in outcomes]
+    for b in blows:
+        assert b["result"] in ("hit", "miss")
+        assert not any(isinstance(v, (int, float)) and not isinstance(v, bool)
+                       for v in b.values())
+
+
+def test_a_blow_is_told_from_the_engines_facts_and_never_a_number():
+    """Measured 2026-10-16 on the fight benches: planned fight beats were accurate (5
+    errors in 21) and one sentence, 120-190 characters, because the slot had a tell and
+    "show it". The slot is now handed THE BLOW: the weapon and its wound, the engine's
+    severity, a confirmed critical, how the one struck is left — and no digit."""
+    s, engine = _scene(fighting=True)
+    facts = planned.blow_facts([_hit(engine, "brutal", "badly hurt", crit=True)], engine,
+                               said={})
+    assert len(facts) == 1 and facts[0].startswith("HIT")
+    assert "rapier (piercing)" in facts[0] and "critical" in facts[0]
+    assert facts[0].split("; ")[1] in planned._SEVERITY["brutal"]
+    assert any(c in facts[0] for c in planned._LEFT["badly hurt"])
+    assert not any(ch.isdigit() for ch in facts[0])
+    bruise = planned.blow_facts([_hit(engine, nonlethal=True, left="shaken")], engine,
+                                said={})[0]
+    assert any(n in bruise for n in planned._NONLETHAL)
+    for how in planned._MISS:
+        text = planned.blow_facts([_miss(how)], engine, said={})[0]
+        assert text.startswith("MISS") and any(p in text for p in planned._MISS[how])
+
+
+def test_the_same_tier_is_not_worded_the_same_twice_running():
+    """The "dryly" lesson (the 2026-10-16 talk bench: one fishmonger said "dryly" on 9 of 9
+    beats): a model shown the same phrase writes it. Each band has three wordings, walked
+    least-recently-used on the scene's own memory of what was said."""
+    s, engine = _scene(fighting=True)
+    said: dict = {}
+    seen = [planned.blow_facts([_hit(engine, "heavy")], engine, said=said)[0].split("; ")[1]
+            for _ in range(3)]
+    assert len(set(seen)) == 3
+
+
+def test_a_fight_beat_gets_the_blow_a_ground_clause_and_the_fight_budget():
+    """The act slot is handed THE BLOW and asked for two or three sentences of it; the
+    fight gets one clause of its ground from the brief's own place words; the budget is the
+    free narrator's fight ceiling; and the still slot stays out of fights."""
+    s, engine = _scene(fighting=True)
+    slots = planned.build_plan(engine, "I stab him.", [_hit(engine)], last_beat=LAST_BEAT)
+    assert [x["key"] for x in slots] == ["fact1", "ground"]
+    assert "THE BLOW (engine facts" in slots[0]["say"]
+    assert "two or three sentences" in slots[0]["say"]
+    assert slots[0]["want"] == planned.BLOW_WANT
+    kept, dropped = planned.allocate(slots, planned.budget_for(engine))
+    assert [x["key"] for x in kept] == ["fact1", "ground"] and not dropped
+    from gm import narration
+
+    assert planned.budget_for(engine) == narration.MAX_COMBAT_CHARS
+
+
+def test_the_enemys_blow_gets_the_same_facts_with_the_planned_narrator(rules_dir,
+                                                                       monkeypatch):
+    """A creature's turn is written by the consequence call, which the planned slots never
+    reach; with Planned on it is handed the same blow facts, the player as "you". Free
+    keeps its call as it was."""
+    from gm import prompts as p
+
+    msgs = p.call_two_messages("", ["Jarek hits Kesst Vayr."], [], "Jarek acts",
+                               acting="Jarek", pc_name="Kesst Vayr",
+                               blows=["HIT — weapon: sap; Kesst Vayr after it: shaken"])
+    assert "THE BLOW (engine facts" in msgs[-1]["content"]
+    assert "you after it: shaken" in msgs[-1]["content"]
+    s, engine = _scene(fighting=True)
+    seen: list = []
+    monkeypatch.setattr(agent_mod.client, "chat",
+                        lambda m, *a, **k: seen.append(m) or FakeReply("Jarek swings."))
+    gm = _agent(engine)
+    houserules.set_active({"narration": "planned"})
+    gm.narrate_outcome("", [_hit(engine)], "Jarek acts", rewrite=False,
+                       acting="Jarek")
+    assert "THE BLOW (engine facts" in seen[-1][-1]["content"]
+    houserules.set_active({"narration": "free"})
+    gm.narrate_outcome("", [_hit(engine)], "Jarek acts", rewrite=False,
+                       acting="Jarek")
+    assert "THE BLOW" not in seen[-1][-1]["content"]
 
 
 # --- That's wrong ------------------------------------------------------------------------

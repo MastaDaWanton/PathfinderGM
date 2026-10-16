@@ -3996,10 +3996,23 @@ class GMAgent:
                               note="nothing to narrate")
 
         pc = self.engine.scene.pc()
+        # With the planned narrator on, a creature's blow gets the same engine facts the
+        # player's does (`planned.blow_facts`): what struck, how hard against the one
+        # struck, how they are left, or how it missed. The planned path's own slots never
+        # write an enemy's turn, so its fights read half-rich without this. Free keeps its
+        # call as it was: the owner asked for the planned fights.
+        blows: list[str] = []
+        from rules import houserules
+
+        if houserules.narration() == "planned" and self.engine.scene.in_encounter:
+            from . import planned
+
+            blows = planned.blow_facts(outcomes, self.engine,
+                                       getattr(self.engine.scene, "said", None))
         reply = client.chat(
             prompts.call_two_messages(narration, tells, because, player_input,
                                       acting=acting, pc_name=pc.name if pc else "",
-                                      manner=manner),
+                                      manner=manner, blows=blows),
             # 700 rather than 250, and it is free. `num_predict` is a ceiling, not a
             # target: llama3.1 writes its two sentences and stops either way. A reasoning
             # model does not — measured on R4C3R/qwen3-8b-heretic, every consequence call
