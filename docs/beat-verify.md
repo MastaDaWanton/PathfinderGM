@@ -353,3 +353,56 @@ kept on its seam, written *"The Aelzeldra is gone."* while the player slept.
   sight is not quite gone, and the engine holds the creature "far"; labelled either way.
 - Bench, 2 runs, 59 beats: `presence` R 2/2, `absent` R 6/6, clean beats falsely alarmed 0
   of 82; every other category as on master.
+
+## The body's conditions (2026-10-16)
+
+The owner's wife's market brawl on 0.2.19 (free narrator, gemma-4-12B): "it was unclear
+if the user was grappled or if the narration just described it that way and the latter
+shouldn't happen." The engine grappled nobody; three beats put a woman's fingers round the
+player's throat. The English reader of the day (gm/state_claims.py) had no grappled row,
+and its one hit in that fight was a false "prone" on an aim ("aiming to knock you off your
+feet"), which cut the creature's wind-up down to its filler.
+
+- **The question.** On a fight's beats (`Facts.bodies`: a fight on, or a blow, spell or
+  manoeuvre resolved), the reader is asked which bodies the narrator says ARE held or
+  impaired at the end of the passage: `CONDITIONS` (grappled, pinned, prone, entangled,
+  stunned, dazed, blinded, deafened, paralyzed), keys of `states.TAGS`, each quoted.
+- **The judgement, in code.** `_condition_unheld`: somebody here and on their feet, the
+  engine holding no such state on them (`Person.holds`, asked by tag through `has_state`),
+  and no effect this turn naming that condition for that body. A "pin" inside a grapple
+  the engine made is the narrator's degree, not a hold from nowhere.
+- **The second read asks whom** (`_in_condition`, the `_shows` shape): asked yes-or-no,
+  "his weight pins yours against the shattered furniture" kept a pin on a bystander.
+- **Repair** is `beat-condition` (weight 3) through `_repair_sentences`; the backstop cuts.
+  `state_claims`' body question stands down wherever this is asked (`asks_bodies`), except
+  on sentences written after the read (`unread`).
+
+**A call of its own, not a slot.** Folded into the first read, the conditions read well
+and cost `harmed`, three wordings running (22 fight beats of the bench, gemma x2, Ollama
+shared with live audits):
+
+| version | harm claims | harm alarms kept | condition alarms | clean beats alarmed |
+|---|---|---|---|---|
+| master (no conditions) | 15/19 (P 0.79) | 3/6 | 0/8 | 2/29 |
+| slot + missed-grab demo + "never an attempt…" | 7/19 | — | — | — |
+| slot, no demo | 7/19 (P 0.70) | 0/5 | 5/8 | 2/30 |
+| slot, short clause ending on harm | 16/20 (P 0.73) | 0/6 | 6/8 | 2/30 |
+| **separate call (shipped)** | **16/20 (P 0.80)** | **2/6** | **4/8, P 1.00** | **2/30** |
+
+The two clean-beat alarms are the same harm alarm master raises (ho-pinioned-strikes). The
+first read's messages and schema are now byte-identical to master's on every beat (49
+non-fight and 22 fight gold beats compared in code); the bodies call is extra, on fight
+beats only: read latency median 8.9 s for both calls on the recordings below.
+
+**On recorded beats.** The committed fight recordings (tests/replay/*fight*, 99 fight
+beats, each against the scene after its own turn): `state_claims`' body question raised 0
+alarms; the read back raised 2, the second read kept 1 — "The fallen man in tattered gear
+lies crumpled in the dirt", of a standing bystander the engine itself had named "fallen
+man". Defensible either way; no clearly false alarm. On the report's own beats (replayed
+offline, scratch only): the regex caught 0 of the 2 invented grips and raised 1 false
+prone; the read back caught 2 of 2, both kept, and claimed nothing on the aim or on the
+first grab ("reaching out to grab you by the throat", an attempt).
+
+**Misses.** "Her fingers tighten around your throat as she leans in close" (0/2 on the
+bench, though the report's own wording of it was caught) and an invented "momentarily
+stunned" (0/2). Recall on condition alarms is 4/8; the precision is what was bought.
