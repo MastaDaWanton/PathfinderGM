@@ -364,13 +364,31 @@ def _does_what_was_declared(intents, player_text: str) -> bool:
     return bool(loud) and all(need.get(i.op, set()) & acts for i in loud)
 
 
+def _reading_attacks(player_text: str) -> bool:
+    """The reading of this line has the player attacking somebody, now (`interpret.acting`).
+
+    The structured answer to "did the player swing?", beside the cue words. Measured on the
+    2026-10-16 report: "I pick up the hairball and hurl it at the woman with the braid
+    because she gave me a weird look" — the reading had it right, `attack target=the woman
+    with the braid`, but VIOLENCE has no "hurl" and PEACEFUL matched the "look" in her
+    look, so `unprovoked` refused the plan's throw three attempts running. Hurling a thing
+    at somebody IS an attack; the reader says so in the engine's own act vocabulary and no
+    verb list has to grow to know it. A reading only ever adds violence here: with no
+    reading (the reader off or failed) the cue words decide, as before."""
+    from . import interpret
+
+    frame = interpret.reading_of(player_text) or {}
+    return any(isinstance(a, dict) and a.get("act") == "attack" and interpret.acting(a)
+               for a in frame.get("actions") or [])
+
+
 def review(player_text: str, intents, scene=None, previous=None) -> Review:
     """Compare what the GM decided against what the player asked for."""
     out = Review()
     text = player_text or ""
     # Violence is read off the line with the character's own speech blanked; a peaceful
     # cue is read off the whole line, because saying something IS the peaceful act.
-    violent = bool(VIOLENCE.search(redact_speech(text)))
+    violent = bool(VIOLENCE.search(redact_speech(text))) or _reading_attacks(text)
     peaceful = bool(PEACEFUL.search(text))
 
     # 0. The same turn over again. Measured: the player said "two guild bravos come round

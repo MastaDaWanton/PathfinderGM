@@ -380,7 +380,7 @@ def square_in_reach(scene, actor, defender, reach: int,
 
 
 def closing_move(scene, actor, defender,
-                 weapon_key: str | None) -> tuple[dict, bool] | None:
+                 weapon_key: str | None, thrown: bool = False) -> tuple[dict, bool] | None:
     """The move a creature makes toward `defender`, as a raw intent, and whether it ends
     in reach — so a blow can follow it this turn. None when it is in reach already,
     when the board cannot say, or when there is no open ground to cover.
@@ -396,8 +396,14 @@ def closing_move(scene, actor, defender,
     square named, never turned into a walk the player did not ask for. A fallback that
     swung from where it stood would be refused every round, and "holds back" at
     fifteen feet, for ever, is the bug the fallback was written to end.
+
+    `thrown`: the blow is a throw, which needs no closing (`out_of_reach` already says so
+    for a thrown blow). It was not passed through until 2026-10-16: "I pick up the hairball
+    and hurl it at the woman with the braid" opened the fight from fifteen feet, the
+    improvised weapon read as a melee swing out of reach, and the player's declared throw
+    was never rolled — the prose landed it anyway.
     """
-    miss = out_of_reach(scene, actor, defender, weapon_key)
+    miss = out_of_reach(scene, actor, defender, weapon_key, thrown=thrown)
     if miss is None:
         return None
     found = square_in_reach(scene, actor, defender, miss.reach, miss.gap)
