@@ -76,39 +76,50 @@ def test_somebody_away_held_by_the_page_is_absent():
     assert [d.category for d in found] == ["absent"]
 
 
-def test_the_slot_is_asked_only_on_a_fights_beats():
-    """Every other beat is asked exactly what it was before: the `shown_here` rule, for
-    the reason docs/beat-verify.md measured (a slot shown where it cannot apply competes
-    with its neighbours)."""
+def test_the_question_is_asked_only_on_a_fights_beats_and_apart():
+    """Every other beat is asked nothing new; a fight's beat is asked the first read exactly
+    as before, plus a call of its own. Folded into the first read as a slot, the conditions
+    competed with `harmed`: the harm alarms the second read keeps went 3/6 -> 0/6 on the
+    bench's fight beats (docs/beat-verify.md, "The body's conditions")."""
     calm = facts(in_fight=False, outcomes=())
-    assert "conditions" not in bv.schema(calm)["properties"]
-    assert all("conditions" not in m["content"] for m in bv.messages("x", calm))
+    assert not calm.bodies
     fight = facts()
-    s = bv.schema(fight)
+    assert "conditions" not in bv.schema(fight)["properties"]
+    assert all("conditions" not in m["content"] for m in bv.messages("x", fight))
+    s = bv.bodies_schema(fight)
     assert s["properties"]["conditions"]["items"]["properties"]["condition"]["enum"] == \
         list(bv.CONDITIONS)
-    assert "conditions" in s["required"]
     # A blow resolved outside a declared fight counts too (the turn that opens one).
     assert bv.Facts(start="x", end="x", places=(), outcomes=(ATTACK_MISS,)).bodies
     # Never in an intimate scene between adults.
     assert not facts(intimate=True).bodies
 
+    calls = []
 
-def test_the_demonstration_shows_a_hold_and_no_missed_grab_at_the_player():
-    """A demonstrated grab at "you" that missed cost the harm claims on blows that landed on
-    the player (bench, 2026-10-16: 0 of 4 reads of "knocks the wind from your lungs")."""
-    msgs = bv.messages("x", facts())
-    demo = msgs[3]["content"]
-    answer = json.loads(msgs[4]["content"])
-    assert "meaning to pull you off your feet" not in demo
-    assert answer["conditions"] == [{"who": "c5", "condition": "grappled",
-                                     "quote": "seizes the drover by the arm and holds "
-                                              "him fast"}]
-    assert answer["harmed"], "the demonstration still teaches harm"
+    def chat(messages, *a, **k):
+        calls.append(k["schema"])
+        return _reply({"conditions": []} if "conditions" in k["schema"]["properties"]
+                      else {"harmed": []})
+
+    bv.read("You swing and miss.", calm, chat=chat, model="m")
+    assert len(calls) == 1
+    bv.read("You swing and miss.", fight, chat=chat, model="m")
+    assert len(calls) == 3 and "conditions" in calls[2]["properties"]
+
+
+def test_the_demonstrations_show_a_hold_a_fall_and_an_attempt_that_is_neither():
+    """Apart from the harm read, the call can show what the folded slot could not afford
+    to: a grab at the player that missed, an aim, and a blow that lands are no condition."""
+    msgs = bv.bodies_messages("x", facts())
+    demo, answer = msgs[1]["content"], json.loads(msgs[2]["content"])
+    assert {(r["who"], r["condition"]) for r in answer["conditions"]} == \
+        {("c5", "grappled"), ("c4", "prone")}
+    assert "meaning to pull you off your feet" in demo
     # Every demonstrated quote is the demonstration's own words (`place_quote` holds a
     # live answer to the page in exactly this way).
-    for row in answer["conditions"] + answer["harmed"]:
+    for row in answer["conditions"]:
         assert row["quote"] in demo
+    assert json.loads(msgs[4]["content"]) == {"conditions": []}
 
 
 def _reply(answer):

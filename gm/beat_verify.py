@@ -421,14 +421,21 @@ def schema(facts: Facts) -> dict:
         # the final bench run; docs/narrator-after-defeat.md).
         **({"shown_here": lst({"who": {"type": "string", "enum": _who(facts)}})}
            if away else {}),
-        # The body's conditions, on a fight's beats only (`Facts.bodies`). Last, after
-        # `harmed`, so a blow is reported as harm first and a hold or a fall beside it.
-        **({"conditions": lst({"who": {"type": "string", "enum": _who(facts)},
-                               "condition": {"type": "string", "enum": list(CONDITIONS)}})}
-           if facts.bodies else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
-                    "left", "time_of_day", *(["shown_here"] if away else []),
-                    *(["conditions"] if facts.bodies else [])]}
+                    "left", "time_of_day", *(["shown_here"] if away else [])]}
+
+
+def bodies_schema(facts: Facts) -> dict:
+    """The body's conditions, asked in a call of their own (`read_bodies`), on a fight's
+    beats only (`Facts.bodies`): who, and which of `CONDITIONS`, each with its quote."""
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"conditions": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "who": {"type": "string", "enum": _who(facts)},
+            "condition": {"type": "string", "enum": list(CONDITIONS)}, "quote": s},
+            "required": ["who", "condition", "quote"]}}},
+        "required": ["conditions"]}
 
 
 _SYSTEM = (
@@ -555,54 +562,75 @@ _DEMO2_AWAY_ANSWER = dict(_DEMO2_ANSWER, shown_here=[
     {"who": "c6", "quote": "The bargeman leans on the rail of the gangway"}])
 
 
-# On a fight's beats (`Facts.bodies`), and only there, the question grows `conditions`: one
-# paragraph and the second demonstration with a hold in it — the `shown_here` split, for
-# the same measured reason. The demonstration shows only a hold that lands ("seizes the
-# drover by the arm and holds him fast"); the attempt that is NOT a condition is the
-# instruction's, in one clause. Its harm and everything else stay as they were.
-#
-# Tried and taken out, 2026-10-16, both for the same measured cost: on the bench's fight
-# beats the harm claims on blows that landed on the PLAYER went — "knocks the wind from your
-# lungs" no longer hurt you, 0 of 4 reads (ho-shove-lands, ho-blow-lands), harm claims
-# 15/19 on master -> 7/19:
-#   * a demonstrated grab at the player that missed ("reaches to catch you by the collar,
-#     meaning to pull you off your feet, and you step back") — the lesson
-#     `_DEMO2_AWAY_ANSWER`'s comment records about a demonstrated miss;
-#   * then, with that gone and the loss still there, a whole sentence of what is NOT a
-#     condition ("Never an attempt, a near miss, an aim or a threat — reaching to grab
-#     someone is not grappled …").
-# This wording, short and ending on harm, on ten of those beats: harm 5/6, conditions 5/5
-# (docs/beat-verify.md, "The body's conditions").
-_SYSTEM_BODIES = (
-    "\nconditions: a body the narrator says IS held or impaired at the end of the passage "
-    "— grappled (held fast in someone's grip), pinned, prone (down on the ground), "
-    "entangled, stunned, dazed, blinded, deafened, paralyzed. Not one only reached for or "
-    "aimed at. A blow that lands is reported under harmed as well.")
-_DEMO2_BODIES_TAIL = ("A watchman comes in from the street and seizes the drover by the arm "
-                      "and holds him fast.")
+# The body's conditions are asked in a call of their own (`read_bodies`), on a fight's
+# beats only (`Facts.bodies`); the read above is asked exactly what it was before on every
+# beat, fight or not. Measured 2026-10-16 on the bench's 22 fight beats, gemma-4-12B x2:
+# folded into that read as one more slot, the conditions read well (claims P 0.91 R 0.83)
+# but the slot competed with `harmed` — the CLAUDE.md rule, a model asked for N things
+# answers in parallel, and the `attacks` slot's lesson above. Three wordings were tried:
+#   * a demonstrated grab at the player that missed, and a sentence of what is NOT a
+#     condition: harm claims 15/19 on master -> 7/19, "knocks the wind from your lungs" no
+#     longer hurt the player (ho-shove-lands, ho-blow-lands, 0 of 4 reads);
+#   * without the demonstrated miss: still 7/19;
+#   * a short clause ending "a blow that lands is reported under harmed as well": claims
+#     back to 16/20, but the harm ALARMS the second read keeps went 3/6 -> 0/6 (the reader
+#     moved "He hits the ground hard" from harm to prone).
+# Apart, the harm read is byte-identical to master's on every beat, and this one can show
+# what the folded slot could not afford to: an attempt that is no condition.
+_BODIES_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") and report every body the "
+    "NARRATOR says IS held or impaired at the end of it, in the codes given: grappled "
+    "(held fast in somebody's grip), pinned (held down), prone (down on the ground), "
+    "entangled, stunned, dazed, blinded, deafened, paralyzed. Copy the passage's own words "
+    "exactly into \"quote\". Never report an attempt, a near miss, an aim or a threat — "
+    "somebody reaching to grab someone is not grappled, aiming to knock someone down is "
+    "not prone — nor what a character only says aloud inside quotation marks. Unconscious "
+    "and dead are not conditions here. Leave the list empty when the passage says none; "
+    "most passages say none.")
+_BODIES_DEMO_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman; "
+    "c5: the drover — commoner\n\n"
+    "Passage:\n"
+    "Dunmar Oake reaches to catch you by the collar, meaning to pull you off your feet, "
+    "and you twist out of his reach. The drover's fist cracks into his jaw and he staggers. "
+    "A watchman comes in from the street, seizes the drover by the arm and holds him fast. "
+    "Dunmar Oake's foot catches on a rope and he goes down flat on the planks.")
+_BODIES_DEMO_ANSWER = {"conditions": [
+    {"who": "c5", "condition": "grappled",
+     "quote": "seizes the drover by the arm and holds him fast"},
+    {"who": "c4", "condition": "prone", "quote": "he goes down flat on the planks"}]}
+_BODIES_DEMO2_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman\n\n"
+    "Passage:\n"
+    "Dunmar Oake lunges with the boathook, aiming to knock you into the river. The hook "
+    "catches your shoulder and knocks the wind out of you, and you stagger a step but keep "
+    "your feet. 'Next time you go in,' he says.")
+_BODIES_DEMO2_ANSWER = {"conditions": []}
 
 
-def _demo2(away: bool, bodies: bool) -> tuple[str, dict]:
-    user = _DEMO2_AWAY_USER if away else _DEMO2_USER
-    answer = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
-    if bodies:
-        user = user.replace("A watchman comes in from the street.", _DEMO2_BODIES_TAIL)
-        answer["conditions"] = [{"who": "c5", "condition": "grappled",
-                                 "quote": "seizes the drover by the arm and holds him fast"}]
-    return user, answer
+def bodies_messages(text: str, facts: Facts) -> list[dict]:
+    people = []
+    for p in facts.people:
+        if not p.here:
+            continue
+        desc = "the player (\"you\")" if p.pc else (p.what or "")
+        people.append(f"{p.ref}: {p.name}" + (f" — {desc}" if desc else ""))
+    return [{"role": "system", "content": _BODIES_SYSTEM},
+            {"role": "user", "content": _BODIES_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_BODIES_DEMO_ANSWER)},
+            {"role": "user", "content": _BODIES_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_BODIES_DEMO2_ANSWER)},
+            {"role": "user", "content": f"People: {'; '.join(people)}\n\nPassage:\n{text}"}]
 
 
 def messages(text: str, facts: Facts) -> list[dict]:
     away = any(not p.here for p in facts.people)
-    bodies = facts.bodies
-    demo2_user, demo2_answer = _demo2(away, bodies)
-    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")
-             + (_SYSTEM_BODIES if bodies else "")},
+    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")},
             {"role": "user", "content": _DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_DEMO_ANSWER)},
+            {"role": "user", "content": _DEMO2_AWAY_USER if away else _DEMO2_USER},
             {"role": "assistant", "content": json.dumps(
-                dict(_DEMO_ANSWER, conditions=[]) if bodies else _DEMO_ANSWER)},
-            {"role": "user", "content": demo2_user},
-            {"role": "assistant", "content": json.dumps(demo2_answer)},
+                _DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)},
             {"role": "user", "content": _ask(text, facts)}]
 
 
@@ -780,6 +808,18 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                      schema=schema(facts))
         result.raw = reply.text
         answer = reply.json()
+        if facts.bodies:
+            # The second question of a fight's beat, in a call of its own (see
+            # `_BODIES_SYSTEM` for why it is not a slot of the first).
+            msgs = bodies_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            more = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                        num_predict=300, provider=provider, api_key=api_key,
+                        schema=bodies_schema(facts))
+            result.raw += "\n" + more.text
+            answer = dict(answer or {}, conditions=(more.json() or {}).get("conditions")
+                          or [])
         result.claims, result.dropped = validate(claims_of(answer, facts), text, facts)
     except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
