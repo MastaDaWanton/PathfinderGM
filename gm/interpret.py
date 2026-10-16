@@ -282,6 +282,22 @@ _DEMOS = [
          {"span": "climb the bell tower", "place": "the bell tower", "act": "athletics"},
          {"span": "to look over the rooftops", "commit": "intended",
           "object": "the rooftops", "act": "look"}]}),
+    # Feats of strength (`exert`, 2026-10-16), written unlike the probe lines (no cart, no
+    # "help him"): one heave alone, one beside somebody, who is the target. Here, beside the
+    # other deed of the body, and not last: appended at the end of the list they were the
+    # last example before every sentence, and the interpreter bench moved on 11 of 302
+    # lines (act F1 0.921 -> 0.916, "I go to her house" losing `call_on`). Here it read
+    # act F1 0.920 and frame exact 0.709, against master's own two runs at 0.921/0.918 and
+    # 0.702/0.699 — the same prompt run twice moves 5 lines, `call_on` among them.
+    ("I set my shoulder to the fallen beam and shove it off the trapdoor.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "set my shoulder to the fallen beam and shove it off the trapdoor",
+          "object": "the fallen beam", "place": "the trapdoor", "act": "exert"}]}),
+    ("I join the old fisherwoman in hauling her boat up the shingle.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "join the old fisherwoman in hauling her boat up the shingle",
+          "object": "her boat", "target": "the old fisherwoman", "place": "the shingle",
+          "act": "exert"}]}),
     ("I sit on the bench for an hour.",
      {"question": False, "claims": [], "actions": [
          {"span": "sit on the bench for an hour", "place": "the bench", "time": "for an hour",
@@ -519,18 +535,6 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "make the shutters fly open by pointing at them",
           "object": "the shutters", "means": "beyond", "act": "other"}]}),
-    # --- 2026-10-16: feats of strength (`exert`) --------------------------------------
-    # Written unlike the probe lines (no cart, no "help him"): one heave alone, one heave
-    # beside somebody, who is the target.
-    ("I set my shoulder to the fallen beam and shove it off the trapdoor.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "set my shoulder to the fallen beam and shove it off the trapdoor",
-          "object": "the fallen beam", "place": "the trapdoor", "act": "exert"}]}),
-    ("I join the old fisherwoman in hauling her boat up the shingle.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "join the old fisherwoman in hauling her boat up the shingle",
-          "object": "her boat", "target": "the old fisherwoman", "place": "the shingle",
-          "act": "exert"}]}),
 ]
 
 
