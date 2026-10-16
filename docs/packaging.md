@@ -405,6 +405,11 @@ build rather than trusting it.
    shipped with an invisible full-screen layer over the table that took every click
    (`#harvest`, whose own `display:grid` outranked `.bench[hidden]`); every check above
    passed, because none of them asks the browser what is under the pointer.
+   **Close that browser tab when done.** The page sends heartbeats, and the packaged
+   backend binds the same port (8917) every time, so a tab left open keeps the next
+   backend alive. On 2026-10-16 a tab left from 0.2.18's hit test made 0.2.19's
+   `prove_build` fail "the game stops when its last window does" twice (65 s after the
+   last heartbeat, grace 20 s); with the tab closed it passed at 24 s.
 5. **Tag after building, never before.** v0.1.3's installer was rebuilt hours after its tag
    while `package.json` still read 0.1.3, so the artifact on disk was not that tag's code
    and the release had to ship without one.
