@@ -806,10 +806,18 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                 # turn, so a purchase or a payment the page names loosely still stands.
                 if to == pc and frm != FLOOR and frm != NOBODY \
                         and not _anything_into(facts, pc):
+                    # The fact names who keeps it and what it must not do. Worded "they
+                    # hold nothing new" alone, the first live rewrite (2026-10-16) turned
+                    # "He tosses it to you; it lands in your palm" into "He gestures
+                    # toward it; it sits in your palm" — still in the hand, and the read
+                    # of the rewrite missed it.
+                    giver = facts.person(frm)
+                    who = giver.name if giver is not None else "whoever holds it"
                     out.append(Discrepancy(
                         "contradiction", "hands",
-                        "Nothing was given to the player: nobody here handed them "
-                        "anything, and they hold nothing new.", c.sentence, "", c))
+                        f"Nothing was given to the player: {who} keeps it. It is not "
+                        f"handed, tossed, pressed or placed into the player's hands, and "
+                        f"it does not land or sit in them.", c.sentence, "", c))
                 continue
             held = any(_same(item, p) for p in facts.pack)
             out_of_pc = any(_same(item, i) and f == pc for i, f, _t in things_moved)
