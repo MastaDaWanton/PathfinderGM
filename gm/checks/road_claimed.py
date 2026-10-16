@@ -9,8 +9,8 @@ may not claim one otherwise.
 
 Detect in code: a claim of being on, taking or setting out along the road to a
 settlement the world's roads reach ("on the road to X", "take the road toward X", "set
-out for X"), outside quoted speech — or that road put in front of the party ("the road
-to X is…", "stretches…"), quoted or not — when (1) no journey happened this beat, (2) the party
+out for X"), or that road put in front of the party ("the road to X is…", "stretches…"),
+in the narrator's words and never inside quoted speech — when (1) no journey happened this beat, (2) the party
 does not stand at X's road head or on its stretch of road, and (3) the reading has no
 journey act. Repair: where the party is, and where that road starts. Backstop: cut the
 sentence.
@@ -37,9 +37,11 @@ _CLAIM = (r"\b(?:on|along|down|up|onto|take|takes|took|taking|follow|follows|fol
 
 
 # The road put in front of the party: "the road toward Dustgate is a straight, punishing
-# line of white stone" (turn 8, with the engine holding the party at the way in); "The
-# road to Grotburrow isn't for the faint of heart", said by a stranger in a wood nowhere
-# near it (turn 9, item 20.5 — the owner's own example, so quoted speech counts here).
+# line of white stone" (turn 8, with the engine holding the party at the way in). In the
+# narrator's own words only. Quoted speech counted here once, on the owner's turn-9 example
+# ("The road to Grotburrow isn't for the faint of heart", said by a stranger), and the
+# owner reversed it on 2026-10-16: "a road in an answer isn't a position claim". Counted,
+# it cut and garbled every answer to "what lies on the road north?".
 # A road said to START somewhere ("the road to Dustgate leaves from the outskirts") is
 # the brief's fact, not a claim, and none of these verbs match it.
 _PRESENT = (r"\bthe\s+(?:\w+\s+){{0,2}}(?:road|path|track|highway|trail)\s+(?:to|toward|"
@@ -76,7 +78,7 @@ def find(ctx) -> list[Finding]:
     for s in _space.sentences(ctx.text):
         plain = _space.unquoted(s)
         for to_name, claim, present in _patterns(ctx):
-            if (claim.search(plain) or present.search(s)) and not _on_it(ctx, to_name):
+            if (claim.search(plain) or present.search(plain)) and not _on_it(ctx, to_name):
                 flagged.append((s, to_name))
                 break
     if not flagged:
