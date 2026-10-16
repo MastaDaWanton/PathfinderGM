@@ -269,6 +269,29 @@ def addressee(engine, outcomes) -> str:
     return talking[0].ref if len(talking) == 1 else ""
 
 
+def _master_will_not_answer(engine, ref: str, player_input: str) -> bool:
+    """Whether `ref` is the market's master and would not hear the player this beat — the
+    same test the brief (`gm/brief/market_master.py`) and the check use."""
+    from rules import audience, keepers, places
+
+    scene = engine.scene
+    master = keepers.master_here(scene)
+    if master is None or master.ref != ref:
+        return False
+    if not places.has_a_master(places.scale_of(str(getattr(scene, "location_id", "") or ""))):
+        return False
+    from . import interpret
+
+    reading = interpret.reading_of(player_input) if player_input else None
+    if isinstance(reading, dict) and reading.get("error"):
+        reading = None
+    if audience.addressed(scene, master, player_input, reading):
+        return False
+    pc = scene.pc()
+    return not (pc is not None and audience.grounds(scene, master, pc, player_input,
+                                                     reading))
+
+
 def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                last_beat: str = "") -> list[dict]:
     """The ordered slots (the module note), before the budget (`allocate`). `last_beat` is
@@ -287,11 +310,12 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
     if last_beat and not fighting and not arriving(outcomes) and _talk_only(outcomes):
         slots.append({
             "key": "still", "want": STILL_WANT,
-            "say": "How things stand now, in one short sentence, from THE SCENE NOW and the "
-                   "last thing you wrote: who is where, what someone holds, or what is "
-                   "still unresolved. A state, not an event: nobody moves, speaks, strikes "
-                   "or does anything in it. In new words; never reuse a phrase from the "
-                   "last thing you wrote."})
+            "say": "How things stand now between the people here, in one short sentence, "
+                   "from THE SCENE NOW and the last thing you wrote: what someone holds, "
+                   "who is watching whom, or what is still unresolved. A state, not an "
+                   "event: nobody moves, speaks, strikes or does anything in it, and it "
+                   "does not say where the player is. In new words; never reuse a phrase "
+                   "from the last thing you wrote."})
     for i, act in enumerate(acts(outcomes)):
         tells = [o.tell for o in act]
         decided = (tells[0] if len(tells) == 1 else
@@ -346,6 +370,14 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
         # seen that particular face before today…' What do you do?" — nobody said it. The
         # slot returns the words and how they are said; code writes the speaker in.
         who = addressee(engine, outcomes)
+        # The market's master answers only a player who turned to them by the house's own
+        # test (`audience.addressed`) or has grounds for a hearing: otherwise every line
+        # of theirs is cut on the page (`gm/checks/master_unprompted.py`). Measured on the
+        # 2026-10-16 talk bench: the engine's `say` went to the master as the only person
+        # in conversation, the reply slot answered as him, and the check cut the answer
+        # on 7 of 10 beats. So the slot follows the check: no answer from him then.
+        if who and _master_will_not_answer(engine, who, player_input):
+            who = ""
         speaker = next((p for p in people if p["ref"] == who), None)
         if speaker is not None:
             slots.append({
@@ -456,11 +488,22 @@ def plan_messages(brief: str, slots: list[dict], people: list[dict], place: str,
             {"role": "user", "content": "\n\n".join(b for b in blocks if b)}]
 
 
+# How an answer is said: one word from a closed set, which Ollama's grammar enforces (an
+# enum held on 6 of 6 probes, 2026-10-03; `contains` and `prefixItems` did not), or "" for
+# plain "says". It was free text, and of the 9 manners on the 2026-10-16 benches one was a
+# second attribution ("the Korvu official says, their voice gravelly…", composed into
+# "'…,' the master of the market says, the Korvu official says…") and four were actions
+# ("grunting as they adjust a heavy crate"). What a speaker DOES belongs to the act slots;
+# how they sound is this word.
+MANNERS = ("", "flatly", "quietly", "curtly", "warmly", "wearily", "gruffly", "sharply",
+           "slowly", "dryly", "carefully", "coldly", "kindly", "impatiently", "softly")
+
+
 def _reply_ask() -> str:
     return ('Reply with a JSON object: {"words": "...", "manner": "..."} — "words" being '
-            'exactly what they say, without quote marks, and "manner" a few words that '
-            "follow 'says,' to show how: what they do or how they sound as they say it "
-            "(for example 'without looking up from the anvil'), or \"\" for nothing.")
+            'exactly what they say, in their own voice, without quote marks and without '
+            'saying who says it; "manner" one word for how they say it, from: '
+            + ", ".join(f'"{m}"' for m in MANNERS) + ".")
 
 
 def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str], *,
@@ -491,7 +534,7 @@ def slot_schema(max_chars: int, *, suggest: bool = False, reply: bool = False) -
                prompts.GRAMMAR_MAXLENGTH_CEILING)
     if reply:
         props: dict = {"words": {"type": "string", "maxLength": room},
-                       "manner": {"type": "string", "maxLength": 80}}
+                       "manner": {"type": "string", "enum": list(MANNERS)}}
         required = ["words", "manner"]
     else:
         props = {"text": {"type": "string", "maxLength": room}}
@@ -507,8 +550,9 @@ def compose_reply(slot: dict, words: str, manner: str) -> str:
     The words are the model's; who says them is the engine's (`addressee`), named by the
     engine's own name, and the verb is "says". "Said" is the one dialogue verb that does
     not draw the eye (Elmore Leonard, "10 Rules of Writing", rule 3: never use a verb
-    other than "said" to carry dialogue), and a fixed verb means the composed line is
-    grammatical whatever the model put in `manner` — which only ever follows "says,".
+    other than "said" to carry dialogue), and a fixed verb with one word from `MANNERS`
+    means the composed line is grammatical whatever the model chose. A manner from outside
+    the set (a hosted provider ignores the grammar) is left off.
     The speaker tag goes on, so the line is booked to them exactly as a tagged line is."""
     from . import speech
 
@@ -521,11 +565,11 @@ def compose_reply(slot: dict, words: str, manner: str) -> str:
         words = words[:-1] + ","
     elif words[-1] not in ",!?…":
         words += ","
-    manner = " ".join(str(manner or "").split()).strip().rstrip(".,;:")
-    manner = manner[:1].lower() + manner[1:]
+    manner = str(manner or "").strip().lower()
+    manner = manner if manner in MANNERS else ""
     who = narration_mod.definite(str(slot.get("speaker_name") or ""))
     return (f"<say who={slot.get('speaker')} to=you>'{words}'</say> {who} says"
-            + (f", {manner}" if manner else "") + ".")
+            + (f" {manner}" if manner else "") + ".")
 
 
 def copied_from(text: str, last_beat: str, n: int = COPY_RUN) -> list[str]:

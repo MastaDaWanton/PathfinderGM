@@ -447,15 +447,57 @@ def test_who_answers_is_the_engines_and_code_writes_them_in():
     assert planned.addressee(engine, []) == "", "spoken to nobody: nobody answers"
     schema = planned.slot_schema(240, reply=True)
     assert set(schema["properties"]) == {"words", "manner"}
+    # How it is said is one word from a closed set the grammar enforces: as free text, of
+    # 9 manners on the 2026-10-16 benches one was a second attribution and four actions.
+    assert schema["properties"]["manner"]["enum"] == list(planned.MANNERS)
     slot = {"key": "reply", "speaker": smith, "speaker_name": "Jarek"}
-    line = planned.compose_reply(slot, "'I keep order here.'", "Without looking up.")
-    assert line == (f"<say who={smith} to=you>'I keep order here,'</say> Jarek says, "
-                    "without looking up.")
+    line = planned.compose_reply(slot, "'I keep order here.'", "Flatly")
+    assert line == f"<say who={smith} to=you>'I keep order here,'</say> Jarek says flatly."
+    assert planned.compose_reply(slot, "Go.", "the Korvu official says, gravelly") == \
+        f"<say who={smith} to=you>'Go,'</say> Jarek says.", "outside the set: left off"
     assert planned.compose_reply(slot, "Who's asking?", "") == \
         f"<say who={smith} to=you>'Who's asking?'</say> Jarek says."
     descriptor = {"key": "reply", "speaker": "c9", "speaker_name": "master of the market"}
     assert "</say> the master of the market says." in \
         planned.compose_reply(descriptor, "No.", "")
+
+
+def test_the_market_master_answers_only_when_the_house_says_he_hears(monkeypatch):
+    """The 2026-10-16 talk bench: the engine's `say` went to the market's master as the
+    only person in conversation, the reply slot answered as him, and the master-approaches
+    check cut his answer on 7 of 10 beats — he answers only a player who turned to him or
+    has grounds. The reply slot now follows that same test (`audience.addressed`,
+    `audience.grounds`): unheard, there is no answer from him to cut."""
+    from rules import audience, keepers, places
+
+    s, engine = _scene()
+    smith = next(a for a in s.actors.values() if not a.is_pc)
+    monkeypatch.setattr(keepers, "master_here", lambda scene: smith)
+    monkeypatch.setattr(places, "has_a_master", lambda scale: True)
+    monkeypatch.setattr(audience, "addressed", lambda *a, **k: False)
+    monkeypatch.setattr(audience, "grounds", lambda *a, **k: [])
+    keys = [x["key"] for x in planned.build_plan(engine, "I ask their name.",
+                                                  [_asked(engine)], last_beat=LAST_BEAT)]
+    assert "reply" not in keys and "aside" in keys
+    monkeypatch.setattr(audience, "addressed", lambda *a, **k: True)
+    keys = [x["key"] for x in planned.build_plan(engine, "I ask the master his name.",
+                                                  [_asked(engine)], last_beat=LAST_BEAT)]
+    assert "reply" in keys
+
+
+def test_a_persons_own_name_is_not_the_briefs_wording():
+    """Measured 2026-10-16 on the benches: the market's master goes by "the master of the
+    market", the brief's scaffold holds "is the master of the market", and the brief-wording
+    repair rewrote every sentence naming him — "the merchant" (he sells nothing), or "You
+    walk the rows, checking the weight of the starweave": 11 of 40 town and talk beats."""
+    from gm.checks import brief_verbatim
+
+    line = "The master of the market walks the rows, checking the weight of the bolts."
+    assert brief_verbatim.flagged(line, ["the master of the market"]) == []
+    s, engine = _scene()
+    smith = next(a for a in s.actors.values() if not a.is_pc)
+    smith.name = "the master of the market"
+    assert "the master of the market" in brief_verbatim._names(s)
 
 
 def test_the_matter_slot_is_given_the_engines_fact_and_never_the_instruction(rules_dir,

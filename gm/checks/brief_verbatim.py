@@ -55,9 +55,35 @@ def _scaffold() -> frozenset:
         return frozenset()
 
 
-def flagged(text: str) -> list[tuple[str, str]]:
+def _names(scene) -> list[str]:
+    """The names the people here go by, longest first."""
+    names = {" ".join(str(getattr(a, "name", "") or "").split())
+             for a in (getattr(scene, "actors", {}) or {}).values()}
+    return sorted((n for n in names if n), key=len, reverse=True)
+
+
+def _without(narration: str, names) -> str:
+    """The narration with every person's own name taken out, by position, not by reading."""
+    low = narration.lower()
+    for name in names:
+        n = name.lower()
+        at = low.find(n)
+        while at >= 0:
+            narration = narration[:at] + " " * len(n) + narration[at + len(n):]
+            low = narration.lower()
+            at = low.find(n)
+    return narration
+
+
+def flagged(text: str, names=()) -> list[tuple[str, str]]:
     """(sentence as written, what gives it away) for each sentence that prints the
-    brief's wording."""
+    brief's wording. `names` are the people here: a person's own name is not the brief's
+    wording even when the brief's scaffold holds it. Measured 2026-10-16 on the planned
+    benches: the market's master goes by "the master of the market", the scaffold holds "is
+    the master of the market", and every sentence naming him was "repaired" — renamed "the
+    merchant" (he sells nothing) or made "You walk the rows, checking the weight of the
+    starweave", the player doing the master's rounds: 11 of 40 town and talk beats, in
+    both narrators' slots alike."""
     scaffold = _scaffold()
     out = []
     for written, narration in page_sentences(text):
@@ -65,14 +91,14 @@ def flagged(text: str) -> list[tuple[str, str]]:
             out.append((written, narration.rsplit(":", 1)[0].split(",")[-1].strip()
                         + ":"))
             continue
-        hit = sorted(_grams(narration) & scaffold)
+        hit = sorted(_grams(_without(narration, names)) & scaffold)
         if hit:
             out.append((written, " ".join(hit[0])))
     return out
 
 
 def find(ctx) -> list:
-    found = flagged(ctx.text)
+    found = flagged(ctx.text, _names(ctx.scene))
     if not found:
         return []
     return [Finding(
@@ -86,7 +112,7 @@ def find(ctx) -> list:
 
 
 def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
-    gone = [w for w, _ in flagged(text)]
+    gone = [w for w, _ in flagged(text, _names(getattr(ctx, "scene", None)))]
     if not gone:
         return text, []
     return cut(text, gone), [f"the brief's wording on the page: cut {len(gone)} "
