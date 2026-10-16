@@ -94,11 +94,13 @@ def test_the_slot_is_asked_only_on_a_fights_beats():
     assert not facts(intimate=True).bodies
 
 
-def test_the_demonstration_shows_an_attempt_as_no_condition_and_a_hold_as_one():
+def test_the_demonstration_shows_a_hold_and_no_missed_grab_at_the_player():
+    """A demonstrated grab at "you" that missed cost the harm claims on blows that landed on
+    the player (bench, 2026-10-16: 0 of 4 reads of "knocks the wind from your lungs")."""
     msgs = bv.messages("x", facts())
     demo = msgs[3]["content"]
     answer = json.loads(msgs[4]["content"])
-    assert "meaning to pull you off your feet" in demo, "an aim, reported as nothing"
+    assert "meaning to pull you off your feet" not in demo
     assert answer["conditions"] == [{"who": "c5", "condition": "grappled",
                                      "quote": "seizes the drover by the arm and holds "
                                               "him fast"}]

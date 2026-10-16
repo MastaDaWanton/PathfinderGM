@@ -5285,6 +5285,9 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         else:
             fell_back = True
         passage = " ".join(p for p in (windup.strip(), str(text or "").strip()) if p)
+        # A descriptor name opens a wind-up in lower case too ("the figure grips the
+        # club…", live 2026-10-16), and the passage starts a paragraph.
+        passage = passage[:1].upper() + passage[1:]
         if passage:
             # "setup" when any of it is the narrator's prose, as every narrated beat is;
             # the engine's plain lines alone stay a "consequence", as before.

@@ -557,20 +557,20 @@ _DEMO2_AWAY_ANSWER = dict(_DEMO2_ANSWER, shown_here=[
 
 # On a fight's beats (`Facts.bodies`), and only there, the question grows `conditions`: one
 # paragraph and the second demonstration with a hold in it — the `shown_here` split, for
-# the same measured reason. The demonstration holds BOTH sides of the line the owner's
-# report crossed: a grab that misses and an aim are no condition ("reaches to catch you by
-# the collar, meaning to pull you off your feet"); a hold that lands is ("seizes the drover
-# by the arm and holds him fast"). Its harm and everything else stay as they were, so the
-# demonstration still teaches that a fist to the jaw is harm.
+# the same measured reason. The demonstration shows only a hold that lands ("seizes the
+# drover by the arm and holds him fast"); the attempt that is NOT a condition is the
+# instruction's, in words. Tried and taken out (2026-10-16): a demonstrated grab at the
+# player that missed ("reaches to catch you by the collar, meaning to pull you off your
+# feet, and you step back") — on the bench it cost the harm claims on blows that DID land
+# on the player, "knocks the wind from your lungs" no longer hurt you (ho-shove-lands and
+# ho-blow-lands, 0 of 4 reads), the lesson `_DEMO2_AWAY_ANSWER`'s comment records about a
+# demonstrated miss. Its harm and everything else stay as they were.
 _SYSTEM_BODIES = (
     "\nconditions: a body the NARRATOR says is held or impaired by the end of the passage: "
     "grappled (held fast in someone's grip), pinned (held down), prone (down on the "
     "ground), entangled, stunned, dazed, blinded, deafened, paralyzed. Never an attempt, a "
     "near miss, an aim or a threat — reaching to grab someone is not grappled, aiming to "
     "knock someone down is not prone — and never unconscious or dead, which are harmed.")
-_DEMO2_BODIES_INSERT = (
-    "He reaches to catch you by the collar, meaning to pull you off your feet, and you step "
-    "back out of his reach. ")
 _DEMO2_BODIES_TAIL = ("A watchman comes in from the street and seizes the drover by the arm "
                       "and holds him fast.")
 
@@ -579,9 +579,7 @@ def _demo2(away: bool, bodies: bool) -> tuple[str, dict]:
     user = _DEMO2_AWAY_USER if away else _DEMO2_USER
     answer = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
     if bodies:
-        user = (user.replace("Dunmar Oake staggers back", _DEMO2_BODIES_INSERT
-                             + "Dunmar Oake staggers back")
-                .replace("A watchman comes in from the street.", _DEMO2_BODIES_TAIL))
+        user = user.replace("A watchman comes in from the street.", _DEMO2_BODIES_TAIL)
         answer["conditions"] = [{"who": "c5", "condition": "grappled",
                                  "quote": "seizes the drover by the arm and holds him fast"}]
     return user, answer
