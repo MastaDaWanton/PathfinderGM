@@ -111,6 +111,12 @@ ASIDE_WANT = 140
 BLOW_WANT = 300
 BLOW_EACH = 100
 GROUND_WANT = 120
+# What the ground clause looks at, one a beat (see where `build_plan` asks); None is a beat
+# with no ground clause at all.
+_GROUND = ("what is underfoot, the floor or ground the blows land on",
+           "the light here and what it falls on",
+           "what already stands about here, walls or furniture or whatever is there",
+           None)
 SLOT_FLOOR = 110
 # Which slots go first when the budget is short: the acts are the beat (never dropped), the
 # answer to the player's own question next, then the state, the open matter, and somebody
@@ -529,12 +535,21 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
         # (UNDERFOOT, HERE): the ground the blows land on. Never a new thing that matters —
         # a weapon to snatch or a door to run for is the engine's to put there. Lowest
         # but one in the fight's budget: the blows come first.
-        slots.append({"key": "ground", "want": GROUND_WANT,
-                      "say": "One short sentence of where this fight is happening, from "
-                             "what THE SCENE says is underfoot and around here: the floor, "
-                             "the light, what already stands about. Nothing new that "
-                             "matters: no new person, weapon, or way out; nobody acts in "
-                             "it."})
+        #
+        # One aspect a beat, walked least-recently-used, and every fourth beat none. The
+        # first cut asked for "the floor, the light, what already stands about" every beat,
+        # and on the 2026-10-16 fight bench the clause came back as the same tables,
+        # benches and hearth on every fight beat — the shape of the ask was the shape of
+        # the answer. A MUD's fight message carries no ground at all; the room is said once
+        # on entry. This keeps a little of the place in a long fight without a refrain.
+        focus = _GROUND[narration_mod.least_recently_used(
+            getattr(engine.scene, "said", None), "planned.ground", len(_GROUND))]
+        if focus:
+            slots.append({"key": "ground", "want": GROUND_WANT,
+                          "say": "One short sentence of where this fight is happening: "
+                                 f"{focus}, from what THE SCENE says is here and nothing "
+                                 "else. Nothing new that matters: no new person, weapon, "
+                                 "or way out; nobody acts in it."})
     if pull:
         # The engine's fact alone (rough edge 3). It was the pull's whole rendering, whose
         # head is an instruction to the free narrator ("STILL OPEN, NEAREST TO HAND … never

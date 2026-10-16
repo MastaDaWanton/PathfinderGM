@@ -717,6 +717,22 @@ def test_the_engine_bands_a_blow_against_the_one_struck():
     assert eng.left_after(smith) == "reeling"
 
 
+def test_the_ground_clause_looks_somewhere_new_each_beat_and_sometimes_nowhere():
+    """Measured on the 2026-10-16 fight bench: asked every beat for "the floor, the light,
+    what already stands about", the ground clause came back as the same tables, benches and
+    hearth on every fight beat. It is now asked for one aspect a beat, walked
+    least-recently-used, and every fourth beat has none."""
+    s, engine = _scene(fighting=True)
+    s.said = {}
+    asks = []
+    for _ in range(4):
+        slots = planned.build_plan(engine, "I stab him.", [_hit(engine)], last_beat=LAST_BEAT)
+        ground = [x["say"] for x in slots if x["key"] == "ground"]
+        asks.append(ground[0] if ground else None)
+    assert asks.count(None) == 1
+    assert len({a for a in asks if a}) == 3
+
+
 def test_a_blow_that_drops_them_is_banded_down_before_the_state_lands():
     """Measured on the planned fight bench, 2026-10-16: a sap that knocked the player out
     was banded "barely upright" — the blow is banded as it falls, and the unconscious tag
