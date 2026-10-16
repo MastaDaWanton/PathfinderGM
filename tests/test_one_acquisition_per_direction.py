@@ -44,12 +44,16 @@ def test_the_coin_is_recorded_beside_the_paper_given_away():
     assert out[:2] == PLAN_7
     assert out[2]["op"] == "give" and out[2]["params"] == {"item": "coin", "to": "pc"}
     engine = Engine(scene, Dice(seed=1))
-    engine.run(engine.validate(out))
-    # Recorded in the PURSE since 2026-10-03 (item 3: "the coins" were a goods line
-    # beside an empty purse). Nothing counted it out, so it is the one coin the engine
-    # can vouch for — a single copper piece — and never the goods line "coin".
-    assert scene.pc().purse.get("cp") == 1
+    before = dict(scene.pc().purse)
+    res = engine.run(engine.validate(out))
+    # Money is the purse's since 2026-10-03 (item 3: "the coins" were a goods line beside
+    # an empty purse), never the goods line "coin". And since 2026-10-16 a coin nobody
+    # counted out is no coin at all: this used to credit "a single copper piece", and on
+    # a real player's game that minted a coin the narrator had invented
+    # (tests/test_requests_and_rewards.py). The take is its own op still — refused, said.
+    assert scene.pc().purse == before
     assert "coin" not in scene.pc().goods
+    assert any(o.op == "give" and o.status == "refused" for o in res.outcomes)
 
 
 def test_a_take_the_plan_already_made_is_not_made_twice():

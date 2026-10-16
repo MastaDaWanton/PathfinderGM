@@ -19176,9 +19176,11 @@ class Engine:
         The amount is the records': the coin in a pouch or a pile (Circle's money object:
         picked up, it is the number again), or the payment the player was just made,
         which is already in the purse and is said to be. Nothing else is money. When no
-        record vouches for any coin at all, the engine counts the one coin it can — a
-        single copper piece — rather than a number a model wrote (law 3), and rather
-        than the goods line "coins" that this door exists to end."""
+        record vouches for any coin at all, nothing changes hands and the refusal says so
+        (since 2026-10-16; until then the engine counted one copper piece, and a coin the
+        narrator invented became real). Only the author's own word (`origin` `author:*`,
+        a cheat) still counts that one coin, rather than a number a model wrote (law 3)
+        and rather than the goods line "coins" that this door exists to end."""
         coins = goods.coinage(getattr(self, "world", None), None)
         if taker is None or (giver is not None and giver.is_pc and taker is not giver):
             who = giver if giver is not None else taker
@@ -19223,6 +19225,24 @@ class Engine:
                 effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": 0,
                           "how": "already", "to": taker.ref, "purse": dict(taker.purse),
                           "goods": dict(taker.goods)}])
+        if not str(getattr(intent, "origin", "") or "").startswith("author:"):
+            # No record vouches for any coin: nobody counted it out, nothing lies here,
+            # no payment was made. Measured 2026-10-16 (a real player's game, 0.2.19): the
+            # free narrator had a carter hand over "a small, weathered coin" nobody paid,
+            # and "I take the coin and move toward the market" was planned `give item=coin
+            # to=pc` from nobody — this door then counted "a single copper piece, all
+            # anybody counted out" into the purse, and the world minted the prose's coin.
+            # Coin comes from a purse, a pile or a payment the engine made (a request
+            # granted, `Engine._make_request`); a word is not money (law 3). The author's
+            # own word (a cheat) still is.
+            if giver is not None and not giver.is_pc:
+                return self._refuse(
+                    intent, f"{giver.name} has counted out no coin for {taker.name}: "
+                            f"nothing changes hands. Ask them for payment, and they may "
+                            f"pay.")
+            return self._refuse(
+                intent, f"Nobody here is holding any coin out to {taker.name}, and none "
+                        f"lies here: nothing changes hands.")
         taker.purse = goods.credit(taker.purse, 1)
         # And remembered as this hour's coin, so "I count the coins… I pocket the coins…
         # I tip them into my purse" is one copper and not three.
@@ -19519,6 +19539,15 @@ class Engine:
                     del box[denom]
                 if not holding.coin_in(pile):
                     self.scene.props.remove(pile)
+            elif taker is not None and denom and not str(
+                    getattr(intent, "origin", "") or "").startswith("author:"):
+                # Coin is never the world's to hand out: "5 gp" taken from nobody, with no
+                # pile of it lying here, is a number nobody counted (law 3) — the same rule
+                # `_give_money` holds for coin with no amount (2026-10-16). The author's
+                # own word (a cheat) still makes it so.
+                return self._refuse(
+                    intent, f"Nobody here is holding {count} {denom} out to {taker.name}, "
+                            f"and none lies here: nothing changes hands.")
             # Unless it is lying right here with a record: then THAT thing is picked
             # up, and its owner and provenance come with it. "I pick up a chunk of
             # wood" after a sunder is the fragments of the challenger's club, his
