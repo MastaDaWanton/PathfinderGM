@@ -615,6 +615,14 @@ def test_a_remake_of_a_planned_beat_asks_again_only_the_slot_the_player_marked(m
     text, made, _secs, _now = planned.remake(page, entry, [], "",
                                              ("stub-12b", "http://x", "ollama", ""))
     assert [c["key"] for c in made] == ["still", "fact1"], "nothing picked: every slot"
+    # Live 2026-10-16: a refused-move cut had left the page as backstop text only ("You
+    # are still at the market. What do you do?"), the remade slot was appended after the
+    # question, and the page asked "What do you do?" twice. With no slot's text left on
+    # the page, the remake is the slots again.
+    text, made, _secs, _now = planned.remake("You are still at the market. What do you do?",
+                                             entry, [], "",
+                                             ("stub-12b", "http://x", "ollama", ""))
+    assert text.count("What do you do?") == 0 and text.endswith("You ask about the ore.")
 
 
 def test_the_corrections_log_keeps_a_planned_remakes_slot_calls(rules_dir, monkeypatch):

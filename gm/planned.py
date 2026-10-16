@@ -913,6 +913,13 @@ def remake(page: str, entry: dict, picked: list[str], complaint: str, who: tuple
         if not text:
             raise PlanFailed(f'the remade "{s["key"]}" slot came back empty')
         new[n] = text
+    now = {s["key"]: new.get(n, s["wrote"]) for n, s in enumerate(slots)}
+    if all(o is None for o in owner):
+        # Nothing on the page is any slot's any more: what stands is the backstops' alone
+        # (measured live 2026-10-16: a refused-move cut left "You are still at the market.
+        # What do you do?"). The beat is the slots again, in order; the hand-back is the
+        # caller's (`GMAgent.remake_planned`).
+        return " ".join(now[s["key"]] for s in slots).strip(), calls, spent, now
     out, done = [], set()
     for x, n in zip(sentences, owner):
         if n in new:
@@ -921,13 +928,17 @@ def remake(page: str, entry: dict, picked: list[str], complaint: str, who: tuple
                 done.add(n)
             continue
         out.append(x)
-    # A slot asked again whose sentences no longer stand on the page at all goes where
-    # its order puts it: before the first sentence of a later slot.
+    # A slot asked again whose sentences no longer stand on the page at all goes where its
+    # order puts it: before the first sentence of a later slot, or else before the closing
+    # question — never after it.
     for n in sorted(set(new) - done):
-        later = next((k for k, o in enumerate(owner) if o is not None and o > n), None)
-        if later is None:
-            out.append(new[n])
-        else:
+        later = next((k for k, x in enumerate(out)
+                      if (owner[sentences.index(x)] if x in sentences else None) is not None
+                      and owner[sentences.index(x)] > n), None)
+        if later is not None:
             out.insert(later, new[n])
-    return (" ".join(x for x in out if x).strip(), calls, spent,
-            {s["key"]: new.get(n, s["wrote"]) for n, s in enumerate(slots)})
+        elif out and out[-1].rstrip().endswith("?"):
+            out.insert(len(out) - 1, new[n])
+        else:
+            out.append(new[n])
+    return " ".join(x for x in out if x).strip(), calls, spent, now
