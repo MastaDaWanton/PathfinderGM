@@ -518,12 +518,23 @@ def remake(c, i: int, sentences=None, note: str = "", *, agent=None) -> dict:
     earlier = narration_mod.own_prose(c.transcript[:i])
     complaint = prompts.player_marked_wrong(picked, note)
     started = time.monotonic()
+    # A beat the planned narrator wrote is remade the planned way (gm/planned.py `remake`,
+    # 2026-10-16): only the slots that wrote what the player picked are asked again, and
+    # the rest of the page stands. Through the whole-beat repair call it came back as free
+    # prose (measured 2026-10-15). A free beat keeps the repair call.
+    planned = entry.get("narration") == "planned" and bool(entry.get("slots"))
+    slots_now: dict = {}
     try:
-        text, attempt, messages = agent.repair_beat(
-            current["text"], complaint, entry.get("player_input", ""),
-            entry.get("scene_brief", ""), facts=entry.get("facts") or None,
-            intimate=bool(entry.get("intimate")), earlier=earlier,
-            note="the player marked it wrong")
+        if planned:
+            text, attempt, messages, slots_now = agent.remake_planned(
+                current["text"], entry, picked, note, earlier=earlier,
+                now=current.get("slots"))
+        else:
+            text, attempt, messages = agent.repair_beat(
+                current["text"], complaint, entry.get("player_input", ""),
+                entry.get("scene_brief", ""), facts=entry.get("facts") or None,
+                intimate=bool(entry.get("intimate")), earlier=earlier,
+                note="the player marked it wrong")
     except Exception as exc:
         # Kept: the player DID say the beat is wrong, whatever the model then did.
         rec.setdefault("failed_remakes", []).append(
@@ -547,7 +558,9 @@ def remake(c, i: int, sentences=None, note: str = "", *, agent=None) -> dict:
              if s in narration_mod._sentences(text)]
     said = _kept_said(list(agent.last_said or []) + list(current.get("said") or []), text)
     version = {"text": text, "by": "remake",
-               **({"added": added} if added else {}), **({"said": said} if said else {})}
+               **({"added": added} if added else {}), **({"said": said} if said else {}),
+               # Which slot wrote what, after this remake, for the next one.
+               **({"slots": slots_now} if slots_now else {})}
     fix["versions"].append(version)
     fix["on"] = len(fix["versions"]) - 1
     rec["versions"].append({
@@ -556,8 +569,10 @@ def remake(c, i: int, sentences=None, note: str = "", *, agent=None) -> dict:
         "model": attempt.model, "at": _now(), "seconds": round(attempt.seconds, 1),
         "raw": attempt.raw, "page_notes": attempt.note,
         # The remake call's own prompt: a remake the player rejects is a training
-        # example for the repair call as well as the narrator.
+        # example for the repair call as well as the narrator. For a planned beat, the
+        # slot calls as made: [{key, messages, reply, model}, ...].
         "repair_messages": messages,
+        **({"narration": "planned"} if planned else {}),
         "flagged_sentences": [], "note": "", "verdict": None})
     rec["outcome"] = "open"
     _apply(c, i, version)

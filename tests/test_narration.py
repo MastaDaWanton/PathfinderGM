@@ -1614,13 +1614,17 @@ def test_pronouns_are_presence():
     and told the player they were still waiting for somebody in their arms."""
     from gm.narration import keep_the_thread
 
-    thread = {"subject": "the woman", "doing": "waiting for"}
+    from types import SimpleNamespace
+
+    thread = {"subject": "the woman", "doing": "waiting for", "ref": "c1"}
+    actors = {"c1": SimpleNamespace(name="woman", is_pc=False, hp=8,
+                                    has_state=lambda tag: False)}
     beat = "Her eyes close, and she leans into the contact. What do you do?"
-    out, anchored = keep_the_thread(beat, thread)
+    out, anchored = keep_the_thread(beat, thread, actors=actors)
     assert out == beat and not anchored
 
     gone = "The market is loud and the stalls are busy. What do you do?"
-    out, anchored = keep_the_thread(gone, thread)
+    out, anchored = keep_the_thread(gone, thread, actors=actors)
     assert anchored == "the woman"
 
 

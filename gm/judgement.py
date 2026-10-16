@@ -6984,13 +6984,30 @@ def thread_brief(scene, where: str = "") -> str:
     t = getattr(scene, "thread", None) or {}
     if not t.get("subject"):
         return ""
+    who = thread_name(scene)
     where = str(where or "").strip()
     placed = (f" You are ALREADY at {where}; nobody arrives at, enters or heads "
               f"toward {where} — they are there now." if where else "")
     return (f"STANDING THREAD (fact, not suggestion): the player is currently "
-            f"{t.get('doing', 'engaged with')} {t['subject']}.{placed} Keep them "
+            f"{t.get('doing', 'engaged with')} {who}.{placed} Keep them "
             f"and the present surroundings in the scene; do not change location, "
-            f"and do not drop or replace {t['subject']} unless the player does.")
+            f"and do not drop or replace {who} unless the player does.")
+
+
+def thread_name(scene) -> str:
+    """Who the standing thread is with, as the prompts print it: the bound person's own
+    engine name when the thread has a `ref` in the scene, else the subject phrase (a
+    role nobody holds yet — "the two guards" before they are on the board). The page's
+    anchor uses the first only (`narration.keep_the_thread`). Measured 2026-10-16: the
+    subject phrase, cut from the player's words by patterns, read "their name and" and
+    "about the road out of the city and", and both briefs printed it as a fact."""
+    t = getattr(scene, "thread", None) or {}
+    who = (getattr(scene, "actors", {}) or {}).get(t.get("ref")) if t.get("ref") else None
+    if who is not None and str(getattr(who, "name", "") or "").strip():
+        from . import narration as _narration
+
+        return _narration.definite(" ".join(str(who.name).split()))
+    return str(t.get("subject") or "")
 
 
 # Distinct from `_DEPARTS` far above, which belongs to inject_travel and carries

@@ -4412,8 +4412,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             added += more_added
         if text:
             before = text
+            # Named by the engine: only a bound person in the scene is anchored, by
+            # their own name (`keep_the_thread`, 2026-10-16).
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread,
-                                                           said=c.scene.said)
+                                                           said=c.scene.said,
+                                                           actors=c.scene.actors)
             if anchored:
                 repairs.append(f"the thread held: re-tethered {anchored!r}")
                 added += narration_mod.added_sentences(before, text)

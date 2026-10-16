@@ -3118,12 +3118,22 @@ class GMAgent:
         rendering of it that cannot be wrong about what they did."""
         deeds = [str(d.get("span") or d.get("object") or d.get("act")) for d in unshown]
         before = any(d.get("before_move") for d in unshown)
-        moved_first = not before and all(d.get("after_move") for d in unshown)
+        # On a turn the engine moved the party, a deed the reading does not place BEFORE
+        # the move happened where they arrived: the order is the engine's (the travel
+        # resolved) and the reading's (`before_move`), never the page's words. Measured
+        # 2026-10-16 on the planned town bench, in both narrators' tails: "I find an inn
+        # and ask for a room" came back "You approach the counter and ask for a room. You
+        # travel for half an hour…" — the deed put at the start, before the walk to the
+        # inn, because the reading had not marked it `after_move` (2 of 2 inn beats).
+        moved_first = not before and all(d.get("after_move") or d.get("moved")
+                                         for d in unshown)
         harmless = any(d.get("act") == "attack" for d in unshown)
         # Where it happens: the scene the player last read, which on a move turn is the
         # place they LEFT — the prose call is shown none of it on an arrival (`stood = []`
-        # in `call_prose_messages`), which is half of why the deeds were skipped.
-        where = (earlier or [])[-1] if earlier else str(brief or "")[:1400]
+        # in `call_prose_messages`), which is half of why the deeds were skipped. A deed
+        # done after arriving happens where the brief is: the place they reached.
+        where = (str(brief or "")[:1400] if moved_first or not earlier
+                 else (earlier or [])[-1])
         scene = self.engine.scene
         lookup = " ".join([where, text, player_input, " ".join(facts or [])])
         people = [str(a.name) for a in scene.actors.values()
@@ -3343,9 +3353,17 @@ class GMAgent:
                 last_beat=tagged[-1][-900:] if tagged else "",
                 last_plain=plain[-1][-900:] if plain else "",
                 since=since, scene_now=scene_now,
-                pull=str((pull or {}).get("text") or ""),
+                # The open matter's own fact, never `text`: that is the free narrator's
+                # rendering, whose head is an instruction (gm/planned.py, rough edge 3).
+                # A pull that yielded asks nothing of the beat.
+                pull=("" if not pull or pull.get("yielded") else
+                      str(pull.get("title") or "")
+                      + (f" — {pull['fact']}" if pull.get("fact") else "")),
                 claim=prompts.false_claim_block(claim) if claim else "",
-                lift=self._lift, check=_check)
+                lift=self._lift, check=_check,
+                # The interpreter's reading of the line (`views` sets it on the agent),
+                # for the slot that must not walk a player the engine did not move.
+                reading=getattr(self, "reading", None))
         except client.ModelStalled:
             raise
         except Exception as exc:  # noqa: BLE001 — any failure hands the beat to free
@@ -3366,9 +3384,12 @@ class GMAgent:
         # The input that wrote this beat, for "That's wrong" (play/corrections.py): the
         # plan as one prompt, and every slot call exactly as it was sent.
         self.last_prose_messages = beat.messages
-        self.last_prose_slots = [{"key": c["key"], "messages": c["messages"],
-                                  "reply": c["raw"], "note": c["note"]}
-                                 for c in beat.calls]
+        # One row a slot, the call whose answer stood and the text it put on the page: a
+        # remake asks exactly that call again (`planned.remake`, rough edge 5).
+        self.last_prose_slots = [
+            {k: s[k] for k in ("key", "messages", "reply", "wrote", "max", "speaker",
+                               "speaker_name", "dropped") if k in s}
+            for s in beat.slots]
         self.last_prose_model = beat.model
         self.last_suggestions = list(beat.suggestions)
         attempts = [Attempt("plan-slot", c["seconds"], c["model"], c["raw"],
@@ -3378,6 +3399,31 @@ class GMAgent:
         return {"text": beat.text, "notes": list(beat.notes), "attempts": attempts,
                 "messages": beat.messages, "schema": schema,
                 "shape": 'Reply with a JSON object: {"narration": "..."}.'}, "", []
+
+    def remake_planned(self, page: str, entry: dict, picked: list[str], note: str = "",
+                       earlier: list[str] | None = None, now: dict | None = None
+                       ) -> tuple[str, Attempt, list[dict], dict]:
+        """"That's wrong" on a planned beat (rough edge 5): the slots that wrote what the
+        player picked are asked again, each its own kept call, and the rest of the page
+        stands. Returns (text, attempt, the slot calls, each slot's text now) — the first
+        three as `repair_beat` gives them, so the corrections log keeps the calls as the
+        remake's `repair_messages`. The page pass and the hand-back, as a free remake has."""
+        from . import planned
+
+        complaint = "The player marked this wrong." + (
+            f" What the player says is wrong: {note}" if str(note or "").strip() else "")
+        text, calls, seconds, slots_now = planned.remake(
+            page, entry, picked, complaint,
+            (self.prose_model, self.prose_host, self.prose_provider, self.prose_key),
+            lift=self._lift, now=now)
+        text, notes = self._page_pass(text, earlier)
+        text, _ = narration_mod.ensure_hand_back(text)
+        attempt = Attempt("polish", seconds, calls[-1]["model"] if calls else self.prose_model,
+                          "\n".join(c["reply"] for c in calls),
+                          note="the player marked it wrong — planned slots: "
+                               + ", ".join(c["key"] for c in calls)
+                               + (f" — page: {'; '.join(notes)}" if notes else ""))
+        return text, attempt, calls, slots_now
 
     def narrate_turn(self, outcomes: list, player_input: str, brief: str,
                      earlier: list[str] | None = None, *,

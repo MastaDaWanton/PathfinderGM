@@ -254,6 +254,46 @@ def test_the_readings_residue_is_not_owed_on_a_turn_that_stays_put():
     assert narration.owed_deeds(reading, line) == []
 
 
+INN_LINE = "I find an inn and ask for a room."
+INN_RAW = json.dumps({"question": False, "actions": [
+    {"span": "find an inn", "target": None, "object": "an inn", "place": None,
+     "time": None, "says": None, "act": "seek"},
+    {"span": "ask for a room", "target": None, "object": "a room", "place": None,
+     "time": None, "says": None, "act": "other"}], "claims": []})
+INN_READING = {"question": False, "actions": [{"act": "seek"}, {"act": "other"}],
+               "claims": [], "raw": INN_RAW}
+INN_BEAT = ("You pass through the gate and the busy market and reach the Driftwood Reach "
+            "after half an hour. The innkeeper looks up from the counter. What do you do?")
+INN_TRAVELLED = [SimpleNamespace(op="travel", status="resolved",
+                                 tell="You are at the Driftwood Reach now.")]
+
+
+def test_a_deed_done_at_the_destination_lands_after_the_arrival(room):
+    """Measured 2026-10-16 on the planned town bench, in the tail both narrators share:
+    "I find an inn and ask for a room" shipped as "You approach the counter and ask for a
+    room. You travel for half an hour…" — the deed before the walk to the inn, on 2 of 2
+    inn beats. The reading had not marked the deed `after_move` (its going was a `seek`),
+    so the placement fell to "at the start". Now the order is the engine's: on a turn the
+    travel resolved, a deed the reading does not place BEFORE the move lands where they
+    arrived, before the hand-back, written for the place they reached."""
+    gm, calls, reply = room
+    gm.reading = dict(INN_READING)
+    reply["passage"] = "You lean on the counter and ask the innkeeper for a room."
+    owed = narration.owed_deeds(INN_READING, INN_LINE, INN_TRAVELLED)
+    assert [(d["span"], d["before_move"], d["after_move"], d["moved"]) for d in owed] == \
+        [("ask for a room", False, False, True)]
+    out, repairs, _ = gm._groom(INN_BEAT, player_input=INN_LINE,
+                                brief="The Driftwood Reach, an inn off the market.",
+                                earlier=["The outskirts, the desert behind you."],
+                                facts=["You are at the Driftwood Reach now."],
+                                hand_back=True, claims=False, outcomes=list(INN_TRAVELLED))
+    assert out.index("reach the Driftwood Reach") < out.index("ask the innkeeper for a room")
+    assert out.rstrip().endswith("What do you do?")
+    # Written for where it happens: the place they reached, not the one they left.
+    assert "Driftwood Reach" in calls[-1][1]["content"]
+    assert "desert behind you" not in calls[-1][1]["content"]
+
+
 def test_a_question_to_the_game_owes_nothing():
     assert narration.owed_deeds({"question": True, "actions": [], "raw": ""},
                                 "is it still raining?") == []

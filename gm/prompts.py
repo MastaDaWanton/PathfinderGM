@@ -2008,8 +2008,9 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> st
         facts.append("WHAT WAS AGREED here (fact, still standing): " + "; ".join(agreed[-3:]))
     thread = getattr(scene, "thread", None) or {}
     if thread.get("subject"):
+        # The bound person's own name when there is one (`judgement.thread_name`).
         facts.append(f"the player is {thread.get('doing', 'engaged with')} "
-                     f"{thread['subject']}")
+                     f"{_judgement.thread_name(scene)}")
     out = []
     if facts:
         out.append("THE SCENE AS IT STANDS NOW (engine facts, this moment — the passage "
