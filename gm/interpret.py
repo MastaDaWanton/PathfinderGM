@@ -41,7 +41,7 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
-    "follow", "claim", "other",
+    "follow", "request", "claim", "other",
 )
 # `exert` since 2026-10-16. The owner: "my wife was playing and a man needed help with his
 # cart. When she helped him the game narrated that i lifted his cart but never gave a
@@ -52,6 +52,25 @@ ACTS = (
 # strength is 1e's Strength check (CRB p.16), and helping somebody with theirs is Aid
 # Another (CRB p.86); `exert` owes that check, built whole (`acts_to_ops._exert`). Its
 # `target` is whoever the player helps; a door forced is still `break_in`.
+# `request` since 2026-10-16, from a real player's game (0.2.19): "…then I ask for fair
+# compensation for helping the carter" was read `talk`, which owes a `say`, so nothing was
+# rolled — and the free narrator answered the request itself, with a coin the engine never
+# gave. Asking somebody to GIVE something or DO something for you is Diplomacy's Make
+# Request (CRB p.93), a deed with its own roll, as looking for tracks is a Survival check
+# and not a search (`track`, above): the fix is the enum, not a word list. What is asked
+# for is a closed choice of its own (`REQUESTS`), never read out of the words in code.
+# Probed on gemma-4-12B before the change: 0 of 8 lines asking for pay, a reward, a favour
+# or help came back as anything but `talk`.
+#
+# Why an act and not a slot on `talk`: a slot on `talk` would change the shape of every
+# conversational line the reader writes (the 2026-09-27 slot measurement: a slot offered
+# is a slot filled), and the act→op table keys its rows on the act. The `offer` act
+# withdrawn on 2026-10-03 (below) split one deed by how far it was done; this splits two
+# deeds — a question and a request — that the book rolls differently.
+
+# What a `request` asks for: payment (pay, a reward, wages, compensation, money) or a
+# favour (help, aid, a service). `rules/requests.KINDS` is the engine's copy of this list.
+REQUESTS = ("payment", "favour")
 # `rise` and `track` since 2026-10-09, both from one live run (gemma-4-12B, Pangrella):
 #
 # * "I break camp and head back to town" was read `rest, go` — the vocabulary had a word
@@ -143,6 +162,9 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "track": ("target", "object", "place"), "rise": (),
     "seek": ("target", "place", "object"), "talk": ("target", "says"),
     "insult": ("target", "says"),
+    # Who is asked, and the words for what is asked of them; `asks_for` (`REQUESTS`) is
+    # the closed choice the engine reads, written after them (`per_act_schema`).
+    "request": ("target", "object"),
     "buy": ("object", "target", "place"), "sell": ("object", "target"),
     "drop": ("object", "place"),
     # A take's `target` is who or what it comes OUT of — a person, or a container: "the
@@ -175,7 +197,12 @@ look      look, watch, listen, read, examine
 search    look for a THING or a PLACE (water, a way in, somewhere to sleep)
 track     look for tracks, a trail or footprints; read the ground for who passed
 seek      look for, ask around for, wave down, head for or turn to a PERSON
-talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody
+talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody;
+          asking a question, for directions or for advice is talk
+request   ask somebody to pay you for your work, reward you, or do you a favour or help
+          for nothing in return; `asks_for` is payment (money owed or given to you) or
+          favour (anything else). Buying, ordering, taking a room and paying or bribing
+          somebody are never a request
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
 buy       buy, order, shop for, pay for goods, take goods and pay the seller for them;
@@ -239,6 +266,38 @@ _DEMOS = [
     ("I ask him his name.",
      {"question": False, "claims": [], "actions": [
          {"span": "ask him his name", "target": "him", "says": "his name", "act": "talk"}]}),
+    # A request (2026-10-16): asked to give or do something, beside a question, which
+    # stays talk. None of these is a probe line (the probe's 14 are kept apart).
+    ("I ask the netmaker which inn is cheapest and ask to be paid for mending her nets.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ask the netmaker which inn is cheapest", "target": "the netmaker",
+          "says": "which inn is cheapest", "act": "talk"},
+         {"span": "ask to be paid for mending her nets",
+          "object": "to be paid for mending her nets", "asks_for": "payment",
+          "act": "request"}]}),
+    ("I ask the boatwright for my wages.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ask the boatwright for my wages", "target": "the boatwright",
+          "object": "my wages", "asks_for": "payment", "act": "request"}]}),
+    ("I ask the gatekeeper to hold the gate open for me.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ask the gatekeeper to hold the gate open for me",
+          "target": "the gatekeeper", "object": "to hold the gate open for me",
+          "asks_for": "favour", "act": "request"}]}),
+    # …and what is NOT a request, because the first cut took them: on the labelled set
+    # "I order an ale" and "I pay for a room at the inn" came back `request` (they are
+    # buy and rest), and "I try to bribe the gatekeeper with a silver coin" too (a give).
+    # Coin going OUT is never a request. Neither line is in the labelled set.
+    ("I order a mug of cider.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "order a mug of cider", "object": "a mug of cider", "act": "buy"}]}),
+    # One action, no purpose clause: with "…to look the other way" written as a second,
+    # `other` action, the bench's single deeds grew a trailing `other` ("I steal a loaf
+    # while the baker's back is turned" -> steal, other; 5 lines of 302).
+    ("I slip the clerk a silver piece.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "slip the clerk a silver piece", "target": "the clerk",
+          "object": "a silver piece", "act": "give"}]}),
     ("I smash the tavern door and everyone inside flees.",
      {"question": False, "claims": ["everyone inside flees"], "actions": [
          {"span": "smash the tavern door", "object": "the tavern door", "act": "break_in"}]}),
@@ -593,6 +652,10 @@ def per_act_schema() -> dict:
                  "commit": {"type": "string", "enum": list(COMMITS)},
                  "act": {"const": act},
                  **{s: slot for s in ACT_SLOTS.get(act, ())},
+                 # What a request asks for, a closed enum the sampler holds, written after
+                 # the words for it (the slots before the label, as everywhere here).
+                 **({"asks_for": {"type": "string", "enum": list(REQUESTS)}}
+                    if act == "request" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -622,7 +685,9 @@ def _demo_reply(frame: dict) -> str:
                          **{s: a.get(s) for s in SLOTS}, **means, "act": a["act"]})
             continue
         acts.append({"span": a.get("span", ""), "commit": commit, "act": a["act"],
-                     **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())}, **means})
+                     **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())},
+                     **({"asks_for": a.get("asks_for") or REQUESTS[1]}
+                        if a["act"] == "request" else {}), **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -708,6 +773,18 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             kept[s] = v
             used.add(low)
         _speech_is_not_a_target(kept, dropped)
+        if kept["act"] == "request":
+            # What is asked for is the enum's, never words: outside it (a hosted provider
+            # does not enforce the schema, or a reply from the flat shape) the asking is
+            # only talk, and the engine rolls nothing for it.
+            asks = str(a.get("asks_for") or "").strip().lower()
+            if asks in REQUESTS:
+                kept["asks_for"] = asks
+            else:
+                dropped.append(f"request.asks_for={a.get('asks_for')!r}")
+                kept["act"] = "talk"
+                if kept.get("object"):
+                    kept["says"] = kept.pop("object")
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is
@@ -1446,8 +1523,9 @@ def _going(frame, scene, places, location) -> str:
 # no row here is not judged (the reading has no view on it).
 _OP_NEEDS = {
     "travel": {"go", "leave", "journey", "search", "seek", "call_on"},
-    "journey": {"journey"}, "introduce": {"seek", "talk", "call_on"},
-    "say": {"talk", "insult"}, "provoke": {"insult"}, "give": {"give", "take", "drop"},
+    "journey": {"journey"}, "introduce": {"seek", "talk", "call_on", "request"},
+    "say": {"talk", "insult", "request"}, "provoke": {"insult"},
+    "give": {"give", "take", "drop"},
     "sell": {"sell"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
@@ -1549,7 +1627,7 @@ def brief_lines(frame: dict | None) -> str:
                 "something the character does. Answer it; the character does nothing.")
     rows = []
     for n, a in enumerate(frame.get("actions") or [], 1):
-        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim") if a.get(s))
+        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim", "asks_for") if a.get(s))
         # How far it is done, said: a plan or a question is context for the plan, never
         # an op of its own (`COMMITS`).
         how = {"tried": " (TRIED now: the outcome is the dice's or the other person's)",
@@ -1571,8 +1649,8 @@ _BARE_PRONOUN = {"him", "her", "them", "he", "she", "they", "it", "his", "their"
                  "me", "you", "us"}
 
 
-def target_of(frame: dict | None, acts=("seek", "call_on", "talk", "give", "buy",
-                                         "follow")) -> str:
+def target_of(frame: dict | None, acts=("seek", "call_on", "talk", "request", "give",
+                                         "buy", "follow")) -> str:
     """The person the sentence goes looking for or addresses, without its article —
     the reading's answer to `judgement.person_sought`. "" when it names nobody."""
     for a in (frame or {}).get("actions") or []:

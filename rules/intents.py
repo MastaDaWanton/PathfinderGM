@@ -282,7 +282,9 @@ def _bounded(value, low: int, high: int, index: int, what: str) -> int:
 
 # op -> (required params, optional params, default visibility)
 OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
-    "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid"), "player"),
+    # `request`: a Diplomacy request (CRB p.93, `rules/requests.py`), written only by the
+    # act→op table from the reader's `request` act (CODE_ONLY_PARAMS).
+    "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request"), "player"),
     "save": (("save", "dc"), ("on_success", "on_failure"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
     # this to `hidden` meant the engine silently rolled the player's attacks for them,
@@ -711,7 +713,7 @@ PARAM_ALIASES = {
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
-CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending"})
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request"})
 
 ENGINE_OWNED_PARAMS = {
     "damage", "damage_type", "damage_roll", "damage_dice", "dice", "die",
@@ -1963,6 +1965,11 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
         if op in ("loot", "trade", "buy", "sell", "give", "pay"):
             allow("purse")
             allow("items")
+        # A request granted with pay (`Engine._pay_for_work`): a check whose record moved
+        # coin into a purse backs the prose that counts it out.
+        if op == "check" and any(isinstance(e, dict) and e.get("kind") == "give"
+                                 and e.get("item") == "coin" for e in effects):
+            allow("purse")
         # Every gathering door brings things home; prospect was missing from this list,
         # so a dug haul's prose could be scrubbed as an invented item.
         if op in ("forage", "prospect", "gather", "craft", "take"):

@@ -225,12 +225,18 @@ def test_the_coins_are_money_and_the_payment_is_not_counted_twice():
     assert note is None, "acknowledging the payment again is not a memory"
 
 
-def test_coins_nobody_counted_out_are_one_copper_once():
+def test_coins_nobody_counted_out_are_no_coin_at_all():
+    """Until 2026-10-16 coins nobody counted out were "one copper, once". On a real
+    player's game that copper was the narrator's invention made real — "I take the coin"
+    after prose that had a carter hand one over (tests/test_requests_and_rewards.py). A
+    number nobody counted is no money: nothing changes hands, and the take says so."""
     scene = _scene()
     pc = scene.pc()
-    _run(scene, [{"op": "give", "params": {"item": "coins", "to": "pc"}}])
-    _run(scene, [{"op": "give", "params": {"item": "the coins", "to": "pc"}}])
-    assert pc.purse == {"cp": 1} and not pc.goods, "the number is the engine's, once"
+    before = dict(pc.purse)
+    out = _run(scene, [{"op": "give", "params": {"item": "coins", "to": "pc"}}])
+    out += _run(scene, [{"op": "give", "params": {"item": "the coins", "to": "pc"}}])
+    assert pc.purse == before and not pc.goods, "the number is the engine's"
+    assert all(o.status == "refused" for o in out)
 
 
 def test_paying_in_gp_works_once_the_purse_has_it():

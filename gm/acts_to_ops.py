@@ -399,9 +399,12 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
     pc = scene.pc() if hasattr(scene, "pc") else None
     coming: list[str] = []
     gone: list[str] = []
+    bought = sold_not_asked(frame, scene)
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
         row = Row(index=i, act=act, commit=str(a.get("commit") or "done"))
+        if i in bought:
+            row.note = bought[i]
         if not interpret.acting(a):
             # Intended or asked about: context for the plan (`interpret.brief_lines` says
             # so), never an op. Round 1's replay sold the crate a turn early on "I take
@@ -469,6 +472,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                                     "because": "the player looks for tracks"})
             if act == "exert" and pc is not None:
                 _exert(row, frame, i, scene, pc)
+            if act == "request" and pc is not None:
+                _request(row, a, scene, pc)
         rows.append(row)
     return rows
 
@@ -547,6 +552,85 @@ def _band_of(r) -> str:
     except (IntentError, TypeError, ValueError):
         return ""
     return str(d.get("band") or dc_mod._nearest_band(int(d["value"])))
+
+
+def sold_not_asked(frame: dict | None, scene) -> dict[int, str]:
+    """A request made of somebody who sells, for something they sell, is a purchase: the
+    reading's action is turned into the `buy` (or, for a bed at an inn, the `rest`) it is,
+    IN PLACE, so every later reader of this turn's reading — the counter's screen
+    (`judgement.purchase_sought` reads `interpret.reading_of`, the same dict), the brief,
+    this table — sees the purchase and nothing rolls Diplomacy for the goods.
+
+    The coordinator's review, 2026-10-16: "ask for a room", "ask for a mug of ale", "ask
+    the smith for a sword" came back `request` from the reader, which would have rolled a
+    favour and let a good roll take the goods for nothing. Decided in code from what the
+    engine holds (`rules/requests.sells` / `offered`: who keeps a counter or lets beds,
+    and what is priced), never from the words: "ask him for fair pay" and "ask the priest
+    to bless my blade" name nothing priced, or nobody who sells, and stay requests.
+    Returns {action index: note} for the turn log."""
+    from rules import requests as requests_mod
+
+    out: dict[int, str] = {}
+    if not frame or scene is None:
+        return out
+    for i, a in enumerate(frame.get("actions") or []):
+        if not isinstance(a, dict) or a.get("act") != "request":
+            continue
+        words = " ".join(str(a.get("target") or "").split())
+        who = person(scene, words) if words else addressed(scene)
+        actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
+        if actor is None or actor.is_pc:
+            continue
+        got = requests_mod.offered(scene, actor, str(a.get("object") or ""))
+        if got is None:
+            continue
+        a.pop("asks_for", None)
+        a["was"] = "request"
+        if got[0] == "lodging":
+            # Taking a room is the reading's `rest` (its gloss: "take a room"; the labelled
+            # set's "I pay for a room at the inn"). What the bed costs is the rest door's
+            # (not charged yet, a known gap, out of this change's scope).
+            a["act"] = "rest"
+            a.pop("object", None)
+            a.pop("target", None)
+            out[i] = f"asked {actor.name} for a bed: taking a room, not a favour"
+        else:
+            a["act"] = "buy"
+            out[i] = (f"asked {actor.name} for {a.get('object')}: a purchase of "
+                      f"{getattr(got[1], 'name', '')}, not a favour")
+    return out
+
+
+def _request(row: Row, a: dict, scene, pc) -> None:
+    """Asking somebody for something, built whole: the player's Diplomacy check against
+    the person asked, carrying what is asked for (`interpret.REQUESTS`), which the engine
+    resolves as Make Request (CRB p.93, `Engine._make_request`) — its DC off their
+    attitude, and what a granted request for payment pays its own (`rules/requests.py`).
+
+    Measured 2026-10-16 (a real player's game): "…then I ask for fair compensation for
+    helping the carter" was a `talk`, so a `say`, and nothing was rolled. Who is asked is
+    the engine's finder (`person`) on the words, else the one the player is dealing with
+    (`addressed`) — "ask for fair compensation" names nobody. Nobody here to ask is said,
+    never invented."""
+    kind = str(a.get("asks_for") or "")
+    words = " ".join(str(a.get("target") or "").split())
+    # Somebody named who is not here is not quietly swapped for whoever is.
+    who = person(scene, words) if words else addressed(scene)
+    actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
+    if actor is None or actor.is_pc:
+        row.missing = (f"there is nobody here who is {words}" if words
+                       else "there is nobody here to ask")
+        return
+    # The popup shows `because`: "asks tanner's apprentice" read wrong live; a descriptor
+    # name takes its article.
+    name = str(actor.name)
+    if name[:1].islower() and not name.lower().startswith(("the ", "a ", "an ")):
+        name = f"the {name}"
+    row.intents.append({"op": "check", "actor": pc.ref, "target": who,
+                        "params": {"skill": "diplomacy", "request": kind},
+                        "because": f"the player asks {name} for "
+                                   + ("payment" if kind == "payment" else "a favour")})
+    row.note = f"a request of {name}: {kind}"
 
 
 def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
@@ -1094,10 +1178,12 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         if op == "check" and checks and str(
                 ((r or {}).get("params") or {}).get("skill") or "").lower() in checks:
-            # The table built this check whole (`first_aid`): the plan's own copy of it,
-            # usually without the patient, would roll a second Heal against nobody.
+            # The table built this check whole (`first_aid`, `_request`): the plan's own
+            # copy of it, usually without the patient, would roll a second Heal against
+            # nobody — or a second Diplomacy, an Influence Attitude beside the request.
             if notes is not None:
-                notes.append("the plan's check replaced by the reading's first aid")
+                notes.append(f"the plan's {((r or {}).get('params') or {}).get('skill')} "
+                             f"check replaced by the reading's own")
             continue
         if op not in ("give", "sell"):
             out.append(r)

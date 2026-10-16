@@ -71,9 +71,12 @@ def test_a_thousand_gold_is_a_thousand_gold_in_the_purse():
     scene = _scene()
     engine = Engine(scene, Dice(seed=1))
     before = dict(scene.pc().purse or {})
+    # Stamped as the cheat door stamps it (`GMAgent` and `play/views` validate a cheat
+    # with origin `author:cheat`): since 2026-10-16 coin from nobody is refused unless it
+    # is the author's own word (tests/test_requests_and_rewards.py).
     engine.run(engine.validate([
         {"op": "give", "because": "the author says so",
-         "params": {"item": "gold", "count": 1000, "to": "pc"}}]))
+         "params": {"item": "gold", "count": 1000, "to": "pc"}}], origin="author:cheat"))
     after = scene.pc().purse or {}
     assert after != before, f"the purse did not move: {before} -> {after}"
     assert sum(after.values()) > sum(before.values())
@@ -293,7 +296,8 @@ def test_the_number_in_the_wish_is_the_number():
     engine = Engine(scene, Dice(seed=1))
     engine.run(judgement.keep_the_authors_numbers(
         engine.validate([{"op": "give", "because": "the author says so",
-                          "params": {"item": "gold", "count": 1000, "to": "pc"}}]),
+                          "params": {"item": "gold", "count": 1000, "to": "pc"}}],
+                        origin="author:cheat"),
         "I have 1000 gold"))
     assert (scene.pc().purse or {}).get("gp") == 1000, scene.pc().purse
 

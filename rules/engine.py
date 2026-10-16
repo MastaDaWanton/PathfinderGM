@@ -5545,6 +5545,12 @@ class Engine:
                 )
 
         level = actor.level if actor.is_pc else 1
+        # Asking somebody for something is Diplomacy's other use, Make Request (CRB p.93,
+        # `rules/requests.py`): its own DC, its own refusals, and what success gives is the
+        # engine's. Before the sway below, which is Influence Attitude.
+        asked = self._request_subject(intent, skill)
+        if asked is not None:
+            return self._make_request(intent, actor, asked, mods, partial)
         # Talking somebody round is a rule with a table behind it, so the DC is the
         # engine's and never the plan's (`rules/attitude.py`). A `check` naming a subject
         # with `target` and a skill that moves the track is the ordinary way to change a
@@ -5772,6 +5778,120 @@ class Engine:
                       "bonus": AID_ANOTHER_BONUS if made else 0, "task_dc": task.final,
                       "done": done}],
             tell=tell, because=intent.because)
+
+    # --- asking somebody for something ----------------------------------------------------
+
+    def _request_subject(self, intent: Intent, skill: str):
+        """The person a Diplomacy request is made of, or None when this check is not one:
+        a `request` param in the closed list (`requests.KINDS`), Diplomacy, unopposed,
+        aimed at somebody here who is not the asker."""
+        from . import requests as requests_mod
+
+        if skill != "diplomacy" or intent.params.get("opposed_by") \
+                or not requests_mod.kind_of(intent.params.get("request")):
+            return None
+        refs = [r for r in intent.targets() if r and r != intent.actor]
+        return self.scene.actors.get(refs[0]) if refs else None
+
+    def _make_request(self, intent: Intent, actor, target, mods, partial: dict) -> Outcome:
+        """Diplomacy's Make Request (CRB p.93), the player's own roll against the book's DC.
+
+        Measured 2026-10-16 (a real player's game, 0.2.19): "I ask for fair compensation
+        for helping the carter" resolved as a `say`, nothing was rolled, and the narrator
+        answered it — the carter's coin came out of the prose, and the next turn's "I take
+        the coin" minted it. Here the request is a check, its DC the attitude's base plus
+        Charisma and the request's row (`requests.dc`), refused unrolled where the book
+        refuses it (`requests.refusal`), and what a granted request for payment gives moves
+        through the purse the person really carries (`_pay_for_work`). A refusal moves
+        nothing, and the tell says so in plain words."""
+        from . import requests as requests_mod
+
+        kind = requests_mod.kind_of(intent.params.get("request"))
+        now = int(self.scene.clock_minutes)
+        what = "payment for the work" if kind == requests_mod.PAYMENT else "a favour"
+        asks = f"{actor.name} asks {target.name} for {what}."
+        if not self.scene.conscious(target.ref):
+            return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
+                           tell=f"{asks} {target.name} cannot answer. Nothing changes hands.",
+                           because=intent.because)
+        why = requests_mod.refusal(target, kind, now)
+        if why:
+            return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
+                           tell=f"{asks} {why}", because=intent.because)
+        value, basis = requests_mod.dc(target, kind, now)
+        resolved_dc = dc_mod.ResolvedDC(value=value, band=None, basis=basis)
+        roll = self._roll_or_suspend(intent, actor, mods, label="Diplomacy check",
+                                     dc=resolved_dc.final, partial=partial)
+        margin = roll.total - resolved_dc.final
+        granted = margin >= 0
+        effects: list[dict] = []
+        paid = 0
+        if granted:
+            tell = (f"{asks} {actor.name} makes the diplomacy check by {margin}."
+                    + self.reward_check(actor, "diplomacy", resolved_dc.final))
+            if kind == requests_mod.PAYMENT:
+                line, effects, paid = self._pay_for_work(actor, target)
+                tell = f"{tell} {line}"
+            else:
+                tell = (f"{tell} {target.name} agrees to do {actor.name} the favour. "
+                        f"Nothing changes hands.")
+        else:
+            tell = (f"{asks} {actor.name} misses the diplomacy check by {-margin}. "
+                    f"{target.name} says no"
+                    + (" and pays nothing" if kind == requests_mod.PAYMENT else "")
+                    + ": nothing changes hands.")
+        requests_mod.remember(target, now, kind=kind, granted=granted, paid_cp=paid)
+        effects.append({"kind": "request", "ref": target.ref, "request": kind,
+                        "granted": granted})
+        # A request is said to somebody: they are in conversation with the player now,
+        # as a `say` would have made them.
+        talk = self.join_talk(target)
+        if talk:
+            tell = f"{tell} {talk}"
+        return Outcome(intent_id=intent.id, op="check", rolls=[roll],
+                       dc=resolved_dc.as_dict(), verdict="success" if granted else "failure",
+                       margin=margin, effects=effects, tell=tell, because=intent.because)
+
+    def _coins_here(self):
+        """This town's coin, as the page names the purse (`play/views._state`). With no
+        place the world's own coin answered, and the first live run (2026-10-16) told a
+        payment of "1 Saltmakers' silver piece" into a purse the sheet showed as "1 Winged
+        silver piece" — two names for one coin, in the paying tell and in the "already in
+        your purse" tell after it."""
+        world = getattr(self, "world", None)
+        here = world.get(self.scene.location_id) if world is not None else None
+        return goods.coinage(world, here)
+
+    def _pay_for_work(self, taker, payer) -> tuple[str, list[dict], int]:
+        """A granted request for payment: an untrained hireling's day wage (CRB p.159,
+        `requests.wage_cp`), out of the purse the payer really carries — their kit's
+        wealth made real the first time it is looked at (`bestiary.collapse_kit`), as a
+        theft or a body's loot makes it. Less than the wage on them pays what they have;
+        nothing pays nothing. Returns (the tell's words, the effect records, copper paid).
+
+        Remembered as this hour's payment (`_mark_payment`), so "I take the coin" after
+        the narration shows it counted out is THIS money, already in the purse, and is
+        never counted again (`_give_money`)."""
+        from . import requests as requests_mod
+        from .bestiary import collapse_kit
+
+        collapse_kit(payer)
+        coins = self._coins_here()
+        owed = requests_mod.wage_cp()
+        cp = min(owed, goods.in_copper(payer.purse))
+        if cp <= 0:
+            return (f"{payer.name} agrees, but carries no coin to pay with: nothing "
+                    f"changes hands.", [], 0)
+        payer.purse, _enough = goods.spend(payer.purse, cp)
+        taker.purse = goods.credit(taker.purse, cp)
+        self._mark_payment(taker, payer.ref, cp)
+        amount = goods.purse_line(goods.coins_for(cp), coins)
+        line = (f"{payer.name} pays {taker.name} {amount} for the work, "
+                + (f"{requests_mod.WAGE_WHAT}." if cp >= owed else
+                   f"all the coin they carry, short of {requests_mod.WAGE_WHAT}."))
+        return line, [{"ref": taker.ref, "kind": "give", "item": "coin", "count": cp,
+                       "how": "paid", "from": payer.ref, "to": taker.ref,
+                       "purse": dict(taker.purse), "goods": dict(taker.goods)}], cp
 
     # --- talking somebody round ----------------------------------------------------------
 
@@ -19187,10 +19307,12 @@ class Engine:
         The amount is the records': the coin in a pouch or a pile (Circle's money object:
         picked up, it is the number again), or the payment the player was just made,
         which is already in the purse and is said to be. Nothing else is money. When no
-        record vouches for any coin at all, the engine counts the one coin it can — a
-        single copper piece — rather than a number a model wrote (law 3), and rather
-        than the goods line "coins" that this door exists to end."""
-        coins = goods.coinage(getattr(self, "world", None), None)
+        record vouches for any coin at all, nothing changes hands and the refusal says so
+        (since 2026-10-16; until then the engine counted one copper piece, and a coin the
+        narrator invented became real). Only the author's own word (`origin` `author:*`,
+        a cheat) still counts that one coin, rather than a number a model wrote (law 3)
+        and rather than the goods line "coins" that this door exists to end."""
+        coins = self._coins_here()
         if taker is None or (giver is not None and giver.is_pc and taker is not giver):
             who = giver if giver is not None else taker
             if who is None:
@@ -19234,6 +19356,24 @@ class Engine:
                 effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": 0,
                           "how": "already", "to": taker.ref, "purse": dict(taker.purse),
                           "goods": dict(taker.goods)}])
+        if not str(getattr(intent, "origin", "") or "").startswith("author:"):
+            # No record vouches for any coin: nobody counted it out, nothing lies here,
+            # no payment was made. Measured 2026-10-16 (a real player's game, 0.2.19): the
+            # free narrator had a carter hand over "a small, weathered coin" nobody paid,
+            # and "I take the coin and move toward the market" was planned `give item=coin
+            # to=pc` from nobody — this door then counted "a single copper piece, all
+            # anybody counted out" into the purse, and the world minted the prose's coin.
+            # Coin comes from a purse, a pile or a payment the engine made (a request
+            # granted, `Engine._make_request`); a word is not money (law 3). The author's
+            # own word (a cheat) still is.
+            if giver is not None and not giver.is_pc:
+                return self._refuse(
+                    intent, f"{giver.name} has counted out no coin for {taker.name}: "
+                            f"nothing changes hands. Ask them for payment, and they may "
+                            f"pay.")
+            return self._refuse(
+                intent, f"Nobody here is holding any coin out to {taker.name}, and none "
+                        f"lies here: nothing changes hands.")
         taker.purse = goods.credit(taker.purse, 1)
         # And remembered as this hour's coin, so "I count the coins… I pocket the coins…
         # I tip them into my purse" is one copper and not three.
@@ -19530,6 +19670,15 @@ class Engine:
                     del box[denom]
                 if not holding.coin_in(pile):
                     self.scene.props.remove(pile)
+            elif taker is not None and denom and not str(
+                    getattr(intent, "origin", "") or "").startswith("author:"):
+                # Coin is never the world's to hand out: "5 gp" taken from nobody, with no
+                # pile of it lying here, is a number nobody counted (law 3) — the same rule
+                # `_give_money` holds for coin with no amount (2026-10-16). The author's
+                # own word (a cheat) still makes it so.
+                return self._refuse(
+                    intent, f"Nobody here is holding {count} {denom} out to {taker.name}, "
+                            f"and none lies here: nothing changes hands.")
             # Unless it is lying right here with a record: then THAT thing is picked
             # up, and its owner and provenance come with it. "I pick up a chunk of
             # wood" after a sunder is the fragments of the challenger's club, his
