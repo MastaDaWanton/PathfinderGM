@@ -247,13 +247,6 @@ def _place(engine) -> str:
 
 # --- the plan --------------------------------------------------------------------------
 
-def _talk_only(outcomes) -> bool:
-    """Whether everything the engine decided this turn was talk (or nothing at all)."""
-    talk = _FAMILIES[0] | {"narrate_only"}
-    return all(getattr(o, "op", "") in talk for o in outcomes or []
-               if getattr(o, "tell", ""))
-
-
 def addressee(engine, outcomes) -> str:
     """Who answers the player this beat, decided in code (rough edge 2): the person the
     player's own `say` was put to — the engine wrote it into the effect — or else the one
@@ -304,10 +297,13 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
     # it restated the action — "your fist inches from the Korvu's face" before the move
     # that brought the fist there. A state is only worth a sentence when this turn's own
     # act does not move the scene: so never in a fight, never on an arrival, and never
-    # when the engine decided a deed of the body (a blow, a step, a take); on a talk turn
-    # or an idle one it says how things stand, as a state from THE SCENE NOW, with the
-    # last beat as reference only.
-    if last_beat and not fighting and not arriving(outcomes) and _talk_only(outcomes):
+    # when the engine decided anything at all this turn. It was kept on talk turns at
+    # first, and the 2026-10-16 talk bench gave the same sentence on 7 of 9 of them ("The
+    # tension of the theft remains palpable", "The lingering weight of the theft hangs in
+    # the air") — on a turn the engine decided, the act and the answer are the beat. On an
+    # idle turn it says how things stand, as a state from THE SCENE NOW, the last beat as
+    # reference only.
+    if last_beat and not fighting and not any(getattr(o, "tell", "") for o in outcomes or []):
         slots.append({
             "key": "still", "want": STILL_WANT,
             "say": "How things stand now between the people here, in one short sentence, "
@@ -380,9 +376,13 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
             who = ""
         speaker = next((p for p in people if p["ref"] == who), None)
         if speaker is not None:
+            # The manner the last beat already gave this speaker, not given again: on the
+            # 2026-10-16 talk bench one fishmonger said "dryly" on 9 of 9 beats.
+            said_as = narration_mod.definite(speaker["name"]) + " says "
+            used = [m for m in MANNERS if m and said_as + m in str(last_beat or "")]
             slots.append({
                 "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
-                "speaker_name": speaker["name"],
+                "speaker_name": speaker["name"], **({"not_manner": used} if used else {}),
                 "say": f'{speaker["name"]} answers the player, in their own voice, as '
                        "themselves (\"I\", never their own name or title), only from what "
                        "THE SCENE says they know; if THE SCENE does not say, they do not "
@@ -499,11 +499,12 @@ MANNERS = ("", "flatly", "quietly", "curtly", "warmly", "wearily", "gruffly", "s
            "slowly", "dryly", "carefully", "coldly", "kindly", "impatiently", "softly")
 
 
-def _reply_ask() -> str:
+def _reply_ask(s: dict | None = None) -> str:
+    allowed = [m for m in MANNERS if m not in ((s or {}).get("not_manner") or [])]
     return ('Reply with a JSON object: {"words": "...", "manner": "..."} — "words" being '
             'exactly what they say, in their own voice, without quote marks and without '
             'saying who says it; "manner" one word for how they say it, from: '
-            + ", ".join(f'"{m}"' for m in MANNERS) + ".")
+            + ", ".join(f'"{m}"' for m in allowed) + ".")
 
 
 def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str], *,
@@ -513,7 +514,7 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
     s = slots[i]
     size = (f" About {s['max']} characters at most: one or two sentences."
             if s.get("max") else "")
-    shape = (_reply_ask() if s["key"] == "reply"
+    shape = (_reply_ask(s) if s["key"] == "reply"
              else 'Reply with a JSON object: {"text": "..."}.')
     if suggest:
         shape = shape.replace('Reply with a JSON object: {', 'Reply with a JSON object: {'
@@ -529,12 +530,14 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
     return [plan[0], {"role": "user", "content": ask}]
 
 
-def slot_schema(max_chars: int, *, suggest: bool = False, reply: bool = False) -> dict:
+def slot_schema(max_chars: int, *, suggest: bool = False, reply: bool = False,
+                not_manner=()) -> dict:
     room = min(int(max_chars * GRAMMAR_ROOM) if max_chars else prompts.GRAMMAR_MAXLENGTH_CEILING,
                prompts.GRAMMAR_MAXLENGTH_CEILING)
     if reply:
         props: dict = {"words": {"type": "string", "maxLength": room},
-                       "manner": {"type": "string", "enum": list(MANNERS)}}
+                       "manner": {"type": "string",
+                                  "enum": [m for m in MANNERS if m not in not_manner]}}
         required = ["words", "manner"]
     else:
         props = {"text": {"type": "string", "maxLength": room}}
@@ -566,7 +569,8 @@ def compose_reply(slot: dict, words: str, manner: str) -> str:
     elif words[-1] not in ",!?…":
         words += ","
     manner = str(manner or "").strip().lower()
-    manner = manner if manner in MANNERS else ""
+    manner = manner if manner in MANNERS and manner not in (
+        slot.get("not_manner") or ()) else ""
     who = narration_mod.definite(str(slot.get("speaker_name") or ""))
     return (f"<say who={slot.get('speaker')} to=you>'{words}'</say> {who} says"
             + (f" {manner}" if manner else "") + ".")
@@ -782,7 +786,8 @@ def call_slot(s: dict, messages: list[dict], who: tuple, *, suggest: bool = Fals
                                         + 120),
                         provider=provider, api_key=key,
                         schema=slot_schema(s.get("max") or 0, suggest=suggest,
-                                           reply=s["key"] == "reply" and bool(s.get("speaker"))))
+                                           reply=s["key"] == "reply" and bool(s.get("speaker")),
+                                           not_manner=s.get("not_manner") or ()))
     return reply, reply.json()
 
 

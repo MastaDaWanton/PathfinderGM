@@ -173,7 +173,7 @@ def test_the_v2_slots_carry_the_players_line_on_the_first_tell_and_never_close()
     assert not any(k in ("close", "closing", "deed", "doing") for k in keys)
     talk = [x["key"] for x in planned.build_plan(engine, "I ask about the ore.",
                                                   [_asked(engine)], last_beat=LAST_BEAT)]
-    assert talk == ["still", "fact1", "reply"]
+    assert talk == ["fact1", "reply"]
 
 
 def test_a_doing_slot_only_when_the_engine_decided_nothing_and_a_reply_only_out_of_fights():
@@ -275,15 +275,14 @@ def test_each_slot_is_its_own_call_shown_the_plan_and_what_is_already_written(mo
     out = planned.write(engine, brief="BRIEF", player_input="I ask about the ore.",
                         outcomes=[_asked(engine)],
                         who=("stub-12b", "http://x", "ollama", ""), last_beat=LAST_BEAT)
-    assert [x["key"] for x in out.slots] == ["still", "fact1", "reply"]
-    assert len(calls) == 3
+    assert [x["key"] for x in out.slots] == ["fact1", "reply"]
+    assert len(calls) == 2
     plan_bytes = out.messages[1]["content"]
     for c in calls:
         assert c["messages"][0] == out.messages[0]
         assert c["messages"][1]["content"].startswith(plan_bytes)
     assert "WRITTEN SO FAR" not in calls[0]["messages"][1]["content"]
-    assert SLOT_TEXT["still"] in calls[1]["messages"][1]["content"]
-    assert SLOT_TEXT["fact1"] in calls[2]["messages"][1]["content"]
+    assert SLOT_TEXT["fact1"] in calls[1]["messages"][1]["content"]
     assert out.suggestions == ["Ask about the pits", "Leave the forge"], \
         "the last slot carries the chips, or the page keeps last beat's"
 
@@ -429,8 +428,11 @@ def test_the_still_slot_is_a_state_and_never_rides_a_body_act():
     s2, fight = _scene(fighting=True)
     assert "still" not in [x["key"] for x in planned.build_plan(
         fight, "I wait.", [], last_beat=LAST_BEAT)]
-    still = planned.build_plan(engine, "I ask about the ore.", [_asked(engine)],
-                               last_beat=LAST_BEAT)[0]
+    # Nor on a talk turn: on the 2026-10-16 talk bench it gave the same sentence on 7 of
+    # 9 talk beats ("The tension of the theft remains palpable").
+    assert "still" not in [x["key"] for x in planned.build_plan(
+        engine, "I ask about the ore.", [_asked(engine)], last_beat=LAST_BEAT)]
+    still = planned.build_plan(engine, "I wait.", [], last_beat=LAST_BEAT)[0]
     assert still["key"] == "still"
     assert "A state, not an event" in still["say"] and "THE SCENE NOW" in still["say"]
 
@@ -455,6 +457,14 @@ def test_who_answers_is_the_engines_and_code_writes_them_in():
     assert line == f"<say who={smith} to=you>'I keep order here,'</say> Jarek says flatly."
     assert planned.compose_reply(slot, "Go.", "the Korvu official says, gravelly") == \
         f"<say who={smith} to=you>'Go,'</say> Jarek says.", "outside the set: left off"
+    # Not the manner the last beat gave them: one fishmonger said "dryly" on 9 of 9 beats.
+    again = next(x for x in planned.build_plan(
+        engine, "I ask.", [_asked(engine)],
+        last_beat="'Fish,' Jarek says dryly. What do you do?") if x["key"] == "reply")
+    assert again["not_manner"] == ["dryly"]
+    assert "dryly" not in planned.slot_schema(240, reply=True,
+                                              not_manner=["dryly"])["properties"]["manner"]["enum"]
+    assert planned.compose_reply(again, "No.", "dryly").endswith("Jarek says.")
     assert planned.compose_reply(slot, "Who's asking?", "") == \
         f"<say who={smith} to=you>'Who's asking?'</say> Jarek says."
     descriptor = {"key": "reply", "speaker": "c9", "speaker_name": "master of the market"}
@@ -557,11 +567,11 @@ def test_the_beat_is_held_to_a_budget_by_priority_never_mid_sentence():
     assert [x["key"] for x in kept] == ["fact1", "fact2", "fact3"]
     assert set(dropped) == {"matter", "aside"}
     assert sum(x["max"] for x in kept) <= 660
-    talk, _ = planned.allocate(planned.build_plan(engine, "I ask.", [_asked(engine)],
-                                                  pull="The bounty", last_beat=LAST_BEAT),
-                               650)
-    assert [x["key"] for x in talk] == ["still", "fact1", "reply"], \
-        "the state before the matter when only one of them fits"
+    idle, dropped = planned.allocate(planned.build_plan(engine, "I wait.", [],
+                                                        pull="The bounty",
+                                                        last_beat=LAST_BEAT), 650)
+    assert [x["key"] for x in idle] == ["still", "doing", "matter"] and dropped == ["aside"], \
+        "the state and the matter before an aside when not all of them fit"
     long = "One sentence that runs on for a while. " * 6 + "The end."
     fitted = planned._fit(long, 120)
     assert len(fitted) <= 120 and fitted.endswith(".") and fitted in long
