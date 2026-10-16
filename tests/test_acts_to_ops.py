@@ -458,8 +458,11 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
         assert alt["properties"]["commit"]["enum"] == list(interpret.COMMITS)
         # And since 2026-10-05 the means and the power's name, last and the same in every
         # alternative, so they choose no act either (gm/means.py; tests/test_means_gate.py).
+        # And `asks_for` on a request alone (2026-10-16): the closed choice of what is
+        # asked for, which the engine reads (tests/test_requests_and_rewards.py).
         assert set(alt["properties"]) == {"span", "commit", "act", "power", "means",
-                                          *interpret.ACT_SLOTS[act]}
+                                          *interpret.ACT_SLOTS[act],
+                                          *(["asks_for"] if act == "request" else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 
