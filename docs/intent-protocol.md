@@ -174,9 +174,12 @@ enforceable (§5), which is why the split is here and not somewhere more conveni
 turn the page used to show it as two beats as well — the wind-up as one paragraph and the
 consequence as the next — and a player read one swing as two actions ("the npc took
 multiple turns", the owner's report of 2026-10-16, where the engine resolved exactly one
-attack a round). `play/views.py:_run_npc_turns` now writes the wind-up and the consequence
-onto the page as one passage; call 2 is already shown the wind-up ("You had already
-narrated: …") and continues from it. Prior art agrees: CircleMUD's `dam_message` sends one
+attack a round). `play/views.py:_run_npc_turns` now puts one passage on the page per
+creature turn, and a turn the engine told is written from its tells alone: the call-1
+wind-up, held to nothing on the creature's sheet, drew a crossbow the barkeep did not have
+on 4 of 6 free and 6 of 6 planned audit turns, and call 2, shown it, fired it
+(`_told_by_its_blows`). A companion keeps its wind-up — its manner — in the same passage.
+Prior art agrees: CircleMUD's `dam_message` sends one
 message per attack, swing and result together, and has no pre-roll line at all
 (src/fight.c, lib/misc/messages); a search found no text tradition that reports a swing
 before its roll as a separate message (searched, not proven absent).
