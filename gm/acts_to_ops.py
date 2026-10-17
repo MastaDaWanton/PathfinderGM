@@ -74,11 +74,14 @@ class Row:
     note: str = ""                                      # why nothing was built, for the log
     thing: str = ""                                     # a goods row's object, resolved
     commit: str = "done"                                # interpret.COMMITS
+    weapon: str = ""                                    # a blow's weapon, resolved (`weapons`)
 
     def record(self) -> dict:
         out = {"act": self.act, "ops": list(self.ops)}
         if self.commit != "done":
             out["commit"] = self.commit
+        if self.weapon:
+            out["weapon"] = self.weapon
         if self.intents:
             out["built"] = [{"op": i["op"], "params": dict(i.get("params") or {})}
                             for i in self.intents]
@@ -1042,6 +1045,191 @@ def _pronoun_victim(scene, words: str, fighting: bool) -> str:
         return fits[0]
     who = addressed(scene)
     return who if who in {x.ref for x in pool} else ""
+
+
+# --- what a declared blow is struck with -----------------------------------------------------
+
+# Acts that put a thing in the player's hands before a later deed of the same sentence: "I
+# snatch the knife off the table and stab him" stabs with a knife the pack does not hold yet.
+_PUTS_IN_HAND = frozenset({"take", "steal", "buy", "gather"})
+
+
+def _weapon_words(frame: dict, i: int) -> str:
+    """The words for what the blow at action `i` is struck with: the attack's own object,
+    else the object of the `use` done just before it in the same sentence — the frame's
+    structure, as "it" is the object of the deed before it (`_object`).
+
+    Both shapes are what the live reader returns (gemma, 2026-10-16, two runs each): "I
+    draw my dagger and stab the shopkeeper", "I stab him with my dagger" and "I attack him
+    with my dagger" come back as ONE action, `attack, object: my dagger` (the reader is
+    shown "I level my spear and drive it into the boar" as one deed); "I pull out my
+    dagger and slash at the smith" and "I swap to my dagger and attack" come back `use,
+    object: my dagger` then `attack` with no object."""
+    from . import interpret
+
+    acts = frame.get("actions") or []
+    said = " ".join(str(acts[i].get("object") or "").split())
+    if said:
+        return said
+    for prev in reversed(acts[:i]):
+        if not interpret.acting(prev):
+            continue
+        if prev.get("act") in VIOLENT_ACTS:
+            break                         # the blow before this one took its own weapon
+        if prev.get("act") == "use" and prev.get("object"):
+            return " ".join(str(prev["object"]).split())
+    return ""
+
+
+def _weapon_of(pc, words: str) -> tuple[str, bool]:
+    """(the weapon the words name, whether the player carries it): the carried entry as
+    the sheet spells it, a carried crafted weapon's record id, or the weapon table's key
+    for one not carried. ("", False) when the words name no weapon the rules know — "the
+    hilt of my rapier", "a chair", "my blade" — which is the plan's and the improvised
+    door's to read, never guessed at here. Every name goes through the engine's own
+    finders (`holding.plain`, `weapons.key_for`, `Actor.crafted_records_called`), the
+    ones the `wear` door draws by."""
+    from rules import holding
+    from rules import weapons as weapons_mod
+    from rules.sheet import _is_weapon_record
+
+    plain = holding.plain(words)
+    key = weapons_mod.key_for(plain) if plain else ""
+    if key:
+        carried = next((w for w in getattr(pc, "weapons", ()) or () if w and
+                        (weapons_mod.key_for(w) or str(w).lower()) == key), None)
+        if carried is not None:
+            return str(carried), True
+    made = [r for r in pc.crafted_records_called(words) if _is_weapon_record(r)]
+    if len(made) == 1:
+        return str(made[0].get("id") or made[0].get("name")).lower(), True
+    return (key, False) if key else ("", False)
+
+
+def _holds_one(actor, key: str) -> bool:
+    from rules import weapons as weapons_mod
+
+    if actor is None:
+        return False
+    theirs = [actor.equipped, *(getattr(actor, "weapons", ()) or ())]
+    return any(w and (weapons_mod.key_for(str(w)) or str(w).lower()) == key for w in theirs)
+
+
+def weapons(rows: list[Row], frame: dict | None, scene) -> list[str]:
+    """The weapon each declared blow is struck with, from the reading: `Row.weapon`, and
+    on the blow `victims` built. A weapon the words name that the player does not carry
+    makes the row `missing` — "Kesst Vayr is not carrying a greataxe" — and the turn says
+    so, as a sale of a crate nobody carries does (`refusal`).
+
+    Measured live on master, 2026-10-16: "I draw my dagger and stab the shopkeeper" was read
+    `attack, object: my dagger`, and nothing below the reader looked at the object — the
+    plan wrote no `weapon`, the engine swung what was in hand, and the tell was "Kesst
+    Vayr's attack with the rapier misses…", the prose "the blade of your rapier".
+
+    Left alone: a blow whose words name no weapon the rules know (the plan's, or the
+    improvised door's); a weapon the player has none of and somebody the blow is aimed at
+    holds ("I strike his club" is at HIS club — `aim_at_the_holder`'s sunder — never a
+    refusal that she carries no club); and one an
+    earlier deed of the sentence puts in the player's hands ("I snatch the knife off the
+    table and stab him"), which the pack does not hold until that deed resolves.
+    Returns a line per row decided, for the turn log."""
+    from . import interpret
+
+    notes: list[str] = []
+    if not frame or scene is None or not hasattr(scene, "pc") or scene.pc() is None:
+        return notes
+    from rules import holding
+
+    pc = scene.pc()
+    actors = getattr(scene, "actors", {}) or {}
+    acts = frame.get("actions") or []
+    for row in rows:
+        a = acts[row.index] if row.index < len(acts) else {}
+        if row.act not in VIOLENT_ACTS or not interpret.acting(a):
+            continue
+        words = _weapon_words(frame, row.index)
+        if not words:
+            continue
+        key, carried = _weapon_of(pc, words)
+        if not key:
+            continue
+        if not carried:
+            # Only when she has none of her own: the thug carries a dagger too, and "I stab
+            # him with my dagger" is still hers.
+            aimed = [actors.get(i.get("target")) for i in row.intents] or [
+                actors.get(person(scene, a.get("target")))]
+            if any(_holds_one(x, key) for x in aimed if x is not None and not x.is_pc):
+                row.note = f"{words!r} is a weapon the one struck holds: not the player's"
+                continue
+            if any(interpret.acting(p) and p.get("act") in _PUTS_IN_HAND
+                   and p.get("object") and holding.same(str(p["object"]), words)
+                   for p in acts[:row.index]):
+                row.note = f"{words!r} comes to hand earlier in the sentence"
+                continue
+            from rules import weapons as weapons_mod
+
+            row.missing = (f"{pc.name} is not carrying "
+                           f"{_a_or_an(weapons_mod.get(key)['name'].lower())}")
+            row.weapon = key                 # with `missing`: named, and not there
+            row.intents = []
+            notes.append(row.missing)
+            continue
+        row.weapon = key
+        for i in row.intents:
+            i["params"] = dict(i.get("params") or {}, weapon=key)
+        notes.append(f"the blow is struck with the {key}: {words!r}")
+    return notes
+
+
+def _a_or_an(noun: str) -> str:
+    return ("an " if noun[:1] in "aeiou" else "a ") + noun
+
+
+def strike_with(raw, rows: list[Row], scene, *, notes: list | None = None) -> list:
+    """The player's blows struck with the weapon the reading named (`weapons`), whatever
+    the plan wrote: the plan's own `weapon` param — or none, which the engine reads as
+    whatever is in hand — is replaced. The engine then draws it if it is not in hand
+    (`Engine._draw_before`) and pays for the draw in a fight.
+
+    Not on a manoeuvre (a disarm or a steal names the OTHER's thing in `item`), an
+    improvised weapon (`inject_improvised`'s thing is the weapon), or a turn whose blows
+    name two different weapons (each act's blow is not told apart from the plan's here)."""
+    if not isinstance(raw, list) or scene is None or not hasattr(scene, "pc") \
+            or scene.pc() is None:
+        return raw
+    pc = scene.pc()
+
+    def players_blow(r) -> bool:
+        params = (r.get("params") or {}) if isinstance(r, dict) else {}
+        return (isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
+                and str(r.get("actor") or pc.ref) in ("pc", pc.ref)
+                and not params.get("manoeuvre") and not params.get("reaction")
+                and str(params.get("weapon") or "").lower() != "improvised")
+
+    # A weapon named and not carried: no blow of the player's is struck with something
+    # else in its place. The turn says what is missing (`unresolved`, the brief's NOT HERE
+    # line; the whole turn's refusal when it is the only deed, `refusal`).
+    gone = [r.missing for r in rows or () if r.weapon and r.missing]
+    if gone:
+        kept = [r for r in raw if not players_blow(r)]
+        if len(kept) != len(raw) and notes is not None:
+            notes.append(f"the player's blow dropped: {gone[0]}")
+        return kept
+    named = list(dict.fromkeys(r.weapon for r in rows or () if r.weapon))
+    if len(named) != 1:
+        return raw
+    for r in raw:
+        if not players_blow(r):
+            continue
+        params = dict(r.get("params") or {})
+        if str(params.get("weapon") or "").lower() != named[0].lower():
+            if notes is not None:
+                notes.append(f"the player's blow struck with the {named[0]}, the weapon "
+                             f"the words name (the plan had "
+                             f"{params.get('weapon') or 'what is in hand'})")
+            params["weapon"] = named[0]
+        r["params"] = params
+    return raw
 
 
 def declared(rows: list[Row]) -> list[str]:

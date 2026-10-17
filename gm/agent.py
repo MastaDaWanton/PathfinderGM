@@ -371,11 +371,16 @@ class GMAgent:
         struck = acts_to_ops.victims(
             self.rows, read_ok, self.engine.scene,
             ask=interpret.confirm_victims if interpret.ENABLED else None)
+        # And what it is struck with: the weapon the words name, or the turn says the
+        # player is not carrying it (`acts_to_ops.weapons`).
+        armed = acts_to_ops.weapons(self.rows, read_ok, self.engine.scene)
         if read_ok is not None:
             if tended:
                 read_ok["first_aid"] = tended
             if struck:
                 read_ok["struck"] = struck
+            if armed:
+                read_ok["armed"] = armed
             read_ok["table"] = [r.record() for r in self.rows]
             if held_back:
                 read_ok["sales_held_back"] = held_back
@@ -848,6 +853,12 @@ class GMAgent:
                 # lethality the model chose for the PC on its own is struck (a -4
                 # nobody asked for).
                 raw = judgement.declare_unarmed(raw, player_input, self.engine.scene)
+                # The weapon the reading named, on every blow of the player's: the plan's
+                # pick, or the hand's default, never stands in for it (2026-10-16, "I draw
+                # my dagger and stab the shopkeeper" swung the rapier). Before lethality,
+                # which reads the weapon.
+                raw = acts_to_ops.strike_with(raw, self.rows, self.engine.scene,
+                                              notes=own_words)
                 raw = judgement.declare_lethality(raw, player_input, self.engine.scene)
                 raw = judgement.inject_company(raw, player_input,
                                                self.engine.scene, self.world)
