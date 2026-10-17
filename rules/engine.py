@@ -22987,12 +22987,31 @@ class Engine:
                     "modifier": sum(m.value for m in mods),
                     "breakdown": [m.as_dict() for m in mods],
                     "dc": dc,
-                    "because": intent.because,
+                    "because": self._roll_why(intent, actor),
                     "intent_id": intent.id,
                 },
                 {state_key: state},
             )
         return self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+
+    def _roll_why(self, intent: Intent, actor: Actor) -> str:
+        """The dice popup's subtitle for a roll the player makes: the plan's `because`,
+        except on a blow, where it is the engine's own words for who is struck.
+
+        Measured live 2026-10-16: "I grab a shard of the broken pot and stab him" — the
+        shard was refused (nothing had put one there) and the engine rolled an unarmed
+        strike, under the title "Attack with unarmed strike" and the subtitle "you use the
+        shard to strike a desperate blow", the plan's reason for a weapon that was never in
+        hand. A blow's weapon is in the title already, from the engine; the subtitle names
+        the target, from the engine too, and the model's prose stays off the dice."""
+        # A reaction's reason is the engine's own ("the thug stooped for the sap within
+        # reach", `_reactions_before`), and is what the player needs to read.
+        if intent.op != "attack" or intent.params.get("reaction"):
+            return intent.because
+        target = self.scene.actors.get(str(intent.target or ""))
+        if target is None:
+            return ""
+        return f"{actor.name} against {target.name}"
 
     def _took(self, roll: Roll) -> Roll:
         """The Roll built from the player's face — the first one, which `_judge` answers
@@ -23029,7 +23048,7 @@ class Engine:
                 # player is entitled to know from the result of a die already rolled in
                 # secret — and printed both as "beat: N".
                 "dc_shown": bool(dc_shown),
-                "because": intent.because,
+                "because": self._roll_why(intent, actor),
                 "intent_id": intent.id,
             }
             raise _NeedsPlayerRoll(prompt, dict(extra_partial or {}))
