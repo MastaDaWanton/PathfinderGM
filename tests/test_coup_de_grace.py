@@ -66,7 +66,9 @@ def _swing(scene, seed=5, **params):
     res = engine.run(engine.validate([
         {"op": "attack", "actor": "pc", "target": "c1", "because": "finish him",
          "visibility": "hidden", "params": {"weapon": weapon, **params}}]))
-    return res.outcomes[0]
+    # The blow, not the draw in front of it: a sling or a bow handed over for the test is
+    # carried and not in hand, and is drawn first (`Engine._draw_before`, 2026-10-16).
+    return next(o for o in res.outcomes if o.op == "attack")
 
 
 # --- the defect: the first swing at a body on the floor -------------------------------

@@ -82,7 +82,9 @@ def test_the_declared_weapon_is_the_one_rolled(table):
     thug.weapons = list(thug.weapons) + ["shortbow"]
     res = e.run(e.validate([{"op": "attack", "actor": thug.ref, "target": "pc",
                              "params": {"weapon": "shortbow"}, "because": "t"}]))
-    assert res.outcomes[0].effects[0]["params"]["weapon"] == "shortbow"
+    # The bow is carried, not in hand: drawn first (`Engine._draw_before`), then the blow.
+    assert [o.op for o in res.outcomes][:2] == ["wear", "attack"]
+    assert res.outcomes[1].effects[0]["params"]["weapon"] == "shortbow"
 
 
 def test_the_planner_is_shown_an_npc_striking_first():

@@ -54,8 +54,8 @@ from .bestiary import printed_alignment
 from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
-from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, Actor, _when_holds, attacker_traits,
-                    current_moment, situated)
+from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _when_holds,
+                    attacker_traits, current_moment, situated)
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
@@ -4079,6 +4079,18 @@ class Engine:
                     queue[0:0] = fired
                     raw["_reacted"] = True
                     continue
+            # A blow with a carried weapon that is not in hand: the draw goes in front of it,
+            # through the one door a weapon comes into the hand by (`_op_wear`), and is paid
+            # for in a fight (`_draw_paid`). Before the close below, so the draw's move
+            # action is already spent when the step is weighed. Asked once per blow — the
+            # flag — and never on a resume.
+            drawn = raw.pop("_drawn", False)
+            if not partial and not drawn:
+                draw = self._draw_before(raw)
+                if draw is not None:
+                    queue[0:0] = [draw]
+                    raw["_drawn"] = True
+                    continue
             # A blow one move short: the move goes in front of it as a real intent, so it
             # provokes through `_reactions_before` exactly as a declared move does, and
             # an attack of opportunity that drops the attacker stops the blow behind it
@@ -4139,6 +4151,10 @@ class Engine:
             # resumed on the player's own d20 arrives here exactly as a hidden one does.
             if intent.gate:
                 queue = self._settle_gate(intent, outcome, queue)
+            # A weapon drawn in a fight is a move action: what that leaves of the turn is
+            # written onto the blows still queued behind it (`_draw_paid`).
+            if intent.op == "wear":
+                self._draw_paid(intent, outcome, queue)
             # The deeds this act holds, read off its own records against the snapshot,
             # and carried on its outcome for the history line. Every outcome is read, not
             # only the player's: a death the player's blow caused can land in anybody's
@@ -6231,6 +6247,20 @@ class Engine:
             return self._refuse(
                 intent, f"{actor.name} closed the distance this turn, and a move leaves "
                         f"time for one blow, already struck. Nothing more is rolled.")
+        # The same arithmetic after a draw (`_draw_paid`): drawing is a move action, so one
+        # blow is left — or none, when the draw came after a move at base attack +0.
+        drew_left = intent.params.get("after_draw")
+        if partial.get("attack_state") is None and drew_left and not dancing:
+            what = actor.weapon().get("name", "weapon").lower()
+            return self._refuse(
+                intent, f"{actor.name} drew the {what} after moving this turn, and that "
+                        f"was the last of the turn: no blow is left. Nothing is rolled."
+                if drew_left == "none" else
+                f"{actor.name} drew the {what} this turn, a move action, and a coup de "
+                f"grâce takes the whole round. Nothing is rolled."
+                if drew_left == "coup" else
+                f"{actor.name} drew the {what} this turn, and a move action leaves time "
+                f"for one blow, already struck. Nothing more is rolled.")
         # Two live people and no word from the player about which: nobody chooses for
         # them. `judgement.check_the_target` parks the candidates here, and the refusal
         # is prose on the page (Inform's check rulebook), never a lost turn.
@@ -6242,6 +6272,19 @@ class Engine:
             return self._refuse(
                 intent, f"Which of them — {asked}? Say who, and the blow follows.")
         weapon_key = (intent.params.get("weapon") or actor.wielded_key()).lower()
+        # The weapon named is the weapon swung, or nothing is: one carried and not in hand
+        # was drawn in front of this blow (`_draw_before`), so still finding it out of hand
+        # means the draw was refused — a two-handed blade with a shield on the arm, a hand
+        # held by the goo — and the refusal is printed right before this. Until 2026-10-16
+        # a named weapon was swung straight off the belt, the one in hand never put away.
+        if partial.get("attack_state") is None and not dancing and intent.params.get(
+                "weapon"):
+            off_belt = self._needs_drawing(actor, weapon_key)
+            if off_belt:
+                name = actor.weapon(weapon_key).get("name", off_belt)
+                return self._refuse(
+                    intent, f"The {str(name).lower()} is not in {actor.name}'s hand, so it "
+                            f"is not swung. Nothing is rolled.")
         # A launcher needs something to launch (E3, CRB Equipment "Ammunition"). Asked
         # before anybody is drawn in, like the reach below: a bow with no arrows starts
         # no fight. Counted for the player always, and for anybody else only once they
@@ -7600,6 +7643,143 @@ class Engine:
         if found is None or found[1] > speed:
             return None
         return found
+
+    def _needs_drawing(self, actor: Actor, key: str) -> str:
+        """The name `wear` draws when `key` is a weapon this actor carries and is not
+        holding; "" when the blow needs no draw — the weapon is in hand, or it is a body's
+        own (the fist, a bite, a stat block's printed attack, a granted strike, a shield
+        bash), an improvised thing, or not carried at all (validation and the attack
+        refuse those by their own rules, `no_such_weapon` and `weapon_out_of_hand`)."""
+        from . import leveling
+        from . import weapons as weapons_mod
+
+        key = str(key or "").strip()
+        low = key.lower()
+        if not low or low in ("unarmed", "improvised"):
+            return ""
+        if (leveling.granted_weapon_named(actor, key) is not None
+                or actor.stat_block_weapon(key) is not None
+                or actor.natural_weapon(key) is not None
+                or actor.shield_bash(key) is not None):
+            return ""
+        # Lying elsewhere (thrown, disarmed, dropped by a dance) or dancing on its own: not
+        # a draw from the belt. The attack's own refusals say where it is, and catching a
+        # dancing blade back is the player's to declare (`_op_attack`, "Catching it back
+        # is drawing it") — an attack naming it never catches it on their behalf.
+        names = {low, str((actor.crafted_record(key) or {}).get("id") or "").strip().lower()}
+        if self.scene.out_of_hand(actor.ref, key) is not None or any(
+                str((e.payload or {}).get("item") or "").strip().lower() in names - {""}
+                for e in self._loosed(actor, "dancing")):
+            return ""
+        canon = weapons_mod.key_for(key) or low
+        held = str(actor.equipped or "").strip()
+        held_canon = weapons_mod.key_for(held) or held.lower()
+        carried = next((w for w in actor.weapons if w and
+                        (weapons_mod.key_for(w) or str(w).lower()) == canon), None)
+        if carried is not None:
+            return "" if canon == held_canon else str(carried)
+        rec = actor.crafted_record(key) if actor._crafted_weapon(key) is not None else None
+        if rec is None:
+            return ""
+        in_hand = actor.wielded_record()
+
+        def ident(r) -> str:
+            return str((r or {}).get("id") or (r or {}).get("name") or "").strip().lower()
+
+        if in_hand is not None and ident(in_hand) == ident(rec):
+            return ""
+        return str(rec.get("id") or rec.get("name") or key)
+
+    def _draw_before(self, raw: dict) -> dict | None:
+        """The `wear` a blow is owed when it names a carried weapon that is not in hand;
+        None for anything else.
+
+        Measured live on master, 2026-10-16: "I draw my dagger and stab the shopkeeper"
+        was read `attack, object: my dagger` and resolved "Kesst Vayr's attack with the
+        rapier misses…" — and an attack that DID name the dagger swung it straight off the
+        belt, the rapier still in hand, the draw never happening. 1e prices the draw
+        (Core Rulebook p.186, Draw or Sheathe a Weapon: "Drawing a weapon so that you can
+        use it in combat ... requires a move action"), and the engine has one weapon in
+        hand (`Actor.equipped`), so the named weapon comes into the hand through the door
+        every draw already uses — the creature re-arm's `wear` (docs/creature-rearms.md) —
+        and is paid for in a fight by `_draw_paid`. Never for a reaction (an attack of
+        opportunity is made with what is in hand) or a thrown flask; a manoeuvre is a blow
+        with the weapon it names like any other."""
+        if raw.get("op") != "attack":
+            return None
+        params = raw.get("params") or {}
+        if params.get("reaction") or params.get("mode") == "splash" or not params.get("weapon"):
+            return None
+        actor = self.scene.actors.get(str(raw.get("actor") or ""))
+        if actor is None:
+            return None
+        item = self._needs_drawing(actor, str(params["weapon"]))
+        if not item:
+            return None
+        return {"op": "wear", "actor": actor.ref, "id": f"{raw.get('id') or 'attack'}-draw",
+                "target": None, "visibility": raw.get("visibility") or "hidden",
+                "because": f"drawing the {params['weapon']} to strike with it",
+                "params": {"item": item, "actor": actor.ref}}
+
+    def _draw_paid(self, intent: Intent, outcome: Outcome, queue: list) -> None:
+        """What a weapon drawn in a fight leaves of the turn, written onto the same actor's
+        blows still queued behind it.
+
+        The rules (Core Rulebook p.186, Draw or Sheathe a Weapon; aonprd.com/Rules.aspx?
+        ID=140): the draw is a move action; "if you have a base attack bonus of +1 or
+        higher, you may draw a weapon as a free action combined with a regular move";
+        Quick Draw makes it "a free action instead of as a move action". A full attack is a
+        full-round action, so after a draw that cost a move action one attack is left (the
+        standard action), as after the closing step (`after_close`). At base attack +0 the
+        draw IS the move action, so the closing step cannot follow it (`move_spent`); a
+        draw after a move already made this round is the second move action, and no blow
+        is left at all. Pathfinder: Wrath of the Righteous charges a weapon switch the same
+        move action in its turn-based mode.
+
+        Out of a fight nothing is counted: there is no turn to spend."""
+        if not self.scene.in_encounter or outcome.status != "resolved":
+            return
+        actor = self.scene.actors.get(intent.actor or "")
+        if actor is None:
+            return
+        # A weapon came into the hand: what the wear put on is what is now held. A suit, a
+        # shield or a cloak leaves `equipped` alone, and putting the weapon away is not a
+        # draw (`put_away`).
+        held = str(actor.equipped or "").strip().lower()
+        drew = next((e for e in outcome.effects or () if e.get("kind") == "wear"
+                     and not e.get("put_away") and held not in ("", "unarmed")
+                     and str(e.get("item") or "").strip().lower() == held), None)
+        # Catching a dancing blade back is a free action (CRB, dancing: "she can grasp it
+        # while it is attacking on its own as a free action").
+        if drew is None or drew.get("caught"):
+            return
+        if actor.has_state(QUICK_DRAW):
+            return
+        moved = self.scene.move_spent.get(actor.ref) == self.scene.round
+        rides_a_move = int(getattr(actor, "bab", 0) or 0) >= 1
+        if not rides_a_move:
+            self.scene.move_spent[actor.ref] = self.scene.round
+        left = "none" if (moved and not rides_a_move) else "one"
+        first = True
+        for later in queue:
+            if later.get("op") != "attack" or later.get("actor") != actor.ref \
+                    or (later.get("params") or {}).get("reaction"):
+                continue
+            params = dict(later.get("params") or {})
+            if params.get("coup_de_grace"):
+                # A coup de grâce is a full-round action (CRB p.197): nothing of the round
+                # is left for it once a move action has gone on the draw.
+                params["after_draw"] = "coup"
+                later["params"] = params
+                first = False
+                continue
+            if first and left == "one":
+                params["full_attack"] = False
+                params.pop("iteration", None)
+                first = False
+            else:
+                params["after_draw"] = left
+            later["params"] = params
 
     def _close_before(self, raw: dict) -> dict | None:
         """The move intent a blow one move short is owed, spliced in front of it by
@@ -21636,7 +21816,8 @@ class Engine:
             return Outcome(
                 intent_id=intent.id, op="wear",
                 effects=[{"ref": actor.ref, "kind": "wear", "item": rec_id,
-                          "crafted": True, "base": base_key, "ac": actor.ac()}],
+                          "crafted": True, "base": base_key, "ac": actor.ac(),
+                          **({"caught": True} if caught is not None else {})}],
                 tell=(f"{actor.name} catches the {name} out of the air; it cannot dance "
                       f"again for {self.LOOSED_ROUNDS} rounds." if caught is not None
                       else f"{actor.name} draws the {name}.") + (f" {seen}" if seen else ""),

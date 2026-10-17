@@ -329,6 +329,9 @@ def _trait_word(text) -> str:
 # lethal or nonlethal damage, at your choice." A permission is a tag (law 1), so the
 # attack roll asks `has_state` and never looks for the feat by name.
 STRIKES_EITHER_WAY = "lethality.either.unarmed"
+# The tag Quick Draw's feat document grants: "You can draw a weapon as a free action
+# instead of as a move action" (Core Rulebook p.132). Asked by `Engine._draw_paid`.
+QUICK_DRAW = "action.draw.free"
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
