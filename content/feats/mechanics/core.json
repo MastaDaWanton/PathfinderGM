@@ -450,6 +450,15 @@
       "counts as armed: no attack of opportunity for attacking unarmed, and threatens with unarmed strikes (rules/reactions.py has no unarmed-provokes rule to waive)"
     ]
   },
+  "quick-draw": {
+    "tags": [
+      "action.draw.free"
+    ],
+    "not_yet": [
+      "throws weapons at the full rate of attacks: a thrown weapon is one throw a turn (Engine._op_attack thrown_any)",
+      "draws a hidden weapon as a move action: there is no hidden-weapon Sleight of Hand roll"
+    ]
+  },
   "improved-bull-rush": {
     "modifiers": [
       {

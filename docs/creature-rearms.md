@@ -148,6 +148,46 @@ the next), then one per step.
   weapon.
 - **Timings are not a measurement.** The runs shared the one Ollama with other sessions.
 
+## The player's draw (2026-10-16, branch `fix/weapon-in-hand`)
+
+Measured live on master: "I draw my dagger and stab the shopkeeper" resolved "Kesst Vayr's
+attack with the rapier misses…". The live reader read the line `attack, object: my dagger`
+(2 of 2; "I pull out my dagger and slash at the smith" reads `use, object: my dagger` then
+a bare `attack`). Nothing below the reader looked at the object, the plan wrote no `weapon`,
+and the engine swung what was in hand. A plan that did name the dagger had it swung straight
+off the belt, with no draw.
+
+The rules, Core Rulebook p.186 (aonprd.com/Rules.aspx?ID=140):
+
+- Drawing a weapon "so that you can use it in combat" is a move action.
+- With base attack +1 or higher it is a free action combined with a regular move.
+- Quick Draw (p.132) makes it a free action instead.
+- Drawing provokes nothing (Table 8-2).
+- A full attack is a full-round action, so one attack is left after a draw that cost a move.
+- Pathfinder: Wrath of the Righteous charges a weapon switch the same move action in its
+  turn-based mode, and players there miss Quick Draw because the game left it out.
+
+What the engine does:
+
+- **The reading names the weapon.** `acts_to_ops.weapons` resolves the attack's object, or
+  the `use` just before it, through the engine's own finders. The result is `Row.weapon`.
+  `strike_with` then puts it on every blow of the player's, replacing the plan's pick.
+- **A weapon named and not carried is the turn's refusal**: "Kesst Vayr is not carrying a
+  greataxe." No other weapon is swung in its place.
+- **The engine draws it.** `Engine._draw_before` splices the existing `wear` in front of any
+  blow naming a carried weapon that is not in hand.
+- **The draw is paid for in a fight** by `_draw_paid`:
+  - at BAB +0 it spends the move (`move_spent`), so no closing step follows;
+  - at BAB +1 it rides the move;
+  - Quick Draw (`action.draw.free`) makes it free;
+  - after a draw, a full attack is one blow;
+  - a draw after a move at BAB +0 leaves no blow at all.
+- **Still not in hand at resolution** (the draw was refused) means the blow is refused in
+  words. It is never swung off the belt.
+- **The engine holds one weapon**, so the one in hand goes back to the belt. That costs one
+  move action, the price of either legal way to do it with a one-handed weapon: drop it (a
+  free action) and draw, or draw into the free hand. An off hand stays deferred (E8).
+
 ## Still open
 
 - **The narration after a reaction roll inside a creature's turn.** The player's attack of
