@@ -46,7 +46,8 @@ from ._page import cut, cut_from
 ORDER = 9
 KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
-                   "beat-omits-outcome", "beat-condition", "beat-setting"})
+                   "beat-omits-outcome", "beat-condition", "beat-setting",
+                   "beat-struck-with"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -66,7 +67,11 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          # A sentence set in another kind of place: a ship's deck in a market (the
          # report of 2026-10-16). As heavy as `wrong-kind-of-place`, the regex reader of
          # a tavern's furniture it stands beside.
-         "setting": ("beat-setting", 3)}
+         "setting": ("beat-setting", 3),
+         # A blow written with a weapon the engine did not swing: the shard that "bites
+         # deep" on an unarmed strike (live, 2026-10-16). As wrong as a wound the dice
+         # never gave.
+         "weapon": ("beat-struck-with", 3)}
 
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair
 # asks `find` again after each rewrite and once more before the backstops; a sentence it

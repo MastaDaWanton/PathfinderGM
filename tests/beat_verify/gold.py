@@ -161,7 +161,9 @@ def facts(beat):
                     went_by=tuple(beat["went_by"]), pack=tuple(beat["pack"]),
                     props=tuple(beat["props"]), people=people, clock=beat["clock"],
                     outcomes=tuple(beat["outcomes"]), pc_ref="pc",
-                    in_fight=bool(beat.get("fight")), settings=settings_of(beat))
+                    in_fight=bool(beat.get("fight")), settings=settings_of(beat),
+                    blows=tuple(beat.get("blows") or ()),
+                    arms=tuple(beat.get("arms") or ()))
 
 
 def by_id(beat_id: str) -> dict:
@@ -1097,4 +1099,109 @@ GOLD = [
       start="the road to Kalixiri", people=(XY_TAM, XY_DROVER), clock=600,
       claims=[C("setting", kind=[_UN, _IN]), C("setting", opt=True, kind=[_UN, _IN])],
       alarms=["setting"]) | {"setting": True},
+    # --- what the player's blows were struck with (2026-10-17), labelled before any run.
+    # The live check of 2026-10-16: the shard refused, an unarmed strike rolled, and "The
+    # shard bites deep into the soft tissue of his shoulder." Kesst carries a rapier and a
+    # dagger (fixtures/pc-kesst.json); `blows` is what the engine struck with.
+    *[B(i, src, text, world="PG", start="the market", fight=True, people=(KESST, FB_WOMAN),
+        outcomes=[FB_HIT if hit else FB_MISS],
+        # The blow's wound and a thrown thing on the floor are other categories' and are
+        # not what these rows label: either answer is accepted.
+        claims=[*claims, *[C("harm", opt=True, who=["c4", "pc", "someone not listed"],
+                             how=["hurt", "down"])] * 2,
+                C("hands", opt=True, item="something else", **{"from": "pc"},
+                  to=["the floor", "nobody"])],
+        alarms=alarms, may_alarm=[*may, "harm"])
+      | {"blows": list(blows), "arms": list(dict.fromkeys(["rapier", "dagger", "unarmed strike", *blows]))}
+      for i, src, text, hit, blows, claims, alarms, may in (
+        ("sw-shard-live", "live:2026-10-16 (turn 3, verbatim)",
+         "The shard is not there, but your reach is. You close the distance and lunge, "
+         "your arm moving with the desperate weight of your fatigue. The shard bites deep "
+         "into the soft tissue of his shoulder, and the man's body buckles as the air is "
+         "driven from his lungs. He collapses into a heap of heavy wool and dull pain, his "
+         "head hitting the stones with a muffled thud.",
+         True, ("unarmed strike",), [C("weapon", weapon="something else")], ["weapon"], []),
+        ("sw-shard-on-a-punch", "live:2026-10-16 (turn 3, cut short)",
+         "You close the distance and lunge. The shard bites deep into the soft tissue of "
+         "his shoulder, and the man's body buckles.",
+         True, ("unarmed strike",), [C("weapon", weapon="something else")], ["weapon"], []),
+        ("sw-fist-true", "synthetic",
+         "Your fist cracks into her jaw and her head snaps back.",
+         True, ("unarmed strike",), [C("weapon", weapon="unarmed strike")], [], []),
+        ("sw-knee-true", "synthetic",
+         "You drive your knee into her ribs, and she doubles over with a grunt.",
+         True, ("unarmed strike",), [C("weapon", weapon="unarmed strike")], [], []),
+        ("sw-rapier-true", "synthetic",
+         "Your rapier darts in under her guard and opens a line across her forearm.",
+         True, ("rapier",), [C("weapon", weapon="rapier")], [], []),
+        ("sw-blade-vague", "synthetic",
+         "Your blade flicks out and bites into her arm.",
+         True, ("rapier",), [C("weapon", opt=True, weapon=["rapier", "not shown"])], [],
+         ["weapon"]),
+        ("sw-dagger-for-rapier", "synthetic",
+         "You whip the dagger from your belt and plunge it into her side.",
+         True, ("rapier",), [C("weapon", weapon="dagger")], ["weapon"], []),
+        ("sw-rapier-miss-on-a-punch", "synthetic",
+         "Your rapier hisses past her ear, a hand's breadth wide.",
+         False, ("unarmed strike",), [C("weapon", weapon="rapier")], ["weapon"], []),
+        ("sw-bottle-on-rapier", "synthetic",
+         "You snatch a bottle off the stall and smash it over her head.",
+         True, ("rapier",), [C("weapon", weapon="something else")], ["weapon"], []),
+        ("sw-kettle-true", "live:2026-10-16 (turn 6, paraphrased)",
+         "You hurl the heavy iron kettle; it clatters across the stones, missing her by a "
+         "foot.",
+         False, ("heavy iron kettle",), [C("weapon", weapon="heavy iron kettle")], [], []),
+        ("sw-kettle-as-fist", "synthetic",
+         "Your fist slams into her cheek and she reels.",
+         True, ("heavy iron kettle",), [C("weapon", weapon="unarmed strike")], ["weapon"],
+         []),
+        ("sw-not-shown", "synthetic",
+         "Your blow lands hard and she staggers back a step, gasping.",
+         True, ("rapier",), [C("weapon", opt=True, weapon="not shown")], [], []),
+        ("sw-her-blow-only", "synthetic",
+         "She swings her cudgel and it cracks against your shoulder. You stagger.",
+         False, ("unarmed strike",), [], [], []),
+        ("sw-miss-with-dagger-true", "synthetic",
+         "Your dagger skids past her hip and clatters against the cobbles.",
+         False, ("dagger",), [C("weapon", weapon="dagger")], [], []),
+        ("sw-shard-and-fist", "synthetic",
+         "You swing at her and your knuckles graze her chin. Then you rake the jagged "
+         "shard across her forearm.",
+         True, ("unarmed strike",), [C("weapon", weapon="unarmed strike"),
+                                     C("weapon", weapon="something else")], ["weapon"],
+         []),
+        ("sw-pommel-of-rapier", "synthetic",
+         "You reverse your rapier and crack the pommel against her temple.",
+         True, ("rapier",), [C("weapon", weapon="rapier")], [], []),
+        ("sw-elbow-on-rapier", "synthetic",
+         "You slam your elbow into her throat and she chokes.",
+         True, ("rapier",), [C("weapon", weapon="unarmed strike")], ["weapon"], []),
+        # Held out: written after the first run, before the demonstrations were changed,
+        # and never run while changing them.
+        ("sw-ho-stool-on-a-punch", "synthetic (held out)",
+         "You step in close. The stool's leg cracks against his skull and he staggers.",
+         True, ("unarmed strike",), [C("weapon", weapon="something else")], ["weapon"], []),
+        ("sw-ho-headbutt-true", "synthetic (held out)",
+         "You slam your forehead into the bridge of her nose.",
+         True, ("unarmed strike",), [C("weapon", weapon="unarmed strike")], [], []),
+        ("sw-ho-rapier-for-dagger", "synthetic (held out)",
+         "You lunge, and the long, thin rapier blade skewers her sleeve to the post.",
+         False, ("dagger",), [C("weapon", weapon="rapier")], ["weapon"], []),
+        ("sw-ho-dagger-true", "synthetic (held out)",
+         "You flip the dagger and drive it down toward her collarbone, but she wrenches "
+         "aside.",
+         False, ("dagger",), [C("weapon", weapon="dagger")], [], []),
+        ("sw-ho-kick-on-rapier", "synthetic (held out)",
+         "You kick her knee out from under her, and she drops to one leg.",
+         True, ("rapier",), [C("weapon", weapon="unarmed strike")], ["weapon"], []),
+        ("sw-ho-flat-of-rapier", "synthetic (held out)",
+         "You slap the flat of your rapier across her cheek.",
+         True, ("rapier",), [C("weapon", weapon="rapier")], [], []),
+        ("sw-ho-rock-on-dagger", "synthetic (held out)",
+         "You lunge. The rock in your fist slams into her temple.",
+         True, ("dagger",), [C("weapon", weapon="something else")], ["weapon"], []),
+        ("sw-ho-vague-true", "synthetic (held out)",
+         "You strike, and she reels back clutching her arm.",
+         True, ("rapier",), [C("weapon", opt=True, weapon="not shown")], [], []),
+      )],
 ]

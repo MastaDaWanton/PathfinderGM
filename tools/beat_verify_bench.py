@@ -34,9 +34,9 @@ from gm import beat_verify as bv  # noqa: E402
 from tests.beat_verify import gold as G  # noqa: E402
 
 CATS = ("move", "hands", "trade", "harm", "shown", "arrived", "left", "hour", "condition",
-        "setting")
+        "setting", "weapon")
 ALARM_CATS = ("move", "hands", "trade", "harm", "absent", "presence", "hour", "omission",
-              "condition", "setting")
+              "condition", "setting", "weapon")
 
 
 # --- the engine's side, as the game builds it ---------------------------------------------
@@ -373,11 +373,15 @@ def main() -> None:
     ap.add_argument("--setting", default="alone", choices=("alone", "slot"),
                     help="ask the kind of place in a call of its own, or as a slot of the "
                     "first read (docs/beat-verify.md measures both)")
+    ap.add_argument("--swing", default="alone", choices=("alone", "slot"),
+                    help="ask what the player's blows were struck with in a call of its "
+                    "own, or as a slot of the first read")
     ap.add_argument("--replay", default="", help="score a --record file's extractions "
                     "instead of calling the model to read (the second read still calls it)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     bv.SETTING_ALONE = args.setting == "alone"
+    bv.SWING_ALONE = args.swing == "alone"
     results = {"regex": run_regex(args.verbose, args.subset)}
     report("regex checks", results["regex"])
     record: dict = {}

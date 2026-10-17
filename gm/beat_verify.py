@@ -185,6 +185,12 @@ class Facts:
     # (`places.settings_for`). Empty when the engine cannot say, and then no `setting`
     # claim is judged and no setting call is made.
     settings: tuple[str, ...] = ()
+    # The player's blows this beat, by the weapon the ENGINE struck with (each attack
+    # outcome's `blows[...]["weapon"]`, on a roll the player made), and the weapons the
+    # reader may answer with: what the player carries, unarmed, and whatever the engine
+    # struck with. Empty `blows` asks nothing (`struck_with`).
+    blows: tuple[str, ...] = ()
+    arms: tuple[str, ...] = ()
 
     @property
     def bodies(self) -> bool:
@@ -226,7 +232,8 @@ class Facts:
                            [p.ref for p in self.people], self.clock,
                            [o.get("intent_id") for o in self.outcomes],
                            # The question asked depends on it (`schema`), so the read does.
-                           self.bodies, [p.holds for p in self.people]],
+                           self.bodies, [p.holds for p in self.people],
+                           self.settings, self.blows, self.arms],
                           default=str, sort_keys=True)
 
 
@@ -358,7 +365,46 @@ def facts_from(ctx) -> Facts:
                  outcomes=outcomes, in_fight=bool(getattr(scene, "in_encounter", False)),
                  pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
                  intimate=bool(getattr(ctx, "intimate", False)),
-                 settings=tuple(sorted(settings)))
+                 settings=tuple(sorted(settings)),
+                 **_blows_of(ctx, outcomes, pc))
+
+
+UNARMED = "unarmed strike"
+
+
+def _weapon_name(name) -> str:
+    return " ".join(str(name or "").split()).lower()
+
+
+def _blows_of(ctx, outcomes, pc) -> dict:
+    """{"blows", "arms"} for `Facts`: the weapons the player's own blows were struck with
+    this beat, and the weapons the reader may name. A blow is the player's when its roll
+    was the player's to make (`visibility == "player"`; every non-PC roll is forced hidden,
+    `Engine._force_visibility`) — `Outcome` carries no actor, and an NPC's turn is its own
+    door (`ctx.acting`)."""
+    if pc is None or getattr(ctx, "acting", ""):
+        return {}
+    blows: list[str] = []
+    for o in outcomes:
+        if o.get("op") != "attack" or o.get("status") == "refused" or not o.get("blows"):
+            continue
+        if not any(isinstance(r, dict) and r.get("visibility") == "player"
+                   for r in o.get("rolls") or ()):
+            continue
+        blows += [_weapon_name(b.get("weapon")) for b in o["blows"]
+                  if isinstance(b, dict) and b.get("weapon")]
+    if not blows:
+        return {}
+    arms: list[str] = []
+    for key in list(getattr(pc, "weapons", None) or ()):
+        try:
+            name = (pc.weapon(key) or {}).get("name") or key
+        except Exception:  # noqa: BLE001 — a weapon the sheet cannot read is named by key
+            name = key
+        arms.append(_weapon_name(name))
+    arms += [UNARMED, *blows]
+    return {"blows": tuple(dict.fromkeys(blows)),
+            "arms": tuple(dict.fromkeys(a for a in arms if a and a != "improvised weapon"))}
 
 
 def asks_bodies(ctx) -> bool:
@@ -450,9 +496,15 @@ def schema(facts: Facts) -> dict:
         # own (`SETTING_ALONE`, measured both ways in docs/beat-verify.md).
         **({} if SETTING_ALONE else {"setting": lst({"kind": {
             "type": "string", "enum": list(_settings())}})}),
+        # And what the player's blows were struck with, as a slot — measured against the
+        # call of its own (`SWING_ALONE`), on a beat where the player struck only.
+        **({"struck_with": lst({"weapon": {"type": "string",
+                                           "enum": swing_codes(facts)}})}
+           if facts.blows and not SWING_ALONE else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
                     "left", "time_of_day", *(["shown_here"] if away else []),
-                    *([] if SETTING_ALONE else ["setting"])]}
+                    *([] if SETTING_ALONE else ["setting"]),
+                    *(["struck_with"] if facts.blows and not SWING_ALONE else [])]}
 
 
 def _settings() -> tuple[str, ...]:
@@ -703,6 +755,78 @@ _SETTING_DEMO2_ANSWER = {"setting": [
      "quote": "Spray bursts over the rail as the deck heaves under your boots"}]}
 
 
+# --- what the player's blows were struck with ----------------------------------------------
+#
+# Measured live 2026-10-16: "I grab a shard of the broken pot and stab him" — the engine
+# refused the shard (nothing had put one there) and rolled an unarmed strike, 5 non-lethal;
+# the page wrote "The shard bites deep into the soft tissue of his shoulder." No reader
+# asked what a blow was struck with. Asked only on a beat where the player struck
+# (`Facts.blows`), from the weapons the player carries, unarmed, and what the engine swung,
+# with "something else" and "not shown" — and compared in code with `Outcome.blows`.
+SWING_ALONE = True
+OTHER_WEAPON = "something else"
+NOT_SHOWN = "not shown"
+
+_SWING_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") in a fight, and report what "
+    "the narrator shows each of the player's own blows struck with — landing or missing — "
+    "in the codes given. \"unarmed strike\" is a fist, foot, knee, elbow or head. "
+    "\"something else\" is a weapon or object not in the list. \"not shown\" when the "
+    "sentence shows the blow and never says what it was struck with. One entry per "
+    "sentence that shows one of YOUR blows, copying its own words into \"quote\"; never "
+    "somebody else's blow, never what a character only says. Leave the list empty when "
+    "the passage shows none of your blows.")
+_SWING_DEMO_USER = (
+    "Your weapons: shortsword, sling, unarmed strike, something else, not shown\n\n"
+    "Passage:\n"
+    "You drive your knee up into the drover's gut and he folds. He swings his cudgel back "
+    "at you and it whistles past your ear. You lunge again. The jagged spar of wood tears "
+    "across his cheek. 'Is that all?' he spits.")
+# The third entry is the shape of the live defect — a weapon named in a sentence of its
+# own after "You lunge", never saying "your": on the first bench run (2026-10-17, x2) the
+# reader quoted "You close the distance and lunge" as not shown and passed over "The shard
+# bites deep into the soft tissue of his shoulder", both runs.
+_SWING_DEMO_ANSWER = {"struck_with": [
+    {"weapon": "unarmed strike", "quote": "You drive your knee up into the drover's gut"},
+    {"weapon": "something else", "quote": "The jagged spar of wood tears across his cheek"}]}
+# The pommel is the weapon's: "You reverse your rapier and crack the pommel against her
+# temple" came back "something else", both runs of the same bench.
+_SWING_DEMO2_USER = (
+    "Your weapons: shortsword, sling, unarmed strike, something else, not shown\n\n"
+    "Passage:\n"
+    "You snatch a bottle off the table and smash it across her shoulder. You turn your "
+    "shortsword and drive its hilt into her ribs. Your next blow takes her across the "
+    "cheek.")
+_SWING_DEMO2_ANSWER = {"struck_with": [
+    {"weapon": "something else", "quote": "smash it across her shoulder"},
+    {"weapon": "shortsword", "quote": "drive its hilt into her ribs"},
+    {"weapon": "not shown", "quote": "Your next blow takes her across the cheek"}]}
+
+
+def swing_codes(facts: Facts) -> list[str]:
+    return list(dict.fromkeys([*facts.arms, OTHER_WEAPON, NOT_SHOWN]))
+
+
+def swing_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"struck_with": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "weapon": {"type": "string", "enum": swing_codes(facts)}, "quote": s},
+            "required": ["weapon", "quote"]}}},
+        "required": ["struck_with"]}
+
+
+def swing_messages(text: str, facts: Facts) -> list[dict]:
+    return [{"role": "system", "content": _SWING_SYSTEM},
+            {"role": "user", "content": _SWING_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_SWING_DEMO_ANSWER)},
+            {"role": "user", "content": _SWING_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_SWING_DEMO2_ANSWER)},
+            {"role": "user", "content": f"Your weapons: {', '.join(swing_codes(facts))}\n\n"
+                                        f"Passage:\n{text}"}]
+
+
 def setting_schema() -> dict:
     from rules.places import SETTINGS
 
@@ -797,13 +921,29 @@ def messages(text: str, facts: Facts) -> list[dict]:
     two = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
     if not SETTING_ALONE:
         one["setting"], two["setting"] = _DEMO_SETTING, _DEMO2_SETTING
+    swing_slot = bool(facts.blows) and not SWING_ALONE
+    if swing_slot:
+        # The demonstrations hold no blow of the player's (the drover's fist is his own).
+        one["struck_with"], two["struck_with"] = [], []
+    ask = _ask(text, facts)
+    if swing_slot:
+        ask = ask.replace("\n\nPassage:\n",
+                          f"\nYour weapons: {', '.join(swing_codes(facts))}\n\nPassage:\n", 1)
     return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")
-             + ("" if SETTING_ALONE else _SYSTEM_SETTING)},
+             + ("" if SETTING_ALONE else _SYSTEM_SETTING)
+             + (_SYSTEM_SWING if swing_slot else "")},
             {"role": "user", "content": _DEMO_USER},
             {"role": "assistant", "content": json.dumps(one)},
             {"role": "user", "content": _DEMO2_AWAY_USER if away else _DEMO2_USER},
             {"role": "assistant", "content": json.dumps(two)},
-            {"role": "user", "content": _ask(text, facts)}]
+            {"role": "user", "content": ask}]
+
+
+_SYSTEM_SWING = (
+    "\nstruck_with: EVERY sentence that shows one of the player's own blows, landing or "
+    "missing, with what it was struck with from \"Your weapons\" — \"unarmed strike\" for a "
+    "fist, foot, knee, elbow or head, \"something else\" for a weapon or object not listed, "
+    "\"not shown\" when the sentence never says.")
 
 
 def _raw_prompt(msgs: list[dict]) -> list[dict]:
@@ -889,7 +1029,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("arrived", "arrived", ("who",)),
                             ("left", "left", ("who",)),
                             ("conditions", "condition", ("who", "condition")),
-                            ("setting", "setting", ("kind",))):
+                            ("setting", "setting", ("kind",)),
+                            ("struck_with", "weapon", ("weapon",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -914,7 +1055,7 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "seller": set(_who(facts)), "buyer": set(_who(facts)),
                "who": set(_who(facts)), "how": set(HOW), "place": set(_places(facts)),
                "part": set(PARTS), "condition": set(CONDITIONS),
-               "kind": set(_settings())}
+               "kind": set(_settings()), "weapon": set(swing_codes(facts))}
     seen: set[str] = set()
     for c in claims:
         bad = [k for k, v in c.slots.items()
@@ -1006,6 +1147,18 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                          schema=setting_schema())
             result.raw += "\n" + where.text
             answer = dict(answer or {}, setting=(where.json() or {}).get("setting") or [])
+        if SWING_ALONE and facts.blows:
+            # What the player's blows were struck with, in a call of its own, on a beat
+            # where the player struck and on no other (`_SWING_SYSTEM`).
+            msgs = swing_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            swung = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                         num_predict=300, provider=provider, api_key=api_key,
+                         schema=swing_schema(facts))
+            result.raw += "\n" + swung.text
+            answer = dict(answer or {},
+                          struck_with=(swung.json() or {}).get("struck_with") or [])
         result.claims, result.dropped = validate(claims_of(answer, facts), text, facts)
     except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
@@ -1147,6 +1300,28 @@ def _condition_unheld(c: Claim, facts: Facts) -> Discrepancy | None:
         "contradiction", "condition",
         f"{name} {'are' if p.pc else 'is'} not {cond}: {why}. The rules put no such state "
         f"on {obj}.", c.sentence, "", c, ref=who)
+
+
+def _said_weapon(name: str) -> str:
+    return ("bare hands — a fist, foot, knee, elbow or head" if name == UNARMED
+            else f"the {name}")
+
+
+def _weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A player's blow shown struck with something the engine did not swing, or None.
+
+    Judged only on a beat where the engine records the player's blows (`Facts.blows`), and
+    never for "not shown". "something else" is judged: the live shard was exactly that — a
+    thing no list held, against an unarmed strike the engine rolled."""
+    said = str(c.slots.get("weapon") or "")
+    if not facts.blows or said in ("", NOT_SHOWN) or said in facts.blows:
+        return None
+    struck = " and ".join(_said_weapon(w) for w in facts.blows)
+    instead = "anything else" if said == OTHER_WEAPON else f"the {said}"
+    return Discrepancy(
+        "contradiction", "weapon",
+        f"Your (the player's) blow was struck with {struck}, not with {instead}: nothing "
+        f"else was in your hand.", c.sentence, "", c)
 
 
 def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
@@ -1366,6 +1541,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             found = _condition_unheld(c, facts)
             if found is not None:
                 out.append(found)
+        elif c.category == "weapon":
+            found = _weapon_wrong(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "setting":
             found = _setting_wrong(c, facts)
             if found is not None:
@@ -1483,6 +1662,10 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
+    if c.category == "weapon":
+        # Asked in `_struck_with`'s shape (which weapon, from the codes), not yes-or-no;
+        # this line is the cache key and the record of what was asked.
+        return "Which of your weapons does this sentence show your blow struck with?"
     if c.category == "setting":
         # Asked of the scene, not of the player's feet: "the club thuds into the planks of
         # the deck" never says where the player stands, and it sets the whole fight on a
@@ -1557,6 +1740,11 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
+        if d.category == "weapon":
+            lead = " ".join(sentences[max(0, at - 2):at]) if at > 0 else ""
+            (kept if _struck_with(d, lead, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
         if d.category == "condition" and d.ref:
             # The passage up to the sentence, not one sentence: "He is dazed" names nobody,
             # and with only "He hits the wood of the bar…" before it, the read named the
@@ -1624,6 +1812,35 @@ def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provide
         return d.ref in [str(x) for x in (reply.json() or {}).get("shown") or []]
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
+
+
+def _struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                 api_key) -> bool:
+    """The second read of a `weapon` contradiction, in `_shows`' shape: WHICH weapon the one
+    sentence shows the player's blow struck with, from the same codes, compared in code —
+    kept only when the answer is neither the engine's weapon nor "not shown". A call that
+    fails keeps the contradiction, as every second read does."""
+    codes = swing_codes(facts)
+    ask = ((f"The sentences before it, for context: {before}\n" if before else "")
+           + f"The sentence: {d.sentence}\n\nYour weapons: {', '.join(codes)}\n\n"
+           f"Question: what does this sentence show YOUR (the player's) blow struck with? "
+           f"\"unarmed strike\" for a fist, foot, knee, elbow or head; \"{OTHER_WEAPON}\" "
+           f"for a weapon or object not listed; \"{NOT_SHOWN}\" if it never says or shows "
+           f"no blow of yours.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"weapon": {
+                         "type": "string", "enum": codes}}, "required": ["weapon"]})
+        said = str((reply.json() or {}).get("weapon") or "")
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+    return bool(said) and said != NOT_SHOWN and said not in facts.blows
 
 
 def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
