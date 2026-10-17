@@ -42,7 +42,13 @@ class _Reply:
         return json.loads(self.text)
 
 
-def _ctx(monkeypatch, answer, *, was=2305, now=2305):
+# The reading that save logged for the line (turn_log row 125).
+READ = {"actions": [{"act": "talk", "target": "the barkeep", "says": "goodbye"},
+                    {"act": "go", "place": "my room"},
+                    {"act": "rest", "time": "until dawn"}]}
+
+
+def _ctx(monkeypatch, answer, *, was=2305, now=2305, reading=READ):
     monkeypatch.setattr(deed_reader, "ENABLED", True)
     s = Scene()
     s.add(load_pc("fixtures/pc-kesst.json"))
@@ -56,7 +62,7 @@ def _ctx(monkeypatch, answer, *, was=2305, now=2305):
     real = deed_reader.read_slept
     monkeypatch.setattr(deed_reader, "read_slept",
                         lambda *a, **k: real(*a, **dict(k, chat=chat)))
-    ctx = SimpleNamespace(scene=s, text=SLEPT, was_clock=was,
+    ctx = SimpleNamespace(scene=s, text=SLEPT, was_clock=was, reading=reading,
                           reader={"model": "stub", "host": "h"})
     return ctx, seen
 
@@ -93,6 +99,15 @@ def test_nothing_named_nothing_cut(monkeypatch):
 def test_no_clock_to_compare_reads_nothing(monkeypatch):
     ctx, seen = _ctx(monkeypatch, 5, was=None)
     assert time_kept.find(ctx) == [] and seen == []
+
+
+def test_a_turn_that_asked_for_no_time_is_never_asked_about(monkeypatch):
+    """Only a turn whose reading asks for time (rest, wait, journey): asked on every turn
+    the clock stood still, this would be one more model call on nearly every turn."""
+    talk = {"actions": [{"act": "talk", "target": "the barkeep", "says": "goodbye"}]}
+    for reading in (talk, None):
+        ctx, seen = _ctx(monkeypatch, 5, reading=reading)
+        assert time_kept.find(ctx) == [] and seen == []
 
 
 def test_it_is_a_registered_member_on_the_turn_door():

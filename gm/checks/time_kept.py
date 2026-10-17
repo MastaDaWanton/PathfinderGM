@@ -12,8 +12,9 @@ player asked for and nothing in the plan did it.
 
 The mirror of `sleep_kept` (the player under who wakes on the page).
 
-**Detection** is a model's, held in code: when the engine moved the clock less than an
-hour this turn and the player is not under (`sleep_kept` owns that), one closed question
+**Detection** is a model's, held in code: when the reading has the player ask for time to
+pass (a `rest`, `wait` or `journey` act), the engine moved the clock less than an hour this
+turn, and the player is not under (`sleep_kept` owns that), one closed question
 asks which sentence first has the player fall asleep or let hours go by
 (`deed_reader.read_slept`); the sentence must be about the player. Asked only on a turn
 the clock stood still, so a false alarm can only cost a sentence the engine contradicts.
@@ -48,10 +49,22 @@ POOL: tuple[str, ...] = (
 )
 
 
+# The reading's acts that ask for time to pass (gm/interpret.py ACT_SLOTS, a closed list):
+# the page is only asked about hours on a turn the player asked for hours. Asked on every
+# turn the clock stood still, this was one more model call on nearly every turn of play.
+ASKS_FOR_TIME = frozenset({"rest", "wait", "journey"})
+
+
 def _still(ctx) -> bool:
-    """The clock moved less than STILL_MINUTES this turn and the player is up."""
+    """The player's words asked for time to pass, the clock moved less than STILL_MINUTES
+    this turn, and the player is up."""
+    from gm import interpret
     from rules import survival
 
+    reading = getattr(ctx, "reading", None) or {}
+    if not any(a.get("act") in ASKS_FOR_TIME and interpret.acting(a)
+               for a in reading.get("actions") or [] if isinstance(a, dict)):
+        return False
     was = getattr(ctx, "was_clock", None)
     scene = ctx.scene
     now = getattr(scene, "clock_minutes", None)
