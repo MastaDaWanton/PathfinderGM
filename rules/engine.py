@@ -22092,6 +22092,15 @@ class Engine:
                 intent, f"You are still in conversation with "
                         f"{_and_list(a.name for a in talking)}. Take your leave first.")
 
+        # A bed at an inn or a tavern is paid for before it is slept in (rules/lodging.py):
+        # the keeper's price out of the purse through `goods.spend`, once a day — a room
+        # already paid for today, or a place the sleeper holds, costs nothing — and a purse
+        # that cannot pay is refused here, before a single hour passes. Known since 0.2.13:
+        # "I pay for a room" took no coin.
+        bill = self._room_bill(intent, actor) if actor.is_pc else None
+        if bill is not None and bill.get("refused") is not None:
+            return bill["refused"]
+
         # The camp (the owner, 2026-10-01: "a tent should decrease the chance of being
         # attacked in my sleep and protect me from the elements to a degree. A bedroll
         # should negate the negative of waking up fatigued after sleeping on the floor or
@@ -22121,11 +22130,11 @@ class Engine:
                 broken = self._broken_night(intent, actor, camp, met)
                 if kept_awake:
                     broken.tell = " ".join(kept_awake + [broken.tell])
-                return broken
+                return self._with_bill(broken, bill)
         if camp["short"]:
             # Woken when they said, short of the book's eight hours: the hours pass and
             # the ground has its say, and nothing a full night gives is given.
-            return self._short_night(intent, actor, camp)
+            return self._with_bill(self._short_night(intent, actor, camp), bill)
 
         # The whole night through one door (`Actor.sleep_through`), shared with the sleep
         # a body drops into when it will not be refused any longer (`survival._wake`):
@@ -22199,7 +22208,7 @@ class Engine:
             if keep_note:
                 bits.append(keep_note)
 
-        return Outcome(
+        return self._with_bill(Outcome(
             intent_id=intent.id, op="rest", rolls=camp_rolls,
             effects=[{"ref": actor.ref, "kind": "rest", "healed": result["healed"],
                       "hours": hours, "hp_after": actor.hp, "origin": "rule:rest",
@@ -22211,7 +22220,71 @@ class Engine:
                     f"{', ' + ', '.join(levelled['grants']) if levelled['grants'] else ''}."
                     if levelled and levelled.get("ok") else ""),
             because=intent.because,
-        )
+        ), bill)
+
+    def _room_bill(self, intent: Intent, actor) -> dict | None:
+        """The bill for a bed where the party stands, before the night is slept: None
+        where no beds are let (the street, the wild, somebody's house); otherwise
+        {"tell", "effect"} for the night's outcome, or {"refused": Outcome} for a purse
+        that cannot pay.
+
+        The price is the place's stay (`lodging.price_cp`, the Core Rulebook's inn stay,
+        per day), paid to its keeper through `goods.spend`, the one door money leaves a
+        purse by. Paid once a day: the payment holds the room (`lodging.hold`, an
+        ActiveEffect on the clock), and a sleep while it holds is free; so is a place the
+        sleeper holds themselves. Never a model's figure — the reading's `rest` is the
+        whole of what the player decides (`acts_to_ops.apply` drops a plan's coin handed
+        to this keeper beside it)."""
+        from . import goods
+        from . import keepers
+        from . import lodging
+
+        at = str(self.scene.at or "")
+        if not lodging.lets_beds(self.scene, at):
+            return None
+        name = self._place_name(at)
+        if lodging.owns(actor, at):
+            return {"tell": f"{name[:1].upper() + name[1:]} is {actor.name}'s own; the "
+                            f"bed costs nothing.",
+                    "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
+                               "paid": 0, "why": "own", "origin": lodging.ORIGIN}}
+        if lodging.held(actor, at):
+            return {"tell": f"{actor.name}'s room at {name} is already paid for today.",
+                    "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
+                               "paid": 0, "why": "held", "origin": lodging.ORIGIN}}
+        cp = lodging.price_cp(self.scene, at)
+        coins = goods.coinage(getattr(self, "world", None), None)
+        price = goods.purse_line(goods.coins_for(cp), coins)
+        keeper = keepers.keeper_in(self.scene, at)
+        asks = keeper.name if keeper is not None and keeper.at == at else ""
+        purse, paid = goods.spend(actor.purse, cp)
+        if not paid:
+            held = goods.purse_line(actor.purse or {}, coins) or "nothing"
+            return {"refused": self._refuse(
+                intent, f"A room at {name} is {price} a night"
+                        + (f", and {asks} wants it first" if asks else "")
+                        + f". {actor.name}'s purse holds {held}: not enough. No room, "
+                          f"and no night's sleep here.",
+                code="cannot_pay")}
+        actor.purse = purse
+        lodging.hold(actor, at, name, self.scene.ROUNDS_PER_MINUTE)
+        return {"tell": f"{actor.name} pays {asks or 'the house'} {price} for a room at "
+                        f"{name} for the night.",
+                "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": cp,
+                           "paid": cp, "to": getattr(keeper, "ref", ""),
+                           "stay": lodging.quality(self.scene, at),
+                           "origin": lodging.ORIGIN}}
+
+    @staticmethod
+    def _with_bill(outcome: Outcome, bill: dict | None) -> Outcome:
+        """The night's outcome with the room's bill in front of it: paid before slept."""
+        if not bill or bill.get("refused") is not None:
+            return outcome
+        outcome.tell = f"{bill['tell']} {outcome.tell}".strip()
+        # The outcome's record list, not an actor's effect store (the hold went through
+        # the applicator in `_room_bill`).
+        outcome.effects.insert(0, bill["effect"])
+        return outcome
 
     def _camp_for(self, actor, kind: str, until: str = "") -> dict:
         """The night ahead: how long it runs, where it is slept, and the camp's check.

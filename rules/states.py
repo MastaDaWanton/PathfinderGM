@@ -56,6 +56,9 @@ from __future__ import annotations
 # And the places a person holds (`rules/places.py`, door two): founding a place with an
 # owner grants that owner `holds.place.<slug>` through the one applicator, source
 # `place:<id>`, so "does anyone here hold a place?" is `has_state("holds.place")`.
+# A room paid for at an inn or a tavern is `holds.room.<slug>` the same way (source
+# `place:<id>`, origin `rule:inn-stay`), timed to the day the book prices it by
+# (rules/lodging.py): the rest door asks it before it charges again.
 #
 # `race.<id>`, `sense.*`, `immune.*`, `move.*`, `natural.*`, `weakness.*` — a race
 # document's tags (rules/races.py), held through `Actor.standing_tags` the way a feat's

@@ -79,6 +79,10 @@ class BeatContext:
     # (`beat_verified`): {"model", "host", "provider", "api_key"}, the narrator's own
     # route. None — a test, a tool — and that member reads nothing.
     reader: Mapping | None = None
+    # The demonstration passages this beat was shown on top of the fixed example sets
+    # (`prompts.demonstrations`): the owner's intimate passages, read fresh each beat
+    # (gm/intimate.py). `copied_example` holds the page to them as well.
+    shown: tuple[str, ...] = ()
 
 
 class CheckContractError(TypeError):

@@ -202,10 +202,11 @@ _INN_STAY_NAME = "a room or a bed for the night, lodging (inn stay)"
 
 
 def _lodging_kinds() -> frozenset[str]:
-    from . import schemes
+    # One list of where beds are let, shared with the rest door that charges for them
+    # (`rules/lodging.py`).
+    from . import lodging
 
-    return frozenset(str(x).removeprefix("the ")
-                     for x in schemes.PLACE_KINDS.get("lodging") or ())
+    return lodging.kinds()
 
 
 def sells(scene, actor) -> str:

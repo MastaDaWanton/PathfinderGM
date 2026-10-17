@@ -101,7 +101,6 @@ class GMAgent:
         self.prose_host = prose.get("host", self.host)
         self.prose_provider = prose.get("provider", self.provider)
         self.prose_key = prose.get("api_key", "")
-        self._echoes = None
         # The sentences the pipeline appended to the last beat it produced (a death
         # line, a thread anchor) — ours, not the model's, and kept apart so they are
         # never shown back to it as its own prose.
@@ -1538,7 +1537,8 @@ class GMAgent:
             except ValueError:
                 line = ""
             line = judgement.name_refs(line, self.engine.scene) if line else ""
-            why = companions.interjection_refusal(line, actor, known)
+            why = (companions.interjection_refusal(line, actor, known)
+                   or self._copy_refusal(line))
             if not why:
                 return line, attempts, rejections
             rejections.append(f"attempt {n + 1}: {why}: {line[:120]!r}")
@@ -1585,9 +1585,11 @@ class GMAgent:
             except ValueError:
                 line = ""
             line = judgement.name_refs(line, self.engine.scene) if line else ""
-            why = confide.refusal(line, actor, known, plan, rec,
-                                  others=[a for a in self.engine.scene.actors.values()
-                                          if a is not actor and companions_mod.is_companion(a)])
+            why = (confide.refusal(line, actor, known, plan, rec,
+                                   others=[a for a in self.engine.scene.actors.values()
+                                           if a is not actor
+                                           and companions_mod.is_companion(a)])
+                   or self._copy_refusal(line))
             if not why:
                 return line, attempts, rejections
             rejections.append(f"attempt {n + 1}: {why}: {line[:160]!r}")
@@ -1640,34 +1642,33 @@ class GMAgent:
     # --- The prose itself ------------------------------------------------------------
 
     def _echo_index(self):
-        if getattr(self, "_echoes", None) is None:
-            # Filled with the fallback word, not the raw token: the index wants the
-            # phrasing around the placeholder, and "{Current Enemy}" never appears in
-            # a reply — only whatever it was filled with does.
-            # And with the speaker tags lifted, as every reply is before this reads it:
-            # a phrase running across `<say who=c1 to=you>` would match nothing.
-            self._echoes = narration_mod.build_echo_index(
-                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
-                  for e in prompts.EXAMPLES],
-                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
-                  for e in prompts.NPC_EXAMPLES],
-                # The fight's examples and Continue's, which the narrator is shown in place
-                # of EXAMPLES in those turns (`prompts.build_messages`). Measured
-                # 2026-10-07 (lane C3): a night fight beat shipped "You break contact and
-                # the window is four running steps away..." word for word from
-                # COMBAT_EXAMPLES, because only EXAMPLES and NPC_EXAMPLES were indexed.
-                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
-                  for e in prompts.COMBAT_EXAMPLES],
-                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
-                  for e in prompts.CARRY_ON_EXAMPLES],
-            # The companion examples too: a companion's turn is shown them in place of
-            # the creature ones, and a copied line is as much a defect there.
-            *[prompts.fill_companion(e["reply"]["narration"], self_ref="c1",
-                                     name="stranger", foe_ref="c2", foe="stranger")
-              for e in prompts.COMPANION_EXAMPLES],
-                prompts.CONSEQUENCE_EXAMPLE["assistant"],
-            )
-        return self._echoes
+        """Every demonstration this narrator is shown, as six-word runs
+        (`narration.demonstration_index`): the fixed example sets, and in an intimate
+        beat the owner's passages chosen for it.
+
+        It was a hand-kept list here, and it missed what it did not name: COMBAT_EXAMPLES
+        and CARRY_ON_EXAMPLES joined only after a night fight shipped "You break contact
+        and the window is four running steps away..." (lane C3, 2026-10-07), and the
+        creature-turn consequence example, the repair examples and the owner's intimate
+        passages never did. The list now lives beside the examples
+        (`prompts.demonstrations`), held there by a test."""
+        return narration_mod.demonstration_index(GMAgent._shown_passages(self))
+
+    def _shown_passages(self) -> tuple[str, ...]:
+        """The owner's intimate passages this beat was shown, as replies. Read with
+        getattr: the index is asked of bare test agents too. Only an intimate decision
+        carries passages (`intimate.decide`), so there is nothing else to gate on."""
+        demos = getattr(getattr(self, "intimate", None), "demonstrations", None)
+        return demos.passages() if demos is not None else ()
+
+    def _copy_refusal(self, line: str) -> str:
+        """Why a companion's remark or confidence is refused for copying its own
+        demonstration ("" when it does not): the interjection and confide calls are shown
+        INTERJECT_EXAMPLES and CONFIDE_EXAMPLES, and their lines never pass through the
+        beat's checks, so their retry loops ask this instead."""
+        copied = narration_mod.copied_sentences(line, self._echo_index())
+        return (f"copies a worked example word for word ({copied[0][:60]!r}) — say it in "
+                f"their own words" if copied else "")
 
     def _known_names(self) -> set[str]:
         """Every name the GM is entitled to use.
@@ -2362,7 +2363,8 @@ class GMAgent:
             # measured on the bench against the 0.6B structure model, which could not
             # keep its quotes on the page (docs/beat-verify.md).
             reader={"model": self.prose_model, "host": self.prose_host,
-                    "provider": self.prose_provider, "api_key": self.prose_key})
+                    "provider": self.prose_provider, "api_key": self.prose_key},
+            shown=self._shown_passages())
 
     def _ref_named(self, name: str) -> str:
         """The ref of the one person here called `name`; "" when none or several are."""
@@ -2718,6 +2720,18 @@ class GMAgent:
             except Exception:  # noqa: BLE001 — an unjudgeable candidate is judged by review
                 return set()
 
+        # The draft's own events, without the sentences it copied from a demonstration.
+        # Measured on the 2026-10-16 fight audit (gemma-4-12B, free narrator): a beat that
+        # was COMBAT_EXAMPLES[4] word for word was caught (59 shared phrases), the
+        # rewrite removed every one, and it was refused because it kept 0.0 of the
+        # draft's "events" — "You break contact and the window is four running steps
+        # away", the example's window and the example's chase, none of which happened.
+        # Across the scratchpad saves, 5 of 5 caught copies of three runs or more shipped
+        # this way. What a copied sentence describes is the example's scene, not this one,
+        # so there is nothing in it for a rewrite to keep.
+        own_events = narration_mod.without_sentences(
+            text, narration_mod.copied_sentences(text, self._echo_index()))
+
         def _accept(candidate: str) -> bool:
             after = _review(candidate)
             # And it must keep the events of the draft: a rewrite that scored better
@@ -2728,7 +2742,8 @@ class GMAgent:
             if not (bool(candidate) and not narration_mod.ends_unfinished(candidate)
                     and after.score < review.score
                     and not ({f.kind for f in after.findings} - was)
-                    and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6):
+                    and narration_mod.actions_kept(own_events, candidate,
+                                                   cast_names) >= 0.6):
                 return False
             if ctx is None:
                 return True
