@@ -690,3 +690,70 @@ page wrote "The shard bites deep into the soft tissue of his shoulder."
   shown a torch. The reader answered "fits a place like this". It was ledgered
   `commonplace` and the tell was "Kesst Vayr takes the torch." The narrated-and-shown path
   was proved live with the kettle the day before.
+
+## A blow before the dice, and a fighter nobody holds (2026-10-17)
+
+Live on the integration branch (free narrator, gemma-4-12B, the inn fight), two beats the
+read back passed.
+
+**A blow landed on the turn the fight was only joined.** "Draw my dagger and stab the one
+behind the bar" joined battle and rolled nothing. The page shipped "He bellows, a raw sound
+of defiance, and recoils from your strike". The claims scrubber had cut the stab sentence;
+`swing-not-yet-struck` (regex) has no "recoils"; the harm repair turned "pain" into
+"defiance", and the re-read of that one sentence, read alone, named "someone not listed",
+which is never judged. Read whole, the shipped beat claimed no harm at all.
+
+- `Facts.joined`: the player's attack this beat resolved as `battle_joined` with no roll.
+  The struck-with question (`swing_messages`) is asked on such a beat too.
+- `_struck_early`: any blow of the player's it finds (any weapon, "not shown" included) is
+  an `early` contradiction, `beat-swing-early` (weight 3). The second read asks whether the
+  blow already ARRIVED — "not only drawn, raised, aimed, or still coming".
+- The backstop cuts the sentence and puts the joined tell before the hand-back.
+- **Measured**, gemma-4-12B x2, on 37 joined-turn texts (19 shipped beats from the scratch
+  saves, 18 drafts from tests/replay; one had a rolled blow and was not asked):
+  - first-read alarms on 7 clean beats' wind-ups ("You lunge forward, your fist aimed
+    directly at the guard's face", "You draw your rapier and strike at the cutpurse"): all
+    14 asks refuted by the second read, so no clean beat lost a sentence;
+  - the 9 beats that name a blow of the player's landing were all kept, 2 of 2 each but the
+    evidence beat (1 of 2 read whole; 1 of 1 as the rewritten sentence alone). In one of
+    them the kept sentence was "your knuckles stinging", not the "force of your blow" before
+    it;
+  - also kept: a narrated MISS on a joined turn ("passes harmlessly past"), which the engine
+    did not roll either;
+  - missed: three beats whose landing is told only by the victim ("He staggers…", "collapses
+    against the bar") with no blow of the player's named.
+
+**A fighter the engine does not hold.** The same fight's next beat: "The other man… hesitates
+for a heartbeat before lunging toward you, his hands out like claws." The read back ran on
+that beat and claimed nothing of him: its vocabulary judges people it has a code for, and the
+`attacks` slot that might have was taken out (harm 12/14 -> 8/14). The beat reader read him
+as a newcomer here; the aftermath rightly made no body in a fight.
+
+- `gm/checks/phantom_fighter.py`: in a fight, a beat-reader mention answered "new" and here,
+  or given to somebody held elsewhere in town, is asked one closed question about its
+  sentence: does it show them fighting — "themselves attacking … not only being attacked or
+  grabbed, watching, shouting, flinching, backing away, fleeing or standing by"? A yes cuts
+  the sentence (`fighter-not-in-fight`, weight 3, cut only).
+- **Measured**, gemma-4-12B, on tests/replay's fight files (144 narrated texts, every one
+  treated as a fight): 22 sentences asked, 2 kept — "A local laborer lunges forward … as he
+  prepares to strike you" and "A desperate stranger lunges toward him", both people the
+  engine did not hold at that turn (checked against the recording's scene). 0 false cuts.
+  The first wording kept "it lunges forward to grab the intruder" as the INTRUDER fighting
+  (2/2); "themselves" and "being attacked or grabbed" took it to 0/2. The live lunge: 3/3 on
+  the draft, 2/3 on the polished beat (once the reader called him the away guard, which is
+  why away mentions are asked too).
+
+**Live, round by round** (scratch copy of the evidence save, combat panel: chip, Strike,
+Commit turn, Roll):
+- Round 2: tell "Kesst Vayr hits the one behind the bar with the dagger for 2 piercing." The
+  draft brought in a man and a figure and repeated nine earlier sentences; what survived the
+  cuts was the blow pass's line, "You strike the one behind the bar with the dagger for 2
+  piercing." The creature's turn (the sap, a miss, 7 against AC 15) was written as a crossbow.
+- Round 3: the same blow, 2 piercing. The beat had "You have him momentarily stunned by the
+  pain", which the condition read caught and repaired to "reeling". The creature's miss (8
+  against AC 15) was told as the sap that "fails to connect".
+
+**Left:** the creature turn's weapon is not read (the struck-with question asks about the
+player's blows only), and the crossbow invented in round 2 was carried into round 3's beat.
+A blow told only by the victim's reaction on a joined turn is not claimed. The joined turn
+was not replayed live (the fight was already on); it is proved offline on the evidence beat.
