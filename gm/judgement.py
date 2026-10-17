@@ -939,6 +939,73 @@ def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
         out = [{"op": "narrate_only", "because": "the only ops were aimed at nobody"}]
     return out
 
+
+# The reader's acts (gm/interpret.py ACTS, a closed list) that END a conversation when the
+# player's own line does them: sleeping or taking a room, walking off, walking out, taking
+# the road. And the acts that go ON talking — a line that walks to somebody and THEN speaks
+# to them has not taken its leave.
+LEAVING_ACTS = frozenset({"rest", "go", "leave", "journey"})
+TALKING_ACTS = frozenset({"talk", "request", "insult", "buy", "sell", "give", "seek"})
+# The ops a leaving act is carried by; the leave goes immediately before the first of them.
+_LEAVING_OPS = frozenset({"rest", "travel", "journey", "venture", "found", "call_on"})
+
+
+def leave_before_leaving(raw_intents, frame, scene, *, notes: list | None = None):
+    """A deed in the player's own line that ends the talk is their leave-taking.
+
+    The owner's ruling, 2026-10-17 (docs/conversation.md): going to bed or up to a room,
+    walking off, leaving, taking the road — said in the player's line — end the
+    conversation first, by the existing free `leave_talk`, and then the rest of the line
+    happens in order. Only from the player's words; never from silence.
+
+    Measured live the same day on this branch (hv-data, the inn, c8 the keeper): "I pay for
+    a room for the night and go to bed" and "I say goodbye to the barkeep, go back up to my
+    room and sleep until dawn" both ended "You are still in conversation with the one
+    behind the bar. Take your leave first." — the rest refused. On the second the plan HAD
+    written a `leave_talk`, first, before the `say`: "You are not in conversation with c8",
+    then the say opened the talk, then the rest was refused.
+
+    Structure only, from the reading's acts and their order: a leaving act (`LEAVING_ACTS`)
+    with no talking act after it. The plan's own `leave_talk` (do: leave) is replaced by
+    one placed immediately before the first op that carries the leaving (`_LEAVING_OPS`),
+    or last when the walk was struck as a walk across the room — so a word said and a room
+    paid for earlier in the line come first, while the talk is open. Only when somebody is
+    in conversation now, or a `say` earlier in the plan opens it. A goodbye said with no
+    other deed is not read here: the reader has no closed slot for parting words, and code
+    does not read the words."""
+    from . import interpret
+
+    if not isinstance(raw_intents, list) or scene is None or not frame \
+            or frame.get("error") or getattr(scene, "in_encounter", False):
+        return raw_intents
+    acts = [a.get("act") for a in frame.get("actions") or []
+            if isinstance(a, dict) and interpret.acting(a)]
+    leaving = [k for k, act in enumerate(acts) if act in LEAVING_ACTS]
+    if not leaving or any(act in TALKING_ACTS for act in acts[leaving[0] + 1:]):
+        return raw_intents
+
+    def op(r) -> str:
+        return str(r.get("op", "")).lower() if isinstance(r, dict) else ""
+
+    kept = [r for r in raw_intents
+            if not (op(r) == "leave_talk"
+                    and str((r.get("params") or {}).get("do") or "leave").lower() == "leave")]
+    at = next((k for k, r in enumerate(kept) if op(r) in _LEAVING_OPS), len(kept))
+    from rules import states as states_mod
+
+    talking = any(not a.is_pc and a.has_state(states_mod.TALKING)
+                  for a in (getattr(scene, "actors", {}) or {}).values())
+    if not talking and not any(op(r) == "say" for r in kept[:at]):
+        return raw_intents
+    leave = {"op": "leave_talk", "actor": getattr(scene.pc(), "ref", "pc"),
+             "params": {"do": "leave"},
+             "because": "the player's own deed ends the conversation (ruling 2026-10-17)"}
+    out = kept[:at] + [leave] + kept[at:]
+    if notes is not None:
+        notes.append(f"the conversation ends before the {acts[leaving[0]]}: the player's "
+                     f"own deed takes their leave")
+    return out
+
 # What the player's words suggest the newcomers are. The animal cue is first because it
 # is the more specific claim: "the guard dog" contains "guard", and with the human cue
 # first the dog came out a watchman.

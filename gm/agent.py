@@ -918,6 +918,10 @@ class GMAgent:
                 raw = judgement.order_the_attached(
                     raw, player_input, self.engine.scene,
                     getattr(self, "attachments", ()))
+                # A deed in the player's line that ends the talk takes their leave first,
+                # in its place in the line (ruling 2026-10-17, docs/conversation.md).
+                raw = judgement.leave_before_leaving(raw, read_ok, self.engine.scene,
+                                                     notes=own_words)
                 # And no placeholder reaches validation with nobody behind it: bound to
                 # the one person meant, or its slot emptied, or its op dropped — never
                 # five refusals and a narrated nothing (2026-10-16, `settle_placeholders`).
