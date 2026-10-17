@@ -8045,6 +8045,23 @@ def heat_brief(scene) -> str:
 
 # --- Company: the person the player addresses must exist ------------------------------
 
+def _no_reading(player_text: str) -> bool:
+    """Whether this sentence has no usable reading (gm/interpret.py): the reader is off, or
+    its call failed. Then the two doors that MAKE people from the player's words —
+    `inject_introduce` and `inject_company` — make nobody.
+
+    Owner direction (2026-10-03, docs/structured-turn.md): models read, code validates; no
+    regex reading English. Both doors had kept a regex fallback for a missing reading, and
+    it was measured making somebody out of a phrase that is not a person: with no reading,
+    "I pay for a room for the night and go to bed" was planned `introduce who="bed"`
+    (2026-10-17, a `plan_turn` replay on this branch). A missing reading costs the turn
+    its newcomer, never a body called "bed"; the plan's own `introduce` still stands."""
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    return not reading or bool(reading.get("error"))
+
+
 _ADDRESSES = re.compile(
     r"\bI\s+(?:talk to|speak (?:to|with)|approach|walk (?:up )?to|greet|ask|"
     r"find)\s+(.{3,50}?)\s*[.!?]?$", re.I)
@@ -8071,6 +8088,10 @@ def inject_company(raw_intents, player_text: str, scene, world=None):
     from rules import places as places_mod
 
     if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    # Who is addressed is the READING's to say; with no reading nobody is made from the
+    # words (`_no_reading`).
+    if _no_reading(player_text):
         return raw_intents
     # The older door, and it steps aside for the two newer ones. Measured live
     # 2026-09-27: "I ask around for the woman who sold me bread" matched "ask" here, and
@@ -8550,6 +8571,10 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     from rules import scope as scope_mod
 
     if scene is None or not isinstance(raw_intents, list) or scene.in_encounter:
+        return raw_intents
+    # Who was looked for is the READING's to say; with no reading nobody is made from the
+    # words (`_no_reading`).
+    if _no_reading(player_text):
         return raw_intents
     # The model's own introduce, with nobody in it. Measured live 2026-09-25: `introduce`
     # with no `who` (and nothing `parse` could fold into one) cost an attempt on two turns

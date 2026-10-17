@@ -41,6 +41,15 @@ def _run(e, plan):
     return e.run(e.validate(plan, origin="author:test"))
 
 
+def _read(said, target, act="seek"):
+    """The reading the reader would give the line (gm/interpret.py). Since 2026-10-17 who
+    is looked for is the reading's alone: with none, nobody is introduced from the words
+    (`judgement._no_reading` — no regex reads English to make a person)."""
+    from gm import interpret
+
+    interpret.remember(said, {"actions": [{"act": act, "target": target, "span": said}]})
+
+
 def _intro(who, **params):
     return {"op": "introduce", "because": "t", "params": {"who": who, **params}}
 
@@ -184,6 +193,7 @@ def test_looking_for_somebody_new_in_a_town_declares_an_introduction(engine):
                       ("I look for a baker who might sell me a loaf.", "baker"),
                       ("I wave down a passing carter and ask where he is headed.",
                        "passing carter")]:
+        _read(said, who)
         assert "introduce" in judgement.declared_ops(said, engine.scene, WORLD), said
         raw = judgement.inject_introduce([{"op": "narrate_only"}], said, engine.scene, WORLD)
         assert raw[0] == {"op": "introduce", "because": raw[0]["because"],
@@ -263,6 +273,7 @@ def test_two_different_people_are_not_the_same_turn_twice(engine):
 
 
 def test_the_models_introduce_with_nobody_in_it_is_filled_from_the_player(engine):
+    _read("I ask around for a guide who knows the grass.", "a guide who knows the grass")
     raw = judgement.inject_introduce([{"op": "introduce", "params": {}}],
                                      "I ask around for a guide who knows the grass.",
                                      engine.scene, WORLD)
@@ -287,7 +298,26 @@ def test_a_child_is_any_child_and_the_girl_is_that_girl(engine):
     population.note(s, "a girl selling ribbons")
     s.at = here
     said = "I look for a child who might run a message for a coin."
+    _read(said, "a child who might run a message")
     assert judgement.absent_answer(s, WORLD, said) == ""
     assert judgement.inject_introduce([], said, s, WORLD)[0]["params"]["who"] == "child"
     # The definite one is the particular girl, found where she was seen.
     assert "girl selling ribbons" in judgement.absent_answer(s, WORLD, "I look for the girl.")
+
+
+def test_with_no_reading_nobody_is_introduced_from_the_words(engine):
+    """Measured 2026-10-17 on a `plan_turn` replay with no reading: "I pay for a room for
+    the night and go to bed" was planned `introduce who="bed"` — the retired regex fallback
+    took "bed" for somebody sought. Owner direction: models read, code validates. With no
+    reading the two doors that make people make nobody."""
+    for said in ("I pay for a room for the night and go to bed.",
+                 "I ask around for a guide.", "I talk to the merchant"):
+        assert judgement.inject_introduce([{"op": "narrate_only"}], said, engine.scene,
+                                          WORLD) == [{"op": "narrate_only"}], said
+        assert judgement.inject_company([{"op": "narrate_only"}], said, engine.scene,
+                                        WORLD) == [{"op": "narrate_only"}], said
+        assert "introduce" not in judgement.declared_ops(said, engine.scene, WORLD), said
+    # The plan's own blank introduce is not filled from the words either.
+    blank = [{"op": "introduce", "params": {}}]
+    assert judgement.inject_introduce(blank, "I ask around for a guide.", engine.scene,
+                                      WORLD) == blank
