@@ -2567,6 +2567,110 @@ def ask(sentence: str, q: str, *, before: str = "", chat=None, model: str = "",
         return True
 
 
+# --- whose pronoun: the swap's two closed questions ------------------------------------------
+#
+# `misgendered-pc` found a pronoun of the wrong family near the player's name; whether it
+# MEANS the player is a reading, so it is asked (`GMAgent._swap_pronouns`), and the swap is
+# a fixed table (`narration.PRONOUN_SWAP`). Speech counts here: "It's him! Thessaly Corr!"
+# is the report that made the finder, and it is said aloud. Each returns None when the
+# call fails — unanswered, so the word is left and logged, never guessed.
+_PRONOUN_SYSTEM = (
+    "You answer one question about one word in a passage of a story told to a player "
+    "(\"you\"). The word is marked like «this». Answer from the whole passage, narration and "
+    "what people say aloud alike.")
+
+
+def _one_of(msgs: list[dict], options: list[str], *, chat, model, host, provider,
+            api_key) -> str | None:
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=30, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"answer": {
+                         "type": "string", "enum": options}}, "required": ["answer"]})
+        said = str((reply.json() or {}).get("answer") or "")
+    except Exception:  # noqa: BLE001 — unanswered: the caller leaves the word as it is
+        return None
+    return said if said in options else None
+
+
+def pronoun_points_to(passage: str, word: str, who: str, *, chat=None, model: str = "",
+                      host: str = "", provider: str = "ollama",
+                      api_key: str = "") -> bool | None:
+    """Does the pronoun marked in `passage` — already put in its they-form, `word`
+    (`narration.pronoun_swap("they/them", …)`) — point to the player's character `who`?
+    The reader copies who it points to from the passage; code compares that with the
+    name. True, False, or None (unanswered).
+
+    Probed 2026-10-17, gemma-4-12B x2, on eleven labelled sentences (seven meaning the
+    player, four somebody else: a boy, a gate captain, an intimate partner twice):
+      * the wrong word marked, yes or no — "does «his» mean Thessaly Corr?": 8 of 22; the
+        reader matched the word's gender to the name, the very mistake being repaired;
+      * the word hidden, yes or no: 8/22 (always "no"); the player's name or "somebody
+        else" as the two answers: 14/22 (always the name);
+      * the word hidden, who copied from the passage: 12/22;
+      * the word in its they-form, who copied ("Grab «them» before he runs" -> "Rowan
+        Ash", "and «they» nods him through" -> "the gate captain"): 20/22. The two misses
+        were one sentence, "Thessaly Corr watches the boy run off down the alley, and
+        «they» does not look back", which reads either way."""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    msgs = [{"role": "system", "content": _PRONOUN_SYSTEM},
+            {"role": "user", "content":
+                f"Passage: {passage}\n\nQuestion: who does the marked word «{word}» point "
+                f"to? Copy from the passage the name or words of that person (\"you\" if it "
+                f"is the player)."}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"refers_to": {
+                         "type": "string", "maxLength": 60}}, "required": ["refers_to"]})
+        said = " ".join(str((reply.json() or {}).get("refers_to") or "").split()).lower()
+    except Exception:  # noqa: BLE001 — unanswered: the caller leaves the word as it is
+        return None
+    if not said:
+        return None
+    # Names compared, never English read: the player's name, its first word, or "you".
+    name = " ".join(str(who).split()).lower()
+    first = name.split()[0] if name else ""
+    return bool(name and (name in said or (first and first in said.split())
+                          or said in ("you", "your", "yours", "yourself")))
+
+
+OWNS, NOT_OWNS = "a thing it owns", "not a thing it owns"
+
+
+def pronoun_owns(passage: str, token: str, *, chat=None, model: str = "", host: str = "",
+                 provider: str = "ollama", api_key: str = "") -> bool | None:
+    """What follows the marked "his"/"her": a thing it owns ("his sword", "her face"), or
+    not ("the sword is his", "they saw her at the docks")? True, False, None.
+
+    Probed 2026-10-17 on six labelled cases x2: asked "followed by a thing it owns, or
+    does it stand on its own?", "I'd know «his» face" and "left «her» cloak" stood on their
+    own both times (6/12); asked what comes right after it, with "face" among the owned
+    things, 12/12."""
+    t = token.lower()
+    alone = f"the sword is {t}" if t in ("his", "hers") else f"they saw {t} at the docks"
+    said = _one_of([{"role": "system", "content": _PRONOUN_SYSTEM},
+                    {"role": "user", "content":
+                        f"Passage: {passage}\n\nQuestion: what comes right after the marked "
+                        f"word «{token}» — a thing it owns (\"{t} sword\", \"{t} face\"), or "
+                        f"not (the sentence goes on, or ends, without a thing of {t}'s: "
+                        f"\"{alone}\")?"}],
+                   [OWNS, NOT_OWNS], chat=chat, model=model, host=host, provider=provider,
+                   api_key=api_key)
+    return None if said is None else said == OWNS
+
+
 def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
            api_key) -> bool:
     """The second read of an `absent` contradiction: not "does this sentence show the
