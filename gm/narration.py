@@ -2868,13 +2868,24 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
         ))
 
     if alone:
-        for phrase in invented_companions(text):
+        # The narration only: "Where are your friends now?" spat by the barkeep is his to
+        # say. Each flagged sentence carries one closed question, so when no rewrite holds
+        # the sentence is cut on a yes (`GMAgent._cut_untrue`) — and only then. The four
+        # beats the finder flagged on the 2026-10 scratch benches were all false ("the
+        # bucket being hoisted by the others", "the wound in your side", "the rope tucked
+        # securely against your side", "the others in the room begin to move"), and the
+        # question refuted every one, 2 of 2 each, while keeping the report's "your
+        # companion's next swing" and three made allies 2 of 2 each (gemma-4-12B).
+        said = unquoted(text)
+        for phrase in invented_companions(said):
+            flagged = tuple(s for s in _sentences(said) if invented_companions(s))[:3]
             out.findings.append(Finding(
                 "invented-companion", f"gives the player {phrase!r}, who is not there",
                 f"Nobody is fighting beside them. Remove {phrase!r}: every blow in this "
                 f"scene is the player's own, and crediting a second pair of hands "
                 f"rewrites who did what.",
-                weight=3,
+                weight=3, sentences=flagged,
+                questions=tuple(COMPANION_QUESTION for _s in flagged),
             ))
             break
 
@@ -3454,6 +3465,14 @@ _COMPANION = re.compile(
     r"|partner|band|party|group|men|people|crew)\b"
     r"|\bthe others\b|\byour side\b|\bone of your (?:companions|allies|friends)\b",
     re.I)
+
+
+# The second read's question for a flagged sentence (`review`, `GMAgent._cut_untrue`).
+# Probed 2026-10-17, gemma-4-12B x2, on 13 narration sentences the finder flags: the
+# report's companion and three made allies kept 8 of 8; "the others" watching, fleeing or
+# hoisting a bucket, "your side" as a wound or a hip, and friends remembered refuted 18 of
+# 18. A longer wording naming those exclusions scored the same, so the short one stands.
+COMPANION_QUESTION = "Does this sentence show somebody fighting beside you or on your side now?"
 
 
 def invented_companions(text: str) -> list[str]:

@@ -2862,7 +2862,13 @@ class GMAgent:
     # `stands-elsewhere` in 30 — a felled man standing at 17 of 23 hp, a smithy at the way
     # in — every one shipped as written. In a fight the retry is gated off, so one refused
     # rewrite was the end of it.
-    _CUT_WHEN_UNREPAIRED = frozenset({"contradicts-the-engine", "stands-elsewhere"})
+    #
+    # `invented-companion` joined it on 2026-10-17: a second pair of hands nobody holds
+    # rewrites who did what in the fight, and the docs' ledger had it "left as written"
+    # for want of a cut that would not take dialogue — the finder now reads the narration
+    # only, so its sentences can go (`narration.COMPANION_QUESTION`).
+    _CUT_WHEN_UNREPAIRED = frozenset({"contradicts-the-engine", "stands-elsewhere",
+                                      "invented-companion"})
 
     def _cut_untrue(self, text: str, review) -> tuple[str, list[str], list]:
         """(text, notes, findings still standing). The sentences of the review's truth
