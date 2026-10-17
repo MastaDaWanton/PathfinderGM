@@ -3014,13 +3014,24 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
         ))
 
     if alone:
-        for phrase in invented_companions(text):
+        # The narration only: "Where are your friends now?" spat by the barkeep is his to
+        # say. Each flagged sentence carries one closed question, so when no rewrite holds
+        # the sentence is cut on a yes (`GMAgent._cut_untrue`) — and only then. The four
+        # beats the finder flagged on the 2026-10 scratch benches were all false ("the
+        # bucket being hoisted by the others", "the wound in your side", "the rope tucked
+        # securely against your side", "the others in the room begin to move"), and the
+        # question refuted every one, 2 of 2 each, while keeping the report's "your
+        # companion's next swing" and three made allies 2 of 2 each (gemma-4-12B).
+        said = unquoted(text)
+        for phrase in invented_companions(said):
+            flagged = tuple(s for s in _sentences(said) if invented_companions(s))[:3]
             out.findings.append(Finding(
                 "invented-companion", f"gives the player {phrase!r}, who is not there",
                 f"Nobody is fighting beside them. Remove {phrase!r}: every blow in this "
                 f"scene is the player's own, and crediting a second pair of hands "
                 f"rewrites who did what.",
-                weight=3,
+                weight=3, sentences=flagged,
+                questions=tuple(COMPANION_QUESTION for _s in flagged),
             ))
             break
 
@@ -3067,6 +3078,24 @@ def misgendered(text: str, pc_name: str, pronouns: str,
     player's character is the *only* named person in it — which is what "It's him!
     Thessaly Corr!" is, and what a sentence about the trainer is not.
     """
+    found: list[str] = []
+    for _a, _b, token, _lo, _hi in misgendered_tokens(text, pc_name, pronouns, others):
+        if token.lower() not in found:
+            found.append(token.lower())
+    return found
+
+
+def misgendered_tokens(text: str, pc_name: str, pronouns: str,
+                       others: tuple[str, ...] = ()) -> list[tuple[int, int, str, int, int]]:
+    """`misgendered`'s finds with where they stand: (start, end, the token as written, and
+    the window it was found in, lo and hi), in page order, each token once.
+
+    The tokens are the page's own words, found over the whole text and kept when they fall
+    inside a window — never words of the window string itself. Measured 2026-10-17 over
+    the scratch saves' shipped beats: 11 of the 12 beats this finder flagged were the
+    window's edge cutting a word — "the competing cries" sliced to "he competing", "The
+    ground here" to "The ground he" — read as a man's pronoun for a she/her character. (The
+    twelfth was an intimate scene's partner: "'More,' she gasps … 'I want more, Sam.'")"""
     family = _pronoun_family(pronouns)
     if not family or not pc_name:
         return []
@@ -3083,18 +3112,82 @@ def misgendered(text: str, pc_name: str, pronouns: str,
     # pronoun and the name in two different sentences, and a per-sentence rule sees
     # nothing at all.
     text = text or ''
-    found: list[str] = []
+    found: dict[int, tuple[int, int, str, int, int]] = {}
+    words = list(re.finditer(r"\b[A-Za-z']+\b", text))
+    quotes = speech.spans(text)
+
+    def spoken(at: int) -> bool:
+        return any(qa <= at < qb for qa, qb in quotes)
+
     pattern = r'\b(?:' + re.escape(pc_name) + '|' + re.escape(first) + r')\b'
     for m in re.finditer(pattern, text, re.I):
         lo = max(0, m.start() - MISGENDER_WINDOW)
-        window = text[lo:m.end() + MISGENDER_WINDOW]
+        hi = m.end() + MISGENDER_WINDOW
+        window = text[lo:hi]
         if any(re.search(r'\b' + re.escape(n) + r'\b', window, re.I) for n in names):
             continue      # somebody else is in earshot; the pronoun may be theirs
-        for token in re.findall(r"\b[A-Za-z']+\b", window):
-            low = token.lower()
-            if low in wrong and low not in found:
-                found.append(low)
-    return found
+        named_aloud = spoken(m.start())
+        for w in words:
+            if w.start() >= lo and w.end() <= hi and w.group(0).lower() in wrong:
+                # The narration calls the player "you". Where the name is only said aloud
+                # — "'Sit down, Kesst Vayr,' she says" — a pronoun in the narration around
+                # it is the speaker's or somebody else's, never the player's. Measured on
+                # the one shipped beat left after the window fix (an intimate scene,
+                # 2026-09-30): every one of its five pronouns was the partner's, around
+                # her "I want more, Sam" and "Sam…", and the reader asked whose they were
+                # copied "Sam" for the vocative two times of two.
+                if named_aloud and not spoken(w.start()):
+                    continue
+                found.setdefault(w.start(), (w.start(), w.end(), w.group(0), lo, hi))
+    return [found[k] for k in sorted(found)]
+
+
+# The swap for a pronoun the second read says means the player (`GMAgent._swap_pronouns`):
+# one fixed grammatical map per family a sheet can name, never English read. Two forms are
+# ambiguous and ask one more closed question: "his" is "her" before a thing it owns ("his
+# sword") and "hers" standing alone ("the sword is his"); "her" is "his" before a thing it
+# owns and "him" otherwise. Counterfactual data augmentation meets the same "her" and settles
+# it with part-of-speech tags (Lu et al. 2018, arXiv 1807.11714; Maudslay et al. 2019,
+# arXiv 1909.00871); here the narrator's own model is asked, as every read is. A tuple is
+# (owns a thing after it, stands alone).
+#
+# A they/them character gets the object, possessive and reflexive forms. "he"/"she" is
+# left for them and logged: "he walks" -> "they walks" breaks the verb, and choosing the
+# verb's form is reading English.
+PRONOUN_SWAP = {
+    "she": {"he": "she", "him": "her", "himself": "herself", "his": ("her", "hers")},
+    "he": {"she": "he", "hers": "his", "herself": "himself", "her": ("his", "him")},
+    "they": {"him": "them", "himself": "themself", "herself": "themself", "hers": "theirs",
+             "his": ("their", "theirs"), "her": ("their", "them")},
+}
+
+
+def pronoun_swap(pronouns: str, token: str, owns: bool | None = None) -> str:
+    """The replacement for one wrong pronoun of the player's, in the token's own case, or
+    "" when the table has none (a they/them character's "he") or an ambiguous form was not
+    answered (`owns` None)."""
+    rep = PRONOUN_SWAP.get(_pronoun_family(pronouns), {}).get(token.lower())
+    if isinstance(rep, tuple):
+        rep = "" if owns is None else rep[0 if owns else 1]
+    if not rep:
+        return ""
+    if token.isupper() and len(token) > 1:
+        return rep.upper()
+    return rep[:1].upper() + rep[1:] if token[:1].isupper() else rep
+
+
+def pronoun_neutral(token: str, owns: bool | None = None) -> str:
+    """The token's they-form, the shape the read is shown it in (`beat_verify.
+    pronoun_points_to`): a gendered word beside a name invites the reader to match genders,
+    which is the mistake being repaired. "" for an ambiguous form not yet answered."""
+    if token.lower() in ("he", "she"):
+        return "they"
+    return pronoun_swap("they/them", token.lower(), owns)
+
+
+def pronoun_is_ambiguous(pronouns: str, token: str) -> bool:
+    return isinstance(PRONOUN_SWAP.get(_pronoun_family(pronouns), {}).get(token.lower()),
+                      tuple)
 
 
 # --- the player's character, given the wrong body -------------------------------------
@@ -3518,6 +3611,14 @@ _COMPANION = re.compile(
     r"|partner|band|party|group|men|people|crew)\b"
     r"|\bthe others\b|\byour side\b|\bone of your (?:companions|allies|friends)\b",
     re.I)
+
+
+# The second read's question for a flagged sentence (`review`, `GMAgent._cut_untrue`).
+# Probed 2026-10-17, gemma-4-12B x2, on 13 narration sentences the finder flags: the
+# report's companion and three made allies kept 8 of 8; "the others" watching, fleeing or
+# hoisting a bucket, "your side" as a wound or a hip, and friends remembered refuted 18 of
+# 18. A longer wording naming those exclusions scored the same, so the short one stands.
+COMPANION_QUESTION = "Does this sentence show somebody fighting beside you or on your side now?"
 
 
 def invented_companions(text: str) -> list[str]:

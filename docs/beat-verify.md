@@ -853,3 +853,66 @@ second man's eyes as he realizes the one behind the counter is no longer a threa
 strike him now or try to push past?" — the second man in a sentence where he does not fight,
 "no longer a threat" (not claimed by any read), and a question that offers him by "him",
 which no mention marks. The creature's turn: the sap, a miss, told as the sap.
+
+## A creature's swing on the player's beat (2026-10-17)
+
+The gap above, closed. On the player's own beat in a fight (no `ctx.acting`, the `turn` or
+`outcome` door) a call of its own asks who the page shows striking or swinging at the player
+(`at_you_messages`: the people codes here, "someone not listed"; a wind-up — raising or
+drawing a weapon, circling, stepping closer — named as no blow). `Facts.struck_by` holds the
+people whose own harm op the engine resolved this beat (an attack of opportunity, a fight
+Continue runs on); a harm outcome with no maker stamped and no player roll asks nothing.
+`_struck_unrolled`: a person here, not the player, not in `struck_by` — a contradiction,
+`beat-struck-at-early` (weight 3, `CUT_ONLY`: re-read alone, "He lunges forward, swinging
+the heavy sap" is nobody's, and no engine line can stand in for a blow nothing threw). The
+second read (`_strikes_at_you`) asks WHO the sentence shows swinging at the player, with the
+four sentences before it for "he".
+
+- **Measured**, gemma-4-12B x2, on 59 player-turn fight beats with no creature attack
+  resolved (41 shipped from the scratch saves, linked by the turn door's read-back quotes;
+  18 drafts in tests/replay): the same 7 beats alarmed both runs, 9 sentences asked per run,
+  8 kept and 1 refuted ("the shopkeeper lunges, his fingers clawing at your sleeve"). Every
+  kept sentence is a blow thrown at the player: both round-4 sentences, "his blade aimed at
+  your chest", "The raider's blade whistles through the air, missing your shoulder", "The
+  man's fist … trailing a blur of motion toward your jaw", grabs to pin and to seize, and "the
+  second raider … lunges forward with a guttural roar". Spared: "the heavy weight of his club
+  is poised for a swing", "closing the distance behind you, the steel of his blade held in a
+  steady grip", "moving toward you", "stumbling toward you". 0 false cuts.
+- **Missed** on the bench: two wolf lunges and "He lunges forward, the heavy mallet … aimed at
+  your ribs" — the bench's people lists came from the save's final scene, where the wolf was
+  not and the man was "man with a thick", so the reader answered "someone not listed".
+  Live the list is the scene's own. A newcomer swinging is `phantom_fighter`'s.
+- **Live** (scratch copy of integ2-data, combat panel: Strike, Commit turn, Roll):
+  - round 2: tell "Kesst Vayr's attack with the dagger misses the one behind the bar (5
+    against AC 13)"; the beat had "he pulls back his arm to swing the heavy sap again" — a
+    wind-up, not claimed — and shipped with it;
+  - round 3: tell "… misses the one behind the bar (6 against AC 13)"; the draft had "He
+    ignores the sting of your blade on his apron, his focus entirely on the heavy sap as he
+    swings it with a roar." Read as `at_you` c8, kept, cut. Shipped: "Your dagger whistles
+    through the air, missing the one behind the bar. The wood of the counter groans under
+    the weight of his desperate lunge. …" His own turn after it: "the one behind the bar hits
+    Kesst Vayr with the sap for 2 non-lethal bludgeoning", told "The figure behind the bar
+    swings a heavy sap with sudden, practiced force."
+
+## A paid room on the page (2026-10-17)
+
+Live: "I pay for a room for the night and go to bed" — the tell "Kesst Vayr pays the one
+behind the bar 5 … silver pieces for a room at the inn for the night. Kesst Vayr rests for
+16 hours." The beat showed the sleep ("You find a small, secluded room … You lay down") and
+never the coin; on another save the same request showed neither. Nothing owed it: the deed
+reader leaves a purchase to the screen and a rest to the clock (`deed_reader.OWED_ACTS`),
+and `_omissions` read sales only. Worse, a page that did say "you pay for the room" was a
+settled trade on a turn with no sale, and was judged a sale nobody made.
+
+- `Engine._room_bill`'s paid `lodging` record carries the payment's own sentence (`line`).
+- `_omissions`: a resolved `rest` whose lodging moved coin is owed unless the read back has
+  the player settle a purchase or hand anything over, or the sentence is on the page.
+  The backstop puts the engine's line FIRST (paid before slept), no model call; the groom
+  makes the name "you".
+- The trade judgement counts a paid room as a purchase the engine made.
+- **Live** (scratch copy of coin-data before the room turn): tell "Kesst Vayr pays the one
+  behind the bar 5 Threnniria silver pieces for a room at the inn for the night. Kesst Vayr
+  rests for 8 hours."; logged "beat read back: the engine's answer was missing"; shipped
+  opening "You pay the one behind the bar 5 Threnniria silver pieces for a room at the inn
+  for the night." Left: that beat still never showed the sleep (it went on to the wanted
+  man's arrival), and nothing owes a rest to the page.

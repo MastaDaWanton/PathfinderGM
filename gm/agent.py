@@ -2750,9 +2750,11 @@ class GMAgent:
             fixed, attempt = _rewrite(review.complaint(), "; ".join(review.as_log()))
             attempts.append(attempt)
         except Exception as exc:
-            # A failed call is a rewrite that did not hold: the truth findings are cut.
+            # A failed call is a rewrite that did not hold: the truth findings are cut, and
+            # a pronoun of the player's swapped.
+            text, swapped, _cleared = self._swap_pronouns(text)
             text, cut, _left = self._cut_untrue(text, review)
-            return text, made + [f"polish failed: {exc}"] + cut, [
+            return text, made + [f"polish failed: {exc}"] + swapped + cut, [
                 Attempt("polish", 0.0, self.model, note=str(exc)[:120])]
 
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
@@ -2821,7 +2823,10 @@ class GMAgent:
             return not (_check_kinds(candidate) - checked["draft"])
 
         if _accept(fixed):
-            return fixed, made + review.as_log(), attempts
+            # A rewrite that held may still call the player by the wrong pronoun (it was
+            # judged better, not perfect): swapped in place, word by word.
+            fixed, swapped, _cleared = self._swap_pronouns(fixed)
+            return fixed, made + review.as_log() + swapped, attempts
 
         heaviest = max(review.findings, key=lambda f: f.weight)
         if (heaviest.kind in self._NO_BACKSTOP
@@ -2832,14 +2837,18 @@ class GMAgent:
                     f"retry, {heaviest.kind} only")
                 attempts.append(attempt)
                 if _accept(second):
-                    return second, made + review.as_log(), attempts
+                    second, swapped, _cleared = self._swap_pronouns(second)
+                    return second, made + review.as_log() + swapped, attempts
             except Exception as exc:
                 attempts.append(Attempt("polish", 0.0, self.model,
                                         note=f"retry failed: {str(exc)[:100]}"))
 
         # No rewrite held. A finding about whether the turn was TRUE does not ship: its
         # sentences are asked once more (the read back's second read) and cut on a yes.
+        # A pronoun that means the player is swapped, never cut (`_swap_pronouns`).
         was = text
+        text, swapped, cleared = self._swap_pronouns(text)
+        made += swapped
         text, cut, left = self._cut_untrue(text, review)
         made += cut
         if text != was:
@@ -2848,6 +2857,9 @@ class GMAgent:
             left = ([f for f in _review(text).findings
                      if f.kind not in self._CUT_WHEN_UNREPAIRED]
                     + [f for f in left if f.kind in self._CUT_WHEN_UNREPAIRED])
+        if cleared:
+            # Every pronoun the finder still sees was asked and is somebody else's.
+            left = [f for f in left if f.kind != "misgendered-pc"]
         if left:
             made.append(f"unrepaired: {', '.join(f'{f.kind}: {f.detail}' for f in left)}")
         return text, made, attempts
@@ -2859,7 +2871,13 @@ class GMAgent:
     # `stands-elsewhere` in 30 — a felled man standing at 17 of 23 hp, a smithy at the way
     # in — every one shipped as written. In a fight the retry is gated off, so one refused
     # rewrite was the end of it.
-    _CUT_WHEN_UNREPAIRED = frozenset({"contradicts-the-engine", "stands-elsewhere"})
+    #
+    # `invented-companion` joined it on 2026-10-17: a second pair of hands nobody holds
+    # rewrites who did what in the fight, and the docs' ledger had it "left as written"
+    # for want of a cut that would not take dialogue — the finder now reads the narration
+    # only, so its sentences can go (`narration.COMPANION_QUESTION`).
+    _CUT_WHEN_UNREPAIRED = frozenset({"contradicts-the-engine", "stands-elsewhere",
+                                      "invented-companion"})
 
     def _cut_untrue(self, text: str, review) -> tuple[str, list[str], list]:
         """(text, notes, findings still standing). The sentences of the review's truth
@@ -2901,6 +2919,76 @@ class GMAgent:
                 text = after
                 notes += [f"{f.kind}: no rewrite held; cut {s[:80]!r}" for s in gone]
         return text, notes, left
+
+    # How many wrong pronouns one beat may ask about: each costs one or two short calls, and
+    # a beat with more than this near the player's name is a beat about somebody else.
+    _PRONOUN_ASKS = 4
+
+    def _swap_pronouns(self, text: str) -> tuple[str, list[str], bool]:
+        """(text, notes, cleared). Each pronoun `narration.misgendered_tokens` finds near
+        the player's name is asked one closed question — does it mean the player? — and on
+        a yes swapped in place from `narration.PRONOUN_SWAP`; "his"/"her" ask one more,
+        whether a thing it owns follows. Quotes stay quotes, and nothing else changes.
+        `cleared` is True when no token is left that the read did not refute.
+
+        Until 2026-10-17 `misgendered-pc` had no repair but the whole-beat rewrite, and a
+        refused rewrite (in a fight, the only one) shipped the pronoun: the ledger in
+        docs/narrator-guards.md listed it "left: no cut that would not take dialogue or a
+        whole line". A pronoun is one word, and the grammar of its swap is a fixed map.
+        With the read off (the suite) or a call that fails, nothing is swapped: a wrong
+        swap would misgender whoever the word did mean."""
+        from . import beat_verify
+
+        name, pronouns = self._pc_name(), self._pc_pronouns()
+        tokens = narration_mod.misgendered_tokens(text, name, pronouns,
+                                                  self._other_names())
+        if not tokens:
+            return text, [], True
+        route = {"model": self.prose_model, "host": self.prose_host,
+                 "provider": self.prose_provider, "api_key": self.prose_key}
+        if not (beat_verify.ENABLED and route["model"]):
+            return text, [], False
+        notes: list[str] = []
+        edits: list[tuple[int, int, str]] = []
+        left = len(tokens) > self._PRONOUN_ASKS
+        for a, b, token, lo, hi in tokens[:self._PRONOUN_ASKS]:
+            # The finder's window, widened to whole words, with the one token marked: as
+            # written for what follows it, in its they-form for whom it points to.
+            lo = text.rfind(" ", 0, lo) + 1 if lo > 0 else 0
+            hi = text.find(" ", hi) if text.find(" ", hi) >= 0 else len(text)
+            passage = " ".join((text[lo:a] + "«" + token + "»" + text[b:hi]).split())
+            owns = None
+            if token.lower() in ("his", "her"):
+                # Asked for every "his"/"her", whatever the sheet: the they-form the next
+                # read is shown depends on it ("their" face, saw "them").
+                owns = beat_verify.pronoun_owns(passage, token, **route)
+            neutral = narration_mod.pronoun_neutral(token, owns)
+            if not neutral:
+                left = True
+                notes.append(f"misgendered-pc: what follows {token!r} went unanswered; left "
+                             f"in {passage[:70]!r}")
+                continue
+            shown = " ".join((text[lo:a] + "«" + neutral + "»" + text[b:hi]).split())
+            means = beat_verify.pronoun_points_to(shown, neutral, name, **route)
+            if means is None:
+                left = True
+                notes.append(f"misgendered-pc: whose {token!r} is went unanswered; left")
+                continue
+            if not means:
+                notes.append(f"misgendered-pc: the second read refuted {token!r} in "
+                             f"{passage[:70]!r}")
+                continue
+            rep = narration_mod.pronoun_swap(pronouns, token, owns)
+            if not rep:
+                left = True
+                notes.append(f"misgendered-pc: {token!r} means the player and is left: no "
+                             f"{pronouns} form keeps the verb")
+                continue
+            edits.append((a, b, rep))
+            notes.append(f"misgendered-pc: {token!r} -> {rep!r} in {passage[:70]!r}")
+        for a, b, rep in sorted(edits, reverse=True):
+            text = text[:a] + rep + text[b:]
+        return text, notes, not left
 
     def repair_beat(self, text: str, complaint: str, player_input: str = "",
                     scene_brief: str = "", *, facts: list[str] | None = None,

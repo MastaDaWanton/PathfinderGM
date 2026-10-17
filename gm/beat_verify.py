@@ -207,6 +207,13 @@ class Facts:
     # Every one of its blows this turn was a natural attack (a bite, a claw, a tentacle):
     # then "something else" is the narrator's own word for the limb and is not judged.
     foe_natural: bool = False
+    # On the player's own beat in a fight (no `ctx.acting`, the `turn` or `outcome` door):
+    # who the page shows striking or swinging at the player is asked (`at_you`), and judged
+    # against `struck_by` — the people whose own blow the engine resolved this beat (an
+    # attack of opportunity on the player's move, a fight Continue runs on). Anybody else
+    # shown swinging at the player swung on a turn that is not theirs (`_struck_unrolled`).
+    at_you: bool = False
+    struck_by: tuple[str, ...] = ()
 
     @property
     def bodies(self) -> bool:
@@ -258,7 +265,8 @@ class Facts:
                            # The attempts question too (`attempts_of`).
                            [(a.code, a.who, a.verdict) for a in attempts_of(self)],
                            self.settings, self.blows, self.arms, self.joined,
-                           self.foe, self.foe_blows, self.foe_arms, self.foe_natural],
+                           self.foe, self.foe_blows, self.foe_arms, self.foe_natural,
+                           self.at_you, self.struck_by],
                           default=str, sort_keys=True)
 
 
@@ -392,7 +400,8 @@ def facts_from(ctx) -> Facts:
                  intimate=bool(getattr(ctx, "intimate", False)),
                  settings=tuple(sorted(settings)),
                  **_blows_of(ctx, outcomes, pc),
-                 **_foe_blows_of(ctx, outcomes, scene))
+                 **_foe_blows_of(ctx, outcomes, scene),
+                 **_struck_by_of(ctx, outcomes, pc, scene))
 
 
 UNARMED = "unarmed strike"
@@ -518,6 +527,40 @@ def _foe_blows_of(ctx, outcomes, scene) -> dict:
     return {"foe": acting, "foe_name": str(a.name), "foe_blows": tuple(dict.fromkeys(blows)),
             "foe_arms": tuple(dict.fromkeys(w for w in arms if w)),
             "foe_natural": all(natural(w) for w in blows)}
+
+
+def _struck_by_of(ctx, outcomes, pc, scene) -> dict:
+    """{"at_you", "struck_by"} for `Facts`: on the player's own beat in a fight, who the
+    engine let strike this beat. Measured live 2026-10-17 (integration branch, gemma-4-12B,
+    the inn fight, round 4): the player's beat — the dagger, 2 piercing — also had "He
+    lunges forward, swinging the heavy sap in a desperate, wide arc … sends it toward your
+    shoulder", and the barkeep's own turn, rolled after it, swung the sap again. Nothing
+    asked whether a creature struck on the player's beat: the struck-with question reads a
+    creature's blows on its own turn only (`_foe_blows_of`), and the plan door's regex
+    (`judgement.attacked_by`) did not read "swinging the heavy sap" as a blow.
+
+    Not asked on a creature's turn (`ctx.acting`), on the plan door (nothing is resolved
+    yet), in an intimate scene, or out of a fight. A harm outcome whose maker the engine
+    did not stamp and whose roll was not the player's is somebody's blow, whose is
+    unknown: nothing is asked then rather than judged wrongly."""
+    if getattr(ctx, "acting", "") or getattr(ctx, "door", "") not in ("turn", "outcome"):
+        return {}
+    if not bool(getattr(scene, "in_encounter", False)) or getattr(ctx, "intimate", False):
+        return {}
+    pc_ref = str(getattr(pc, "ref", "pc") or "pc")
+    struck: list[str] = []
+    for o in outcomes:
+        if o.get("op") not in _HARM_OPS or o.get("status") == "refused":
+            continue
+        who = str(o.get("actor") or "")
+        if not who:
+            if any(isinstance(r, dict) and r.get("visibility") == "player"
+                   for r in o.get("rolls") or ()):
+                continue
+            return {}
+        if who != pc_ref:
+            struck.append(who)
+    return {"at_you": True, "struck_by": tuple(dict.fromkeys(struck))}
 
 
 def asks_bodies(ctx) -> bool:
@@ -1012,6 +1055,73 @@ def foe_swing_messages(text: str, facts: Facts) -> list[dict]:
             {"role": "user", "content": f"{_foe_line(facts)}\n\nPassage:\n{text}"}]
 
 
+# --- who strikes at the player on the player's own beat ------------------------------------
+#
+# The struck-with questions read blows the engine rolled. On the player's beat in a fight no
+# creature's blow is rolled (its turn is its own door, after this one), so a creature shown
+# swinging at the player here is a blow nobody declared — the live round 4 of 2026-10-17,
+# the barkeep's sap swung on the player's dagger beat and swung again on his own. Asked by
+# who (the people codes), compared in code with the engine's own attacks this beat
+# (`Facts.struck_by`), and a contradiction is cut, the second read deciding.
+_AT_YOU_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") in a fight, and report every "
+    "sentence in which the narrator shows somebody else striking or swinging at the player "
+    "— a blow, a cut, a thrust, a shot or a thrown thing aimed at you, landing or missing — "
+    "in the codes given. Never the player's own blows, never a blow at somebody else, never "
+    "what a character only says. Not a threat that is no blow yet: raising or drawing a "
+    "weapon, circling, glaring, stepping closer, reaching for something, getting ready to "
+    "strike. One entry per such sentence, copying its own words into \"quote\". Leave the "
+    "list empty when the passage shows nobody striking at you; most passages show nobody.")
+_AT_YOU_DEMO_USER = (
+    "People: c4: Dunmar Oake — ferryman; c5: the drover — commoner; someone not listed\n\n"
+    "Passage:\n"
+    "You drive your knee into the drover's gut and he folds. Dunmar Oake raises his "
+    "boathook and circles to your left, watching for an opening. The drover straightens and "
+    "swings his cudgel at your head; it whistles past your ear. Behind him a deckhand hurls "
+    "a bottle that shatters against the mast above you. 'You'll pay for that,' Dunmar "
+    "growls.")
+_AT_YOU_DEMO_ANSWER = {"at_you": [
+    {"who": "c5", "quote": "swings his cudgel at your head; it whistles past your ear"},
+    {"who": "someone not listed",
+     "quote": "a deckhand hurls a bottle that shatters against the mast above you"}]}
+_AT_YOU_DEMO2_USER = (
+    "People: c4: Dunmar Oake — ferryman; c5: the drover — commoner; someone not listed\n\n"
+    "Passage:\n"
+    "Your blade opens a line across the drover's forearm. He stumbles back against the rail, "
+    "clutching it, and Dunmar Oake draws a knife, his eyes on you. 'Next one goes in your "
+    "belly,' the drover spits.")
+_AT_YOU_DEMO2_ANSWER = {"at_you": []}
+
+
+def at_you_codes(facts: Facts) -> list[str]:
+    return [*(p.ref for p in facts.people if not p.pc and p.here), NEW_PERSON]
+
+
+def at_you_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"at_you": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "who": {"type": "string", "enum": at_you_codes(facts)}, "quote": s},
+            "required": ["who", "quote"]}}},
+        "required": ["at_you"]}
+
+
+def _people_line(facts: Facts) -> str:
+    """The people here other than the player, as the read is told them."""
+    return "; ".join([*(f"{p.ref}: {p.name}" + (f" — {p.what}" if p.what else "")
+                        for p in facts.people if not p.pc and p.here), NEW_PERSON])
+
+
+def at_you_messages(text: str, facts: Facts) -> list[dict]:
+    return [{"role": "system", "content": _AT_YOU_SYSTEM},
+            {"role": "user", "content": _AT_YOU_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_AT_YOU_DEMO_ANSWER)},
+            {"role": "user", "content": _AT_YOU_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_AT_YOU_DEMO2_ANSWER)},
+            {"role": "user", "content": f"People: {_people_line(facts)}\n\nPassage:\n{text}"}]
+
+
 def setting_schema() -> dict:
     from rules.places import SETTINGS
 
@@ -1419,7 +1529,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("conditions", "condition", ("who", "condition")),
                             ("setting", "setting", ("kind",)),
                             ("struck_with", "weapon", ("weapon",)),
-                            ("foe_struck_with", "foe_weapon", ("weapon",))):
+                            ("foe_struck_with", "foe_weapon", ("weapon",)),
+                            ("at_you", "at_you", ("who",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -1581,6 +1692,17 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
             result.raw += "\n" + theirs.text
             answer = dict(answer or {}, foe_struck_with=(theirs.json() or {}).get(
                 "foe_struck_with") or [])
+        if facts.at_you:
+            # Who strikes at the player on the player's own beat, in a call of its own
+            # (`_AT_YOU_SYSTEM`).
+            msgs = at_you_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            hit = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                       num_predict=300, provider=provider, api_key=api_key,
+                       schema=at_you_schema(facts))
+            result.raw += "\n" + hit.text
+            answer = dict(answer or {}, at_you=(hit.json() or {}).get("at_you") or [])
         claims = claims_of(answer, facts)
         attempts = attempts_of(facts)
         if attempts:
@@ -1890,6 +2012,26 @@ def _foe_weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
         f"the only weapon {who} used this turn.", c.sentence, line, c, ref=facts.foe)
 
 
+def _struck_unrolled(c: Claim, facts: Facts) -> Discrepancy | None:
+    """Somebody here shown striking or swinging at the player on the player's own beat,
+    whose blow the engine did not resolve this beat, or None. "someone not listed" is not
+    judged here (a fighter the engine does not hold is `phantom_fighter`'s), nor anybody
+    held elsewhere (`shown_here`'s). Whether the sentence shows a blow thrown or only a
+    wind-up is the second read's question (`_strikes_at_you`), never code's."""
+    if not facts.at_you:
+        return None
+    who = str(c.slots.get("who") or "")
+    p = facts.person(who)
+    if p is None or p.pc or not p.here or who in facts.struck_by:
+        return None
+    name = _name(facts, who)
+    return Discrepancy(
+        "contradiction", "at_you",
+        f"{name[:1].upper() + name[1:]} has not struck at you (the player) this turn: no blow "
+        f"of theirs was thrown, so none whistled past you and none landed. Their turn comes "
+        f"after yours.", c.sentence, "", c, ref=who)
+
+
 def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
     """The player shown picking up a thing on a turn the engine refused a pick-up of
     something that is not there (`Engine._picked_from_nowhere`, code `not_here`), or None.
@@ -2074,6 +2216,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # deal done is true, and is not cut as a sale nobody made.
             paid = any(e.get("kind") == "give" and e.get("how") == "paid"
                        and e.get("to") == pc for o in _resolved(facts) for e in _effects(o))
+            # And a room paid for by sleeping at an inn (rules/lodging.py): coin for a bed,
+            # a purchase the engine made. "You pay for the room" is true on that turn, and
+            # was a sale nobody made to this judgement until 2026-10-17.
+            paid = paid or bool(_rooms_paid(facts))
             if s["settled"] and not done and not paid:
                 why = _refusal_line(refused[0]) if refused else ""
                 out.append(Discrepancy(
@@ -2159,6 +2305,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             found = _foe_weapon_wrong(c, facts)
             if found is not None:
                 out.append(found)
+        elif c.category == "at_you":
+            found = _struck_unrolled(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "setting":
             found = _setting_wrong(c, facts)
             if found is not None:
@@ -2202,7 +2352,33 @@ def _omissions(claims: list[Claim], facts: Facts, text: str) -> list[Discrepancy
         if said or named or _norm(line) in page:
             continue
         out.append(Discrepancy("omission", "trade", line, "", line))
+    # A room paid for at an inn, on a page that never shows the coin. Live 2026-10-17: "I
+    # pay for a room for the night and go to bed" — the tell "Kesst Vayr pays the one
+    # behind the bar 5 … silver pieces for a room at the inn for the night. Kesst Vayr
+    # rests for 8 hours." — and the beat showed the sleep only ("You find a small,
+    # secluded room at the back of the inn … You lay down"). The purse was lighter and
+    # the page never said why. The payment is not the deed reader's (a purchase is the
+    # screen's, a rest the clock's: deed_reader.OWED_ACTS), and this omission read only
+    # sales. Shown when the read back has the player settle a purchase or hand anything
+    # over this beat, or the engine's own sentence is on the page.
+    for line in _rooms_paid(facts):
+        said = any(c.valid and ((c.category == "trade" and c.slots.get("settled")
+                                 and str(c.slots.get("buyer")) == facts.pc_ref)
+                                or (c.category == "hands"
+                                    and str(c.slots.get("from")) == facts.pc_ref))
+                   for c in claims)
+        if said or _norm(line) in page:
+            continue
+        out.append(Discrepancy("omission", "lodging", line, "", line))
     return out
+
+
+def _rooms_paid(facts: Facts) -> list[str]:
+    """The engine's own sentence for each room paid for this beat (a resolved `rest`
+    whose `lodging` record moved coin; `Engine._room_bill`)."""
+    return [str(e.get("line")) for o in _resolved(facts) if o.get("op") == "rest"
+            for e in _effects(o)
+            if e.get("kind") == "lodging" and e.get("paid") and e.get("line")]
 
 
 # --- the second read: a contradiction is asked about once more before it costs a sentence --
@@ -2311,6 +2487,11 @@ def question(d: Discrepancy, facts: Facts) -> str:
         return ("Does this sentence show a blow of yours (the player's) already struck — "
                 "reaching, hitting or cutting somebody, or somebody reeling or recoiling from "
                 "it — not only drawn, raised, aimed, or still coming?")
+    if c.category == "at_you":
+        # Asked in `_strikes_at_you`'s shape (who, from the codes); this line is the cache
+        # key and the record of what was asked.
+        return (f"Which of these people does this sentence show striking or swinging at you "
+                f"(the player)? ({_name(facts, s['who'])} was named.)")
     if c.category == "foe_weapon":
         # Asked in `_struck_with`'s shape too; this line is the cache key.
         return f"Which weapon does this sentence show {facts.foe_name}'s blow struck with?"
@@ -2405,6 +2586,13 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _foe_struck_with(d, lead, facts, chat, model, host, provider,
                                       api_key) else refuted).append(d)
             continue
+        if d.category == "at_you":
+            # The passage up to the sentence, for who "he" is: the live round-4 swing was
+            # "He lunges forward, swinging the heavy sap", after two more sentences of "he".
+            lead = " ".join(sentences[max(0, at - 4):at]) if at > 0 else ""
+            (kept if _strikes_at_you(d, lead, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
         if d.category == "weapon":
             lead = " ".join(sentences[max(0, at - 2):at]) if at > 0 else ""
             (kept if _struck_with(d, lead, facts, chat, model, host, provider, api_key)
@@ -2455,6 +2643,110 @@ def ask(sentence: str, q: str, *, before: str = "", chat=None, model: str = "",
         return str((reply.json() or {}).get("answer") or "") == "yes"
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
+
+
+# --- whose pronoun: the swap's two closed questions ------------------------------------------
+#
+# `misgendered-pc` found a pronoun of the wrong family near the player's name; whether it
+# MEANS the player is a reading, so it is asked (`GMAgent._swap_pronouns`), and the swap is
+# a fixed table (`narration.PRONOUN_SWAP`). Speech counts here: "It's him! Thessaly Corr!"
+# is the report that made the finder, and it is said aloud. Each returns None when the
+# call fails — unanswered, so the word is left and logged, never guessed.
+_PRONOUN_SYSTEM = (
+    "You answer one question about one word in a passage of a story told to a player "
+    "(\"you\"). The word is marked like «this». Answer from the whole passage, narration and "
+    "what people say aloud alike.")
+
+
+def _one_of(msgs: list[dict], options: list[str], *, chat, model, host, provider,
+            api_key) -> str | None:
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=30, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"answer": {
+                         "type": "string", "enum": options}}, "required": ["answer"]})
+        said = str((reply.json() or {}).get("answer") or "")
+    except Exception:  # noqa: BLE001 — unanswered: the caller leaves the word as it is
+        return None
+    return said if said in options else None
+
+
+def pronoun_points_to(passage: str, word: str, who: str, *, chat=None, model: str = "",
+                      host: str = "", provider: str = "ollama",
+                      api_key: str = "") -> bool | None:
+    """Does the pronoun marked in `passage` — already put in its they-form, `word`
+    (`narration.pronoun_swap("they/them", …)`) — point to the player's character `who`?
+    The reader copies who it points to from the passage; code compares that with the
+    name. True, False, or None (unanswered).
+
+    Probed 2026-10-17, gemma-4-12B x2, on eleven labelled sentences (seven meaning the
+    player, four somebody else: a boy, a gate captain, an intimate partner twice):
+      * the wrong word marked, yes or no — "does «his» mean Thessaly Corr?": 8 of 22; the
+        reader matched the word's gender to the name, the very mistake being repaired;
+      * the word hidden, yes or no: 8/22 (always "no"); the player's name or "somebody
+        else" as the two answers: 14/22 (always the name);
+      * the word hidden, who copied from the passage: 12/22;
+      * the word in its they-form, who copied ("Grab «them» before he runs" -> "Rowan
+        Ash", "and «they» nods him through" -> "the gate captain"): 20/22. The two misses
+        were one sentence, "Thessaly Corr watches the boy run off down the alley, and
+        «they» does not look back", which reads either way."""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    msgs = [{"role": "system", "content": _PRONOUN_SYSTEM},
+            {"role": "user", "content":
+                f"Passage: {passage}\n\nQuestion: who does the marked word «{word}» point "
+                f"to? Copy from the passage the name or words of that person (\"you\" if it "
+                f"is the player)."}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"refers_to": {
+                         "type": "string", "maxLength": 60}}, "required": ["refers_to"]})
+        said = " ".join(str((reply.json() or {}).get("refers_to") or "").split()).lower()
+    except Exception:  # noqa: BLE001 — unanswered: the caller leaves the word as it is
+        return None
+    if not said:
+        return None
+    # Names compared, never English read: the player's name, its first word, or "you".
+    name = " ".join(str(who).split()).lower()
+    first = name.split()[0] if name else ""
+    return bool(name and (name in said or (first and first in said.split())
+                          or said in ("you", "your", "yours", "yourself")))
+
+
+OWNS, NOT_OWNS = "a thing it owns", "not a thing it owns"
+
+
+def pronoun_owns(passage: str, token: str, *, chat=None, model: str = "", host: str = "",
+                 provider: str = "ollama", api_key: str = "") -> bool | None:
+    """What follows the marked "his"/"her": a thing it owns ("his sword", "her face"), or
+    not ("the sword is his", "they saw her at the docks")? True, False, None.
+
+    Probed 2026-10-17 on six labelled cases x2: asked "followed by a thing it owns, or
+    does it stand on its own?", "I'd know «his» face" and "left «her» cloak" stood on their
+    own both times (6/12); asked what comes right after it, with "face" among the owned
+    things, 12/12."""
+    t = token.lower()
+    alone = f"the sword is {t}" if t in ("his", "hers") else f"they saw {t} at the docks"
+    said = _one_of([{"role": "system", "content": _PRONOUN_SYSTEM},
+                    {"role": "user", "content":
+                        f"Passage: {passage}\n\nQuestion: what comes right after the marked "
+                        f"word «{token}» — a thing it owns (\"{t} sword\", \"{t} face\"), or "
+                        f"not (the sentence goes on, or ends, without a thing of {t}'s: "
+                        f"\"{alone}\")?"}],
+                   [OWNS, NOT_OWNS], chat=chat, model=model, host=host, provider=provider,
+                   api_key=api_key)
+    return None if said is None else said == OWNS
 
 
 def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
@@ -2614,6 +2906,40 @@ def _foe_struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, hos
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
     return bool(said) and said != NOT_SHOWN and said not in facts.foe_blows
+
+
+def _strikes_at_you(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                    api_key) -> bool:
+    """The second read of an `at_you` contradiction, in `_in_condition`'s shape: WHO the one
+    sentence shows striking or swinging at the player, from the codes, with a wind-up named
+    as what it is not; kept when it names anybody here the engine let strike nobody this
+    beat (the first read's person or another — either way a blow the dice never threw). A
+    call that fails keeps the contradiction, as every second read does."""
+    codes = at_you_codes(facts) + [NOBODY]
+    ask = ((f"The passage before it, for who \"he\", \"she\" and \"they\" are: {before}\n"
+            if before else "")
+           + f"The sentence: {d.sentence}\n\nPeople: {_people_line(facts)}\n\nQuestion: which "
+           f"of these people does this sentence show striking or swinging at you (the player) "
+           f"— a blow, cut, thrust or throw actually aimed at you, landing or missing — not "
+           f"only raising or drawing a weapon, circling, threatening, stepping closer or "
+           f"getting ready to strike? Every one it shows; \"{NOBODY}\" if none.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=60, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"who": {
+                         "type": "array", "maxItems": 6,
+                         "items": {"type": "string", "enum": codes}}},
+                         "required": ["who"]})
+        named = [str(x) for x in (reply.json() or {}).get("who") or []]
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+    return any((p := facts.person(code)) is not None and p.here and not p.pc
+               and code not in facts.struck_by for code in named)
 
 
 def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
