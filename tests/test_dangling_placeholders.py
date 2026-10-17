@@ -18,8 +18,9 @@ bind to the one person meant, else empty a slot the op never reads, else drop th
 """
 from __future__ import annotations
 
-import inspect
+import ast
 import re
+from pathlib import Path
 
 import pytest
 
@@ -148,11 +149,19 @@ def test_a_spawn_is_never_re_aimed_at_somebody_already_here():
 
 def test_the_ops_about_somebody_are_the_ones_the_engine_aims():
     """Every `_op_<name>` that reads `intent.target` is in `_ABOUT_SOMEBODY`, so an op that
-    starts reading its target can never have that target silently emptied here."""
+    starts reading its target can never have that target silently emptied here. Walked as
+    an AST, as test_three_laws does (tests/test_suite_isolation.py caps source pins)."""
+    tree = ast.parse((Path(__file__).resolve().parents[1] / "rules" / "engine.py")
+                     .read_text(encoding="utf-8"))
+    engine = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Engine")
     reads = set()
-    for name, fn in inspect.getmembers(Engine, inspect.isfunction):
-        m = re.fullmatch(r"_op_(\w+)", name)
-        if m and m.group(1) in OPS and "intent.target" in inspect.getsource(fn):
+    for fn in engine.body:
+        m = re.fullmatch(r"_op_(\w+)", getattr(fn, "name", "") or "")
+        if not (isinstance(fn, ast.FunctionDef) and m and m.group(1) in OPS):
+            continue
+        if any(isinstance(n, ast.Attribute) and n.attr == "target"
+               and isinstance(n.value, ast.Name) and n.value.id == "intent"
+               for n in ast.walk(fn)):
             reads.add(m.group(1))
     assert reads, "no handler read a target: the pin is reading the wrong thing"
     assert reads <= judgement._ABOUT_SOMEBODY, sorted(reads - judgement._ABOUT_SOMEBODY)

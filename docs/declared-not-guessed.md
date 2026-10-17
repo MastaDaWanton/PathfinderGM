@@ -365,3 +365,54 @@ when the model wanted "him", the grammar offered `new1` as one of five legal str
 Taking the placeholders out of the enum would stop a plan attacking or checking against
 somebody it introduced (`say`'s `to` lives in params, outside the enum). That is a
 trade-off to measure with the strangers script before changing it.
+
+## Built (2026-10-17): a refusal is not an answer, and five of them cost the turn
+
+**What happened.** On master (0.2.20, gemma-4-12B) a lane playing a Pangrella scratch
+campaign in a tavern saw the plan write `new1` with nothing introduced on 5 of 5 attempts
+across two turns ("I pay for a room for the night and go to bed", "I ask the barkeep for a
+room…"). Reproduced on the hv-data scratch save, in the inn off Khalmorin's market with c8
+"the one behind the bar" and c9 present: "I ask the barkeep for a room for the night and go
+to sleep" was planned `travel target=new1`, `rest target=new1` five times, refused five
+times, then handed to a fallback model that did not answer in 600 s, and the turn fell to
+narration only. The lane's own saves hold two more shapes, seven refusals each: `travel
+target=new1` from the outskirts with nobody there, and `say to=new1` beside the one person
+in the room.
+
+**What had regressed: nothing.** `bind_placeholders` is unchanged since 2026-09-27. It
+binds one label only when the player's words can only mean one person, and "the barkeep"
+shares no word with "the one behind the bar", so it rightly bound nothing. What was missing
+was a step after it: the refusal above was the only answer, the correction did not teach
+the retry to stop writing `new1` (the schema still offers it in every enum out of a fight),
+and nothing in code took the label out.
+
+**The ruling, in code** (`judgement.settle_placeholders`, last before validation, after
+every door that may still introduce somebody or drop an introduce):
+
+- **Bound to the one person meant**: the one the reading's target slots name here
+  (`acts_to_ops.person`), or the one the words can only mean (`_the_one_meant`); for a line
+  said, also the one person the player is dealing with (`acts_to_ops.addressed`). A blow is
+  never aimed by that last guess.
+- **Else the slot goes, where the op never reads it**: a travel's or a rest's `target`, a
+  say's `to`. Inform's "supplying a missing noun" activity (Writing with Inform §18.32)
+  either supplies a noun or the command goes on without one when the grammar needs none.
+- **Else the op goes**, with the reason in the turn log, and the rest of the turn stands.
+  `_ABOUT_SOMEBODY` names the ops whose resolution reads a target, pinned against the
+  engine's handlers by a test. The player's own deed on somebody keeps the first attempt's
+  retry, so G2's `cast aim=ref:new2` still gets the people named and is re-aimed by the
+  model (tests/test_g2_phantom_targets.py); from the second attempt code settles it.
+
+**And when a turn does fall to narration only.** The read-back ran on that door, and its
+move and hour rows both passed a beat that slept the night: the stairs went to no place the
+engine lists, and "the sun is hanging lower in the sky" was true of the unmoved clock. No
+row asked whether hours went by. `gm/checks/time_kept.py` asks one closed question
+(`deed_reader.read_slept`) on a turn whose reading asked for time (rest, wait, journey)
+and whose clock moved under an hour: which sentence has the player sleep or let hours
+pass. Rewrite with the fact, then cut from it.
+
+**Seen and not changed.** On the same save, "I say goodbye to the barkeep, go back up to
+my room and sleep until dawn" resolved `leave_talk`, then a `say` "goodbye" that opened the
+conversation again, so the `rest` was refused ("You are still in conversation…"). The table
+orders the leave before the words; a goodbye said is the leave, and should not reopen it.
+Also, with no reading, the retired-regex fallback `inject_introduce` read "go to bed" as
+somebody sought and introduced a person called "bed".
