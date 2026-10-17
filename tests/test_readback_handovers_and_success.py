@@ -229,6 +229,61 @@ def test_the_attempts_are_a_call_of_their_own_and_the_first_read_is_unchanged():
     assert len(calls) == 1
 
 
+# The model's own replies on the bench (gemma-4-12B, 2026-10-16, run 1 of 2), one per call
+# in the order asked: the first read, then the attempts.
+RECORDED = {
+    "pay-tossed-in-dirt": [
+        {"player_ends_at": {"place": "the gate", "quote": ""},
+         "changed_hands": [{"item": "something else", "from": "c4", "to": "the floor",
+                            "quote": "He tosses it into the dirt between you"}],
+         "trades": [{"item": "something else", "seller": "c4", "buyer": "pc",
+                     "settled": True, "quote": "the trade is finished"}],
+         "harmed": [], "arrived": [], "left": [], "time_of_day": []},
+        {"a1": {"shown": "fails", "quote": "your limbs feel heavy and your muscles lack the "
+                                           "strength to lighten the load"},
+         "a2": {"shown": "succeeds",
+                "quote": "The cart groans and settles into its frame with a heavy thud"},
+         "a3": {"shown": "fails", "quote": "He doesn't even seem to consider the request; he "
+                                           "just shakes his head slowly."}}],
+    "no-trade-finished": [
+        {"player_ends_at": {"place": "the gate", "quote": ""}, "changed_hands": [],
+         "trades": [{"item": "something else", "seller": "pc", "buyer": "c5",
+                     "settled": True, "quote": "the trade is finished"}],
+         "harmed": [], "arrived": [], "left": [], "time_of_day": []},
+        {"a1": {"shown": "fails",
+                "quote": "The tanner's apprentice shrugs and turns back to his rods."}}],
+    "att-lift-told-success": [
+        dict(EMPTY, player_ends_at={"place": "the road to Kalixiri",
+                                    "quote": "rolls free onto the firm road"}),
+        {"a1": {"shown": "succeeds",
+                "quote": "it rises out of the rut and rolls free onto the firm road"}}],
+    "ho-att-tracks-found": [
+        dict(EMPTY, player_ends_at={"place": "the road to Kalixiri", "quote": ""}),
+        {"a1": {"shown": "succeeds", "quote": "the ground shows a clear, recent path... The "
+                                              "tracks lead straight toward the knoll."}}],
+}
+
+
+def test_the_models_recorded_readings_raise_what_the_engine_contradicts():
+    """Replayed without a model. The live beat raises the gift by the floor and nothing
+    else — not the trade it was cut for on 0.2.20, and not its three attempts, which it told
+    truly (the help failed, the smith lifted alone, the request refused). The bare "trade is
+    finished" raises nothing. A failed lift told as the cart rolling free, and the held-out
+    failed tracking told as "a clear, recent path" (an ellipsis quote), raise the attempt."""
+    from tests.beat_verify import gold as G
+
+    want = {"pay-tossed-in-dirt": {"hands"}, "no-trade-finished": set(),
+            "att-lift-told-success": {"attempt"}, "ho-att-tracks-found": {"attempt"}}
+    for beat_id, replies in RECORDED.items():
+        beat = G.by_id(beat_id)
+        f = G.facts(beat)
+        chat, _calls = _scripted(*replies)
+        reading = bv.read(beat["text"], f, model="stub", chat=chat)
+        assert not reading.error, (beat_id, reading.error)
+        got = {d.category for d in bv.diff(reading.claims, f, beat["text"])}
+        assert got == want[beat_id], (beat_id, got)
+
+
 def test_the_member_raises_an_attempt_finding():
     from gm.checks import beat_verified
 

@@ -740,7 +740,16 @@ _ATTEMPTS_SYSTEM = (
     "it at all, or something the passage leaves open.\n"
     "A person's spoken answer to what they were asked IS how it turned out. A threat, a "
     "plan or a hope is not. Copy the passage's own words that show it into \"quote\"; "
-    "\"\" when unsure.")
+    "\"\" when unsure.\n"
+    # Measured 2026-10-17: every bench beat with no check of its own was given one failed
+    # check the page never tells (four kinds, 71 beats each). Without this line and the
+    # third demonstration, a failed "Perception check: the player looks about" was read
+    # as succeeding on 20-22 of 71 beats — any description of what is in view — and the
+    # second read kept 3-4 of those. With them: 3-5 of 71 claimed, 1-2 kept, and the
+    # 32 labelled attempt claims and 11 alarms on the gold beats unchanged.
+    "Most passages show the outcome of few of the attempts listed, often none: a passage "
+    "about something else says nothing of an attempt, and a description of what is there "
+    "to be seen is not a search or a look succeeding unless it finds what was looked for.")
 _ATTEMPTS_DEMO_USER = (
     "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman; "
     "c5: the drover — commoner\n"
@@ -769,6 +778,18 @@ _ATTEMPTS_DEMO2_USER = (
 _ATTEMPTS_DEMO2_ANSWER = {
     "a1": {"shown": "succeeds", "quote": "it clears, and the numbness ebbs out of your hand"},
     "a2": {"shown": "unsure", "quote": ""}}
+# A passage that tells neither attempt: a view described is not a search succeeding.
+_ATTEMPTS_DEMO3_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman\n"
+    "Attempts:\n"
+    "a1: you (the player) — Perception check: the player scans the river for boats\n"
+    "a2: you (the player) — Sleight of Hand check: the player palms a die\n\n"
+    "Passage:\n"
+    "The ferry landing is quiet at this hour. Nets hang drying from the posts, and through "
+    "the thinning mist you can make out the far bank. You tip the last coins from your "
+    "pouch into your palm and count them. Dunmar Oake is coiling a rope by the bollard.")
+_ATTEMPTS_DEMO3_ANSWER = {"a1": {"shown": "unsure", "quote": ""},
+                          "a2": {"shown": "unsure", "quote": ""}}
 
 
 def _attempt_line(a: Attempt, facts: Facts) -> str:
@@ -789,6 +810,8 @@ def attempts_messages(text: str, facts: Facts, attempts: list[Attempt]) -> list[
             {"role": "assistant", "content": json.dumps(_ATTEMPTS_DEMO_ANSWER)},
             {"role": "user", "content": _ATTEMPTS_DEMO2_USER},
             {"role": "assistant", "content": json.dumps(_ATTEMPTS_DEMO2_ANSWER)},
+            {"role": "user", "content": _ATTEMPTS_DEMO3_USER},
+            {"role": "assistant", "content": json.dumps(_ATTEMPTS_DEMO3_ANSWER)},
             {"role": "user", "content": f"People: {'; '.join(people)}\nAttempts:\n{listed}"
                                         f"\n\nPassage:\n{text}"}]
 
