@@ -46,9 +46,12 @@ from dataclasses import dataclass, field
 
 # The acts whose ops are built here, whole.
 GOODS_ACTS = frozenset({"take", "drop", "give", "sell", "steal"})
-# The acts under which coin leaves the player's purse. `rest` because a room is paid for
-# ("I take a room for the night": the act list's own words for `rest`).
-PAYING_ACTS = frozenset({"give", "buy", "drop", "rest"})
+# The acts under which coin leaves the player's purse. `rest` was one ("I take a room for
+# the night": the act list's own words for it), which let the plan pay for a room with a
+# coin `give` at whatever figure the model wrote. The rest door charges the room itself
+# now, at the book's price (`Engine._room_bill`, 2026-10-16), so a plan's coin beside a
+# rest would be the room paid twice — and a number no model may author.
+PAYING_ACTS = frozenset({"give", "buy", "drop"})
 
 _PRONOUNS = frozenset({"him", "her", "them", "he", "she", "they", "his", "their"})
 _IT = frozenset({"it", "them", "these", "those", "this", "that"})
@@ -588,8 +591,8 @@ def sold_not_asked(frame: dict | None, scene) -> dict[int, str]:
         a["was"] = "request"
         if got[0] == "lodging":
             # Taking a room is the reading's `rest` (its gloss: "take a room"; the labelled
-            # set's "I pay for a room at the inn"). What the bed costs is the rest door's
-            # (not charged yet, a known gap, out of this change's scope).
+            # set's "I pay for a room at the inn"). What the bed costs is the rest door's:
+            # `Engine._room_bill` charges the house's price and holds the room.
             a["act"] = "rest"
             a.pop("object", None)
             a.pop("target", None)
@@ -1196,6 +1199,11 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         if not mine:
             out.append(r)                        # between other people: theirs
             continue
+        if _pays_for_the_room(r, acts, scene, pc):
+            if notes is not None:
+                notes.append(f"the plan's {op} of {p.get('item')!r} to the keeper: the "
+                             f"room is the rest's to charge, at the house's price, dropped")
+            continue
         twin = next((k for k, b in enumerate(built)
                      if _same_thing(p.get("item"), b["params"].get("item"), pc)), None)
         if twin is None and not _is_coin(p.get("item")) and any(
@@ -1236,9 +1244,38 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         out.append(r)
     for k, b in enumerate(built):
-        if k not in placed:
-            out.append(b)
+        if k in placed:
+            continue
+        if _pays_for_the_room(b, acts, scene, pc):
+            if notes is not None:
+                notes.append(f"the reading's give of {b['params'].get('item')!r} to the "
+                             f"keeper: the room is the rest's to charge, dropped")
+            continue
+        out.append(b)
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
+def _pays_for_the_room(r: dict, acts: set, scene, pc) -> bool:
+    """Whether a give is coin from the player to the keeper of the inn or tavern they
+    stand in, on a turn whose reading takes a room (`rest`). The rest door bills the room
+    at the house's price (`Engine._room_bill`) and holds it for the day; this coin beside
+    it would pay for the same bed twice — measured before the bill existed, "I pay for a
+    room" moved coin only when the plan wrote a figure for it, and never held a room.
+    Structure only: the reading's act, the op's item, its receiver, and what the engine
+    holds about the place — never the player's words."""
+    if "rest" not in acts or not isinstance(r, dict) or r.get("op") != "give":
+        return False
+    p = r.get("params") or {}
+    if not _is_coin(p.get("item")) or _to_player(p, pc, r.get("target")):
+        return False
+    from rules import keepers, lodging
+
+    at = str(getattr(scene, "at", "") or "")
+    if not lodging.lets_beds(scene, at):
+        return False
+    keeper = keepers.keeper_in(scene, at)
+    to = str(p.get("to") or r.get("target") or "")
+    return keeper is not None and to == keeper.ref
 
 
 # The acts that choose where a walk goes: a move, a person sought or followed, a door

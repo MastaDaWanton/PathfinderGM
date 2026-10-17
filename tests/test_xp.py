@@ -111,6 +111,10 @@ def test_sleeping_on_enough_xp_takes_the_level(tmp_path):
         pc = c.scene.pc()
         was = pc.level
         pc.xp = xp.total_for(was + 1)
+        # This start stands in a tavern, and since 2026-10-16 a bed there is paid for
+        # (`Engine._room_bill`, the common inn stay): Kesst's purse is empty, and the
+        # night was refused before a level could settle.
+        pc.purse = {"sp": 5}
         e = c.engine()
         res = e.run(e.validate([{"op": "rest", "params": {"kind": "night"}}]))
         cm._LIVE.clear()

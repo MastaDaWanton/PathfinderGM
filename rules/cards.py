@@ -940,7 +940,11 @@ MEANS_KEYS = ("coin", "coins", "work", "wage", "wages", "earn", "paid", "hire", 
 # (common)", 5 sp — "a place on a raised, heated floor and the use of a blanket and a
 # pillow". (Poor, 2 sp, is "a place on the floor near the hearth", which is not a bed.)
 # A world that exports its own room prices replaces this (docs/from-world-bible.md).
-BED_PRICE_CP = 50
+# The figure lives with the door that charges it (`rules/lodging.py`, 2026-10-16), so the
+# card's "can you pay for it" and the rest's bill can never quote two prices.
+from .lodging import DEFAULT_STAY as _STAY, STAY_CP as _STAY_CP  # noqa: E402
+
+BED_PRICE_CP = _STAY_CP[_STAY]
 
 
 def need_of(card: Card) -> str:
