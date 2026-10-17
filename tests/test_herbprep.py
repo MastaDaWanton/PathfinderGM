@@ -520,7 +520,10 @@ def _scene_at(minute=0):
 def _give(engine, item, count=1):
     raw = {"op": "give", "actor": "pc",
            "params": {"item": item, "count": count, "to": "pc"}}
-    return engine.run(engine.validate([raw])).outcomes[0]
+    # The test's own word that the thing exists: since 2026-10-16 a pick-up from nowhere
+    # is refused (`Engine._picked_from_nowhere`, tests/test_scenery.py), and what these
+    # pin is where a herb lands once it is in hand, not where it came from.
+    return engine.run(engine.validate([raw], origin="author:test")).outcomes[0]
 
 
 def test_a_handed_over_herb_reaches_the_satchel():
