@@ -562,9 +562,21 @@ class GMAgent:
             # project its whole combat loop — narrating a punch and proposing nothing —
             # is not a reply the sampler can produce. See `prompts.turn_schema`.
             try:
+                # The rescue's own allowance, as the prose call has had since 2026-09-17
+                # (FALLBACK_TIMEOUT): this loop was the copy left on client.chat's 600 s
+                # cold-load default. Measured 2026-10-17 (shared Ollama, scratch data):
+                # "richardyoung/qwen3-4b-… did not answer within 600s" on three degraded
+                # turns, with the model INSTALLED (it is in /api/tags) — Ollama never
+                # logged a load: the request queued behind the busy 12B the whole time.
+                # Every load in this machine's Ollama log took 79 s at most (454 loads,
+                # median 5.5 s, p95 27 s), so two minutes is a load and a reply; past it
+                # the turn's own floor answers. A model NOT installed is never scheduled
+                # (`client.has_model`, above).
                 reply = client.chat(messages, model, host, as_json=True, think=False,
                                 temperature=0.8 if n == 0 else 0.5,
                                 provider=provider, api_key=key,
+                                timeout=(FALLBACK_TIMEOUT if n >= max_attempts
+                                         else PRIMARY_TIMEOUT),
                                 schema=prompts.turn_schema(
                                     fighting=self.engine.scene.in_encounter,
                                     refs=tuple(self.engine.scene.actors),
