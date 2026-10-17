@@ -804,3 +804,52 @@ the sap before his turn and a patron "reaching for a heavy chair"; the patron, a
 here, raised no phantom-fighter finding (reaching is not fighting), and the early creature
 swing shipped.
 That is the next gap: the turn door has no read-back question for a creature's blow.
+
+## A number, an unnamed felling, and a question about nobody (2026-10-17)
+
+The merged integration branch, live (free narrator, gemma-4-12B, the inn fight): "I stab the
+one behind the bar with my dagger", tell "… hits the one behind the bar with the dagger for
+5 piercing" (12 of 23 left). The page: "You drive your dagger into the man behind the bar,
+piercing his flesh for 5 damage. … he collapses into the counter … Do you turn to face the
+second man or move for the exit?"
+
+**The number.** The blow pass (`_show_blows`) handed the engine's line, amount and all, to the
+model as the deed to write. `plain_tell` keeps a damage amount on purpose — the
+narrator-down fallback shows the player their own damage (`test_the_players_own_damage_
+survives`, left as it is). A line written INTO prose is `narration.page_line` now: the blow
+pass, `_blows_from` (`right_hands`, `cut_premature_blows`), `right_actor` and the read-back's
+creature and early-blow lines. And the last step of every door's groom is
+`strip_turn_numbers`: every number the turn's outcome RECORDS hold (roll faces and totals, the
+DC, the margin, a damage amount) is taken off the page with the words the engine wraps it in
+("for 5 damage", "against AC 15"); a number that is a verb's object takes its sentence. A
+price, a count, a line of speech are left. Found on the way: `_cut_sentences` ate the space
+before a cut sentence ("A b.E f.").
+
+**The collapse.** Neither reader claimed it as his. The truth pass reads the beat before the
+blow pass writes the line that names him, so the beat opened "The blade finds the gap in his
+leather jerkin…"; the read back answered "he collapses into the counter" as `down`, "someone
+not listed" — never judged — and the regex links a sentence to a name that was not there.
+The body-conditions call claimed no `prone`. Now a `down`/`dead` claim on "someone not
+listed", with somebody here standing, is asked WHO (`_felled_who`: the passage before and the
+turn's tells for "he", the felling wording probed at 4/4 felled and 0/5 standing), and judged
+against the engine (`beat-harms`). On the live draft: the first read still "someone not
+listed" 3 of 3, the who-read named him 3 of 3, kept. On the recorded fight beats (126 texts,
+each against the scene after its turn): 1 alarm, kept — "He is pinned beneath the heavy
+weight of the wood, his arms trapped" of a man the engine held in a grapple, not down;
+borderline, not a stumble.
+
+**The question.** The phantom's fighting sentence was cut; the closing question still offered
+him. In a fight, a hand-back whose mention the beat reader answered new and here, or gave to
+somebody held elsewhere, is cut (`hand-back-names-nobody`, no model call); the groom writes
+the plain hand-back. **History:** the narrator's history carries the page as shipped, cut text
+and all (`Campaign.history`), so a repair does reach the next beat. The second man in this save
+comes from two beats shipped before the phantom check existed, which are still in its history.
+
+**Live, after** (scratch copy of integ3-data, the same line typed): tell "for 5 piercing"; the
+page "You drive your dagger into the chest of the one behind the bar." — no number. The
+collapse ("The man behind the bar is down, his shoulder a ruin…") was cut by polish, the
+other man's charge by the phantom check. Still shipped: "the desperate, frantic look in the
+second man's eyes as he realizes the one behind the counter is no longer a threat. Do you
+strike him now or try to push past?" — the second man in a sentence where he does not fight,
+"no longer a threat" (not claimed by any read), and a question that offers him by "him",
+which no mention marks. The creature's turn: the sap, a miss, told as the sap.
