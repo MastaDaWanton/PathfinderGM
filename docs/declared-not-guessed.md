@@ -415,4 +415,31 @@ my room and sleep until dawn" resolved `leave_talk`, then a `say` "goodbye" that
 conversation again, so the `rest` was refused ("You are still in conversation…"). The table
 orders the leave before the words; a goodbye said is the leave, and should not reopen it.
 Also, with no reading, the retired-regex fallback `inject_introduce` read "go to bed" as
-somebody sought and introduced a person called "bed".
+somebody sought and introduced a person called "bed". (Whether a goodbye counts as taking
+leave is the owner's to rule: conversations end by an explicit leave or by walking out.)
+
+**Closed the same day:**
+
+- **The 600 s wait.** The fallback planner (qwen3-4b) IS installed; Ollama never logged
+  loading it — each request queued behind the busy 12B for `client.chat`'s whole 600 s
+  cold-load default. The prose call had capped its rescue at `FALLBACK_TIMEOUT` (120 s)
+  since 2026-09-17; the plan loop was the copy left behind. This machine's Ollama log
+  holds 454 model loads, median 5.5 s, p95 27 s, slowest 79 s. An uninstalled fallback was
+  already never scheduled (`client.has_model`).
+- **"bed".** With no reading, `inject_introduce` and `inject_company` make nobody
+  (`judgement._no_reading`).
+- **The second barkeep.** The keeper's trade is on the record: `keeper:<place>` names the
+  place, the place its kind, `places.keeper_of` the words (`keepers.trade_words`).
+  `scope.in_the_room` lets a keeper answer when the phrase is only the trade, and
+  `judgement.introduced_is_here` folds an introduce into the one person here that both its
+  `who` and the reading's target find.
+- **A refused rest.** `time_kept` asks a refused rest whatever the reading, with the room,
+  the bed and the key in the question, and closes on the engine's own refusal line.
+  Bench (gemma-4-12B, temperature 0, two runs identical, 39 labelled beats from scratch
+  saves): the plain question found 9 of 17 beats that sleep or pass hours and flagged 1 of
+  14 that do not ("Your limbs are heavy…", a turn the reading would not gate in); the
+  refused question found 4 of 4 and flagged 1 of 4 ("You are still at the inn.", the
+  refused-move backstop's own line). Precision 13/15, recall 13/21; the misses are the
+  "three hours pass" and "you have spent the night" kind, which the gate only meets on a
+  degraded turn. Live, the refusal now closes the beat, but "The door to your room groans
+  on its hinges" stood twice: the reader named the later sleep sentence, not the room.
