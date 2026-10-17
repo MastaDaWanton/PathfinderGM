@@ -191,6 +191,11 @@ class Facts:
     # struck with. Empty `blows` asks nothing (`struck_with`).
     blows: tuple[str, ...] = ()
     arms: tuple[str, ...] = ()
+    # The player's attack this beat only OPENED the fight (`battle_joined`, no roll): the
+    # first blow is still to be struck, so any blow of theirs the page shows landing is a
+    # contradiction (`_struck_early`). The swing question is asked on such a beat too.
+    # The engine's own line for it (the joined tell), for the backstop.
+    joined: str = ""
 
     @property
     def bodies(self) -> bool:
@@ -202,6 +207,12 @@ class Facts:
         if self.intimate:
             return False
         return self.in_fight or any(o.get("op") in _HARM_OPS for o in self.outcomes)
+
+    @property
+    def swings(self) -> bool:
+        """Whether the swing question is asked: the player struck (`blows`), or their
+        attack only opened the fight (`joined`)."""
+        return bool(self.blows) or bool(self.joined)
 
     def person(self, ref: str) -> Person | None:
         return next((p for p in self.people if p.ref == ref), None)
@@ -235,7 +246,7 @@ class Facts:
                            self.bodies, [p.holds for p in self.people],
                            # The attempts question too (`attempts_of`).
                            [(a.code, a.who, a.verdict) for a in attempts_of(self)],
-                           self.settings, self.blows, self.arms],
+                           self.settings, self.blows, self.arms, self.joined],
                           default=str, sort_keys=True)
 
 
@@ -387,16 +398,35 @@ def _blows_of(ctx, outcomes, pc) -> dict:
     if pc is None or getattr(ctx, "acting", ""):
         return {}
     blows: list[str] = []
+    pc_ref = str(getattr(pc, "ref", "pc") or "pc")
+    joined = ""
     for o in outcomes:
-        if o.get("op") != "attack" or o.get("status") == "refused" or not o.get("blows"):
+        if o.get("op") != "attack" or o.get("status") == "refused":
+            continue
+        # The first swing that opens a fight is declared and stops (the battle gate):
+        # "Battle is joined … Nothing has landed yet — the first blow is still to be
+        # struck." No roll, no `blows`. Measured live 2026-10-17 (integration branch,
+        # gemma-4-12B): on that turn the page shipped "He bellows … and recoils from your
+        # strike" — the claims scrubber had cut the stab sentence before it, the harm
+        # repair turned "pain" into "defiance", and nothing else asked whether a blow of
+        # the player's had landed at all. The swing question is asked on this beat too,
+        # and any blow of theirs it finds is judged against the joined tell.
+        if not o.get("rolls") and any(
+                isinstance(e, dict) and e.get("kind") == "battle_joined"
+                and str(e.get("ref") or "") == pc_ref for e in o.get("effects") or ()):
+            joined = joined or str(o.get("tell") or "Nothing has landed yet.")
+            continue
+        if not o.get("blows"):
             continue
         if not any(isinstance(r, dict) and r.get("visibility") == "player"
                    for r in o.get("rolls") or ()):
             continue
         blows += [_weapon_name(b.get("weapon")) for b in o["blows"]
                   if isinstance(b, dict) and b.get("weapon")]
-    if not blows:
+    if not blows and not joined:
         return {}
+    if blows:
+        joined = ""
     arms: list[str] = []
     for key in list(getattr(pc, "weapons", None) or ()):
         try:
@@ -406,7 +436,8 @@ def _blows_of(ctx, outcomes, pc) -> dict:
         arms.append(_weapon_name(name))
     arms += [UNARMED, *blows]
     return {"blows": tuple(dict.fromkeys(blows)),
-            "arms": tuple(dict.fromkeys(a for a in arms if a and a != "improvised weapon"))}
+            "arms": tuple(dict.fromkeys(a for a in arms if a and a != "improvised weapon")),
+            "joined": joined}
 
 
 def asks_bodies(ctx) -> bool:
@@ -502,11 +533,11 @@ def schema(facts: Facts) -> dict:
         # call of its own (`SWING_ALONE`), on a beat where the player struck only.
         **({"struck_with": lst({"weapon": {"type": "string",
                                            "enum": swing_codes(facts)}})}
-           if facts.blows and not SWING_ALONE else {}),
+           if facts.swings and not SWING_ALONE else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
                     "left", "time_of_day", *(["shown_here"] if away else []),
                     *([] if SETTING_ALONE else ["setting"]),
-                    *(["struck_with"] if facts.blows and not SWING_ALONE else [])]}
+                    *(["struck_with"] if facts.swings and not SWING_ALONE else [])]}
 
 
 def _settings() -> tuple[str, ...]:
@@ -1126,7 +1157,7 @@ def messages(text: str, facts: Facts) -> list[dict]:
     two = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
     if not SETTING_ALONE:
         one["setting"], two["setting"] = _DEMO_SETTING, _DEMO2_SETTING
-    swing_slot = bool(facts.blows) and not SWING_ALONE
+    swing_slot = facts.swings and not SWING_ALONE
     if swing_slot:
         # The demonstrations hold no blow of the player's (the drover's fist is his own).
         one["struck_with"], two["struck_with"] = [], []
@@ -1368,7 +1399,7 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                          schema=setting_schema())
             result.raw += "\n" + where.text
             answer = dict(answer or {}, setting=(where.json() or {}).get("setting") or [])
-        if SWING_ALONE and facts.blows:
+        if SWING_ALONE and facts.swings:
             # What the player's blows were struck with, in a call of its own, on a beat
             # where the player struck and on no other (`_SWING_SYSTEM`).
             msgs = swing_messages(text, facts)
@@ -1608,6 +1639,22 @@ def _weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
         "contradiction", "weapon",
         f"Your (the player's) blow was struck with {struck}, not with {instead}: nothing "
         f"else was in your hand.", c.sentence, "", c)
+
+
+def _struck_early(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A blow of the player's shown on a beat whose attack only opened the fight
+    (`Facts.joined`), or None. Any weapon, "not shown" included: no blow was rolled, so
+    whatever it was struck with, it was not struck. Whether the sentence shows the blow
+    already struck — reaching him, knocking him back — or only drawn, aimed or coming is
+    the second read's question (`question`), never code's."""
+    if not facts.joined or facts.blows:
+        return None
+    return Discrepancy(
+        "contradiction", "early",
+        "No blow has been struck yet: the fight has only just been joined, and your (the "
+        "player's) first blow is still to come — nothing of yours has reached anybody, so "
+        "nobody is hit, cut, staggered or sent recoiling by it. You square off; the blow is "
+        "coming, not landed.", c.sentence, facts.joined, c)
 
 
 def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
@@ -1869,7 +1916,7 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                 out.append(Discrepancy("contradiction", "attempt", _attempt_fact(a, facts),
                                        c.sentence, "", c, ref=a.who))
         elif c.category == "weapon":
-            found = _weapon_wrong(c, facts)
+            found = _struck_early(c, facts) or _weapon_wrong(c, facts)
             if found is not None:
                 out.append(found)
         elif c.category == "setting":
@@ -2015,6 +2062,12 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
+    if d.category == "early":
+        # Asked of the blow's ARRIVAL, with the wind-up named as what it is not: a joined
+        # turn's page is the player drawing and going for him, and that is true.
+        return ("Does this sentence show a blow of yours (the player's) already struck — "
+                "reaching, hitting or cutting somebody, or somebody reeling or recoiling from "
+                "it — not only drawn, raised, aimed, or still coming?")
     if c.category == "weapon":
         # Asked in `_struck_with`'s shape (which weapon, from the codes), not yes-or-no;
         # this line is the cache key and the record of what was asked.
