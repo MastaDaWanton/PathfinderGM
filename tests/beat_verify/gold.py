@@ -106,6 +106,38 @@ FB_TRIP = {"intent_id": "i1", "op": "attack", "status": "resolved",
            "effects": [{"ref": "c4", "kind": "condition", "condition": "prone"}]}
 
 
+# What kind of place each bench place is (`places.settings_for` of the place the game
+# would hold): the same answers the game's own function gives for these places on the
+# Pangrella and Aurvantis fixtures (tests/test_setting_read.py pins them there).
+_ST, _IN, _TV, _CO, _UN, _SH = ("a town street, square or market", "inside a building",
+                                "a tavern or inn", "open country", "underground",
+                                "aboard a ship or boat")
+PLACE_SETTINGS = {
+    "the market": (_ST,), "the docks": (_ST, _SH), "the tavern": (_IN, _TV),
+    "the counting house": (_IN,), "the great square": (_ST,), "the north crossing": (_ST,),
+    "the east crossing": (_ST,), "the south crossing": (_ST,), "the west crossing": (_ST,),
+    "the storage area": (_IN,), "the smithy": (_IN,), "the gate": (_ST, _CO),
+    "the approach": (_CO,), "the edge": (_CO,), "the way in": (_ST, _CO), "the well": (_ST,),
+    "the guildhall": (_IN,), "the lane": (_ST,), "the green": (_ST, _CO),
+    "the upper floor of the guildhall": (_IN,), "the road to Kalixiri": (_CO,),
+    "the ridgelines": (_CO,), "the outskirts": (_ST, _CO), "the road to Blackline": (_CO,),
+}
+
+
+def settings_of(beat) -> tuple[str, ...]:
+    """The union of where the beat began, where it ends and what its walk passed through,
+    as `facts_from` builds it."""
+    if "settings" in beat:
+        return tuple(beat["settings"])
+    out: set[str] = set()
+    for name in (beat["start"], beat["end"], *beat.get("went_by", ())):
+        got = PLACE_SETTINGS.get(name)
+        if got is None:
+            return ()
+        out |= set(got)
+    return tuple(sorted(out))
+
+
 def places_of(beat) -> tuple[str, ...]:
     return {"VM": VM_PLACES, "PG": PG_PLACES, "XY": XY_PLACES,
             "RG": RG_PLACES}.get(beat["world"], ZH_PLACES)
@@ -129,7 +161,7 @@ def facts(beat):
                     went_by=tuple(beat["went_by"]), pack=tuple(beat["pack"]),
                     props=tuple(beat["props"]), people=people, clock=beat["clock"],
                     outcomes=tuple(beat["outcomes"]), pc_ref="pc",
-                    in_fight=bool(beat.get("fight")))
+                    in_fight=bool(beat.get("fight")), settings=settings_of(beat))
 
 
 def by_id(beat_id: str) -> dict:
@@ -237,7 +269,9 @@ GOLD = [
       # The engine handed the brunt to the smith and left the player a copy (playtest
       # item 5, since fixed): against that state the page's drop IS a contradiction, and
       # the hour is one at 01:28 only if read as "before dawn".
-      alarms=["move", "hands"], may_alarm=["hour"]),
+      # Stepping out into the street is a setting the engine does not hold either: the
+      # same defect as the move, read a second way.
+      alarms=["move", "hands"], may_alarm=["hour", "setting"]),
     B("first-hint-of-dawn", "kesst:19",
       "The leather pouch is heavy in your palm, the weight of the coins shifting with every "
       "movement. You pull the drawstring and tip the contents into your hand. The clerk "
@@ -428,7 +462,11 @@ GOLD = [
       "distant tolling of a bell provide the only constant. You stand your ground, the smell "
       "of stale ale and damp wood clinging to the room.",
       start="the market", people=(KESST, SERVANT, COAT), clock=0,
-      player="What is going on?"),
+      player="What is going on?",
+      # The market-talk taproom (gm/checks/setting_kind.py's own measurement): a bar and
+      # a room round a party the engine held at the market. Labelled 2026-10-16 when the
+      # read back learned the kind of place.
+      alarms=["setting"]),
     B("rapier", "talk:7",
       "The heavy fabric of his coat creaks like old timber as he shifts his weight, the "
       "sound cutting through the quiet of the night. When you ask where a rapier might be "
@@ -985,4 +1023,78 @@ GOLD = [
       claims=[C("harm", who="pc", how="hurt"),
               C("condition", opt=True, who="pc", condition=["grappled", "pinned"])],
       may_alarm=["condition"]),
+    # --- the kind of place (2026-10-16): beats labelled with `setting`, scored for the
+    # setting claims; every other beat is scored for setting ALARMS only. The report's
+    # market fight (0.2.19, free narrator) set a blow on "the wooden planks of the deck";
+    # its pot and crate are scenery and set nothing wrong.
+    *[B(i, src, text, world="PG", start=at, fight=fight, people=(KESST, FB_WOMAN),
+        outcomes=outs, claims=claims, alarms=alarms, may_alarm=may)
+      | {"setting": True}
+      for i, src, at, fight, text, outs, claims, alarms, may in (
+        ("set-deck-in-market", "report:fight (paraphrased)", "the market", True,
+         "The woman with the braid swings the heavy club two-handed. The heavy weapon "
+         "whistles through the air past your ear, thudding uselessly into the wooden planks "
+         "of the deck. She drags it free with a grunt, her eyes never leaving yours.",
+         [FB_MISS], [C("setting", kind=_SH)], ["setting"], []),
+        ("set-timber-stall", "synthetic", "the market", True,
+         "Your dagger skids off her guard and bites into the timber post of a fishmonger's "
+         "stall. Behind her the awnings sway, and the crowd has drawn back to the edges of "
+         "the square.",
+         [FB_MISS], [C("setting", kind=_ST), C("setting", opt=True, kind=_ST)], [], []),
+        ("set-pot-shatters", "report:fight (paraphrased)", "the market", True,
+         "Your dagger skids past her hip and clatters against a clay pot on the nearest "
+         "stall; the pot shatters into shards that spray outward across the cobbles.",
+         [FB_MISS], [C("setting", opt=True, kind=_ST)], [], []),
+        ("set-crate-of-nails", "report:fight (paraphrased)", "the market", True,
+         "To your left, a heavy wooden crate sits partially overturned, its contents of "
+         "iron nails spilled across the cobbles. The woman circles to your right.",
+         [], [C("setting", opt=True, kind=_ST)], [], []),
+        ("set-tavern-across", "synthetic", "the market", False,
+         "Across the square, the tavern door bangs open and two men stagger out into the "
+         "lamplight. The stalls around you are shuttered for the night.",
+         [], [C("setting", opt=True, kind=_ST),
+              C("arrived", opt=True, who="someone not listed"),
+              C("hour", opt=True, part="night")], [], []),
+        ("set-ship-in-speech", "synthetic", "the market", False,
+         "'We sail at dawn,' she says, 'and the deck of my ship is no place for a fool like "
+         "you.' She turns back to her stall and starts stacking crates.",
+         [], [C("setting", opt=True, kind=_ST)], [], []),
+        ("set-forest-in-the-market", "synthetic", "the market", True,
+         "Branches whip at your face as you push on through the undergrowth after her, "
+         "roots snagging at your boots.",
+         [], [C("setting", kind=_CO), C("move", opt=True, place="somewhere not listed")],
+         ["setting"], ["move"]),
+      )],
+    B("set-taproom-at-the-market", "talk:0 draft", world="ZH",
+      text=("Behind him, the tavern patrons have stopped their drinking; the clatter of mugs "
+            "has died away. The air in the room feels thick. The man on the stool blinks, his "
+            "eyes darting to the door, then to the man at the bar, and finally back to you. "
+            "The stalls stand dark around you."),
+      start="the market", people=(KESST, COAT), clock=1200,
+      claims=[C("setting", kind=[_TV, _IN]), C("setting", opt=True, kind=[_TV, _IN]),
+              C("setting", opt=True, kind=[_TV, _IN]), C("setting", opt=True, kind=_ST)],
+      alarms=["setting"]) | {"setting": True},
+    B("set-leans-on-the-bar", "talk:4 draft", world="ZH",
+      text=("He leans back against the bar, the wood groaning under his weight. He doesn't "
+            "move toward you, but the heavy atmosphere of the tavern seems to press in on the "
+            "two of you."),
+      start="the market", people=(KESST, COAT), clock=1200,
+      claims=[C("setting", kind=[_TV, _IN]), C("setting", opt=True, kind=[_TV, _IN])],
+      alarms=["setting"]) | {"setting": True},
+    B("set-smithy-rafters", "synthetic", world="ZH",
+      text=("Smoke curls up into the blackened rafters, and the anvil rings under the smith's "
+            "hammer. Korvu does not look up from the work."),
+      start="the smithy", people=(KESST, SMITH), clock=600,
+      claims=[C("setting", kind=_IN)]) | {"setting": True},
+    B("set-docks-planks", "synthetic", world="ZH",
+      text=("Her boots drum on the planks of the jetty as she backs toward the moored boats, "
+            "and gulls scatter off the pilings."),
+      start="the docks", people=(KESST, FB_WOMAN), clock=600,
+      claims=[C("setting", opt=True, kind=[_ST, _SH])]) | {"setting": True},
+    B("set-tunnel-on-the-road", "synthetic", world="XY",
+      text=("Water drips from the low stone ceiling of the tunnel, and the torchlight "
+            "shivers on the wet walls. The drover mutters a prayer behind you."),
+      start="the road to Kalixiri", people=(XY_TAM, XY_DROVER), clock=600,
+      claims=[C("setting", kind=[_UN, _IN]), C("setting", opt=True, kind=[_UN, _IN])],
+      alarms=["setting"]) | {"setting": True},
 ]

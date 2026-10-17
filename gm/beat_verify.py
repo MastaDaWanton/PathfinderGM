@@ -180,6 +180,11 @@ class Facts:
     # Not an intimate beat: an intimate scene between adults is not read for the body's
     # conditions (its own words are the scene's, `GMAgent._repair_state_claims` likewise).
     intimate: bool = False
+    # The kinds of place (`places.SETTINGS`) the beat may truthfully put the party in: the
+    # union of where it began, where it ends and what its walk passed through
+    # (`places.settings_for`). Empty when the engine cannot say, and then no `setting`
+    # claim is judged and no setting call is made.
+    settings: tuple[str, ...] = ()
 
     @property
     def bodies(self) -> bool:
@@ -327,13 +332,33 @@ def facts_from(ctx) -> Facts:
     for p in beat_reader.away_people(scene):
         people.append(Person(ref=str(p["ref"]), name=str(p["name"]), here=False))
     clock = getattr(scene, "clock_minutes", None)
+    # What kind of place the beat is set in, from the engine's own answers about where it
+    # began, where it ends and where it went by. A walk in from somewhere this town cannot
+    # name leaves the first half unknown, and then nothing is judged (precision: a sentence set back on
+    # the road the party just left is not a deck in a market).
+    settings: frozenset[str] = frozenset()
+    try:
+        here_place = engine.here()
+    except Exception:  # noqa: BLE001
+        here_place = None
+    if here_place is not None and (not ctx.was_at or was is not None):
+        settings = places_mod.settings_for(here_place, known)
+        # And every place the beat's own walk passed through: "you pass through the docks
+        # … into the great square … and into the counting house" is set in streets on the
+        # way to a room (the bench's counter-and-go, a false alarm before this).
+        on_the_way = [p for p in (places_mod.find(known, w) for w in went_by) if p]
+        for p in ([was] if was is not None else []) + on_the_way:
+            if settings and p is not here_place:
+                more = places_mod.settings_for(p, known)
+                settings = (settings | more) if more else frozenset()
     return Facts(start=start, end=end,
                  places=tuple(dict.fromkeys(n for n in (_name_of(p) for p in known) if n)),
                  went_by=tuple(dict.fromkeys(went_by)), pack=pack, props=props,
                  people=tuple(people), clock=None if clock is None else int(clock),
                  outcomes=outcomes, in_fight=bool(getattr(scene, "in_encounter", False)),
                  pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
-                 intimate=bool(getattr(ctx, "intimate", False)))
+                 intimate=bool(getattr(ctx, "intimate", False)),
+                 settings=tuple(sorted(settings)))
 
 
 def asks_bodies(ctx) -> bool:
@@ -421,8 +446,19 @@ def schema(facts: Facts) -> dict:
         # the final bench run; docs/narrator-after-defeat.md).
         **({"shown_here": lst({"who": {"type": "string", "enum": _who(facts)}})}
            if away else {}),
+        # The kind of place, as a slot of this read — only when it is not asked on its
+        # own (`SETTING_ALONE`, measured both ways in docs/beat-verify.md).
+        **({} if SETTING_ALONE else {"setting": lst({"kind": {
+            "type": "string", "enum": list(_settings())}})}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
-                    "left", "time_of_day", *(["shown_here"] if away else [])]}
+                    "left", "time_of_day", *(["shown_here"] if away else []),
+                    *([] if SETTING_ALONE else ["setting"])]}
+
+
+def _settings() -> tuple[str, ...]:
+    from rules.places import SETTINGS
+
+    return SETTINGS
 
 
 def bodies_schema(facts: Facts) -> dict:
@@ -608,6 +644,125 @@ _BODIES_DEMO2_USER = (
 _BODIES_DEMO2_ANSWER = {"conditions": []}
 
 
+# --- the kind of place, asked on its own ---------------------------------------------------
+#
+# What KIND of place each sentence shows the player in, from the app's own kinds
+# (`places.SETTINGS`), judged in code against `places.settings_for` of where the engine
+# holds the party. Measured 2026-10-16 on the report's market fight: "thudding uselessly
+# into the wooden planks of the deck" — no deck in a market — passed every check, because
+# the only reader of a setting (gm/checks/setting_kind.py) is a word list of a tavern's and
+# a room's furniture. That list is not to grow; this replaces growing it.
+#
+# A LIST, one entry per sentence, for the hour's reason (`schema`'s `time_of_day`): the
+# deck was one sentence among a market's, and one answer per passage is the market's.
+# The reader is NOT told where the engine holds the party: told "the market", a reader
+# reads the market into every sentence (QAGS answers from the text alone, then compares).
+SETTING_ALONE = True
+
+_SETTING_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") and report what KIND of "
+    "place the narrator shows the player in, sentence by sentence, in the codes given: "
+    "\"a town street, square or market\" (the open air among a town's buildings, stalls, "
+    "carts and crowds); \"inside a building\" (a room, hall, shop or house, with walls and a "
+    "roof round them); \"a tavern or inn\" (its bar, taproom, tankards and patrons); "
+    "\"open country\" (fields, forest, hills or wild land, or a road out among them); "
+    "\"underground\" (a cave, tunnel, cellar, sewer or mine); \"aboard a ship or boat\" (its "
+    "deck, hold, rail or mast). One entry for each sentence whose narration plainly shows "
+    "which of these the place round the player is, copying its own words into \"quote\". "
+    "Dirt, mud, ground, stone, wood, a table or a crate can be in any of them and show none. "
+    "Not a place only seen in the distance, through a door or from outside, spoken of "
+    "inside quotation marks, remembered or planned. Leave the list empty when no sentence "
+    "shows it.")
+# The second sentence of this demonstration is the weak cue, NOT reported: on the first full
+# bench (2026-10-16, gemma-4-12B x2) "she lands flat on her back in the dirt" and "the dirt
+# of the west crossing" came back as open country, "he stumbles into the nearest table" as
+# a tavern, and "You wake on the hard ground … mineral and old stone" as underground — 8 of
+# the 18 false setting alarms, every one a thing any place has.
+_SETTING_DEMO_USER = (
+    "Passage:\n"
+    "The crowd presses close between the fish stalls, and the awnings snap overhead. The "
+    "carter sprawls in the dirt against an overturned table, groaning. Across the square "
+    "the tavern door bangs open on a burst of laughter. The drover swings at you and his "
+    "cudgel cracks against the cobbles at your feet. 'I'll see you on the next boat out,' "
+    "he spits.")
+_SETTING_DEMO_ANSWER = {"setting": [
+    {"kind": "a town street, square or market",
+     "quote": "The crowd presses close between the fish stalls"},
+    {"kind": "a town street, square or market",
+     "quote": "his cudgel cracks against the cobbles at your feet"}]}
+_SETTING_DEMO2_USER = (
+    "Passage:\n"
+    "The lantern swings from the rafters above the table. You rise, and the ferryman's "
+    "knife flashes. Spray bursts over the rail as the deck "
+    "heaves under your boots. He nods at the door. 'Out in the woods they'll never find "
+    "you.'")
+_SETTING_DEMO2_ANSWER = {"setting": [
+    {"kind": "inside a building",
+     "quote": "The lantern swings from the rafters above the table"},
+    {"kind": "aboard a ship or boat",
+     "quote": "Spray bursts over the rail as the deck heaves under your boots"}]}
+
+
+def setting_schema() -> dict:
+    from rules.places import SETTINGS
+
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"setting": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "kind": {"type": "string", "enum": list(SETTINGS)}, "quote": s},
+            "required": ["kind", "quote"]}}},
+        "required": ["setting"]}
+
+
+def setting_messages(text: str) -> list[dict]:
+    return [{"role": "system", "content": _SETTING_SYSTEM},
+            {"role": "user", "content": _SETTING_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_SETTING_DEMO_ANSWER)},
+            {"role": "user", "content": _SETTING_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_SETTING_DEMO2_ANSWER)},
+            {"role": "user", "content": f"Passage:\n{text}"}]
+
+
+# What each kind of place is, said for the second read's question, and what is NOT there
+# when the party is not in one (the fact a repair is given).
+_SET_WHAT = {
+    "a town street, square or market": "out in a town street, square or market, in the "
+                                       "open air",
+    "inside a building": "inside a building — in a room, with walls and a roof round them",
+    "a tavern or inn": "in a tavern or inn — at its bar, in its taproom",
+    "open country": "out in open country — in fields, forest or wild land, or on a road "
+                    "out among them",
+    "underground": "underground — in a cave, tunnel, cellar, sewer or mine",
+    "aboard a ship or boat": "aboard a ship or boat — on its deck, in its hold, at its rail",
+}
+_SET_ABSENT = {
+    "a town street, square or market": "no street, square or open sky",
+    "inside a building": "no room, roof, rafters or walls round them",
+    "a tavern or inn": "no bar, taproom, tankards or patrons",
+    "open country": "no fields, forest or wild road",
+    "underground": "no cave, tunnel, cellar or rock overhead",
+    "aboard a ship or boat": "no ship, boat, deck, hold, rail or mast",
+}
+_SET_IN = {
+    "a town street, square or market": "out in a street or square",
+    "inside a building": "inside a building",
+    "a tavern or inn": "in a tavern",
+    "open country": "out in open country",
+    "underground": "underground",
+    "aboard a ship or boat": "aboard a ship or boat",
+}
+# Where the party IS, said from the kinds the place truly is, first match wins.
+_SET_HERE = (
+    ("a tavern or inn", "inside a tavern"),
+    ("inside a building", "indoors, under a roof"),
+    ("a town street, square or market", "in the open air of the town"),
+    ("underground", "underground"),
+    ("open country", "out in open country"),
+    ("aboard a ship or boat", "by the water"),
+)
+
+
 def bodies_messages(text: str, facts: Facts) -> list[dict]:
     people = []
     for p in facts.people:
@@ -623,14 +778,31 @@ def bodies_messages(text: str, facts: Facts) -> list[dict]:
             {"role": "user", "content": f"People: {'; '.join(people)}\n\nPassage:\n{text}"}]
 
 
+# The slot version of the setting question (`SETTING_ALONE` False), kept so the bench can
+# measure it against the call of its own.
+_SYSTEM_SETTING = (
+    "\nsetting: EVERY sentence whose narration shows what kind of place the player is in "
+    "— a town street, square or market; inside a building; a tavern or inn; open country; "
+    "underground; aboard a ship or boat — one entry per sentence. Not a place seen in the "
+    "distance or spoken of.")
+_DEMO_SETTING = [{"kind": "inside a building",
+                  "quote": "You cross to the counter and set your lantern down on it"}]
+_DEMO2_SETTING = [{"kind": "a town street, square or market",
+                   "quote": "You move toward the eel stalls and stop beside the drover"}]
+
+
 def messages(text: str, facts: Facts) -> list[dict]:
     away = any(not p.here for p in facts.people)
-    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")},
+    one = dict(_DEMO_ANSWER)
+    two = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
+    if not SETTING_ALONE:
+        one["setting"], two["setting"] = _DEMO_SETTING, _DEMO2_SETTING
+    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")
+             + ("" if SETTING_ALONE else _SYSTEM_SETTING)},
             {"role": "user", "content": _DEMO_USER},
-            {"role": "assistant", "content": json.dumps(_DEMO_ANSWER)},
+            {"role": "assistant", "content": json.dumps(one)},
             {"role": "user", "content": _DEMO2_AWAY_USER if away else _DEMO2_USER},
-            {"role": "assistant", "content": json.dumps(
-                _DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)},
+            {"role": "assistant", "content": json.dumps(two)},
             {"role": "user", "content": _ask(text, facts)}]
 
 
@@ -716,7 +888,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("shown_here", "shown", ("who",)),
                             ("arrived", "arrived", ("who",)),
                             ("left", "left", ("who",)),
-                            ("conditions", "condition", ("who", "condition"))):
+                            ("conditions", "condition", ("who", "condition")),
+                            ("setting", "setting", ("kind",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -740,7 +913,8 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "from": set(_holders(facts)), "to": set(_holders(facts)),
                "seller": set(_who(facts)), "buyer": set(_who(facts)),
                "who": set(_who(facts)), "how": set(HOW), "place": set(_places(facts)),
-               "part": set(PARTS), "condition": set(CONDITIONS)}
+               "part": set(PARTS), "condition": set(CONDITIONS),
+               "kind": set(_settings())}
     seen: set[str] = set()
     for c in claims:
         bad = [k for k, v in c.slots.items()
@@ -820,6 +994,18 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
             result.raw += "\n" + more.text
             answer = dict(answer or {}, conditions=(more.json() or {}).get("conditions")
                           or [])
+        if SETTING_ALONE and facts.settings:
+            # The kind of place, in a call of its own (`_SETTING_SYSTEM`), on every beat
+            # whose place the engine can name the kinds of — and on no other, since an
+            # unjudgeable answer is a call for nothing.
+            msgs = setting_messages(text)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            where = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                         num_predict=300, provider=provider, api_key=api_key,
+                         schema=setting_schema())
+            result.raw += "\n" + where.text
+            answer = dict(answer or {}, setting=(where.json() or {}).get("setting") or [])
         result.claims, result.dropped = validate(claims_of(answer, facts), text, facts)
     except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
@@ -963,6 +1149,57 @@ def _condition_unheld(c: Claim, facts: Facts) -> Discrepancy | None:
         f"on {obj}.", c.sentence, "", c, ref=who)
 
 
+def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
+    """The player shown picking up a thing on a turn the engine refused a pick-up of
+    something that is not there (`Engine._picked_from_nowhere`, code `not_here`), or None.
+
+    The read judges nothing taken off the floor ("a stone picked up is the world's"), and
+    that was right while the world never ran out. It runs out now (2026-10-16): on the live
+    check "I pick up one of the crates of dried fruit and throw it" was refused — "There is
+    no one of the crates of dried fruit here … to pick up" — and the page wrote "you have to
+    wrench it from the pile. You heave the wood and the heavy, sticky fruit, and it flies."
+    The refusal's own sentence is the fact, and the line the backstop puts in."""
+    if c.category != "hands" or str(c.slots.get("to")) != facts.pc_ref:
+        return None
+    if str(c.slots.get("from")) not in (FLOOR, NOBODY, NEW_PERSON):
+        return None
+    why = next((_refusal_line(o) for o in facts.outcomes
+                if o.get("op") == "give" and o.get("status") == "refused"
+                and o.get("code") == "not_here" and _refusal_line(o)), "")
+    if not why:
+        return None
+    return Discrepancy("contradiction", "hands",
+                       f"Nothing was picked up: {why} The player's hands stay empty of it.",
+                       c.sentence, why, c)
+
+
+def _setting_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A sentence set in a kind of place the party is not in, or None.
+
+    Judged only where the engine names the kinds of both ends of the beat
+    (`Facts.settings`), and generously (`places.settings_for`): a cellar is a room and a
+    vault, the outskirts are road and town, a boat is the docks' own. The fact the repair
+    is given says where the party is and names what is not there."""
+    kind = str(c.slots.get("kind") or "")
+    if not facts.settings or not kind or kind in facts.settings:
+        return None
+    # A sentence that names the place the engine holds the party at is set there by the
+    # narrator's own word, whatever kind the reader inferred from the rest: "the dirt of
+    # the west crossing mingling with the blood on his tunic" was open country to the
+    # reader, both runs, both reads (bench, 2026-10-16). Names compared, never English read.
+    said = f" {_norm(c.sentence)} "
+    for name in dict.fromkeys((facts.start, facts.end, *facts.went_by)):
+        own = _norm(name).removeprefix("the ").strip()
+        if own and f" {own} " in said:
+            return None
+    here = next((said for k, said in _SET_HERE if k in facts.settings), "here")
+    where = facts.end or "this place"
+    return Discrepancy(
+        "contradiction", "setting",
+        f"The player is at {where}, {here} — not {_SET_IN.get(kind, kind)}. There is "
+        f"{_SET_ABSENT.get(kind, 'none of that')} here.", c.sentence, "", c)
+
+
 def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]:
     """The page's claims against the engine's outcomes and state. Code only.
 
@@ -982,6 +1219,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
         if not c.valid:
             continue
         s = c.slots
+        refused = _taken_though_refused(c, facts)
+        if refused is not None:
+            out.append(refused)
+            continue
         if c.category == "move":
             place = s["place"]
             if not moved:
@@ -1125,6 +1366,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             found = _condition_unheld(c, facts)
             if found is not None:
                 out.append(found)
+        elif c.category == "setting":
+            found = _setting_wrong(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "hour":
             h = _hour(facts)
             if h is not None and h not in PARTS[s["part"]]:
@@ -1190,6 +1435,11 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c is None:
         return ""
     s = c.slots
+    if c.category == "hands" and d.line and s.get("from") in (FLOOR, NOBODY, NEW_PERSON):
+        # `_taken_though_refused`: a pick-up, not a hand-over — "is something handed to
+        # you?" is no question to ask of "you wrench it from the pile … and it flies".
+        return ("Does this sentence say that you (the player) pick something up, take hold "
+                "of it, or throw it?")
     if c.category == "move":
         return (f"Does this sentence say that you (the player) have left {facts.start} and "
                 f"are now somewhere else — not just moving about inside {facts.start}?")
@@ -1233,6 +1483,17 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
+    if c.category == "setting":
+        # Asked of the scene, not of the player's feet: "the club thuds into the planks of
+        # the deck" never says where the player stands, and it sets the whole fight on a
+        # ship all the same. Probed 2026-10-16 on ten sentences (five true settings, five
+        # views, speech, a memory, a wrong guess), gemma-4-12B at temperature 0: "Does
+        # this sentence show the place round you as…" and "…describe the place where you
+        # are now as…" each refused "Branches whip at your face as you push on through the
+        # undergrowth" (9/10); this wording 10/10.
+        return (f"Is the scene in this sentence set {_SET_WHAT.get(s['kind'], s['kind'])} — "
+                f"where you (the player) are now, not somewhere only seen in the distance or "
+                f"from outside, remembered or spoken of?")
     if c.category == "arrived":
         return f"Does this sentence say that {_name(facts, s['who'])} comes into the place?"
     if c.category == "left":

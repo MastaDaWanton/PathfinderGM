@@ -33,9 +33,10 @@ sys.path.insert(0, str(ROOT))
 from gm import beat_verify as bv  # noqa: E402
 from tests.beat_verify import gold as G  # noqa: E402
 
-CATS = ("move", "hands", "trade", "harm", "shown", "arrived", "left", "hour", "condition")
+CATS = ("move", "hands", "trade", "harm", "shown", "arrived", "left", "hour", "condition",
+        "setting")
 ALARM_CATS = ("move", "hands", "trade", "harm", "absent", "presence", "hour", "omission",
-              "condition")
+              "condition", "setting")
 
 
 # --- the engine's side, as the game builds it ---------------------------------------------
@@ -71,6 +72,10 @@ def score_claims(beat, claims: list[bv.Claim], tally) -> list[str]:
     """Greedy one-to-one matching; returns notes on the misses."""
     notes = []
     golds = list(beat["claims"])
+    if not beat.get("setting"):
+        # The kind of place is labelled on the beats marked `setting` only; elsewhere its
+        # claims are neither rewarded nor punished (its ALARMS are scored everywhere).
+        claims = [c for c in claims if c.category != "setting"]
     used = set()
     # One claim stated about two sentences is one claim to the label (the reader keeps
     # both so each sentence can be judged).
@@ -133,7 +138,7 @@ def prf(t) -> str:
 
 REGEX = {"refused_move": "move", "road_claimed": "move", "thing_kept": "hands",
          "trade_claimed": "trade", "time_of_day": "hour", "empty_roll": "harm",
-         "absent_person": "presence"}
+         "absent_person": "presence", "setting_kind": "setting"}
 
 
 class _Actor(SimpleNamespace):
@@ -365,10 +370,14 @@ def main() -> None:
     ap.add_argument("--no-confirm", action="store_true")
     ap.add_argument("--subset", default="all",
                     help="all | tuned | held | id:<prefix> (the beats whose id starts so)")
+    ap.add_argument("--setting", default="alone", choices=("alone", "slot"),
+                    help="ask the kind of place in a call of its own, or as a slot of the "
+                    "first read (docs/beat-verify.md measures both)")
     ap.add_argument("--replay", default="", help="score a --record file's extractions "
                     "instead of calling the model to read (the second read still calls it)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
+    bv.SETTING_ALONE = args.setting == "alone"
     results = {"regex": run_regex(args.verbose, args.subset)}
     report("regex checks", results["regex"])
     record: dict = {}
