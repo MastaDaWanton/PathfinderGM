@@ -82,7 +82,11 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          "early": ("beat-swing-early", 3),
          # A creature's blow written with a weapon the engine did not swing: the barkeep's
          # heavy crossbow on a sap turn (live, 2026-10-17), carried into the next beat.
-         "foe_weapon": ("beat-foe-struck-with", 3)}
+         "foe_weapon": ("beat-foe-struck-with", 3),
+         # Somebody here on their feet written down, whom the first read could not name
+         # and the second read did (`beat_verify._felled_unnamed`): the barkeep who
+         # "collapses into the counter" at 12 of 23 (live, 2026-10-17).
+         "felled": ("beat-harms", 3)}
 
 # The kinds repaired by the backstop alone, never a one-sentence rewrite. A rewrite is
 # checked by reading the rewritten sentence back ALONE (`beat_verify.read_beat` reads only

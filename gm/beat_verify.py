@@ -1827,6 +1827,43 @@ def _struck_early(c: Claim, facts: Facts) -> Discrepancy | None:
         "coming, not landed.", c.sentence, facts.joined, c)
 
 
+# Who a "someone not listed" felling turned out to be, by (facts, sentence): the second read
+# (`_felled_who`) answers it once, and a later `diff` of the same beat — the repair asks the
+# member again — reads the answer here instead of a fact it cannot write.
+_FELLED: dict[tuple[str, str], str] = {}
+
+
+def _felled_fact(p: Person, how: str) -> str:
+    if how == "dead":
+        return f"{p.name} is not dead: still on their feet and able to act."
+    return (f"{p.name} is not down: still on their feet and able to act — hurt, perhaps, "
+            f"but not collapsed, fallen or knocked down.")
+
+
+def _felled_unnamed(c: Claim, facts: Facts) -> Discrepancy | None:
+    """Somebody written down or dead whom the first read could not name ("someone not
+    listed"), on a beat where somebody here is on their feet; or None. WHO it is is the
+    second read's question (`_felled_who`), asked with the passage before the sentence and
+    the turn's tells for "he".
+
+    Measured live 2026-10-17 (integration branch, gemma-4-12B): the dagger left the one
+    behind the bar at 12 of 23, and the beat the truth pass read opened "The blade finds
+    the gap in his leather jerkin…" — the engine's own line naming him was written after
+    it, by the blow pass. The read answered "he collapses into the counter" as `down`,
+    "someone not listed", which is never judged, and the collapse shipped. Read with the
+    blow line in front of it, the same read named him 4 of 4 and the collapse was caught."""
+    if str(c.slots.get("who")) != NEW_PERSON or c.slots.get("how") not in ("down", "dead"):
+        return None
+    standing = [p for p in facts.people if p.here and not (p.down or p.dead)]
+    if not standing:
+        return None
+    ref = _FELLED.get((facts.key(), _skey(c.sentence)), "")
+    p = facts.person(ref) if ref else None
+    return Discrepancy("contradiction", "felled",
+                       _felled_fact(p, str(c.slots["how"])) if p is not None else "",
+                       c.sentence, "", c, ref=ref)
+
+
 def _foe_weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
     """A creature's blow, on its own turn, shown struck with something the engine did not
     swing, or None. "not shown" is never judged; "something else" is, as for the player."""
@@ -2053,6 +2090,9 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             who = str(s["who"])
             p = facts.person(who)
             if p is None:
+                felled = _felled_unnamed(c, facts)
+                if felled is not None:
+                    out.append(felled)
                 continue
             if not p.here:
                 out.append(_not_here(p, c))
@@ -2262,6 +2302,9 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
+    if d.category == "felled":
+        # Asked in `_felled_who`'s shape (WHO, from the codes); this line is the cache key.
+        return FELLED_QUESTION
     if d.category == "early":
         # Asked of the blow's ARRIVAL, with the wind-up named as what it is not: a joined
         # turn's page is the player drawing and going for him, and that is true.
@@ -2350,6 +2393,11 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
         before = sentences[at - 1] if at > 0 else ""
         if d.category == "absent" and d.ref:
             (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
+        if d.category == "felled":
+            lead = " ".join(sentences[max(0, at - 4):at]) if at > 0 else ""
+            (kept if _felled_who(d, lead, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
         if d.category == "foe_weapon":
@@ -2476,6 +2524,67 @@ def _struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host, p
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
     return bool(said) and said != NOT_SHOWN and said not in facts.blows
+
+
+# The felling, as `narration._felled_question` words it — probed 2026-10-17 at 4/4 felled
+# and 0/5 standing ("staggers back against the bar", "doubles over … but keeps his feet",
+# "reels from the blow and catches himself"), and 4 of the 14 live regex hits kept, its
+# false ones refused. Asked here of WHO.
+FELLED_QUESTION = ("Which of these people does this sentence say collapses, falls, drops or "
+                   "is knocked to the ground — or is unconscious or dead? Not only staggers, "
+                   "stumbles, reels or steps back.")
+
+
+def _felled_who(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                api_key) -> bool:
+    """The second read of a `felled` contradiction (`_felled_unnamed`): WHO the sentence
+    says is down, from the codes, with the passage before it and the turn's own tells for
+    "he" — kept only when it names somebody here whom the engine holds on their feet, and
+    then the fact names them. A call that fails keeps nothing: there is nobody to name."""
+    codes = [p.ref for p in facts.people if p.here] + [NEW_PERSON, NOBODY]
+    people = "; ".join(
+        f"{p.ref}: {p.name}" + (" (the player, \"you\")" if p.pc else
+                                f" — {p.what}" if p.what else "")
+        for p in facts.people if p.here)
+    told = " ".join(page_line_of(o) for o in facts.outcomes if o.get("tell"))
+    ask = ((f"What the rules resolved this turn: {told}\n" if told else "")
+           + (f"The passage before it, for who \"he\", \"she\" and \"they\" are: {before}\n"
+              if before else "")
+           + f"The sentence: {d.sentence}\n\nPeople: {people}\n\nQuestion: "
+           + FELLED_QUESTION
+           + f" Every one it says so of; \"{NEW_PERSON}\" for somebody else, \"{NOBODY}\" "
+             f"if none.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=60, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"who": {
+                         "type": "array", "maxItems": 6,
+                         "items": {"type": "string", "enum": codes}}},
+                         "required": ["who"]})
+        named = [str(x) for x in (reply.json() or {}).get("who") or []]
+    except Exception:  # noqa: BLE001 — nobody to name, so nothing to judge
+        return False
+    how = str(d.claim.slots.get("how") if d.claim else "down")
+    for code in named:
+        p = facts.person(code)
+        if p is not None and p.here and not (p.down or p.dead):
+            d.ref, d.fact = p.ref, _felled_fact(p, how)
+            _FELLED[(facts.key(), _skey(d.sentence))] = p.ref
+            while len(_FELLED) > 256:
+                _FELLED.pop(next(iter(_FELLED)))
+            return True
+    return False
+
+
+def page_line_of(o: dict) -> str:
+    from .narration import page_line
+
+    return page_line(str(o.get("tell") or ""))
 
 
 def _foe_struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host,
@@ -2610,4 +2719,5 @@ def take_last() -> dict | None:
 def clear_cache() -> None:
     global _LAST
     _CACHE.clear()
+    _FELLED.clear()
     _LAST = None
