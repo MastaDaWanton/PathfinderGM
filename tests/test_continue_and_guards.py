@@ -107,7 +107,9 @@ def test_a_short_draft_that_carries_its_events_ships_at_its_own_length():
 
     src = inspect.getsource(agent_mod.GMAgent.polish)
     assert 'kinds <= {"too-short", "no-hand-back"}' in src
-    assert "actions_kept(text, candidate, cast_names) >= 0.6" in src
+    # The draft's events without the sentences it copied from a demonstration
+    # (2026-10-16, tests/test_demonstration_echoes.py): still 0.6 of them.
+    assert "actions_kept(own_events, candidate," in src and "cast_names) >= 0.6" in src
 
 
 # --- 22: the escape claim needs a restraint and respects negation ------------------------------
