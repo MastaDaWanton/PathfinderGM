@@ -6329,6 +6329,13 @@ class Engine:
                                                voice="tell")
             if out_of_reach:
                 return self._refuse(intent, out_of_reach)
+        # The thing an improvised weapon IS must be somewhere: in the hand, or lying here
+        # on the props ledger (`_improvised_unheld`). Asked before anybody is drawn in — a
+        # swing of a shard nothing made opens no fight.
+        if partial.get("attack_state") is None and str(weapon_key or "").lower() == "improvised":
+            unheld = self._improvised_unheld(actor, str(intent.params.get("item") or ""))
+            if unheld:
+                return self._refuse(intent, unheld, code="not_here")
         # A blow given or taken ends being a bystander. The one place besides
         # `join_fight` that lifts the tag, and it lifts it BEFORE the encounter forms so
         # the sides are drawn with both of them in.
@@ -19629,6 +19636,92 @@ class Engine:
                       "to": taker.ref, "purse": dict(taker.purse),
                       "goods": dict(taker.goods)}])
 
+    def _picked_from_nowhere(self, intent: Intent, taker, item: str, acting: str) -> str:
+        """Why a pick-up of a thing with no record anywhere is refused, or "".
+
+        The world used to never run out: a give with no giver, no container and no record
+        on the props ledger minted whatever it named. Measured 2026-10-16 (a real player's
+        0.2.19 game, a market fight): the narrator wrote a dagger "clattering against a
+        clay pot … the pot shatters into shards" when nothing in the engine broke
+        anything, and "I grab a shard of the broken pot and stab him" then minted the shard
+        and swung it as an improvised weapon. Invented scenery, changed by prose, became
+        a weapon.
+
+        Every tradition puts existence before use: Inform answers a noun the world does not
+        implement with "You can't see any such thing"; PF1e's improvised weapons are
+        objects at hand; Fate's declared story detail is paid for and must be plausible.
+        So a thing taken from nowhere must be on the ledger first. The narration's own
+        scenery gets there through one door before the plan runs (`gm/scenery.py`: a
+        thing the passages the player read show lying here, or that is plainly loose in a
+        place like this, is ledgered then, the way a person the beat shows is given a
+        body) — so "I pick up the hairball" the narrator put on the floor still works,
+        and a shard of a pot nothing broke does not.
+
+        Only a pick-up by the one acting: a document's give (`origin` stamped — a jar,
+        the author's cheat, a test) is the document's word, and a hand-over has a giver,
+        which the branches above answer."""
+        if taker is None or str(getattr(taker, "ref", "")) != str(acting or ""):
+            return ""
+        if str(getattr(intent, "origin", "") or ""):
+            return ""
+        lying = [str(r.get("name") or "") for r in self.scene.props_here()
+                 if r.get("name")]
+        here = (f"What lies here: {', '.join(lying[:6])}." if lying
+                else "Nothing loose lies here.")
+        return (f"There is no {holding.plain(item) or item} here for {taker.name} to pick "
+                f"up: nothing has put one here. {here}")
+
+    def unrecorded_thing(self, item: str, taker) -> bool:
+        """Whether a pick-up of `item` by `taker` would find nothing at all: not coin, not
+        already in their hands, not in a container they hold, not in anybody's hands here,
+        not lying here on the ledger and not lying anywhere else either (that one has its
+        own refusal, naming where it is). The thing `_picked_from_nowhere` refuses; asked
+        by `gm/scenery.py` BEFORE the plan runs, so a thing the narration showed can be
+        ledgered first — one definition, so the two cannot disagree about what is here."""
+        name = " ".join(str(item or "").split())
+        if not name or taker is None:
+            return False
+        coins = goods.coinage(getattr(self, "world", None), None)
+        # "5 gp" as well as "gp": coin is a number on the purse, never a thing to ledger.
+        if goods.coin_named(name, coins) or goods.coin_named(name.split()[-1], coins) \
+                or holding.is_money(name):
+            return False
+        if holding.key_in(getattr(taker, "goods", None) or {}, name):
+            return False
+        if any(r.get("held_by") == taker.ref and holding.same(r.get("name"), name)
+               for r in self.scene.props):
+            return False
+        if self._box_holding(name, taker) is not None:
+            return False
+        if self.scene.prop_on_the_ground(name) is not None:
+            return False
+        if self._holder_of(name, taker) is not None:
+            return False
+        return not any(holding.same(r.get("name"), name) for r in self.scene.props)
+
+    def _improvised_unheld(self, actor, item: str) -> str:
+        """Why an improvised weapon cannot be swung or thrown, or "": the thing it IS must
+        be in the attacker's hands (their goods, or a ledger record they hold) or lie here
+        on the props ledger. An attack naming no thing is the row's own "improvised
+        weapon" and is left alone.
+
+        Until 2026-10-16 `params.item` was a name and nothing more — the tell named it and
+        the throw put it on the ground, and nothing asked whether it existed. The fight
+        lane found it on the report's market fight: "grab a shard of the broken pot" swung
+        a shard no record held (`_picked_from_nowhere` has the measurement)."""
+        name = " ".join(str(item or "").split())
+        if not name:
+            return ""
+        if holding.key_in(getattr(actor, "goods", None) or {}, name):
+            return ""
+        if any(r.get("held_by") == actor.ref and holding.same(r.get("name"), name)
+               for r in self.scene.props):
+            return ""
+        if self.scene.prop_on_the_ground(name) is not None:
+            return ""
+        return (f"{actor.name} has no {holding.plain(name) or name} to swing or throw: it is "
+                f"not in hand and none lies here. Nothing is rolled.")
+
     def _op_give(self, intent: Intent, partial: dict) -> Outcome:
         """Something changes hands.
 
@@ -19944,6 +20037,9 @@ class Engine:
                             intent, f"{self._the(str(away['name']))} is not here: it lies "
                                     f"at {self._place_name(str(away['at']))}. Go back for "
                                     f"it first.")
+                    unshown = self._picked_from_nowhere(intent, taker, item, acting)
+                    if unshown:
+                        return self._refuse(intent, unshown, code="not_here")
                 if rec is not None:
                     # Picking a thing up is done with a hand, from where you stand
                     # (natural reach; 1e Table 7-2: a move action). A thing lying
@@ -23166,12 +23262,31 @@ class Engine:
                     "modifier": sum(m.value for m in mods),
                     "breakdown": [m.as_dict() for m in mods],
                     "dc": dc,
-                    "because": intent.because,
+                    "because": self._roll_why(intent, actor),
                     "intent_id": intent.id,
                 },
                 {state_key: state},
             )
         return self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+
+    def _roll_why(self, intent: Intent, actor: Actor) -> str:
+        """The dice popup's subtitle for a roll the player makes: the plan's `because`,
+        except on a blow, where it is the engine's own words for who is struck.
+
+        Measured live 2026-10-16: "I grab a shard of the broken pot and stab him" — the
+        shard was refused (nothing had put one there) and the engine rolled an unarmed
+        strike, under the title "Attack with unarmed strike" and the subtitle "you use the
+        shard to strike a desperate blow", the plan's reason for a weapon that was never in
+        hand. A blow's weapon is in the title already, from the engine; the subtitle names
+        the target, from the engine too, and the model's prose stays off the dice."""
+        # A reaction's reason is the engine's own ("the thug stooped for the sap within
+        # reach", `_reactions_before`), and is what the player needs to read.
+        if intent.op != "attack" or intent.params.get("reaction"):
+            return intent.because
+        target = self.scene.actors.get(str(intent.target or ""))
+        if target is None:
+            return ""
+        return f"{actor.name} against {target.name}"
 
     def _took(self, roll: Roll) -> Roll:
         """The Roll built from the player's face — the first one, which `_judge` answers
@@ -23208,7 +23323,7 @@ class Engine:
                 # player is entitled to know from the result of a die already rolled in
                 # secret — and printed both as "beat: N".
                 "dc_shown": bool(dc_shown),
-                "because": intent.because,
+                "because": self._roll_why(intent, actor),
                 "intent_id": intent.id,
             }
             raise _NeedsPlayerRoll(prompt, dict(extra_partial or {}))

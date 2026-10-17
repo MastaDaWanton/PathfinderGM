@@ -264,13 +264,20 @@ RECORDED = {
 }
 
 
-def test_the_models_recorded_readings_raise_what_the_engine_contradicts():
+def test_the_models_recorded_readings_raise_what_the_engine_contradicts(monkeypatch):
     """Replayed without a model. The live beat raises the gift by the floor and nothing
     else — not the trade it was cut for on 0.2.20, and not its three attempts, which it told
     truly (the help failed, the smith lifted alone, the request refused). The bare "trade is
     finished" raises nothing. A failed lift told as the cart rolling free, and the held-out
-    failed tracking told as "a clear, recent path" (an ellipsis quote), raise the attempt."""
+    failed tracking told as "a clear, recent path" (an ellipsis quote), raise the attempt.
+
+    The replies were recorded for the first read and the attempts call only; the setting
+    and struck-with calls (fix/setting-and-scenery, merged after) are switched off here so
+    the script's replies line up — they have tests of their own."""
     from tests.beat_verify import gold as G
+
+    monkeypatch.setattr(bv, "SETTING_ALONE", False)
+    monkeypatch.setattr(bv, "SWING_ALONE", False)
 
     want = {"pay-tossed-in-dirt": {"hands"}, "no-trade-finished": set(),
             "att-lift-told-success": {"attempt"}, "ho-att-tracks-found": {"attempt"}}

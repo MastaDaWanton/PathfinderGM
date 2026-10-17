@@ -284,8 +284,9 @@ Kept:
 - **`empty_roll`** is equal on harm. It is also the only reader of a victim who is not on
   the actor list ("Dagan Havenstone", G2), a claim this member never judges.
 - **Every other check.** The bench has no row for its kind: road, direction, route,
-  bearing, land, setting, faces, speech, keepers, hooks, size, and the rest. Those are the
-  next rows to label before anything else retires.
+  bearing, land, faces, speech, keepers, hooks, size, and the rest. Those are the
+  next rows to label before anything else retires. (Setting has rows since 2026-10-16;
+  see "The kind of place" below, and `setting_kind` still runs.)
 
 `time_of_day`'s repair cost no model call: it swapped the clock's word in. Its
 replacement costs the read, plus at most one rewrite of the sentence, and the backstop
@@ -494,3 +495,198 @@ both read as the player's stolen-satchel check failing. The second read refuted 
 stamp has no `actor`, so its attempts are not asked about; spell and creature-ability saves
 inside a `cast` or `use_ability` outcome are not separate outcomes, so they are not
 listed yet.
+
+## The kind of place (2026-10-16)
+
+A real player's 0.2.19 market fight (free narrator, gemma-4-12B): "The heavy weapon
+whistles through the air… thudding uselessly into the wooden planks of the deck." There is
+no deck in a market. The only reader of a setting was `gm/checks/setting_kind.py`, a word
+list of a tavern's and a room's furniture, which the owner's direction says must not grow.
+
+- **The vocabulary.** `places.SETTINGS`: a town street, square or market; inside a
+  building; a tavern or inn; open country; underground; aboard a ship or boat. The kinds a
+  place truly is come from `places.settings_for`: the ground in the id, the floor plan's
+  roof, the side of the settlement's edge and the kind words. Diku's sector type is the
+  precedent: one kind per room from a short fixed list. It is generous where a place is
+  generous. A cellar is a room and a vault. The way in and the gate are road and town. A
+  graveyard is street and open ground. A ship counts only where the place stands on water.
+- **The question.** A call of its own (`setting_messages`), one entry per sentence, for
+  the hour's reason: the deck was one sentence among a market's. The reader is not told
+  where the engine holds the party. Asked only where `Facts.settings` is known: the union
+  of where the beat began, where it ends and every place its walk passed through.
+- **The judgement, in code.** `_setting_wrong`: a kind not among the place's kinds is a
+  `beat-setting` contradiction (weight 3). It is not judged when the sentence names the
+  place the engine holds. The second read asks whether the scene is set in that kind of
+  place, not somewhere only seen in the distance or from outside. Probed: 10/10 on the
+  tuned sentences, 12/13 with the recordings' own false alarms added. Two other wordings
+  scored 9/10.
+- **Repair** goes through `_repair_sentences`. The backstop cuts the sentence.
+
+**A call of its own, measured.** Gold beats: 12 labelled for setting, 6 of them bad. Full
+bench, every beat, gemma x2, with Ollama shared with live play and other lanes:
+
+| version | setting alarms kept (beats) | clean beats falsely alarmed | other categories |
+|---|---|---|---|
+| slot of the first read | 12/12, 5 false | 5/110 | `shown` claims 10/10 -> 4/10, `absent` alarms 6/6 -> 4/6, harm claims 17 -> 15 |
+| own call, first prompt | 10/10, 18 false | 8/112 | identical first read |
+| own call, shipped prompt (setting call only) | 12/12, 0 false | 0/152 | first read byte-identical to master |
+
+- The shipped prompt demonstrates a weak cue that is not reported: dirt, a table, the
+  ground. On the first prompt, 8 of the 18 false alarms were things any place has.
+- The other 10 false alarms were fixed in code:
+  - a walk's places joined the union (counter-and-go);
+  - the way in became road as well as town (gates-receive);
+  - a taproom beat already in the bench was relabelled as a true alarm (man-on-the-stool).
+- The setting call costs a median of 2.5 s and a p90 of 4.1 s over 166 calls, contended.
+
+**On recorded beats** (tests/replay, held out, 232 drafts judged against the engine's
+place before and after each turn):
+- 62 drafts alarmed on the first read, 47 after the second. By hand: about 36 are true against the engine of the day, 7 are false, and 4 are walks the recording does not hold.
+- Most kept alarms are true against the engine of the day: the 2026-09-25 scripts where a
+  walk "into the worst tavern" left the party at the west crossing, the town script held
+  in the wild while the prose walked its streets, and rooms and halls furnished at a
+  street crossing.
+- The false ones: a smith at work written as a forge interior while the engine held the
+  market (5 drafts), "display racks" (1), and "the muddy rut of the road" in town (1).
+
+**Kept beside it:** `setting_kind.py`. On its own measured rows (talk:0, talk:4,
+man-on-the-stool) the read back caught every beat both runs at no cost. It is a candidate
+for retirement under this doc's rule, but it was not retired in this lane.
+
+## Scenery that changes state (2026-10-16)
+
+The same fight: "the blade… clattering against a clay pot… the pot shatters into shards".
+Then "a heavy wooden crate sits partially overturned, its contents of iron nails…". Then
+"I grab a shard of the broken pot and stab him". The shard was minted (the world never ran
+out) and swung, because an improvised attack took any `params.item`.
+
+**Decided, with the sources** (gm/scenery.py's docstring cites them):
+- The narrator may describe scenery. That is the look-only tier: Inform's scenery and
+  backdrops, TADS 3's `Decoration`, Diku's extra descriptions.
+- The narrator may not change scenery's state. Fate: "the barn doesn't catch On Fire!
+  without someone kicking over the lantern."
+- What the narration showed is established and usable, as Fate's "poorly lit" is.
+- A detail that follows from the place is free. A stretch is not. Fate Condensed revised
+  its charge to exactly this in its 2020 changelog.
+
+**Built.**
+- `Engine._picked_from_nowhere` refuses a pick-up with no record.
+- `Engine._improvised_unheld` refuses an improvised weapon not in hand or on the ledger.
+  It is asked before any fight opens.
+- `gm/scenery.py` asks one closed question per unrecorded thing the plan reaches for:
+  shown here (quoted, the quote checked to be the narration), commonplace here, or not
+  here. A shown or commonplace thing is ledgered through `place_prop` with its `origin`.
+  This is "seen people are real" for things, applied at first use rather than first
+  mention, so no beat pays a call for it.
+- A fight's Steal of a thing lying on the ground becomes the pick-up it is.
+- `_taken_though_refused`: on a turn the engine refused a pick-up as not there, the page
+  showing the player taking it is a `hands` contradiction.
+
+**Measured.**
+- Tuned probe: 24/24.
+- Held out: 18/24, with no false ledgering. The misses are an apple from a smashed crate
+  ledgered as commonplace rather than shown, a torch in its bracket and a thrown bucket
+  refused (2 cases, twice each).
+
+**Live** (scratch copy of hv-data, Khalmorin market, gemma-4-12B, contended):
+- "I grab a shard of the broken pot and stab him" with no pot: scenery "not here". The give
+  was refused: "There is no shard here for Kesst Vayr to pick up". The plan's attack was
+  unarmed. Nothing was minted.
+- The prose still wrote "The shard bites deep into the soft tissue of his shoulder" against
+  an unarmed strike's tell. No reader judges which weapon a blow was struck with.
+- "I hurl the heavy iron kettle at Lyraea", a kettle the previous beat put on the stall:
+  shown here, ledgered `origin: narrated`, thrown at -4 with Dex, missed 4 against AC 14,
+  and "The heavy iron kettle lies where it fell."
+
+**Not built.**
+- A read-back question for a narrated state change (the pot shattering itself). With the
+  engine hole closed, a broken thing is only usable if the player read it broken.
+- Ownership of narrated scenery (a pot on a stall is the stall-keeper's).
+- Ledgering at first mention.
+
+### Refusals biased toward allowing (2026-10-17)
+
+A wrong refusal breaks play harder than the old minting did: the player read about the
+torch and is told there is none.
+
+- **Why the first held-out misses failed.** The torch and the bucket were the model's own
+  answer, "not here" with no quote. The quote check played no part. The apple was ledgered
+  as commonplace, so it was not refused. The live crate was the window: six transcript
+  entries no longer reached the arrival beat.
+- **What changed.**
+  - A refusal must name its reason: a piece of something no passage shows broken; taken
+    away, gone, far off, or only spoken of; or would not be found in a place like this.
+  - The reader is told the place's kinds from `settings_for`.
+  - A "shown" answer whose quote misses is ledgered as fitting, not refused.
+  - A "never shown" or "piece of something" refusal is overruled when every word of the
+    player's name for the thing is in the narration, with speech blanked. "Gone" refusals
+    are never overruled.
+- **What was tried and dropped.** A narrow yes/no second read. Asked about "the bucket",
+  gemma answered "no" while writing "At your feet" as where it was. The best of three
+  wordings scored 6/8.
+- **Held-out sets, gemma x2, contended:**
+
+  | set (here/absent) | written | false refusals | false ledgering |
+  |---|---|---|---|
+  | 1 (22/22) | before the redesign, then used in tuning | 2/44 (the bucket) | 0/44 |
+  | 2 (8/8) | after the override, used in rewording | 0/16 | 0/16 |
+  | 3 (8/8) | before the final run, never tuned on | 0/16 | 0/16 |
+
+  - Before the rewording, sets 1 and 2 gave 0 false refusals and 4 false ledgerings. A
+    taken-away apple and boathooks were filed as "broken" and then overruled.
+  - The old design on set 1 gave 2/44 false refusals and 0/44 false ledgering.
+  - The bucket ("hurls a bucket of eel water at your feet") is still refused, now as
+    "gone". The sentence is ambiguous, and it is the one known miss.
+
+## What the player's blows were struck with (2026-10-17)
+
+The live shard turn: the engine refused the shard and rolled an unarmed strike, and the
+page wrote "The shard bites deep into the soft tissue of his shoulder."
+
+- **The question.** A call of its own (`swing_messages`), asked only on a beat where the
+  player struck. Those are the attack outcomes with blows on a roll made at
+  `visibility: player`. The codes are the PC's carried weapons, `unarmed strike`, the
+  weapon the engine swung, `something else` and `not shown`.
+- **The judgement, in code.** `_weapon_wrong` compares the answer with
+  `Outcome.blows[...]["weapon"]` and raises `beat-struck-with` (weight 3). `not shown` is
+  never judged. The second read (`_struck_with`) asks which weapon the sentence shows,
+  from the same codes, and keeps the alarm only for a weapon that is neither the engine's
+  nor `not shown`.
+- **Slot or call, first prompt, 16 beats x2:**
+
+  | version | weapon alarms before / after second read | read latency (median) |
+  |---|---|---|
+  | own call | 12/14, 2 false / 12/14, 2 false | 9.3 s |
+  | slot of the first read | 13/14, 6 false / 13/14, 2 false | 12.3 s |
+
+  The slot also changes the first read on every beat with a blow. The call of its own
+  leaves the first read byte-identical, so the call was kept.
+- **Shipped prompt, 25 beats x2 (8 held out).**
+  - Weapon claims: precision 0.95, recall 0.95.
+  - Alarms: 20/22 caught, 0 false, 0 of 26 clean beat-runs alarmed.
+  - The 8 held-out beats were correct both runs.
+  - The two misses are a shortened paraphrase of the shard beat. The verbatim live beat is
+    caught 2/2 and confirmed.
+  - The demonstrations were changed after the first run: a weapon named in its own
+    sentence, and a hilt counting as the weapon. The pommel false alarm went with them.
+  - Read latency had a median of 30 s. Ollama was heavily contended.
+- **The dice popup.** Over a blow, the subtitle is now the engine's words (`_roll_why`:
+  "Kesst Vayr against Lyraea"), not the plan's `because`. A reaction keeps its own reason,
+  which the engine wrote.
+
+**Live, 2026-10-17** (scratch copy, Khalmorin market, fight with Lyraea, contended):
+- "I grab a shard of the broken pot and stab Lyraea with it":
+  - The scenery read answered "not here: a piece of something no passage shows broken".
+    The give was refused.
+  - The plan's attack was the rapier. The popup read "Attack with rapier / Kesst Vayr
+    against Lyraea". The roll was 13 against AC 14, a miss.
+  - The draft wrote "…the shard … as you lunged, it bit deep into her shoulder". The harm
+    repair turned it into a graze. The struck-with read then found `something else`
+    against the rapier and cut the sentence. The blow backstop put "Your attack with the
+    rapier misses Lyraea." on the page.
+  - Still shipped: "the force of the impact sends her stumbling back" on a miss. No
+    reader claimed it.
+- At the gate, "I take a torch from its bracket on the gatehouse wall": no passage had
+  shown a torch. The reader answered "fits a place like this". It was ledgered
+  `commonplace` and the tell was "Kesst Vayr takes the torch." The narrated-and-shown path
+  was proved live with the kettle the day before.

@@ -213,7 +213,9 @@ def test_a_beat_is_read_once_and_a_rewrite_reads_only_its_new_sentence():
     (`GMAgent._repair_sentences`); reading the whole beat each time would cost a call per
     ask. Unchanged sentences keep their claims; a rewritten one is read alone."""
     bv.clear_cache()
-    beat = G.by_id("finalized")
+    # The place's kinds left out, so the read is the one call this pins (the kind of
+    # place is a call of its own since 2026-10-16, tests/test_setting_read.py).
+    beat = dict(G.by_id("finalized"), settings=())
     facts = G.facts(beat)
     chat = _chat(RECORDED["finalized"], {"player_ends_at": {"place": "the smithy",
                                                             "quote": ""},

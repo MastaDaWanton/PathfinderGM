@@ -89,9 +89,12 @@ def test_picking_up_a_chunk_of_wood_finds_the_fragments_and_keeps_their_provenan
     assert rec["owner"] == challenger.ref and rec["from_"] == "club"
     assert not ring.props_here(), "nothing lies here now"
     assert "fragments of the challenger's club" in pc.goods
-    # A thing nobody made real is still taken from the world, as before.
+    # A thing nobody made real is NOT taken from the world any more (2026-10-16: a shard of
+    # a pot only the prose broke was minted and swung; tests/test_scenery.py). The pebble
+    # the narration shows, or a place plainly holds, is ledgered first by gm/scenery.py.
     res = engine.run(engine.validate([{"op": "give", "params": {"item": "pebble", "to": "pc"}}]))
-    assert "pebble" in pc.goods and ring.prop_named("pebble") is None
+    assert res.outcomes[0].status == "refused"
+    assert "pebble" not in pc.goods and ring.prop_named("pebble") is None
 
 
 def test_dropping_a_thing_lays_it_here_with_its_record(ring):

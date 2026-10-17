@@ -53,6 +53,11 @@ def scripted(monkeypatch):
         if "player_ends_at" in props:
             state["asked"].append(("read", messages[-1]["content"]))
             return _Reply(state["reads"].pop(0) if state["reads"] else _empty())
+        if "setting" in props:
+            # The kind of place, asked in a call of its own (2026-10-16): answered "shows
+            # none" and kept off `asked`, so these pin the plumbing they always did.
+            state.setdefault("settings", []).append(messages[-1]["content"])
+            return _Reply({"setting": []})
         if "answer" in props:
             state["asked"].append(("confirm", messages[-1]["content"]))
             return _Reply({"answer": state["answers"].pop(0) if state["answers"] else "yes"})

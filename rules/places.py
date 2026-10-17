@@ -1975,6 +1975,90 @@ def kinds_of(known) -> tuple[str, ...]:
             out.extend(w for w in _said_as(p)[1:] if w not in out)
     return tuple(out)
 
+
+# --- what KIND of place a party stands in -------------------------------------------------
+#
+# The closed answers a reader of a beat gives to "what kind of place does this passage put
+# the player in?" (`gm/beat_verify.py`), and the ones this place truly is (`settings_for`),
+# derived from what the engine already holds: the ground in the id (`terrain_of`), which
+# side of the settlement's edge it is (`setting_of`), whether it has a roof (`is_indoors`,
+# the floor plan's answer), and its kind words (`words_for_here`). Diku's sector type is
+# the precedent — one kind per room from a short fixed list (INSIDE, CITY, FIELD, FOREST,
+# WATER…; CircleMUD building guide §3), never a description; this is the coarse version a
+# narrator's sentence can be held to.
+#
+# Measured 2026-10-16 (a real player's 0.2.19 market fight): "thudding uselessly into the
+# wooden planks of the deck" — no deck in a market, and nothing read it, because the regex
+# check of the day (gm/checks/setting_kind.py) knew a tavern's and a room's furniture only.
+SET_STREET = "a town street, square or market"
+SET_BUILDING = "inside a building"
+SET_TAVERN = "a tavern or inn"
+SET_COUNTRY = "open country"
+SET_UNDER = "underground"
+SET_SHIP = "aboard a ship or boat"
+SETTINGS = (SET_STREET, SET_BUILDING, SET_TAVERN, SET_COUNTRY, SET_UNDER, SET_SHIP)
+# The kinds a tavern's own words carry (`KIND_WORDS` maps pub, alehouse and bar to tavern).
+_TAVERN_KINDS = frozenset({"tavern", "inn"})
+# The settlement's open ground that is grass and trees rather than street: a narrator who
+# sets the graveyard among yews, or the green under an open sky, is right to call it open
+# country as much as a square.
+_GREEN_KINDS = frozenset({"green", "graveyard", "gardens", "mine head"})
+# The settlement's hidden ways are streets whatever their floor plan's roof says: the
+# warrens are "a street plan nobody drew", and "the alley of the warrens" is true there.
+_STREET_KINDS = frozenset({"lane", "back streets", "warrens"})
+# A settlement's own way in stands where the road meets the first house: "the dusty road
+# stretches out behind you … You stand at the way in" is true of it (the bench's
+# gates-receive, a false alarm while the way in was street alone).
+_EDGE_KINDS = frozenset({"gate", "way in"})
+
+
+def settings_for(place, known=()) -> frozenset[str]:
+    """The `SETTINGS` a passage set at `place` may truthfully put the party in; empty when
+    the engine cannot say (no place, no id), which a caller reads as "do not judge".
+
+    Generous where the place is generous: a cellar is a room as well as underground, a
+    ruin is any of open ground, a room or a vault, a town's way out past the ring is both
+    road and town. A ship is a truth only where the place stands on water (`WATER_KINDS`,
+    `_OUTSIDE_WATER`): a boat at the docks is the docks' own, a deck in a market is not."""
+    pid = str(getattr(place, "id", "") or "")
+    if not pid:
+        return frozenset()
+    ground = str(getattr(place, "terrain", "") or "") or terrain_of(pid)
+    kinds = {kind_named(w) for w in words_for_here(place, known)}
+    tavern = bool(kinds & _TAVERN_KINDS)
+    water = bool(kinds & (WATER_KINDS | _OUTSIDE_WATER))
+    try:
+        roofed = is_indoors(pid, ground, getattr(place, "shape", None))
+    except Exception:  # noqa: BLE001 — a place with no floor plan answer is not judged
+        return frozenset()
+    out: set[str] = set()
+    if ground == "underground":
+        out |= {SET_UNDER, SET_BUILDING}
+    elif ground == "ruins":
+        out |= {SET_UNDER, SET_BUILDING, SET_COUNTRY, SET_STREET}
+    elif roofed:
+        out.add(SET_BUILDING)
+        # An undercroft is a building's room below the street: underground as well.
+        if setting_of(pid) == "under" or storey_of(pid) < 0:
+            out.add(SET_UNDER)
+    elif setting_of(pid) == "in":
+        out.add(SET_STREET)
+        if kinds & (_GREEN_KINDS | _EDGE_KINDS):
+            out.add(SET_COUNTRY)
+    elif setting_of(pid) == "under":
+        out |= {SET_UNDER, SET_BUILDING}
+    else:
+        out.add(SET_COUNTRY)
+        if is_ring(pid):
+            out.add(SET_STREET)
+    if kinds & _STREET_KINDS:
+        out.add(SET_STREET)
+    if tavern and roofed:
+        out.add(SET_TAVERN)
+    if water or ground == "coast":
+        out.add(SET_SHIP)
+    return frozenset(out)
+
 # Kinds that stand on water, and the words a settlement is described with when it has
 # some. The generator's own cues (`IMPLIED`) are read first; these are the words a
 # tide-and-stilt village gets described with instead — Vormoor's export says "coral and

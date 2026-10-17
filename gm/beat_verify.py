@@ -180,6 +180,17 @@ class Facts:
     # Not an intimate beat: an intimate scene between adults is not read for the body's
     # conditions (its own words are the scene's, `GMAgent._repair_state_claims` likewise).
     intimate: bool = False
+    # The kinds of place (`places.SETTINGS`) the beat may truthfully put the party in: the
+    # union of where it began, where it ends and what its walk passed through
+    # (`places.settings_for`). Empty when the engine cannot say, and then no `setting`
+    # claim is judged and no setting call is made.
+    settings: tuple[str, ...] = ()
+    # The player's blows this beat, by the weapon the ENGINE struck with (each attack
+    # outcome's `blows[...]["weapon"]`, on a roll the player made), and the weapons the
+    # reader may answer with: what the player carries, unarmed, and whatever the engine
+    # struck with. Empty `blows` asks nothing (`struck_with`).
+    blows: tuple[str, ...] = ()
+    arms: tuple[str, ...] = ()
 
     @property
     def bodies(self) -> bool:
@@ -223,7 +234,8 @@ class Facts:
                            # The question asked depends on it (`schema`), so the read does.
                            self.bodies, [p.holds for p in self.people],
                            # The attempts question too (`attempts_of`).
-                           [(a.code, a.who, a.verdict) for a in attempts_of(self)]],
+                           [(a.code, a.who, a.verdict) for a in attempts_of(self)],
+                           self.settings, self.blows, self.arms],
                           default=str, sort_keys=True)
 
 
@@ -329,13 +341,72 @@ def facts_from(ctx) -> Facts:
     for p in beat_reader.away_people(scene):
         people.append(Person(ref=str(p["ref"]), name=str(p["name"]), here=False))
     clock = getattr(scene, "clock_minutes", None)
+    # What kind of place the beat is set in, from the engine's own answers about where it
+    # began, where it ends and where it went by. A walk in from somewhere this town cannot
+    # name leaves the first half unknown, and then nothing is judged (precision: a sentence set back on
+    # the road the party just left is not a deck in a market).
+    settings: frozenset[str] = frozenset()
+    try:
+        here_place = engine.here()
+    except Exception:  # noqa: BLE001
+        here_place = None
+    if here_place is not None and (not ctx.was_at or was is not None):
+        settings = places_mod.settings_for(here_place, known)
+        # And every place the beat's own walk passed through: "you pass through the docks
+        # … into the great square … and into the counting house" is set in streets on the
+        # way to a room (the bench's counter-and-go, a false alarm before this).
+        on_the_way = [p for p in (places_mod.find(known, w) for w in went_by) if p]
+        for p in ([was] if was is not None else []) + on_the_way:
+            if settings and p is not here_place:
+                more = places_mod.settings_for(p, known)
+                settings = (settings | more) if more else frozenset()
     return Facts(start=start, end=end,
                  places=tuple(dict.fromkeys(n for n in (_name_of(p) for p in known) if n)),
                  went_by=tuple(dict.fromkeys(went_by)), pack=pack, props=props,
                  people=tuple(people), clock=None if clock is None else int(clock),
                  outcomes=outcomes, in_fight=bool(getattr(scene, "in_encounter", False)),
                  pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
-                 intimate=bool(getattr(ctx, "intimate", False)))
+                 intimate=bool(getattr(ctx, "intimate", False)),
+                 settings=tuple(sorted(settings)),
+                 **_blows_of(ctx, outcomes, pc))
+
+
+UNARMED = "unarmed strike"
+
+
+def _weapon_name(name) -> str:
+    return " ".join(str(name or "").split()).lower()
+
+
+def _blows_of(ctx, outcomes, pc) -> dict:
+    """{"blows", "arms"} for `Facts`: the weapons the player's own blows were struck with
+    this beat, and the weapons the reader may name. A blow is the player's when its roll
+    was the player's to make (`visibility == "player"`; every non-PC roll is forced hidden,
+    `Engine._force_visibility`) — `Outcome` carries no actor, and an NPC's turn is its own
+    door (`ctx.acting`)."""
+    if pc is None or getattr(ctx, "acting", ""):
+        return {}
+    blows: list[str] = []
+    for o in outcomes:
+        if o.get("op") != "attack" or o.get("status") == "refused" or not o.get("blows"):
+            continue
+        if not any(isinstance(r, dict) and r.get("visibility") == "player"
+                   for r in o.get("rolls") or ()):
+            continue
+        blows += [_weapon_name(b.get("weapon")) for b in o["blows"]
+                  if isinstance(b, dict) and b.get("weapon")]
+    if not blows:
+        return {}
+    arms: list[str] = []
+    for key in list(getattr(pc, "weapons", None) or ()):
+        try:
+            name = (pc.weapon(key) or {}).get("name") or key
+        except Exception:  # noqa: BLE001 — a weapon the sheet cannot read is named by key
+            name = key
+        arms.append(_weapon_name(name))
+    arms += [UNARMED, *blows]
+    return {"blows": tuple(dict.fromkeys(blows)),
+            "arms": tuple(dict.fromkeys(a for a in arms if a and a != "improvised weapon"))}
 
 
 def asks_bodies(ctx) -> bool:
@@ -423,8 +494,25 @@ def schema(facts: Facts) -> dict:
         # the final bench run; docs/narrator-after-defeat.md).
         **({"shown_here": lst({"who": {"type": "string", "enum": _who(facts)}})}
            if away else {}),
+        # The kind of place, as a slot of this read — only when it is not asked on its
+        # own (`SETTING_ALONE`, measured both ways in docs/beat-verify.md).
+        **({} if SETTING_ALONE else {"setting": lst({"kind": {
+            "type": "string", "enum": list(_settings())}})}),
+        # And what the player's blows were struck with, as a slot — measured against the
+        # call of its own (`SWING_ALONE`), on a beat where the player struck only.
+        **({"struck_with": lst({"weapon": {"type": "string",
+                                           "enum": swing_codes(facts)}})}
+           if facts.blows and not SWING_ALONE else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
-                    "left", "time_of_day", *(["shown_here"] if away else [])]}
+                    "left", "time_of_day", *(["shown_here"] if away else []),
+                    *([] if SETTING_ALONE else ["setting"]),
+                    *(["struck_with"] if facts.blows and not SWING_ALONE else [])]}
+
+
+def _settings() -> tuple[str, ...]:
+    from rules.places import SETTINGS
+
+    return SETTINGS
 
 
 def bodies_schema(facts: Facts) -> dict:
@@ -608,6 +696,197 @@ _BODIES_DEMO2_USER = (
     "catches your shoulder and knocks the wind out of you, and you stagger a step but keep "
     "your feet. 'Next time you go in,' he says.")
 _BODIES_DEMO2_ANSWER = {"conditions": []}
+
+
+# --- the kind of place, asked on its own ---------------------------------------------------
+#
+# What KIND of place each sentence shows the player in, from the app's own kinds
+# (`places.SETTINGS`), judged in code against `places.settings_for` of where the engine
+# holds the party. Measured 2026-10-16 on the report's market fight: "thudding uselessly
+# into the wooden planks of the deck" — no deck in a market — passed every check, because
+# the only reader of a setting (gm/checks/setting_kind.py) is a word list of a tavern's and
+# a room's furniture. That list is not to grow; this replaces growing it.
+#
+# A LIST, one entry per sentence, for the hour's reason (`schema`'s `time_of_day`): the
+# deck was one sentence among a market's, and one answer per passage is the market's.
+# The reader is NOT told where the engine holds the party: told "the market", a reader
+# reads the market into every sentence (QAGS answers from the text alone, then compares).
+SETTING_ALONE = True
+
+_SETTING_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") and report what KIND of "
+    "place the narrator shows the player in, sentence by sentence, in the codes given: "
+    "\"a town street, square or market\" (the open air among a town's buildings, stalls, "
+    "carts and crowds); \"inside a building\" (a room, hall, shop or house, with walls and a "
+    "roof round them); \"a tavern or inn\" (its bar, taproom, tankards and patrons); "
+    "\"open country\" (fields, forest, hills or wild land, or a road out among them); "
+    "\"underground\" (a cave, tunnel, cellar, sewer or mine); \"aboard a ship or boat\" (its "
+    "deck, hold, rail or mast). One entry for each sentence whose narration plainly shows "
+    "which of these the place round the player is, copying its own words into \"quote\". "
+    "Dirt, mud, ground, stone, wood, a table or a crate can be in any of them and show none. "
+    "Not a place only seen in the distance, through a door or from outside, spoken of "
+    "inside quotation marks, remembered or planned. Leave the list empty when no sentence "
+    "shows it.")
+# The second sentence of this demonstration is the weak cue, NOT reported: on the first full
+# bench (2026-10-16, gemma-4-12B x2) "she lands flat on her back in the dirt" and "the dirt
+# of the west crossing" came back as open country, "he stumbles into the nearest table" as
+# a tavern, and "You wake on the hard ground … mineral and old stone" as underground — 8 of
+# the 18 false setting alarms, every one a thing any place has.
+_SETTING_DEMO_USER = (
+    "Passage:\n"
+    "The crowd presses close between the fish stalls, and the awnings snap overhead. The "
+    "carter sprawls in the dirt against an overturned table, groaning. Across the square "
+    "the tavern door bangs open on a burst of laughter. The drover swings at you and his "
+    "cudgel cracks against the cobbles at your feet. 'I'll see you on the next boat out,' "
+    "he spits.")
+_SETTING_DEMO_ANSWER = {"setting": [
+    {"kind": "a town street, square or market",
+     "quote": "The crowd presses close between the fish stalls"},
+    {"kind": "a town street, square or market",
+     "quote": "his cudgel cracks against the cobbles at your feet"}]}
+_SETTING_DEMO2_USER = (
+    "Passage:\n"
+    "The lantern swings from the rafters above the table. You rise, and the ferryman's "
+    "knife flashes. Spray bursts over the rail as the deck "
+    "heaves under your boots. He nods at the door. 'Out in the woods they'll never find "
+    "you.'")
+_SETTING_DEMO2_ANSWER = {"setting": [
+    {"kind": "inside a building",
+     "quote": "The lantern swings from the rafters above the table"},
+    {"kind": "aboard a ship or boat",
+     "quote": "Spray bursts over the rail as the deck heaves under your boots"}]}
+
+
+# --- what the player's blows were struck with ----------------------------------------------
+#
+# Measured live 2026-10-16: "I grab a shard of the broken pot and stab him" — the engine
+# refused the shard (nothing had put one there) and rolled an unarmed strike, 5 non-lethal;
+# the page wrote "The shard bites deep into the soft tissue of his shoulder." No reader
+# asked what a blow was struck with. Asked only on a beat where the player struck
+# (`Facts.blows`), from the weapons the player carries, unarmed, and what the engine swung,
+# with "something else" and "not shown" — and compared in code with `Outcome.blows`.
+SWING_ALONE = True
+OTHER_WEAPON = "something else"
+NOT_SHOWN = "not shown"
+
+_SWING_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") in a fight, and report what "
+    "the narrator shows each of the player's own blows struck with — landing or missing — "
+    "in the codes given. \"unarmed strike\" is a fist, foot, knee, elbow or head. "
+    "\"something else\" is a weapon or object not in the list. \"not shown\" when the "
+    "sentence shows the blow and never says what it was struck with. One entry per "
+    "sentence that shows one of YOUR blows, copying its own words into \"quote\"; never "
+    "somebody else's blow, never what a character only says. Leave the list empty when "
+    "the passage shows none of your blows.")
+_SWING_DEMO_USER = (
+    "Your weapons: shortsword, sling, unarmed strike, something else, not shown\n\n"
+    "Passage:\n"
+    "You drive your knee up into the drover's gut and he folds. He swings his cudgel back "
+    "at you and it whistles past your ear. You lunge again. The jagged spar of wood tears "
+    "across his cheek. 'Is that all?' he spits.")
+# The third entry is the shape of the live defect — a weapon named in a sentence of its
+# own after "You lunge", never saying "your": on the first bench run (2026-10-17, x2) the
+# reader quoted "You close the distance and lunge" as not shown and passed over "The shard
+# bites deep into the soft tissue of his shoulder", both runs.
+_SWING_DEMO_ANSWER = {"struck_with": [
+    {"weapon": "unarmed strike", "quote": "You drive your knee up into the drover's gut"},
+    {"weapon": "something else", "quote": "The jagged spar of wood tears across his cheek"}]}
+# The pommel is the weapon's: "You reverse your rapier and crack the pommel against her
+# temple" came back "something else", both runs of the same bench.
+_SWING_DEMO2_USER = (
+    "Your weapons: shortsword, sling, unarmed strike, something else, not shown\n\n"
+    "Passage:\n"
+    "You snatch a bottle off the table and smash it across her shoulder. You turn your "
+    "shortsword and drive its hilt into her ribs. Your next blow takes her across the "
+    "cheek.")
+_SWING_DEMO2_ANSWER = {"struck_with": [
+    {"weapon": "something else", "quote": "smash it across her shoulder"},
+    {"weapon": "shortsword", "quote": "drive its hilt into her ribs"},
+    {"weapon": "not shown", "quote": "Your next blow takes her across the cheek"}]}
+
+
+def swing_codes(facts: Facts) -> list[str]:
+    return list(dict.fromkeys([*facts.arms, OTHER_WEAPON, NOT_SHOWN]))
+
+
+def swing_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"struck_with": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "weapon": {"type": "string", "enum": swing_codes(facts)}, "quote": s},
+            "required": ["weapon", "quote"]}}},
+        "required": ["struck_with"]}
+
+
+def swing_messages(text: str, facts: Facts) -> list[dict]:
+    return [{"role": "system", "content": _SWING_SYSTEM},
+            {"role": "user", "content": _SWING_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_SWING_DEMO_ANSWER)},
+            {"role": "user", "content": _SWING_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_SWING_DEMO2_ANSWER)},
+            {"role": "user", "content": f"Your weapons: {', '.join(swing_codes(facts))}\n\n"
+                                        f"Passage:\n{text}"}]
+
+
+def setting_schema() -> dict:
+    from rules.places import SETTINGS
+
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"setting": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "kind": {"type": "string", "enum": list(SETTINGS)}, "quote": s},
+            "required": ["kind", "quote"]}}},
+        "required": ["setting"]}
+
+
+def setting_messages(text: str) -> list[dict]:
+    return [{"role": "system", "content": _SETTING_SYSTEM},
+            {"role": "user", "content": _SETTING_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_SETTING_DEMO_ANSWER)},
+            {"role": "user", "content": _SETTING_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_SETTING_DEMO2_ANSWER)},
+            {"role": "user", "content": f"Passage:\n{text}"}]
+
+
+# What each kind of place is, said for the second read's question, and what is NOT there
+# when the party is not in one (the fact a repair is given).
+_SET_WHAT = {
+    "a town street, square or market": "out in a town street, square or market, in the "
+                                       "open air",
+    "inside a building": "inside a building — in a room, with walls and a roof round them",
+    "a tavern or inn": "in a tavern or inn — at its bar, in its taproom",
+    "open country": "out in open country — in fields, forest or wild land, or on a road "
+                    "out among them",
+    "underground": "underground — in a cave, tunnel, cellar, sewer or mine",
+    "aboard a ship or boat": "aboard a ship or boat — on its deck, in its hold, at its rail",
+}
+_SET_ABSENT = {
+    "a town street, square or market": "no street, square or open sky",
+    "inside a building": "no room, roof, rafters or walls round them",
+    "a tavern or inn": "no bar, taproom, tankards or patrons",
+    "open country": "no fields, forest or wild road",
+    "underground": "no cave, tunnel, cellar or rock overhead",
+    "aboard a ship or boat": "no ship, boat, deck, hold, rail or mast",
+}
+_SET_IN = {
+    "a town street, square or market": "out in a street or square",
+    "inside a building": "inside a building",
+    "a tavern or inn": "in a tavern",
+    "open country": "out in open country",
+    "underground": "underground",
+    "aboard a ship or boat": "aboard a ship or boat",
+}
+# Where the party IS, said from the kinds the place truly is, first match wins.
+_SET_HERE = (
+    ("a tavern or inn", "inside a tavern"),
+    ("inside a building", "indoors, under a roof"),
+    ("a town street, square or market", "in the open air of the town"),
+    ("underground", "underground"),
+    ("open country", "out in open country"),
+    ("aboard a ship or boat", "by the water"),
+)
 
 
 def bodies_messages(text: str, facts: Facts) -> list[dict]:
@@ -828,17 +1107,48 @@ def attempt_claims(answer: dict, attempts: list[Attempt]) -> list[Claim]:
             out.append(Claim("attempt", {"attempt": a.code, "shown": row["shown"]},
                              str(row.get("quote") or "")))
     return out
+# The slot version of the setting question (`SETTING_ALONE` False), kept so the bench can
+# measure it against the call of its own.
+_SYSTEM_SETTING = (
+    "\nsetting: EVERY sentence whose narration shows what kind of place the player is in "
+    "— a town street, square or market; inside a building; a tavern or inn; open country; "
+    "underground; aboard a ship or boat — one entry per sentence. Not a place seen in the "
+    "distance or spoken of.")
+_DEMO_SETTING = [{"kind": "inside a building",
+                  "quote": "You cross to the counter and set your lantern down on it"}]
+_DEMO2_SETTING = [{"kind": "a town street, square or market",
+                   "quote": "You move toward the eel stalls and stop beside the drover"}]
 
 
 def messages(text: str, facts: Facts) -> list[dict]:
     away = any(not p.here for p in facts.people)
-    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")},
+    one = dict(_DEMO_ANSWER)
+    two = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
+    if not SETTING_ALONE:
+        one["setting"], two["setting"] = _DEMO_SETTING, _DEMO2_SETTING
+    swing_slot = bool(facts.blows) and not SWING_ALONE
+    if swing_slot:
+        # The demonstrations hold no blow of the player's (the drover's fist is his own).
+        one["struck_with"], two["struck_with"] = [], []
+    ask = _ask(text, facts)
+    if swing_slot:
+        ask = ask.replace("\n\nPassage:\n",
+                          f"\nYour weapons: {', '.join(swing_codes(facts))}\n\nPassage:\n", 1)
+    return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")
+             + ("" if SETTING_ALONE else _SYSTEM_SETTING)
+             + (_SYSTEM_SWING if swing_slot else "")},
             {"role": "user", "content": _DEMO_USER},
-            {"role": "assistant", "content": json.dumps(_DEMO_ANSWER)},
+            {"role": "assistant", "content": json.dumps(one)},
             {"role": "user", "content": _DEMO2_AWAY_USER if away else _DEMO2_USER},
-            {"role": "assistant", "content": json.dumps(
-                _DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)},
-            {"role": "user", "content": _ask(text, facts)}]
+            {"role": "assistant", "content": json.dumps(two)},
+            {"role": "user", "content": ask}]
+
+
+_SYSTEM_SWING = (
+    "\nstruck_with: EVERY sentence that shows one of the player's own blows, landing or "
+    "missing, with what it was struck with from \"Your weapons\" — \"unarmed strike\" for a "
+    "fist, foot, knee, elbow or head, \"something else\" for a weapon or object not listed, "
+    "\"not shown\" when the sentence never says.")
 
 
 def _raw_prompt(msgs: list[dict]) -> list[dict]:
@@ -923,7 +1233,9 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("shown_here", "shown", ("who",)),
                             ("arrived", "arrived", ("who",)),
                             ("left", "left", ("who",)),
-                            ("conditions", "condition", ("who", "condition"))):
+                            ("conditions", "condition", ("who", "condition")),
+                            ("setting", "setting", ("kind",)),
+                            ("struck_with", "weapon", ("weapon",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -952,7 +1264,8 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "seller": set(_who(facts)), "buyer": set(_who(facts)),
                "who": set(_who(facts)), "how": set(HOW), "place": set(_places(facts)),
                "part": set(PARTS), "condition": set(CONDITIONS),
-               "attempt": {a.code for a in attempts_of(facts)}, "shown": set(SHOWN)}
+               "attempt": {a.code for a in attempts_of(facts)}, "shown": set(SHOWN),
+               "kind": set(_settings()), "weapon": set(swing_codes(facts))}
     seen: set[str] = set()
     for c in claims:
         bad = [k for k, v in c.slots.items()
@@ -1043,6 +1356,30 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
             result.raw += "\n" + more.text
             answer = dict(answer or {}, conditions=(more.json() or {}).get("conditions")
                           or [])
+        if SETTING_ALONE and facts.settings:
+            # The kind of place, in a call of its own (`_SETTING_SYSTEM`), on every beat
+            # whose place the engine can name the kinds of — and on no other, since an
+            # unjudgeable answer is a call for nothing.
+            msgs = setting_messages(text)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            where = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                         num_predict=300, provider=provider, api_key=api_key,
+                         schema=setting_schema())
+            result.raw += "\n" + where.text
+            answer = dict(answer or {}, setting=(where.json() or {}).get("setting") or [])
+        if SWING_ALONE and facts.blows:
+            # What the player's blows were struck with, in a call of its own, on a beat
+            # where the player struck and on no other (`_SWING_SYSTEM`).
+            msgs = swing_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            swung = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                         num_predict=300, provider=provider, api_key=api_key,
+                         schema=swing_schema(facts))
+            result.raw += "\n" + swung.text
+            answer = dict(answer or {},
+                          struck_with=(swung.json() or {}).get("struck_with") or [])
         claims = claims_of(answer, facts)
         attempts = attempts_of(facts)
         if attempts:
@@ -1251,6 +1588,79 @@ def _attempt_fact(a: Attempt, facts: Facts) -> str:
                  f"and what was tried is not done.")
 
 
+def _said_weapon(name: str) -> str:
+    return ("bare hands — a fist, foot, knee, elbow or head" if name == UNARMED
+            else f"the {name}")
+
+
+def _weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A player's blow shown struck with something the engine did not swing, or None.
+
+    Judged only on a beat where the engine records the player's blows (`Facts.blows`), and
+    never for "not shown". "something else" is judged: the live shard was exactly that — a
+    thing no list held, against an unarmed strike the engine rolled."""
+    said = str(c.slots.get("weapon") or "")
+    if not facts.blows or said in ("", NOT_SHOWN) or said in facts.blows:
+        return None
+    struck = " and ".join(_said_weapon(w) for w in facts.blows)
+    instead = "anything else" if said == OTHER_WEAPON else f"the {said}"
+    return Discrepancy(
+        "contradiction", "weapon",
+        f"Your (the player's) blow was struck with {struck}, not with {instead}: nothing "
+        f"else was in your hand.", c.sentence, "", c)
+
+
+def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
+    """The player shown picking up a thing on a turn the engine refused a pick-up of
+    something that is not there (`Engine._picked_from_nowhere`, code `not_here`), or None.
+
+    The read judges nothing taken off the floor ("a stone picked up is the world's"), and
+    that was right while the world never ran out. It runs out now (2026-10-16): on the live
+    check "I pick up one of the crates of dried fruit and throw it" was refused — "There is
+    no one of the crates of dried fruit here … to pick up" — and the page wrote "you have to
+    wrench it from the pile. You heave the wood and the heavy, sticky fruit, and it flies."
+    The refusal's own sentence is the fact, and the line the backstop puts in."""
+    if c.category != "hands" or str(c.slots.get("to")) != facts.pc_ref:
+        return None
+    if str(c.slots.get("from")) not in (FLOOR, NOBODY, NEW_PERSON):
+        return None
+    why = next((_refusal_line(o) for o in facts.outcomes
+                if o.get("op") == "give" and o.get("status") == "refused"
+                and o.get("code") == "not_here" and _refusal_line(o)), "")
+    if not why:
+        return None
+    return Discrepancy("contradiction", "hands",
+                       f"Nothing was picked up: {why} The player's hands stay empty of it.",
+                       c.sentence, why, c)
+
+
+def _setting_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A sentence set in a kind of place the party is not in, or None.
+
+    Judged only where the engine names the kinds of both ends of the beat
+    (`Facts.settings`), and generously (`places.settings_for`): a cellar is a room and a
+    vault, the outskirts are road and town, a boat is the docks' own. The fact the repair
+    is given says where the party is and names what is not there."""
+    kind = str(c.slots.get("kind") or "")
+    if not facts.settings or not kind or kind in facts.settings:
+        return None
+    # A sentence that names the place the engine holds the party at is set there by the
+    # narrator's own word, whatever kind the reader inferred from the rest: "the dirt of
+    # the west crossing mingling with the blood on his tunic" was open country to the
+    # reader, both runs, both reads (bench, 2026-10-16). Names compared, never English read.
+    said = f" {_norm(c.sentence)} "
+    for name in dict.fromkeys((facts.start, facts.end, *facts.went_by)):
+        own = _norm(name).removeprefix("the ").strip()
+        if own and f" {own} " in said:
+            return None
+    here = next((said for k, said in _SET_HERE if k in facts.settings), "here")
+    where = facts.end or "this place"
+    return Discrepancy(
+        "contradiction", "setting",
+        f"The player is at {where}, {here} — not {_SET_IN.get(kind, kind)}. There is "
+        f"{_SET_ABSENT.get(kind, 'none of that')} here.", c.sentence, "", c)
+
+
 def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]:
     """The page's claims against the engine's outcomes and state. Code only.
 
@@ -1270,6 +1680,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
         if not c.valid:
             continue
         s = c.slots
+        refused = _taken_though_refused(c, facts)
+        if refused is not None:
+            out.append(refused)
+            continue
         if c.category == "move":
             place = s["place"]
             if not moved:
@@ -1450,6 +1864,14 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             if a is not None and (s["shown"] == "succeeds") != (a.verdict == "success"):
                 out.append(Discrepancy("contradiction", "attempt", _attempt_fact(a, facts),
                                        c.sentence, "", c, ref=a.who))
+        elif c.category == "weapon":
+            found = _weapon_wrong(c, facts)
+            if found is not None:
+                out.append(found)
+        elif c.category == "setting":
+            found = _setting_wrong(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "hour":
             h = _hour(facts)
             if h is not None and h not in PARTS[s["part"]]:
@@ -1515,6 +1937,11 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c is None:
         return ""
     s = c.slots
+    if c.category == "hands" and d.line and s.get("from") in (FLOOR, NOBODY, NEW_PERSON):
+        # `_taken_though_refused`: a pick-up, not a hand-over — "is something handed to
+        # you?" is no question to ask of "you wrench it from the pile … and it flies".
+        return ("Does this sentence say that you (the player) pick something up, take hold "
+                "of it, or throw it?")
     if c.category == "move":
         return (f"Does this sentence say that you (the player) have left {facts.start} and "
                 f"are now somewhere else — not just moving about inside {facts.start}?")
@@ -1584,6 +2011,21 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
+    if c.category == "weapon":
+        # Asked in `_struck_with`'s shape (which weapon, from the codes), not yes-or-no;
+        # this line is the cache key and the record of what was asked.
+        return "Which of your weapons does this sentence show your blow struck with?"
+    if c.category == "setting":
+        # Asked of the scene, not of the player's feet: "the club thuds into the planks of
+        # the deck" never says where the player stands, and it sets the whole fight on a
+        # ship all the same. Probed 2026-10-16 on ten sentences (five true settings, five
+        # views, speech, a memory, a wrong guess), gemma-4-12B at temperature 0: "Does
+        # this sentence show the place round you as…" and "…describe the place where you
+        # are now as…" each refused "Branches whip at your face as you push on through the
+        # undergrowth" (9/10); this wording 10/10.
+        return (f"Is the scene in this sentence set {_SET_WHAT.get(s['kind'], s['kind'])} — "
+                f"where you (the player) are now, not somewhere only seen in the distance or "
+                f"from outside, remembered or spoken of?")
     if c.category == "arrived":
         return f"Does this sentence say that {_name(facts, s['who'])} comes into the place?"
     if c.category == "left":
@@ -1648,6 +2090,11 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
         before = sentences[at - 1] if at > 0 else ""
         if d.category == "absent" and d.ref:
             (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
+        if d.category == "weapon":
+            lead = " ".join(sentences[max(0, at - 2):at]) if at > 0 else ""
+            (kept if _struck_with(d, lead, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
         if d.category == "condition" and d.ref:
@@ -1720,6 +2167,35 @@ def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provide
         return d.ref in [str(x) for x in (reply.json() or {}).get("shown") or []]
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
+
+
+def _struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                 api_key) -> bool:
+    """The second read of a `weapon` contradiction, in `_shows`' shape: WHICH weapon the one
+    sentence shows the player's blow struck with, from the same codes, compared in code —
+    kept only when the answer is neither the engine's weapon nor "not shown". A call that
+    fails keeps the contradiction, as every second read does."""
+    codes = swing_codes(facts)
+    ask = ((f"The sentences before it, for context: {before}\n" if before else "")
+           + f"The sentence: {d.sentence}\n\nYour weapons: {', '.join(codes)}\n\n"
+           f"Question: what does this sentence show YOUR (the player's) blow struck with? "
+           f"\"unarmed strike\" for a fist, foot, knee, elbow or head; \"{OTHER_WEAPON}\" "
+           f"for a weapon or object not listed; \"{NOT_SHOWN}\" if it never says or shows "
+           f"no blow of yours.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"weapon": {
+                         "type": "string", "enum": codes}}, "required": ["weapon"]})
+        said = str((reply.json() or {}).get("weapon") or "")
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+    return bool(said) and said != NOT_SHOWN and said not in facts.blows
 
 
 def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
