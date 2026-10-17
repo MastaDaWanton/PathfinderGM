@@ -728,20 +728,36 @@ _ABOUT_SOMEBODY = frozenset({
 })
 
 
-def _declared_placeholders(raw_intents) -> set[str]:
-    """The placeholders this plan's own `introduce` hands out (one introduce per plan,
-    `Engine.validate`)."""
+def _declared_placeholders(raw_intents) -> tuple[set[str], float]:
+    """(the placeholders this plan's own `introduce` hands out, the position it will
+    really run at). One introduce per plan (`Engine.validate`).
+
+    The position is the engine's, not the list's: `engine._introduce_after_travel` moves an
+    `already_here` introduce after the plan's last walk unless the walk takes them along.
+    Measured live 2026-10-17 (hv-data, the inn): "I say goodbye to the barkeep, go back up
+    to my room and sleep until dawn" was planned introduce, `say to=new1`, travel, rest; the
+    engine ran the introduce after the walk, so the goodbye named nobody yet, and all five
+    attempts were refused as though nothing introduced anybody."""
     from rules.intents import INTRODUCED_REFS
 
-    intro = next((r for r in raw_intents if isinstance(r, dict)
-                  and str(r.get("op", "")).lower() == "introduce"), None)
-    if intro is None:
-        return set()
+    at = next((k for k, r in enumerate(raw_intents) if isinstance(r, dict)
+               and str(r.get("op", "")).lower() == "introduce"), None)
+    if at is None:
+        return set(), 0.0
+    params = raw_intents[at].get("params") or {}
     try:
-        n = int((intro.get("params") or {}).get("count", 1) or 1)
+        n = int(params.get("count", 1) or 1)
     except (TypeError, ValueError):
         n = 1
-    return set(INTRODUCED_REFS[:max(1, n)])
+    mine = set(INTRODUCED_REFS[:max(1, n)])
+    walks = [k for k, r in enumerate(raw_intents) if isinstance(r, dict)
+             and str(r.get("op", "")).lower() in ("travel", "journey")]
+    runs_at = float(at)
+    if walks and walks[-1] > at and (params.get("how") or "already_here") == "already_here":
+        taken = (raw_intents[walks[-1]].get("params") or {}).get("with") or []
+        if not ({str(w) for w in taken} & mine):
+            runs_at = walks[-1] + 0.5
+    return mine, runs_at
 
 
 def _meant_by_the_reading(scene, frame) -> str:
@@ -802,7 +818,7 @@ def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
     if scene is None or not isinstance(raw_intents, list):
         return raw_intents
     known = set(getattr(scene, "actors", {}) or {})
-    declared = _declared_placeholders(raw_intents)
+    declared, runs_at = _declared_placeholders(raw_intents)
     if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn"
            for r in raw_intents):
         # A spawn's bodies are `bind_placeholders`' to number; what a spawn left unbound
@@ -814,12 +830,16 @@ def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
 
         said_to = meant or acts_to_ops.addressed(scene)
 
+    here_at = 0
+
     def dangling(ref) -> bool:
-        return (isinstance(ref, str) and ref not in known and ref not in declared
-                and _is_label(ref))
+        # A placeholder its introduce has not made yet, where the engine will run it, is
+        # as unmade as one nothing introduces.
+        return (isinstance(ref, str) and ref not in known
+                and (ref not in declared or here_at < runs_at) and _is_label(ref))
 
     out: list = []
-    for raw in raw_intents:
+    for here_at, raw in enumerate(raw_intents):
         if not isinstance(raw, dict) or not any(dangling(r) for r in _refs_in(raw)):
             out.append(raw)
             continue

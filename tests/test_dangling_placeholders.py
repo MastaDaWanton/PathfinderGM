@@ -137,6 +137,30 @@ def test_an_introduced_placeholder_and_a_real_ref_are_left_alone():
     assert judgement.settle_placeholders(raw, "I hail the ferryman.", scene, None) == raw
 
 
+def test_an_introduce_the_engine_runs_after_the_walk_has_not_made_anybody_yet():
+    """Live 2026-10-17 on this branch (hv-data, the inn, c8 alone with the player): "I say
+    goodbye to the barkeep, go back up to my room and sleep until dawn" was planned
+    introduce, `say to=new1`, travel, rest five times and refused five times — the engine
+    runs an `already_here` introduce after the plan's last walk
+    (`engine._introduce_after_travel`), so the goodbye named nobody yet. The first cut of
+    this step counted the introduce wherever it stood in the list and let it through."""
+    scene = _scene("the one behind the bar")
+    raw = [{"op": "introduce", "params": {"who": "the barkeep"}},
+           {"op": "say", "actor": "pc", "params": {"words": "Goodbye.", "to": "new1"}},
+           {"op": "travel", "params": {"place": "the upper floor of the inn"}},
+           {"op": "rest", "actor": "pc", "target": "new1", "params": {"kind": "night"}}]
+    out = judgement.settle_placeholders(
+        raw, "I say goodbye to the barkeep, go back up to my room and sleep until dawn.",
+        scene, None)
+    assert out[1]["params"]["to"] == "c1"
+    assert out[3] == raw[3], "after the walk new1 exists, and is left alone"
+    # Taken along on the walk, the introduce runs where it stands, and new1 is theirs.
+    along = [dict(raw[0], params={"who": "the barkeep"}), raw[1],
+             dict(raw[2], params={"place": "the upper floor of the inn", "with": ["new1"]}),
+             raw[3]]
+    assert judgement.settle_placeholders(along, "I say goodbye.", scene, None) == along
+
+
 def test_a_spawn_is_never_re_aimed_at_somebody_already_here():
     """A spawn's bodies are `bind_placeholders`' to number. A placeholder beyond them is
     settled, but never by the one-person guess — that man is not the newcomer."""
