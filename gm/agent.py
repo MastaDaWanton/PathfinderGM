@@ -197,6 +197,16 @@ class GMAgent:
             return cut, f"an undeclared blow by {names}: the sentence was cut", attempts
         return text, f"an undeclared blow by {names}: could not be removed", attempts
 
+    def _ground_scenery(self, raw) -> None:
+        """Ledger the narrated scenery this plan reaches for (gm/scenery.py), and note what
+        was asked on the reading, which the turn log keeps. Off with the interpreter."""
+        from . import interpret, scenery
+
+        rows = scenery.ground(raw, self.engine, list(getattr(self, "narrated", ()) or ()),
+                              ask_fn=scenery.ask if interpret.ENABLED else None)
+        if rows and isinstance(self.reading, dict):
+            self.reading.setdefault("scenery", []).extend(rows)
+
     def _undeclared_arrivals(self, text: str, messages: list, schema: dict, *,
                              shape: str = ""):
         """Mid-fight, the prose brings in people the engine never put on the board.
@@ -903,6 +913,11 @@ class GMAgent:
                 raw = judgement.order_the_attached(
                     raw, player_input, self.engine.scene,
                     getattr(self, "attachments", ()))
+                # A thing the plan reaches for that nothing records is asked about once,
+                # of the passages the player read here (gm/scenery.py): shown, or loose in
+                # any place of this kind, it is ledgered before the engine looks for it;
+                # otherwise the engine's own refusal stands (`_picked_from_nowhere`).
+                self._ground_scenery(raw)
                 data = dict(data, intents=raw)
                 try:
                     intents = self.engine.validate(raw)

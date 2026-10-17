@@ -4084,6 +4084,11 @@ def _arm_cards(agent, c) -> None:
     not the transcript, and the cards scan the transcript (`rules/cards.py`)."""
     recent = [b["text"] for b in c.transcript[-4:] if b.get("text")]
     agent.recent = recent
+    # The GM's own passages among the last few, for the scenery step (gm/scenery.py): a
+    # thing the player reaches for is "shown here" only in what the narrator wrote — the
+    # player's own line naming a shard is not a shard.
+    agent.narrated = [b["text"] for b in c.transcript[-6:]
+                      if b.get("text") and b.get("who") == "gm"]
     agent.turn = len(c.transcript)
     # And what happened in the turns the context budget has already cut, so the model
     # is told about them rather than left to notice they are missing.
