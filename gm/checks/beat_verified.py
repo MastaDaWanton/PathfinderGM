@@ -189,7 +189,12 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
     for d in found:
         if d.kind == "omission":
             if d.line and d.line not in text:
-                text = narration_mod.put_before_the_hand_back(text, d.line)
+                if d.category == "lodging":
+                    # Paid before slept, as the tell runs: a payment put after "You lay
+                    # down … the world fades" would be paid in the sleep.
+                    text = f"{d.line} {text}".strip()
+                else:
+                    text = narration_mod.put_before_the_hand_back(text, d.line)
                 notes.append(f"beat read back: the engine's answer was missing: {d.line[:60]!r}")
             continue
         if d.category == "move" or d.sentence not in text:

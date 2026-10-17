@@ -2179,6 +2179,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # deal done is true, and is not cut as a sale nobody made.
             paid = any(e.get("kind") == "give" and e.get("how") == "paid"
                        and e.get("to") == pc for o in _resolved(facts) for e in _effects(o))
+            # And a room paid for by sleeping at an inn (rules/lodging.py): coin for a bed,
+            # a purchase the engine made. "You pay for the room" is true on that turn, and
+            # was a sale nobody made to this judgement until 2026-10-17.
+            paid = paid or bool(_rooms_paid(facts))
             if s["settled"] and not done and not paid:
                 why = _refusal_line(refused[0]) if refused else ""
                 out.append(Discrepancy(
@@ -2308,7 +2312,33 @@ def _omissions(claims: list[Claim], facts: Facts, text: str) -> list[Discrepancy
         if said or named or _norm(line) in page:
             continue
         out.append(Discrepancy("omission", "trade", line, "", line))
+    # A room paid for at an inn, on a page that never shows the coin. Live 2026-10-17: "I
+    # pay for a room for the night and go to bed" — the tell "Kesst Vayr pays the one
+    # behind the bar 5 … silver pieces for a room at the inn for the night. Kesst Vayr
+    # rests for 8 hours." — and the beat showed the sleep only ("You find a small,
+    # secluded room at the back of the inn … You lay down"). The purse was lighter and
+    # the page never said why. The payment is not the deed reader's (a purchase is the
+    # screen's, a rest the clock's: deed_reader.OWED_ACTS), and this omission read only
+    # sales. Shown when the read back has the player settle a purchase or hand anything
+    # over this beat, or the engine's own sentence is on the page.
+    for line in _rooms_paid(facts):
+        said = any(c.valid and ((c.category == "trade" and c.slots.get("settled")
+                                 and str(c.slots.get("buyer")) == facts.pc_ref)
+                                or (c.category == "hands"
+                                    and str(c.slots.get("from")) == facts.pc_ref))
+                   for c in claims)
+        if said or _norm(line) in page:
+            continue
+        out.append(Discrepancy("omission", "lodging", line, "", line))
     return out
+
+
+def _rooms_paid(facts: Facts) -> list[str]:
+    """The engine's own sentence for each room paid for this beat (a resolved `rest`
+    whose `lodging` record moved coin; `Engine._room_bill`)."""
+    return [str(e.get("line")) for o in _resolved(facts) if o.get("op") == "rest"
+            for e in _effects(o)
+            if e.get("kind") == "lodging" and e.get("paid") and e.get("line")]
 
 
 # --- the second read: a contradiction is asked about once more before it costs a sentence --

@@ -22387,12 +22387,17 @@ class Engine:
                 code="cannot_pay")}
         actor.purse = purse
         lodging.hold(actor, at, name, self.scene.ROUNDS_PER_MINUTE)
-        return {"tell": f"{actor.name} pays {asks or 'the house'} {price} for a room at "
-                        f"{name} for the night.",
+        tell = (f"{actor.name} pays {asks or 'the house'} {price} for a room at {name} "
+                f"for the night.")
+        return {"tell": tell,
                 "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": cp,
                            "paid": cp, "to": getattr(keeper, "ref", ""),
                            "stay": lodging.quality(self.scene, at),
-                           "origin": lodging.ORIGIN}}
+                           "origin": lodging.ORIGIN,
+                           # The payment's own sentence, apart from the night's: the read
+                           # back puts it on a page that showed the sleep and never the
+                           # coin (`beat_verify._omissions`, live 2026-10-17).
+                           "line": tell}}
 
     @staticmethod
     def _with_bill(outcome: Outcome, bill: dict | None) -> Outcome:
