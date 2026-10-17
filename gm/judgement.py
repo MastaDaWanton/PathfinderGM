@@ -714,6 +714,164 @@ def bind_placeholders(raw_intents, player_text: str, scene):
         return raw_intents
     return [_swap_refs(dict(r), bound) for r in raw_intents]
 
+
+# The ops whose resolution reads `intent.target` (or an aim, or `opposed_by`): with the
+# person gone the deed is a different deed or none, so an unbound placeholder there drops
+# the op. Every other op's target is decoration — a `travel`, `rest` or `say` that wrote
+# `target: new1` resolves exactly the same without it — and loses only the slot. Pinned
+# against the engine's own handlers by tests/test_dangling_placeholders.py, so an op that
+# starts reading its target is added here or the suite says so.
+_ABOUT_SOMEBODY = frozenset({
+    "attack", "cast", "use_ability", "check", "give", "heal", "damage", "ability_damage",
+    "temp_hp", "condition", "compel", "provoke", "haggle", "judge", "rename", "repair",
+    "mend", "item_damage", "hazard",
+})
+
+
+def _declared_placeholders(raw_intents) -> set[str]:
+    """The placeholders this plan's own `introduce` hands out (one introduce per plan,
+    `Engine.validate`)."""
+    from rules.intents import INTRODUCED_REFS
+
+    intro = next((r for r in raw_intents if isinstance(r, dict)
+                  and str(r.get("op", "")).lower() == "introduce"), None)
+    if intro is None:
+        return set()
+    try:
+        n = int((intro.get("params") or {}).get("count", 1) or 1)
+    except (TypeError, ValueError):
+        n = 1
+    return set(INTRODUCED_REFS[:max(1, n)])
+
+
+def _meant_by_the_reading(scene, frame) -> str:
+    """The one person here the reading's target slots name, by the engine's finder
+    (`acts_to_ops.person`: a name, a description shown as the name, a pronoun); "" when the
+    slots name nobody here or more than one."""
+    from . import acts_to_ops, interpret
+
+    if not frame or frame.get("error"):
+        return ""
+    found = {acts_to_ops.person(scene, a.get("target"))
+             for a in frame.get("actions") or []
+             if interpret.acting(a) and str(a.get("target") or "").strip()}
+    found.discard("")
+    return next(iter(found)) if len(found) == 1 else ""
+
+
+def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
+                        hold_players: bool = False, notes: list | None = None):
+    """No placeholder reaches validation without somebody behind it.
+
+    Measured live 2026-10-16 on master (gemma-4-12B, Pangrella, scratch data): the plan
+    wrote `new1` as a target with nothing introduced on 5 of 5 attempts across two turns
+    in a tavern ("I pay for a room for the night and go to bed", "I ask the barkeep for a
+    room…"); validation refused every attempt and the turn fell to narration only, whose
+    prose then had the character asleep upstairs with the engine's clock and place unmoved.
+    The same scratch saves hold more of it: `travel target=new1` from the outskirts with
+    nobody there (7 refusals), and `say to=new1` beside the one person in the room, c8 "the
+    one behind the bar", for "I say goodbye to the barkeep…" (7 refusals). `bind_placeholders`
+    had not regressed: it binds only one dangling label the player's words can only mean,
+    and "the barkeep" found nobody by name, so it rightly bound nothing — and nothing after
+    it took the placeholder out. The schema keeps offering `new1` in every ref enum out of a
+    fight (`prompts.turn_schema`), and the refusal's correction never taught the retry to
+    stop writing it.
+
+    Last before validation, after every door that may still introduce somebody
+    (`inject_introduce`, the `declared` merge) or drop an introduce (`asked_about_not_
+    addressed`). For each placeholder no introduce in this plan declares:
+
+      * bound to the one person the reading's target slots name here (`acts_to_ops.person`)
+        or the one the player's words can only mean (`_the_one_meant`); for a line said,
+        also the one person the player is dealing with (`acts_to_ops.addressed`) — words
+        are said to somebody, and a blow is never aimed by that guess;
+      * else, in a slot the op's resolution never reads (a travel's or a rest's `target`, a
+        say's `to`), the slot is emptied and the deed stands: Inform's "supplying a missing
+        noun" either supplies one or the action goes on without it when it needs none;
+      * else the op goes, with the reason noted: the person it was done to is nobody, and
+        the rest of the turn stands. JSON:API answers an unresolved `lid` by refusing the
+        whole request (400); a turn is not a request the player can resend for free, which
+        is exactly how five refusals became a narrated nothing.
+
+    `hold_players` leaves the player's character's own deed on somebody to validation's
+    refusal instead of dropping it — the agent sets it on a plan's FIRST attempt only, so a
+    cast the player asked for gets one retry with the people here named (G2's `aim
+    ref:new2`, which the retry then aimed at Kaelith, tests/test_g2_phantom_targets.py)
+    before code settles it on the next.
+    """
+    if scene is None or not isinstance(raw_intents, list):
+        return raw_intents
+    known = set(getattr(scene, "actors", {}) or {})
+    declared = _declared_placeholders(raw_intents)
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn"
+           for r in raw_intents):
+        # A spawn's bodies are `bind_placeholders`' to number; what a spawn left unbound
+        # is still settled below, but never re-aimed at somebody already here.
+        meant = said_to = ""
+    else:
+        meant = _meant_by_the_reading(scene, frame) or _the_one_meant(scene, player_text)
+        from . import acts_to_ops
+
+        said_to = meant or acts_to_ops.addressed(scene)
+
+    def dangling(ref) -> bool:
+        return (isinstance(ref, str) and ref not in known and ref not in declared
+                and _is_label(ref))
+
+    out: list = []
+    for raw in raw_intents:
+        if not isinstance(raw, dict) or not any(dangling(r) for r in _refs_in(raw)):
+            out.append(raw)
+            continue
+        op = str(raw.get("op", "")).lower()
+        if dangling(raw.get("actor")):
+            if notes is not None:
+                notes.append(f"{op} dropped: its actor {raw.get('actor')!r} is nobody here "
+                             f"and nothing in the plan introduces them")
+            continue
+        who = said_to if op == "say" else meant
+        if who:
+            swap = {r: who for r in _refs_in(raw) if dangling(r)}
+            out.append(_swap_refs(dict(raw), swap))
+            if notes is not None:
+                notes.append(f"{op}: {', '.join(sorted(swap))} is {who}, the one person "
+                             f"here the player means")
+            continue
+        if op in _ABOUT_SOMEBODY:
+            pc = scene.pc() if hasattr(scene, "pc") else None
+            if hold_players and str(raw.get("actor") or "pc") in (
+                    "pc", "None", getattr(pc, "ref", "pc")):
+                out.append(raw)
+                continue
+            if notes is not None:
+                notes.append(f"{op} dropped: it was aimed at a placeholder nobody "
+                             f"introduced, and nobody here is plainly the one meant")
+            continue
+        fixed = dict(raw)
+        if dangling(fixed.get("target")):
+            fixed.pop("target", None)
+        params = fixed.get("params")
+        if isinstance(params, dict) and isinstance(params.get("to"), list):
+            params = dict(params, to=[t for t in params["to"] if not dangling(t)])
+            if not params["to"]:
+                params.pop("to")
+            fixed["params"] = params
+        elif isinstance(params, dict) and dangling(params.get("to")):
+            params = dict(params)
+            params.pop("to", None)
+            fixed["params"] = params
+        if any(dangling(r) for r in _refs_in(fixed)):
+            if notes is not None:
+                notes.append(f"{op} dropped: a placeholder nobody introduced")
+            continue
+        out.append(fixed)
+        if notes is not None:
+            notes.append(f"{op}: the placeholder nobody introduced was taken out; the "
+                         f"{op} needs nobody")
+    if not out and raw_intents:
+        out = [{"op": "narrate_only", "because": "the only ops were aimed at nobody"}]
+    return out
+
 # What the player's words suggest the newcomers are. The animal cue is first because it
 # is the more specific claim: "the guard dog" contains "guard", and with the human cue
 # first the dog came out a watchman.

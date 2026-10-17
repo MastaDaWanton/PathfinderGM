@@ -903,6 +903,13 @@ class GMAgent:
                 raw = judgement.order_the_attached(
                     raw, player_input, self.engine.scene,
                     getattr(self, "attachments", ()))
+                # And no placeholder reaches validation with nobody behind it: bound to
+                # the one person meant, or its slot emptied, or its op dropped — never
+                # five refusals and a narrated nothing (2026-10-16, `settle_placeholders`).
+                # The player's own deed aimed at nobody gets the first attempt's retry.
+                raw = judgement.settle_placeholders(
+                    raw, player_input, self.engine.scene, read_ok, notes=own_words,
+                    hold_players=n == 0)
                 data = dict(data, intents=raw)
                 try:
                     intents = self.engine.validate(raw)
