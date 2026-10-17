@@ -69,6 +69,32 @@ def test_the_place_and_the_world_name_different_coins_here():
     assert _stem(goods.coinage(WORLD, None)) == "Saltmakers'"
 
 
+SETTLEMENTS = ("CITY", "TOWN", "VILLAGE", "HAMLET")
+
+
+@pytest.mark.parametrize("path", ["fixtures/pangrella-campaign.json",
+                                  "fixtures/aurvantis-campaign.json",
+                                  "fixtures/synthetic-world.json"])
+def test_a_towns_coin_is_named_by_the_nation_it_stands_in(path):
+    """Measured 2026-10-17: all 12 of Pangrella's cities coined their money from the
+    first word of a culture fact — "Winged nobility…" gave "Winged", "Clans, merchant
+    guilds…" "Clans", "Four castes…" "Four", "Patrilineal clans…" "Patrilineal" — and a
+    live transcript recorded "180 Clans gold pieces". Aurvantis's came out possessive
+    ("Ardenhale's silver piece"). Golarion and the Realms name coin by the nation that
+    strikes it; every settlement in every fixture world sits under one."""
+    world = loader.load_cached(path)
+    wrong = {}
+    for e in world.entities.values():
+        if e.kind not in SETTLEMENTS:
+            continue
+        nation = next((a for a in world.ancestors(e.id) if a.kind == "NATION"), None)
+        assert nation is not None, e.name
+        stem = _stem(goods.coinage(world, e))
+        if stem not in nation.name.split() or stem.endswith("'s"):
+            wrong[e.name] = (stem, nation.name)
+    assert not wrong, wrong
+
+
 # --- the engine's paths, each against the sheet's own answer -------------------------------
 
 def _here(purse=None, at=INN):

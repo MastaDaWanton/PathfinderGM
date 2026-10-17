@@ -56,8 +56,36 @@ class Coin:
         return self.name + ("es" if self.name.endswith(("s", "x", "ch")) else "s")
 
 
+def _nation_of(world, place) -> str:
+    """The nation the place sits in, as a coin's name: "Ashgate" for Ashgate Reach,
+    "Saltholm" for The Saltholm Compact. "" when the place is under no nation.
+
+    The traditions name coin by who strikes it: Golarion's by nation (Absalom's silver
+    "weight", Cheliax's own), the Forgotten Realms' by minting state (Cormyr's "lion",
+    Waterdeep's "dragon") — https://pathfinderwiki.com/wiki/List_of_currencies,
+    https://forgottenrealms.fandom.com/wiki/Currency. Every place in all three fixture
+    worlds sits under a NATION. Asked first because the culture facts below were naming
+    coin after the first word of a sentence: measured 2026-10-17, all 12 of Pangrella's
+    cities — "Winged", "Clan", "Clans", "Four", "Patrilineal" — and a live transcript
+    recorded "180 Clans gold pieces".
+    """
+    pid = str(getattr(place, "id", "") or "")
+    ancestors = getattr(world, "ancestors", None)
+    chain = [place] + (list(ancestors(pid) or []) if pid and callable(ancestors) else [])
+    for entity in chain:
+        if str(getattr(entity, "kind", "")).upper() != "NATION":
+            continue
+        for found in _NAME.findall(str(getattr(entity, "name", ""))):
+            if found.lower() not in _NOT_A_PEOPLE:
+                return found
+    return ""
+
+
 def _proper_noun(world, place) -> str:
     """A name the world already uses, to hang a coin on. "" when there is none."""
+    nation = _nation_of(world, place) if place is not None else ""
+    if nation:
+        return nation
     for source in (place, None):
         facts = getattr(source, "facts", {}) if source is not None else {}
         for key in CULTURE_KEYS:
@@ -131,7 +159,8 @@ def coins_here(world=None, scene=None) -> list[Coin]:
     Named by the settlement the party is in (`scene.location_id`, always a world
     entity; the inn, the market and a founded house are `scene.at` inside it), because
     a purse is a count of copper/silver/gold/platinum and says nothing about who struck
-    the coins — there is nothing else here to name them by (docs/coin-names.md).
+    the coins — there is nothing else here to name them by (docs/for-world-bible.md,
+    ask 13: what the export would need, and the purse-records-its-mint option left open).
 
     Measured 2026-10-17 on a Pangrella save at Khalmorin's inn: the sheet said "12
     Winged silver pieces" and the room's tell said "5 Saltmakers' silver pieces". The
