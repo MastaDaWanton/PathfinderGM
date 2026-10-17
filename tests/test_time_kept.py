@@ -48,7 +48,7 @@ READ = {"actions": [{"act": "talk", "target": "the barkeep", "says": "goodbye"},
                     {"act": "rest", "time": "until dawn"}]}
 
 
-def _ctx(monkeypatch, answer, *, was=2305, now=2305, reading=READ):
+def _ctx(monkeypatch, answer, *, was=2305, now=2305, reading=READ, outcomes=(), text=None):
     monkeypatch.setattr(deed_reader, "ENABLED", True)
     s = Scene()
     s.add(load_pc("fixtures/pc-kesst.json"))
@@ -62,7 +62,8 @@ def _ctx(monkeypatch, answer, *, was=2305, now=2305, reading=READ):
     real = deed_reader.read_slept
     monkeypatch.setattr(deed_reader, "read_slept",
                         lambda *a, **k: real(*a, **dict(k, chat=chat)))
-    ctx = SimpleNamespace(scene=s, text=SLEPT, was_clock=was, reading=reading,
+    ctx = SimpleNamespace(scene=s, text=text or SLEPT, was_clock=was, reading=reading,
+                          outcomes=tuple(outcomes),
                           reader={"model": "stub", "host": "h"})
     return ctx, seen
 
@@ -113,3 +114,39 @@ def test_a_turn_that_asked_for_no_time_is_never_asked_about(monkeypatch):
 def test_it_is_a_registered_member_on_the_turn_door():
     assert time_kept in checks.registered()
     assert time_kept.DOORS == frozenset({"turn"})
+
+
+# The live beat of 2026-10-17 (dn-live, the inn), the rest refused for a conversation still
+# open, as the page shipped it before the room sentences were read.
+ROOM = ("You turn to the man behind the counter, your voice low as you say your goodbyes to "
+        "the barkeep. He grunts, a dry sound that barely carries across the room, and gives "
+        "you a curt nod. You have your keys, your room is secured, and the bustling world of "
+        "the market is now a memory behind a heavy door. You find a small, secluded room at "
+        "the back of the inn, where the timbers groan in the wind and the cot is firm. You "
+        "lay down. What do you do?")
+REFUSAL = ("You are still in conversation with the one behind the bar and the barkeep. "
+           "Take your leave first.")
+
+
+def test_a_refused_rest_takes_no_room_and_says_why(monkeypatch):
+    """Live 2026-10-17: "I pay for a room for the night and go to bed", the rest refused
+    while in conversation; the page handed over keys, secured a room, found one at the back
+    and laid the player down, and the refusal was nowhere on it. The read-back cut only the
+    one sentence it read as a sale. Asked whatever the reading (the refusal is the
+    engine's), with the room and the bed in the question; cut from the keys and closed on
+    the engine's own refusal."""
+    rest = {"op": "rest", "status": "refused", "tell": REFUSAL}
+    ctx, seen = _ctx(monkeypatch, 3, reading=None, outcomes=[rest], text=ROOM)
+    found = time_kept.find(ctx)
+    assert found and found[0].sentences[0].startswith("You have your keys")
+    assert "REFUSED the player's rest" in seen[0][0]["content"]
+    out, notes = time_kept.backstop(ctx, ROOM, found)
+    assert "keys" not in out and "secluded room" not in out and "lay down" not in out
+    assert out.endswith(REFUSAL) and notes
+
+
+def test_a_rest_that_ran_is_never_asked_about(monkeypatch):
+    rest = {"op": "rest", "status": "resolved", "tell": "Kesst Vayr rests for 8 hours."}
+    ctx, seen = _ctx(monkeypatch, 3, reading=None, outcomes=[rest], text=ROOM,
+                     was=1825, now=2305)
+    assert time_kept.find(ctx) == [] and seen == []

@@ -103,6 +103,30 @@ def test_a_rewrite_that_still_moves_them_is_cut_from_the_move_on(scripted):
     assert any("still did it" in n for n in notes)
 
 
+def test_a_rewrite_that_still_settles_the_sale_is_cut(scripted):
+    """Live 2026-10-17 (dn-live, the inn): "beat-settles-trade: the rewrite still did it:
+    'The transaction of coin is a formality…'" — and the backstop then cut it ("beat read
+    back: trade: cut"). Pinned here: a sale the engine never made, rewritten into a sale
+    again, leaves the page."""
+    agent, _ = scene_at(MARKET)
+    text = ("The stalls are loud. You count the coin onto the board and the deal is "
+            "done. What do you do?")
+    ctx = context(agent, text, outcomes=[])
+    sale = {"item": bv.OTHER_THING, "seller": "pc",
+            "buyer": next(r for r in agent.engine.scene.actors if r != "pc"),
+            "settled": True}
+    scripted["reads"] = [
+        _empty(trades=[dict(sale, quote="You count the coin onto the board and the deal "
+                                        "is done")]),
+        _empty(trades=[dict(sale, quote="The coin changes hands and the deal is struck")])]
+    scripted["rewrites"] = ["The coin changes hands and the deal is struck."]
+    found = checks.run(ctx)
+    assert "beat-settles-trade" in [f.kind for f in found]
+    out, notes, _ = agent._repair_sentences(text, found, ctx)
+    assert "coin" not in out and "deal" not in out, out
+    assert any("still did it" in n for n in notes)
+
+
 def test_a_contradiction_the_second_read_refutes_costs_nothing(scripted):
     agent, _ = scene_at(MARKET)
     text = "The stalls are loud. You set off toward the crossroads. What do you do?"

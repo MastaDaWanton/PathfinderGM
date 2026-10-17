@@ -55,12 +55,38 @@ POOL: tuple[str, ...] = (
 ASKS_FOR_TIME = frozenset({"rest", "wait", "journey"})
 
 
+def _refused_rest(ctx):
+    """This turn's refused `rest` outcome, or None.
+
+    Measured live 2026-10-17 (dn-live, the inn): "I pay for a room for the night and go to
+    bed" while in conversation — the rest was refused ("You are still in conversation with
+    the one behind the bar… Take your leave first."), and the page had the keys handed
+    over, the room secured, a room found at the back and the player lying down. The
+    read-back cut the one sentence it read as a sale; the keys, the room and the bed were
+    no claim any of its rows could make, and the refusal itself was nowhere on the page."""
+    for o in getattr(ctx, "outcomes", ()) or ():
+        get = o.get if isinstance(o, dict) else (lambda k, _o=o: getattr(_o, k, None))
+        if get("op") == "rest" and get("status") == "refused" and str(get("tell") or ""):
+            return o
+    return None
+
+
+def _refusal_line(o) -> str:
+    tell = o.get("tell") if isinstance(o, dict) else getattr(o, "tell", "")
+    return " ".join(str(tell or "").split())
+
+
 def _still(ctx) -> bool:
-    """The player's words asked for time to pass, the clock moved less than STILL_MINUTES
-    this turn, and the player is up."""
+    """The player is up, and either the engine refused their rest, or their words asked for
+    time to pass and the clock moved less than STILL_MINUTES this turn."""
     from gm import interpret
     from rules import survival
 
+    pc = ctx.scene.pc() if hasattr(ctx.scene, "pc") else None
+    if pc is None or pc.is_down or survival.asleep(pc) is not None:
+        return False
+    if _refused_rest(ctx) is not None:
+        return True
     reading = getattr(ctx, "reading", None) or {}
     if not any(a.get("act") in ASKS_FOR_TIME and interpret.acting(a)
                for a in reading.get("actions") or [] if isinstance(a, dict)):
@@ -75,9 +101,6 @@ def _still(ctx) -> bool:
             return False
     except (TypeError, ValueError):
         return False
-    pc = scene.pc() if hasattr(scene, "pc") else None
-    if pc is None or pc.is_down or survival.asleep(pc) is not None:
-        return False
     return True
 
 
@@ -89,7 +112,8 @@ def _slept(ctx, text: str) -> str:
         return ""
     pc = ctx.scene.pc()
     sentence, error = deed_reader.read_slept(
-        text, **route, pc_name=str(getattr(pc, "name", "") or ""))
+        text, **route, pc_name=str(getattr(pc, "name", "") or ""),
+        refused=_refused_rest(ctx) is not None)
     if error:
         raise RuntimeError(f"the page could not be read for time passing: {error}")
     return sentence
@@ -102,6 +126,17 @@ def find(ctx) -> list:
     from rules import residency
 
     hour = residency.time_words(int(ctx.scene.clock_minutes))
+    refused = _refused_rest(ctx)
+    if refused is not None:
+        why = _refusal_line(refused)
+        return [Finding(
+            "time-passed-unrun",
+            f"the engine refused the rest ({why[:80]!r}); the page has the player take a "
+            f"room or bed, or sleep: {sentence[:90]!r}",
+            f"The player's character did not rest: {why} They take no room and no bed, "
+            f"and do not sleep. Rewrite the sentence so it does not happen — keep "
+            f"anything else it says.",
+            weight=3, sentences=(sentence,))]
     return [Finding(
         "time-passed-unrun",
         f"the engine passed no time this turn (it is still {hour}); the page has the "
@@ -118,8 +153,12 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
     sentence = _slept(ctx, text)
     if not sentence or sentence not in text:
         return text, []
-    line = POOL[narration_mod.least_recently_used(getattr(ctx.scene, "said", None),
-                                                  "time-still", len(POOL))]
+    refused = _refused_rest(ctx)
+    # A refused rest closes on the engine's own refusal, the one sentence the page owed
+    # and did not carry; anything else on the authored lines.
+    line = (_refusal_line(refused) if refused is not None
+            else POOL[narration_mod.least_recently_used(getattr(ctx.scene, "said", None),
+                                                        "time-still", len(POOL))])
     text = f"{cut_from(text, sentence)} {line}".strip()
     return text, [f"no time passed this turn: cut from {sentence[:60]!r}, "
                   f"wrote {line[:50]!r}"]
