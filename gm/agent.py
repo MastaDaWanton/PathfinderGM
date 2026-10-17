@@ -202,8 +202,13 @@ class GMAgent:
         was asked on the reading, which the turn log keeps. Off with the interpreter."""
         from . import interpret, scenery
 
+        # Asked once a turn: the plan is retried up to five times, and the live check of
+        # 2026-10-16 asked "shard" twice in one turn, the same "not here" both times.
+        held = self.reading.get("scenery") if isinstance(self.reading, dict) else None
+        asked = {str(r.get("thing")) for r in held or () if isinstance(r, dict)}
         rows = scenery.ground(raw, self.engine, list(getattr(self, "narrated", ()) or ()),
-                              ask_fn=scenery.ask if interpret.ENABLED else None)
+                              ask_fn=scenery.ask if interpret.ENABLED else None,
+                              skip=asked)
         if rows and isinstance(self.reading, dict):
             self.reading.setdefault("scenery", []).extend(rows)
 

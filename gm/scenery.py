@@ -238,13 +238,14 @@ def _quoted_on(quote: str, passages: list[str]) -> bool:
     return any(bv.place_quote(quote, bv._sentences(text)) for text in passages)
 
 
-def ground(raw, engine, passages: list[str], *, ask_fn=None) -> list[dict]:
+def ground(raw, engine, passages: list[str], *, ask_fn=None, skip=()) -> list[dict]:
     """Ledger what the plan reaches for that the narration showed or the place plainly
     holds; one row per thing asked, for the turn log. Nothing is asked with no `ask_fn`
-    (the reader off) or nothing to ask about."""
+    (the reader off) or nothing to ask about, and nothing in `skip` (asked already this
+    turn) is asked again."""
     if ask_fn is None:
         return _picked(raw, engine)
-    things = reached_for(raw, engine)
+    things = [t for t in reached_for(raw, engine) if t not in set(skip or ())]
     if not things:
         return _picked(raw, engine)
     scene = engine.scene
