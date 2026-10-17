@@ -2507,6 +2507,8 @@ class GMAgent:
                 members.append(member)
             if member is not None and getattr(member, "REWRITE", True) is False:
                 continue            # cut-only: the backstop below is the repair
+            if member is not None and f.kind in (getattr(member, "CUT_ONLY", None) or ()):
+                continue            # this kind is cut-only (its re-check reads alone)
             for sentence in f.sentences:
                 if not sentence or sentence not in text:
                     continue
