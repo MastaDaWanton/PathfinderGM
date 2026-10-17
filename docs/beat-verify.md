@@ -406,3 +406,91 @@ first grab ("reaching out to grab you by the throat", an attempt).
 **Misses.** "Her fingers tighten around your throat as she leans in close" (0/2 on the
 bench, though the report's own wording of it was caught) and an invented "momentarily
 stunned" (0/2). Recall on condition alarms is 4/8; the precision is what was bought.
+
+## Gifts by the floor, deals nobody made, and the attempts (2026-10-16)
+
+Live on 0.2.20's code (a scratch save; free narrator, gemma-4-12B): the player helped the
+smith lift his cart and asked for fair pay. The engine rolled both. The help failed, the
+smith lifted it alone, and the request failed ("the smith says no and pays nothing:
+nothing changes hands"). The page then had him toss "a piece of coarse, stained leather
+… into the dirt between you. 'There's your pay.'" and ended "You are still here, and the
+trade is finished.", which a repair turned into "…the trade is not finished."
+
+**The gift by the floor.** The read back heard the toss (`something else`, c4 -> the
+floor) and skipped it: only an unlisted thing handed INTO the player's hands was judged.
+Now an unlisted thing that a listed person here parts with to the floor or to nobody is a
+`hands` contradiction (`_parts_with_unlisted`). It is judged only when nothing came into
+the player's hands this turn and no resolved effect moved anything of that person's. Whether
+the thing is given FOR the player, or is just the smith setting his own hammer down, is the
+second read's question (`question`), not code's. A crow's feather is from nobody listed.
+
+**The deal nobody made.** A settled sale of `something else` is judged only when a `sell`,
+`buy` or `haggle` is on this turn's record. A thing the engine names is still judged with
+no trade op: the crate still in the pack is not sold (kesst:18).
+
+**The attempts.** Nothing compared the page with a check's verdict. The claims scrubber
+(rules/intents.py) is English regex and backs any success claim once the turn has any
+verdict. Prior art: the same split (the engine rolls, a model narrates) produced this
+defect in agentic-dm-engine (issue #34: a death save narrated "passed" under a "fail"
+badge). The one repair found in the open, infinite-realms-app PR #345, reads "you
+succeed" and "you manage to" by regex and took four rounds of narrowing against false
+alarms.
+
+- `attempts_of`: every check and save this turn settled (`_ATTEMPT_OPS`, a whitelist).
+  Each attempt carries who made it (the new `Outcome.actor`, stamped in
+  `Engine._resolve_one`), the roll's own label and the intent's `because`. Aid Another
+  counts as two attempts: the helper's, and the helped person's own effort. A request's
+  label names who it was made of. Attacks are left to the blow lane.
+- A call of its own (`attempts_messages`/`attempts_schema`) asks, per attempt, for
+  `succeeds`, `fails` or `unsure`, as a required enum with a quote. `unsure` is no claim.
+  The quote may be speech: a refusal is often only said aloud.
+- Code compares the answer with the verdict. A mismatch is `beat-attempt` (weight 3),
+  repaired through `_repair_sentences` with the verdict as the fact (no number). The
+  second read asks whether the sentence shows the attempt working or failing.
+
+**Its own call, measured.** One run on the bench. Every beat with no check of its own was
+given one unrelated attempt, so that the folded slot was shown everywhere, as the bodies
+lane measured `conditions`.
+
+| version | attempt claims | other slots | clean beats alarmed |
+|---|---|---|---|
+| folded into the first read | P 0.94 R 0.97 | `shown` 5/5 -> 2/5, `absent` alarms 3/3 -> 2/3, trade alarms 4/4 -> 3/4, harm claims 9 -> 8 of 11 | 2/73 |
+| **separate call (shipped)** | P 1.00 R 1.00 on the labelled beats | first read byte-identical (tested) | 1/73 |
+
+The separate call had its own weakness: given an unrelated FAILED check, it described the
+scene in view as the check succeeding. On a failed "Perception check: the player looks
+about" it did so on 20-22 of 71 beats, and the second read kept 3-4. One line ("a
+description of what is there to be seen is not a search or a look succeeding") and a third
+demonstration that tells neither attempt brought that to 3-5 of 71 claimed and 1-2 kept,
+with Disable Device, Survival and Sense Motive at 0-2 claimed and 0-1 kept. The labelled
+gold was unchanged (32 of 32 claims, 11 of 11 alarms). Tried and dropped: a second read
+asking WHICH attempt a sentence tells (the `_shows` shape). It kept 5 of 5 unrelated
+Perception claims, worse than yes-or-no.
+
+**Bench, gemma-4-12B x2, 108 beats (41 new).** Ollama was shared with other lanes. The
+read median was 4.7 s and the max 23.2 s across the three calls.
+
+| | master's code, same gold (x1) | this branch (x2) |
+|---|---|---|
+| attempt claims | none read | P 1.00 R 1.00 (64/64) |
+| attempt alarms | 0/11 | **P 1.00 R 1.00 (22/22)** |
+| hands alarms | P 1.00 R 0.50 (4/8) | P 1.00 R 0.88 (14/16) |
+| trade alarms | P 0.67 (2 false: the live "trade is finished", and its twin) | **P 1.00 R 1.00 (8/8)** |
+| clean beats falsely alarmed | 2/73 | 2/146 (both ho-pinioned-strikes, harm, as on master) |
+
+The scenery beats (a crow's feather, the smith's hammer on the anvil, a nail tossed on the
+scrap heap) raised nothing in either run: the second read refuted the hammer and the nail
+both times. One miss across five runs: the second read refuted "drops it in the dust at your feet"
+once.
+
+**On recorded beats.** The committed recordings (tests/replay, 169 GM beats, each against
+the scene after its own turn; their outcomes predate the stamp, so `actor` was filled from
+the turn's own intents): 24 beats had an attempt. The first read raised 2 attempt alarms,
+a creature lunging "to grab the intruder" and a crowd that "struggle to clear the path",
+both read as the player's stolen-satchel check failing. The second read refuted both, so
+0 were kept. It raised no gift-by-the-floor alarm and spared no trade claim.
+
+**Left alone:** a hosted provider's reads are unmeasured; a turn log written before the
+stamp has no `actor`, so its attempts are not asked about; spell and creature-ability saves
+inside a `cast` or `use_ability` outcome are not separate outcomes, so they are not
+listed yet.

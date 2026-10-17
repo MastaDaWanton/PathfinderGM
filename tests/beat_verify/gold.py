@@ -986,3 +986,360 @@ GOLD = [
               C("condition", opt=True, who="pc", condition=["grappled", "pinned"])],
       may_alarm=["condition"]),
 ]
+
+
+# --- 2026-10-16: an unlisted thing given by the floor, and the attempts -------------------
+#
+# Item 1 (gold "pay-*", "scenery-*", "no-trade-*"): on 0.2.20 the smith refused to pay —
+# "says no and pays nothing: nothing changes hands" — and the page had him toss "a piece of
+# coarse, stained leather … into the dirt between you. 'There's your pay.'" The read back
+# heard it (`something else`, c4 -> the floor) and skipped it: only a hand-over INTO the
+# player's hands was judged. The same beat's "the trade is finished" was cut as a sale
+# nobody made, on a turn that had no trade at all.
+#
+# Item 2 (gold "att-*" and the held-out "ho-att-*"): a check or a save told the other way
+# round. Outcomes carry `actor`, as `Engine._resolve_one` stamps it.
+CARTER = ["c1", "the carter", "human"]
+SMITH4 = ["c4", "the smith", "Korvu"]
+GUARD1 = ["c1", "the guard by the mounting block", "Korvu"]
+INNKEEP = ["c2", "the innkeeper", "human"]
+GATEGUARD = ["c3", "the gate guard", "human"]
+APPRENTICE = ["c5", "the tanner's apprentice", "Korvu"]
+
+
+def _req(ref: str, kind: str, granted: bool, paid: bool = False, why: str = "") -> dict:
+    """A Diplomacy request as `Engine._make_request` records it."""
+    effects = [{"kind": "request", "ref": ref, "request": kind, "granted": granted}]
+    if paid:
+        effects.insert(0, {"ref": "pc", "kind": "give", "item": "coin", "count": 10,
+                           "how": "paid", "from": ref, "to": "pc"})
+    return {"intent_id": "i4", "op": "check", "status": "resolved", "actor": "pc",
+            "verdict": "success" if granted else "failure",
+            "rolls": [{"label": "Diplomacy check", "visibility": "player"}],
+            "effects": effects, "because": why,
+            "tell": "Kesst Vayr asks for " + ("payment for the work. " if kind == "payment"
+                                               else "a favour. ")
+                    + ("They agree." if granted else "They say no: nothing changes hands.")}
+
+
+def _chk(label: str, ok: bool, why: str = "", op: str = "check", actor: str = "pc",
+         effects=()) -> dict:
+    return {"intent_id": "i1", "op": op, "status": "resolved", "actor": actor,
+            "verdict": "success" if ok else "failure",
+            "rolls": [{"label": label, "visibility": "player"}], "effects": list(effects),
+            "because": why, "tell": f"{label}: {'made' if ok else 'missed'}."}
+
+
+AID_FAILED = {"intent_id": "i3", "op": "check", "status": "resolved", "actor": "pc",
+              "verdict": "success",
+              "rolls": [{"label": "Strength check to help the smith", "visibility": "player"},
+                        {"label": "the smith Strength check", "visibility": "hidden"}],
+              "effects": [{"kind": "aid", "ref": "c4", "made": False, "bonus": 0,
+                           "task_dc": 10, "done": True}],
+              "because": "the player helps the smith with it",
+              "tell": "Kesst Vayr misses the Strength check to help the smith by 1: no help. "
+                      "the smith makes the Strength check by 4: the attempt succeeds."}
+SAID_TO_SMITH = {"intent_id": "i2", "op": "say", "status": "resolved",
+                 "effects": [{"kind": "said", "who": "pc", "to": "c4", "words": "Pay me."}],
+                 "tell": "Kesst Vayr speaks to the smith."}
+
+GOLD += [
+    # --- item 1 ---------------------------------------------------------------------------
+    B("pay-tossed-in-dirt", "integ:29 (0.2.20 live, the shipped beat, trade sentence as "
+      "drafted)",
+      "You reach out to assist him, but your limbs feel heavy and your muscles lack the "
+      "strength to lighten the load; the smith's effort remains his alone as he heaves the "
+      "cart, his thick muscles bunching under the soot-stained skin of his arms. The cart "
+      "groans and settles into its frame with a heavy thud that vibrates through the "
+      "ground. You demand fair pay for the work. He doesn't even seem to consider the "
+      "request; he just shakes his head slowly. 'Work is work,' his voice grinds like stone "
+      "against stone. He reaches into a pouch at his belt, but he doesn't pull out a coin; "
+      "he pulls out a piece of coarse, stained leather. He tosses it into the dirt between "
+      "you. 'There's your pay. Keep it if you want it, or throw it away.' He turns back to "
+      "his work, the heavy hammer in his hand looking like an extension of his arm. You are "
+      "still here, and the trade is finished.",
+      start="the gate", world="PG", people=(KESST, GUARD1, SMITH4), clock=1809,
+      player="I help the smith lift his cart, then ask him for fair pay for the work.",
+      outcomes=[SAID_TO_SMITH, AID_FAILED, _req("c4", "payment", False,
+                                                why="the player asks the smith for payment")],
+      claims=[C("hands", item="something else", **{"from": "c4"},
+                to=["the floor", "nobody", "pc"]),
+              C("trade", opt=True, item="something else", seller=["pc", "c4"],
+                buyer=["pc", "c4", "c1"], settled=[True, False]),
+              C("attempt", attempt="a1", shown="fails"),
+              C("attempt", attempt="a2", shown="succeeds"),
+              C("attempt", opt=True, attempt="a3", shown=["fails", "succeeds"])],
+      alarms=["hands"], may_alarm=["attempt"]),
+    B("pay-coin-dropped", "synthetic (item 1)",
+      "The carter shakes his head at the idea of paying. Then he fishes a copper bit out of "
+      "his apron and drops it in the dust at your feet. 'For your trouble,' he mutters, and "
+      "turns back to his mule.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_req("c1", "payment", False)],
+      claims=[C("hands", item="something else", **{"from": "c1"},
+                to=["the floor", "nobody", "pc"]),
+              C("attempt", opt=True, attempt="a1", shown=["fails", "succeeds"])],
+      alarms=["hands"], may_alarm=["attempt"]),
+    B("pay-purse-on-counter", "synthetic (item 1)",
+      "The innkeeper looks at you for a long moment. Then he takes a small purse from under "
+      "the counter and sets it down on the wood in front of you, and nods at it.",
+      start="the tavern", people=(KESST, INNKEEP),
+      outcomes=[_req("c2", "payment", False)],
+      claims=[C("hands", item="something else", **{"from": "c2"},
+                to=["the floor", "nobody", "pc"]),
+              C("attempt", attempt="a1", shown="succeeds")],
+      alarms=["hands", "attempt"]),
+    B("pay-held-out", "synthetic (item 1)",
+      "Grudgingly, the smith digs two coppers out of his apron and holds them out to you "
+      "on his open palm.",
+      start="the gate", world="PG", people=(KESST, SMITH4),
+      outcomes=[_req("c4", "payment", False)],
+      claims=[C("hands", opt=True, item="something else", **{"from": "c4"},
+                to=["pc", "the floor", "nobody"]),
+              C("attempt", attempt="a1", shown="succeeds")],
+      alarms=["attempt"], may_alarm=["hands"]),
+    B("scenery-feather", "synthetic (item 1, scenery)",
+      "A crow on the roof ridge drops a feather; it spirals down into the dirt beside you. "
+      "The carter goes on brushing his mule and does not look up.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_req("c1", "payment", False)],
+      claims=[C("hands", opt=True, item="something else", **{"from": "someone not listed"},
+                to=["the floor", "nobody"]),
+              C("attempt", opt=True, attempt="a1", shown=["fails"])]),
+    B("scenery-hammer", "synthetic (item 1, scenery)",
+      "The smith shakes his head and sets his hammer down on the anvil. 'No coin for help I "
+      "never asked for,' he says, and wipes his hands on his apron.",
+      start="the gate", world="PG", people=(KESST, SMITH4),
+      outcomes=[_req("c4", "payment", False)],
+      claims=[C("hands", opt=True, item="something else", **{"from": "c4"},
+                to=["the floor", "nobody"]),
+              C("attempt", attempt="a1", shown="fails")]),
+    B("scenery-scrap-heap", "synthetic (item 1, scenery)",
+      "The smith tosses a bent nail onto the scrap heap behind the anvil and reaches for "
+      "another rod, saying nothing.",
+      start="the gate", world="PG", people=(KESST, SMITH4),
+      outcomes=[_req("c4", "payment", False)],
+      claims=[C("hands", opt=True, item="something else", **{"from": "c4"},
+                to=["the floor", "nobody"]),
+              C("attempt", opt=True, attempt="a1", shown=["fails"])]),
+    B("pay-paid-true", "synthetic (item 1, true)",
+      "The tanner's apprentice grunts, counts three coppers out of his pouch and drops them "
+      "into your palm. 'Fair's fair,' he says.",
+      start="the gate", world="PG", people=(KESST, APPRENTICE),
+      outcomes=[_req("c5", "payment", True, paid=True)],
+      claims=[C("hands", opt=True, item=["something else", "coin"], **{"from": "c5"},
+                to="pc"),
+              C("attempt", attempt="a1", shown="succeeds")]),
+    B("no-trade-finished", "synthetic (item 1, the false trade alarm)",
+      "The tanner's apprentice shrugs and turns back to his rods. You are still here, and "
+      "the trade is finished.",
+      start="the gate", world="PG", people=(KESST, APPRENTICE),
+      outcomes=[_req("c5", "payment", False)],
+      claims=[C("trade", opt=True, item="something else", seller=["pc", "c5"],
+                buyer=["pc", "c5"], settled=[True, False]),
+              C("attempt", opt=True, attempt="a1", shown=["fails"])]),
+    # --- item 2 ---------------------------------------------------------------------------
+    B("att-lift-told-success", "synthetic (item 2)",
+      "You set your shoulder under the tail of the cart and heave, and it rises out of the "
+      "rut and rolls free onto the firm road.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_chk("Strength check", False, "the player lifts the cart out of the rut")],
+      claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
+    B("att-lift-told-fail-true", "synthetic (item 2, true)",
+      "You heave until your arms shake, but the wheel stays sunk in the rut and the cart "
+      "does not move.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_chk("Strength check", False, "the player lifts the cart out of the rut")],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("att-lift-success-told-fail", "synthetic (item 2)",
+      "You strain against the cart with everything you have, but it will not budge an "
+      "inch, and you step back, breathing hard.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_chk("Strength check", True, "the player lifts the cart out of the rut")],
+      claims=[C("attempt", attempt="a1", shown="fails")], alarms=["attempt"]),
+    B("att-lift-success-true", "synthetic (item 2, true)",
+      "The cart lurches up out of the mud under your shoulder and rolls clear onto the "
+      "road. The carter whistles.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_chk("Strength check", True, "the player lifts the cart out of the rut")],
+      claims=[C("attempt", attempt="a1", shown="succeeds")]),
+    B("att-favour-told-agreed", "synthetic (item 2)",
+      "The innkeeper thinks it over, rubbing his jaw, then nods. 'All right. I'll fetch the "
+      "key to the cellar for you myself.'",
+      start="the tavern", people=(KESST, INNKEEP),
+      outcomes=[_req("c2", "favour", False, why="the player asks for the cellar key")],
+      claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
+    B("att-favour-refused-true", "synthetic (item 2, true)",
+      "The innkeeper laughs without humour. 'The cellar key? Not for you, not tonight.'",
+      start="the tavern", people=(KESST, INNKEEP),
+      outcomes=[_req("c2", "favour", False, why="the player asks for the cellar key")],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("att-sway-told-won", "synthetic (item 2)",
+      "The gate guard's frown melts away. He laughs, claps you on the shoulder and waves "
+      "you through like an old friend.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Diplomacy check", False, "the player tries to win the guard over")],
+      claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
+    B("att-sway-failed-true", "synthetic (item 2, true)",
+      "The gate guard hears you out with a face like a shut door, and does not move out of "
+      "the gateway.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Diplomacy check", False, "the player tries to win the guard over")],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("att-save-passed-told-failed", "synthetic (item 2)",
+      "The venom floods your veins like ice water, and your legs buckle under you as the "
+      "sickness takes hold.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_chk("Fortitude save", True, "the spider's venom", op="save")],
+      claims=[C("attempt", attempt="a1", shown="fails"),
+              C("harm", opt=True, who="pc", how=["hurt", "down"])],
+      alarms=["attempt"], may_alarm=["harm"]),
+    B("att-save-passed-true", "synthetic (item 2, true)",
+      "Your arm burns where the fangs went in, but the sickness passes and your head "
+      "clears.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, CARTER),
+      outcomes=[_chk("Fortitude save", True, "the spider's venom", op="save")],
+      claims=[C("attempt", attempt="a1", shown="succeeds"),
+              C("harm", opt=True, who="pc", how="hurt")]),
+    B("att-save-failed-told-passed", "synthetic (item 2)",
+      "You shake off the creeping dread and stand your ground, steady as the stones under "
+      "your feet.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Will save", False, "the wraith's dread", op="save")],
+      claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
+    B("att-save-failed-true", "synthetic (item 2, true)",
+      "Cold terror floods you, and your feet carry you back a step before you can stop "
+      "them.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Will save", False, "the wraith's dread", op="save")],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("att-climb-told-success", "synthetic (item 2)",
+      "You find handholds in the old mortar and pull yourself up and over the top of the "
+      "wall.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Climb check", False, "the player climbs the wall")],
+      claims=[C("attempt", attempt="a1", shown="succeeds"),
+              C("move", opt=True, place="somewhere not listed")],
+      alarms=["attempt"], may_alarm=["move"]),
+    B("att-stealth-told-success", "synthetic (item 2)",
+      "You slip past the gate guard in the shadow of the arch; he never turns his head.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Stealth check", False, "the player sneaks past the guard")],
+      claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
+    B("att-lock-unsure", "synthetic (item 2, not shown)",
+      "You crouch at the door and set your picks to the lock. Somewhere down the street a "
+      "dog barks twice and falls quiet.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Disable Device check", False, "the player picks the lock")],
+      claims=[]),
+    # --- item 2, held out: real beats from this session's live runs, cut to the sentences
+    # the label needs, labelled before any run (scratch saves; `actor` added as the stamp
+    # now records it).
+    B("ho-att-intimidate", "bugs4/fightlive (held out)",
+      "You tower over him, your voice a rasping command that cuts through the din of the "
+      "shouting crowd. He hears you, and for a heartbeat, the twitching of his muscles "
+      "halts as he stares up at you.",
+      start="the tavern", people=(KESST, ["c2", "the one behind the bar", "human"]),
+      outcomes=[_chk("Intimidate check", True, "the player tells him to stay down")],
+      claims=[C("attempt", opt=True, attempt="a1", shown="succeeds")]),
+    B("ho-att-tracks-found", "bugs4/live (held out)",
+      "You move toward the knoll, your eyes scanning the trampled paths and the signs of "
+      "passage left by the seasons and the travelers. A few yards from where the rider "
+      "sits, the ground shows a clear, recent path—not from a person, but from a heavy "
+      "cart, the wheels having carved deep, distinct ruts into the earth. The tracks lead "
+      "straight toward the knoll.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM, ["c2", "the rider", "human"]),
+      outcomes=[dict(_chk("Kesst Vayr Survival (tracks)", False, op="track"),
+                     effects=[{"ref": "pc", "kind": "tracks", "ground": "firm", "dc": 15,
+                               "found": []}])],
+      claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
+    B("ho-att-perform", "data/sammy (held out)",
+      "You strike a final, definitive pose, one hand gripped tight on the hilt of your "
+      "blade. Silence falls over the gate. Then the goblin with the scarred cheek lets out "
+      "a wild, barking laugh that echoes off the archway. 'Not bad, outsider! Not bad at "
+      "all!'",
+      start="the gate", world="PG", people=(KESST, ["c2", "goblin with the scarred cheek",
+                                                    "goblin"]),
+      outcomes=[_chk("Perform check", True)],
+      claims=[C("attempt", attempt="a1", shown="succeeds")]),
+    B("ho-att-ore", "data-hinterland/sammy (held out)",
+      "You spend the better part of the evening digging into the rocky soil, your hands "
+      "becoming raw and stained with the grime of the earth. You manage to pull four chunks "
+      "of copper ore from a vein, the metal heavy and dull in your pack.",
+      start="the ridgelines", world="RG", people=(RG_SAMMY,),
+      outcomes=[_chk("Survival check", True)],
+      claims=[C("attempt", attempt="a1", shown="succeeds"),
+              C("hour", opt=True, part="evening"),
+              C("hands", opt=True, item="something else",
+                **{"from": ["the floor", "nobody", "someone not listed"]}, to="pc")]),
+    B("ho-att-aid-lift", "fos/live-data (held out)",
+      "The smith grunts as you grip the edge of the cart. You lean your weight into it, and "
+      "together you heave. The wheels groan, the axle groans, and then the cart gives with "
+      "a heavy, shuddering lurch forward, settling into its proper place with a resounding "
+      "thud of wood on stone. 'Stronger than you look, girl,' he grunts.",
+      start="the gate", world="PG", people=(KESST, SMITH4),
+      outcomes=[dict(AID_FAILED, effects=[{"kind": "aid", "ref": "c4", "made": True,
+                                           "bonus": 2, "task_dc": 10, "done": True}])],
+      claims=[C("attempt", attempt="a1", shown="succeeds"),
+              C("attempt", attempt="a2", shown="succeeds")]),
+    B("ho-att-wagon-fails", "fos/live-data (held out)",
+      "You press your shoulder against the frame of the wagon, bracing your feet against "
+      "the stone. The cart doesn't move; it only gives a hollow, grinding shudder that "
+      "vibrates through your shoulder and up into your jaw.",
+      start="the gate", world="PG", people=(KESST, SMITH4),
+      outcomes=[_chk("Strength check", False)],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("ho-att-old-tracks", "leather-final (held out)",
+      "Instead of a clear trail, the earth offers only a mocking ambiguity. You realize "
+      "with a jolt of unease that the tracks you were following are old—perhaps days, if "
+      "not weeks, old.",
+      start="the road to Kalixiri", world="XY", people=(XY_TAM,),
+      outcomes=[_chk("Survival check", False)],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("ho-att-bluff-doubted", "mindgate/sammy (held out)",
+      "The lie hangs in the air, brittle as dry glass. 'You're a long way from home, then,' "
+      "he says. 'If you weren't here, you'd have a lot of explaining to do about why "
+      "you're currently standing in my district.' He waits, his eyes searching yours for "
+      "the first crack in the story.",
+      start="the gate", world="PG", people=(KESST, GATEGUARD),
+      outcomes=[_chk("Bluff check", False, "the player claims to have never been here")],
+      claims=[C("attempt", opt=True, attempt="a1", shown="fails")]),
+    B("ho-att-paid-coin", "rr-live-data (held out)",
+      "He pulls out a single, heavy silver coin and presses it into your palm. 'Fair "
+      "enough,' he grunts. 'A day's labor for a day's weight.'",
+      start="the gate", world="PG", people=(KESST, APPRENTICE),
+      outcomes=[_req("c5", "payment", True, paid=True)],
+      claims=[C("attempt", attempt="a1", shown="succeeds"),
+              C("hands", opt=True, item=["something else", "coin"], **{"from": "c5"}, to="pc")]),
+    B("ho-att-favour-granted", "rr-live-data (held out)",
+      "He waits a beat, the rhythm of the hammers providing a heavy backbeat to his "
+      "decision. 'I'll speak for you. If you're looking for a special commission, tell him "
+      "you've been talking to me.' He gives a short nod of his head as if sealing a pact.",
+      start="the gate", world="PG", people=(KESST, APPRENTICE),
+      outcomes=[_req("c5", "favour", True)],
+      claims=[C("attempt", attempt="a1", shown="succeeds")]),
+    B("ho-att-apron-refused", "rr-live-data (held out)",
+      "He lets out a short, dry breath and shakes his head. 'My apron is my skin,' he "
+      "says. 'If I give it to you, I have nothing to protect me from the next blast.'",
+      start="the gate", world="PG", people=(KESST, APPRENTICE),
+      outcomes=[_req("c5", "favour", False)],
+      claims=[C("attempt", attempt="a1", shown="fails")]),
+    B("ho-att-apple-unseen", "spoken-theft (held out)",
+      "You reach out and snag the apple from the fruit seller's basket. Their eyes are "
+      "fixed on a scale, and they don't seem to notice the theft. The apple is heavy and "
+      "cool in your hand.",
+      start="the market", world="PG", people=(KESST, ["c2", "the fruit seller", "Korvu"]),
+      outcomes=[_chk("Stealth check", True)],
+      claims=[C("attempt", attempt="a1", shown="succeeds"),
+              C("hands", opt=True, item="something else",
+                **{"from": ["c2", "the floor", "someone not listed"]}, to="pc")]),
+    B("ho-att-bandage", "spoken-theft (held out)",
+      "You press the linen against the ragged tear in his side, and the pressure stops the "
+      "welling of red. He doesn't move, but the frantic pulse in his neck steadies as the "
+      "bleeding slows.",
+      start="the market", world="PG", people=(KESST, ["c6", "the wounded porter", "Korvu",
+                                                      False, "down"]),
+      outcomes=[_chk("Heal check", True, effects=[{"kind": "condition", "ref": "c6",
+                                                    "condition": "stable"}])],
+      claims=[C("attempt", attempt="a1", shown="succeeds")]),
+]

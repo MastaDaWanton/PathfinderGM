@@ -307,7 +307,14 @@ def test_a_paid_request_or_a_floor_pickup_is_not_flagged():
 def test_a_paid_request_called_a_deal_done_is_not_cut_as_a_sale():
     """The trade category reads only sales and purchases: a page calling the engine's own
     payment "a fair trade" would have been cut as "Nothing was sold or bought". A paid
-    request is coin for work, settled; an unpaid turn still is not."""
+    request is coin for work, settled.
+
+    And a deal of nothing the engine names, on a turn with no sale, purchase or haggle, is
+    not judged at all. This test asserted the opposite until 2026-10-16, when 0.2.20 played
+    it live: a refused request for pay ended "You are still here, and the trade is
+    finished.", the read back called it a settled sale of `something else`, and the repair
+    wrote "…the trade is not finished." — an open trade on a turn that never had one. A
+    refused sale on the books is still held to."""
     deal = bv.Claim("trade", {"item": bv.OTHER_THING, "seller": "pc", "buyer": "c1",
                               "settled": True}, "the deal is done", sentence=SENTENCE,
                     valid=True)
@@ -315,7 +322,12 @@ def test_a_paid_request_called_a_deal_done_is_not_cut_as_a_sale():
         {"kind": "give", "item": "coin", "count": 10, "how": "paid", "from": "c1",
          "to": "pc"}]}]
     assert bv.diff([deal], _facts(paid), SENTENCE) == []
-    assert [d.category for d in bv.diff([deal], _facts(), SENTENCE)] == ["trade"]
+    refused = [{"op": "check", "status": "resolved", "verdict": "failure", "effects": [
+        {"kind": "request", "ref": "c1", "request": "payment", "granted": False}]}]
+    assert bv.diff([deal], _facts(refused), SENTENCE) == []
+    no_sale = [{"op": "sell", "status": "refused", "effects": [],
+                "tell": "The carter has no coin to buy anything with."}]
+    assert [d.category for d in bv.diff([deal], _facts(no_sale), SENTENCE)] == ["trade"]
 
 
 def test_the_page_may_count_out_the_coin_a_granted_request_paid():
