@@ -794,6 +794,33 @@ _SLOT_WORDS = {0: "midnight", 1: "the small hours", 2: "first light", 3: "mid-mo
                4: "noon", 5: "mid-afternoon", 6: "evening", 7: "the curfew bell"}
 
 
+def trade_words(actor, founded=()) -> tuple[str, ...]:
+    """The words a keeper's trade answers to, read off the record: the place their id says
+    they keep (`place_of`), that place's kind (a founded place's own `kind`, else its
+    label), and the staffing table's row for it (`places.keeper_of`: what they are called
+    and the codex's words) — "the one behind the bar", barkeep, innkeeper, bartender for a
+    tavern. () for anybody who keeps nothing.
+
+    Why it exists, measured live 2026-10-17 (hv-data, the inn off Khalmorin's market):
+    "I say goodbye to the barkeep…" with c8 "the one behind the bar" standing there. The
+    finder (`scope.in_the_room`) matched shown and true names only, "barkeep" is neither,
+    so the plan introduced a SECOND barkeep (c9, `how: arrives`) and the goodbye went to
+    him. The keeper's trade was on the record all along — their id names the place, the
+    place names its kind — and nothing asked it."""
+    wid = getattr(actor, "world_entity_id", "") or ""
+    place = place_of(wid)
+    # A market counter's keeper keeps the counter, not the place: the market's row is its
+    # master's ("clerk", "merchant"), and every stallholder answering to it would make
+    # "the merchant" whoever stood first.
+    if not place or counter_of(wid):
+        return ()
+    out: list[str] = []
+    for label in dict.fromkeys((f"the {kind_of(place, founded)}", label_of(place))):
+        title, words = places_mod.keeper_of(label)
+        out += [w for w in (title, *words) if w and w not in out]
+    return tuple(out)
+
+
 def kind_of(place_id: str, founded=()) -> str:
     """What a place is, for its hours: a founded place's own `kind`, else its label."""
     for p in founded or ():

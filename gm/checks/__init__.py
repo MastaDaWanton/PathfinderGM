@@ -83,6 +83,10 @@ class BeatContext:
     # (`prompts.demonstrations`): the owner's intimate passages, read fresh each beat
     # (gm/intimate.py). `copied_example` holds the page to them as well.
     shown: tuple[str, ...] = ()
+    # The scene's clock when plan_turn began (agent._was_clock), for the check that the
+    # page passes no time the engine did not (`time_kept`). None — a test, an NPC's turn
+    # built elsewhere — and that member reads nothing.
+    was_clock: int | None = None
 
 
 class CheckContractError(TypeError):

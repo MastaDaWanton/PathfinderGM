@@ -43,6 +43,24 @@ panel's button), walks out of the place (`travel`, `journey`, `venture` say "You
 mid-sentence"), or the other party leaves it — walks out, goes down, or draws
 (`_settle_talk` at the end of every batch, said).
 
+**A deed that ends the talk is the leave (owner's ruling, 2026-10-17).** When the player's
+own line does something that ends the conversation — goes to bed or takes a room, goes up
+to their room, walks off, leaves, takes the road — the engine ends the conversation first,
+by the same free `leave_talk` and its tell ("You take your leave of …"), and then does the
+rest of the line in order. Words to the same person before the leaving deed still come
+first ("I say goodbye to the barkeep, then go up to bed": the `say`, the leave, the rest),
+and so does paying for the room (trade is open in conversation). It is still only from the
+player's words: never silence, never an implicit system exit. Decided from the reading's
+acts and their order (`judgement.leave_before_leaving`): a `rest`, `go`, `leave` or
+`journey` act with no talking act after it ("I walk to the bar and ask him for a drink"
+has not left). Measured live the same day, both refused before it: "I pay for a room for
+the night and go to bed" and "I say goodbye to the barkeep, go back up to my room and
+sleep until dawn" ("You are not in conversation with c8" — the plan put its leave before
+the goodbye that opened the talk — then "You are still in conversation … Take your leave
+first."). Not yet covered: a goodbye said with no other deed. The reader has no closed
+slot for parting words, and code does not read the words; a closed `talk` slot would be
+the way, measured on the interpreter bench first (a slot offered is a slot filled).
+
 A wait is not an exit (2026-10-09). When the player waits (advance_time, a bench's Wait
 for it) the people with the party go about their day (docs/the-population.md, "A wait
 moves the people with the party too"): a talker whose day keeps them here is still in the

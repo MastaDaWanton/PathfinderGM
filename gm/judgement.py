@@ -720,6 +720,319 @@ def bind_placeholders(raw_intents, player_text: str, scene):
         return raw_intents
     return [_swap_refs(dict(r), bound) for r in raw_intents]
 
+
+# The ops whose resolution reads `intent.target` (or an aim, or `opposed_by`): with the
+# person gone the deed is a different deed or none, so an unbound placeholder there drops
+# the op. Every other op's target is decoration — a `travel`, `rest` or `say` that wrote
+# `target: new1` resolves exactly the same without it — and loses only the slot. Pinned
+# against the engine's own handlers by tests/test_dangling_placeholders.py, so an op that
+# starts reading its target is added here or the suite says so.
+_ABOUT_SOMEBODY = frozenset({
+    "attack", "cast", "use_ability", "check", "give", "heal", "damage", "ability_damage",
+    "temp_hp", "condition", "compel", "provoke", "haggle", "judge", "rename", "repair",
+    "mend", "item_damage", "hazard",
+})
+
+
+def _declared_placeholders(raw_intents) -> tuple[set[str], float]:
+    """(the placeholders this plan's own `introduce` hands out, the position it will
+    really run at). One introduce per plan (`Engine.validate`).
+
+    The position is the engine's, not the list's: `engine._introduce_after_travel` moves an
+    `already_here` introduce after the plan's last walk unless the walk takes them along.
+    Measured live 2026-10-17 (hv-data, the inn): "I say goodbye to the barkeep, go back up
+    to my room and sleep until dawn" was planned introduce, `say to=new1`, travel, rest; the
+    engine ran the introduce after the walk, so the goodbye named nobody yet, and all five
+    attempts were refused as though nothing introduced anybody."""
+    from rules.intents import INTRODUCED_REFS
+
+    at = next((k for k, r in enumerate(raw_intents) if isinstance(r, dict)
+               and str(r.get("op", "")).lower() == "introduce"), None)
+    if at is None:
+        return set(), 0.0
+    params = raw_intents[at].get("params") or {}
+    try:
+        n = int(params.get("count", 1) or 1)
+    except (TypeError, ValueError):
+        n = 1
+    mine = set(INTRODUCED_REFS[:max(1, n)])
+    walks = [k for k, r in enumerate(raw_intents) if isinstance(r, dict)
+             and str(r.get("op", "")).lower() in ("travel", "journey")]
+    runs_at = float(at)
+    if walks and walks[-1] > at and (params.get("how") or "already_here") == "already_here":
+        taken = (raw_intents[walks[-1]].get("params") or {}).get("with") or []
+        if not ({str(w) for w in taken} & mine):
+            runs_at = walks[-1] + 0.5
+    return mine, runs_at
+
+
+def _meant_by_the_reading(scene, frame) -> str:
+    """The one person here the reading's target slots name, by the engine's finder
+    (`acts_to_ops.person`: a name, a description shown as the name, a pronoun); "" when the
+    slots name nobody here or more than one."""
+    from . import acts_to_ops, interpret
+
+    if not frame or frame.get("error"):
+        return ""
+    found = {acts_to_ops.person(scene, a.get("target"))
+             for a in frame.get("actions") or []
+             if interpret.acting(a) and str(a.get("target") or "").strip()}
+    found.discard("")
+    return next(iter(found)) if len(found) == 1 else ""
+
+
+def introduced_is_here(raw_intents, scene, frame=None, *, notes: list | None = None):
+    """An `introduce` of somebody already standing here is that person, not a second one.
+
+    Measured live 2026-10-17 (hv-data, the inn off Khalmorin's market, gemma-4-12B): "I say
+    goodbye to the barkeep, go back up to my room and sleep until dawn", with c8 "the one
+    behind the bar" — the inn's keeper — standing there. The plan wrote `introduce
+    who="barkeep" how=arrives` and `say to=new1`; the engine made c9 "barkeep", the
+    goodbye went to him, and the inn had two barkeeps.
+
+    Code decides with the engine's own finder and the record, never the prose: the
+    introduce's `who` and the reading's target words must BOTH find the same one person
+    here (`acts_to_ops.person`, i.e. `scope.in_the_room`, which reads a keeper's trade off
+    their record, `keepers.trade_words`). Then the introduce goes and its placeholder is
+    that person's ref everywhere in the plan. One introduce of one person only; a crowd
+    ("two more drinkers") is never folded into one man. A reading that names nobody here
+    binds nothing: the plan's newcomer stands."""
+    from rules.intents import INTRODUCED_REFS
+
+    from . import acts_to_ops
+
+    if scene is None or not isinstance(raw_intents, list):
+        return raw_intents
+    at = next((k for k, r in enumerate(raw_intents) if isinstance(r, dict)
+               and str(r.get("op", "")).lower() == "introduce"), None)
+    if at is None:
+        return raw_intents
+    params = raw_intents[at].get("params") or {}
+    try:
+        count = int(params.get("count", 1) or 1)
+    except (TypeError, ValueError):
+        return raw_intents
+    who = str(params.get("who") or "").strip()
+    if count != 1 or not who:
+        return raw_intents
+    ref = acts_to_ops.person(scene, who)
+    if not ref or ref != _meant_by_the_reading(scene, frame):
+        return raw_intents
+    swap = {INTRODUCED_REFS[0]: ref}
+    out = [_swap_refs(dict(r), swap) if isinstance(r, dict) else r
+           for k, r in enumerate(raw_intents) if k != at]
+    if notes is not None:
+        notes.append(f"introduce {who!r} dropped: {ref} is here already, and the player's "
+                     f"words name them")
+    return out
+
+
+def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
+                        hold_players: bool = False, notes: list | None = None):
+    """No placeholder reaches validation without somebody behind it.
+
+    Measured live 2026-10-16 on master (gemma-4-12B, Pangrella, scratch data): the plan
+    wrote `new1` as a target with nothing introduced on 5 of 5 attempts across two turns
+    in a tavern ("I pay for a room for the night and go to bed", "I ask the barkeep for a
+    room…"); validation refused every attempt and the turn fell to narration only, whose
+    prose then had the character asleep upstairs with the engine's clock and place unmoved.
+    The same scratch saves hold more of it: `travel target=new1` from the outskirts with
+    nobody there (7 refusals), and `say to=new1` beside the one person in the room, c8 "the
+    one behind the bar", for "I say goodbye to the barkeep…" (7 refusals). `bind_placeholders`
+    had not regressed: it binds only one dangling label the player's words can only mean,
+    and "the barkeep" found nobody by name, so it rightly bound nothing — and nothing after
+    it took the placeholder out. The schema keeps offering `new1` in every ref enum out of a
+    fight (`prompts.turn_schema`), and the refusal's correction never taught the retry to
+    stop writing it.
+
+    Last before validation, after every door that may still introduce somebody
+    (`inject_introduce`, the `declared` merge) or drop an introduce (`asked_about_not_
+    addressed`). For each placeholder no introduce in this plan declares:
+
+      * bound to the one person the reading's target slots name here (`acts_to_ops.person`)
+        or the one the player's words can only mean (`_the_one_meant`); for a line said,
+        also the one person the player is dealing with (`acts_to_ops.addressed`) — words
+        are said to somebody, and a blow is never aimed by that guess;
+      * else, in a slot the op's resolution never reads (a travel's or a rest's `target`, a
+        say's `to`), the slot is emptied and the deed stands: Inform's "supplying a missing
+        noun" either supplies one or the action goes on without it when it needs none;
+      * else the op goes, with the reason noted: the person it was done to is nobody, and
+        the rest of the turn stands. JSON:API answers an unresolved `lid` by refusing the
+        whole request (400); a turn is not a request the player can resend for free, which
+        is exactly how five refusals became a narrated nothing.
+
+    `hold_players` leaves the player's character's own deed on somebody to validation's
+    refusal instead of dropping it — the agent sets it on a plan's FIRST attempt only, so a
+    cast the player asked for gets one retry with the people here named (G2's `aim
+    ref:new2`, which the retry then aimed at Kaelith, tests/test_g2_phantom_targets.py)
+    before code settles it on the next.
+    """
+    if scene is None or not isinstance(raw_intents, list):
+        return raw_intents
+    raw_intents = introduced_is_here(raw_intents, scene, frame, notes=notes)
+    known = set(getattr(scene, "actors", {}) or {})
+    declared, runs_at = _declared_placeholders(raw_intents)
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn"
+           for r in raw_intents):
+        # A spawn's bodies are `bind_placeholders`' to number; what a spawn left unbound
+        # is still settled below, but never re-aimed at somebody already here.
+        meant = said_to = ""
+    else:
+        meant = _meant_by_the_reading(scene, frame) or _the_one_meant(scene, player_text)
+        from . import acts_to_ops
+
+        said_to = meant or acts_to_ops.addressed(scene)
+
+    here_at = 0
+
+    def dangling(ref) -> bool:
+        # A placeholder its introduce has not made yet, where the engine will run it, is
+        # as unmade as one nothing introduces.
+        return (isinstance(ref, str) and ref not in known
+                and (ref not in declared or here_at < runs_at) and _is_label(ref))
+
+    out: list = []
+    for here_at, raw in enumerate(raw_intents):
+        if not isinstance(raw, dict) or not any(dangling(r) for r in _refs_in(raw)):
+            out.append(raw)
+            continue
+        op = str(raw.get("op", "")).lower()
+        if dangling(raw.get("actor")):
+            if notes is not None:
+                notes.append(f"{op} dropped: its actor {raw.get('actor')!r} is nobody here "
+                             f"and nothing in the plan introduces them")
+            continue
+        who = said_to if op == "say" else meant
+        if who:
+            swap = {r: who for r in _refs_in(raw) if dangling(r)}
+            out.append(_swap_refs(dict(raw), swap))
+            if notes is not None:
+                notes.append(f"{op}: {', '.join(sorted(swap))} is {who}, the one person "
+                             f"here the player means")
+            continue
+        if op in _ABOUT_SOMEBODY:
+            pc = scene.pc() if hasattr(scene, "pc") else None
+            if hold_players and str(raw.get("actor") or "pc") in (
+                    "pc", "None", getattr(pc, "ref", "pc")):
+                out.append(raw)
+                continue
+            if notes is not None:
+                notes.append(f"{op} dropped: it was aimed at a placeholder nobody "
+                             f"introduced, and nobody here is plainly the one meant")
+            continue
+        fixed = dict(raw)
+        if dangling(fixed.get("target")):
+            fixed.pop("target", None)
+        params = fixed.get("params")
+        if isinstance(params, dict) and isinstance(params.get("to"), list):
+            params = dict(params, to=[t for t in params["to"] if not dangling(t)])
+            if not params["to"]:
+                params.pop("to")
+            fixed["params"] = params
+        elif isinstance(params, dict) and dangling(params.get("to")):
+            params = dict(params)
+            params.pop("to", None)
+            fixed["params"] = params
+        if any(dangling(r) for r in _refs_in(fixed)):
+            if notes is not None:
+                notes.append(f"{op} dropped: a placeholder nobody introduced")
+            continue
+        out.append(fixed)
+        if notes is not None:
+            notes.append(f"{op}: the placeholder nobody introduced was taken out; the "
+                         f"{op} needs nobody")
+    if not out and raw_intents:
+        out = [{"op": "narrate_only", "because": "the only ops were aimed at nobody"}]
+    return out
+
+
+# The reader's acts (gm/interpret.py ACTS, a closed list) that END a conversation when the
+# player's own line does them: sleeping or taking a room, walking off, walking out, taking
+# the road. And the acts that go ON talking — a line that walks to somebody and THEN speaks
+# to them has not taken its leave.
+LEAVING_ACTS = frozenset({"rest", "go", "leave", "journey"})
+TALKING_ACTS = frozenset({"talk", "request", "insult", "buy", "sell", "give", "seek"})
+# The ops a leaving act is carried by, the surest first: the leave goes immediately before
+# the first `rest` or `journey`, else before the first walk. A plan's walk is not always the
+# player's (live 2026-10-17: a stray `travel` to the inn the party stood in, and a `travel`
+# with no place, both before the words), so a sleep outranks it.
+_LEAVING_OPS = (frozenset({"rest", "journey"}),
+                frozenset({"travel", "venture", "found", "call_on"}))
+# The ops that are still the conversation: words and things changing hands. Any of them the
+# plan put after the leaving op is moved before the leave — the reading has no talking act
+# after the leaving one, so the words put them first.
+_STILL_TALKING_OPS = frozenset({"say", "give", "buy", "sell", "haggle", "provoke"})
+
+
+def leave_before_leaving(raw_intents, player_text: str, scene, frame=None, *,
+                         notes: list | None = None):
+    """A deed in the player's own line that ends the talk is their leave-taking.
+
+    The owner's ruling, 2026-10-17 (docs/conversation.md): going to bed or up to a room,
+    walking off, leaving, taking the road — said in the player's line — end the
+    conversation first, by the existing free `leave_talk`, and then the rest of the line
+    happens in order. Only from the player's words; never from silence.
+
+    Measured live the same day on this branch (hv-data, the inn, c8 the keeper): "I pay for
+    a room for the night and go to bed" and "I say goodbye to the barkeep, go back up to my
+    room and sleep until dawn" both ended "You are still in conversation with the one
+    behind the bar. Take your leave first." — the rest refused. On the second the plan HAD
+    written a `leave_talk`, first, before the `say`: "You are not in conversation with c8",
+    then the say opened the talk, then the rest was refused.
+
+    Structure only, from the reading's acts and their order: a leaving act (`LEAVING_ACTS`)
+    with no talking act after it. The plan's own `leave_talk` (do: leave) is replaced by
+    one placed immediately before the first op that carries the leaving (`_LEAVING_OPS`),
+    or last when the walk was struck as a walk across the room — so a word said and a room
+    paid for earlier in the line come first, while the talk is open. Only when somebody is
+    in conversation now, or a `say` earlier in the plan opens it. A goodbye said with no
+    other deed is not read here: the reader has no closed slot for parting words, and code
+    does not read the words."""
+    from . import interpret
+
+    if frame is None:
+        frame = interpret.reading_of(player_text)
+    if not isinstance(raw_intents, list) or scene is None or not isinstance(frame, dict) \
+            or frame.get("error") or getattr(scene, "in_encounter", False):
+        return raw_intents
+    acts = [a.get("act") for a in frame.get("actions") or []
+            if isinstance(a, dict) and interpret.acting(a)]
+    leaving = [k for k, act in enumerate(acts) if act in LEAVING_ACTS]
+    if not leaving or any(act in TALKING_ACTS for act in acts[leaving[0] + 1:]):
+        return raw_intents
+
+    def op(r) -> str:
+        return str(r.get("op", "")).lower() if isinstance(r, dict) else ""
+
+    kept = [r for r in raw_intents
+            if not (op(r) == "leave_talk"
+                    and str((r.get("params") or {}).get("do") or "leave").lower() == "leave")]
+    at = len(kept)
+    for ops in _LEAVING_OPS:
+        k = next((k for k, r in enumerate(kept) if op(r) in ops), None)
+        if k is not None:
+            at = k
+            break
+    # Live 2026-10-17 on this branch: travel, say "goodbye", rest — the leave before the
+    # walk came before the goodbye that opened the talk. The words go first.
+    later = [r for r in kept[at:] if op(r) in _STILL_TALKING_OPS]
+    kept = kept[:at] + later + [r for r in kept[at:] if not any(r is x for x in later)]
+    at += len(later)
+    from rules import states as states_mod
+
+    talking = any(not a.is_pc and a.has_state(states_mod.TALKING)
+                  for a in (getattr(scene, "actors", {}) or {}).values())
+    if not talking and not any(op(r) == "say" for r in kept[:at]):
+        return raw_intents
+    leave = {"op": "leave_talk", "actor": getattr(scene.pc(), "ref", "pc"),
+             "params": {"do": "leave"},
+             "because": "the player's own deed ends the conversation (ruling 2026-10-17)"}
+    out = kept[:at] + [leave] + kept[at:]
+    if notes is not None:
+        notes.append(f"the conversation ends before the {acts[leaving[0]]}: the player's "
+                     f"own deed takes their leave")
+    return out
+
 # What the player's words suggest the newcomers are. The animal cue is first because it
 # is the more specific claim: "the guard dog" contains "guard", and with the human cue
 # first the dog came out a watchman.
@@ -7873,6 +8186,23 @@ def heat_brief(scene) -> str:
 
 # --- Company: the person the player addresses must exist ------------------------------
 
+def _no_reading(player_text: str) -> bool:
+    """Whether this sentence has no usable reading (gm/interpret.py): the reader is off, or
+    its call failed. Then the two doors that MAKE people from the player's words —
+    `inject_introduce` and `inject_company` — make nobody.
+
+    Owner direction (2026-10-03, docs/structured-turn.md): models read, code validates; no
+    regex reading English. Both doors had kept a regex fallback for a missing reading, and
+    it was measured making somebody out of a phrase that is not a person: with no reading,
+    "I pay for a room for the night and go to bed" was planned `introduce who="bed"`
+    (2026-10-17, a `plan_turn` replay on this branch). A missing reading costs the turn
+    its newcomer, never a body called "bed"; the plan's own `introduce` still stands."""
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    return not reading or bool(reading.get("error"))
+
+
 _ADDRESSES = re.compile(
     r"\bI\s+(?:talk to|speak (?:to|with)|approach|walk (?:up )?to|greet|ask|"
     r"find)\s+(.{3,50}?)\s*[.!?]?$", re.I)
@@ -7899,6 +8229,10 @@ def inject_company(raw_intents, player_text: str, scene, world=None):
     from rules import places as places_mod
 
     if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    # Who is addressed is the READING's to say; with no reading nobody is made from the
+    # words (`_no_reading`).
+    if _no_reading(player_text):
         return raw_intents
     # The older door, and it steps aside for the two newer ones. Measured live
     # 2026-09-27: "I ask around for the woman who sold me bread" matched "ask" here, and
@@ -8378,6 +8712,10 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     from rules import scope as scope_mod
 
     if scene is None or not isinstance(raw_intents, list) or scene.in_encounter:
+        return raw_intents
+    # Who was looked for is the READING's to say; with no reading nobody is made from the
+    # words (`_no_reading`).
+    if _no_reading(player_text):
         return raw_intents
     # The model's own introduce, with nobody in it. Measured live 2026-09-25: `introduce`
     # with no `who` (and nothing `parse` could fold into one) cost an attempt on two turns

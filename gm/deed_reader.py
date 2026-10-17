@@ -283,6 +283,59 @@ def read_under(text: str, state: str, *, chat=None, model: str = "", host: str =
     """(the first page sentence that has the player up again after going under, an error).
     "" when there is none, when the reader names a sentence not about the player, or when
     the read fails (the error says so)."""
+    return _first_sentence(text, _UNDER_SYSTEM.format(state=state), chat=chat, model=model,
+                           host=host, provider=provider, api_key=api_key, pc_name=pc_name)
+
+
+# --- time the engine did not pass ------------------------------------------------------------
+#
+# The mirror of the question above. Measured on a scratch save of 2026-10-16 (gemma-4-12B,
+# Pangrella, turn_log row 125): every plan for "I say goodbye to the barkeep, go back up to
+# my room and sleep until dawn" was refused, the turn fell to narration only, and the page
+# said "You collapse onto the pallet… sleep takes hold. When you finally stir, the light has
+# changed" — the engine's clock had not moved a minute. The read-back's hour row passed it:
+# "the sun is hanging lower" was true of the unmoved clock, and no row asks whether hours
+# went by. So: which sentence, if any, has the player fall asleep or let hours go by.
+
+_SLEPT_SYSTEM = (
+    "You check one passage of a tabletop game, narrated to the player as \"you\". The "
+    "rules say NO time passes for the player's character in this passage: it is one "
+    "moment, and they stay awake through it. Find the first sentence where the player "
+    "falls asleep, sleeps, wakes from sleep, or lets hours go by — resting the night, "
+    "waiting out the day, the light changing while they rest. Only the player counts, "
+    "and only time that is shown passing: being tired, wanting to sleep, asking for a "
+    "bed or lying down without sleeping do not. Answer its number, or 0 when there is "
+    "none.")
+
+
+# The rest the engine REFUSED (in conversation, no coin, a fight on): no room is taken
+# either, so the question widens to the bed and the room — measured live 2026-10-17, a
+# refused rest's page had "You have your keys, your room is secured" and "You find a small,
+# secluded room at the back of the inn" before the player lay down.
+_REFUSED_REST_SYSTEM = (
+    "You check one passage of a tabletop game, narrated to the player as \"you\". The "
+    "rules REFUSED the player's rest this moment: they take no room, get no bed or key, "
+    "and do not sleep; they stay where they are, awake. Find the first sentence where the "
+    "player is given or takes a room, a bed or a key, goes off to a room or bed, lies down "
+    "to sleep, sleeps, or lets hours go by. Only the player counts; asking for a room, "
+    "being tired or wanting to sleep do not. Answer its number, or 0 when there is none.")
+
+
+def read_slept(text: str, *, chat=None, model: str = "", host: str = "",
+               provider: str = "ollama", api_key: str = "",
+               pc_name: str = "", refused: bool = False) -> tuple[str, str]:
+    """(the first page sentence that has the player sleep or let hours pass — or, for a
+    `refused` rest, take a room or bed — an error), on the same terms as `read_under`."""
+    return _first_sentence(text, _REFUSED_REST_SYSTEM if refused else _SLEPT_SYSTEM,
+                           chat=chat, model=model, host=host, provider=provider,
+                           api_key=api_key, pc_name=pc_name)
+
+
+def _first_sentence(text: str, system: str, *, chat=None, model: str = "", host: str = "",
+                    provider: str = "ollama", api_key: str = "",
+                    pc_name: str = "") -> tuple[str, str]:
+    """One closed question over the numbered page: the sentence number `system` asks for,
+    held in code to a sentence about the player."""
     from .checks._page import page_sentences
 
     pairs = page_sentences(text)
@@ -299,7 +352,7 @@ def read_under(text: str, state: str, *, chat=None, model: str = "", host: str =
                                           "enum": [str(i) for i in range(len(written) + 1)]}},
               "required": ["sentence"]}
     try:
-        reply = chat([{"role": "system", "content": _UNDER_SYSTEM.format(state=state)},
+        reply = chat([{"role": "system", "content": system},
                       {"role": "user", "content": f"PASSAGE, BY SENTENCE:\n{page}"}],
                      model, host, as_json=True, think=False, temperature=0.0,
                      num_predict=24, provider=provider, api_key=api_key, schema=schema)

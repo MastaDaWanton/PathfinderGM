@@ -67,6 +67,27 @@ def test_the_fallback_is_tried_when_the_primary_is_down(gm, monkeypatch):
     assert plan.intents
 
 
+def test_the_rescue_waits_two_minutes_not_six_hundred_seconds(gm, monkeypatch):
+    """Measured 2026-10-17 (shared Ollama, scratch data): three degraded turns each ended
+    "richardyoung/qwen3-4b-… did not answer within 600s". The fallback was installed;
+    Ollama never logged loading it — the request queued behind the busy 12B for the whole
+    of `client.chat`'s 600 s cold-load default, which the plan loop still passed to the
+    rescue while the prose call had capped its own at FALLBACK_TIMEOUT since 2026-09-17.
+    This machine's Ollama log holds 454 loads, the slowest 79 s."""
+    waits: dict[str, list] = {}
+
+    def chat(messages, model, *a, **kw):
+        waits.setdefault(model, []).append(kw.get("timeout"))
+        return client.Reply("not json", 0.1, model)
+
+    monkeypatch.setattr(agent_mod.client, "chat", chat)
+    gm.plan_turn("I look around.", [])
+    assert waits["spare-model"] and set(waits["spare-model"]) == {agent_mod.FALLBACK_TIMEOUT}
+    assert agent_mod.FALLBACK_TIMEOUT <= 120
+    primary = [m for m in waits if m != "spare-model"]
+    assert primary and set(waits[primary[0]]) == {agent_mod.PRIMARY_TIMEOUT}
+
+
 def test_with_every_model_down_the_player_is_told_to_start_ollama(gm, monkeypatch):
     def chat(*a, **kw):
         raise client.ModelUnavailable("cannot reach Ollama")

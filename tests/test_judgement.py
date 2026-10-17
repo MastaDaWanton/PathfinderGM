@@ -1433,7 +1433,14 @@ def test_the_person_addressed_becomes_real():
     """Measured live, overruling an older refusal by the player's word: "i talk
     to another merchant" produced a vivid stranger who was never added to the
     scene, could not be traded with, and evaporated. Addressing a civilian role
-    now spawns them peacefully as the commoner they are."""
+    now spawns them peacefully as the commoner they are. Who is addressed is the
+    reading's since 2026-10-17 (`judgement._no_reading`), so the reading is handed in."""
+    from gm import interpret
+
+    interpret.remember("i talk to another merchant", {"actions": [
+        {"act": "talk", "target": "another merchant", "span": "talk to another merchant"}]})
+    interpret.remember("I talk to the merchant", {"actions": [
+        {"act": "talk", "target": "the merchant", "span": "talk to the merchant"}]})
     out = judgement.inject_company(
         [{"op": "narrate_only"}], "i talk to another merchant", _empty_room())
     spawn = next(i for i in out if i.get("op") == "spawn")

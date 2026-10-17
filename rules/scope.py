@@ -191,7 +191,21 @@ def in_the_room(scene, phrase: str) -> str:
         owns: set[str] = set()
         for n in names:
             owns |= _words(n)
+        # A keeper also answers to their trade, read off their record (`keepers.
+        # trade_words`): "the barkeep" is the one behind the bar (2026-10-17, a second
+        # barkeep introduced beside the first because this finder knew names only). Only
+        # when the phrase is the trade and nothing more: "the stallholder with a ledger" is
+        # a particular stallholder, not whoever keeps the general counter (measured on the
+        # suite's own keepers-on-the-clock case when every trade word counted).
+        from . import keepers
+
+        trade: set[str] = set()
+        for w in keepers.trade_words(a, getattr(scene, "founded", ()) or ()):
+            trade |= _words(w)
+        by_trade = bool(trade) and want <= trade
         shared = len(want & owns)
+        if by_trade:
+            shared = max(shared, len(want))
         if not shared:
             continue
         whole = max((len(_name_run(n)) for n in names if n.strip() and _says_whole(said, n)),
