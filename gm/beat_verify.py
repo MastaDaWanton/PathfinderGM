@@ -1780,8 +1780,12 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # of its two sides: a sale, purchase or haggle this turn (refused or not), or
             # a thing it names (the crate in the pack is not sold, whatever the page says
             # — kesst:18, "the transaction is finalized in the eyes of the guild").
+            # A rest is a side of one too since 2026-10-17: a room at an inn is bought by
+            # resting there (rules/lodging.py), and the live turn that pinned this ("The
+            # transaction of coin is a formality…", dn-live) had a refused rest and nothing
+            # else — a payment the engine never took, which the page must not keep.
             if item == OTHER_THING and not any(
-                    o.get("op") in (*_TRADE_OPS, "haggle") for o in facts.outcomes):
+                    o.get("op") in (*_TRADE_OPS, "haggle", "rest") for o in facts.outcomes):
                 continue
             done = [o for o in trades if o.get("status") != "refused"]
             refused = [o for o in trades if o.get("status") == "refused"]

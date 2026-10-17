@@ -112,11 +112,16 @@ def test_a_rewrite_that_still_settles_the_sale_is_cut(scripted):
     """Live 2026-10-17 (dn-live, the inn): "beat-settles-trade: the rewrite still did it:
     'The transaction of coin is a formality…'" — and the backstop then cut it ("beat read
     back: trade: cut"). Pinned here: a sale the engine never made, rewritten into a sale
-    again, leaves the page."""
+    again, leaves the page. The live turn's only record was the refused rest (a room is
+    bought by resting, rules/lodging.py), which is what lets a sale of an unnamed thing be
+    judged at all (`diff`'s trade gate, fix/readback-handovers-and-success)."""
     agent, _ = scene_at(MARKET)
     text = ("The stalls are loud. You count the coin onto the board and the deal is "
             "done. What do you do?")
-    ctx = context(agent, text, outcomes=[])
+    refused_rest = [{"intent_id": "i1", "op": "rest", "status": "refused", "effects": [],
+                     "tell": "You are still in conversation with the one behind the bar. "
+                             "Take your leave first."}]
+    ctx = context(agent, text, outcomes=refused_rest)
     sale = {"item": bv.OTHER_THING, "seller": "pc",
             "buyer": next(r for r in agent.engine.scene.actors if r != "pc"),
             "settled": True}
