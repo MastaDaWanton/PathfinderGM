@@ -1143,7 +1143,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                         whose = f", {owner.name}'s" if owner is not None else ""
                     was = f", {rec['state']} {rec['from_']}" if rec and rec.get("from_") else ""
                     bits.append(f"{name}" + (f" ×{n}" if n != 1 else "") + whose + was)
-                money = _goods.purse_line(purse, _goods.coinage()) if purse else "no coin"
+                money = (_goods.purse_line(purse, _goods.coins_here(world, scene))
+                         if purse else "no coin")
                 lines.append(f"    HAS (fact): purse {money}"
                              + (f"; carrying {', '.join(bits)}" if bits else "")
                              + ". Coin leaves the purse only through a give; nothing "

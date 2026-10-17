@@ -5899,9 +5899,15 @@ class Engine:
         payment of "1 Saltmakers' silver piece" into a purse the sheet showed as "1 Winged
         silver piece" — two names for one coin, in the paying tell and in the "already in
         your purse" tell after it."""
-        world = getattr(self, "world", None)
-        here = world.get(self.scene.location_id) if world is not None else None
-        return goods.coinage(world, here)
+        return goods.coins_here(getattr(self, "world", None), self.scene)
+
+    def _coin_text(self, gold: float) -> str:
+        """A price in gold, said in the coin `_coins_here` names. The buy, the sell and
+        the mend wrote theirs through `pricing.as_text` ("1 gp") beside a purse said as
+        "7 Winged silver pieces left" in the same sentence: the book's abbreviation and
+        the town's coin for one payment."""
+        return goods.purse_line(goods.coins_for(int(round(float(gold) * 100))),
+                                self._coins_here())
 
     def _pay_for_work(self, taker, payer) -> tuple[str, list[dict], int]:
         """A granted request for payment: an untrained hireling's day wage (CRB p.159,
@@ -8374,7 +8380,7 @@ class Engine:
             return say(m["nothing"], False), [], []
         where, key, label = loot["where"], loot["key"], loot["label"]
         if where == "purse":
-            coins = goods.coinage(getattr(self, "world", None), None)
+            coins = self._coins_here()
             label = f"coin purse ({goods.purse_line(defender.purse, coins)})"
             for coin, n in defender.purse.items():
                 actor.purse[coin] = actor.purse.get(coin, 0) + int(n)
@@ -9675,9 +9681,9 @@ class Engine:
         cost_cp = int(round(cost_gp * 100))
         if goods.in_copper(actor.purse) < cost_cp:
             return self._refuse(
-                intent, f"Mending {name} takes {pricing.as_text(cost_gp)} of materials, "
+                intent, f"Mending {name} takes {self._coin_text(cost_gp)} of materials, "
                         f"a fifth of its price, and {actor.name} has "
-                        f"{goods.purse_line(actor.purse, goods.coinage())}.")
+                        f"{goods.purse_line(actor.purse, self._coins_here())}.")
         roll = self._roll_or_suspend(intent, actor, mods, "Craft check (mend)", dc, partial)
         margin = roll.total - dc
         self._judge(roll, margin >= 0)
@@ -9714,8 +9720,8 @@ class Engine:
             effects.append({"ref": actor.ref, "kind": "spent", "paid_cp": spent,
                             "for": f"materials to mend {name}",
                             "origin": "rule:mend-gear"})
-            tell += (f" Materials: {goods.purse_line(goods.coins_for(spent), goods.coinage())}"
-                     f" ({goods.purse_line(actor.purse, goods.coinage())} left).")
+            tell += (f" Materials: {goods.purse_line(goods.coins_for(spent), self._coins_here())}"
+                     f" ({goods.purse_line(actor.purse, self._coins_here())} left).")
         if body:
             tell += f" The work cost them: {body}."
         return Outcome(intent_id=intent.id, op="mend", rolls=[roll],
@@ -9872,7 +9878,7 @@ class Engine:
         paid = per_day * days_done
         if paid:
             pc.purse = goods.credit(pc.purse, paid)
-        coins = goods.coinage()
+        coins = self._coins_here()
         as_ = f" as a {trade}" if trade else ""
         tell = (f"{pc.name} works{as_} in {town} for {days_done} "
                 f"day{'s' if days_done != 1 else ''} ({how}). ")
@@ -15786,7 +15792,7 @@ class Engine:
         market_mod.mark_spent(self.scene.market_taken, paid, place, stall, day)
         self._mark_payment(actor, buyer or "", cp)
 
-        coins = goods.coinage()
+        coins = self._coins_here()
         short = paid < asking
         # Who bought it, said: "hands over 1x Yarow Elixir" named the thing and not the
         # stallholder, and the ledger then remembered the sale as made to the player.
@@ -15796,7 +15802,7 @@ class Engine:
             # Said out loud, because a silent shortfall reads as a bad price rather than
             # an empty till, and the difference is the whole point of the cap.
             tell += (f" — all {who} can raise today, against "
-                     f"{pricing.as_text(asking)} asked")
+                     f"{self._coin_text(asking)} asked")
         tell += f". ({goods.purse_line(actor.purse, coins)} in hand.)"
 
         return Outcome(
@@ -15871,13 +15877,13 @@ class Engine:
         market_mod.mark_spent(self.scene.market_taken, paid, place, stall, day)
         self._mark_payment(actor, buyer_ref or "", cp)
 
-        coins = goods.coinage()
+        coins = self._coins_here()
         what = f"{count} × {key}" if count != 1 else self._the(key)
         tell = (f"{actor.name} sells {what} to {who} for "
                 f"{goods.purse_line(goods.coins_for(cp), coins)}")
         if paid < asking:
             tell += (f" — all {who} can raise today, against "
-                     f"{pricing.as_text(asking)} asked")
+                     f"{self._coin_text(asking)} asked")
         tell += f". ({goods.purse_line(actor.purse, coins)} in hand.)"
         effects = [{"ref": actor.ref, "kind": "sold", "item": key, "count": count,
                     "paid_cp": cp, "left": left, "to": buyer_ref or ""}]
@@ -15960,11 +15966,11 @@ class Engine:
             round(pricing.worth(found, buyer=actor, town=place) * count, 2), haggled)
         cp = int(round(price * 100))
         purse, paid = goods.spend(actor.purse, cp)
-        coins = goods.coinage()
+        coins = self._coins_here()
         if not paid:
             return Outcome(
                 intent_id=intent.id, op="buy", effects=[],
-                tell=f"{found.name} is {pricing.as_text(price)} and {actor.name} has "
+                tell=f"{found.name} is {self._coin_text(price)} and {actor.name} has "
                      f"{goods.purse_line(actor.purse, coins)}. Nothing changes hands.",
                 because=intent.because,
             )
@@ -15991,7 +15997,7 @@ class Engine:
                       "from": seller or (here_keeper.ref if here_keeper is not None
                                          and here_keeper.ref in self.scene.actors
                                          and who == here_keeper.name else "")}] + arrived,
-            tell=f"{actor.name} pays {who} {pricing.as_text(price)} for "
+            tell=f"{actor.name} pays {who} {self._coin_text(price)} for "
                  + (f"{goods.measure(count * per, found.unit)} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
                  + (f", {haggled}% off for the haggle" if haggled else "")
@@ -18283,7 +18289,7 @@ class Engine:
         if not gold:
             return ""
         pc.purse = goods_mod.credit(pc.purse, gold * 100)
-        coins = goods_mod.coinage()
+        coins = self._coins_here()
         return (f" Taken from {', '.join(sorted(set(names)))}: "
                 f"{goods_mod.purse_line(goods_mod.coins_for(gold * 100), coins)} "
                 f"({goods_mod.purse_line(pc.purse, coins)} in hand).")
@@ -19629,8 +19635,9 @@ class Engine:
         self._mark_payment(taker, getattr(giver, "ref", "") or "", 1)
         return Outcome(
             intent_id=intent.id, op="give", because=intent.because,
-            tell=(f"{taker.name} pockets {self._the(item)}: a single copper piece, all "
-                  f"anybody counted out."),
+            tell=(f"{taker.name} pockets {self._the(item)}: a single "
+                  f"{goods.purse_line({'cp': 1}, self._coins_here())[2:]}, "
+                  f"all anybody counted out."),
             effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": 1,
                       "how": "took", "from": getattr(giver, "ref", "") or "",
                       "to": taker.ref, "purse": dict(taker.purse),
@@ -19681,7 +19688,7 @@ class Engine:
         name = " ".join(str(item or "").split())
         if not name or taker is None:
             return False
-        coins = goods.coinage(getattr(self, "world", None), None)
+        coins = self._coins_here()
         # "5 gp" as well as "gp": coin is a number on the purse, never a thing to ledger.
         if goods.coin_named(name, coins) or goods.coin_named(name.split()[-1], coins) \
                 or holding.is_money(name):
@@ -19818,7 +19825,7 @@ class Engine:
                          "their hands are empty") + "."),
                 because=intent.because)
 
-        coins = goods.coinage(getattr(self, "world", None), None)
+        coins = self._coins_here()
         denom = goods.coin_named(item, coins)
 
         # Coin with no amount and no denomination — "the coins", "the payment" — is
@@ -20144,7 +20151,11 @@ class Engine:
 
                     taker.add_stock(Stock(base=item, tier="common"), moved)
 
-        what = f"{moved} × {item}" if moved != 1 else item
+        # Coin said as coin, in the purse's own words (`_coins_here`): this wrote the
+        # denomination's id — "the one behind the bar takes 2 × sp." — so the one tell
+        # about money changing hands named no coin at all (2026-10-17).
+        what = (goods.purse_line({denom: moved}, coins) if denom and moved
+                else f"{moved} × {item}" if moved != 1 else item)
         how = "took"
         if source is not None and taker is not None:
             how = "took_out"
@@ -22361,7 +22372,7 @@ class Engine:
                     "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
                                "paid": 0, "why": "held", "origin": lodging.ORIGIN}}
         cp = lodging.price_cp(self.scene, at)
-        coins = goods.coinage(getattr(self, "world", None), None)
+        coins = self._coins_here()
         price = goods.purse_line(goods.coins_for(cp), coins)
         keeper = keepers.keeper_in(self.scene, at)
         asks = keeper.name if keeper is not None and keeper.at == at else ""
@@ -22685,7 +22696,7 @@ class Engine:
         days = max(0, int(days or 0))
         if pc is None or not mounts or (not days and not stabled):
             return "", []
-        coins = goods.coinage()
+        coins = self._coins_here()
         n = len(mounts)
         who = mounts[0].name if n == 1 else f"{n} mounts"
         bits, effects = [], []

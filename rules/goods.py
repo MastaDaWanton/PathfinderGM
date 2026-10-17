@@ -124,6 +124,30 @@ def coinage(world=None, place=None) -> list[Coin]:
     return [Coin(cid, f"{METALS[cid]} piece", value) for cid, value in DENOMINATIONS]
 
 
+def coins_here(world=None, scene=None) -> list[Coin]:
+    """The coin in this purse, here — the ONE answer every line that names money reads:
+    the sheet's purse, every tell, the narrator's brief, the trade panel and the cards.
+
+    Named by the settlement the party is in (`scene.location_id`, always a world
+    entity; the inn, the market and a founded house are `scene.at` inside it), because
+    a purse is a count of copper/silver/gold/platinum and says nothing about who struck
+    the coins — there is nothing else here to name them by (docs/coin-names.md).
+
+    Measured 2026-10-17 on a Pangrella save at Khalmorin's inn: the sheet said "12
+    Winged silver pieces" and the room's tell said "5 Saltmakers' silver pieces". The
+    sheet asked `coinage(world, the town)`; the room charge, the take, the give and the
+    pick-up asked `coinage(world, None)` (the world's first faction); the buy, the sell,
+    the loot, the work, the mend, the stable, the trade panel and the narrator's brief
+    asked `coinage()` (the book's bare "silver piece"). Three names for one purse, and
+    the narrator, fed the tells, repeated whichever it was shown last.
+    """
+    place = None
+    location_id = str(getattr(scene, "location_id", "") or "")
+    if world is not None and location_id and hasattr(world, "get"):
+        place = world.get(location_id)
+    return coinage(world, place)
+
+
 # The words a denomination's name can end on, with any plural `s` taken off: the ids,
 # the metals, and the "piece"/"coin" every coined name ends with (`coinage`).
 _MONEY_LAST = frozenset({"cp", "sp", "gp", "pp", "copper", "silver", "gold", "platinum",

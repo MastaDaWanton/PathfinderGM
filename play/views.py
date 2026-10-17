@@ -556,7 +556,10 @@ def _state(c) -> dict:
     from rules import residency
     from rules import schemes as schemes_mod
 
-    coins = goods_mod.coinage(c.world, c.location)
+    # The one answer to what the purse's coin is called here (`goods.coins_here`), the
+    # same the engine's tells read: the room's tell said Saltmakers' while this said
+    # Winged (2026-10-17).
+    coins = goods_mod.coins_here(c.world, c.scene)
 
     def with_areas(grid):
         # The latest turn's spell areas, for the map's overlay (§2.10): the cells each
@@ -6263,7 +6266,7 @@ def trade(request):
         "lines": _lines_of(c, at, choices) if choices else [],
         "seller": {"ref": merchant.ref, "name": str(merchant.name)},
         "till": {"gp": left, "text": pricing.as_text(max(0.0, left))},
-        "purse": goods.purse_line(pc.purse, goods.coinage()),
+        "purse": goods.purse_line(pc.purse, goods.coins_here(c.world, c.scene)),
         "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
         # Yours, at what a shop would pay — which is the number that matters when the
         # question is what you can get for it, not what it is worth.

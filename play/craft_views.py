@@ -1206,8 +1206,8 @@ def _price_cp(material) -> int:
         return 0
 
 
-def _price_line(material) -> str:
-    return goods.purse_line(goods.coins_for(_price_cp(material)), goods.coinage())
+def _price_line(material, coins) -> str:
+    return goods.purse_line(goods.coins_for(_price_cp(material)), coins)
 
 
 def _sells_its_own_trade(track_id: str, pool: list) -> list:
@@ -1364,10 +1364,10 @@ def craft_excursion(request):
         purse_cp = goods.in_copper(pc.purse)
         cheapest = min(within, key=_price_cp)
         if purse_cp < _price_cp(cheapest):
-            coins = goods.coinage()
+            coins = goods.coins_here(c.world, c.scene)
             return JsonResponse({"error": (
                 f"You cannot afford anything on the shelf today. The cheapest you could "
-                f"use is {cheapest.name} at {_price_line(cheapest)}, and you have "
+                f"use is {cheapest.name} at {_price_line(cheapest, coins)}, and you have "
                 f"{goods.purse_line(pc.purse, coins)}.")}, status=409)
     else:
         within = [m for m in found if getattr(m, "rank", 1) <= ceiling]
@@ -1466,7 +1466,7 @@ def craft_excursion(request):
     verb = spec.get("verb") or spec.get("label", "working")
     # What it cost and what was left on the counter, said in the same line as the haul.
     # A purse that quietly empties is the version of this a player cannot check.
-    coins = goods.coinage()
+    coins = goods.coins_here(c.world, c.scene)
     paid = ""
     if buying and spent_cp:
         paid = (f" Paid {goods.purse_line(goods.coins_for(spent_cp), coins)}"

@@ -223,7 +223,7 @@ def _the_winners_act(campaign, pc) -> tuple[list[dict], list[str]]:
     world = getattr(campaign, "world", None)
     if world is not None:
         try:
-            coins = goods.coinage(world, getattr(campaign, "location", None))
+            coins = goods.coins_here(world, getattr(campaign, "scene", None))
         except Exception:      # noqa: BLE001 — the coin's name is never worth the turn
             coins = None
     # Where it happened, by the name the party knows it by, for the quest the robbery
