@@ -514,5 +514,91 @@ out) and swung, because an improvised attack took any `params.item`.
 - A read-back question for a narrated state change (the pot shattering itself). With the
   engine hole closed, a broken thing is only usable if the player read it broken.
 - Ownership of narrated scenery (a pot on a stall is the stall-keeper's).
-- A "struck with" read for blows.
 - Ledgering at first mention.
+
+### Refusals biased toward allowing (2026-10-17)
+
+A wrong refusal breaks play harder than the old minting did: the player read about the
+torch and is told there is none.
+
+- **Why the first held-out misses failed.** The torch and the bucket were the model's own
+  answer, "not here" with no quote. The quote check played no part. The apple was ledgered
+  as commonplace, so it was not refused. The live crate was the window: six transcript
+  entries no longer reached the arrival beat.
+- **What changed.**
+  - A refusal must name its reason: a piece of something no passage shows broken; taken
+    away, gone, far off, or only spoken of; or would not be found in a place like this.
+  - The reader is told the place's kinds from `settings_for`.
+  - A "shown" answer whose quote misses is ledgered as fitting, not refused.
+  - A "never shown" or "piece of something" refusal is overruled when every word of the
+    player's name for the thing is in the narration, with speech blanked. "Gone" refusals
+    are never overruled.
+- **What was tried and dropped.** A narrow yes/no second read. Asked about "the bucket",
+  gemma answered "no" while writing "At your feet" as where it was. The best of three
+  wordings scored 6/8.
+- **Held-out sets, gemma x2, contended:**
+
+  | set (here/absent) | written | false refusals | false ledgering |
+  |---|---|---|---|
+  | 1 (22/22) | before the redesign, then used in tuning | 2/44 (the bucket) | 0/44 |
+  | 2 (8/8) | after the override, used in rewording | 0/16 | 0/16 |
+  | 3 (8/8) | before the final run, never tuned on | 0/16 | 0/16 |
+
+  - Before the rewording, sets 1 and 2 gave 0 false refusals and 4 false ledgerings. A
+    taken-away apple and boathooks were filed as "broken" and then overruled.
+  - The old design on set 1 gave 2/44 false refusals and 0/44 false ledgering.
+  - The bucket ("hurls a bucket of eel water at your feet") is still refused, now as
+    "gone". The sentence is ambiguous, and it is the one known miss.
+
+## What the player's blows were struck with (2026-10-17)
+
+The live shard turn: the engine refused the shard and rolled an unarmed strike, and the
+page wrote "The shard bites deep into the soft tissue of his shoulder."
+
+- **The question.** A call of its own (`swing_messages`), asked only on a beat where the
+  player struck. Those are the attack outcomes with blows on a roll made at
+  `visibility: player`. The codes are the PC's carried weapons, `unarmed strike`, the
+  weapon the engine swung, `something else` and `not shown`.
+- **The judgement, in code.** `_weapon_wrong` compares the answer with
+  `Outcome.blows[...]["weapon"]` and raises `beat-struck-with` (weight 3). `not shown` is
+  never judged. The second read (`_struck_with`) asks which weapon the sentence shows,
+  from the same codes, and keeps the alarm only for a weapon that is neither the engine's
+  nor `not shown`.
+- **Slot or call, first prompt, 16 beats x2:**
+
+  | version | weapon alarms before / after second read | read latency (median) |
+  |---|---|---|
+  | own call | 12/14, 2 false / 12/14, 2 false | 9.3 s |
+  | slot of the first read | 13/14, 6 false / 13/14, 2 false | 12.3 s |
+
+  The slot also changes the first read on every beat with a blow. The call of its own
+  leaves the first read byte-identical, so the call was kept.
+- **Shipped prompt, 25 beats x2 (8 held out).**
+  - Weapon claims: precision 0.95, recall 0.95.
+  - Alarms: 20/22 caught, 0 false, 0 of 26 clean beat-runs alarmed.
+  - The 8 held-out beats were correct both runs.
+  - The two misses are a shortened paraphrase of the shard beat. The verbatim live beat is
+    caught 2/2 and confirmed.
+  - The demonstrations were changed after the first run: a weapon named in its own
+    sentence, and a hilt counting as the weapon. The pommel false alarm went with them.
+  - Read latency had a median of 30 s. Ollama was heavily contended.
+- **The dice popup.** Over a blow, the subtitle is now the engine's words (`_roll_why`:
+  "Kesst Vayr against Lyraea"), not the plan's `because`. A reaction keeps its own reason,
+  which the engine wrote.
+
+**Live, 2026-10-17** (scratch copy, Khalmorin market, fight with Lyraea, contended):
+- "I grab a shard of the broken pot and stab Lyraea with it":
+  - The scenery read answered "not here: a piece of something no passage shows broken".
+    The give was refused.
+  - The plan's attack was the rapier. The popup read "Attack with rapier / Kesst Vayr
+    against Lyraea". The roll was 13 against AC 14, a miss.
+  - The draft wrote "…the shard … as you lunged, it bit deep into her shoulder". The harm
+    repair turned it into a graze. The struck-with read then found `something else`
+    against the rapier and cut the sentence. The blow backstop put "Your attack with the
+    rapier misses Lyraea." on the page.
+  - Still shipped: "the force of the impact sends her stumbling back" on a miss. No
+    reader claimed it.
+- At the gate, "I take a torch from its bracket on the gatehouse wall": no passage had
+  shown a torch. The reader answered "fits a place like this". It was ledgered
+  `commonplace` and the tell was "Kesst Vayr takes the torch." The narrated-and-shown path
+  was proved live with the kettle the day before.
