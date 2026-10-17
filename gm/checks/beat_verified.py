@@ -189,9 +189,9 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
             # The engine's own line in the cut sentence's place, its numbers off (the
             # creature's roll is hidden): "the one behind the bar's attack with the sap
             # misses Kesst Vayr." The name becomes "you" later in the groom.
-            from play.views import plain_tell
-
-            line = plain_tell(d.line)
+            # `page_line`, not `plain_tell`: plain_tell keeps a hit's damage amount ("for
+            # 4 non-lethal bludgeoning"), which is a number on the page.
+            line = narration_mod.page_line(d.line)
             line = line[:1].upper() + line[1:]
             if line and line not in text:
                 text = text.replace(d.sentence, line, 1)
@@ -204,6 +204,7 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
         if d.category == "early" and d.line and d.line not in text:
             # The engine's own declaration stands where the landed blow was, once, as
             # `cut_premature_blows` puts it (the name becomes "you" later in the groom).
-            text = narration_mod.put_before_the_hand_back(text, d.line)
+            text = narration_mod.put_before_the_hand_back(text,
+                                                          narration_mod.page_line(d.line))
         notes.append(f"beat read back: {d.category}: cut {d.sentence[:60]!r}")
     return text, notes

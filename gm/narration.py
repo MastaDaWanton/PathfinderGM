@@ -197,6 +197,148 @@ def copied_sentences(text: str, index: set[tuple] | None = None) -> list[str]:
     return out
 
 
+# --- numbers never reach the page -----------------------------------------------------------
+#
+# Measured live 2026-10-17 (integration branch, free narrator, gemma-4-12B): the tell was
+# "Kesst Vayr hits the one behind the bar with the dagger for 5 piercing.", the blow pass
+# (`GMAgent._show_blows`) handed that line to the model as the deed to write, and the beat
+# shipped "You drive your dagger into the man behind the bar, piercing his flesh for 5
+# damage." `play.views.plain_tell` takes off a tell's roll arithmetic but keeps a damage
+# amount (the narrator-down fallback shows the player's own damage on purpose); a line
+# written INTO prose must carry neither.
+
+# A tell's roll arithmetic, as `plain_tell` reads it: "(9 against AC 15)", "(4, non-lethal
+# now 4)", and a margin " by 7".
+_PAREN_NUMBERS = re.compile(r"\s*\((?=[^)]*\d)[^()]*(?:\([^()]*\)[^()]*)*\)")
+_MARGIN = re.compile(r"\s+by \d+(?=[.,:;]|\s|$)")
+# The damage amount in the engine's own phrasing: "for 5 piercing", "for 1 non-lethal
+# bludgeoning", "for 6 fire damage". Engine text, fixed format — not the page's English.
+_AMOUNT = re.compile(r"\s+for \d+(?:\s+(?:non-?lethal|points? of))?(?:\s+[a-z][a-z-]*){0,2}?"
+                     r"(?=\s*(?:[.,;:!?]|\(|$))")
+
+
+def page_line(tell: str) -> str:
+    """An engine line made fit to stand in prose: no roll arithmetic and no damage amount.
+    "Kesst Vayr hits the one behind the bar with the dagger for 5 piercing." -> "Kesst Vayr
+    hits the one behind the bar with the dagger." Every backstop that writes the engine's
+    own line onto a narrated beat writes this."""
+    text = _PAREN_NUMBERS.sub("", str(tell or ""))
+    text = _MARGIN.sub("", text)
+    text = _AMOUNT.sub("", text)
+    return " ".join(text.split())
+
+
+def _field(o, key: str, default=None):
+    return o.get(key, default) if isinstance(o, dict) else getattr(o, key, default)
+
+
+def turn_numbers(outcomes) -> dict[str, set[str]]:
+    """{number: the words that follow it in its tell} for every number this turn's
+    outcomes carry as a roll or a damage amount — read from the outcome RECORDS (roll
+    faces, totals, modifiers, the DC, the margin, a damage effect's amount), never from the
+    page. Prices and counts are not here, so a sale's "12 sp" is never touched."""
+    nums: dict[str, set[str]] = {}
+
+    def add(v):
+        if isinstance(v, bool) or v is None:
+            return
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return
+        if n >= 0:
+            nums.setdefault(str(n), set())
+
+    for o in outcomes or ():
+        for r in _field(o, "rolls") or ():
+            if isinstance(r, dict):
+                add(r.get("total"))
+                add(r.get("natural"))
+                for f in r.get("faces") or ():
+                    add(f)
+        dc = _field(o, "dc")
+        add(dc.get("value") if isinstance(dc, dict) else dc)
+        add(_field(o, "margin"))
+        for e in _field(o, "effects") or ():
+            if isinstance(e, dict) and e.get("kind") in ("damage", "heal", "ability_damage"):
+                add(e.get("amount"))
+        # The words after each such number in the tell: its unit ("piercing",
+        # "non-lethal bludgeoning") as the engine wrote it.
+        tell = str(_field(o, "tell") or "")
+        for m in re.finditer(r"\b(\d+)((?:\s+[a-z][a-z-]*){1,2})", tell):
+            if m.group(1) in nums:
+                nums[m.group(1)] |= set(m.group(2).lower().split())
+    return nums
+
+
+# The nouns a page wraps a number in, whatever the tell said: "for 5 damage", "5 points of
+# damage", "6 hit points". A closed list of units, read only around a number the engine
+# rolled; it never decides whether a sentence is about anything.
+_UNITS = frozenset({"damage", "points", "point", "of", "hit", "hp", "health", "wounds"})
+# Only prepositions: the phrase they open can go and the sentence still stands ("piercing
+# his flesh for 5 damage" -> "piercing his flesh"). A number that is a verb's object ("he
+# takes 5 points of damage") cannot be lifted out of its sentence, so that sentence is cut.
+_LEAD = r"(?:,\s*)?\b(?:for|by|of|against|at|with|to)\s+(?:(?:AC|DC)\s+)?"
+
+
+def strip_turn_numbers(text: str, outcomes) -> tuple[str, list[str]]:
+    """The page with every number this turn rolled or dealt taken off, with the words the
+    engine wraps it in; returns (text, the phrases removed). Narration only — a line of
+    speech is the speaker's ("I'll give you 5 for it"). The final guard every door's groom
+    runs: a backstop or a rewrite that forgot `page_line` cannot put "for 5 damage" on the
+    page. Numbers the engine did not roll this turn (a price, "the 3 men") are left."""
+    nums = turn_numbers(outcomes)
+    if not nums or not re.search(r"\d", text or ""):
+        return text, []
+    removed: list[str] = []
+
+    def found(blank: str) -> tuple[list[tuple[int, int]], list[int]]:
+        """(lifted spans, starts of numbers that cannot be lifted)."""
+        spans: list[tuple[int, int]] = []
+        stuck: list[int] = []
+        for n, units in nums.items():
+            words = sorted(units | _UNITS, key=len, reverse=True)
+            unit = r"(?:\s+(?:non-?lethal|" + "|".join(re.escape(w) for w in words) + r"))"
+            # Wrapped as the engine wraps it — a lead word before ("for 5", "against AC
+            # 15") or a unit after ("5 damage") — never a bare digit: "the 3 men" is the
+            # page's own.
+            bare = r"\b" + n + r"\b"
+            for m in re.finditer(f"{_LEAD}{bare}{unit}*", blank):
+                spans.append(m.span())
+            for m in re.finditer(f"{bare}{unit}+", blank):
+                if not any(a <= m.start() < b for a, b in spans):
+                    stuck.append(m.start())
+        return spans, stuck
+
+    _spans, stuck = found(speech.blanked(text))
+    if stuck:
+        # The sentences a number cannot be lifted out of go whole.
+        blank = speech.blanked(text)
+        gone = [text[m.start():m.end()].strip() for m in _SENTENCE.finditer(blank)
+                if any(m.start() <= at < m.end() for at in stuck)]
+        if gone:
+            removed += gone
+            text = _cut_sentences(text, gone)
+    spans, _stuck = found(speech.blanked(text))
+    if not spans:
+        return text, removed
+    merged: list[list[int]] = []
+    for a, b in sorted(spans):
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    out = text
+    lifted = []
+    for a, b in reversed(merged):
+        lifted.append(text[a:b].strip(" ,"))
+        out = out[:a] + out[b:]
+    removed += reversed(lifted)
+    out = re.sub(r"\s+([.,;:!?])", r"\1", out)
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    return out.strip(), removed
+
+
 def without_sentences(text: str, sentences) -> str:
     """`text` with each of `sentences` taken out (first occurrence), spaces tidied."""
     for s in sentences or ():
@@ -2252,7 +2394,11 @@ def _cut_sentences(text: str, flagged: list[str]) -> str:
     if not want:
         return text
     blank = speech.blanked(text)
-    spans = [m.span() for m in _SENTENCE.finditer(blank)
+    # A match carries the whitespace before it, and `_without` takes the whitespace after:
+    # cutting the middle sentence of "A b. C d. E f." gave "A b.E f." (found 2026-10-17
+    # cutting the felled barkeep's sentence). The span starts at the sentence's first word.
+    spans = [(m.start() + len(m.group(0)) - len(m.group(0).lstrip()), m.end())
+             for m in _SENTENCE.finditer(blank)
              if " ".join(m.group(0).split()) in want
              or " ".join(text[m.start():m.end()].split()) in want]
     return _without(text, spans) if spans else text
