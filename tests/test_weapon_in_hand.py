@@ -269,6 +269,27 @@ def test_strike_with_overrules_the_plans_weapon_and_leaves_a_manoeuvre_alone():
     assert [r["params"].get("weapon") for r in out] == ["dagger", "dagger", None]
 
 
+def test_a_blow_declared_again_is_not_refused_as_a_repeat():
+    """Live, 2026-10-16, on the scratch save: "I draw my dagger and stab him" was refused
+    for reach (the draw took her move); the next line, "I draw my rapier and stab him",
+    planned the same `attack c1` with the same reason, the repeat guard refused it twice,
+    and the turn degraded to narration. A blow the reading declares this turn is the player
+    asking again, as a sale asked again already is (`_does_what_was_declared`)."""
+    from gm import judgement
+    from rules.intents import parse_all
+
+    s, pc, thug = _scene()
+    first = parse_all([{"op": "attack", "actor": "pc", "target": thug.ref,
+                        "because": "the player attacks the thug"}])
+    line = "I draw my rapier and stab him"
+    interpret.remember(line, {"question": False, "claims": [], "actions": [
+        {"act": "attack", "object": "my rapier", "target": "him"}]})
+    again = parse_all([{"op": "attack", "actor": "pc", "target": thug.ref,
+                        "because": "the player attacks the thug"}])
+    v = judgement.review(line, again, s, previous=judgement._signature(first))
+    assert not any(f.kind == "repeats-the-last-turn" for f in v.objections), v.objections
+
+
 # --- the whole turn ---------------------------------------------------------------------
 
 class _Reply:

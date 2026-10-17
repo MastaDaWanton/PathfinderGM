@@ -359,7 +359,13 @@ def _does_what_was_declared(intents, player_text: str) -> bool:
 
     frame = interpret.reading_of(player_text) or {}
     acts = {str(a.get("act") or "") for a in frame.get("actions") or [] if isinstance(a, dict)}
-    need = dict(interpret._OP_NEEDS, give={"give", "take"}, buy={"buy"})
+    # A blow too (2026-10-16, live, scratch save): "I draw my dagger and stab him" was
+    # refused for reach, and the next line, "I draw my rapier and stab him", planned the
+    # same `attack c1` — the guard refused it twice and the turn degraded to narration,
+    # the blow the player declared never struck. Here, not in `_OP_NEEDS`, which also
+    # decides which detector ops the reading supports.
+    need = dict(interpret._OP_NEEDS, give={"give", "take"}, buy={"buy"},
+                attack={"attack"})
     loud = [i for i in intents if i.op not in QUIET_OPS]
     return bool(loud) and all(need.get(i.op, set()) & acts for i in loud)
 
