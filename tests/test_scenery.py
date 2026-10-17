@@ -131,17 +131,49 @@ def test_a_shard_the_page_showed_shattering_is_ledgered_and_then_swung(market):
     assert res.outcomes[0].status != "refused" and SHARD in market.pc().goods
 
 
-def test_a_shown_answer_whose_quote_is_not_the_narration_ledgers_nothing(market):
-    """A reader that says "shown" with words that are not on the page — or only in a
-    character's mouth — is leaning on its own guess, and the refusal stands."""
+def test_a_shown_answer_whose_quote_misses_is_kept_as_fitting_not_refused(market):
+    """Biased toward allowing (the coordinator, 2026-10-17): reading about a torch and then
+    hearing "there is no torch here" breaks play harder than the old minting did. A reader
+    that says "shown" with a quote that paraphrases or is not on the page is not refused for
+    the quote: the thing is ledgered as fitting the place, and the row says the quote
+    missed. The refusals are the answers that name WHY a thing is not there."""
     engine = Engine(market, Dice(seed=4))
-    said = "'Mind the pots,' the stallholder snaps. 'You break it, you buy it.'"
-    for quote, passages in (("the pot shatters into shards", [HOLDS]),
-                            ("You break it, you buy it", [said])):
-        rows = scenery.ground(_grab_and_stab(market), engine, passages,
-                              ask_fn=_asker(scenery.SHOWN, quote))
-        assert rows[0].get("dropped") and not rows[0].get("ledgered")
-        assert market.prop_named(SHARD) is None
+    rows = scenery.ground([{"op": "give", "actor": "pc", "params": {"item": "torch",
+                                                                   "to": "pc"}}],
+                          engine, ["Torches gutter in their iron brackets."],
+                          ask_fn=_asker(scenery.SHOWN, "a torch burns on the wall"))
+    assert rows[0]["ledgered"] and "quote is not the narration" in rows[0]["note"]
+    assert market.prop_named("torch")["origin"] == "commonplace"
+
+
+def test_a_refusal_of_a_thing_every_word_of_which_is_on_the_page_is_overruled(market):
+    """Held out, 2026-10-17: "The fishwife hurls a bucket of eel water at your feet" came
+    back "only if something had broken" for "the bucket", 2 runs of 2. A refusal that the
+    thing was never shown or is a piece of something unbroken is overruled when every word
+    of the player's name for it is in the narration — so the shard beside a pot that
+    "rocks but holds" stays refused ("shard", "broken" are not on the page), and a thing
+    the page says was carried off (`ELSEWHERE`) is never overruled."""
+    bucket = "The fishwife hurls a bucket of eel water at your feet."
+    got = scenery.decide("the market", (), [bucket], "the bucket",
+                         ask_fn=_asker(scenery.BROKEN))
+    assert got["ledger"] and "every word" in got["why"]
+    got = scenery.decide("the market", (), [HOLDS], SHARD, ask_fn=_asker(scenery.BROKEN))
+    assert not got["ledger"]
+    gone = "The guard pulls the torch from its bracket and carries it off."
+    got = scenery.decide("the gate", (), [gone], "the torch",
+                         ask_fn=_asker(scenery.ELSEWHERE))
+    assert not got["ledger"]
+    said = "'I'll break this bottle over your skull,' he snarls."
+    got = scenery.decide("the tavern", (), [said], "the bottle",
+                         ask_fn=_asker(scenery.WRONG_PLACE))
+    assert not got["ledger"], "speech is blanked: a bottle only spoken of is not on the page"
+
+
+def test_the_reader_is_told_what_kind_of_place_it_is():
+    asked = _asker(scenery.COMMON)
+    scenery.decide("the tavern", ("a tavern or inn", "inside a building"), ["Loud."],
+                   "a stool", ask_fn=asked)
+    assert asked.asked[0][0] == "the tavern (a tavern or inn; inside a building)"
 
 
 def test_a_commonplace_thing_is_ledgered_and_a_thing_not_here_is_not(market):
