@@ -79,6 +79,10 @@ class BeatContext:
     # (`beat_verified`): {"model", "host", "provider", "api_key"}, the narrator's own
     # route. None — a test, a tool — and that member reads nothing.
     reader: Mapping | None = None
+    # The scene's clock when plan_turn began (agent._was_clock), for the check that the
+    # page passes no time the engine did not (`time_kept`). None — a test, an NPC's turn
+    # built elsewhere — and that member reads nothing.
+    was_clock: int | None = None
 
 
 class CheckContractError(TypeError):

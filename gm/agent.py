@@ -302,6 +302,9 @@ class GMAgent:
         # checks (gm/checks, `BeatContext.was_at`): a refused move is judged against the
         # place the turn started from, whatever the engine did afterwards.
         self._was_at = str(getattr(self.engine.scene, "at", "") or "")
+        # And the clock, for the check that the page passes no time the engine did not
+        # (gm/checks/time_kept.py).
+        self._was_clock = getattr(self.engine.scene, "clock_minutes", None)
         self._location = location
         # Continue is a directive, never an utterance. The ruling (2026-09-18): "my
         # character should keep doing whatever he is doing and the scene should move
@@ -2354,6 +2357,7 @@ class GMAgent:
             was_at=str(getattr(self, "_was_at", None) or getattr(scene, "at", "") or ""),
             acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0),
             intimate=self._intimate_beat(),
+            was_clock=getattr(self, "_was_clock", None),
             # The beat read back (gm/beat_verify.py) goes to the narrator's own model:
             # measured on the bench against the 0.6B structure model, which could not
             # keep its quotes on the page (docs/beat-verify.md).
@@ -3725,10 +3729,11 @@ class GMAgent:
         self.last_added = narration_mod.added_sentences(before, text)
         # And the body's authored lines, which the truth pass's backstop put on inside the
         # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
-        from .checks import body_shown, light_shown, power_unbacked, sleep_kept
+        from .checks import body_shown, light_shown, power_unbacked, sleep_kept, time_kept
 
         self.last_added += [s for s in (*body_shown.authored_in(text),
                                         *sleep_kept.authored_in(text),
+                                        *time_kept.authored_in(text),
                                         *power_unbacked.authored_in(text),
                                         *light_shown.authored_in(text))
                             if s not in self.last_added]
