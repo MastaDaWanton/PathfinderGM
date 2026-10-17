@@ -58,7 +58,7 @@ def _ops(raw):
 def test_paying_for_a_room_and_going_to_bed_takes_leave_before_the_rest():
     s, e, keeper = _inn()
     raw = [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
-    out = judgement.leave_before_leaving(raw, ROOM_READ, s)
+    out = judgement.leave_before_leaving(raw, '', s, ROOM_READ)
     assert _ops(out) == ["leave_talk", "rest"]
     res = e.run(e.validate(out))
     tells = {o.op: (o.status, o.tell) for o in res.outcomes}
@@ -74,7 +74,7 @@ def test_the_goodbye_is_said_then_the_leave_then_the_sleep():
     raw = [{"op": "leave_talk", "params": {"who": keeper.ref, "do": "leave"}},
            {"op": "say", "actor": "pc", "params": {"words": "goodbye", "to": keeper.ref}},
            {"op": "rest", "actor": "pc", "params": {"kind": "night", "until": "until dawn"}}]
-    out = judgement.leave_before_leaving(raw, GOODBYE_READ, s)
+    out = judgement.leave_before_leaving(raw, '', s, GOODBYE_READ)
     assert _ops(out) == ["say", "leave_talk", "rest"]
     res = e.run(e.validate(out))
     assert [(o.op, o.status) for o in res.outcomes
@@ -88,7 +88,7 @@ def test_a_walk_across_the_room_that_was_struck_still_leaves_last():
     s, _e, keeper = _inn()
     raw = [{"op": "say", "actor": "pc", "params": {"words": "goodbye", "to": keeper.ref}}]
     read = {"actions": GOODBYE_READ["actions"][:2]}
-    assert _ops(judgement.leave_before_leaving(raw, read, s)) == ["say", "leave_talk"]
+    assert _ops(judgement.leave_before_leaving(raw, '', s, read)) == ["say", "leave_talk"]
 
 
 def test_a_walk_then_words_to_somebody_has_not_taken_leave():
@@ -96,14 +96,14 @@ def test_a_walk_then_words_to_somebody_has_not_taken_leave():
     read = {"actions": [{"act": "go", "place": "the bar"},
                         {"act": "talk", "target": "the barkeep", "says": "a drink"}]}
     raw = [{"op": "say", "actor": "pc", "params": {"words": "A drink.", "to": keeper.ref}}]
-    assert judgement.leave_before_leaving(raw, read, s) == raw
+    assert judgement.leave_before_leaving(raw, '', s, read) == raw
 
 
 def test_asking_about_the_road_stays_in_the_conversation():
     s, e, keeper = _inn()
     raw = [{"op": "say", "actor": "pc", "params": {"words": "What of the road?",
                                                    "to": keeper.ref}}]
-    out = judgement.leave_before_leaving(raw, ROAD_READ, s)
+    out = judgement.leave_before_leaving(raw, '', s, ROAD_READ)
     assert out == raw
     e.run(e.validate(out))
     assert e.talking_to() == [keeper]
@@ -113,13 +113,13 @@ def test_nobody_talking_and_nothing_said_adds_no_leave():
     """Silence never ends what was never open: no leave, so no refusal on the page."""
     s, _e, _keeper = _inn(talking=False)
     raw = [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
-    assert judgement.leave_before_leaving(raw, ROOM_READ, s) == raw
+    assert judgement.leave_before_leaving(raw, '', s, ROOM_READ) == raw
 
 
 def test_without_a_reading_nothing_is_read_from_the_words():
     s, _e, _keeper = _inn()
     raw = [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
-    assert judgement.leave_before_leaving(raw, None, s) == raw
+    assert judgement.leave_before_leaving(raw, '', s, None) == raw
 
 
 class _Reply:
@@ -160,3 +160,27 @@ def test_the_measured_lines_through_the_planner(monkeypatch):
         res = gm.engine.run(got.intents)
         rest = next(o for o in res.outcomes if o.op == "rest")
         assert rest.status == "resolved", (said, rest.tell)
+
+
+def test_words_the_plan_put_after_the_walk_still_come_before_the_leave():
+    """Live 2026-10-17 on this branch, the goodbye line's plan: `travel` (no place),
+    `say "goodbye"`, `rest`. The leave went before the walk, ahead of the words that opened
+    the talk: "You are not in conversation with anybody", then the rest refused. The sleep
+    outranks a stray walk, and the words go first."""
+    s, e, keeper = _inn(talking=False)
+    raw = [{"op": "travel", "actor": "pc", "params": {}},
+           {"op": "say", "actor": "pc", "params": {"words": "goodbye", "to": keeper.ref}},
+           {"op": "rest", "actor": "pc", "params": {"kind": "night", "until": "until dawn"}}]
+    out = judgement.leave_before_leaving(raw, "", s, GOODBYE_READ)
+    assert _ops(out) == ["travel", "say", "leave_talk", "rest"]
+
+
+def test_paying_comes_before_the_leave_even_after_a_stray_walk():
+    """Live 2026-10-17: the room line's plan was travel (to the inn it stood in), a coin
+    paid, rest; the leave went before the travel and so before the coin."""
+    s, _e, keeper = _inn()
+    raw = [{"op": "travel", "params": {"place": "the inn"}},
+           {"op": "give", "actor": "pc", "target": keeper.ref, "params": {"item": "coin"}},
+           {"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
+    assert _ops(judgement.leave_before_leaving(raw, "", s, ROOM_READ)) == [
+        "travel", "give", "leave_talk", "rest"]

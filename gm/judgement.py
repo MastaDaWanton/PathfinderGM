@@ -946,11 +946,20 @@ def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
 # to them has not taken its leave.
 LEAVING_ACTS = frozenset({"rest", "go", "leave", "journey"})
 TALKING_ACTS = frozenset({"talk", "request", "insult", "buy", "sell", "give", "seek"})
-# The ops a leaving act is carried by; the leave goes immediately before the first of them.
-_LEAVING_OPS = frozenset({"rest", "travel", "journey", "venture", "found", "call_on"})
+# The ops a leaving act is carried by, the surest first: the leave goes immediately before
+# the first `rest` or `journey`, else before the first walk. A plan's walk is not always the
+# player's (live 2026-10-17: a stray `travel` to the inn the party stood in, and a `travel`
+# with no place, both before the words), so a sleep outranks it.
+_LEAVING_OPS = (frozenset({"rest", "journey"}),
+                frozenset({"travel", "venture", "found", "call_on"}))
+# The ops that are still the conversation: words and things changing hands. Any of them the
+# plan put after the leaving op is moved before the leave — the reading has no talking act
+# after the leaving one, so the words put them first.
+_STILL_TALKING_OPS = frozenset({"say", "give", "buy", "sell", "haggle", "provoke"})
 
 
-def leave_before_leaving(raw_intents, frame, scene, *, notes: list | None = None):
+def leave_before_leaving(raw_intents, player_text: str, scene, frame=None, *,
+                         notes: list | None = None):
     """A deed in the player's own line that ends the talk is their leave-taking.
 
     The owner's ruling, 2026-10-17 (docs/conversation.md): going to bed or up to a room,
@@ -975,7 +984,9 @@ def leave_before_leaving(raw_intents, frame, scene, *, notes: list | None = None
     does not read the words."""
     from . import interpret
 
-    if not isinstance(raw_intents, list) or scene is None or not frame \
+    if frame is None:
+        frame = interpret.reading_of(player_text)
+    if not isinstance(raw_intents, list) or scene is None or not isinstance(frame, dict) \
             or frame.get("error") or getattr(scene, "in_encounter", False):
         return raw_intents
     acts = [a.get("act") for a in frame.get("actions") or []
@@ -990,7 +1001,17 @@ def leave_before_leaving(raw_intents, frame, scene, *, notes: list | None = None
     kept = [r for r in raw_intents
             if not (op(r) == "leave_talk"
                     and str((r.get("params") or {}).get("do") or "leave").lower() == "leave")]
-    at = next((k for k, r in enumerate(kept) if op(r) in _LEAVING_OPS), len(kept))
+    at = len(kept)
+    for ops in _LEAVING_OPS:
+        k = next((k for k, r in enumerate(kept) if op(r) in ops), None)
+        if k is not None:
+            at = k
+            break
+    # Live 2026-10-17 on this branch: travel, say "goodbye", rest — the leave before the
+    # walk came before the goodbye that opened the talk. The words go first.
+    later = [r for r in kept[at:] if op(r) in _STILL_TALKING_OPS]
+    kept = kept[:at] + later + [r for r in kept[at:] if not any(r is x for x in later)]
+    at += len(later)
     from rules import states as states_mod
 
     talking = any(not a.is_pc and a.has_state(states_mod.TALKING)
