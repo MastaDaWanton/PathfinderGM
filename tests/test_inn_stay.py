@@ -72,6 +72,16 @@ def test_a_room_paid_for_today_is_not_paid_for_twice():
     assert goods.in_copper(pc.purse) == left - 50
 
 
+def test_a_room_held_in_one_town_is_not_held_in_the_next():
+    """The first cut tagged the hold with the `found` door's slug, the id's last segment,
+    and the live check's founded tavern came out `holds.room.the-tavern` — the same tag
+    as every founded tavern in every town. The whole id now."""
+    s, pc, _keeper, _engine = _inn("the-market/the-tavern")
+    lodging.hold(pc, s.at, "the tavern", 10)
+    assert lodging.held(pc, s.at)
+    assert not lodging.held(pc, "ad9201319866~urban:the-market/the-tavern")
+
+
 def test_an_empty_purse_is_refused_in_plain_words_and_nobody_sleeps():
     s, pc, _keeper, engine = _inn(purse={"cp": 3})
     hp, clock = pc.hp, s.clock_minutes

@@ -65,8 +65,11 @@ def price_cp(scene, at: str = "") -> int:
 
 
 def slug(at: str) -> str:
-    """The place id as one tag segment: the `found` door's slug, dots made safe."""
-    return str(at or "").rsplit("/", 1)[-1].replace(".", "-")
+    """The whole place id as one tag segment, dots made safe. Not the `found` door's
+    last-segment slug: two towns' founded taverns are both "…/the-tavern", and a room
+    paid for in one was held in the other (seen live 2026-10-16: the tag came out
+    `holds.room.the-tavern`)."""
+    return str(at or "").replace(".", "-")
 
 
 def tag(at: str) -> str:
