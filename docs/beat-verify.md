@@ -753,7 +753,54 @@ Commit turn, Roll):
   pain", which the condition read caught and repaired to "reeling". The creature's miss (8
   against AC 15) was told as the sap that "fails to connect".
 
-**Left:** the creature turn's weapon is not read (the struck-with question asks about the
-player's blows only), and the crossbow invented in round 2 was carried into round 3's beat.
+**Left:** (closed the same day, below) the creature turn's weapon was not read, and the
+crossbow invented in round 2 was carried into round 3's beat.
 A blow told only by the victim's reaction on a joined turn is not claimed. The joined turn
 was not replayed live (the fight was already on); it is proved offline on the evidence beat.
+
+## What a creature's blows were struck with (2026-10-17)
+
+Round 2 above: the barkeep's tell was "attack with the sap misses Kesst Vayr (7 against AC
+15)", and the beat wrote "The tavern keeper swings the heavy crossbow … the heavy bolt
+whistles past your ear". His stat block prints a heavy crossbow; the engine swung the sap.
+
+- **The door.** A creature's turn reaches the page through the `outcome` door with
+  `ctx.acting` (the wind-up from the `npc` door is dropped when the turn is told by its
+  blows, play/views.py). `Facts.foe_blows` are the weapons of that creature's own resolved
+  attacks (`Outcome.actor`, else a roll not shown to the player), `Facts.foe_arms` what it
+  carries and what its stat block prints (`arms_of`), unarmed, and what it swung.
+- **The question.** A call of its own (`foe_swing_messages`), the player's question's
+  sibling: "each blow of ONE named attacker". Not the player's question widened: its whole
+  point is "YOUR blows", and its demonstrations teach passing over the drover's cudgel.
+- **The judgement.** `_foe_weapon_wrong`: a weapon that is not one the engine swung, "not
+  shown" never judged, "something else" judged — except when every blow was a natural attack
+  (`foe_natural`): a tentacle has no name the page must use.
+- **The repair is the cut** (`beat_verified.CUT_ONLY`): a one-sentence rewrite is checked by
+  reading the rewritten sentence back alone, and alone a creature's blow ("the heavy bolt
+  whistles past your ear") is nobody's — the hole measured on the joined turn above, where
+  "recoils from your strike" re-read alone was "someone not listed". The early blow joins the
+  set. The sentence goes and the engine's line, numbers off, stands in its place.
+- **Measured**, gemma-4-12B x2, on 74 creature-turn texts (37 shipped beats from the scratch
+  saves, linked to their npc-turn rows by the outcome door's read; 37 consequence drafts in
+  tests/replay, each judged against every creature turn of its record, so other creatures'
+  blows are in the set): 10 beats alarmed, the same 10 both runs, all kept by the second
+  read. 9 true: the crossbow twice, a club told as a blade, as "his heavy arm" and as "his
+  heavy fist", an unarmed commoner swinging a stool (twice), a fist on a sap turn, a club told
+  as a shove. 1 false, a tentacle told as a vine (now spared by `foe_natural`). 64 clean.
+  Missed: "The blade strikes your temple" on a sap turn, read as "not shown".
+- **Replayed** on the live round-2 beat through the outcome door's truth pass (x2, no model
+  call for the repair): "The tavern keeper swings the heavy crossbow …" became "The one
+  behind the bar's attack with the sap misses Kesst Vayr." (the name is made "you" later in
+  the groom). Still standing after it: "as they struggle to reload the weapon" — not a blow.
+- **Live**, round 4 on the same save: the tell "the one behind the bar hits Kesst Vayr with
+  the sap for 4 non-lethal bludgeoning"; read as `sap` ("swinging the sap with a frantic
+  grunt"), no alarm; shipped "swinging the sap … The heavy leather wrap connects with your
+  shoulder".
+
+**Separate handling.** The player's turn beat is not asked this question: no creature blow
+is rolled on it, so any creature blow it shows is undeclared, not mis-armed — the plan
+door's `_undeclared_blows` owns that. Live round 4's player beat had the barkeep lunge with
+the sap before his turn and a patron "reaching for a heavy chair"; the patron, a newcomer
+here, raised no phantom-fighter finding (reaching is not fighting), and the early creature
+swing shipped.
+That is the next gap: the turn door has no read-back question for a creature's blow.
