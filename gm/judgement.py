@@ -775,6 +775,52 @@ def _meant_by_the_reading(scene, frame) -> str:
     return next(iter(found)) if len(found) == 1 else ""
 
 
+def introduced_is_here(raw_intents, scene, frame=None, *, notes: list | None = None):
+    """An `introduce` of somebody already standing here is that person, not a second one.
+
+    Measured live 2026-10-17 (hv-data, the inn off Khalmorin's market, gemma-4-12B): "I say
+    goodbye to the barkeep, go back up to my room and sleep until dawn", with c8 "the one
+    behind the bar" — the inn's keeper — standing there. The plan wrote `introduce
+    who="barkeep" how=arrives` and `say to=new1`; the engine made c9 "barkeep", the
+    goodbye went to him, and the inn had two barkeeps.
+
+    Code decides with the engine's own finder and the record, never the prose: the
+    introduce's `who` and the reading's target words must BOTH find the same one person
+    here (`acts_to_ops.person`, i.e. `scope.in_the_room`, which reads a keeper's trade off
+    their record, `keepers.trade_words`). Then the introduce goes and its placeholder is
+    that person's ref everywhere in the plan. One introduce of one person only; a crowd
+    ("two more drinkers") is never folded into one man. A reading that names nobody here
+    binds nothing: the plan's newcomer stands."""
+    from rules.intents import INTRODUCED_REFS
+
+    from . import acts_to_ops
+
+    if scene is None or not isinstance(raw_intents, list):
+        return raw_intents
+    at = next((k for k, r in enumerate(raw_intents) if isinstance(r, dict)
+               and str(r.get("op", "")).lower() == "introduce"), None)
+    if at is None:
+        return raw_intents
+    params = raw_intents[at].get("params") or {}
+    try:
+        count = int(params.get("count", 1) or 1)
+    except (TypeError, ValueError):
+        return raw_intents
+    who = str(params.get("who") or "").strip()
+    if count != 1 or not who:
+        return raw_intents
+    ref = acts_to_ops.person(scene, who)
+    if not ref or ref != _meant_by_the_reading(scene, frame):
+        return raw_intents
+    swap = {INTRODUCED_REFS[0]: ref}
+    out = [_swap_refs(dict(r), swap) if isinstance(r, dict) else r
+           for k, r in enumerate(raw_intents) if k != at]
+    if notes is not None:
+        notes.append(f"introduce {who!r} dropped: {ref} is here already, and the player's "
+                     f"words name them")
+    return out
+
+
 def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
                         hold_players: bool = False, notes: list | None = None):
     """No placeholder reaches validation without somebody behind it.
@@ -817,6 +863,7 @@ def settle_placeholders(raw_intents, player_text: str, scene, frame=None, *,
     """
     if scene is None or not isinstance(raw_intents, list):
         return raw_intents
+    raw_intents = introduced_is_here(raw_intents, scene, frame, notes=notes)
     known = set(getattr(scene, "actors", {}) or {})
     declared, runs_at = _declared_placeholders(raw_intents)
     if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn"

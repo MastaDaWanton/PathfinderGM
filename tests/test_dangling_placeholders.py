@@ -316,3 +316,64 @@ def test_the_recorded_ask_for_a_room_stands(monkeypatch):
     assert len(asked) == 1, plan.rejections
     assert not any("degraded" in r for r in plan.repairs), plan.repairs
     assert "rest" in [i.op for i in plan.intents], shown
+
+
+# --- an introduce of somebody already here (2026-10-17) ------------------------------------
+
+def _inn():
+    """c1 is the inn's keeper, shown as "the one behind the bar" (owner ruling F1): their
+    record says what they keep — `keeper:<place>` — and the place says it is a tavern."""
+    s = _scene("the one behind the bar")
+    s.actors["c1"].world_entity_id = "keeper:b36e9f16214d~urban:the-tavern"
+    return s
+
+
+GOODBYE = "I say goodbye to the barkeep, go back up to my room and sleep until dawn."
+# The reading the live turn logged (turn_log, 2026-10-17, dn-live).
+GOODBYE_READ = {"actions": [
+    {"act": "talk", "target": "the barkeep", "says": "goodbye",
+     "span": "say goodbye to the barkeep"},
+    {"act": "go", "place": "my room", "span": "go back up to my room"},
+    {"act": "rest", "time": "until dawn", "span": "sleep until dawn"}]}
+
+
+def test_the_barkeep_is_the_one_behind_the_bar():
+    """Live 2026-10-17: the plan's `introduce who="barkeep" how=arrives` made c9 "barkeep"
+    beside c8 "the one behind the bar", the inn's keeper, and the goodbye went to c9. The
+    finder knew names only; the keeper's trade is on their record."""
+    from gm import acts_to_ops
+    from rules import keepers
+
+    s = _inn()
+    assert keepers.trade_words(s.actors["c1"]) == (
+        "the one behind the bar", "barkeep", "innkeeper", "bartender")
+    assert acts_to_ops.person(s, "the barkeep") == "c1"
+    raw = [{"op": "introduce", "params": {"who": "barkeep", "how": "arrives"}},
+           {"op": "say", "actor": "pc", "target": "new1",
+            "params": {"words": "Goodbye", "to": "new1"}},
+           {"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
+    notes: list[str] = []
+    out = judgement.settle_placeholders(raw, GOODBYE, s, GOODBYE_READ, notes=notes)
+    assert [r["op"] for r in out] == ["say", "rest"]
+    assert out[0]["params"]["to"] == "c1" and out[0]["target"] == "c1"
+    assert "introduce 'barkeep' dropped" in notes[0]
+
+
+def test_a_newcomer_the_words_do_not_put_here_still_comes_in():
+    """The reading names nobody here ("a guide"): the plan's introduce stands."""
+    s = _inn()
+    raw = [{"op": "introduce", "params": {"who": "a guide"}},
+           {"op": "say", "actor": "pc", "params": {"words": "Hello", "to": "new1"}}]
+    read = {"actions": [{"act": "seek", "target": "a guide"}]}
+    assert judgement.settle_placeholders(raw, "I look for a guide.", s, read) == raw
+
+
+def test_an_introduce_the_reading_does_not_back_is_left_alone():
+    """The introduce's `who` finds the keeper but the words name somebody else, or it
+    brings in two: neither is folded into the one man here."""
+    s = _inn()
+    raw = [{"op": "introduce", "params": {"who": "barkeep"}}]
+    read = {"actions": [{"act": "talk", "target": "the drover by the fire"}]}
+    assert judgement.introduced_is_here(raw, s, read) == raw
+    two = [{"op": "introduce", "params": {"who": "barkeep", "count": 2}}]
+    assert judgement.introduced_is_here(two, s, GOODBYE_READ) == two
