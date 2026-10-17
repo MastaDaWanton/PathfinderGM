@@ -2417,6 +2417,9 @@ class Outcome:
     # number: the planned narrator's fights are written from these (gm/planned.py
     # `blow_facts`) so the colour has a fact under it. Empty on everything but an attack.
     blows: list[dict] = field(default_factory=list)
+    # The ref of whoever made the attempt (`Intent.actor`), stamped where every op leaves
+    # the engine (`_resolve_one`). Emitted only when set, as `mode` is.
+    actor: str = ""
 
     def as_dict(self) -> dict:
         d = {
@@ -2444,6 +2447,8 @@ class Outcome:
             d["mode"] = self.mode
         if self.blows:
             d["blows"] = [dict(b) for b in self.blows]
+        if self.actor:
+            d["actor"] = self.actor
         return d
 
     def player_visible(self) -> dict:
@@ -4672,7 +4677,14 @@ class Engine:
         m = current_moment()
         before = set(m.guttered) if m is not None else None
         try:
-            return self._articled(handler(intent, partial))
+            out = self._articled(handler(intent, partial))
+            # Who made the attempt, on the record: the beat read back (gm/beat_verify.py
+            # `attempts_of`) names each check and save to its reader by whose it was, and
+            # an outcome said nothing of its actor — the tell's leading name was the only
+            # trace, and reading it would be reading English (2026-10-16).
+            if isinstance(out, Outcome) and not out.actor and intent.actor:
+                out.actor = str(intent.actor)
+            return out
         finally:
             if m is not None:
                 m.guttered.clear()
@@ -23317,6 +23329,7 @@ def _rehydrate(d: dict) -> Outcome:
         effects=d.get("effects", []), tell=d.get("tell", ""), because=d.get("because", ""),
         code=str(d.get("code", "") or ""), for_a_person=str(d.get("for_a_person", "") or ""),
         fix=d.get("fix"), mode=str(d.get("mode", "") or ""),
+        actor=str(d.get("actor", "") or ""),
     )
 
 
