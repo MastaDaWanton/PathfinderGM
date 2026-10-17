@@ -480,8 +480,8 @@ read median was 4.7 s and the max 23.2 s across the three calls.
 
 The scenery beats (a crow's feather, the smith's hammer on the anvil, a nail tossed on the
 scrap heap) raised nothing in either run: the second read refuted the hammer and the nail
-both times. One miss in an earlier run: "drops it in the dust at your feet" was refuted
-once of three.
+both times. One miss across five runs: the second read refuted "drops it in the dust at your feet"
+once.
 
 **On recorded beats.** The committed recordings (tests/replay, 169 GM beats, each against
 the scene after its own turn; their outcomes predate the stamp, so `actor` was filled from
