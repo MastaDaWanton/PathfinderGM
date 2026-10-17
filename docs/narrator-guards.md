@@ -936,6 +936,62 @@ one refused rewrite was the end of it.
 | sale settled, door opened (`contradicts-the-engine`) | polish | no: `keep_the_goods`, `hold_the_door` downstream |
 | `swing-not-yet-struck`, `wrong-hands`, `grants-a-nature`, `fire-from-nowhere`, `invented-name`, `wrong-body`, `death-left-off-the-page`, `no-hand-back`, `third-person-pc` | polish | no: each has its backstop further down `_groom` |
 | `too-short`, `too-long-for-a-fight`, `formulaic-opening`, `recurring-phrase`, `echoes-the-examples`, `repeats-an-earlier-beat`, `drops-the-thread`, `nobody-reacts`, `ignores-the-dead`, `narrator-in-first-person`, `asks-the-player-to-narrate` | polish | yes: how the prose reads, not whether the turn was true |
-| `misgendered-pc`, `invented-companion` | polish | yes, still: true faults with no cut that would not take dialogue or a whole line; left |
+| `misgendered-pc` | polish | no (2026-10-17, below): the pronoun asked whose it is, then swapped in place |
+| `invented-companion` | polish | no (2026-10-17, below): narration only, second read, then cut |
 | `face-changed`, `greets-known-as-stranger`, `hook-secret-on-page`, `giver-asks-own-answer`, `pull-took-the-beat`, `route-not-walked` | truth pass, `no backstop; left as written` | yes: a description, a manner, a secret or an omission, not an engine outcome |
-| "an undeclared blow … could not be removed", "undeclared arrivals in a fight … could not be removed" | the plan's draft (`_undeclared_blows`, `_undeclared_arrivals`) | the arrival's fighting half is now cut by `phantom_fighter` downstream; the blow's is judged by the read back's harm and condition questions |
+| "an undeclared blow … could not be removed", "undeclared arrivals in a fight … could not be removed" | the plan's draft (`_undeclared_blows`, `_undeclared_arrivals`) | the arrival's fighting half is now cut by `phantom_fighter` downstream; a creature's blow at the player on the player's beat by the read back's `beat-struck-at-early` (docs/beat-verify.md, 2026-10-17) |
+
+## The player's pronoun swapped, a narrated companion cut (2026-10-17)
+
+The two rows the table above left shipping.
+
+**`misgendered-pc`.** Before building the swap, the finder was run over every shipped gm
+beat in the scratch saves (each save's own PC name, pronouns and cast): 12 beats flagged,
+and none was a misgendering.
+- 11 were the ±90-character window cutting a word at its edge: the window string was
+  tokenised, so "the competing cries" read as "he competing", "The ground here" as "The
+  ground he" — on a she/her character's opening line, in eight different saves.
+- 1 was an intimate scene: five she/her, every one the partner's, around her "I want more,
+  Sam" and "Sam…".
+
+Fixed in the finder (`narration.misgendered_tokens`): tokens are the page's own words that
+fall inside the window, and a narration pronoun is not held to a name only said aloud (the
+narration calls the player "you"; "'Sit down, Kesst Vayr,' she says" is the speaker's she).
+After it, 0 of the 12 flag; the report ("It's him! Thessaly Corr!") still does.
+
+The repair (`GMAgent._swap_pronouns`, in `polish` when no rewrite holds and after a rewrite
+that held): each token is asked whose it is, and on the player's swapped in place from a
+fixed table (`narration.PRONOUN_SWAP`: he→she, him→her, himself→herself, and back; they
+forms for a they/them sheet). "his"/"her" are ambiguous — "her" is "his" before a thing it
+owns and "him" otherwise, which counterfactual data augmentation settles with
+part-of-speech tags (Lu et al. 2018, arXiv 1807.11714; Maudslay et al. 2019, arXiv
+1909.00871) — so they ask one more question. Probed, gemma-4-12B x2:
+- whose, asked of the marked wrong word ("does «his» mean Thessaly Corr?"): 8/22 on eleven
+  labelled sentences — the reader matched the word's gender to the name, the mistake being
+  repaired. The word hidden, yes/no: 8/22; name-or-somebody-else: 14/22; hidden and the
+  person copied: 12/22. The word in its they-form, the person copied and compared with the
+  name in code: 20/22 (the misses: "watches the boy run off, and «they» does not look
+  back", which reads either way). The intimate partner's vocative ("'Sam…' «they» cries
+  out") was copied as "Sam" by every wording — why the narration/speech rule above exists;
+- what follows "his"/"her": "followed by a thing it owns, or stands on its own?" 6/12;
+  "what comes right after it — a thing it owns ('his sword', 'his face'), or not?" 12/12;
+- end to end on eight made cases x2: every swap right ("It's her!", "I'd know her face",
+  "the scroll is hers", "I saw him", "left his cloak", "Grab them"), the boy refuted.
+
+Left: a they/them character's "he"/"she" (the verb would need changing: "they walks"); an
+unanswered read leaves the word and logs it; with the read off nothing is swapped.
+
+**`invented-companion`.** The finder read the whole beat; it now reads the narration only
+("Where are your friends now?" is the barkeep's to say), and each flagged sentence carries
+one closed question, cut on a yes when no rewrite holds (`_CUT_WHEN_UNREPAIRED`). On the
+bench outputs of the 2026-10 runs the finder had flagged four beats, all false: "the bucket
+being hoisted by the others", "the wound in your side", "the rope tucked securely against
+your side", "the others in the room begin to move". Asked "Does this sentence show somebody
+fighting beside you or on your side now?", gemma-4-12B refuted 18 of 18 asks on nine false
+sentences and kept 8 of 8 on four true ones (the tavern report's "your companion's next
+swing", three made allies). A wording naming the exclusions scored the same.
+
+Left: the finder still fires only when the player is the last one standing (`_alone`). In a
+fight with a foe upright it says nothing; widening it was not done, because "your side" is
+fight prose's commonest wound and every false hit costs a whole-beat rewrite before the
+second read can refute it.
