@@ -662,7 +662,8 @@ def settle(engine) -> list:
         if rec.get("coin_cp") and not rec.get("coin_back") and robber is not None:
             if goods.in_copper(robber.purse) <= int(rec.get("robber_cp_before", 0)):
                 rec["coin_back"] = True
-                money = rec.get("coin_said") or goods.purse_line(rec.get("coin") or {})
+                money = rec.get("coin_said") or goods.purse_line(
+                    rec.get("coin") or {}, engine._coins_here())
                 said.append(f"{rec.get('robber_name', 'the robber')} no longer has your "
                             f"{money}.")
                 if "coin" in index:

@@ -350,8 +350,10 @@ def test_a_night_in_town_charges_the_stabling_and_the_feed():
     out = _run(e, [{"op": "rest", "actor": "pc", "because": "t",
                     "params": {"kind": "night"}}])[-1]
     assert goods.in_copper(pc.purse) == 100 - 50 - 5, pc.purse
-    assert "5 silver pieces for the stabling." in out.tell, out.tell
-    assert "5 copper pieces for the feed." in out.tell, out.tell
+    # In the town's coin, as the sheet says the purse (`goods.coins_here`, 2026-10-17).
+    coins = goods.coins_here(WORLD, s)
+    assert f"5 {coins[1].plural} for the stabling." in out.tell, out.tell
+    assert f"5 {coins[0].plural} for the feed." in out.tell, out.tell
     kinds = [x.get("what") for x in out.effects if x.get("kind") == "upkeep"]
     assert kinds == ["stabling", "feed"]
 
@@ -373,7 +375,8 @@ def test_the_road_charges_a_day_s_feed_for_each_day_on_it():
     _a_mount(s, "donkey")
     pc.purse = {"sp": 5}
     note, fx = e._keep_the_mounts(3)
-    assert note == "1 silver piece, 5 copper pieces for the feed.", note
+    coins = goods.coins_here(e.world, s)
+    assert note == f"1 {coins[1].name}, 5 {coins[0].plural} for the feed.", note
     assert goods.in_copper(pc.purse) == 50 - 15
 
 

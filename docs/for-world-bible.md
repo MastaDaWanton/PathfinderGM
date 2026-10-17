@@ -217,6 +217,7 @@ worse than none — somebody builds a thing that shipped a month ago.** Last rea
 | 7 | `play.names[]` | **built, and empty.** See below |
 | 8 | **Where the water is** | **new, and now the sharpest.** See below |
 | 9 | A vocabulary for versatile and lucky | **this side's**, listed so it is not lost |
+| 13 | Each nation's coin | **new, 2026-10-17.** Names only, no numbers. See below |
 
 ## 7. `play.names[]` — naming material (built; needs back-filling)
 
@@ -874,6 +875,52 @@ An export carries `miles` on at least one route, Pathfinder GM reports that jour
 `exact`, and the tell names the distance instead of only the days.
 
 ---
+
+## 13. Each nation's coin — names, never numbers
+
+**Why.** Neither shipped world names a currency, so this app coins one. Measured
+2026-10-17 on a Pangrella save at Khalmorin's inn: the sheet read "12 Winged silver
+pieces" and the room's tell read "5 Saltmakers' silver pieces" — the sheet coined its name
+from the town's facts, the room charge from the world's first faction. That half is fixed
+on this side (`goods.coins_here`, one answer for every purse line and tell). What it
+exposed is the half only the export can fix: the coined names are guesses at a word
+somebody in the world would use. In Pangrella **all 12 cities** were named after the first
+word of a fact — "Winged", "Clan", "Clans", "Four", "Patrilineal" — and a live transcript
+recorded "180 Clans gold pieces". Since 2026-10-17 the coin is named after the town's
+nation instead (Kaldrimia, Ashgate, Saltholm), which is what the traditions do — Golarion's
+coins are named per nation (Absalom's silver "weight", Cheliax's own) and most nations
+accept each other's at face value under a common standard; the Forgotten Realms name them
+per minting state (Cormyr's "lion", Waterdeep's "dragon") and take pure, standard-weight
+coin anywhere
+(https://pathfinderwiki.com/wiki/List_of_currencies,
+https://forgottenrealms.fandom.com/wiki/Currency). A nation's name in front of "silver
+piece" is honest but plain; the world can do better.
+
+**Shape.** One entry per nation that strikes coin, keyed by the nation's entity id. Names
+only: the ratios stay the Core Rulebook's (10 copper to a silver, 10 silver to a gold, 10
+gold to a platinum), because every shipped price is written in them. A denomination the
+nation does not strike is simply left out, and the book's name is used for it.
+
+```json
+"coinage": [
+  {"nation_id": "…", "copper": "thumb", "silver": "falcon", "gold": "lion",
+   "platinum": "tricrown", "about": "Struck in the capital; the lion is on the gold."}
+]
+```
+
+**What Pathfinder GM does without it.** Names the purse after the nation the party stands
+in, and falls back to the old coined word, then the book's names, where there is none.
+
+**What it does not answer, and is this side's call.** A purse here is a count of copper,
+silver, gold and platinum (`Actor.purse`); it does not record who struck the coins, so a
+purse walked from Kaldrimia into Kyraxys is renamed at the border. Both traditions say
+coins keep their mint's name in another country. Recording it would make the purse
+`{nation_id: {denomination: count}}`, with spending and change-making across mints — a
+cost paid for a difference no price in the game depends on (the common standard means a
+Kaldrimian silver buys what a Kyraxian one does). Left as the owner's decision; the export
+above is needed either way.
+
+**Done when** both shipped worlds carry `coinage[]` for every nation that has a town.
 
 # Known gaps — not asks yet, but on the list
 

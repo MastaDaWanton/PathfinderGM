@@ -213,7 +213,8 @@ def test_paying_in_coin_is_a_give_of_the_denomination_to_the_person_paid(ring):
     engine = Engine(ring, Dice(seed=1))
     res = engine.run(engine.validate(raw))
     assert pc.purse["gp"] == 221 and woman.purse.get("gp") == 10
-    assert "hands the woman 10 × gp" in res.outcomes[0].tell
+    # Said as coin since 2026-10-17: "10 × gp" named the denomination's id, no coin at all.
+    assert "hands the woman 10 gold pieces" in res.outcomes[0].tell
     # Said in words, with "her" the one other person here: the reading's give of an
     # amount (`acts_to_ops.coin_amount`) since 2026-10-03, where `_PAYS` read the sentence.
     from gm import acts_to_ops

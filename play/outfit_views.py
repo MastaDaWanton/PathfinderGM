@@ -28,6 +28,11 @@ from rules.tables import ARMOUR, SHIELDS
 from . import roster
 from .apiutil import read_body
 
+# Outfitting happens before the sandbox: the character stands in no world and no town,
+# so the purse is counted in the book's own names. Asked through the same one door as
+# every other purse line (`goods.coins_here`) so there is still only one answer.
+_OUTSIDE_ANY_WORLD = goods.coins_here(None, None)
+
 
 def catalogue() -> dict:
     """Everything for sale, with the number beside it."""
@@ -151,7 +156,7 @@ def apply(entry, buys: list[dict]) -> tuple[dict, list[str]]:
                             count * int(item.get("per", 1) or 1))
     entry.sheet = to_dict(actor)
     roster.save(entry)
-    return {"purse": goods.purse_line(actor.purse, goods.coinage()),
+    return {"purse": goods.purse_line(actor.purse, _OUTSIDE_ANY_WORLD),
             "purse_gp": round(goods.in_copper(actor.purse) / 100, 2),
             "weapons": list(actor.weapons), "armour": actor.armour, "shield": actor.shield,
             "stock": [f"{s.count}x {s.base}" for s in actor.stock.values()]}, []
@@ -212,7 +217,7 @@ def outfit_state(request, character_id: str):
     actor = from_dict(entry.sheet, ref="pc")
     return JsonResponse({
         "name": actor.name, "class": actor.class_data.get("name", actor.char_class),
-        "purse": goods.purse_line(actor.purse, goods.coinage()),
+        "purse": goods.purse_line(actor.purse, _OUTSIDE_ANY_WORLD),
         "purse_gp": round(goods.in_copper(actor.purse) / 100, 2),
         "weapons": list(actor.weapons), "armour": actor.armour, "shield": actor.shield,
         "stock": [f"{s.count}x {s.base}" for s in actor.stock.values()],
