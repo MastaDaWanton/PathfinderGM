@@ -47,7 +47,8 @@ ORDER = 9
 KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
                    "beat-omits-outcome", "beat-condition", "beat-attempt", "beat-setting",
-                   "beat-struck-with", "beat-swing-early", "beat-foe-struck-with"})
+                   "beat-struck-with", "beat-swing-early", "beat-foe-struck-with",
+                   "beat-struck-at-early"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -82,7 +83,11 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          "early": ("beat-swing-early", 3),
          # A creature's blow written with a weapon the engine did not swing: the barkeep's
          # heavy crossbow on a sap turn (live, 2026-10-17), carried into the next beat.
-         "foe_weapon": ("beat-foe-struck-with", 3)}
+         "foe_weapon": ("beat-foe-struck-with", 3),
+         # A creature swinging at the player on the player's own beat, before its turn:
+         # the barkeep's sap on the dagger beat of round 4 (live, 2026-10-17), swung again
+         # on his own turn after it. A blow no die threw, as heavy as the early one.
+         "at_you": ("beat-struck-at-early", 3)}
 
 # The kinds repaired by the backstop alone, never a one-sentence rewrite. A rewrite is
 # checked by reading the rewritten sentence back ALONE (`beat_verify.read_beat` reads only
@@ -92,7 +97,11 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
 # ear") has the same hole, so the sentence goes and the engine's own line takes its place
 # (`GMAgent._repair_sentences` reads this set). The early blow is the case that was measured,
 # and joins it: the joined tell stands in for a cut wind-up that landed.
-CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early"})
+#
+# A creature's swing on the player's beat joins it for the same reason: "He lunges forward,
+# swinging the heavy sap" rewritten and re-read alone is nobody's swing, and there is no
+# engine line to stand in its place — nothing happened — so the sentence simply goes.
+CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early", "beat-struck-at-early"})
 
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair
 # asks `find` again after each rewrite and once more before the backstops; a sentence it
