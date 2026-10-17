@@ -47,7 +47,7 @@ ORDER = 9
 KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
                    "beat-omits-outcome", "beat-condition", "beat-attempt", "beat-setting",
-                   "beat-struck-with"})
+                   "beat-struck-with", "beat-swing-early", "beat-foe-struck-with"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -75,7 +75,24 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          # A blow written with a weapon the engine did not swing: the shard that "bites
          # deep" on an unarmed strike (live, 2026-10-16). As wrong as a wound the dice
          # never gave.
-         "weapon": ("beat-struck-with", 3)}
+         "weapon": ("beat-struck-with", 3),
+         # A blow of the player's landed on the turn the fight was only joined: "recoils
+         # from your strike" before any die was rolled (live, 2026-10-17). The outcome has
+         # not happened yet — `swing-not-yet-struck`'s weight, read by a model, not a list.
+         "early": ("beat-swing-early", 3),
+         # A creature's blow written with a weapon the engine did not swing: the barkeep's
+         # heavy crossbow on a sap turn (live, 2026-10-17), carried into the next beat.
+         "foe_weapon": ("beat-foe-struck-with", 3)}
+
+# The kinds repaired by the backstop alone, never a one-sentence rewrite. A rewrite is
+# checked by reading the rewritten sentence back ALONE (`beat_verify.read_beat` reads only
+# the sentences a beat did not have), and alone it loses whose blow it is: measured live
+# 2026-10-17, "He bellows … and recoils from your strike" re-read alone named "someone not
+# listed" and passed. A creature's blow re-read alone ("the heavy bolt whistles past your
+# ear") has the same hole, so the sentence goes and the engine's own line takes its place
+# (`GMAgent._repair_sentences` reads this set). The early blow is the case that was measured,
+# and joins it: the joined tell stands in for a cut wind-up that landed.
+CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early"})
 
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair
 # asks `find` again after each rewrite and once more before the backstops; a sentence it
@@ -168,8 +185,25 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
             continue
         if d.category == "move" or d.sentence not in text:
             continue
+        if d.category == "foe_weapon" and d.line:
+            # The engine's own line in the cut sentence's place, its numbers off (the
+            # creature's roll is hidden): "the one behind the bar's attack with the sap
+            # misses Kesst Vayr." The name becomes "you" later in the groom.
+            from play.views import plain_tell
+
+            line = plain_tell(d.line)
+            line = line[:1].upper() + line[1:]
+            if line and line not in text:
+                text = text.replace(d.sentence, line, 1)
+                notes.append(f"beat read back: foe_weapon: {d.sentence[:60]!r} -> the "
+                             f"engine's line")
+                continue
         text = cut(text, [d.sentence])
         if d.category == "trade" and d.line and d.line not in text:
             text = f"{d.line} {text}".strip()
+        if d.category == "early" and d.line and d.line not in text:
+            # The engine's own declaration stands where the landed blow was, once, as
+            # `cut_premature_blows` puts it (the name becomes "you" later in the groom).
+            text = narration_mod.put_before_the_hand_back(text, d.line)
         notes.append(f"beat read back: {d.category}: cut {d.sentence[:60]!r}")
     return text, notes

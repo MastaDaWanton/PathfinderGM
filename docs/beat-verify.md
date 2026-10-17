@@ -690,3 +690,117 @@ page wrote "The shard bites deep into the soft tissue of his shoulder."
   shown a torch. The reader answered "fits a place like this". It was ledgered
   `commonplace` and the tell was "Kesst Vayr takes the torch." The narrated-and-shown path
   was proved live with the kettle the day before.
+
+## A blow before the dice, and a fighter nobody holds (2026-10-17)
+
+Live on the integration branch (free narrator, gemma-4-12B, the inn fight), two beats the
+read back passed.
+
+**A blow landed on the turn the fight was only joined.** "Draw my dagger and stab the one
+behind the bar" joined battle and rolled nothing. The page shipped "He bellows, a raw sound
+of defiance, and recoils from your strike". The claims scrubber had cut the stab sentence;
+`swing-not-yet-struck` (regex) has no "recoils"; the harm repair turned "pain" into
+"defiance", and the re-read of that one sentence, read alone, named "someone not listed",
+which is never judged. Read whole, the shipped beat claimed no harm at all.
+
+- `Facts.joined`: the player's attack this beat resolved as `battle_joined` with no roll.
+  The struck-with question (`swing_messages`) is asked on such a beat too.
+- `_struck_early`: any blow of the player's it finds (any weapon, "not shown" included) is
+  an `early` contradiction, `beat-swing-early` (weight 3). The second read asks whether the
+  blow already ARRIVED — "not only drawn, raised, aimed, or still coming".
+- The backstop cuts the sentence and puts the joined tell before the hand-back.
+- **Measured**, gemma-4-12B x2, on 37 joined-turn texts (19 shipped beats from the scratch
+  saves, 18 drafts from tests/replay; one had a rolled blow and was not asked):
+  - first-read alarms on 7 clean beats' wind-ups ("You lunge forward, your fist aimed
+    directly at the guard's face", "You draw your rapier and strike at the cutpurse"): all
+    14 asks refuted by the second read, so no clean beat lost a sentence;
+  - the 9 beats that name a blow of the player's landing were all kept, 2 of 2 each but the
+    evidence beat (1 of 2 read whole; 1 of 1 as the rewritten sentence alone). In one of
+    them the kept sentence was "your knuckles stinging", not the "force of your blow" before
+    it;
+  - also kept: a narrated MISS on a joined turn ("passes harmlessly past"), which the engine
+    did not roll either;
+  - missed: three beats whose landing is told only by the victim ("He staggers…", "collapses
+    against the bar") with no blow of the player's named.
+
+**A fighter the engine does not hold.** The same fight's next beat: "The other man… hesitates
+for a heartbeat before lunging toward you, his hands out like claws." The read back ran on
+that beat and claimed nothing of him: its vocabulary judges people it has a code for, and the
+`attacks` slot that might have was taken out (harm 12/14 -> 8/14). The beat reader read him
+as a newcomer here; the aftermath rightly made no body in a fight.
+
+- `gm/checks/phantom_fighter.py`: in a fight, a beat-reader mention answered "new" and here,
+  or given to somebody held elsewhere in town, is asked one closed question about its
+  sentence: does it show them fighting — "themselves attacking … not only being attacked or
+  grabbed, watching, shouting, flinching, backing away, fleeing or standing by"? A yes cuts
+  the sentence (`fighter-not-in-fight`, weight 3, cut only).
+- **Measured**, gemma-4-12B, on tests/replay's fight files (144 narrated texts, every one
+  treated as a fight): 22 sentences asked, 2 kept — "A local laborer lunges forward … as he
+  prepares to strike you" and "A desperate stranger lunges toward him", both people the
+  engine did not hold at that turn (checked against the recording's scene). 0 false cuts.
+  The first wording kept "it lunges forward to grab the intruder" as the INTRUDER fighting
+  (2/2); "themselves" and "being attacked or grabbed" took it to 0/2. The live lunge: 3/3 on
+  the draft, 2/3 on the polished beat (once the reader called him the away guard, which is
+  why away mentions are asked too).
+
+**Live, round by round** (scratch copy of the evidence save, combat panel: chip, Strike,
+Commit turn, Roll):
+- Round 2: tell "Kesst Vayr hits the one behind the bar with the dagger for 2 piercing." The
+  draft brought in a man and a figure and repeated nine earlier sentences; what survived the
+  cuts was the blow pass's line, "You strike the one behind the bar with the dagger for 2
+  piercing." The creature's turn (the sap, a miss, 7 against AC 15) was written as a crossbow.
+- Round 3: the same blow, 2 piercing. The beat had "You have him momentarily stunned by the
+  pain", which the condition read caught and repaired to "reeling". The creature's miss (8
+  against AC 15) was told as the sap that "fails to connect".
+
+**Left:** (closed the same day, below) the creature turn's weapon was not read, and the
+crossbow invented in round 2 was carried into round 3's beat.
+A blow told only by the victim's reaction on a joined turn is not claimed. The joined turn
+was not replayed live (the fight was already on); it is proved offline on the evidence beat.
+
+## What a creature's blows were struck with (2026-10-17)
+
+Round 2 above: the barkeep's tell was "attack with the sap misses Kesst Vayr (7 against AC
+15)", and the beat wrote "The tavern keeper swings the heavy crossbow … the heavy bolt
+whistles past your ear". His stat block prints a heavy crossbow; the engine swung the sap.
+
+- **The door.** A creature's turn reaches the page through the `outcome` door with
+  `ctx.acting` (the wind-up from the `npc` door is dropped when the turn is told by its
+  blows, play/views.py). `Facts.foe_blows` are the weapons of that creature's own resolved
+  attacks (`Outcome.actor`, else a roll not shown to the player), `Facts.foe_arms` what it
+  carries and what its stat block prints (`arms_of`), unarmed, and what it swung.
+- **The question.** A call of its own (`foe_swing_messages`), the player's question's
+  sibling: "each blow of ONE named attacker". Not the player's question widened: its whole
+  point is "YOUR blows", and its demonstrations teach passing over the drover's cudgel.
+- **The judgement.** `_foe_weapon_wrong`: a weapon that is not one the engine swung, "not
+  shown" never judged, "something else" judged — except when every blow was a natural attack
+  (`foe_natural`): a tentacle has no name the page must use.
+- **The repair is the cut** (`beat_verified.CUT_ONLY`): a one-sentence rewrite is checked by
+  reading the rewritten sentence back alone, and alone a creature's blow ("the heavy bolt
+  whistles past your ear") is nobody's — the hole measured on the joined turn above, where
+  "recoils from your strike" re-read alone was "someone not listed". The early blow joins the
+  set. The sentence goes and the engine's line, numbers off, stands in its place.
+- **Measured**, gemma-4-12B x2, on 74 creature-turn texts (37 shipped beats from the scratch
+  saves, linked to their npc-turn rows by the outcome door's read; 37 consequence drafts in
+  tests/replay, each judged against every creature turn of its record, so other creatures'
+  blows are in the set): 10 beats alarmed, the same 10 both runs, all kept by the second
+  read. 9 true: the crossbow twice, a club told as a blade, as "his heavy arm" and as "his
+  heavy fist", an unarmed commoner swinging a stool (twice), a fist on a sap turn, a club told
+  as a shove. 1 false, a tentacle told as a vine (now spared by `foe_natural`). 64 clean.
+  Missed: "The blade strikes your temple" on a sap turn, read as "not shown".
+- **Replayed** on the live round-2 beat through the outcome door's truth pass (x2, no model
+  call for the repair): "The tavern keeper swings the heavy crossbow …" became "The one
+  behind the bar's attack with the sap misses Kesst Vayr." (the name is made "you" later in
+  the groom). Still standing after it: "as they struggle to reload the weapon" — not a blow.
+- **Live**, round 4 on the same save: the tell "the one behind the bar hits Kesst Vayr with
+  the sap for 4 non-lethal bludgeoning"; read as `sap` ("swinging the sap with a frantic
+  grunt"), no alarm; shipped "swinging the sap … The heavy leather wrap connects with your
+  shoulder".
+
+**Separate handling.** The player's turn beat is not asked this question: no creature blow
+is rolled on it, so any creature blow it shows is undeclared, not mis-armed — the plan
+door's `_undeclared_blows` owns that. Live round 4's player beat had the barkeep lunge with
+the sap before his turn and a patron "reaching for a heavy chair"; the patron, a newcomer
+here, raised no phantom-fighter finding (reaching is not fighting), and the early creature
+swing shipped.
+That is the next gap: the turn door has no read-back question for a creature's blow.

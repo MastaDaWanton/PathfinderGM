@@ -191,6 +191,22 @@ class Facts:
     # struck with. Empty `blows` asks nothing (`struck_with`).
     blows: tuple[str, ...] = ()
     arms: tuple[str, ...] = ()
+    # The player's attack this beat only OPENED the fight (`battle_joined`, no roll): the
+    # first blow is still to be struck, so any blow of theirs the page shows landing is a
+    # contradiction (`_struck_early`). The swing question is asked on such a beat too.
+    # The engine's own line for it (the joined tell), for the backstop.
+    joined: str = ""
+    # On a creature's turn (`ctx.acting`), the weapons ITS blows were struck with
+    # (`Outcome.blows[...]["weapon"]` on its own attack outcomes), the weapons it may be
+    # named with (what it carries and what its stat block prints, unarmed, what it swung),
+    # and who it is. Empty `foe_blows` asks nothing (`foe_struck_with`).
+    foe: str = ""
+    foe_name: str = ""
+    foe_blows: tuple[str, ...] = ()
+    foe_arms: tuple[str, ...] = ()
+    # Every one of its blows this turn was a natural attack (a bite, a claw, a tentacle):
+    # then "something else" is the narrator's own word for the limb and is not judged.
+    foe_natural: bool = False
 
     @property
     def bodies(self) -> bool:
@@ -202,6 +218,12 @@ class Facts:
         if self.intimate:
             return False
         return self.in_fight or any(o.get("op") in _HARM_OPS for o in self.outcomes)
+
+    @property
+    def swings(self) -> bool:
+        """Whether the swing question is asked: the player struck (`blows`), or their
+        attack only opened the fight (`joined`)."""
+        return bool(self.blows) or bool(self.joined)
 
     def person(self, ref: str) -> Person | None:
         return next((p for p in self.people if p.ref == ref), None)
@@ -235,7 +257,8 @@ class Facts:
                            self.bodies, [p.holds for p in self.people],
                            # The attempts question too (`attempts_of`).
                            [(a.code, a.who, a.verdict) for a in attempts_of(self)],
-                           self.settings, self.blows, self.arms],
+                           self.settings, self.blows, self.arms, self.joined,
+                           self.foe, self.foe_blows, self.foe_arms, self.foe_natural],
                           default=str, sort_keys=True)
 
 
@@ -368,7 +391,8 @@ def facts_from(ctx) -> Facts:
                  pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
                  intimate=bool(getattr(ctx, "intimate", False)),
                  settings=tuple(sorted(settings)),
-                 **_blows_of(ctx, outcomes, pc))
+                 **_blows_of(ctx, outcomes, pc),
+                 **_foe_blows_of(ctx, outcomes, scene))
 
 
 UNARMED = "unarmed strike"
@@ -387,16 +411,35 @@ def _blows_of(ctx, outcomes, pc) -> dict:
     if pc is None or getattr(ctx, "acting", ""):
         return {}
     blows: list[str] = []
+    pc_ref = str(getattr(pc, "ref", "pc") or "pc")
+    joined = ""
     for o in outcomes:
-        if o.get("op") != "attack" or o.get("status") == "refused" or not o.get("blows"):
+        if o.get("op") != "attack" or o.get("status") == "refused":
+            continue
+        # The first swing that opens a fight is declared and stops (the battle gate):
+        # "Battle is joined … Nothing has landed yet — the first blow is still to be
+        # struck." No roll, no `blows`. Measured live 2026-10-17 (integration branch,
+        # gemma-4-12B): on that turn the page shipped "He bellows … and recoils from your
+        # strike" — the claims scrubber had cut the stab sentence before it, the harm
+        # repair turned "pain" into "defiance", and nothing else asked whether a blow of
+        # the player's had landed at all. The swing question is asked on this beat too,
+        # and any blow of theirs it finds is judged against the joined tell.
+        if not o.get("rolls") and any(
+                isinstance(e, dict) and e.get("kind") == "battle_joined"
+                and str(e.get("ref") or "") == pc_ref for e in o.get("effects") or ()):
+            joined = joined or str(o.get("tell") or "Nothing has landed yet.")
+            continue
+        if not o.get("blows"):
             continue
         if not any(isinstance(r, dict) and r.get("visibility") == "player"
                    for r in o.get("rolls") or ()):
             continue
         blows += [_weapon_name(b.get("weapon")) for b in o["blows"]
                   if isinstance(b, dict) and b.get("weapon")]
-    if not blows:
+    if not blows and not joined:
         return {}
+    if blows:
+        joined = ""
     arms: list[str] = []
     for key in list(getattr(pc, "weapons", None) or ()):
         try:
@@ -406,7 +449,75 @@ def _blows_of(ctx, outcomes, pc) -> dict:
         arms.append(_weapon_name(name))
     arms += [UNARMED, *blows]
     return {"blows": tuple(dict.fromkeys(blows)),
-            "arms": tuple(dict.fromkeys(a for a in arms if a and a != "improvised weapon"))}
+            "arms": tuple(dict.fromkeys(a for a in arms if a and a != "improvised weapon")),
+            "joined": joined}
+
+
+def arms_of(a) -> list[str]:
+    """The weapons a creature may be named striking with: what it carries (`weapons`,
+    `equipped`) and what its stat block prints (`stat_block_attacks` — the barkeep's sap,
+    dagger and heavy crossbow), by name. Read off the actor, never off prose."""
+    out: list[str] = []
+    raw = getattr(a, "weapons", None) or ()
+    for key in (list(raw) if not isinstance(raw, dict) else list(raw.keys())):
+        try:
+            name = (a.weapon(key) or {}).get("name") or key
+        except Exception:  # noqa: BLE001 — a weapon the sheet cannot read is named by key
+            name = key
+        out.append(_weapon_name(name))
+    if getattr(a, "equipped", None):
+        out.append(_weapon_name(a.equipped))
+    try:
+        blocks = a.stat_block_attacks() if hasattr(a, "stat_block_attacks") else {}
+    except Exception:  # noqa: BLE001 — a block that will not parse names nothing
+        blocks = {}
+    for options in (blocks or {}).values():
+        for option in options or ():
+            for att in option or ():
+                out.append(_weapon_name(att.get("name") or att.get("key")))
+    return [w for w in dict.fromkeys(out) if w and w != "improvised weapon"]
+
+
+def _foe_blows_of(ctx, outcomes, scene) -> dict:
+    """{"foe", "foe_name", "foe_blows", "foe_arms"} for `Facts`: on a creature's turn
+    (`ctx.acting`), the weapons its resolved attacks were struck with. Measured live
+    2026-10-17 (integration branch, gemma-4-12B): the barkeep's tell was "the one behind
+    the bar's attack with the sap misses Kesst Vayr (7 against AC 15)", and the beat wrote
+    "The tavern keeper swings the heavy crossbow … the heavy bolt whistles past your ear"
+    — a crossbow his stat block prints and the engine never fired, carried into the next
+    round's beat. The struck-with question read the player's blows only."""
+    acting = str(getattr(ctx, "acting", "") or "")
+    actors = getattr(scene, "actors", {}) or {}
+    a = actors.get(acting)
+    if not acting or a is None or getattr(a, "is_pc", False):
+        return {}
+    blows: list[str] = []
+    for o in outcomes:
+        if o.get("op") != "attack" or o.get("status") == "refused" or not o.get("blows"):
+            continue
+        # The creature's own attack: the stamped actor where the outcome carries one, else
+        # a roll nobody showed the player (every non-PC roll is forced hidden).
+        who = str(o.get("actor") or "")
+        if who and who != acting:
+            continue
+        if not who and any(isinstance(r, dict) and r.get("visibility") == "player"
+                           for r in o.get("rolls") or ()):
+            continue
+        blows += [_weapon_name(b.get("weapon")) for b in o["blows"]
+                  if isinstance(b, dict) and b.get("weapon")]
+    if not blows:
+        return {}
+
+    def natural(w: str) -> bool:
+        try:
+            return bool((a.weapon(w) or {}).get("natural"))
+        except Exception:  # noqa: BLE001 — a weapon the sheet cannot read is not natural
+            return False
+
+    arms = [*arms_of(a), UNARMED, *blows]
+    return {"foe": acting, "foe_name": str(a.name), "foe_blows": tuple(dict.fromkeys(blows)),
+            "foe_arms": tuple(dict.fromkeys(w for w in arms if w)),
+            "foe_natural": all(natural(w) for w in blows)}
 
 
 def asks_bodies(ctx) -> bool:
@@ -502,11 +613,11 @@ def schema(facts: Facts) -> dict:
         # call of its own (`SWING_ALONE`), on a beat where the player struck only.
         **({"struck_with": lst({"weapon": {"type": "string",
                                            "enum": swing_codes(facts)}})}
-           if facts.blows and not SWING_ALONE else {}),
+           if facts.swings and not SWING_ALONE else {}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
                     "left", "time_of_day", *(["shown_here"] if away else []),
                     *([] if SETTING_ALONE else ["setting"]),
-                    *(["struck_with"] if facts.blows and not SWING_ALONE else [])]}
+                    *(["struck_with"] if facts.swings and not SWING_ALONE else [])]}
 
 
 def _settings() -> tuple[str, ...]:
@@ -829,6 +940,78 @@ def swing_messages(text: str, facts: Facts) -> list[dict]:
                                         f"Passage:\n{text}"}]
 
 
+# --- what a creature's blows were struck with, on its own turn --------------------------
+#
+# The sibling of the question above, asked on a creature's turn (`Facts.foe_blows`, the
+# `outcome` door with `ctx.acting`): its weapons are what it carries and what its stat block
+# prints, so a weapon it HAS but did not swing — the barkeep's heavy crossbow on a sap turn —
+# is a code the reader can answer with, and code compares it with the engine's. A call of its
+# own, not the player's question widened: "YOUR blows" is the player's question's whole
+# point, and its demonstrations teach skipping the drover's cudgel.
+_FOE_SWING_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") in a fight, and report what "
+    "the narrator shows each blow of ONE named attacker struck with — landing or missing — "
+    "in the codes given. \"unarmed strike\" is a fist, foot, knee, elbow or head. "
+    "\"something else\" is a weapon or object not in the list. \"not shown\" when the "
+    "sentence shows that attacker's blow and never says what it was struck with. One entry "
+    "per sentence that shows one of THAT ATTACKER's blows, copying its own words into "
+    "\"quote\"; never the player's blow or anybody else's, never what a character only says. "
+    "Leave the list empty when the passage shows none of that attacker's blows.")
+_FOE_SWING_DEMO_USER = (
+    "The attacker: the drover\n"
+    "The drover's weapons: cudgel, knife, unarmed strike, something else, not shown\n\n"
+    "Passage:\n"
+    "The drover swings his cudgel at your head and it whistles past your ear. You duck "
+    "under it and drive your knee into his gut. He snatches a bottle off the table and "
+    "smashes it against your shoulder. 'Is that all you've got?' he spits.")
+_FOE_SWING_DEMO_ANSWER = {"struck_with": [
+    {"weapon": "cudgel", "quote": "The drover swings his cudgel at your head"},
+    {"weapon": "something else", "quote": "smashes it against your shoulder"}]}
+_FOE_SWING_DEMO2_USER = (
+    "The attacker: the drover\n"
+    "The drover's weapons: cudgel, knife, unarmed strike, something else, not shown\n\n"
+    "Passage:\n"
+    "He reverses the knife and cracks its pommel against your temple. His next blow takes "
+    "you across the cheek. Behind him the watchman's spear clatters to the floor, and your "
+    "rapier slides off his shoulder.")
+_FOE_SWING_DEMO2_ANSWER = {"struck_with": [
+    {"weapon": "knife", "quote": "cracks its pommel against your temple"},
+    {"weapon": "not shown", "quote": "His next blow takes you across the cheek"}]}
+
+
+def foe_swing_codes(facts: Facts) -> list[str]:
+    return list(dict.fromkeys([*facts.foe_arms, OTHER_WEAPON, NOT_SHOWN]))
+
+
+def foe_swing_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"foe_struck_with": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "weapon": {"type": "string", "enum": foe_swing_codes(facts)}, "quote": s},
+            "required": ["weapon", "quote"]}}},
+        "required": ["foe_struck_with"]}
+
+
+def _foe_line(facts: Facts) -> str:
+    who = facts.foe_name or "the attacker"
+    return (f"The attacker: {who}\n"
+            f"{who[:1].upper() + who[1:]}'s weapons: {', '.join(foe_swing_codes(facts))}")
+
+
+def foe_swing_messages(text: str, facts: Facts) -> list[dict]:
+    # The demonstrations answer under the player's key; the live call's schema asks for
+    # `foe_struck_with`, so they are shown under that key too.
+    one = {"foe_struck_with": _FOE_SWING_DEMO_ANSWER["struck_with"]}
+    two = {"foe_struck_with": _FOE_SWING_DEMO2_ANSWER["struck_with"]}
+    return [{"role": "system", "content": _FOE_SWING_SYSTEM},
+            {"role": "user", "content": _FOE_SWING_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(one)},
+            {"role": "user", "content": _FOE_SWING_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(two)},
+            {"role": "user", "content": f"{_foe_line(facts)}\n\nPassage:\n{text}"}]
+
+
 def setting_schema() -> dict:
     from rules.places import SETTINGS
 
@@ -1126,7 +1309,7 @@ def messages(text: str, facts: Facts) -> list[dict]:
     two = dict(_DEMO2_AWAY_ANSWER if away else _DEMO2_ANSWER)
     if not SETTING_ALONE:
         one["setting"], two["setting"] = _DEMO_SETTING, _DEMO2_SETTING
-    swing_slot = bool(facts.blows) and not SWING_ALONE
+    swing_slot = facts.swings and not SWING_ALONE
     if swing_slot:
         # The demonstrations hold no blow of the player's (the drover's fist is his own).
         one["struck_with"], two["struck_with"] = [], []
@@ -1235,7 +1418,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("left", "left", ("who",)),
                             ("conditions", "condition", ("who", "condition")),
                             ("setting", "setting", ("kind",)),
-                            ("struck_with", "weapon", ("weapon",))):
+                            ("struck_with", "weapon", ("weapon",)),
+                            ("foe_struck_with", "foe_weapon", ("weapon",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -1266,10 +1450,15 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "part": set(PARTS), "condition": set(CONDITIONS),
                "attempt": {a.code for a in attempts_of(facts)}, "shown": set(SHOWN),
                "kind": set(_settings()), "weapon": set(swing_codes(facts))}
+    # A creature's weapons are its own codes, not the player's (`foe_swing_codes`).
+    foe_codes = set(foe_swing_codes(facts)) if facts.foe_blows else set()
     seen: set[str] = set()
     for c in claims:
         bad = [k for k, v in c.slots.items()
-               if k in allowed and str(v) not in allowed[k]]
+               if k in allowed and str(v) not in allowed[k]
+               and not (c.category == "foe_weapon" and k == "weapon")]
+        if c.category == "foe_weapon" and str(c.slots.get("weapon")) not in foe_codes:
+            bad.append("weapon")
         if c.category == "trade" and not isinstance(c.slots.get("settled"), bool):
             bad.append("settled")
         if bad:
@@ -1368,7 +1557,7 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                          schema=setting_schema())
             result.raw += "\n" + where.text
             answer = dict(answer or {}, setting=(where.json() or {}).get("setting") or [])
-        if SWING_ALONE and facts.blows:
+        if SWING_ALONE and facts.swings:
             # What the player's blows were struck with, in a call of its own, on a beat
             # where the player struck and on no other (`_SWING_SYSTEM`).
             msgs = swing_messages(text, facts)
@@ -1380,6 +1569,18 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
             result.raw += "\n" + swung.text
             answer = dict(answer or {},
                           struck_with=(swung.json() or {}).get("struck_with") or [])
+        if facts.foe_blows:
+            # What the creature's blows were struck with, on its own turn, in a call of
+            # its own (`_FOE_SWING_SYSTEM`).
+            msgs = foe_swing_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            theirs = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                          num_predict=300, provider=provider, api_key=api_key,
+                          schema=foe_swing_schema(facts))
+            result.raw += "\n" + theirs.text
+            answer = dict(answer or {}, foe_struck_with=(theirs.json() or {}).get(
+                "foe_struck_with") or [])
         claims = claims_of(answer, facts)
         attempts = attempts_of(facts)
         if attempts:
@@ -1608,6 +1809,48 @@ def _weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
         "contradiction", "weapon",
         f"Your (the player's) blow was struck with {struck}, not with {instead}: nothing "
         f"else was in your hand.", c.sentence, "", c)
+
+
+def _struck_early(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A blow of the player's shown on a beat whose attack only opened the fight
+    (`Facts.joined`), or None. Any weapon, "not shown" included: no blow was rolled, so
+    whatever it was struck with, it was not struck. Whether the sentence shows the blow
+    already struck — reaching him, knocking him back — or only drawn, aimed or coming is
+    the second read's question (`question`), never code's."""
+    if not facts.joined or facts.blows:
+        return None
+    return Discrepancy(
+        "contradiction", "early",
+        "No blow has been struck yet: the fight has only just been joined, and your (the "
+        "player's) first blow is still to come — nothing of yours has reached anybody, so "
+        "nobody is hit, cut, staggered or sent recoiling by it. You square off; the blow is "
+        "coming, not landed.", c.sentence, facts.joined, c)
+
+
+def _foe_weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A creature's blow, on its own turn, shown struck with something the engine did not
+    swing, or None. "not shown" is never judged; "something else" is, as for the player."""
+    said = str(c.slots.get("weapon") or "")
+    if not facts.foe_blows or said in ("", NOT_SHOWN) or said in facts.foe_blows:
+        return None
+    # A natural attack has no name a reader can hold it to: on the recorded fight beats
+    # (2026-10-17, gemma-4-12B x2) the one false alarm of 10 was Zygomind's tentacle
+    # written as "the heavy vine strikes your ribs" — "something else", both runs, kept
+    # by the second read. A listed weapon it did not swing is still judged.
+    if said == OTHER_WEAPON and facts.foe_natural:
+        return None
+    who = facts.foe_name or "the attacker"
+    struck = " and ".join(_said_weapon(w) for w in facts.foe_blows)
+    instead = "anything else" if said == OTHER_WEAPON else f"the {said}"
+    # The engine's own line for the blow, for the backstop to stand in the cut sentence's
+    # place: the attack outcome's tell (its numbers are taken off where it is put).
+    line = next((str(o.get("tell") or "") for o in _resolved(facts)
+                 if o.get("op") == "attack" and o.get("blows") and o.get("tell")
+                 and str(o.get("actor") or facts.foe) == facts.foe), "")
+    return Discrepancy(
+        "contradiction", "foe_weapon",
+        f"{who[:1].upper() + who[1:]} struck with {struck}, not with {instead}: that is "
+        f"the only weapon {who} used this turn.", c.sentence, line, c, ref=facts.foe)
 
 
 def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
@@ -1869,7 +2112,11 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                 out.append(Discrepancy("contradiction", "attempt", _attempt_fact(a, facts),
                                        c.sentence, "", c, ref=a.who))
         elif c.category == "weapon":
-            found = _weapon_wrong(c, facts)
+            found = _struck_early(c, facts) or _weapon_wrong(c, facts)
+            if found is not None:
+                out.append(found)
+        elif c.category == "foe_weapon":
+            found = _foe_weapon_wrong(c, facts)
             if found is not None:
                 out.append(found)
         elif c.category == "setting":
@@ -2015,6 +2262,15 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
+    if d.category == "early":
+        # Asked of the blow's ARRIVAL, with the wind-up named as what it is not: a joined
+        # turn's page is the player drawing and going for him, and that is true.
+        return ("Does this sentence show a blow of yours (the player's) already struck — "
+                "reaching, hitting or cutting somebody, or somebody reeling or recoiling from "
+                "it — not only drawn, raised, aimed, or still coming?")
+    if c.category == "foe_weapon":
+        # Asked in `_struck_with`'s shape too; this line is the cache key.
+        return f"Which weapon does this sentence show {facts.foe_name}'s blow struck with?"
     if c.category == "weapon":
         # Asked in `_struck_with`'s shape (which weapon, from the codes), not yes-or-no;
         # this line is the cache key and the record of what was asked.
@@ -2096,6 +2352,11 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _shows(d, before, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
+        if d.category == "foe_weapon":
+            lead = " ".join(sentences[max(0, at - 2):at]) if at > 0 else ""
+            (kept if _foe_struck_with(d, lead, facts, chat, model, host, provider,
+                                      api_key) else refuted).append(d)
+            continue
         if d.category == "weapon":
             lead = " ".join(sentences[max(0, at - 2):at]) if at > 0 else ""
             (kept if _struck_with(d, lead, facts, chat, model, host, provider, api_key)
@@ -2110,27 +2371,42 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _in_condition(d, lead, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
-        ask = ((f"The sentence before it, for context: {before}\n" if before else "")
-               + f"The sentence: {d.sentence}\n\nQuestion: {q}")
         # An attempt's outcome may be spoken: the person asked says yes or no aloud
         # (`validate` lets its quote be speech for that reason).
-        msgs = [{"role": "system", "content": _CONFIRM_ATTEMPT_SYSTEM
-                 if d.category == "attempt" else _CONFIRM_SYSTEM},
-                {"role": "user", "content": ask}]
-        if bare_template(model):
-            msgs = _raw_prompt(msgs)
-        try:
-            reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                         num_predict=20, provider=provider, api_key=api_key,
-                         schema={"type": "object",
-                                 "properties": {"answer": {"type": "string",
-                                                           "enum": ["yes", "no"]}},
-                                 "required": ["answer"]})
-            yes = str((reply.json() or {}).get("answer") or "") == "yes"
-        except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
-            yes = True
+        yes = ask(d.sentence, q, before=before, chat=chat, model=model, host=host,
+                  provider=provider, api_key=api_key, spoken=d.category == "attempt")
         (kept if yes else refuted).append(d)
     return kept, refuted, round(time.monotonic() - started, 2)
+
+
+def ask(sentence: str, q: str, *, before: str = "", chat=None, model: str = "",
+        host: str = "", provider: str = "ollama", api_key: str = "",
+        spoken: bool = False) -> bool:
+    """One closed yes-or-no question about one sentence (`confirm`'s second read), for any
+    finder whose finding names a sentence and a question: `GMAgent.polish` asks it of the
+    review's truth findings before it cuts a sentence the rewrite could not mend. A call
+    that fails answers yes — the finder's answer stands, as in every second read."""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    text = ((f"The sentence before it, for context: {before}\n" if before else "")
+            + f"The sentence: {sentence}\n\nQuestion: {q}")
+    msgs = [{"role": "system", "content": _CONFIRM_ATTEMPT_SYSTEM if spoken
+             else _CONFIRM_SYSTEM},
+            {"role": "user", "content": text}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=20, provider=provider, api_key=api_key,
+                     schema={"type": "object",
+                             "properties": {"answer": {"type": "string",
+                                                       "enum": ["yes", "no"]}},
+                             "required": ["answer"]})
+        return str((reply.json() or {}).get("answer") or "") == "yes"
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
 
 
 def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
@@ -2200,6 +2476,35 @@ def _struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host, p
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
     return bool(said) and said != NOT_SHOWN and said not in facts.blows
+
+
+def _foe_struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host,
+                     provider, api_key) -> bool:
+    """The second read of a `foe_weapon` contradiction: WHICH weapon the one sentence shows
+    the creature's blow struck with, from its codes, compared in code — kept only when the
+    answer is neither what the engine swung nor "not shown"."""
+    codes = foe_swing_codes(facts)
+    who = facts.foe_name or "the attacker"
+    ask = ((f"The sentences before it, for context: {before}\n" if before else "")
+           + f"The sentence: {d.sentence}\n\n{who[:1].upper() + who[1:]}'s weapons: "
+           f"{', '.join(codes)}\n\nQuestion: what does this sentence show {who}'s "
+           f"blow struck with? \"unarmed strike\" for a fist, foot, knee, elbow or head; "
+           f"\"{OTHER_WEAPON}\" for a weapon or object not listed; \"{NOT_SHOWN}\" if it never "
+           f"says, or shows no blow of {who}'s.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"weapon": {
+                         "type": "string", "enum": codes}}, "required": ["weapon"]})
+        said = str((reply.json() or {}).get("weapon") or "")
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+    return bool(said) and said != NOT_SHOWN and said not in facts.foe_blows
 
 
 def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,

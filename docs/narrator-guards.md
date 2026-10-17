@@ -894,3 +894,48 @@ grey world is not described (a player with darkvision in range is not in poor li
 the engine's reading, so nothing is owed). The NPC wind-up door (`npc`) is not checked;
 its outcome line is. No labelled bench of night-fight beats exists yet: the precision on
 dim beats is the five live ones read by hand, not a measured rate.
+
+## A found contradiction never ships (2026-10-17)
+
+Live on the integration branch (free narrator, gemma-4-12B, a fight in the inn): the
+player's dagger left the one behind the bar at 17 of 23, and the page said "He cries out…
+and collapses against the bar". The turn log: `unrepaired: contradicts-the-engine …,
+too-long-for-a-fight: 628 characters, over 600`.
+
+**Why it ended unrepaired.** Not the budget, and not the length finding competing for the
+pass: the rewrite fixed both (review score 4 -> 0) and was refused by the events guard
+(`actions_kept` 0.0 against the 0.6 floor). Two of the draft's three "events" were the
+collapse itself and a phantom fighter's lunge, and the rewrite had rewritten the third.
+`contradicts-the-engine` was in `_NO_BACKSTOP`, and in a fight the retry is gated off, so
+one refused rewrite was the end of it.
+
+**Across the scratch saves:** 511 save files, 139 distinct beats logged `unrepaired:`.
+`contradicts-the-engine` was in 26, `stands-elsewhere` in 30; every one shipped as written.
+
+**Fixed** (`GMAgent.polish`, `GMAgent._cut_untrue`):
+- The events guard no longer counts the review's untrue sentences as events a rewrite owes
+  the draft (the copied-sentence rule's reason: there is nothing in them to keep).
+- When no rewrite holds (or the call fails), each sentence of a `contradicts-the-engine` or
+  `stands-elsewhere` finding is asked one closed question (`beat_verify.ask`, the read
+  back's second read) and cut on a yes. The finding names its sentences and question
+  (`Finding.sentences`, `Finding.questions`). What still stands is judged on the cut beat.
+- The second read matters: of the 14 live "down or dead" hits in the saves, the regex's
+  own were mostly false ("The wind has died down", "the smith is hunched over his anvil",
+  "her body tense"). The shipped wording kept 4 and refused those; 4/4 felled and 0/5
+  standing on the made probe. The read back's own harm wording kept 1 of 4 (a "he" is not
+  plainly the one behind the bar).
+- Replayed offline on the live draft (gemma-4-12B, 3 runs): the collapse cut 3 of 3, the
+  beat 525 characters, nothing logged unrepaired.
+
+**Every `unrepaired`/`left as written` outcome, judged:**
+
+| outcome | where | ships? |
+|---|---|---|
+| `contradicts-the-engine` (state) | polish | no: second read, then cut |
+| `stands-elsewhere` | polish | no: second read, then cut |
+| sale settled, door opened (`contradicts-the-engine`) | polish | no: `keep_the_goods`, `hold_the_door` downstream |
+| `swing-not-yet-struck`, `wrong-hands`, `grants-a-nature`, `fire-from-nowhere`, `invented-name`, `wrong-body`, `death-left-off-the-page`, `no-hand-back`, `third-person-pc` | polish | no: each has its backstop further down `_groom` |
+| `too-short`, `too-long-for-a-fight`, `formulaic-opening`, `recurring-phrase`, `echoes-the-examples`, `repeats-an-earlier-beat`, `drops-the-thread`, `nobody-reacts`, `ignores-the-dead`, `narrator-in-first-person`, `asks-the-player-to-narrate` | polish | yes: how the prose reads, not whether the turn was true |
+| `misgendered-pc`, `invented-companion` | polish | yes, still: true faults with no cut that would not take dialogue or a whole line; left |
+| `face-changed`, `greets-known-as-stranger`, `hook-secret-on-page`, `giver-asks-own-answer`, `pull-took-the-beat`, `route-not-walked` | truth pass, `no backstop; left as written` | yes: a description, a manner, a secret or an omission, not an engine outcome |
+| "an undeclared blow … could not be removed", "undeclared arrivals in a fight … could not be removed" | the plan's draft (`_undeclared_blows`, `_undeclared_arrivals`) | the arrival's fighting half is now cut by `phantom_fighter` downstream; the blow's is judged by the read back's harm and condition questions |
