@@ -899,6 +899,20 @@ def _anything_into(facts: Facts, ref: str) -> bool:
             if got == ref and any(k in e for k in ("item", "items", "goods", "purse")):
                 return True
     return False
+def _parts_with_unlisted(facts: Facts, frm: str, things_moved) -> bool:
+    """Whether a thing the engine has no name for, put down by `frm`, is judged at all:
+    `frm` a listed person here who is not the player, nothing at all coming into the
+    player's hands this turn (`_anything_into`), and no resolved effect moving anything
+    out of `frm`'s hands — an engine drop, give or sale of theirs the page may name
+    loosely."""
+    p = facts.person(frm)
+    if p is None or p.pc or not p.here:
+        return False
+    if _anything_into(facts, facts.pc_ref):
+        return False
+    return not any(f == frm for _i, f, _t in things_moved)
+
+
 _HARM_OPS = ("attack", "cast", "damage", "full_attack", "maneuver", "coup_de_grace",
              "hazard", "use_ability")
 
@@ -1030,6 +1044,26 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                         f"Nothing was given to the player: {who} keeps it. It is not "
                         f"handed, tossed, pressed or placed into the player's hands, and "
                         f"it does not land or sit in them.", c.sentence, "", c))
+                elif to in (FLOOR, NOBODY) and _parts_with_unlisted(facts, frm, things_moved):
+                    # The same gift by the floor. Live on 0.2.20 (2026-10-16): the smith
+                    # refused to pay ("says no and pays nothing: nothing changes hands"),
+                    # and the page had him pull "a piece of coarse, stained leather" from
+                    # his pouch and toss it "into the dirt between you. 'There's your
+                    # pay.'" — read back as exactly this claim (`something else`, c4 ->
+                    # the floor) and skipped, because the floor is where a stone the
+                    # player picks up comes from. Judged only when the one parting with
+                    # it is a listed person here (a bird dropping a feather is no
+                    # listed person) on a turn the engine moved nothing of theirs and put
+                    # nothing in the player's hands; whether it is put down FOR the
+                    # player, or is only the smith laying down his own hammer, is the
+                    # second read's question (`question`), not code's.
+                    who = facts.person(frm).name
+                    out.append(Discrepancy(
+                        "contradiction", "hands",
+                        f"Nothing was given to the player: {who} pays nothing and gives "
+                        f"nothing, and keeps whatever {who} holds. Nothing is tossed, "
+                        f"dropped, set down or left for the player, and nothing lands at "
+                        f"the player's feet.", c.sentence, "", c, ref=frm))
                 continue
             held = any(_same(item, p) for p in facts.pack)
             out_of_pc = any(_same(item, i) and f == pc for i, f, _t in things_moved)
@@ -1049,6 +1083,18 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             if pc not in (seller, buyer):
                 continue
             trades = [o for o in facts.outcomes if o.get("op") in _TRADE_OPS]
+            # A deal the engine never had in front of it is not judged. Live on 0.2.20
+            # (2026-10-16): a turn with no sale, no purchase and no haggle — a refused
+            # request for pay, in conversation — ended "You are still here, and the trade
+            # is finished.", read back as a settled sale of `something else`, and the
+            # repair wrote "…the trade is not finished.": a trade still open, on a turn
+            # that never had one. The engine answers a sale claim only when it holds one
+            # of its two sides: a sale, purchase or haggle this turn (refused or not), or
+            # a thing it names (the crate in the pack is not sold, whatever the page says
+            # — kesst:18, "the transaction is finalized in the eyes of the guild").
+            if item == OTHER_THING and not any(
+                    o.get("op") in (*_TRADE_OPS, "haggle") for o in facts.outcomes):
+                continue
             done = [o for o in trades if o.get("status") != "refused"]
             refused = [o for o in trades if o.get("status") == "refused"]
             # A granted request that paid (`Engine._pay_for_work`, a `check` whose record
@@ -1204,6 +1250,15 @@ def question(d: Discrepancy, facts: Facts) -> str:
             # a reader answers. Asked whether anything is put in the player's hands.
             return ("Does this sentence say that something is handed over or given to "
                     "you — put into your hands now, not only shown or offered?")
+        if s["item"] == OTHER_THING and s["to"] in (FLOOR, NOBODY):
+            # Put down FOR the player, or only laid down: "He tosses it into the dirt
+            # between you" (the smith's unpaid pay, live 2026-10-16) is the first, the
+            # smith setting his own hammer on the anvil the second. The giver by name:
+            # the first read already said whose hand it left.
+            return (f"Does this sentence say that {_name(facts, s['from'])} gives "
+                    f"something to you (the player) — tosses, drops, sets down or leaves "
+                    f"it for you, as payment or a gift — not only puts down or throws "
+                    f"away their own things?")
         if s["to"] == facts.pc_ref:
             return (f"Does this sentence say that the {s['item']} is picked up, taken or "
                     f"given to you?")
