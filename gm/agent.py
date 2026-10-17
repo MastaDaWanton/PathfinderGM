@@ -2739,7 +2739,9 @@ class GMAgent:
             fixed, attempt = _rewrite(review.complaint(), "; ".join(review.as_log()))
             attempts.append(attempt)
         except Exception as exc:
-            return text, made + [f"polish failed: {exc}"], [
+            # A failed call is a rewrite that did not hold: the truth findings are cut.
+            text, cut, _left = self._cut_untrue(text, review)
+            return text, made + [f"polish failed: {exc}"] + cut, [
                 Attempt("polish", 0.0, self.model, note=str(exc)[:120])]
 
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
@@ -2778,6 +2780,15 @@ class GMAgent:
         # so there is nothing in it for a rewrite to keep.
         own_events = narration_mod.without_sentences(
             text, narration_mod.copied_sentences(text, self._echo_index()))
+        # Nor what a sentence the review found untrue describes. Measured live 2026-10-17
+        # (integration branch, gemma-4-12B, a fight): the draft had the barkeep "collapse
+        # against the bar" at 17 of 23 hp; the rewrite dropped the collapse and scored 0
+        # against the draft's 4, and was refused because it kept 0.0 of the draft's
+        # "events" — the collapse itself was one of the three. The contradiction shipped.
+        untrue = [s for f in review.findings if f.kind in self._CUT_WHEN_UNREPAIRED
+                  for s in f.sentences]
+        if untrue:
+            own_events = narration_mod._cut_sentences(own_events, untrue)
 
         def _accept(candidate: str) -> bool:
             after = _review(candidate)
@@ -2815,7 +2826,70 @@ class GMAgent:
                 attempts.append(Attempt("polish", 0.0, self.model,
                                         note=f"retry failed: {str(exc)[:100]}"))
 
-        return text, made + [f"unrepaired: {', '.join(review.as_log())}"], attempts
+        # No rewrite held. A finding about whether the turn was TRUE does not ship: its
+        # sentences are asked once more (the read back's second read) and cut on a yes.
+        was = text
+        text, cut, left = self._cut_untrue(text, review)
+        made += cut
+        if text != was:
+            # What still stands is judged on the beat as it now is: the cut that took the
+            # collapse also took the live beat under the fight's 600 characters.
+            left = ([f for f in _review(text).findings
+                     if f.kind not in self._CUT_WHEN_UNREPAIRED]
+                    + [f for f in left if f.kind in self._CUT_WHEN_UNREPAIRED])
+        if left:
+            made.append(f"unrepaired: {', '.join(f'{f.kind}: {f.detail}' for f in left)}")
+        return text, made, attempts
+
+    # The review's findings that say the turn is untrue and have no backstop further down
+    # `_groom` (`hold_the_door`, `keep_the_goods`, `cut_premature_blows`, `right_hands`,
+    # `press_the_death` and the rest each have theirs). Across the 511 scratch saves of
+    # 2026-10-17, 139 beats logged `unrepaired:`; `contradicts-the-engine` was in 26 and
+    # `stands-elsewhere` in 30 — a felled man standing at 17 of 23 hp, a smithy at the way
+    # in — every one shipped as written. In a fight the retry is gated off, so one refused
+    # rewrite was the end of it.
+    _CUT_WHEN_UNREPAIRED = frozenset({"contradicts-the-engine", "stands-elsewhere"})
+
+    def _cut_untrue(self, text: str, review) -> tuple[str, list[str], list]:
+        """(text, notes, findings still standing). The sentences of the review's truth
+        findings (`_CUT_WHEN_UNREPAIRED`) are each put to the read back's second read
+        (`beat_verify.ask`, the finding's own question) and cut on a yes. The finder is
+        English regex; the model reads, and code cuts. With the read back off (the suite)
+        or a call that fails, the finding's answer stands, as in every second read."""
+        from . import beat_verify
+
+        notes: list[str] = []
+        left: list = []
+        route = {"model": self.prose_model, "host": self.prose_host,
+                 "provider": self.prose_provider, "api_key": self.prose_key}
+        ask = beat_verify.ENABLED and bool(route["model"])
+        for f in review.findings:
+            if f.kind not in self._CUT_WHEN_UNREPAIRED or not f.sentences:
+                left.append(f)
+                continue
+            gone = []
+            questions = list(f.questions) + [""] * (len(f.sentences) - len(f.questions))
+            for sentence, q in zip(f.sentences, questions):
+                if not sentence or narration_mod._cut_sentences(text, [sentence]) == text:
+                    continue
+                if ask and q:
+                    said = narration_mod._sentences(narration_mod.unquoted(text))
+                    at = said.index(sentence) if sentence in said else -1
+                    if not beat_verify.ask(sentence, q, before=said[at - 1] if at > 0 else "",
+                                           **route):
+                        notes.append(f"{f.kind}: the second read refuted {sentence[:60]!r}")
+                        continue
+                gone.append(sentence)
+            if gone:
+                after = narration_mod._cut_sentences(text, gone)
+                if not narration_mod._sentences(narration_mod.unquoted(after)):
+                    # A beat that was nothing but the untrue sentence: an empty page is
+                    # not a repair. Left standing, and logged as unrepaired.
+                    left.append(f)
+                    continue
+                text = after
+                notes += [f"{f.kind}: no rewrite held; cut {s[:80]!r}" for s in gone]
+        return text, notes, left
 
     def repair_beat(self, text: str, complaint: str, player_input: str = "",
                     scene_brief: str = "", *, facts: list[str] | None = None,

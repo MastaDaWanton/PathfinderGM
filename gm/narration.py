@@ -93,6 +93,11 @@ class Finding:
     # them and the registry can drop a finding a heavier one already covers
     # (gm/checks, docs/fix-interfaces.md §2.1). Empty for the review's whole-beat kinds.
     sentences: tuple[str, ...] = ()
+    # One closed yes-or-no question per flagged sentence (aligned with `sentences`), for a
+    # finding whose sentence may be CUT when the rewrite fails: the second read
+    # (`beat_verify.ask`) is asked it first, and only a yes costs the sentence. The
+    # finder here is English regex; the model reads, and code then cuts.
+    questions: tuple[str, ...] = ()
 
 
 @dataclass
@@ -1833,6 +1838,30 @@ def _sentences_about_linked(text: str, name: str, state: dict) -> list[str]:
     return [sents[i] for i in keep]
 
 
+def _felled_question(name: str, claim: str) -> str:
+    """The second read's question for one `contradicts_state` hit, with the person named
+    and the pronoun allowed for.
+
+    Probed 2026-10-17, gemma-4-12B at temperature 0, on 4 felled and 5 standing sentences
+    plus the 14 "down or dead" sentences the regex had flagged in the scratch saves' live
+    `unrepaired:` rows. The read back's own harm wording ("…is down — unconscious,
+    collapsed or fallen and unable to fight — or dead?") said yes to 1 of the 4 felled,
+    and no to the live "He cries out … and collapses against the bar": a "he" is not
+    plainly the one behind the bar. Without the name, "somebody", 4/4 and 0/5, but a yes
+    to "The market continues its frantic pulse around you". This wording 4/4 and 0/5, and
+    of the 14 live hits kept 4 (the collapse at the bar, two crumpled or collapsed bodies,
+    a steward "slumped against a pillar, his arm hanging limp") and refused the regex's
+    false ones — "The wind has died down", "the smith is hunched over his anvil", "her
+    body tense"."""
+    who = definite(str(name))
+    if claim == "hurt":
+        return (f"Does this sentence say that {who} (who may be called he, she or they here) "
+                f"is physically hurt — struck, wounded or burned?")
+    return (f"Does this sentence say that {who} (who may be called he, she or they here) "
+            f"collapses, falls, drops or is knocked to the ground — or is unconscious or "
+            f"dead? Not only staggers, stumbles, reels or steps back.")
+
+
 def contradicts_state(text: str, state: dict | None) -> list[tuple]:
     """Claims in the prose that the engine says are not true.
 
@@ -2543,7 +2572,10 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
                  f"invent somewhere for the scene to happen in.")
                 + f" Rewrite {sentence!r} so it happens at {here}, which is where they "
                   f"are. The only places that exist here are: {real}. Keep the rest.",
-                weight=3,
+                weight=3, sentences=(sentence,),
+                questions=(f"Does this sentence put you (the player) in {where} now — not "
+                           f"somewhere only seen in the distance, remembered, planned or "
+                           f"spoken of?",),
             ))
 
     wrong = contradicts_state(text, state)
@@ -2557,6 +2589,10 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             "sentences to describe the attempt and its failure, and leave everyone "
             "standing exactly as they are. Describe effort, not effect.",
             weight=3,
+            # The sentences, so a rewrite that drops them has lost no event of the
+            # draft's, and so they can be cut when no rewrite holds (`GMAgent.polish`).
+            sentences=tuple(s for _n, _c, s in wrong[:3]),
+            questions=tuple(_felled_question(n, c) for n, c, _s in wrong[:3]),
         ))
 
     # 0b. The square has bodies in it and the prose is describing a market day.

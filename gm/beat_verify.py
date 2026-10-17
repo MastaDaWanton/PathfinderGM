@@ -2110,27 +2110,42 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             (kept if _in_condition(d, lead, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
-        ask = ((f"The sentence before it, for context: {before}\n" if before else "")
-               + f"The sentence: {d.sentence}\n\nQuestion: {q}")
         # An attempt's outcome may be spoken: the person asked says yes or no aloud
         # (`validate` lets its quote be speech for that reason).
-        msgs = [{"role": "system", "content": _CONFIRM_ATTEMPT_SYSTEM
-                 if d.category == "attempt" else _CONFIRM_SYSTEM},
-                {"role": "user", "content": ask}]
-        if bare_template(model):
-            msgs = _raw_prompt(msgs)
-        try:
-            reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                         num_predict=20, provider=provider, api_key=api_key,
-                         schema={"type": "object",
-                                 "properties": {"answer": {"type": "string",
-                                                           "enum": ["yes", "no"]}},
-                                 "required": ["answer"]})
-            yes = str((reply.json() or {}).get("answer") or "") == "yes"
-        except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
-            yes = True
+        yes = ask(d.sentence, q, before=before, chat=chat, model=model, host=host,
+                  provider=provider, api_key=api_key, spoken=d.category == "attempt")
         (kept if yes else refuted).append(d)
     return kept, refuted, round(time.monotonic() - started, 2)
+
+
+def ask(sentence: str, q: str, *, before: str = "", chat=None, model: str = "",
+        host: str = "", provider: str = "ollama", api_key: str = "",
+        spoken: bool = False) -> bool:
+    """One closed yes-or-no question about one sentence (`confirm`'s second read), for any
+    finder whose finding names a sentence and a question: `GMAgent.polish` asks it of the
+    review's truth findings before it cuts a sentence the rewrite could not mend. A call
+    that fails answers yes — the finder's answer stands, as in every second read."""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    text = ((f"The sentence before it, for context: {before}\n" if before else "")
+            + f"The sentence: {sentence}\n\nQuestion: {q}")
+    msgs = [{"role": "system", "content": _CONFIRM_ATTEMPT_SYSTEM if spoken
+             else _CONFIRM_SYSTEM},
+            {"role": "user", "content": text}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=20, provider=provider, api_key=api_key,
+                     schema={"type": "object",
+                             "properties": {"answer": {"type": "string",
+                                                       "enum": ["yes", "no"]}},
+                             "required": ["answer"]})
+        return str((reply.json() or {}).get("answer") or "") == "yes"
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
 
 
 def _shows(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
