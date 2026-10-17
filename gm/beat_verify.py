@@ -221,7 +221,9 @@ class Facts:
                            [p.ref for p in self.people], self.clock,
                            [o.get("intent_id") for o in self.outcomes],
                            # The question asked depends on it (`schema`), so the read does.
-                           self.bodies, [p.holds for p in self.people]],
+                           self.bodies, [p.holds for p in self.people],
+                           # The attempts question too (`attempts_of`).
+                           [(a.code, a.who, a.verdict) for a in attempts_of(self)]],
                           default=str, sort_keys=True)
 
 
@@ -623,6 +625,188 @@ def bodies_messages(text: str, facts: Facts) -> list[dict]:
             {"role": "user", "content": f"People: {'; '.join(people)}\n\nPassage:\n{text}"}]
 
 
+# --- the attempts: a check or a save told the other way round ----------------------------
+#
+# The third question, in a call of its own like the body's (`read_attempts`), asked only
+# on a beat where the engine settled a check or a save (`attempts_of`). Measured 2026-10-16
+# on 0.2.20's code: nothing compared the page with a check's verdict. The claims scrubber
+# (`rules/intents.py`, English regex) backs ANY success claim once the turn has any
+# verdict, so a failed lift told as the cart rising, or a refused request told as the
+# person agreeing, shipped. docs/beat-verify.md, "The attempts", has the bench.
+#
+# Prior art: tools built on the same split — the engine rolls, a model narrates — report
+# this exact defect (agentic-dm-engine issue #34, a death save narrated "passed" under a
+# "fail" badge), and the one repair found in the open (infinite-realms-app PR #345) reads
+# "you succeed"/"you manage to" by regex and spent four rounds narrowing it against false
+# alarms: the endless loop the owner named. Here the reader states, per attempt, a closed
+# answer, and code compares it with the verdict (QAGS's shape: the engine's side is never
+# read). Attacks are not listed: a blow's landing is `blows_shown`'s, read from the
+# engine's own blow records; listing them here would judge one sentence twice.
+SHOWN = ("succeeds", "fails", "unsure")
+# The ops whose verdict is a check's or a save's, the attempt's own success or failure.
+# Not an attack, a manoeuvre or a spell: their verdicts are hits and misses, and the blow
+# lane owns them. A whitelist, so an op that grows a verdict later is asked about only once
+# somebody has looked at what its verdict means.
+_ATTEMPT_OPS = ("check", "save", "judge", "mend", "trade_lore", "haggle", "work", "track",
+                "extinguish", "break_free", "repair")
+
+
+@dataclass(frozen=True)
+class Attempt:
+    code: str              # "a1", the reader's key
+    who: str               # the ref of whoever made it
+    label: str             # the roll, as the engine labels it ("Strength check")
+    verdict: str           # "success" | "failure", the engine's
+    why: str = ""          # what it was for, in plain words, never the verdict
+    save: bool = False
+    request: str = ""      # "payment" | "favour" — a Diplomacy request (`rules/requests.py`)
+    of: str = ""           # who a request or an aid was made of
+
+
+def _roll_label(o: dict, at: int = 0) -> str:
+    rolls = [r for r in o.get("rolls") or () if isinstance(r, dict)]
+    return str(rolls[at].get("label") or "") if len(rolls) > at else ""
+
+
+def attempts_of(facts: Facts) -> list[Attempt]:
+    """Every check and save this turn settled, with its verdict: the engine's side of the
+    attempts question. Built from the outcome records only — the op, the stamped `actor`,
+    the roll's own label, and the structured effects of a request or an aid — never from
+    a tell's words. An outcome with no actor on record (a turn log written before the
+    stamp) is left out: there is nobody to name, so nothing is asked."""
+    out: list[Attempt] = []
+    for o in _resolved(facts):
+        verdict = str(o.get("verdict") or "")
+        if o.get("op") not in _ATTEMPT_OPS or verdict not in ("success", "failure"):
+            continue
+        who = str(o.get("actor") or "")
+        if not who or facts.person(who) is None:
+            continue
+        label = _roll_label(o) or f"{str(o.get('op')).replace('_', ' ')} attempt"
+        aid = next((e for e in _effects(o) if e.get("kind") == "aid"), None)
+        asked = next((e for e in _effects(o) if e.get("kind") == "request"), None)
+        if aid is not None:
+            # Aid Another is two attempts: the helper's against the book's 10, and the
+            # helped person's own effort (CRB p.86). The outcome's verdict is the second.
+            # Live 2026-10-16: the player's help failed and the smith lifted the cart
+            # alone, and the page said exactly that — one verdict would have called it
+            # wrong.
+            helped = str(aid.get("ref") or "")
+            out.append(Attempt(f"a{len(out) + 1}", who, label,
+                               "success" if aid.get("made") else "failure", of=helped))
+            if facts.person(helped) is not None and "done" in aid:
+                helper = "you" if who == facts.pc_ref else _name(facts, who)
+                out.append(Attempt(
+                    f"a{len(out) + 1}", helped, "their own effort at the task",
+                    "success" if aid.get("done") else "failure",
+                    why=f"the task {helper} tried to help with"))
+            continue
+        why = str(o.get("because") or "").strip()
+        if asked is not None:
+            of = str(asked.get("ref") or "")
+            kind = "payment" if asked.get("request") == "payment" else "favour"
+            what = "payment for the work" if kind == "payment" else "a favour"
+            out.append(Attempt(f"a{len(out) + 1}", who, label, verdict,
+                               why=f"asking {_name(facts, of)} for {what}",
+                               request=kind, of=of))
+            continue
+        out.append(Attempt(f"a{len(out) + 1}", who, label, verdict, why=why,
+                           save=o.get("op") == "save" or label.lower().endswith(" save")))
+    return out
+
+
+def attempts_schema(attempts: list[Attempt]) -> dict:
+    """One required property per listed attempt, each a closed `shown` and its quote.
+    Required properties and enums are what this stack enforces (memory
+    `ollama-schema-enforcement`), so every attempt is answered, if only with "unsure"."""
+    s = {"type": "string"}
+    return {"type": "object", "properties": {
+        a.code: {"type": "object", "properties": {
+            "shown": {"type": "string", "enum": list(SHOWN)}, "quote": s},
+            "required": ["shown", "quote"]} for a in attempts},
+        "required": [a.code for a in attempts]}
+
+
+_ATTEMPTS_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\"), and a list of attempts "
+    "the rules settled this turn — who tried what. For each attempt, say how the passage "
+    "tells it turning out:\n"
+    "succeeds: the passage shows it working — the thing done, the person won over or "
+    "agreeing, the lie believed, the trail found; for a save, the person shrugs off or "
+    "escapes what it was against.\n"
+    "fails: the passage shows it not working — the thing not done, the person refusing "
+    "or unmoved, the lie doubted, nothing found; for a save, it takes hold of them.\n"
+    "unsure: the passage does not show how it turned out — only the try, or nothing about "
+    "it at all, or something the passage leaves open.\n"
+    "A person's spoken answer to what they were asked IS how it turned out. A threat, a "
+    "plan or a hope is not. Copy the passage's own words that show it into \"quote\"; "
+    "\"\" when unsure.")
+_ATTEMPTS_DEMO_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman; "
+    "c5: the drover — commoner\n"
+    "Attempts:\n"
+    "a1: you (the player) — Climb check: the player climbs the toll-house wall\n"
+    "a2: you (the player) — Diplomacy check: asking Dunmar Oake for a favour\n"
+    "a3: the drover — Sense Motive check\n\n"
+    "Passage:\n"
+    "You get a boot into a gap in the stones and haul yourself up until your fingers "
+    "close on the top of the wall, and you swing over onto the roof. Below, Dunmar Oake "
+    "folds his arms. 'Not a chance,' he says. 'Find your own boat.' The drover spits into "
+    "the river.")
+_ATTEMPTS_DEMO_ANSWER = {
+    "a1": {"shown": "succeeds", "quote": "you swing over onto the roof"},
+    "a2": {"shown": "fails", "quote": "'Not a chance,' he says"},
+    "a3": {"shown": "unsure", "quote": ""}}
+_ATTEMPTS_DEMO2_USER = (
+    "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman\n"
+    "Attempts:\n"
+    "a1: you (the player) — Fortitude save: the eel's venom\n"
+    "a2: Dunmar Oake — Perception check: he watches the far bank\n\n"
+    "Passage:\n"
+    "The bite throbs, and for a moment your vision swims — then it clears, and the "
+    "numbness ebbs out of your hand. Dunmar Oake squints across the water toward the far "
+    "bank, chewing his lip.")
+_ATTEMPTS_DEMO2_ANSWER = {
+    "a1": {"shown": "succeeds", "quote": "it clears, and the numbness ebbs out of your hand"},
+    "a2": {"shown": "unsure", "quote": ""}}
+
+
+def _attempt_line(a: Attempt, facts: Facts) -> str:
+    who = "you (the player)" if a.who == facts.pc_ref else _name(facts, a.who)
+    return f"{a.code}: {who} — {a.label}" + (f": {a.why}" if a.why else "")
+
+
+def attempts_messages(text: str, facts: Facts, attempts: list[Attempt]) -> list[dict]:
+    people = []
+    for p in facts.people:
+        if not p.here:
+            continue
+        desc = "the player (\"you\")" if p.pc else (p.what or "")
+        people.append(f"{p.ref}: {p.name}" + (f" — {desc}" if desc else ""))
+    listed = "\n".join(_attempt_line(a, facts) for a in attempts)
+    return [{"role": "system", "content": _ATTEMPTS_SYSTEM},
+            {"role": "user", "content": _ATTEMPTS_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_ATTEMPTS_DEMO_ANSWER)},
+            {"role": "user", "content": _ATTEMPTS_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_ATTEMPTS_DEMO2_ANSWER)},
+            {"role": "user", "content": f"People: {'; '.join(people)}\nAttempts:\n{listed}"
+                                        f"\n\nPassage:\n{text}"}]
+
+
+def attempt_claims(answer: dict, attempts: list[Attempt]) -> list[Claim]:
+    """The attempts answer as claims: one per attempt the passage shows either way.
+    "unsure" is no claim — it abstains, as "not listed" does."""
+    out = []
+    if not isinstance(answer, dict):
+        return out
+    for a in attempts:
+        row = answer.get(a.code)
+        if isinstance(row, dict) and row.get("shown") in ("succeeds", "fails"):
+            out.append(Claim("attempt", {"attempt": a.code, "shown": row["shown"]},
+                             str(row.get("quote") or "")))
+    return out
+
+
 def messages(text: str, facts: Facts) -> list[dict]:
     away = any(not p.here for p in facts.people)
     return [{"role": "system", "content": _SYSTEM + (_SYSTEM_AWAY if away else "")},
@@ -735,12 +919,17 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
     """(kept, dropped). A claim is kept only when its quote is the page's own narration
     and its slots are the engine's own values."""
     sentences = _sentences(text)
+    # An attempt's quote may be speech: a person's spoken "Not a chance" to what they were
+    # asked IS the request's outcome on the page, and a refused request told as agreement
+    # is usually told in the agreeing voice. Every other claim stays narration only.
+    written = [(w, w) for w, _n in sentences]
     kept, dropped = [], []
     allowed = {"item": set(facts.things) | {OTHER_THING},
                "from": set(_holders(facts)), "to": set(_holders(facts)),
                "seller": set(_who(facts)), "buyer": set(_who(facts)),
                "who": set(_who(facts)), "how": set(HOW), "place": set(_places(facts)),
-               "part": set(PARTS), "condition": set(CONDITIONS)}
+               "part": set(PARTS), "condition": set(CONDITIONS),
+               "attempt": {a.code for a in attempts_of(facts)}, "shown": set(SHOWN)}
     seen: set[str] = set()
     for c in claims:
         bad = [k for k, v in c.slots.items()
@@ -769,7 +958,18 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
             c.why = "the quote names no hour and no sky"
             dropped.append(c)
             continue
-        c.sentence = place_quote(c.quote, sentences)
+        if c.category == "attempt":
+            # Joined across a gap with an ellipsis — "the ground shows a clear, recent
+            # path... The tracks lead straight toward the knoll" — the quote is two of the
+            # page's own pieces, not one (2 of 32 attempt quotes on the first bench run,
+            # both true claims, both dropped). The first piece long enough to say anything
+            # stands for it; it must still be on the page.
+            pieces = [p for p in re.split(r"\.\.\.|…", c.quote)
+                      if len(_norm(p).split()) >= MIN_QUOTE_WORDS]
+            c.sentence = next((s for s in (place_quote(p, written) for p in pieces) if s),
+                              "")
+        else:
+            c.sentence = place_quote(c.quote, sentences)
         if not c.sentence:
             c.why = "the quote is not the page's narration"
             dropped.append(c)
@@ -820,7 +1020,21 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
             result.raw += "\n" + more.text
             answer = dict(answer or {}, conditions=(more.json() or {}).get("conditions")
                           or [])
-        result.claims, result.dropped = validate(claims_of(answer, facts), text, facts)
+        claims = claims_of(answer, facts)
+        attempts = attempts_of(facts)
+        if attempts:
+            # The third question, on a beat where a check or a save was settled, in a call
+            # of its own (see `_ATTEMPTS_SYSTEM`'s block and docs/beat-verify.md for the
+            # measurement of folding it into the first).
+            msgs = attempts_messages(text, facts, attempts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            more = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                        num_predict=80 + 60 * len(attempts), provider=provider,
+                        api_key=api_key, schema=attempts_schema(attempts))
+            result.raw += "\n" + more.text
+            claims += attempt_claims(more.json() or {}, attempts)
+        result.claims, result.dropped = validate(claims, text, facts)
     except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
     result.seconds = round(time.monotonic() - started, 2)
@@ -975,6 +1189,43 @@ def _condition_unheld(c: Claim, facts: Facts) -> Discrepancy | None:
         "contradiction", "condition",
         f"{name} {'are' if p.pc else 'is'} not {cond}: {why}. The rules put no such state "
         f"on {obj}.", c.sentence, "", c, ref=who)
+
+
+def _attempt_fact(a: Attempt, facts: Facts) -> str:
+    """The engine's verdict on one attempt, as the fact a one-sentence repair is given:
+    who, what, and what it means on the page — with no number (the third law: the margin
+    stays the engine's)."""
+    pc = a.who == facts.pc_ref
+    subj = "You (the player)" if pc else _name(facts, a.who)
+    subj = subj[:1].upper() + subj[1:]
+    obj = "you" if pc else "them"
+    of = _name(facts, a.of) if a.of else ""
+    the = "" if a.label.lower().startswith(("the ", "their ")) else "the "
+    what = f"{the}{a.label}" + (f" ({a.why})" if a.why else "")
+    ok = a.verdict == "success"
+    if a.request:
+        asked = "payment for the work" if a.request == "payment" else "the favour"
+        if ok:
+            return (f"{of[:1].upper() + of[1:]} agrees to the request for {asked}: the "
+                    f"answer is yes.")
+        return (f"{of[:1].upper() + of[1:]} says no to the request for {asked}"
+                + (" and pays nothing: nothing changes hands." if a.request == "payment"
+                   else ": the favour is refused.")
+                + " The answer is no, however it is put.")
+    if a.of:
+        return (f"{subj} {'help' if pc else 'helps'} {of}: the help makes a difference."
+                if ok else
+                f"{subj} {'do' if pc else 'does'} not manage to help {of}: the help makes "
+                f"no difference to {of}'s effort.")
+    if a.save:
+        they = "you" if pc else "they"
+        return (f"{subj} {'make' if pc else 'makes'} {what}: {they} resist it, and it does "
+                f"not take hold of {obj}." if ok else
+                f"{subj} {'fail' if pc else 'fails'} {what}: it takes hold of {obj}, and "
+                f"{they} do not shrug it off.")
+    return (f"{subj} {'succeed' if pc else 'succeeds'} at {what}: the attempt works." if ok
+            else f"{subj} {'fail' if pc else 'fails'} at {what}: the attempt does not work, "
+                 f"and what was tried is not done.")
 
 
 def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]:
@@ -1171,6 +1422,11 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             found = _condition_unheld(c, facts)
             if found is not None:
                 out.append(found)
+        elif c.category == "attempt":
+            a = next((x for x in attempts_of(facts) if x.code == s["attempt"]), None)
+            if a is not None and (s["shown"] == "succeeds") != (a.verdict == "success"):
+                out.append(Discrepancy("contradiction", "attempt", _attempt_fact(a, facts),
+                                       c.sentence, "", c, ref=a.who))
         elif c.category == "hour":
             h = _hour(facts)
             if h is not None and h not in PARTS[s["part"]]:
@@ -1285,6 +1541,23 @@ def question(d: Discrepancy, facts: Facts) -> str:
         be = "are" if s["who"] == facts.pc_ref else "is"
         return (f"Does this sentence say that {who} {be} {_COND_WHAT[s['condition']]} — "
                 f"actually so, not only grabbed at, aimed at, threatened or nearly?")
+    if c.category == "attempt":
+        a = next((x for x in attempts_of(facts) if x.code == s["attempt"]), None)
+        if a is None:
+            return ""
+        whose = ("your (the player's)" if a.who == facts.pc_ref
+                 else f"{_name(facts, a.who)}'s")
+        what = a.label + (f" ({a.why})" if a.why else "")
+        if a.save:
+            how = ("working — they shrug off or escape what it was against"
+                   if s["shown"] == "succeeds" else
+                   "failing — what it was against takes hold of them")
+        else:
+            how = ("working — done, agreed to, believed or found"
+                   if s["shown"] == "succeeds" else
+                   "failing — not done, refused, doubted or not found")
+        return (f"Does this sentence show {whose} attempt — {what} — {how}? Not only the "
+                f"try, a threat or a hope.")
     if c.category == "shown":
         return (f"Does this sentence show {_name(facts, s['who'])} here, doing or saying "
                 f"something now — not only remembered or spoken of?")
@@ -1318,6 +1591,9 @@ _CONFIRM_SYSTEM = (
     "You answer one yes-or-no question about one sentence of a story told to a player "
     "(\"you\"). Answer from what the narrator says, not from what a character says aloud "
     "inside quotation marks.")
+_CONFIRM_ATTEMPT_SYSTEM = (
+    "You answer one yes-or-no question about one sentence of a story told to a player "
+    "(\"you\"). A person's spoken answer to what they were asked counts as what happened.")
 
 
 def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
@@ -1362,7 +1638,10 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             continue
         ask = ((f"The sentence before it, for context: {before}\n" if before else "")
                + f"The sentence: {d.sentence}\n\nQuestion: {q}")
-        msgs = [{"role": "system", "content": _CONFIRM_SYSTEM},
+        # An attempt's outcome may be spoken: the person asked says yes or no aloud
+        # (`validate` lets its quote be speech for that reason).
+        msgs = [{"role": "system", "content": _CONFIRM_ATTEMPT_SYSTEM
+                 if d.category == "attempt" else _CONFIRM_SYSTEM},
                 {"role": "user", "content": ask}]
         if bare_template(model):
             msgs = _raw_prompt(msgs)

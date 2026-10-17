@@ -243,7 +243,9 @@ def test_the_bench_labels_only_values_the_engine_offers():
                    "from": set(bv._holders(facts)), "to": set(bv._holders(facts)),
                    "seller": set(bv._who(facts)), "buyer": set(bv._who(facts)),
                    "who": set(bv._who(facts)), "how": set(bv.HOW), "part": set(bv.PARTS),
-                   "condition": set(bv.CONDITIONS)}
+                   "condition": set(bv.CONDITIONS),
+                   "attempt": {a.code for a in bv.attempts_of(facts)},
+                   "shown": set(bv.SHOWN)}
         for claim in beat["claims"]:
             for k, v in claim.items():
                 if k in allowed:
