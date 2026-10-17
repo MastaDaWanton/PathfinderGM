@@ -97,6 +97,36 @@ def test_somebody_held_elsewhere_in_town_is_asked_too(monkeypatch):
     assert [(s, w) for s, w, _b in rows] == [(LUNGE, "The other man")]
 
 
+ASK_SECOND = "Do you turn to face the second man or move for the exit?"
+
+
+def test_a_closing_question_that_offers_nobody_here_is_cut(monkeypatch):
+    """Live 2026-10-17 (integration branch, gemma-4-12B): the other man's charge was cut,
+    and the beat still closed "Do you turn to face the second man or move for the exit?" —
+    the reader's newcomer "second man", here. No model call: the reader's closed answer and
+    the question being the last sentence are the whole test. The groom then puts the plain
+    hand-back in its place (`ensure_hand_back`)."""
+    text = "The blade finds the gap in his jerkin. " + ASK_SECOND
+    reading = _reading(text, ("the second man", ASK_SECOND, beat_reader.HERE))
+    monkeypatch.setattr(bv, "ENABLED", True)
+    monkeypatch.setattr(bv, "ask", lambda *a, **k: False)   # he does not FIGHT in it
+    phantom_fighter._ASKED.clear()
+    found = phantom_fighter.find(_ctx(text, reading))
+    assert [(f.kind, f.sentences) for f in found] == [("hand-back-names-nobody", (ASK_SECOND,))]
+    out, notes = phantom_fighter.backstop(_ctx(text, reading), text, found)
+    assert out == "The blade finds the gap in his jerkin."
+    assert notes == [f"a question about nobody here: cut {ASK_SECOND[:70]!r}"]
+    from gm import narration
+
+    assert narration.ensure_hand_back(out)[0].endswith("?")
+    # Not in a fight, or a question about somebody the engine holds: left.
+    assert phantom_fighter.hand_back_naming_nobody(_ctx(text, reading, fighting=False)) == ""
+    held = mentions.Mention(id="m1", sentence=ASK_SECOND, phrase="the second man",
+                            kind="description", model="c8")
+    r = beat_reader.Reading(mentions=[held], read=True, refs={"pc", "c8"})
+    assert phantom_fighter.hand_back_naming_nobody(_ctx(text, r)) == ""
+
+
 def test_the_member_is_cut_only():
     """A rewrite's re-check would read the reader's mentions of the OLD sentence, find none,
     and pass a rewrite that still has him lunging."""

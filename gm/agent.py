@@ -2371,6 +2371,15 @@ class GMAgent:
                 repairs.append(
                     f"phantom opposition: cut {len(ghosts)} sentence(s) of enemies "
                     f"who are not in the scene")
+        # The last thing on every door: no number this turn rolled or dealt stays on the
+        # page. Live 2026-10-17: "piercing his flesh for 5 damage" shipped from the blow
+        # pass; every backstop now writes `page_line`, and this is the guard under a
+        # rewrite or a backstop that forgets to. The numbers come from the outcome
+        # records (`narration.turn_numbers`), never from reading the page.
+        text, numbered = narration_mod.strip_turn_numbers(
+            text, list(outcomes or ()) or list(getattr(ctx, "outcomes", ()) or ()))
+        if numbered:
+            repairs.append(f"a number on the page: took off {'; '.join(numbered)[:120]}")
         return text, repairs, attempts
 
     # --- The narrator checks (gm/checks) ------------------------------------------------
@@ -3114,10 +3123,9 @@ class GMAgent:
         wrong = narration_mod.wrong_actor(text, acting, pc_name, others, named=named)
         if not wrong:
             return text, [], []
-        from play.views import plain_tell
 
-        plain = [narration_mod.pc_to_second_person(plain_tell(t), pc_name)[0]
-                 if pc_name else plain_tell(t) for t in (tells or []) if t]
+        plain = [narration_mod.pc_to_second_person(narration_mod.page_line(t), pc_name)[0]
+                 if pc_name else narration_mod.page_line(t) for t in (tells or []) if t]
         shown = [narration_mod.pc_to_second_person(t, pc_name)[0] if pc_name else t
                  for t in (tells or []) if t]
         sentence, why = wrong[0]
@@ -3428,7 +3436,10 @@ class GMAgent:
         owed, unshown = self._blows_unshown(text, outcomes, player_input)
         if not unshown:
             return text, [], []
-        lines = [" ".join(str(b["tell"]).split()) for b in unshown]
+        # The engine's line with its numbers off (`page_line`): handed to the model as the
+        # deed, "for 5 piercing" came back "piercing his flesh for 5 damage" (live,
+        # 2026-10-17), and the backstop below writes the same line onto the page.
+        lines = [narration_mod.page_line(" ".join(str(b["tell"]).split())) for b in unshown]
         deeds = [{"act": "attack", "span": line} for line in lines]
         # Blows that hurt nobody (off the outcome RECORD through `_changes_from`, the one
         # reader of effect records here — never the tells' words): the passage may not
@@ -4235,9 +4246,8 @@ class GMAgent:
     def _blows_from(self, outcomes: list) -> list[dict]:
         """Who struck this turn, from the attack outcomes that rolled — the reviewer's
         feed for `wrong-hands`. `{"attacker", "pc", "tell"}` per blow; the tell is the
-        plain, second-person line the backstop stands in the prose's place."""
-        from play.views import plain_tell
-
+        plain, second-person line the backstop stands in the prose's place — with its
+        numbers off (`narration.page_line`), since the backstop writes it into prose."""
         pc = self.engine.scene.pc()
         out = []
         for o in outcomes or []:
@@ -4252,7 +4262,7 @@ class GMAgent:
             if joined:
                 # The fight declared and the swing deferred: no blow to be in anybody's
                 # hands yet, which `premature_blows` reads.
-                line = plain_tell(str(getattr(o, "tell", "") or ""))
+                line = narration_mod.page_line(str(getattr(o, "tell", "") or ""))
                 if pc is not None:
                     line, _ = narration_mod.pc_to_second_person(line, pc.name)
                 out.append({"attacker": "", "pc": True, "joined": True, "tell": line})
@@ -4263,7 +4273,7 @@ class GMAgent:
             attacker = actor.name if actor is not None else tell.split("'")[0].split(" hits ")[0].split(" misses ")[0].strip()
             is_pc = bool(pc is not None and (attacker == pc.name
                                              or tell.startswith(pc.name)))
-            line = plain_tell(tell)
+            line = narration_mod.page_line(tell)
             if pc is not None:
                 line, _ = narration_mod.pc_to_second_person(line, pc.name)
             out.append({"attacker": attacker or "somebody", "pc": is_pc, "tell": line})

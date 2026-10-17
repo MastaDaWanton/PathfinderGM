@@ -37,7 +37,7 @@ from __future__ import annotations
 from gm.narration import Finding
 
 ORDER = 11
-KINDS = frozenset({"fighter-not-in-fight"})
+KINDS = frozenset({"fighter-not-in-fight", "hand-back-names-nobody"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 REWRITE = False
 
@@ -119,6 +119,40 @@ def candidates(ctx) -> list[tuple[str, str, str]]:
     return out[:MAX_ASKS]
 
 
+def hand_back_naming_nobody(ctx) -> str:
+    """The beat's closing question, when it names somebody the engine does not hold here
+    in a fight — a mention the beat reader answered "new" and here, or gave to somebody
+    held elsewhere — or "". Structure only: the reader's closed answer, and the question
+    being the page's last sentence.
+
+    Measured live 2026-10-17 (integration branch, gemma-4-12B): the fighting sentence of
+    "the other man" was cut, and the beat still closed "Do you turn to face the second man
+    or move for the exit?" — the reader's newcomer "second man", here. A choice offered on
+    nobody: he has no body in a fight, so whatever the player answers acts on air, and the
+    phantom comes back next beat from the player's own words. Not asked of the model:
+    whether the question has him fight does not matter, only that it offers him."""
+    from gm import beat_reader, mentions
+
+    from ._page import page_sentences
+
+    if not bool(getattr(ctx.scene, "in_encounter", False)):
+        return ""
+    reading = ctx.attribution
+    if not isinstance(reading, beat_reader.Reading) or not reading.read:
+        return ""
+    page = page_sentences(ctx.text)
+    if not page or not page[-1][0].rstrip().endswith("?"):
+        return ""
+    last = page[-1][0]
+    nobody = {mid for n in reading.newcomers if n.where == beat_reader.HERE
+              for mid in n.mentions}
+    nobody |= {m.id for m in reading.mentions if m.ref and m.ref in (reading.away or ())}
+    for m in reading.mentions:
+        if m.id in nobody and mentions._key(m.sentence) == mentions._key(last):
+            return last
+    return ""
+
+
 def find(ctx) -> list:
     from gm import beat_verify, mentions
 
@@ -126,6 +160,14 @@ def find(ctx) -> list:
     if not beat_verify.ENABLED or not route.get("model"):
         return []
     out = []
+    asked = hand_back_naming_nobody(ctx)
+    if asked:
+        out.append(Finding(
+            "hand-back-names-nobody",
+            f"the closing question offers somebody the engine does not hold in this fight: "
+            f"{asked[:90]!r}",
+            "The closing question names somebody who is not in this fight. Ask only about "
+            "the people the engine holds.", weight=3, sentences=(asked,)))
     for sentence, words, before in candidates(ctx):
         key = (mentions._key(sentence), words)
         if key not in _ASKED:
@@ -149,13 +191,17 @@ def find(ctx) -> list:
 
 
 def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
-    """The sentences still on the page go."""
+    """The sentences still on the page go. A cut closing question is put back as the
+    plain hand-back by the groom (`narration.ensure_hand_back`), on the doors that hand
+    back at all."""
     from ._page import cut
 
     notes = []
     for f in findings:
+        what = ("a question about nobody here" if f.kind == "hand-back-names-nobody"
+                else "fighter not in the fight")
         for s in f.sentences:
             if s and s in text:
                 text = cut(text, [s])
-                notes.append(f"fighter not in the fight: cut {s[:70]!r}")
+                notes.append(f"{what}: cut {s[:70]!r}")
     return text, notes
