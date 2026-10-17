@@ -6505,7 +6505,9 @@ class Engine:
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders), attacker=actor)
-        ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
+        # The AC's parts past the sheet's own number, (what, how much), so the tell can
+        # state the number the roll was judged on and say what made it (`_ac_said`).
+        sheet_ac, ac_parts = target_ac, []
         # Brilliant energy (CRB): "armor bonuses to AC (including any enhancement bonuses
         # to that armor) do not count against it". Both shield and armour are dropped —
         # the book's own example ("a brilliant energy weapon ignores ... shields") — and
@@ -6517,15 +6519,15 @@ class Engine:
                         weapon["category"], flat_footed or bool(flounders), attacker=actor)
                     if (m.type or "") not in ("armour", "shield")]
             if sum(m.value for m in kept) < target_ac:
+                ac_parts.append(("armour and shield passed through",
+                                 sum(m.value for m in kept) - target_ac))
                 target_ac = sum(m.value for m in kept)
-                ac_note = (f"AC {target_ac}, armour and shield passed through"
-                           + (" (flat-footed)" if flat_footed else ""))
         worn_ac = target_ac
         if wet_defender:
             against = water.bonus_against(wet_defender)
             if against:
                 target_ac -= against
-                ac_note += f", floundering in the water"
+                ac_parts.append(("floundering in the water", -against))
 
         # What the board is worth to the defender. Added to the number being rolled
         # against rather than taken off the attack roll: the two are the same arithmetic
@@ -6541,11 +6543,17 @@ class Engine:
         cover_mods = position_mod.ac_mods(self.scene, actor, defender)
         if cover_mods:
             target_ac += sum(m.value for m in cover_mods)
-            ac_note += " with " + ", ".join(m.source for m in cover_mods)
+            ac_parts.extend((m.source, m.value) for m in cover_mods)
+        # Written from the final number. Measured live 2026-10-16 on master: "misses the
+        # smith (10 against AC 10 (flat-footed) with cover)" while the dice popup asked to
+        # beat 14 — the note was formatted before cover's +4 (and floundering's -2) were
+        # added, so a printed 10 against 10 read as a hit beside the verdict "misses".
+        ac_note = _ac_said("AC", sheet_ac, flat_footed, ac_parts)
         # What the water and the board added, kept apart so a touch attack below can
         # stand them on the touch AC instead: floundering and cover are about where the
         # defender is, not about what they wear.
         footing = target_ac - worn_ac
+        footing_parts = [p for p in ac_parts if p[0] != "armour and shield passed through"]
 
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
@@ -6672,10 +6680,9 @@ class Engine:
             if printed.get("touch"):
                 # "tongue +7 touch", "incorporeal touch +5": armour, shield and natural
                 # armour do not count. 243 printed attacks say so.
-                swing_ac = defender.touch_ac(flat_footed or bool(flounders),
-                                             attacker=actor) + footing
-                swing_note = (f"touch AC {swing_ac}"
-                              + (" (flat-footed)" if flat_footed else ""))
+                touch = defender.touch_ac(flat_footed or bool(flounders), attacker=actor)
+                swing_ac = touch + footing
+                swing_note = _ac_said("touch AC", touch, flat_footed, footing_parts)
                 # Ghost touch armour (CRB): "its enhancement bonus and armor bonus count
                 # against the touch attacks of incorporeal creatures" — asked of the
                 # defender's `property.ghost-touch-armour` tag (law 1), and only the
@@ -6687,8 +6694,9 @@ class Engine:
                         if (m.type or "") in ("armour", "shield"))
                     if worn:
                         swing_ac += worn
-                        swing_note = (f"touch AC {swing_ac}, the ghost touch armour "
-                                      f"counting" + (" (flat-footed)" if flat_footed else ""))
+                        swing_note = _ac_said(
+                            "touch AC", touch, flat_footed,
+                            [("the ghost touch armour counting", worn), *footing_parts])
             # The defender rides in the roll context, so a term that is "against fey"
             # (cold iron's, contract §2) is asked of THIS defender and nobody else.
             if dancing:
@@ -18559,11 +18567,12 @@ class Engine:
         else:
             flat_footed = self._flat_footed(defender)
             ac = defender.touch_ac(flat_footed, attacker=actor)
-            note = f"touch AC {ac}" + (" (flat-footed)" if flat_footed else "")
             cover = position_mod.ac_mods(self.scene, actor, defender)
+            # From the final number, as the attack's note is (`_ac_said`): this printed
+            # the touch AC before cover's +4 and appended "with cover".
+            note = _ac_said("touch AC", ac, flat_footed, [(m.source, m.value) for m in cover])
             if cover:
                 ac += sum(m.value for m in cover)
-                note += " with " + ", ".join(m.source for m in cover)
             mods = actor.splash_attack_modifiers(defender)
         if feet and int(feet) > inc:
             n = (int(feet) - 1) // inc
@@ -23600,6 +23609,24 @@ def miss_how(short_by: int, cover: bool) -> str:
     if cover:
         return "cover"
     return "close" if short_by <= 2 else "wide" if short_by >= 8 else "plain"
+
+
+def _ac_said(kind: str, base: int, flat_footed: bool, parts=()) -> str:
+    """The defence a roll was judged on, as a tell states it: the final number first,
+    then what made it — "AC 14 (10 flat-footed, +4 cover)", "touch AC 9 (11, -2
+    floundering in the water)", or plain "AC 12 (flat-footed)" when nothing was added.
+
+    The number is the sum, never the sheet's own figure with the extras trailing after
+    it in words. Until 2026-10-16 the attack tell printed the sheet's AC and appended
+    "with cover": "10 against AC 10 (flat-footed) with cover" for a miss judged against
+    14, which the dice popup showed as "beat 14". `parts` are (what, signed amount)."""
+    parts = [(str(what), int(amount)) for what, amount in parts or () if int(amount)]
+    total = int(base) + sum(amount for _, amount in parts)
+    if not parts:
+        return f"{kind} {total}" + (" (flat-footed)" if flat_footed else "")
+    first = f"{int(base)}" + (" flat-footed" if flat_footed else "")
+    return (f"{kind} {total} (" + ", ".join(
+        [first, *(f"{amount:+d} {what}" for what, amount in parts)]) + ")")
 
 
 def _instrument(weapon: dict, weapon_key: str) -> str:
