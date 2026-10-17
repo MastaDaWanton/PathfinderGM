@@ -133,6 +133,72 @@ def build_echo_index(*sources: str) -> set[tuple]:
     return out
 
 
+# A placeholder an example carries until the prompt fills it: `{Current Enemy}`,
+# `{Companion}`, `{Other}`. The index splits a passage at each one instead of filling it,
+# because the narrator was shown it filled with whoever is really there — "the figure",
+# "Ragnar" — and an index filled with "stranger" holds windows across the slot that no
+# real copy contains.
+_PLACEHOLDER = re.compile(r"\{[^{}]*\}")
+_DEMO_INDEX: set[tuple] | None = None
+
+
+def demonstration_index(extra=()) -> set[tuple]:
+    """Every six-word run of every worked reply a narrator is shown
+    (`prompts.demonstrations`), speaker tags lifted and split at the placeholders; and of
+    `extra`, the passages shown this beat on top of the fixed sets (the owner's intimate
+    passages, read fresh from their file each beat). The fixed part is built once."""
+    global _DEMO_INDEX
+    if _DEMO_INDEX is None:
+        from . import prompts
+
+        built: set[tuple] = set()
+        for _name, passage in prompts.demonstrations():
+            for part in _PLACEHOLDER.split(speech.lift(passage)[0]):
+                built |= _ngrams(part)
+        _DEMO_INDEX = built
+    if not extra:
+        return _DEMO_INDEX
+    out = set(_DEMO_INDEX)
+    for passage in extra:
+        out |= _ngrams(speech.lift(str(passage or ""))[0])
+    return out
+
+
+# How many six-word runs one sentence must share with the demonstrations before it is a
+# copy and not a coincidence: three, which is eight words running. Measured 2026-10-16
+# over 5,910 recorded beats (tests/replay and every scratchpad save and audit): every
+# sentence sharing ONE or TWO runs was stock English — "He does not look up from the…",
+# "…would you? What do you do?", "What is the first thing you do?" — and every one sharing
+# THREE or more was lifted: "He is faster over the open floor than he was in the press",
+# "You break contact and the window is four running steps away…" (6 to 10+ runs). The
+# opening's own copy check reached the same line from the other side
+# (`play.opening_prose.COPIED_RUNS`): a six-word match on stock English is a coincidence.
+COPIED_RUNS = 3
+
+
+def copied_sentences(text: str, index: set[tuple] | None = None) -> list[str]:
+    """The sentences of `text`, as written on the page, that are copied from the
+    demonstrations: each shares `COPIED_RUNS` or more six-word runs with `index` (by
+    default `demonstration_index()`). A set comparison of the page with text the app
+    itself wrote — never a reading of what the prose means."""
+    index = demonstration_index() if index is None else index
+    if not text or not index:
+        return []
+    out = []
+    for m in _SENTENCE.finditer(str(text)):
+        written = m.group(0).strip()
+        if written and len(_ngrams(speech.lift(written)[0]) & index) >= COPIED_RUNS:
+            out.append(written)
+    return out
+
+
+def without_sentences(text: str, sentences) -> str:
+    """`text` with each of `sentences` taken out (first occurrence), spaces tidied."""
+    for s in sentences or ():
+        text = text.replace(s, " ", 1)
+    return re.sub(r"\s{2,}", " ", text or "").strip()
+
+
 def unquoted(text: str) -> str:
     """The narration with spoken dialogue removed.
 

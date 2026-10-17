@@ -3919,3 +3919,40 @@ def cheat_messages(briefing_scene: str, wish: str) -> list[dict]:
         {"role": "user",
          "content": f"The author writes: {wish}\n\nMake it true."},
     ]
+
+
+# --- every demonstration a narrator is shown, for the echo index -------------------------
+#
+# One list, read by `narration.demonstration_index`, because the index was a hand-kept list
+# in `GMAgent._echo_index` and every new example set had to remember to join it. Two did
+# not: COMBAT_EXAMPLES and CARRY_ON_EXAMPLES were added to it only after a night fight
+# shipped "You break contact and the window is four running steps away..." (lane C3,
+# 2026-10-07), and the consequence call's creature example, the three repair examples,
+# the companion answers, the interjections and the confidences never joined at all.
+# `tests/test_demonstration_echoes.py` holds every `*EXAMPLE*` constant in this module to
+# this list, so the next set cannot be forgotten either.
+#
+# The replies only: what a call is shown as its OWN output is what it copies. The
+# placeholder tokens stay in (`{Current Enemy}`, `{Companion}`): the index splits the
+# passage at them, because the narrator sees them filled with whoever is really there.
+def demonstrations() -> tuple[tuple[str, str], ...]:
+    """(name, passage) for every worked reply a prose-writing call is shown."""
+    out: list[tuple[str, str]] = []
+    for name in ("EXAMPLES", "COMBAT_EXAMPLES", "CARRY_ON_EXAMPLES", "NPC_EXAMPLES",
+                 "COMPANION_EXAMPLES", "COMPANION_ANSWER_EXAMPLES"):
+        for i, ex in enumerate(globals()[name]):
+            out.append((f"{name}[{i}]", str(ex["reply"]["narration"])))
+    for i, ex in enumerate(INTERJECT_EXAMPLES):
+        out.append((f"INTERJECT_EXAMPLES[{i}]", str(json.loads(ex["assistant"])["line"])))
+    for kind, rows in CONFIDE_EXAMPLES.items():
+        for i, ex in enumerate(rows):
+            out.append((f"CONFIDE_EXAMPLES[{kind}][{i}]", str(ex["line"])))
+    out.append(("CONSEQUENCE_EXAMPLE", CONSEQUENCE_EXAMPLE["assistant"]))
+    out.append(("CONSEQUENCE_NPC_EXAMPLE", CONSEQUENCE_NPC_EXAMPLE["assistant"]))
+    out.append(("ACTOR_REPAIR_EXAMPLE",
+                str(json.loads(ACTOR_REPAIR_EXAMPLE["assistant"])["narration"])))
+    for key, line in json.loads(MANNER_REPAIR_EXAMPLE["assistant"]).items():
+        out.append((f"MANNER_REPAIR_EXAMPLE[{key}]", str(line)))
+    out.append(("NARRATION_REPAIR_EXAMPLE",
+                str(json.loads(NARRATION_REPAIR_EXAMPLE["assistant"])["narration"])))
+    return tuple(out)

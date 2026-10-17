@@ -225,6 +225,13 @@ class Demonstrations:
     skipped: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
+    def passages(self) -> tuple[str, ...]:
+        """The chosen passages' replies, for the echo index: a beat that copies one of
+        the owner's passages word for word is as much a copy as one that copies a
+        shipped example (`narration.demonstration_index`)."""
+        return tuple(str((ex.get("reply") or {}).get("narration") or "")
+                     for ex in self.examples if isinstance(ex, dict))
+
 
 def parse(raw: str) -> tuple[list[Passage], list[str]]:
     """Every passage in the file, in order, and why any was left out. Comment lines go
