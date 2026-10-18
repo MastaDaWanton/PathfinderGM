@@ -122,17 +122,45 @@ def _fake(calls, *, slot_text=None, free="", fail_slots=False):
 
 # --- the switch --------------------------------------------------------------------------
 
-def test_the_switch_defaults_to_free_round_trips_and_refuses_nonsense(rules_dir):
-    """Free is the default, the owner flips it to try Planned, and the file must read back
-    what it wrote: the content switch shipped once as a key `set_active` wrote and the
-    whitelist in `active` dropped, so it could be pressed and never held."""
-    assert houserules.narration() == "free"
-    rules, problems = houserules.set_active({"narration": "planned"})
-    assert not problems and rules["narration"] == "planned"
+def test_the_switch_defaults_to_planned_round_trips_and_refuses_nonsense(rules_dir):
+    """Planned is the default since 2026-10-18 (the owner, on the blind fight bench of
+    2026-10-17: Free 0.59 errors a beat with 67% of fight turns wrong, Planned 0.04 and 7%).
+    Free can still be chosen, and the file must read back what it wrote: the content switch
+    shipped once as a key `set_active` wrote and the whitelist in `active` dropped, so it
+    could be pressed and never held."""
     assert houserules.narration() == "planned"
+    rules, problems = houserules.set_active({"narration": "free"})
+    assert not problems and rules["narration"] == "free"
+    assert houserules.narration() == "free"
     rules, problems = houserules.set_active({"narration": "poetic"})
     assert problems and "'free' or 'planned'" in problems[0]
-    assert houserules.narration() == "planned", "a refused change leaves the rule alone"
+    assert houserules.narration() == "free", "a refused change leaves the rule alone"
+
+
+def test_an_inherited_free_moves_to_planned_and_a_chosen_free_stays(rules_dir):
+    """Every save of any house rule writes the whole set, so a file from before 2026-10-18
+    says "free" for anybody who ever saved a setting — a point-buy tier, the content
+    switch — whether or not they ever touched the narrator. That "free" was the old default
+    written back, and it gives way to Planned; a Free picked in Settings is kept, and so is
+    a choice made after this change."""
+    import json
+
+    path = houserules._path()
+    # An older file: some other rule was saved, and the old default came along with it.
+    path.write_text(json.dumps({"point_buy": 25, "narration": "free"}), encoding="utf-8")
+    assert houserules.narration() == "planned"
+    assert houserules.active()["point_buy"] == 25, "the rule that was chosen still holds"
+    # Saving another rule now writes the new default back, not the old one.
+    houserules.set_active({"content": "fade"})
+    assert houserules.narration() == "planned"
+    # Free chosen in Settings holds, through later saves of other rules.
+    houserules.set_active({"narration": "free"})
+    houserules.set_active({"point_buy": 20})
+    assert houserules.narration() == "free"
+    # And a file that already recorded a chosen Free keeps it.
+    path.write_text(json.dumps({"narration": "free", "narration_chosen": True}),
+                    encoding="utf-8")
+    assert houserules.narration() == "free"
 
 
 def test_the_switch_is_served_and_set_through_the_house_rules_endpoint(rules_dir):

@@ -92,9 +92,20 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             # beat out as slots and the narrator writes each slot alone (gm/planned.py).
             # Measured 2026-10-09 on the owner's model, three live runs hand-scored
             # against the engine's facts: planned made about a third of the errors and
-            # wrote beats half as long and plainer. Free stays the default; the owner
-            # flips it to try it in play. An intimate beat is always free.
-            "narration": "free",
+            # wrote beats half as long and plainer. An intimate beat is always free.
+            #
+            # Planned is the default since 2026-10-18 (owner: "make planned the default
+            # narrator"), on the blind fight bench of 2026-10-17: Free 0.59 errors a beat
+            # with 67% of fight turns wrong, Planned 0.04 and 7%, on the same build
+            # (memory note narration-accuracy-measured; data in that session's scratchpad
+            # accm\). Free stays in Settings for a table that wants it.
+            # Beside it on disk, not a rule of its own: `narration_chosen`, whether the
+            # narrator was chosen in Settings rather than inherited. Every save of ANY
+            # house rule writes the whole set (`set_active`), so a file from before
+            # 2026-10-18 says "free" for anybody who ever saved a setting, chosen or not.
+            # Only a choice made on purpose is kept; an inherited "free" moves to the new
+            # default (`active`).
+            "narration": "planned",
             # Homebrew level-up grants, asked for 2026-10-04: "1 extra feat and 2 ability
             # points every level, every odd level, or every even level", with the two
             # pickers separate "so i can assign feats to odd levels and ability points to
@@ -180,8 +191,12 @@ def active() -> dict:
             out["content"] = said
         # The narrator switch, for the same reason: a key left out here is a switch that
         # can be pressed and never holds.
+        # A stored narrator holds only when it was chosen (`narration_chosen`, written by
+        # `set_active` when the switch is pressed): an older file's "free" was the old
+        # default written back by saving some other rule, and it gives way to the new one.
         said = str(raw.get("narration", "") or "").strip().lower()
-        if said in NARRATION_MODES:
+        out["narration_chosen"] = bool(raw.get("narration_chosen", False))
+        if said in NARRATION_MODES and (out["narration_chosen"] or said != "free"):
             out["narration"] = said
         # The level-up grants, named here for the reason the two comments above give:
         # a key this whitelist leaves out is written and silently never read back.
@@ -237,6 +252,7 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
                             f"'free' or 'planned'.")
         else:
             current["narration"] = want
+            current["narration_chosen"] = True
     for key, what in (("bonus_feats", "bonus feat"),
                       ("bonus_ability_points", "bonus ability point")):
         if key not in updates:
@@ -314,8 +330,8 @@ def content() -> str:
 def narration() -> str:
     """"free" or "planned": who lays out the beat's prose (gm/planned.py). Read on every
     beat, so a change in Settings holds from the next one."""
-    said = str(active().get("narration", "free") or "free")
-    return said if said in NARRATION_MODES else "free"
+    said = str(active().get("narration", "planned") or "planned")
+    return said if said in NARRATION_MODES else "planned"
 
 
 def qualifies(rhythm: str, level: int) -> bool:

@@ -491,6 +491,11 @@ def live(tmp_path, monkeypatch):
         cm._LIVE.clear()
         concurrency.reset_for_tests()
         monkeypatch.setattr(houserules, "content", lambda: "explicit")
+        # An intimate beat is always written the free way, whatever the switch says; these
+        # tests hold it against an ORDINARY beat on that same free path (its 1,800 clamp,
+        # its briefing). Planned became the default on 2026-10-18, so the ordinary beat is
+        # pinned to free here rather than inherited.
+        monkeypatch.setattr(houserules, "narration", lambda: "free")
         cm.set_active("adults")
         c = cm.current("adults")
         # The fixture world opens on a chase; this scene is a quiet room.

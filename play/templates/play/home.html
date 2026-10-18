@@ -1618,7 +1618,7 @@ function paneRules() {
       read from the next beat. The model that writes it is the Consequence job in
       Settings.</p>
     <h2 style="margin-top:22px">How the narrator writes</h2>
-    <p>The narrator is set to ${(r.narration || "free") === "planned" ? "Planned" : "Free"}.
+    <p>The narrator is set to ${(r.narration || "planned") === "planned" ? "Planned" : "Free"}.
       That switch lives in Settings, so it can be changed from the table between two
       beats.</p>
     <div id="ruleserr"></div>`;
@@ -2107,7 +2107,7 @@ function narrationPanel() {
     return `<h2 class="sect">How the narrator writes</h2>
       <p class="note">Reading the setting…</p>`;
   }
-  const mode = RULES.rules.narration || "free";
+  const mode = RULES.rules.narration || "planned";
   // The grid is held in 34px a side: the card frames' ironmongery reaches 34px past each
   // card (`.card::after`), and a grid filling the pane put it past the pane's edge, so
   // Settings scrolled sideways at 601px (by 34px on the page, 18px embedded over the
