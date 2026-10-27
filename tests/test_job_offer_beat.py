@@ -168,6 +168,57 @@ def test_a_sentence_opening_a_quotation_is_repaired_with_its_speaker():
     assert "if qa <= at and at + len(sentence) <= qb" in src
 
 
+def test_a_coins_name_never_lands_a_tell_on_the_nation_it_is_named_for():
+    """The cause under the next test, measured on the re-run's save: the job tell ("…6
+    Eldrida gold pieces in all… work…") hit the Cartographers' Conclave card's keys "work" and
+    "eldrida" — the coin's name — and was filed as that world card's newest fact, twice; the
+    matter slot, told the card's latest fact, wrote the caravan as the Conclave's matter.
+    The coin as the engine writes it is money, not a word about anything."""
+    from types import SimpleNamespace
+
+    from rules import cards
+
+    facts = ["Their work has led to trade agreements in Eldrida."]
+    title = "A network of mapmakers and cartographers"
+    card = cards.Card(id="w1", title=title, facts=facts, tags=(cards.TAG_WORLD,),
+                      keys=cards.keys_from(title, *facts))
+    scene = SimpleNamespace(cards=[card.as_dict()], actors={}, clock_minutes=0)
+    told = Outcome("i2", "job", tell="The guild clerk puts work to you: 1 Eldrida gold piece "
+                                     "a day, 6 Eldrida gold pieces in all.")
+    assert cards.touch_from_outcomes(scene, [told]) == []
+    real = Outcome("i3", "say", tell="Their work for Eldrida's crown is spoken of here.")
+    assert cards.touch_from_outcomes(scene, [real]) == ["w1"]
+
+
+def test_a_matter_slot_that_writes_another_matter_is_asked_again_then_dropped(monkeypatch):
+    """Measured twice on the re-run: "I ask the clerk what the caravan job pays" with the
+    open matter "A network of mapmakers, cartographers, and travelers …", and the matter
+    slot wrote "The clerk's mutterings mention a caravan master departing at noon for
+    Kalixiri" and then "The clerk's ledger contains the details of a caravan bound for
+    Kalixiri" — the job a third time, the matter not at all. Read back by the matter's own
+    identity words (`cards.identity_keys`, as `note_mentions` counts them); asked once more
+    with the matter named; dropped when it still is not about it."""
+    from tests.test_planned_narration import LAST_BEAT, _fake as plan_fake, _scene
+
+    s, engine = _scene()
+    pull = {"id": "w1", "title": "A network of mapmakers and cartographers",
+            "fact": "", "standing": "situation", "keys": ["network", "mapmakers",
+                                                         "cartographers"]}
+    caravan = "The clerk's ledger holds the details of a caravan bound for Kalixiri."
+    for second, kept in ((caravan, False),
+                         ("Two mapmakers argue over a chart by the well.", True)):
+        calls: list = []
+        monkeypatch.setattr(planned.client, "chat",
+                            plan_fake(calls, slot_text={"matter": [caravan, second]}))
+        out = planned.write(engine, brief="BRIEF", player_input="I wait.", outcomes=[],
+                            pull=pull, who=("stub-12b", "http://x", "ollama", ""),
+                            last_beat=LAST_BEAT)
+        assert "caravan bound for Kalixiri" not in out.text
+        assert ("mapmakers argue" in out.text) is kept
+        assert any("That is not about A network of mapmakers" in str(m.get("content"))
+                   for c in calls for m in c["messages"])
+
+
 # --- 4. one telling of the player's words -----------------------------------------------------------
 
 def test_the_players_words_ride_the_say_and_the_offer_is_said_once_by_its_speaker(worlds):

@@ -769,6 +769,11 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                                  "or way out; nobody acts in it."})
     matter = matter_slot(pull)
     if matter is not None:
+        # The matter's own identity words (`cards.identity_keys`, the pull's `keys`): what
+        # its sentence is read back for (`_matter_is_its_own`).
+        if isinstance(pull, dict) and pull.get("keys"):
+            matter["keys"] = [str(k) for k in pull["keys"]]
+            matter["about"] = _one_line(pull.get("title"), 120)
         slots.append(matter)
     people = [p for p in present(engine) if p["can_answer"]]
     if people and not fighting:
@@ -823,7 +828,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                             f"Show the player saying it, once, and stop there: "
                             f"{speaker['name']}'s answer is written next, so none of it "
                             f"here.")
-            folded = [k for k, ref in offered_by.items() if ref == speaker["ref"]]
+            folded =[k for k, ref in offered_by.items() if ref == speaker["ref"]]
             if folded and held:
                 # The offer's act slot goes; the answer is where it is said, once.
                 slots[:] = [x for x in slots if x["key"] not in folded]
@@ -1242,6 +1247,37 @@ def _not_their_goal(out: Planned, plan, slots, i, written, who, s: dict, text: s
     return text
 
 
+def _matter_is_its_own(out: Planned, plan, slots, i, written, who, s: dict, text: str, *,
+                       final: bool, lift) -> str | None:
+    """The matter slot as it may stand: about its own matter, by that matter's identity words
+    (`cards.identity_keys`, compared as `note_mentions` compares them), asked once more with
+    the matter named, else dropped (the matter is never core). None when dropped.
+
+    Measured twice on the 0.2.22 job-offer re-run: "I ask the clerk what the caravan job
+    pays" with the open matter "A network of mapmakers, cartographers, and travelers who
+    share knowledge…", and the matter slot wrote "The clerk's mutterings mention a caravan
+    master departing at noon for Kalixiri, a journey of six days" and then "The clerk's
+    ledger contains the details of a caravan bound for Kalixiri" — the job a third time, the
+    matter not at all. The slot leans to whatever the beat is already about."""
+    from rules import cards as cards_mod
+
+    keys, about = list(s.get("keys") or ()), str(s.get("about") or "the matter")
+    if cards_mod._identity_hits(keys, text):
+        return text
+    redo = (f"You wrote: {text!r}. That is not about {about}. Write one sentence about "
+            f"{about} itself, as the slot asks, and about nothing else.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    ok = bool(text2) and bool(cards_mod._identity_hits(keys, text2))
+    out.calls[-1]["note"] = "not its own matter, named" + ("" if ok else " — still not")
+    if ok:
+        out.notes.append('the "matter" slot wrote another matter — asked again, fixed')
+        return text2
+    out.notes.append(f'the "matter" slot wrote another matter twice: dropped '
+                     f'({text[:80]!r})')
+    return None
+
+
 def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: str, job,
                     *, final: bool, lift, core: bool) -> str:
     """The reply as it may stand, when its speaker holds no work for the player
@@ -1356,6 +1392,12 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
             out.calls[-1]["note"] = "fault named" + (" — still there" if again else "")
             out.notes.append(f'the "{s["key"]}" slot: {wrong} — asked again'
                              + (", still there" if again else ", fixed"))
+        if s["key"] == "matter" and s.get("keys"):
+            text = _matter_is_its_own(out, plan, slots, i, written, who, s, text,
+                                      final=final, lift=lift)
+            if text is None:
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
         if s.get("no_job") and job is not None:
             text = _no_job_made_up(out, plan, slots, i, written, who, s, text, job,
                                    final=final, lift=lift, core=core)
