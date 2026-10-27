@@ -90,6 +90,51 @@ def test_a_saved_reptoid_with_a_korvu_face_has_it_taken_off_on_load():
     assert reptoid.appearance == ""
 
 
+def test_the_wagons_named_away_from_the_caravan_bring_nobody_in(worlds):
+    """Measured on the leftovers run: stopped at the gate on the way to the road head, the
+    plan introduced "the wagons", and a guildhand named "wagons" with a Korvu face stood at
+    the gate while the caravan waited at the road. The caravan exists elsewhere: the
+    introduce is refused with where it is, and nobody is made."""
+    s, e, _clerk = _hiring_table(worlds)
+    esc = _escort(s)
+    before = set(s.people)
+    out = _run(e, [{"op": "introduce", "params": {"who": "the wagons"}}]).outcomes[0]
+    assert set(s.people) == before
+    assert out.status == "refused" and esc.job["meets"]["where"] in out.tell
+
+
+def test_the_plans_step_on_a_job_is_passed_over_never_refused_into_the_prose(worlds):
+    """Measured on the leftovers run: met at the road head, the plan wrote `quest_step` for
+    "JOB, TAKEN ON: Guard the wagons to Kalixiri" (the brief's label), the engine refused
+    "No such quest is underway. Nothing has been taken on yet.", and the beat told the
+    player "No formal contract is yet recorded in your records". A job's steps are the
+    engine's (`jobs.settle`); the plan's is passed over, with nothing said or ticked."""
+    s, e, clerk = _hiring_table(worlds)
+    _job(e, clerk, "offer", work="fight")
+    _job(e, clerk, "accept")
+    esc = _escort(s)
+    out = _run(e, [{"op": "quest_step", "params": {
+        "quest": f"JOB, TAKEN ON: {esc.title}", "objective": 1}}]).outcomes[0]
+    assert out.status != "refused" and out.tell == ""
+    assert not cards.find(s, esc.id).objectives[0]["done"]
+
+
+def test_the_plans_quest_copying_a_job_is_passed_over(worlds):
+    """Measured on the leftovers run: on the road with the caravan, the plan wrote `quest`
+    "Guard the wagons to Kalixiri" with the job's objectives and "6 Eldrida gold pieces" as
+    reward, refused "No numbers on a quest …" into the prose on two turns of three. The job
+    is the engine's card already: the copy is passed over, and no second card is made."""
+    s, e, clerk = _hiring_table(worlds)
+    _job(e, clerk, "offer", work="fight")
+    _job(e, clerk, "accept")
+    esc = _escort(s)
+    before = len(cards.load(s))
+    out = _run(e, [{"op": "quest", "params": {
+        "title": esc.title, "objectives": ["See the wagons safe"],
+        "reward": "6 gold pieces"}}]).outcomes[0]
+    assert out.status != "refused" and out.tell == "" and len(cards.load(s)) == before
+
+
 # --- 2. the caravan on the road ---------------------------------------------------------------
 
 def _set_out(worlds):
@@ -147,6 +192,40 @@ def test_the_bond_goes_when_the_wagons_are_in(worlds):
     assert cards.find(s, esc.id).job["state"] == "paid"
     assert not any(s.people[r].has_state(states.TRAVELS_WITH_YOU)
                    for r in esc.job["counterpart"]["people"])
+
+
+def test_leading_the_wagons_on_is_the_journey_not_a_walk_back_or_a_pick_up(worlds):
+    """Measured on the leftovers run, on a stretch of the road after the fight: "I nod to the
+    merchants and lead the wagons on toward Kalixiri" was read `go: Kalixiri, object: the
+    wagons`. The table built "Kesst Vayr takes the wagons" (a pick-up of the caravan), the
+    plan added a travel to "the outskirts" beside the owed journey, the travel walked the
+    party a day back to Kalimnar and shed the caravan, and the journey was refused as the
+    turn's second. The caravan is never carried, and the plan's walk goes."""
+    s, e, _clerk, esc = _set_out(worlds)
+    to = esc.job["route"]["to_name"]
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "go", "place": to, "object": "the wagons",
+         "span": f"lead the wagons on toward {to}"}]}
+    rows = acts_to_ops.table(frame, s, places=e.places())
+    assert rows[0].ops == ["journey"] and rows[0].intents == []
+    plan = [{"op": "travel", "params": {"place": "the outskirts"}},
+            {"op": "journey", "params": {"to": to}}]
+    assert [r["op"] for r in acts_to_ops.apply(plan, rows, frame, s)] == ["journey"]
+
+
+def test_taking_a_broken_road_up_again_is_not_a_repeat_of_the_last_turn():
+    """Measured on the leftovers run: stopped by an aasimar in the way, "I lead the wagons
+    around the aasimar and on to Kalixiri" (read `go: Kalixiri`) planned the same `journey`
+    as the turn before; the repeat guard refused it twice and the turn degraded to
+    narration. A journey the words' own `go` owes is the player asking again."""
+    from gm import judgement
+    from rules.engine import Intent
+
+    line = "I lead the wagons around the aasimar and on to Kalixiri."
+    interpret.remember(line, {"question": False, "claims": [], "actions": [
+        {"act": "go", "place": "Kalixiri", "span": "lead the wagons on to Kalixiri"}]})
+    plan = [Intent(op="journey", params={"to": "Kalixiri"})]
+    assert judgement._does_what_was_declared(plan, line)
 
 
 # --- 3. the wagons do not wait for ever --------------------------------------------------------

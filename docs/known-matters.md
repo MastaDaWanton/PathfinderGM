@@ -542,6 +542,68 @@ time passed.
    fallback keeps the table's built ops, each validated on its own
    (`GMAgent._built_survives`), instead of a bare narrate_only.
 
+**Found and fixed on the leftovers' live run** (each pinned in `tests/test_jobs_leftovers.py`):
+
+- Stopped at the gate by a thug on the way to the road head, the plan introduced "the
+  wagons" there and a guildhand named "wagons" stood at the gate. The caravan elsewhere is
+  now refused with where it is, and nobody is made (`Engine._op_introduce`).
+- Met at the road head, the plan wrote `quest_step` for "JOB, TAKEN ON: …" and the refusal
+  reached the beat as "No formal contract is yet recorded in your records"; on the road it
+  wrote a `quest` copying the job with "6 Eldrida gold pieces" as reward, refused "No
+  numbers on a quest" on two turns of three. Both are passed over in silence for a job
+  (`_op_quest_step`, `_op_quest`): its steps are the engine's.
+- "I nod to the merchants and lead the wagons on toward Kalixiri" built "Kesst Vayr takes
+  the wagons" (the caravan as a thing to carry) and kept the plan's walk to "the
+  outskirts" beside the owed journey: the party walked a day back to Kalimnar, the caravan
+  was shed, and the journey was refused as the turn's second. The caravan is never
+  carried (`acts_to_ops._carry`), and a go that owes a journey strikes the plan's walk
+  (`acts_to_ops.apply`).
+- "I lead the wagons around the aasimar and on to Kalixiri" planned the same journey as the
+  turn before — a broken road taken up again — and the repeat guard degraded the turn. A
+  journey the words' own `go` owes is the player asking again (`judgement.
+  _does_what_was_declared`).
+
+**The live run, 2026-10-27** (Pangrella, Kalimnar, gemma-4-12B, Planned, a fresh
+hiring-table campaign):
+
+- "I go back to the guild clerk and tell them I can fight": the plan stepped to the clerk
+  with a `move`, and the job tell ran ("The guild clerk puts work to Kesst Vayr: the caravan
+  master takes wagons to Kalixiri …"). Before, seven refused walks and a degraded turn.
+- Road fight 1 (the player struck a toll-keeper who stopped the road): the four joined the
+  order on the player's side — sides `{'pc': ['pc', 'c4', 'c5', 'c6', 'c7'], 'them':
+  ['c8']}` — and each took their own turn: "the caravan master moves 30 ft toward
+  Toll-Keeper", "the hired sword hits Toll-Keeper with the halberd for 13 piercing", "the
+  second teamster hits Toll-Keeper with the club for 5 bludgeoning. Toll-Keeper is
+  unconscious and dying." The master's beat: "eyes darting between the Toll-Keeper and the
+  wagons … to keep the threat from getting too close to the cargo".
+- Road fight 2 (the road's own roll: "a riding dog is on it, and it has seen you"): the
+  engine drew the fight and the four were in it unasked; the player's popup counted
+  "flanking with the caravan master +2"; "the hired sword hits the riding dog with the heavy
+  flail for 4 bludgeoning. The riding dog is unconscious and dying." Then "The wagons are in
+  at Kalixiri. The caravan master pays Kesst Vayr 6 Threnniria gold pieces for the road, as
+  agreed", and the four no longer travel with the player.
+- Departure: met at 8:40 and waiting by the wagons to three in the afternoon: "The hour has
+  come and gone at the road to Kalixiri, and Kesst Vayr has not given the word to set out:
+  the caravan master takes the wagons out on the road to Kalixiri without Kesst Vayr, and
+  the job is lost." The clerk's regard 39 → 34 (a step crossed: "cools").
+- Faces: the road's riding dog and an aasimar arrived with no people's face; the
+  `tools/table_hit_test.js` check on /play/ found 27, 25 and 22 controls, `covered` empty.
+
+**Still seen, not fixed:**
+
+- Ally misses written as if aimed at the player: "the lead teamster lunges forward with a
+  heavy, practiced swing of the club … you pivot away from the arc of the swing", and the
+  hired sword's halberd "whistling toward your chest" — 2 of the 4 allied misses in road
+  fight 1 and 1 of 3 in fight 2; the tells name the foe correctly. The NPC beat's narrator
+  takes a companion's swing for one at the player.
+- The teamsters fought on both runs rather than hanging back; their turn was told they
+  "may run", and chose to fight — the model's choice, not refused or measured further.
+- Separated from a caravan that had set out (the party walked back to town), the player
+  cannot walk back to it: its stretch of road is not a place the town's walk reaches, and
+  the beat claimed the party "reach the point where the others have stopped" when it had
+  reached the road head. The walk that caused it is fixed; the rejoining is not built.
+- In road fight 1 "I close in on the toll-keeper" ran no move (the turn was narrate_only).
+
 ### 6.6 What World Bible would need to export
 
 Nothing is required: a job is built from what every export already has (settlements,
