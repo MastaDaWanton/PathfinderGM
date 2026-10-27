@@ -89,7 +89,29 @@ onRender(function bookHead(s, prev) {
 //
 // Which page scrolls: `#story` on a desktop; on a phone the whole leaf (`#bookin`), head
 // and all (the design's phone: a fixed head left the story 190px).
-const STORY = { count: 0, beat: -1, landedAt: null, holding: false, watch: null };
+//
+// WHERE THE READER WAS is taken before the rebuild, not after it (the owner, 2026-10-27:
+// "once the narration goes a few turns ... it jumps you up"). render() rebuilds the story
+// whole with every "That's wrong" slot empty, and 23-thats-wrong.js fills them in a hook
+// that runs after this one. In between, the story is one slot shorter per narrated beat,
+// and a page at its foot is clamped up by all of them. Measured on the owner's save, 24
+// slots in: 13689 to 13001, and the landing read the clamped position as a reader who had
+// scrolled back to reread, so it held the page there; then the slots filled above it and
+// the new turn sat 1192px below the top of a 587px pane. So `storyKeep` (called by render
+// before the rebuild) keeps the position the reader really had, the reread test reads
+// that, and every landing, or a rereader's own place, is put back once the hooks have
+// drawn (a microtask: after render's last hook, before the browser paints).
+const STORY = { count: 0, beat: -1, landedAt: null, holding: false, watch: null, was: null };
+
+function storyKeep() {
+  const scroller = storyScroller();
+  STORY.was = scroller ? scroller.scrollTop : null;
+}
+
+function storyAfterHooks(fn) {
+  if (typeof queueMicrotask === "function") queueMicrotask(fn);
+  else Promise.resolve().then(fn);
+}
 
 function storyScroller() {
   const story = document.getElementById("story");
@@ -121,17 +143,28 @@ function storySettle() {
 function storyLand(s, prev) {
   const n = ((s && s.transcript) || []).length;
   const scroller = storyScroller();
+  // Where the reader was before this draw's rebuild (`storyKeep`), or, when nothing
+  // called it, where the page is now.
+  const was = STORY.was !== null ? STORY.was : (scroller ? scroller.scrollTop : 0);
+  STORY.was = null;
   if (!scroller || !n) { STORY.count = n; return; }
-  if (prev && n <= STORY.count) { STORY.count = n; return; }   // nothing new: stay put
+  // Put back where they were once every hook has drawn: the rebuild's clamp has moved it.
+  const stay = () => storyAfterHooks(() => {
+    if (STORY.holding) storySettle(); else scroller.scrollTop = was;
+  });
+  if (prev && n <= STORY.count) { STORY.count = n; stay(); return; }   // nothing new
   // Scrolled back above where the last beat landed: they are rereading. Nothing moves.
-  const rereading = prev && STORY.landedAt !== null && scroller.scrollTop < STORY.landedAt - 24;
+  const rereading = prev && STORY.landedAt !== null && was < STORY.landedAt - 24;
   // The first new beat (the player's own line leads the answer), or on a fresh page, the
   // newest beat of all.
   STORY.beat = prev ? Math.min(STORY.count, n - 1) : n - 1;
   STORY.count = n;
-  if (rereading) { STORY.holding = false; return; }
+  if (rereading) { STORY.holding = false; stay(); return; }
   STORY.holding = true;
   storySettle();
+  // And again once the slots under the beats are filled, which moves every beat below
+  // them down by their height.
+  storyAfterHooks(() => { if (STORY.holding) storySettle(); });
   storyWatch();
 }
 
@@ -140,8 +173,11 @@ function storyLand(s, prev) {
 function storyObserve() {
   if (!STORY.watch) return;
   STORY.watch.disconnect();
+  // The slots under the narrated beats too: one filled or opened late moves every beat
+  // after it, and the story's own box (a scroller) never changes size when they do.
   const els = [document.getElementById("story"), document.getElementById("bookin"),
-               document.querySelector(".bookhead"), ...document.querySelectorAll("#story .beat")];
+               document.querySelector(".bookhead"),
+               ...document.querySelectorAll("#story .beat, #story .beatfix")];
   for (const el of els) if (el) STORY.watch.observe(el);
 }
 

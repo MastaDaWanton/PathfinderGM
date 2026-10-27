@@ -869,6 +869,74 @@
     transition: text-shadow .1s ease-out;
   }
 
+  /* --- Settings on the light leather -------------------------------------------------
+     The owner, 2026-10-27: "the settings is hard to read against the background lets give
+     the options the same treatment we give everything else and put them on the light
+     leather cards." Every group of options is a `.card`: the side bars' leather, the brass
+     ring and the ironmongery, nothing new. Measured with the text removed (the brightest
+     2% of what is under each run), 19 of 99 runs on the bare grimoire leather fell under
+     WCAG AA at 1366px and 21 at 375px: the italic notes (2.8-3.4:1), the field labels
+     (3.4-3.9), the key names (3.4-3.5) and the faded "optional" pill (1.7). On the card the
+     page's --dim is the card's own #b3a488, as on every other card.
+
+     The frames' ironmongery reaches past each card (the 34px note in `narrationPanel`):
+     the visible metal about 11px, the bosses' box and its shadow to 34px. The column keeps
+     34px a side clear and clips the rest of the reach sideways (`overflow-x: clip`, which,
+     unlike `hidden`, makes no scroller and leaves the vertical axis alone), so the
+     invisible part of the box never scrolls the pane; on a phone it keeps 14px, the metal
+     and its shadow. A group stands 44px from the next: the bosses ride 11px past each
+     card's edge, top and bottom, and the column's own gap is a row gap (32px) beyond that. */
+  .setcol { display: flex; flex-direction: column; gap: 44px; padding: 14px 34px 24px;
+            overflow-x: clip; }
+  .setcol > .note { margin: 0; }
+  .card.setgroup { padding: 22px 26px 24px; cursor: default; }
+  /* A group of options is not something to press: it keeps its resting frame under the
+     pointer, where a card that can be picked lifts and glows. */
+  .card.setgroup:hover {
+    border-color: rgba(201, 162, 39, .25);
+    box-shadow:
+      var(--sdx, 0px) var(--sdy, 6px) calc(22px * var(--flicks, .8))
+        rgba(0, 0, 0, calc(.62 * var(--flicks, .8) + .18)),
+      inset 0 1px 0 rgba(255, 230, 150, .08), inset 0 0 42px rgba(0, 0, 0, .40),
+      var(--ring-cast);
+  }
+  /* The group's title is the pane's own section heading, engraved on the leather like a
+     card's: the gold, with the bronze's shadow above and light below. */
+  .setgroup h2.sect, .setgroup h3.subsect {
+    margin: 0 0 12px; color: var(--gold); border-bottom-color: rgba(217, 192, 138, .22);
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 225, 175, .12);
+  }
+  .setgroup h3.subsect { margin-top: 26px; padding-bottom: 6px; border-bottom: 1px solid;
+    border-bottom-color: rgba(217, 192, 138, .22); font: 400 16px/1 var(--display);
+    letter-spacing: .12em; font-variant: small-caps; }
+  .setgroup > :last-child { margin-bottom: 0; }
+  .setgroup .note { color: var(--dim); }
+  /* The boxes inside a group (a role, the sound sliders, a model row) are recesses in the
+     leather: the same thin gilt rule, over a little of the dark the inputs sit in. */
+  .setgroup .rolecard, .setgroup .modelrow {
+    border-color: rgba(217, 192, 138, .24); background: rgba(10, 7, 4, .26); }
+  .setgroup .rolecard:last-child { margin-bottom: 0; }
+  .setgroup .rolecard h3 { color: var(--gold);
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 225, 175, .12); }
+  /* "optional" was faded with the whole pill at .5 opacity: 1.7:1 on the bare leather. A
+     dashed rule says it is optional; the words stay legible. */
+  .setgroup .pill.soon { opacity: 1; border-style: dashed; }
+  .setgroup .keyrow:last-of-type { margin-bottom: 0; }
+  /* The narrator's two choices are cards on a card. Their own frames reach the same 34px
+     (11px of metal), so the grid keeps it clear inside the group as it did on the pane,
+     and clips the invisible rest the way the column does. */
+  /* Below them, the group's own bottom ring: their bosses (11px) and the group's (11px)
+     with a row gap between, or the two sets of metal touched (seen at 1366px). */
+  .narrcards { padding-inline: 34px; overflow-x: clip; margin-block: 22px 40px;
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+  @media (max-width: 600px) {
+    .setcol { padding-inline: 14px; gap: 40px; }
+    .card.setgroup { padding: 18px 16px 20px; }
+    .narrcards { padding-inline: 14px; }
+    .setgroup .keyrow { flex-wrap: wrap; gap: 4px 10px; }
+    .setgroup .keyrow span:first-child { flex: 1 1 100%; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
@@ -1935,8 +2003,7 @@ function soundPanel() {
         aria-label="${esc(s.label)} volume" ${muted ? "disabled" : ""}></label>`;
   }).join("");
   const flour = prefGet("flourishes", "full");
-  return `
-    <h2 class="sect">Sound and motion</h2>
+  return setGroup("set-sound", "Sound and motion", `
     <p class="note">Kept on this machine, and saved as you change them.</p>
     <div class="rolecard">
       <h3>Sound</h3>
@@ -1963,7 +2030,7 @@ function soundPanel() {
       </div>
       <div class="prefnote">Short keeps the sounds and the words, and leaves out the shake
         and the sparks. It is chosen for you when your system asks for less motion.</div>
-    </div>`;
+    </div>`);
 }
 
 // Live while dragging: the level changes under the finger, and the number beside it.
@@ -2016,19 +2083,26 @@ function soundSample(name) {
   window.Sound && Sound.play(name);
 }
 
+// One group of options on the light leather (`.card.setgroup`, the style block's note):
+// its heading is the pane's own section heading, with the id a report link scrolls to.
+function setGroup(id, title, body) {
+  return `<section class="card setgroup" aria-labelledby="${id}">
+    <h2 class="sect" id="${id}">${title}</h2>${body}</section>`;
+}
+
 function paneSettings() {
   if (!SETTINGS) {
-    return `<p class="note">Reading the model settings…</p>` + soundPanel() + reportSlot();
+    return `<div class="setcol"><p class="note">Reading the model settings…</p>`
+      + soundPanel() + reportSlot() + `</div>`;
   }
   const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
-  return `
-    <h2 class="sect">Before you can play</h2>
-    ${setupPanel()}
+  return `<div class="setcol">
+    ${setGroup("set-setup", "Before you can play", setupPanel())}
 
-    <h2 class="sect">Play on your phone</h2>
-    ${phonePanel()}
+    ${setGroup("set-phone", "Play on your phone", phonePanel())}
 
-    <h2 class="sect">Who does which job</h2>
+    <section class="card setgroup" aria-labelledby="set-jobs">
+    <h2 class="sect" id="set-jobs">Who does which job</h2>
     <p class="note">Four jobs, and they are genuinely different work. Everything ships
       pointed at Ollama on this machine, which needs no key and sends nothing anywhere;
       a hosted provider needs a key below.</p>
@@ -2057,7 +2131,8 @@ function paneSettings() {
     <datalist id="ollamamodels">${(SETTINGS.installed || [])
       .map(m => `<option value="${esc(m)}">`).join("")}</datalist>
 
-    <h2 class="sect">API keys</h2>
+    <!-- The keys share the roles' card and its Save: one button saves both. -->
+    <h3 class="subsect">API keys</h3>
     <p class="note">Kept in a file beside your campaigns, on this machine only, never
       in the app's own folder. A saved key is never sent back to this page — you see
       that one is set and its last four characters. Type <code>clear</code> to remove
@@ -2077,9 +2152,11 @@ function paneSettings() {
       <span class="note" id="modelsaid" style="margin-left:12px"></span>
     </div>
     <div id="modelerr"></div>
+    </section>
     ${narrationPanel()}
     ${soundPanel()}
-    ${reportSlot()}`;
+    ${reportSlot()}
+    </div>`;
 }
 
 /* How the narrator writes (the owner's switch, 2026-10-10; gm/planned.py). A house rule,
@@ -2104,27 +2181,26 @@ function narrationPanel() {
         .then(d => { RULES = d; render(); })
         .catch(() => { narrationPanel.asked = false; });
     }
-    return `<h2 class="sect">How the narrator writes</h2>
-      <p class="note">Reading the setting…</p>`;
+    return setGroup("set-narration", "How the narrator writes",
+      `<p class="note">Reading the setting…</p>`);
   }
   const mode = RULES.rules.narration || "planned";
-  // The grid is held in 34px a side: the card frames' ironmongery reaches 34px past each
-  // card (`.card::after`), and a grid filling the pane put it past the pane's edge, so
-  // Settings scrolled sideways at 601px (by 34px on the page, 18px embedded over the
-  // table; measured 2026-10-10). And the grid's 300px column floor, less the inset, is
-  // wider than a 375px phone's pane, so the column may shrink to what is there.
-  return `
-    <h2 class="sect">How the narrator writes</h2>
+  // The grid is held in 34px a side (`.narrcards`): the card frames' ironmongery reaches
+  // 34px past each card (`.card::after`), and a grid filling the pane put it past the
+  // pane's edge, so Settings scrolled sideways at 601px (by 34px on the page, 18px
+  // embedded over the table; measured 2026-10-10). And the grid's 300px column floor, less
+  // the inset, is wider than a 375px phone's pane, so the column may shrink to what is
+  // there. Since 2026-10-27 the two cards sit on the group's own leather card.
+  return setGroup("set-narration", "How the narrator writes", `
     <p class="note">Changes from the next beat. An intimate scene is always written the
       free way.</p>
-    <div class="cards" style="padding-inline:34px;
-         grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))">${NARRATION_MODES.map(([v, label, em]) => `
+    <div class="cards narrcards">${NARRATION_MODES.map(([v, label, em]) => `
       <button class="card pick ${mode === v ? "on" : ""}" data-hbnarration="${v}"
               aria-pressed="${mode === v}">
         <h3>${label}</h3>
         <em>${em}</em>
       </button>`).join("")}</div>
-    <div id="ruleserr"></div>`;
+    <div id="ruleserr"></div>`);
 }
 
 /* --- Playing from a phone -------------------------------------------------------
@@ -2209,7 +2285,7 @@ let REPORT_NODE = null;
 const IN_DESKTOP_APP = /Electron\//.test(navigator.userAgent);
 
 function reportSlot() {
-  return `<h2 class="sect" id="reporthead">Report a problem</h2><div id="reportslot"></div>`;
+  return setGroup("reporthead", "Report a problem", `<div id="reportslot"></div>`);
 }
 
 function reportSize(n) {
