@@ -3663,8 +3663,16 @@ class Engine:
             # (a Collect at the bench rewrote the record): worn copies are read afresh.
             for a in list(self.scene.people.values()):
                 a.refresh_worn()
+            # What the clock did before this batch — a bench's or a forge's hours moved
+            # outside any op — told FIRST, as what came before. It was told behind the
+            # batch's first op (`_drive`'s per-op settle), so the owner's report of
+            # 2026-10-27 read "Jason rests for 15 hours…" and then "Jason fails a Will
+            # save against sleep… Jason is fatigued. Jason is exhausted." — the toll of 21
+            # hours at the herb bench, said as though the night had done it, and the beat
+            # wrote "the grueling struggle leaves you drained and exhausted" after sleep.
+            before_batch = [o.as_dict() for o in self._body_settles() + self._works_settles()]
             resolution = self._tick_schemes(self._their_first_blow(
-                self._drive([i.as_dict() for i in intents], [], {})))
+                self._drive([i.as_dict() for i in intents], before_batch, {})))
         resolution.clock_before = before
         return resolution
 
@@ -12803,6 +12811,12 @@ class Engine:
         self.scene.advance(worked * survival.MINUTES_PER_HOUR, charge_body=False)
 
         names = self._gathered_names(spec, result["found"])
+        if actor.is_pc and result["found"]:
+            # What the engine just put in the pack, remembered (`_mark_granted`): a page
+            # that then shows "a cluster of monkshood" by the player's feet is describing
+            # these, and "I take the monkshood" is answered "already in the pack".
+            self._mark_granted(actor, f"the {spec['what']} {actor.name} gathered",
+                               result["found"], names)
         span = f"{worked} hour{'s' if worked != 1 else ''}"
         verb = str(spec.get("verb") or "searching")
         if result["empty"]:
@@ -19413,9 +19427,25 @@ class Engine:
                              int(s.get("count", 1)))
                 got.append(f"{s.get('count', 1)}× {s['base']}")
             held_by = str(g.get("guard_name") or "")
-            lines.append(f" The {g.get('what', 'find')}"
-                         + (f" the {held_by} held" if held_by else "")
-                         + f" is yours now: {', '.join(got)}.")
+            what = str(g.get("what") or "find")
+            # Said as the act it is — the player gathers the find up and packs it — and
+            # never as a thing lying there to be found. It was "The herbs find the grioth
+            # held is yours now: …", a possession with no act and no place, and the planned
+            # slot that showed it gave the possession a scene of its own: "you find a
+            # bundle of herbs — 18 Monkshood, 18 Caranator, and 12 Coldwood — left behind
+            # in its wake" (the owner's 0.2.21 report, 2026-10-27). The player then took the
+            # bundle off the ground it was never on (`_mark_granted` has the rest).
+            noun = what[:-len(" find")] if what.endswith(" find") else ""
+            them = (f"the {noun} it held" if noun and held_by else
+                    f"the {noun}" if noun else f"what the {what} held")
+            lines.append((f" With the {held_by} gone, " if held_by else " ")
+                         + f"{pc.name} gathers up {them} and puts it all in the pack: "
+                           f"{', '.join(got)}.")
+            if g.get("found"):
+                # Herbs and ore alike: every excursion carries into the satchel by id.
+                label = (f"the {noun or what} the {held_by} held" if held_by
+                         else f"the {noun or what}")
+                self._mark_granted(pc, label, g.get("found") or {}, names)
         self.scene.guarded_finds = kept
         return "".join(lines)
 
@@ -19555,6 +19585,140 @@ class Engine:
                 age = int(self.scene.clock_minutes) - int(rec.get("turn", 0) or 0)
                 return rec if 0 <= age <= self.PAYMENT_FRESH_MINUTES else None
         return None
+
+    # --- what the engine has just put in the pack: the payment's rule, for goods ----------
+    #
+    # Measured on the owner's 0.2.21 report (2026-10-27, planned narration): a grioth gave
+    # way, the engine paid its guarded find into the satchel ("…is yours now: 18× Monkshood,
+    # 18× Caranator, 12× Coldwood"), and the beat wrote "you find a bundle of herbs — 18
+    # Monkshood, 18 Caranator, and 12 Coldwood — left behind in its wake". "I take the
+    # bundle of herbs" was then a pick-up from nowhere, the scenery reader ledgered the
+    # bundle as shown here (it was on the page), and the give put `"bundle of herbs": 1`
+    # into the goods — a thing with no data beside the herbs it described. The payment
+    # already had this answer ("The payment is already in X's purse", `_mark_payment`):
+    # Inform's "can't take what's already taken" rule ("You already have that"). A grant
+    # is remembered on the props ledger the same way, and a narrated thing the scenery
+    # reader ties to it (gm/scenery.py, `ALREADY`) is answered "already in the pack".
+    #
+    # The record carries ids and names, never counts to spend from: the satchel is the
+    # store (law 2), and what the record says is read off the satchel when it is said.
+
+    # How many grant records one person keeps: a day's foraging is one record per label
+    # (the label is the record's name, so a second hour adds to the first), and the
+    # oldest go when more labels come.
+    GRANTS_KEPT = 6
+
+    def _mark_granted(self, taker: Actor, label: str, found: dict,
+                      names: dict | None = None) -> dict | None:
+        """Remember that the engine just put `found` (ingredient id -> count) into
+        `taker`'s satchel under `label` ("the herbs the grioth held"). Returns the record."""
+        found = {str(k): int(n) for k, n in (found or {}).items() if int(n or 0) > 0}
+        if taker is None or not found or not str(label or "").strip():
+            return None
+        rec = self.scene.hold_prop(label, taker.ref, owner=taker.ref,
+                                   turn=int(self.scene.clock_minutes))
+        was = rec.get("granted") or {}
+        ids = dict(was.get("ids") or {})
+        for iid, n in found.items():
+            ids[iid] = int(ids.get(iid, 0)) + n
+        named = dict(was.get("names") or {})
+        for iid in found:
+            named[iid] = str((names or {}).get(iid) or named.get(iid) or "")
+        rec.update({"kind": "granted", "where": str(self.scene.at or ""),
+                    "turn": int(self.scene.clock_minutes),
+                    "granted": {"ids": ids, "names": named}})
+        mine = [r for r in self.scene.props
+                if r.get("kind") == "granted" and r.get("held_by") == taker.ref]
+        for old in sorted(mine, key=lambda r: int(r.get("turn", 0) or 0))[:-self.GRANTS_KEPT]:
+            self.scene.props.remove(old)
+        return rec
+
+    def granted_here(self, taker) -> list[dict]:
+        """The grants `taker` was given in this place since the party last arrived here,
+        newest first — what the scenery reader is told is already theirs."""
+        if taker is None:
+            return []
+        since = int(getattr(self.scene, "arrived", 0) or 0)
+        out = [r for r in self.scene.props
+               if r.get("kind") == "granted" and r.get("held_by") == taker.ref
+               and str(r.get("where") or "") == str(self.scene.at or "")
+               and int(r.get("turn", 0) or 0) >= since]
+        return sorted(out, key=lambda r: -int(r.get("turn", 0) or 0))
+
+    def granted_line(self, taker, rec: dict) -> str:
+        """What a grant holds now, off the satchel: "18× Monkshood, 18× Caranator". A herb
+        since spent is not claimed — "" when none of it is carried any more."""
+        g = rec.get("granted") or {}
+        inv = getattr(taker, "inventory", None) or {}
+        bits = []
+        for iid in g.get("ids") or {}:
+            n = int(inv.get(iid, 0) or 0)
+            if n <= 0:
+                continue
+            name = str((g.get("names") or {}).get(iid) or "")
+            if not name:
+                try:
+                    name = ing_mod.get(iid).name
+                except KeyError:
+                    name = str(iid).replace("-", " ").title()
+            bits.append(f"{n}× {name}")
+        return ", ".join(bits)
+
+    def _grant_named(self, item: str, taker) -> dict | None:
+        """The grant `taker` holds that `item` names: by the grant's own name, or by a name
+        the scenery reader tied to it (`aka`, gm/scenery.py). Never by a guess at the
+        words: what ties a narrated "bundle of herbs" to a grant is the reader's answer."""
+        ref = getattr(taker, "ref", "")
+        for rec in self.scene.props:
+            if rec.get("kind") != "granted" or rec.get("held_by") != ref:
+                continue
+            if any(holding.same(n, item) for n in [rec.get("name"), *(rec.get("aka") or [])]):
+                return rec
+        return None
+
+    def known_as(self, rec: dict, name: str) -> None:
+        """Tie another name for a thing to its record: the scenery reader said the
+        narration's "bundle of herbs" IS this grant. Names only — where the thing is stays
+        `place_prop`'s and `hold_prop`'s."""
+        name = " ".join(str(name or "").split())
+        if not name or rec not in self.scene.props:
+            return
+        aka = list(rec.get("aka") or [])
+        if not any(holding.same(a, name) for a in aka):
+            aka.append(name)
+        rec["aka"] = aka
+
+    def _already_carried(self, intent: Intent, taker, item: str) -> Outcome | None:
+        """A pick-up of a thing the taker already has, answered as the payment is: said,
+        and nothing minted. A grant the reader tied the words to, a goods line of that
+        name, or an ingredient of that name in the satchel. None when it is none of them."""
+        grant = self._grant_named(item, taker)
+        if grant is not None:
+            held = self.granted_line(taker, grant)
+            said = self._the(holding.plain(item) or item)
+            said = said[:1].upper() + said[1:]
+            tell = (f"{said} is {grant['name']}, already in {taker.name}'s pack: {held}. "
+                    f"Nothing more is picked up." if held else
+                    f"{said} is {grant['name']}, which went into {taker.name}'s pack and "
+                    f"is used up now. Nothing more is picked up.")
+        else:
+            key = holding.key_in(getattr(taker, "goods", None) or {}, item)
+            herb = None if key else ing_mod.by_name(item)
+            have = int((getattr(taker, "inventory", None) or {}).get(herb.id, 0)) if herb else 0
+            if key:
+                tell = (f"{taker.name} already carries {self._the(key)}, and none lies here: "
+                        f"nothing more is picked up.")
+            elif have > 0:
+                tell = (f"{taker.name} already carries {have}× {herb.name}, and none lies "
+                        f"here: nothing more is picked up.")
+            else:
+                return None
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because, tell=tell,
+            effects=[{"ref": taker.ref, "kind": "give", "item": item, "count": 0,
+                      "how": "already", "to": taker.ref, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods),
+                      **({"grant": grant["name"]} if grant is not None else {})}])
 
     def _give_money(self, intent: Intent, item: str, taker, giver, source) -> Outcome:
         """Coin with no amount named — "the coins", "the payment", "the money".
@@ -19697,6 +19861,9 @@ class Engine:
             return False
         if any(r.get("held_by") == taker.ref and holding.same(r.get("name"), name)
                for r in self.scene.props):
+            return False
+        # A name the scenery reader already tied to a grant (`known_as`): asked once.
+        if self._grant_named(name, taker) is not None:
             return False
         if self._box_holding(name, taker) is not None:
             return False
@@ -20021,12 +20188,26 @@ class Engine:
                 return self._refuse(
                     intent, f"Nobody here is holding {count} {denom} out to {taker.name}, "
                             f"and none lies here: nothing changes hands.")
+            # A pick-up by the one acting, on nobody's document and for no price: the
+            # thing it can be that the taker already has is answered before the ground is
+            # searched — a grant the narration described is the grant, whatever lies here.
+            picking = (taker is not None and not denom and str(taker.ref) == acting
+                       and not str(getattr(intent, "origin", "") or "")
+                       and not intent.params.get("price"))
+            if picking and self._grant_named(item, taker) is not None:
+                return self._already_carried(intent, taker, item)
             # Unless it is lying right here with a record: then THAT thing is picked
             # up, and its owner and provenance come with it. "I pick up a chunk of
             # wood" after a sunder is the fragments of the challenger's club, his
             # still, and never a second piece of wood from nowhere.
             if taker is not None and not denom:
                 rec = self.scene.prop_on_the_ground(item)
+                if rec is None and picking:
+                    # Already in the pack, and nothing of the name lies here: said, as the
+                    # payment is, rather than "nothing has put one here".
+                    have = self._already_carried(intent, taker, item)
+                    if have is not None:
+                        return have
                 if rec is None:
                     # The world never runs out of a stone or a stick nobody recorded —
                     # but a thing the engine HAS a record of, lying somewhere else, is
@@ -20074,6 +20255,13 @@ class Engine:
                     self.scene.hold_prop(rec["name"], taker.ref,
                                          turn=int(self.scene.clock_minutes))
                     item = rec["name"]
+                    if rec.get("origin") in ("narrated", "commonplace"):
+                        # One record is one thing (the ledger's own rule). A plan's count
+                        # beside scenery is a number in prose — "I take the 18 monkshood"
+                        # off a page that showed a bundle — and the herb door below would
+                        # mint all of them into the satchel (law 3: no model authors a
+                        # number). The thing the page showed is picked up, once.
+                        moved = 1
                     # A whole thing that was somebody's (a disarmed sap is recorded
                     # as "the thug's sap", so two thugs' saps are two records) is
                     # carried as what it IS, so it can be swung; fragments stay
@@ -22264,7 +22452,8 @@ class Engine:
         # never prepared, from the book in its own order; a cleric with nothing chosen is
         # left empty and told so (owner, Q39). No study hour is added (Q40): the night
         # already runs to dawn.
-        result = actor.sleep_through(kind, self.dice)
+        # The hours actually slept (to the dawn, `_camp_for`): fatigue lifts by the hour.
+        result = actor.sleep_through(kind, self.dice, slept=int(camp.get("hours") or 0) or None)
         levelled, refilled, prep_said = (result["levelled"], result["refilled"],
                                          result["prepared"])
         # Everyone, not only the sleeper. Rest ticked the resting actor alone, so an
@@ -22282,6 +22471,12 @@ class Engine:
 
         bits = kept_awake + [f"{actor.name} rests for {hours} hours"
                              + (f", {camp['until']}." if camp["until"] else ".")]
+        # What the sleep did to fatigue, before the ground has its say: a night on bare
+        # ground lifts yesterday's fatigue and then lays the morning's stiffness on, in
+        # that order (`_camp_morning`).
+        tired = survival.fatigue_said(actor, result)
+        if tired:
+            bits.append(tired)
         # What the ground did to them, after the healing: the cold (a Fortitude save an
         # hour, the blanket and the bedroll counting), then the stiffness of a night with
         # nothing between them and the ground. Both through the one applicator.

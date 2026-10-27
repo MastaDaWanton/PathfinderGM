@@ -71,7 +71,18 @@ ELSEWHERE = "not here: taken away, gone, far off, or only spoken of or remembere
 WRONG_PLACE = "not here: would not be found in a place like this"
 ABSENT = WRONG_PLACE           # the old name, for callers that only ask "refused?"
 REFUSALS = (BROKEN, ELSEWHERE, WRONG_PLACE)
-ANSWERS = (SHOWN, COMMON, *REFUSALS)
+# The fourth way: the thing is the player's already, because the engine put it in their pack
+# here and the page described it. Measured on the owner's 0.2.21 report (2026-10-27): the
+# engine paid a grioth's guarded find into the satchel, the planned beat wrote "you find a
+# bundle of herbs — 18 Monkshood, 18 Caranator, and 12 Coldwood — left behind in its wake",
+# and "I take the bundle of herbs" was read "shown here" — true of the page — and ledgered,
+# and the give minted `"bundle of herbs": 1` beside the 48 herbs it described. The reader
+# could not have answered otherwise: it was never told what the player had been given. It
+# is now (`Engine.granted_here`), and it names WHICH grant (`given`, an enum Ollama's
+# grammar holds); code checks the number is one it was shown. Offered only when there is a
+# grant to name, so a reader with nothing given here cannot answer it.
+ALREADY = "already the player's: the game put it in their pack"
+ANSWERS = (SHOWN, COMMON, *REFUSALS, ALREADY)
 
 # The most things one turn asks about: a plan reaching for more than this from nowhere is
 # a plan conjuring, and the rest stay refused.
@@ -95,7 +106,12 @@ _SYSTEM = (
     "used up or taken out of sight, or has it only far off across the place, somewhere "
     "else, in somebody's speech or in a memory.\n"
     "\"" + WRONG_PLACE + "\": no passage shows it and a place of this kind would not "
-    "have one lying about — a sword in a wood, a crossbow in a tavern.")
+    "have one lying about — a sword in a wood, a crossbow in a tavern.\n"
+    "When the player has been given things here, they are listed, numbered:\n"
+    "\"" + ALREADY + "\": the thing is one of those, or holds them, or is made of them — "
+    "the passages describing what the player was given, however they put it. Put its "
+    "number in \"given\". Only for a thing that IS what was given: anything else the "
+    "passages show is answered as above, and \"given\" is \"\".")
 
 _DEMOS = [
     ("the fish market (a town street, square or market)",
@@ -121,12 +137,29 @@ _DEMOS = [
     ("the toll house (inside a building)",
      "The clerk slams the ledger shut and stands, his chair grinding back on the boards.",
      "a pitchfork", {"answer": WRONG_PLACE, "quote": ""}),
+    # Given things listed: the page's own words for what the game put in the pack are that,
+    # and a thing beside it on the same page is still answered as scenery.
+    ("the old quarry (open country)",
+     "The wolf slinks off into the scrub. Where it lay you find a sack of grey rock salt, "
+     "left behind on the stones.",
+     "the sack of salt", {"answer": ALREADY, "quote": "", "given": "2"},
+     ("the herbs Arlo gathered: 4× Sukake", "the salt the wolf held: 6× Rock Salt")),
+    ("the old quarry (open country)",
+     "The wolf slinks off into the scrub. A pick handle, split and grey, lies across the "
+     "path where the wolf lay.",
+     "the pick handle", {"answer": SHOWN, "quote": "A pick handle, split and grey, lies "
+                                                   "across the path", "given": ""},
+     ("the salt the wolf held: 6× Rock Salt",)),
 ]
 
 
-def _user(place: str, passages: str, thing: str) -> str:
-    return (f"The player is at: {place}\n\nWhat the player has read here:\n{passages}\n\n"
-            f"The thing: {thing}")
+def _user(place: str, passages: str, thing: str, given=()) -> str:
+    listed = ""
+    if given:
+        listed = ("\n\nGiven to the player here, already in their pack:\n"
+                  + "\n".join(f"({i}) {g}" for i, g in enumerate(given, 1)))
+    return (f"The player is at: {place}\n\nWhat the player has read here:\n{passages}"
+            f"{listed}\n\nThe thing: {thing}")
 
 
 def where_said(place: str, kinds=()) -> str:
@@ -136,12 +169,21 @@ def where_said(place: str, kinds=()) -> str:
     return f"{place} ({'; '.join(kinds)})" if kinds else place
 
 
-def messages(place: str, passages: str, thing: str) -> list[dict]:
+def messages(place: str, passages: str, thing: str, given=()) -> list[dict]:
     out = [{"role": "system", "content": _SYSTEM}]
-    for at, said, what, answer in _DEMOS:
-        out.append({"role": "user", "content": _user(at, said, what)})
+    for demo in _DEMOS:
+        at, said, what, answer = demo[:4]
+        shown_given = demo[4] if len(demo) > 4 else ()
+        answer = dict(answer)
+        if not given:
+            # With nothing given, the demonstrations that list a grant still show it, but
+            # no answer carries a `given` the call's own schema will not have.
+            answer.pop("given", None)
+        else:
+            answer.setdefault("given", "")
+        out.append({"role": "user", "content": _user(at, said, what, shown_given)})
         out.append({"role": "assistant", "content": json.dumps(answer)})
-    out.append({"role": "user", "content": _user(place, passages, thing)})
+    out.append({"role": "user", "content": _user(place, passages, thing, given)})
     return out
 
 
@@ -150,10 +192,25 @@ SCHEMA = {"type": "object", "properties": {
     "required": ["answer", "quote"]}
 
 
-def ask(place: str, passages: str, thing: str, *, chat=None, cfg: dict | None = None
-        ) -> tuple[str, str]:
-    """(one of `ANSWERS`, the quote) — ("", "") when the call fails, which ledgers
-    nothing: the engine's refusal then stands, as it does with the reader off."""
+def schema_for(given=()) -> dict:
+    """The call's grammar: `ALREADY` and its `given` number only when something was given
+    here — a reader shown no grant cannot answer that it is one."""
+    if not given:
+        return {"type": "object", "properties": {
+            "answer": {"type": "string", "enum": [a for a in ANSWERS if a != ALREADY]},
+            "quote": {"type": "string"}}, "required": ["answer", "quote"]}
+    return {"type": "object", "properties": {
+        "answer": {"type": "string", "enum": list(ANSWERS)}, "quote": {"type": "string"},
+        "given": {"type": "string",
+                  "enum": [""] + [str(i) for i in range(1, len(given) + 1)]}},
+        "required": ["answer", "quote", "given"]}
+
+
+def ask(place: str, passages: str, thing: str, given=(), *, chat=None,
+        cfg: dict | None = None) -> tuple:
+    """(one of `ANSWERS`, the quote, the grant's number or "") — ("", "", "") when the
+    call fails, which ledgers nothing: the engine's refusal then stands, as it does with
+    the reader off."""
     if chat is None:
         from . import client
 
@@ -165,29 +222,48 @@ def ask(place: str, passages: str, thing: str, *, chat=None, cfg: dict | None = 
         if not cfg.get("model"):
             cfg = modelcfg.for_role("narrator")
     try:
-        reply = chat(messages(place, passages, thing), cfg.get("model"), cfg.get("host"),
-                     as_json=True, think=False, temperature=0.0, num_predict=120,
-                     provider=cfg.get("provider", "ollama"), api_key=cfg.get("api_key", ""),
-                     schema=SCHEMA)
+        reply = chat(messages(place, passages, thing, given), cfg.get("model"),
+                     cfg.get("host"), as_json=True, think=False, temperature=0.0,
+                     num_predict=140, provider=cfg.get("provider", "ollama"),
+                     api_key=cfg.get("api_key", ""), schema=schema_for(given))
         got = reply.json() or {}
     except Exception:  # noqa: BLE001 — unasked is not here: the engine's refusal stands
-        return "", ""
+        return "", "", ""
     answer = str(got.get("answer") or "")
-    return (answer if answer in ANSWERS else ""), str(got.get("quote") or "")
+    if answer == ALREADY and not given:
+        answer = ""
+    return ((answer if answer in ANSWERS else ""), str(got.get("quote") or ""),
+            str(got.get("given") or ""))
 
 
 def decide(place: str, kinds, passages: list[str], thing: str, *, ask_fn=None,
-           cfg: dict | None = None) -> dict:
-    """The verdict on one thing: {"answer", "quote", "ledger", "origin", "why"}."""
+           cfg: dict | None = None, given=()) -> dict:
+    """The verdict on one thing: {"answer", "quote", "ledger", "origin", "why", "given"}
+    — `given` the index into `given` of the grant it is, or None."""
     texts = [str(t) for t in passages if str(t or "").strip()]
     shown = "\n\n".join(texts) or "(nothing yet)"
     said = where_said(place, kinds)
+    given = tuple(given or ())
     if ask_fn is None:
-        answer, quote = ask(said, shown, thing, cfg=cfg)
+        got = ask(said, shown, thing, given, cfg=cfg)
     else:
-        answer, quote = ask_fn(said, shown, thing)
+        got = ask_fn(said, shown, thing, given) if given else ask_fn(said, shown, thing)
+    answer, quote = got[0], got[1]
+    which = str(got[2]) if len(got) > 2 else ""
     out = {"answer": answer or "unread", "quote": quote, "ledger": False, "origin": "",
-           "why": ""}
+           "why": "", "given": None}
+    if answer == ALREADY:
+        # The number checked against what was shown: one grant needs no number, and a
+        # number that names nothing shown is no answer — nothing is ledgered, so nothing
+        # is minted, and the engine's own refusal stands.
+        if which.isdigit() and 1 <= int(which) <= len(given):
+            out["given"] = int(which) - 1
+        elif len(given) == 1:
+            out["given"] = 0
+        else:
+            out["answer"] = "unread"
+            out["why"] = f"answered as given, naming {which!r} of {len(given)}"
+        return out
     if answer == SHOWN and not _quoted_on(quote, texts):
         # Biased toward allowing (the coordinator, 2026-10-17): the reader said the thing
         # is there, and a quote that paraphrases, joins two sentences or picks up a word of
@@ -356,13 +432,28 @@ def ground(raw, engine, passages: list[str], *, ask_fn=None, skip=()) -> list[di
         kinds = tuple(sorted(places_mod.settings_for(here, known))) if here else ()
     except Exception:  # noqa: BLE001
         place = "here"
+    # What the engine has put in the player's pack here (`Engine.granted_here`), said as
+    # the satchel holds it now: the page may be describing exactly these.
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    grants, given = [], []
+    for rec in (engine.granted_here(pc) if hasattr(engine, "granted_here") else []):
+        held = engine.granted_line(pc, rec)
+        if held:
+            grants.append(rec)
+            given.append(f"{rec.get('name')}: {held}")
     rows: list[dict] = []
     for thing in things:
-        verdict = decide(place, kinds, passages, thing, ask_fn=ask_fn)
+        verdict = decide(place, kinds, passages, thing, ask_fn=ask_fn, given=given)
         row = {"kind": "scenery", "thing": thing, "answer": verdict["answer"],
                **({"quote": verdict["quote"]} if verdict["quote"] else {}),
                **({"note": verdict["why"]} if verdict["why"] else {})}
-        if verdict["ledger"]:
+        if verdict["given"] is not None:
+            # Not ledgered: it is the grant, under the page's name for it, and the take
+            # is answered "already in the pack" (`Engine._already_carried`).
+            rec = grants[verdict["given"]]
+            engine.known_as(rec, thing)
+            row["already"] = str(rec.get("name") or "")
+        elif verdict["ledger"]:
             rec = scene.place_prop(thing, state="intact",
                                    turn=int(getattr(scene, "clock_minutes", 0) or 0))
             rec["origin"] = verdict["origin"]

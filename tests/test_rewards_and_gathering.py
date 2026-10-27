@@ -123,7 +123,10 @@ def test_a_rich_find_doubles_the_haul_and_a_guarded_one_waits_for_the_guard(monk
     s.actors[guard].hp = -20
     carried_before = dict(pc.satchel) if hasattr(pc, "satchel") else None
     line = engine._settle_guarded_finds()
-    assert "is yours now" in line and s.guarded_finds == []
+    # Said as the act, into the pack (the owner's 0.2.21 report: "is yours now" was
+    # written as herbs left lying on the ground; tests/test_granted_bundle.py).
+    assert "gathers up the herbs it held and puts it all in the pack" in line
+    assert s.guarded_finds == []
 
 
 def test_an_animal_that_notices_you_starts_the_fight(monkeypatch):
@@ -220,7 +223,8 @@ def test_the_patch_it_holds_is_booked_once_and_paid_only_once_it_has_gone(monkey
     before = s.pc().inventory.get("bitterroot", 0)
     s.remove(ref)
     line = engine._settle_guarded_finds()
-    assert "The patch the clockwork spy held is yours now" in line, line
+    assert ("With the clockwork spy gone, Kesst Vayr gathers up what the patch held "
+            "and puts it all in the pack: 2× Bitterroot.") in line, line
     assert s.pc().inventory.get("bitterroot", 0) == before + 2
     assert s.guarded_finds == []
 
@@ -272,7 +276,7 @@ def test_closing_on_it_rolls_its_reaction_on_the_old_table(monkeypatch, face, ex
         assert not [o for o in res.outcomes if o.op == "stance"]
     else:
         assert "gives way" in tell and ref not in s.actors
-        claimed = [o.tell for o in res.outcomes if "is yours now" in o.tell]
+        claimed = [o.tell for o in res.outcomes if "puts it all in the pack" in o.tell]
         assert claimed, [o.tell for o in res.outcomes]
 
 

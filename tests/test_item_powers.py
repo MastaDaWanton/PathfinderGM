@@ -168,8 +168,11 @@ def _shield(props=("blinding",)):
 
 
 def _use(e, power, item="flash-shield"):
-    return _run(e, [{"op": "use_item", "actor": "pc", "because": "t",
-                     "params": {"item": item, "power": power}}]).outcomes[0]
+    # The use's own outcome, not the first: a day passed outside any op (`s.advance`) is
+    # told first in the next batch since 2026-10-27 (`Engine.run`), as what came before.
+    return next(o for o in _run(e, [{"op": "use_item", "actor": "pc", "because": "t",
+                                     "params": {"item": item, "power": power}}]).outcomes
+                if o.op == "use_item")
 
 
 def test_a_blinding_shield_flashes_twice_a_day_and_comes_back_with_the_day(monkeypatch):
