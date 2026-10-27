@@ -49,9 +49,10 @@ def chat(people: dict | None = None, places: dict | None = None, *, fail: str = 
     return _chat
 
 
-def _mention_ids(text: str, scene) -> dict[str, list[str]]:
+def _mention_ids(text: str, scene, gone=()) -> dict[str, list[str]]:
     """phrase (lower-case) -> the mention ids `mentions.find` gives it, in order."""
-    cast = mentions.people(scene) + beat_reader.away_people(scene)
+    cast = (mentions.people(scene) + beat_reader.away_people(scene)
+            + [beat_reader.gone_person(g) for g in gone or ()])
     out: dict[str, list[str]] = {}
     for m in mentions.find(text, cast):
         out.setdefault(m.phrase.lower(), []).append(m.id)
@@ -64,12 +65,13 @@ def _line_ids(text: str) -> dict[str, str]:
 
 def people_answer(text: str, scene, *, who: dict | None = None, new=(), lines=None,
                   names: dict | None = None, pronouns: dict | None = None,
-                  arrived=()) -> dict:
+                  arrived=(), gone=()) -> dict:
     """The people call's JSON from the page's words. `who`: phrase ("the man#2" for the
     second) -> a ref, "new", "nobody", or "same as <phrase>". `new`: (phrase, "here" |
-    "elsewhere", the page's words). `lines`: the first words of a line -> (by, to), each a
-    ref, "you", "nobody" or a phrase. Every mention and line not given is "nobody"."""
-    ids = _mention_ids(text, scene)
+    "elsewhere", the page's words[, "person" | "creature"]). `lines`: the first words of a
+    line -> (by, to), each a ref, "you", "nobody" or a phrase. Every mention and line not
+    given is "nobody". `gone`: `Scene.gone_in` records the reader is shown."""
+    ids = _mention_ids(text, scene, gone)
 
     def mid(phrase: str) -> str:
         p, _, n = phrase.partition("#")
@@ -101,7 +103,8 @@ def people_answer(text: str, scene, *, who: dict | None = None, new=(), lines=No
                     ans[lid] = {"by": person(by), "to": person(to)}
                     break
     if ids:
-        ans["new"] = [{"mention": mid(p), "where": w, "words": words} for p, w, words in new]
+        ans["new"] = [{"mention": mid(n[0]), "where": n[1], "words": n[2],
+                       **({"being": n[3]} if len(n) > 3 else {})} for n in new]
     ans["names"] = [{"who": person(w), "name": n} for w, n in (names or {}).items()]
     if arrived:
         ans["arrived"] = list(arrived)
@@ -130,11 +133,11 @@ def places_answer(text: str, *, places=(), placed=()) -> dict:
 
 def read(text: str, scene, *, engine=None, said=(), who=None, new=(), lines=None,
          names=None, pronouns=None, arrived=(), places=(), placed=(), fail: str = "",
-         calls: list | None = None) -> beat_reader.Reading:
+         calls: list | None = None, gone=()) -> beat_reader.Reading:
     people = people_answer(text, scene, who=who, new=new, lines=lines, names=names,
-                           pronouns=pronouns, arrived=arrived)
+                           pronouns=pronouns, arrived=arrived, gone=gone)
     where = places_answer(text, places=places, placed=placed) if (places or placed) else {}
-    return beat_reader.read(text, scene, engine=engine, said=said,
+    return beat_reader.read(text, scene, engine=engine, said=said, gone=gone,
                             chat=chat(people, where, fail=fail, calls=calls))
 
 

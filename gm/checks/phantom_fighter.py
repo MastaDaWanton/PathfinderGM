@@ -103,8 +103,11 @@ def candidates(ctx) -> list[tuple[str, str, str]]:
     # this fight; the second read decides whether the sentence has them fight.
     asked = [mid for n in reading.newcomers if n.where == beat_reader.HERE
              for mid in n.mentions]
+    # And the mentions of somebody this batch took out of the scene (`Reading.gone`, the
+    # routed and the fled, 2026-10-27): told going, fair; told still swinging, a phantom.
+    elsewhere = set(reading.away or ()) | set(getattr(reading, "gone", None) or ())
     asked += [m.id for m in reading.mentions
-              if m.ref and m.ref in (reading.away or ()) and m.id not in asked]
+              if m.ref and m.ref in elsewhere and m.id not in asked]
     for mid in asked:
         m = reading.mention(mid)
         if m is None:
@@ -146,7 +149,8 @@ def hand_back_naming_nobody(ctx) -> str:
     last = page[-1][0]
     nobody = {mid for n in reading.newcomers if n.where == beat_reader.HERE
               for mid in n.mentions}
-    nobody |= {m.id for m in reading.mentions if m.ref and m.ref in (reading.away or ())}
+    elsewhere = set(reading.away or ()) | set(getattr(reading, "gone", None) or ())
+    nobody |= {m.id for m in reading.mentions if m.ref and m.ref in elsewhere}
     for m in reading.mentions:
         if m.id in nobody and mentions._key(m.sentence) == mentions._key(last):
             return last

@@ -220,8 +220,14 @@ def what_they_are(a) -> str:
         from rules import bestiary
 
         if not bestiary.is_a_person(template):
-            row = bestiary.imported().get(template.strip().lower()) or {}
-            kind = str(row.get("creature_type") or "").strip().lower()
+            # Its size and its kind, from its own record ("Medium monstrous humanoid";
+            # `bestiary.body_words`), so the readers can tell "the towering figure" from
+            # the creature the engine holds as Medium. Until 2026-10-27 this was the raw
+            # printed type, and core.json's is truncated: the grioth was "monstrous".
+            kind = bestiary.body_words(a)
+            if not kind:
+                row = bestiary.imported().get(template.strip().lower()) or {}
+                kind = str(row.get("creature_type") or "").strip().lower()
     # A person of the world's own people is shown as that people (`heritage`, the
     # world's; `race` is the stat block's rules term and "human" by default — memory: the
     # world owns its own races). Measured 2026-10-09 replaying the owner's name turn: the

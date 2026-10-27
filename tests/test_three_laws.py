@@ -1037,6 +1037,8 @@ _UNSAVED_SCENE_FIELDS = {
     "log": "transient — rebuilt each turn",
     "bleeding": "transient — read and cleared within the turn that fills it",
     "hazards": "transient — read and cleared within the turn that fills it",
+    "gone": "transient — who `remove` took, read by the beat that tells of it in the "
+            "same request (`Scene.gone_in`)",
 }
 
 

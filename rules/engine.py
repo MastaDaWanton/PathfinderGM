@@ -315,6 +315,15 @@ class Scene:
     # Each is {"guard": ref, "what": ..., "found": {...}, "stock": [...]} and pays out
     # when the guard is dead or gone (`rules/gathering.py`).
     guarded_finds: list[dict] = field(default_factory=list)
+    # Who `remove` took out of the campaign lately, newest last: {"ref", "name", "body",
+    # "people"}, kept only so the beat that tells of their going can still say who they
+    # were (`gone_in`). Transient, never saved: the beat that narrates a removal is written
+    # in the same request as the batch that made it. Measured on the owner's save
+    # (2026-10-27, 0.2.21): the grioth guarding a herb find gave way as the player closed
+    # (`_holding_ground_settles`) and was removed in that batch, so the narrator and the
+    # beat reader met its going with nobody of that description in the scene — the reader
+    # answered "the towering figure" as a newcomer, and seen-people made a Gnome of it.
+    gone: list[dict] = field(default_factory=list)
     # The situation cards on the table (`rules/cards.py`): the facts of each situation
     # in play, as dicts, kept by the engine and shown to the model when their keys
     # appear in the last few beats. The store; `cards.load`/`cards.save` are the doors.
@@ -2361,6 +2370,7 @@ class Scene:
         actor = self.people.get(ref)
         if actor is None or actor.is_pc:
             return None
+        self._note_gone(actor)
         self._unseat(ref)
         self.guards = [g for g in self.guards if ref not in (g.guardian, g.protects)]
         # A ward naming a creature who no longer exists is one more place for a ghost
@@ -2376,6 +2386,75 @@ class Scene:
                 e.pop("ref", None)
         del self.people[ref]
         return actor
+
+    # How many removals `gone` remembers. A batch removes a handful at most (a rout, a
+    # sweep of the fallen, a travel leaving the town behind); the rest are long told.
+    GONE_KEPT = 24
+
+    def _note_gone(self, actor: Actor) -> None:
+        """Who is leaving, as the beat that tells of it will need them: name, and what
+        they are — a creature's size and kind (`bestiary.body_words`), a person's people
+        (`faces.people_of`). Written only by `remove`, the one destroyer."""
+        from . import bestiary as bestiary_mod
+        from . import faces as faces_mod
+
+        try:
+            body = bestiary_mod.body_words(actor)
+        except Exception:  # noqa: BLE001 — a block that will not load says nothing
+            body = ""
+        self.gone.append({
+            "ref": actor.ref, "name": str(actor.name or ""), "body": body,
+            "people": faces_mod.people_of(str(getattr(actor, "appearance", "") or "")),
+            "at": str(getattr(actor, "at", "") or ""), "minute": int(self.clock_minutes or 0),
+        })
+        del self.gone[:-self.GONE_KEPT]
+
+    # How long, in game minutes, somebody who left this place is still who a beat here
+    # may be talking about (`gone_lately`).
+    GONE_WITHIN = 60
+
+    def gone_lately(self, within: int | None = None) -> list[dict]:
+        """Who `remove` took from the place the party stands, within the last hour of the
+        world's clock: the beats after a going still talk of them. Measured live on this
+        branch (2026-10-27): the beat after the grioth gave way, "I look for the towering
+        figure in the trees" was written back as "tracks left by the towering figure", and
+        with only the batch's own removals shown (`gone_in`, empty that turn) the reader
+        answered it a newcomer, a person — a population record, one "here" away from
+        another body with a people's face."""
+        within = self.GONE_WITHIN if within is None else int(within)
+        now = int(self.clock_minutes or 0)
+        out, seen = [], set()
+        for g in reversed(self.gone):
+            if (g["ref"] in self.people or g["ref"] in seen or g.get("at") != self.at
+                    or now - int(g.get("minute") or 0) > within):
+                continue
+            seen.add(g["ref"])
+            out.append(dict(g))
+        return list(reversed(out))
+
+    def gone_in(self, outcomes) -> list[dict]:
+        """Who this batch's outcomes speak of and `remove` has taken away: the people a
+        beat about these outcomes may still name, though they are not here now. Read off
+        the outcomes' effects by ref (structure, never a tell's words); refs are never
+        reused (`bestiary.next_ref`), so a ref in this batch's effects that is gone went
+        in this batch or is somebody the batch still tells of.
+
+        The beat reader shows them as "gone from here just now" so its mentions are them
+        and not newcomers (gm/beat_reader.py), and the planned narrator names them as gone
+        just now with their size and kind (gm/planned.py)."""
+        said: set[str] = set()
+        for o in outcomes or ():
+            effects = o.get("effects") if isinstance(o, dict) else getattr(o, "effects", None)
+            for fx in effects or ():
+                if isinstance(fx, dict):
+                    said |= {v for v in fx.values() if isinstance(v, str)}
+        here = set(self.people)
+        out, seen = [], set()
+        for g in reversed(self.gone):
+            if g["ref"] in said and g["ref"] not in here and g["ref"] not in seen:
+                seen.add(g["ref"])
+                out.append(dict(g))
+        return list(reversed(out))
 
     # The name every earlier stage knew the destroyer by. Kept so the four callers and
     # the tests that pin its contract (every trace gone, the turn stays on the same

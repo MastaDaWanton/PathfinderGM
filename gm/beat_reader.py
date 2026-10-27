@@ -72,6 +72,13 @@ HERE = "here"
 ELSEWHERE = "elsewhere"
 SAME = "same as "
 HERE_SPEAKER = "where the speaker is"
+# What a newcomer is (the `being` answer): somebody, or a creature that is nobody's people.
+# A closed question to the reader, never a word list (owner direction 2026-10-03): seen-
+# people makes a body only of a PERSON (play/aftermath/seen_people.py). Measured on the
+# owner's save, 2026-10-27: "the towering figure" — the grioth that had just given way —
+# was answered "new" and made a guildhand with the village's Gnome face.
+PERSON = "person"
+CREATURE = "creature"
 NONE = "none"
 OTHER = "other"
 
@@ -118,6 +125,7 @@ class Newcomer:
     words: str                # the page's words for them
     ref: str = ""             # once made a body (`play/aftermath/seen_people.py`)
     record: str = ""          # the population record
+    being: str = ""           # PERSON | CREATURE | "" (unanswered)
 
 
 @dataclass
@@ -150,6 +158,10 @@ class Reading(Attribution):
     dropped: list[dict] = field(default_factory=list)
     refs: set = field(default_factory=set)          # the people here
     away: set = field(default_factory=set)          # known elsewhere in this town
+    # Taken out of the scene by the batch this beat tells of, or from this place within
+    # the hour (`Scene.gone_in`, `Scene.gone_lately`): a mention may be them, and nobody
+    # is made in their place.
+    gone: set = field(default_factory=set)
     arrived: list = field(default_factory=list)     # away refs the passage shows here
     read: bool = False        # the people call answered
     places_read: bool = False
@@ -209,8 +221,10 @@ class Reading(Attribution):
             "kind": "beat-reading",
             "lines": len(self.lines),
             "lines_read": sum(1 for ln in self.lines if ln.by),
-            "newcomers": [{"words": n.words, "where": n.where, "mentions": n.mentions}
+            "newcomers": [{"words": n.words, "where": n.where, "mentions": n.mentions,
+                           **({"being": n.being} if n.being else {})}
                           for n in self.newcomers],
+            **({"gone": sorted(self.gone)} if self.gone else {}),
             "places": [{"words": p.words, "kind": p.kind, "landmark": p.landmark}
                        for p in self.places],
             "placed": [{"words": p.words, "at": p.at} for p in self.placed],
@@ -284,15 +298,15 @@ def marked(text: str, found: list[Mention], lines: list[Line]) -> str:
 # --- call 1: people and lines ------------------------------------------------------------
 
 def people_schema(mention_ids: list[str], refs: list[str], line_ids: list[str],
-                  vague: list[str], away: list[str] = ()) -> dict:
+                  vague: list[str], away: list[str] = (), gone: list[str] = ()) -> dict:
     """Every answer an enum the engine supplied. `vague`: the refs present with no gender
     and they/them pronouns, whose pronoun the page may settle (owner's ruling Q26)."""
     props: dict = {}
     earlier: list[str] = []
     for mid in mention_ids:
         props[mid] = {"type": "string",
-                      "enum": list(refs) + list(away) + [NEW] + [SAME + e for e in earlier]
-                      + [NOBODY]}
+                      "enum": list(refs) + list(away) + list(gone) + [NEW]
+                      + [SAME + e for e in earlier] + [NOBODY]}
         earlier.append(mid)
     who = list(refs) + [YOU] + list(mention_ids) + [NOBODY]
     for lid in line_ids:
@@ -306,8 +320,10 @@ def people_schema(mention_ids: list[str], refs: list[str], line_ids: list[str],
                                   "properties": {
                                       "mention": {"type": "string", "enum": mention_ids},
                                       "where": {"type": "string", "enum": [HERE, ELSEWHERE]},
+                                      "being": {"type": "string",
+                                                "enum": [PERSON, CREATURE]},
                                       "words": {"type": "string"}},
-                                  "required": ["mention", "where", "words"]}}
+                                  "required": ["mention", "where", "being", "words"]}}
     # A name the page gives somebody: who (a person listed, not the player's character, or
     # a newcomer's mention) and the name as written. The name is the one free string here,
     # and it is checked: on the page, and nobody else's (`seen_people.name_them`).
@@ -341,9 +357,13 @@ _PEOPLE_SYSTEM = (
     "Numbered lines {q1} are words spoken aloud. For each, answer who says it (a code, "
     "\"you\" for the player's character, or the marked phrase of a newcomer) and who it is "
     "said to.\n"
+    "Somebody listed as gone from here has just left: a mention of them, "
+    "however it describes them, is their code, not somebody new.\n"
     "Under \"new\", give each newcomer once, by their first marked phrase: \"here\" if the "
-    "passage shows them in the scene now, \"elsewhere\" if they are only spoken of; and "
-    "copy the passage's own words that best describe them.\n"
+    "passage shows them in the scene now, \"elsewhere\" if they are only spoken of; "
+    "\"person\" if they are somebody — a man, a woman, a child, a figure who could be "
+    "anybody — or \"creature\" if they are a beast, an animal or a monster; and copy the "
+    "passage's own words that best describe them.\n"
     "Under \"names\", a person's own name if the passage gives one (they say it, or the "
     "narration names them), exactly as written; leave it empty when nobody is named.\n"
     "Under \"arrived\", anybody from the people known but not here whom the passage shows "
@@ -363,6 +383,8 @@ _PEOPLE_EXAMPLE_USER = (
     "shows here and now is not one of them unless it says they came:\n"
     "c2: the harbour clerk\n"
     "c6: the net-mender with the limp\n\n"
+    "Gone from here just now — not here any more:\n"
+    "c7: hound — Medium animal\n\n"
     "Passage:\n"
     "[m1: The man at the barrel] does not look up. He is [m2: a broad man], his apron "
     "stiff with pitch. {q1}'Not today,' he says. You lean on the barrel. {q2}'I only want "
@@ -370,14 +392,21 @@ _PEOPLE_EXAMPLE_USER = (
     "watch, and [m4: the crowd] on the quay goes quiet. {q3}'Leave him be. Folk call me "
     "Tam,' [m5: the girl] calls to you. The cooper mutters that [m6: his brother] would "
     "have the hoops, if he were not away at sea, and that [m7: the clerk] still owes "
-    "him. [m8: The net-mender] limps in out of the rain and sits by the stove.")
+    "him. [m8: The net-mender] limps in out of the rain and sits by the stove. "
+    "[m9: The grey shape] slinks off under the jetty and is gone, and [m10: a heron] "
+    "drops onto the rail.")
+# m9 and m10 added 2026-10-27 (the grioth report): somebody the batch took away, met in
+# words that are not their name ("the towering figure" was the grioth that gave way), and
+# a newcomer who is a creature, not a person — nobody is made of one.
 _PEOPLE_EXAMPLE_ASSISTANT = json.dumps({
     "m1": "c4", "m2": "c4", "m3": "new", "m4": "nobody", "m5": "same as m3", "m6": "new",
-    "m7": "c2", "m8": "c6",
+    "m7": "c2", "m8": "c6", "m9": "c7", "m10": "new",
     "q1": {"by": "c4", "to": "you"}, "q2": {"by": "you", "to": "c4"},
     "q3": {"by": "m3", "to": "you"},
-    "new": [{"mention": "m3", "where": "here", "words": "a girl with a basket of eels"},
-            {"mention": "m6", "where": "elsewhere", "words": "his brother"}],
+    "new": [{"mention": "m3", "where": "here", "being": "person",
+             "words": "a girl with a basket of eels"},
+            {"mention": "m6", "where": "elsewhere", "being": "person", "words": "his brother"},
+            {"mention": "m10", "where": "here", "being": "creature", "words": "a heron"}],
     "names": [{"who": "m3", "name": "Tam"}],
     "arrived": ["c6"],
     "pronoun c5": "not said"})
@@ -385,7 +414,7 @@ _PEOPLE_EXAMPLE_ASSISTANT = json.dumps({
 
 def people_messages(text: str, found: list[Mention], lines: list[Line], cast: list[dict],
                     vague: list[str], acting: str = "", facts: list[str] | None = None,
-                    away: list[dict] = ()) -> list[dict]:
+                    away: list[dict] = (), gone: list[dict] = ()) -> list[dict]:
     body = ["People present:", *_cast_lines(cast)]
     if away:
         # Measured on the bench, 2026-10-03: with the list bare, "a lone laborer …
@@ -395,6 +424,9 @@ def people_messages(text: str, found: list[Mention], lines: list[Line], cast: li
                  "the passage shows here and now is not one of them unless it says they "
                  "came:",
                  *_cast_lines(list(away))]
+    if gone:
+        body += ["\nGone from here just now — not here any more:",
+                 *_cast_lines(list(gone))]
     if acting:
         body.append(f"\nIt is {acting}'s turn.")
     if facts:
@@ -581,6 +613,16 @@ def town_places(engine) -> tuple[list, object | None]:
     return known, here
 
 
+def gone_person(g: dict) -> dict:
+    """One of `Scene.gone_in`'s records as the reader's cast lists people: what they were
+    is the creature's size and kind, or the person's people."""
+    what = str(g.get("body") or "")
+    if not what and g.get("people"):
+        what = f"one of the {g['people']} people"
+    return {"ref": str(g["ref"]), "name": str(g.get("name") or ""), "true": "",
+            "pc": False, "what": what, "dead": False, "gone": True, "race": ""}
+
+
 # The most people known elsewhere in this town the reader is shown beside the people here.
 MAX_AWAY = 10
 
@@ -614,23 +656,31 @@ def away_people(scene) -> list[dict]:
 
 def read(text: str, scene, *, engine=None, said=(), acting: str = "",
          facts: list[str] | None = None, chat=None, model: str = "", host: str = "",
-         provider: str = "ollama", api_key: str = "", places: bool = True) -> Reading:
+         provider: str = "ollama", api_key: str = "", places: bool = True,
+         gone=()) -> Reading:
     """The beat's reading. Never raises: a failed call leaves the code's certain answers
     (names `mentions.find` settled), says why in `error`, and guesses nothing else.
 
     The interface the other readers of a finished beat plug into (lane V's verify pass,
     docs/structured-turn.md): text in, a `Reading` out, `chat` the one door to a model
     (`client.chat`'s signature; a stub in the tests). Off when `ENABLED` is False unless a
-    `chat` is passed — the suite's way of asking for a reading."""
+    `chat` is passed — the suite's way of asking for a reading.
+
+    `gone` is who the batch this beat tells of took out of the scene (`Scene.gone_in`):
+    shown as gone from here just now, offered as answers, and never newcomers."""
     from .narration import _sentences
 
     cast = mentions.people(scene)
     away = away_people(scene)
-    found = mentions.find(text, cast + away)
+    held = {p["ref"] for p in cast + away}
+    left = [gone_person(g) for g in (gone or ()) if isinstance(g, dict)
+            and g.get("ref") and g["ref"] not in held]
+    found = mentions.find(text, cast + away + left)
     reading = Reading(mentions=found)
     reading.sentences = {mentions._key(s) for s in _sentences(speech.unquoted(str(text or "")))}
     reading.refs = {p["ref"] for p in cast}
     reading.away = {p["ref"] for p in away}
+    reading.gone = {p["ref"] for p in left}
     reading.lines = lines_of(text, said)
     ask_m = found[:MAX_MENTIONS]
     ask_l = reading.lines[:MAX_LINES]
@@ -653,7 +703,7 @@ def read(text: str, scene, *, engine=None, said=(), acting: str = "",
     if ONE_CALL and places and ask_l:
         return _read_in_one_call(reading, scene, engine, chat, model, host, provider,
                                  api_key, text, ask_m, ask_l, cast, vague, away, acting,
-                                 facts, refs)
+                                 facts, refs, left)
     worker = None
     if places and ask_l:
         worker = threading.Thread(
@@ -663,16 +713,19 @@ def read(text: str, scene, *, engine=None, said=(), acting: str = "",
         worker.start()
     started = time.monotonic()
     try:
-        reply = chat(people_messages(text, ask_m, ask_l, cast, vague, acting, facts, away),
+        reply = chat(people_messages(text, ask_m, ask_l, cast, vague, acting, facts, away,
+                                     gone=left),
                      model, host, as_json=True, think=False, temperature=0.0,
-                     num_predict=180 + 14 * len(ask_m) + 22 * len(ask_l) + 12 * len(vague),
+                     # 6 tokens more a mention for the newcomer's `being`.
+                     num_predict=180 + 20 * len(ask_m) + 22 * len(ask_l) + 12 * len(vague),
                      provider=provider, api_key=api_key,
                      schema=people_schema([m.id for m in ask_m], refs,
                                           [ln.id for ln in ask_l], vague,
-                                          away=[p["ref"] for p in away]))
+                                          away=[p["ref"] for p in away],
+                                          gone=[p["ref"] for p in left]))
         reading.raw = reply.text
         _apply_people(reading, reply.json() or {}, ask_m, ask_l, refs, vague, text,
-                      away=[p["ref"] for p in away])
+                      away=[p["ref"] for p in away], gone=[p["ref"] for p in left])
         reading.read = True
         reading.labelled = True
     except Exception as exc:  # a failed read must never lose the turn
@@ -710,12 +763,15 @@ def _one_call_example() -> str:
 
 
 def _read_in_one_call(reading, scene, engine, chat, model, host, provider, api_key, text,
-                      ask_m, ask_l, cast, vague, away, acting, facts, refs) -> Reading:
+                      ask_m, ask_l, cast, vague, away, acting, facts, refs,
+                      left=()) -> Reading:
     town = _town_for(reading, scene, engine)
     away_refs = [p["ref"] for p in away]
+    gone_refs = [p["ref"] for p in left]
     schema = people_schema([m.id for m in ask_m], refs, [ln.id for ln in ask_l], vague,
-                           away=away_refs)
-    msgs = people_messages(text, ask_m, ask_l, cast, vague, acting, facts, away)
+                           away=away_refs, gone=gone_refs)
+    msgs = people_messages(text, ask_m, ask_l, cast, vague, acting, facts, away,
+                           gone=left)
     if town is not None:
         known, here, by_name, npc_lines, _names = town
         pl = places_schema([ln.id for ln in npc_lines], list(by_name))["properties"]
@@ -739,7 +795,8 @@ def _read_in_one_call(reading, scene, engine, chat, model, host, provider, api_k
                      provider=provider, api_key=api_key, schema=schema)
         reading.raw = reply.text
         ans = reply.json() or {}
-        _apply_people(reading, ans, ask_m, ask_l, refs, vague, text, away=away_refs)
+        _apply_people(reading, ans, ask_m, ask_l, refs, vague, text, away=away_refs,
+                      gone=gone_refs)
         reading.read = reading.labelled = True
         if town is not None:
             _apply_places(reading, {"places": ans.get("places") or [],
@@ -788,14 +845,14 @@ def _places_from_npcs(reading: Reading, scene) -> None:
 
 
 def _apply_people(reading: Reading, ans: dict, ask_m, ask_l, refs, vague, text,
-                  away=()) -> None:
+                  away=(), gone=()) -> None:
     """Take the people call's answers that pass their checks; drop the rest with why."""
     narration = speech.unquoted(text)
     roots: dict[str, str] = {}               # mention id -> its newcomer's root id
     for m in ask_m:
         got = str(ans.get(m.id) or "")
         reading.who_said[m.id] = got
-        if got in refs or got in away:
+        if got in refs or got in away or got in gone:
             m.model = got
         elif got == NOBODY:
             m.model = NOBODY
@@ -851,9 +908,11 @@ def _apply_people(reading: Reading, ans: dict, ask_m, ask_l, refs, vague, text,
         # mallet" made a person called "worker's" (measured live on the merged branch,
         # 2026-10-03). The 's is grammar, a closed form, and comes off.
         words = re.sub(r"(?:'s|’s|s'|s’)$", "", _article_off(words)).strip()
+        being = str(item.get("being") or "")
         reading.newcomers.append(Newcomer(
             root=root, mentions=[k for k, v in roots.items() if v == root],
-            where=where, words=words))
+            where=where, words=words,
+            being=being if being in (PERSON, CREATURE) else ""))
     # Lines.
     mids = {m.id for m in ask_m}
     who_ok = set(refs) | {YOU, NOBODY} | mids

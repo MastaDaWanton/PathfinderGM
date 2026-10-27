@@ -245,8 +245,42 @@ def present(engine) -> list[dict]:
         if people:
             what.append(f"one of the {people} people; {people} is their people, not "
                         f"their name")
+        body = _body(a)
+        if body:
+            what.append(body)
         out.append({"ref": ref, "name": a.name, "what": ", ".join(what),
                     "can_answer": not dead and not a.is_down})
+    return out
+
+
+def _body(creature) -> str:
+    """A creature's size and kind from its record, said as a fact the slot may not
+    contradict: "a Medium monstrous humanoid, about a grown man's height — no bigger". ""
+    for a person, whose body is their people's and their face's.
+
+    The owner's report (2026-10-27, 0.2.21): the grioth, a Medium monstrous humanoid, was
+    "a massive creature", "a large, monstrous figure" and "the towering figure", and no
+    slot had been given a size at all. Takes an Actor, or a `Scene.gone` record."""
+    from rules import bestiary
+
+    if isinstance(creature, dict):
+        words = str(creature.get("body") or "")
+    else:
+        try:
+            words = bestiary.body_words(creature)
+        except Exception:  # noqa: BLE001 — a block that will not load says nothing
+            words = ""
+    return bestiary.body_said(words)
+
+
+def gone(engine, outcomes) -> list[dict]:
+    """Who this beat's outcomes took out of the scene (`Scene.gone_in`), as the plan names
+    them: they are not HERE NOW, but the act slot's tell is about them."""
+    scene = engine.scene
+    out = []
+    for g in (scene.gone_in(outcomes) if hasattr(scene, "gone_in") else ()):
+        what = _body(g) or (f"one of the {g['people']} people" if g.get("people") else "")
+        out.append({"ref": g["ref"], "name": g.get("name") or "", "what": what})
     return out
 
 
@@ -689,7 +723,7 @@ Reply with the JSON object each request asks for."""
 
 def plan_messages(brief: str, slots: list[dict], people: list[dict], place: str, *,
                   last_beat: str = "", since: list[str] | None = None,
-                  scene_now: str = "", claim: str = "") -> list[dict]:
+                  scene_now: str = "", claim: str = "", gone=()) -> list[dict]:
     """The plan as one prompt: [system + the scene, the plan]. Every slot call opens with
     exactly these bytes, so Ollama reuses their cache from the second slot on."""
     scene = f"THE SCENE (reference; the only things that exist):\n{brief}"
@@ -708,6 +742,14 @@ def plan_messages(brief: str, slots: list[dict], people: list[dict], place: str,
             for p in people))
     else:
         blocks.append("PEOPLE HERE NOW: nobody but the player's character.")
+    if gone:
+        # Who this moment's own outcomes took away (`gone`): the act slot's tell names
+        # them, and without this line "the grioth gives way" was written about a creature
+        # no list held, with the size the last beat had invented (2026-10-27).
+        blocks.append("GONE IN THIS MOMENT (the engine took them out of the scene; write "
+                      "them going, never staying): " + "; ".join(
+                          f'{p["name"]} ({p["ref"]}' + (f'; {p["what"]})' if p["what"]
+                                                         else ")") for p in gone))
     if scene_now:
         blocks.append(scene_now.strip())
     if claim:
@@ -879,7 +921,8 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
                    reading=reading), budget)
     people = present(engine)
     plan = plan_messages(brief, slots, people, _place(engine), last_beat=last_beat,
-                         since=since, scene_now=scene_now, claim=claim)
+                         since=since, scene_now=scene_now, claim=claim,
+                         gone=gone(engine, outcomes))
     out = Planned(text="", slots=[], messages=plan, model=model)
     if dropped:
         out.notes.append(f"over the {budget}-character budget: no {', '.join(dropped)} slot")
