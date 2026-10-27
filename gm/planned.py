@@ -485,10 +485,109 @@ def _means_to_go(reading) -> bool:
                for a in reading.get("actions") or ())
 
 
-def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
+def _one_line(text: str, cap: int = 300) -> str:
+    return " ".join(str(text or "").split())[:cap]
+
+
+def _holds_a_job(engine, ref: str) -> bool:
+    """Whether the engine holds work from this person for the player: a live quest card
+    whose giver they are, known to the player in any way. The reply of anybody who holds
+    none is read back for work made up on the spot (`_no_job_made_up`)."""
+    from rules import cards as cards_mod
+
+    return any(c.live and c.giver == ref and cards_mod.standing(c) != cards_mod.UNHEARD
+               for c in cards_mod.quests(engine.scene))
+
+
+def matter_slot(pull) -> dict | None:
+    """The "matter" slot for the open matter the engine picked (`cards.thread_to_pull`), or
+    None. Its words come from the pull's facts and never its `text`, which is the free
+    narrator's instruction (rough edge 3: the slot paraphrased the instruction into
+    "…fueled by the fact that and few guards can restrain…", 2026-10-10).
+
+    Whose the matter is decides what the slot may say (`cards.standing`). The owner's
+    report of 2026-10-27, row 137 of the 0.2.21 turn log: the slot read "A matter the
+    engine keeps open: Find Tanna Ashbourne's lost Coldwood — Search the approach for the
+    Coldwood. Let it touch the scene in one sentence", with nobody in the field, and wrote
+    "You keep the goal of finding Tanna Ashbourne's lost Coldwood in mind" — a quest the
+    player had never heard of. So:
+
+      * the player's own (a quest taken, their errand): their open matter, as before;
+      * a matter of the world (a town's strain): a fact seen or heard here;
+      * somebody else's, put to the player or not: only through the person who carries it
+        here, by the pull's approach — the giver seen or overheard at it, or the person
+        the player is talking with mentioning it — and never the player's goal. The
+        `not_own` mark is what the read-back asks after (`GMAgent._check`).
+
+    A bare string is a matter from before `standing` existed, worded as it always was."""
+    if not pull:
+        return None
+    if isinstance(pull, str):
+        return {"key": "matter", "want": MATTER_WANT,
+                "say": "A matter the engine keeps open: " + _one_line(pull)
+                       + " Let it touch the scene in one sentence, as a fact, "
+                         "without resolving it."}
+    title = _one_line(pull.get("title"), 120)
+    fact = _one_line(pull.get("fact"), 180)
+    what = title + (f" — {fact}" if fact else "")
+    stands = str(pull.get("standing") or "")
+    if not title:
+        return None
+    if stands in ("", "own"):
+        lead = ("The player's own open matter, one they took on: " if stands == "own"
+                else "A matter the engine keeps open: ")
+        return {"key": "matter", "want": MATTER_WANT,
+                "say": lead + what + ". Let it touch the scene in one sentence, as a fact, "
+                                     "without resolving it."}
+    if stands == "situation":
+        return {"key": "matter", "want": MATTER_WANT, "not_own": title,
+                "say": f"A matter of the world here, not a task of the player's: {what}. Let "
+                       "it touch the scene in one sentence, as something seen or heard "
+                       "here, without resolving it. It is not the player's goal: never "
+                       "write that they seek it, pursue it or keep it in mind."}
+    giver = _one_line((pull.get("giver") or {}).get("name"), 60)
+    how = str(pull.get("approach") or "")
+    never = (f"It is {giver or 'somebody else'}'s matter, not the player's: they have "
+             + ("never heard of it" if stands == "unheard" else "not taken it on")
+             + ", so never write it as the player's goal, errand or intention, or as "
+               "something they keep in mind.")
+    # The approach decides who carries it; a matter with nobody here to carry it is not
+    # picked at all (`cards._pull_one`), and none is invented for it here.
+    if how == "overheard" and giver:
+        doing = _one_line(pull.get("doing"), 100)
+        say = (f"{giver} is here{', ' + doing if doing else ''}. In one sentence the player "
+               f"sees or overhears {giver} at their own trouble — {title} — said to "
+               f"somebody else or to nobody. {giver} does not speak to the player.")
+    elif how == "go_between" and (pull.get("carrier") or {}).get("name"):
+        carrier = _one_line(pull["carrier"]["name"], 60)
+        say = (f"{carrier}, who is here, mentions in passing, in one sentence, "
+               f"{giver or 'somebody'}'s trouble: {title}. {giver or 'They'} "
+               f"{'does' if giver else 'do'} not appear.")
+    elif how in ("asked", "greets") and giver:
+        offer = _one_line(pull.get("offer"), 120)
+        motive = _one_line(pull.get("motive"), 140)
+        opener = (f"{giver}, whom the player has turned to," if how == "asked" else
+                  f"{giver}, who knows the player, greets them as someone they know and")
+        say = (f"{opener} asks it of the player in one or two sentences of their own: "
+               f"{title}" + (f" (why it matters to them: {motive})" if motive else "")
+               + (f"; what they offer: {offer}" if offer else "")
+               + ". They ask; the player has not agreed to anything.")
+    elif how == "sends_word" and giver:
+        say = (f"Word reaches the player from {giver}, who is not here, asking them to "
+               f"come by about {giver}'s trouble: {title}.")
+    else:
+        # Nobody here to carry it: `cards.thread_to_pull` should not have picked it.
+        return None
+    return {"key": "matter", "want": MATTER_WANT, "not_own": title, "approach": how,
+            "giver_ref": str((pull.get("giver") or {}).get("ref") or ""),
+            "say": say + " " + never + " Do not resolve it."}
+
+
+def build_plan(engine, player_input: str, outcomes, *, pull=None,
                last_beat: str = "", reading=None) -> list[dict]:
     """The ordered slots (the module note), before the budget (`allocate`). `last_beat` is
-    the beat before this one; `pull` the open matter's own fact, never an instruction."""
+    the beat before this one; `pull` the open matter as the engine picked it
+    (`matter_slot`), never an instruction."""
     slots: list[dict] = []
     carry_on = player_input == prompts.CARRY_ON
     fighting = bool(engine.scene.in_encounter)
@@ -571,9 +670,19 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
             say = (f"The engine decided this: {decided} "
                    + ("Show it as it happens: no blow lands yet." if declared
                       else "Show it as it happens."))
+        # A scheme's step on a quest the player has not taken (`schemes._progress_not_
+        # taken`): said so, and the slot read back like the matter slot. Live 2026-10-27,
+        # "the approach, the ground where Glowvine grows" came back "You scan … searching
+        # the soil where the luminescent Glowvine is known to take root".
+        theirs = next((e["not_own"] for o in act for e in (getattr(o, "effects", None) or [])
+                       if isinstance(e, dict) and e.get("not_own")), "")
+        if theirs:
+            say += (f" It concerns {theirs}, which is somebody else's matter: the player "
+                    "has not taken it on, so never write it as something they seek, "
+                    "pursue or keep in mind.")
         slots.append({"key": f"fact{i + 1}",
                       "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
-                      "say": say, "tells": tells})
+                      "say": say, "tells": tells, **({"not_own": theirs} if theirs else {})})
     if not any(s["key"].startswith("fact") for s in slots):
         if carry_on:
             # Continue moves the scene (the ruling of 2026-09-18): with no tells, the
@@ -621,15 +730,9 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                                  f"{focus}, from what THE SCENE says is here and nothing "
                                  "else. Nothing new that matters: no new person, weapon, "
                                  "or way out; nobody acts in it."})
-    if pull:
-        # The engine's fact alone (rough edge 3). It was the pull's whole rendering, whose
-        # head is an instruction to the free narrator ("STILL OPEN, NEAREST TO HAND … never
-        # to resolve for the player"), and on 2026-10-10 the slot paraphrased the
-        # instruction into "…fueled by the fact that and few guards can restrain…".
-        slots.append({"key": "matter", "want": MATTER_WANT,
-                      "say": "A matter the engine keeps open: " + " ".join(pull.split())[:300]
-                             + " Let it touch the scene in one sentence, as a fact, "
-                               "without resolving it."})
+    matter = matter_slot(pull)
+    if matter is not None:
+        slots.append(matter)
     people = [p for p in present(engine) if p["can_answer"]]
     if people and not fighting:
         # Who answers is the engine's (rough edge 2): measured live 2026-10-15, "'I have not
@@ -650,13 +753,26 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
             # 2026-10-16 talk bench one fishmonger said "dryly" on 9 of 9 beats.
             said_as = narration_mod.definite(speaker["name"]) + " says "
             used = [m for m in MANNERS if m and said_as + m in str(last_beat or "")]
+            # The player turned to the matter's own person: their ask is their answer,
+            # one voice, so the matter slot folds into the reply instead of giving the
+            # same person a second speech beside it.
+            asks = ""
+            if matter is not None and matter.get("approach") == "asked" \
+                    and matter.get("giver_ref") == speaker["ref"]:
+                slots.remove(matter)
+                asks = (" They also ask the player for what they want, in their own words: "
+                        + matter["say"].split(" asks it of the player in one or two "
+                                              "sentences of their own: ", 1)[-1])
             slots.append({
                 "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
                 "speaker_name": speaker["name"], **({"not_manner": used} if used else {}),
                 "say": f'{speaker["name"]} answers the player, in their own voice, as '
                        "themselves (\"I\", never their own name or title), only from what "
                        "THE SCENE says they know; if THE SCENE does not say, they do not "
-                       "know and say so."})
+                       "know and say so." + asks,
+                **({"not_own": matter["not_own"]} if asks else {}),
+                **({"no_job": speaker["name"]}
+                   if not _holds_a_job(engine, speaker["ref"]) else {})})
         else:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
@@ -908,8 +1024,8 @@ def _unwrap_quotes(text: str) -> str:
 
 def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
           last_beat: str = "", last_plain: str = "", since=None, scene_now: str = "",
-          pull: str = "", claim: str = "", lift=None, check=None,
-          budget: int | None = None, reading=None) -> Planned:
+          pull=None, claim: str = "", lift=None, check=None,
+          budget: int | None = None, reading=None, goal=None, job=None) -> Planned:
     """Plan the beat and write it slot by slot. `who` is (model, host, provider, key) —
     the prose role's, so a hosted narrator writes planned beats too. `last_beat` is the
     beat before as the model is shown it (speaker tags back on); `last_plain` the same
@@ -917,7 +1033,10 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     (`GMAgent._lift`). `check(key, text)` returns what is wrong with a slot as written, or
     "": the slot is asked once more with that named (the house's shape — detect in code,
     repair only what was found), and kept either way, for the pipeline's backstops after.
-    `budget` is the beat's length in characters (`budget_for` when None).
+    `budget` is the beat's length in characters (`budget_for` when None). `goal(matter,
+    text)` reads back a slot carrying somebody else's matter (`_not_their_goal`); `job(
+    speaker, text)` the reply of somebody who holds no work for the player
+    (`_no_job_made_up`).
     Raises `PlanFailed` (or the client's own error) when a core slot call fails or comes
     back empty: the caller hands the beat to the free narrator."""
     model, host, provider, key = who
@@ -933,7 +1052,7 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     if dropped:
         out.notes.append(f"over the {budget}-character budget: no {', '.join(dropped)} slot")
     try:
-        _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check)
+        _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check, goal, job)
     except Exception as exc:
         # The calls made before the failure, for the turn log beside the free beat.
         exc.calls = list(out.calls)
@@ -972,7 +1091,95 @@ def _settle(out: Planned, s: dict, text: str) -> None:
                       "reply": call.get("raw") or ""})
 
 
-def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None) -> None:
+def _not_their_goal(out: Planned, plan, slots, i, written, who, s: dict, text: str, goal,
+                    *, final: bool, lift, core: bool) -> str | None:
+    """The slot as it may stand, or None to drop it: a matter that is not the player's
+    (`s["not_own"]`, from `matter_slot`) read back by `goal(matter, text)` — the sentence
+    that makes it the player's own goal, "" for none, None unanswered — and asked once more
+    with that sentence named. Still there: a matter slot goes whole; the answer to the
+    player (a core slot) loses only that sentence, and stands whole if it was nothing else.
+
+    The owner's report of 2026-10-27, row 137: "You keep the goal of finding Tanna
+    Ashbourne's lost Coldwood in mind as you scout the approach" — the slot was told the
+    matter was open and nothing of whose it was; instructing it was half of the fix, and
+    CLAUDE.md says an instruction alone does not hold, so the slot is read back."""
+    matter = s["not_own"]
+    said = goal(matter, text)
+    if said is None:
+        out.notes.append(f'the "{s["key"]}" slot: whose matter it makes {matter!r} was not '
+                         f'answered — left as written')
+        return text
+    if not said:
+        return text
+    redo = (f"You wrote: {text!r}. The sentence {said!r} makes {matter!r} the player's own "
+            f"goal, and it is not theirs: they have not taken it on. Write it again so it "
+            f"is only somebody else's matter, seen or heard here, and nothing the player "
+            f"seeks, pursues or keeps in mind.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=core, redo=redo)
+    again = goal(matter, text2) if text2 else said
+    out.calls[-1]["note"] = "not the player's goal, named" + (" — still there" if again else "")
+    if text2 and again == "":
+        out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal — asked '
+                         f'again, fixed')
+        return text2
+    if not core:
+        out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: '
+                         f'dropped')
+        return None
+    cut = narration_mod._cut_sentences(text, [said])
+    if narration_mod._sentences(narration_mod.unquoted(cut)) and cut != text:
+        out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: '
+                         f'cut {said[:80]!r}')
+        return cut.strip()
+    out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: left '
+                     f'standing, nothing else in it')
+    return text
+
+
+def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: str, job,
+                    *, final: bool, lift, core: bool) -> str:
+    """The reply as it may stand, when its speaker holds no work for the player
+    (`_holds_a_job`): read back by `job(speaker, text)` for the sentence that puts
+    particular work to the player, and asked once more with it named. Still there: cut
+    when the reply has anything else in it, else left standing and said so — an answer
+    the player asked for is not taken off the page whole.
+
+    The owner's report of 2026-10-27: at the hiring table the clerk's reply slot, told to
+    answer "only from what THE SCENE says they know", made up an escort, a shipment, an
+    outpost, paperwork and a caravan over five beats, and the player then tracked a caravan
+    the engine never held (docs/known-matters.md §4)."""
+    speaker = s["no_job"]
+    said = job(speaker, text)
+    if not said:
+        if said is None:
+            out.notes.append(f'the "{s["key"]}" slot: whether {speaker} made up work was '
+                             f'not answered — left as written')
+        return text
+    redo = (f"You wrote: {text!r}. In {said!r}, {speaker} puts particular work to the "
+            f"player, and the engine holds no work from {speaker}: no task, cargo, place, "
+            f"start, papers or pay of it exists. Write it again with {speaker} saying only "
+            f"what THE SCENE says of any work, and nothing more particular.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=core, redo=redo)
+    again = job(speaker, text2) if text2 else said
+    out.calls[-1]["note"] = "made-up work named" + (" — still there" if again else "")
+    if text2 and again == "":
+        out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work — asked again, '
+                         f'fixed')
+        return text2
+    cut = narration_mod._cut_sentences(text, [said])
+    if cut != text and narration_mod._sentences(cut):
+        out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work twice — cut '
+                         f'{said[:80]!r}')
+        return cut.strip()
+    out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work twice — left standing, '
+                     f'nothing else in it')
+    return text
+
+
+def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
+                 goal=None, job=None) -> None:
     written: list[str] = []
     for i, s in enumerate(slots):
         final = i == len(slots) - 1
@@ -1037,6 +1244,15 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None) ->
             out.calls[-1]["note"] = "fault named" + (" — still there" if again else "")
             out.notes.append(f'the "{s["key"]}" slot: {wrong} — asked again'
                              + (", still there" if again else ", fixed"))
+        if s.get("no_job") and job is not None:
+            text = _no_job_made_up(out, plan, slots, i, written, who, s, text, job,
+                                   final=final, lift=lift, core=core)
+        if s.get("not_own") and goal is not None:
+            text = _not_their_goal(out, plan, slots, i, written, who, s, text, goal,
+                                   final=final, lift=lift, core=core)
+            if text is None:
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
         if final:
             from .agent import _suggestions
 

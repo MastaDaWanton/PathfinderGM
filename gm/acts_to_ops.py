@@ -158,6 +158,113 @@ def person(scene, words) -> str:
     return ref
 
 
+def _follows_a_trail(a: dict, scene, places=()) -> bool:
+    """Whether a `follow` act follows a trail rather than somebody in sight or a way to a
+    place: nobody it names is standing here (`person`), and nothing it names is a place
+    the engine knows (`places.find`). The engine's state, never the words' meaning:
+    "I follow the guards" with the guards beside you is the thread's
+    (`judgement.update_thread`), and "I follow the road to the well" is a walk."""
+    from rules import places as places_mod
+
+    said = [" ".join(str(a.get(s) or "").split()) for s in ("target", "object", "place")]
+    said = [w for w in said if w]
+    if any(person(scene, w) for w in said):
+        return False
+    if places and any(places_mod.find(places, w) is not None for w in said):
+        return False
+    return True
+
+
+def quarries(rows: list[Row], frame: dict | None, scene, *, ask=None,
+             world=None) -> list[str]:
+    """What each track the table built is after — its `quarry`, the player's own words —
+    and a line per one kept, for the turn log.
+
+    A phrase that names somebody the engine holds (`tracking.quarry_of`) is the quarry
+    outright. Any other phrase is asked ONE question (`interpret.confirm_quarry`): does it
+    name the one who made the trail, or only the marks? — because the reader puts "the
+    caravan" and "the tracks" in either slot (probed live, 2026-10-27). `ask` None (the
+    suite, the reader off) keeps only a held quarry: a track that claims nothing about
+    what it is after is the track as it was before.
+
+    The owner's report the same day: "I continue to track the caravan", a caravan nothing
+    held, rolled Survival and the beat found its ruts. With the quarry kept, the engine
+    answers that no trail of the caravan crosses this ground."""
+    from rules import tracking
+
+    notes: list[str] = []
+    if not frame or scene is None:
+        return notes
+    actions = frame.get("actions") or []
+    for row in rows:
+        a = actions[row.index] if row.index < len(actions) else {}
+        for built in row.intents:
+            if built.get("op") != "track":
+                continue
+            phrases = []
+            for slot in ("target", "object"):
+                w = " ".join(str(a.get(slot) or "").split())
+                if w and w not in phrases:
+                    phrases.append(w)
+            quarry = next((w for w in phrases
+                           if tracking.quarry_of(scene, w, world=world) is not None), "")
+            if not quarry and ask is not None:
+                span = str(a.get("span") or " ".join(phrases))
+                quarry = next((w for w in phrases if ask(span, w) == "the maker"), "")
+            if quarry:
+                built["params"] = dict(built.get("params") or {}, quarry=quarry[:80])
+                notes.append(f"track: after {quarry!r}")
+    return notes
+
+
+# The acts a player agrees to a task in: words said to somebody.
+_AGREEING_ACTS = frozenset({"talk", "request", "other"})
+
+
+def take_ups(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str]:
+    """A quest the player knows of (`cards.offered_quests`), taken up when the player
+    speaks to the one who wants it done and the reader says the words agree to do it
+    (`interpret.confirm_take_up`) — the engine's `quest` op, built whole with the card's
+    own title and objectives, so the planner's wording never replaces them.
+
+    Detected in code from the engine's state — an act done now, aimed at a person here
+    who is the giver of such a quest — and asked one closed question; `ask` None (the
+    suite, the reader off) takes nothing up. Measured live 2026-10-27: "I will find your
+    Coldwood for you" to Brix Sootspar, the planner proposed nothing, and the quest stayed
+    his. Returns a line per quest taken up, for the turn log."""
+    from rules import cards as cards_mod
+
+    from . import interpret
+
+    notes: list[str] = []
+    if ask is None or not frame or scene is None:
+        return notes
+    known = cards_mod.offered_quests(scene)
+    if not known:
+        return notes
+    actions = frame.get("actions") or []
+    taken: set[str] = set()
+    for row in rows:
+        a = actions[row.index] if row.index < len(actions) else {}
+        if row.act not in _AGREEING_ACTS or not interpret.acting(a):
+            continue
+        ref = person(scene, " ".join(str(a.get("target") or "").split())) or addressed(scene)
+        for card in known:
+            if card.id in taken or not ref or card.giver != ref:
+                continue
+            who = scene.actors[ref].name
+            if ask(str(a.get("span") or ""), who, card.title) != "agrees to do it":
+                continue
+            row.intents.append({
+                "op": "quest", "actor": scene.pc().ref if scene.pc() else "pc",
+                "params": {"title": card.title, "quest": card.id,
+                           "objectives": [o["text"] for o in card.objectives] or [card.title]},
+                "because": f"the player agrees to it, to {who}"})
+            taken.add(card.id)
+            notes.append(f"{card.title}: taken up, to {who}")
+    return notes
+
+
 def coin_amount(words) -> tuple[str, int] | None:
     """("gp", 10) for "ten gold", "10 gp", "three silver pieces"; None otherwise."""
     from rules import goods
@@ -476,6 +583,23 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 # was rolled at all.
                 row.intents.append({"op": "track", "actor": pc.ref, "params": {},
                                     "because": "the player looks for tracks"})
+            if act == "follow" and pc is not None and not row.ops \
+                    and _follows_a_trail(a, scene, places):
+                # Following a trail is the same Survival check, and where it leads is the
+                # engine's (`Engine._op_track` with `follow`). Measured on the owner's
+                # 0.2.21 save (row 136): "I follow the tracks in search of the caravan"
+                # owed no op, and the plan walked the party to "the fields" — a walk
+                # toward nothing the engine held.
+                looked = next((i for r in rows for i in r.intents if i["op"] == "track"),
+                              None)
+                if looked is not None:
+                    # "I look for tracks of the caravan and follow them": one look, one
+                    # roll, followed. Measured live 2026-10-27 as two tracks and two d20s.
+                    looked["params"] = dict(looked.get("params") or {}, follow=True)
+                else:
+                    row.intents.append({"op": "track", "actor": pc.ref,
+                                        "params": {"follow": True},
+                                        "because": "the player follows a trail"})
             if act == "exert" and pc is not None:
                 _exert(row, frame, i, scene, pc)
             if act == "request" and pc is not None:
@@ -1330,6 +1454,14 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     checks = {str((b.get("params") or {}).get("skill") or "").lower()
               for b in built if b.get("op") == "check"}
     tracking = any(b.get("op") == "track" for b in built)
+    # A trail followed walks where the engine says it leads (`Engine._op_track`), so the
+    # plan's own walk for the same follow is not the walk: on the owner's 0.2.21 save
+    # (row 136) it was "the fields", toward nothing the engine held.
+    # Only when no other deed of the sentence walks ("I head out of town and follow the
+    # tracks" keeps its walk out of town).
+    trailing = any(b.get("op") == "track" and (b.get("params") or {}).get("follow")
+                   for b in built) \
+        and not (acts & (interpret._MOVING_ACTS - {"follow"}))
     # A feat of strength the table built (`_exert`) takes the plan's word for how hard the
     # task is — the band of the plan's own check for it, which it then replaces: one roll,
     # the engine's skill and target, the plan's difficulty. Reset on every call, because
@@ -1350,6 +1482,16 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
                 and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):
             if notes is not None:
                 notes.append("the plan's attack replaced by the reading's take, a steal")
+            continue
+        if op == "quest" and any(b.get("op") == "quest" for b in built):
+            # The take-up the table built (`take_ups`) is the quest op for this turn: the
+            # plan's own, with its own wording, would be refused as a repeat.
+            if notes is not None:
+                notes.append("the plan's quest replaced by the reading's take-up")
+            continue
+        if trailing and op in ("travel", "journey"):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's follow of a trail")
             continue
         if tracking and (op == "track" or (op == "check" and str(
                 ((r or {}).get("params") or {}).get("skill") or "").lower() == "survival")

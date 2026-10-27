@@ -459,10 +459,13 @@ def _a(word: str) -> str:
     return f"{'an' if word[:1].lower() in 'aeiou' else 'a'} {word}"
 
 
-def render(ing: dict, how: str, *, head: str = "", first: bool = False) -> str:
+def render(ing: dict, how: str, *, head: str = "", first: bool = False,
+           carrier: str = "") -> str:
     """The pull's text for one approach. `head` is the matter's own line (title, the open
     objective, how long it has been quiet), which every approach but `waits` carries;
-    `first` adds the approach's demonstration, once per card."""
+    `first` adds the approach's demonstration, once per card; `carrier` is the person the
+    player is talking with who carries a `go_between` (`cards._carrier`), when there is
+    one."""
     g = ing.get("giver") or {}
     name = g.get("name") or "the one it belongs to"
     # Named, never by ref: the pull carries no number of any kind (a ref is "c4"), which
@@ -493,6 +496,14 @@ def render(ing: dict, how: str, *, head: str = "", first: bool = False) -> str:
             f"approach the player or speak to them. Let it show in the background: "
             f"{name} seen at it, or heard speaking of it to somebody else or to nobody, "
             f"so the player may step in if they choose.")
+    elif how == "go_between" and carrier:
+        # Named, so the beat has a mouth to put it in: with only "somebody the player is
+        # already dealing with", a beat in an empty field put it in the player's head
+        # (the owner's report, 2026-10-27).
+        parts.append(
+            f"{name}{role} is not here. {carrier}, who is here, mentions {name}'s trouble "
+            f"in passing, in one sentence of their own, to the player or to somebody "
+            f"else; nobody brings {name} on stage.")
     elif how == "go_between":
         parts.append(
             f"{name}{role} does not raise it this beat. If somebody the player is already "

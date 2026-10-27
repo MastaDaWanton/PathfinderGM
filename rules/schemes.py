@@ -787,7 +787,17 @@ def _open_one_card(engine, inst: dict, doc: dict, card: dict, filled: dict,
                 giver=giver, reward=fill_text(card.get("reward", ""), filled),
                 facts=[fill_text(f, filled) for f in card.get("facts") or []],
             people=[giver] if giver else [], place=str(scene.at or ""),
-            origin=f"scheme:{doc['id']}", turn=turn)
+            origin=f"scheme:{doc['id']}", turn=turn,
+            # A scheme that STARTS a story (`_starts_fresh`: somebody's favour, a debt to
+            # collect, a lost thing) opens its quest unheard: nobody has put it to the
+            # player yet. A beat that carries it to them makes it heard or offered
+            # (`cards.note_heard`), and only the player takes it up (`Engine._op_quest`,
+            # `acts_to_ops.take_ups`). Until 2026-10-27 it was the player's quest from
+            # this moment (the owner's report: "not a request that i ever took or
+            # heard"). A scheme that CONTINUES the player's own story — it opens on what
+            # they know, `has(pc, knows.…)`: a name to clear, a price on their head —
+            # is theirs already, as it always was.
+            known="unheard" if _starts_fresh(doc) else "taken")
     else:
         n = sum(1 for c in cards_mod.load(scene) if c.id.startswith(f"scheme-{doc['id']}")) + 1
         made = cards_mod.open_card(scene, cards_mod.Card(
@@ -1133,6 +1143,34 @@ def _outcome(engine, inst: dict, doc: dict, name: str, turn: int) -> str:
 
 # --- the tick ---------------------------------------------------------------------------------------
 
+_PROGRESS = ("objective", "reveal_objective")
+
+
+def _progress_not_taken(scene, inst: dict, step: dict) -> str:
+    """The title of the quest card this step's own action makes progress on, when the
+    player has not taken it on (`cards.standing`); "" otherwise.
+
+    The step still fires — the world's story moves whether or not the player took the
+    errand, and the scheme's own tests hold it to that — but its outcome says whose the
+    quest is (`not_own`), so the beat that tells it is read back for making it the
+    player's goal (`planned.build_plan`, `GMAgent._not_their_goal`). Measured live
+    2026-10-27 on a scratch Fizspark campaign, and on the owner's 0.2.21 save (row 82):
+    walking out to the fields fired a-small-favour's `reached` — "the approach, the
+    ground where Glowvine grows" — for a quest the player had only overheard, and the
+    beat had them "searching the soil where the luminescent Glowvine is known to take
+    root". Holding the step back until the quest was taken was tried first and broke
+    eighteen scheme tests whose stories move without a take-up: an owner's question
+    (docs/known-matters.md §4.2), not this lane's to decide."""
+    act = step.get("action") or {}
+    if not isinstance(act, dict) or act.get("do") not in _PROGRESS:
+        return ""
+    cid = (inst.get("cards") or {}).get(str(act.get("card") or ""))
+    card = cards_mod.find(scene, cid) if cid else None
+    if card is None or card.kind != "quest" or cards_mod.standing(card) == cards_mod.OWN:
+        return ""
+    return card.title
+
+
 def tick(engine, outcomes) -> list:
     """Open what should open, then fire the one most specific step that holds, then
     deliver news that has arrived. Returns the outcomes the prose may see."""
@@ -1224,6 +1262,8 @@ def tick(engine, outcomes) -> list:
         if best is not None:
             tell = best.get("tell") or {}
             silent = "silent" in tell or "deferred" in tell
+            # Asked before the step acts (its action may finish the card).
+            theirs = _progress_not_taken(scene, inst, best)
             inst["_silent_step"] = silent
             for act in [best.get("action")] + list(best.get("also") or []):
                 if isinstance(act, dict):
@@ -1258,7 +1298,8 @@ def tick(engine, outcomes) -> list:
                     made.append(Outcome(
                         intent_id="", op="scheme",
                         effects=[{"kind": "scheme", "scheme": doc["id"], "step": best["id"],
-                                  "origin": f"scheme:{doc['id']}/{best['id']}"}],
+                                  "origin": f"scheme:{doc['id']}/{best['id']}",
+                                  **({"not_own": theirs} if theirs else {})}],
                         tell=said + (f" {extra}" if extra else ""), because="the world moves"))
                 elif extra:
                     inst["banked"] = extra

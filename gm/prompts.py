@@ -799,7 +799,12 @@ When somebody gives the party a task and the player takes it on, it is a quest:
 harbourmaster where the salt went", "Bring word back to Marra"], "giver": "c2",
 "reward": "a season's salt at cost"}}. Objectives are what is to be done, one sentence
 each, at most six; `giver` is the ref of the person who asked; `reward` is what was
-promised in words — no numbers anywhere, the engine prices it. When play plainly finishes
+promised in words — no numbers anywhere, the engine prices it. A quest on the SITUATIONS
+list marked OFFERED or HEARD OF, NOT TAKEN UP is somebody else's until the player agrees
+to it in their own words; then take it up by its exact title: {"op": "quest", "params":
+{"title": "<its title as listed>", "objectives": ["<what they asked, as listed>"]}}. One
+marked NOT YET PUT TO THE PLAYER cannot be taken
+up, and nobody may treat it as the player's. When play plainly finishes
 one objective of a quest on the SITUATIONS list: {"op": "quest_step", "params":
 {"quest": "<the quest's id>", "objective": 1, "note": "what was done"}}. The last
 objective done finishes the quest and pays the award; never narrate a quest as finished

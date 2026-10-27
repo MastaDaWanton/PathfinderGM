@@ -4121,6 +4121,16 @@ def _realigned(records, kept, text: str) -> list[dict]:
     return out
 
 
+def _matter_told(agent) -> bool:
+    """Whether the beat could have told the pull's matter: always on a free beat (its
+    text is the test, `cards.note_mentions`), and on a planned beat only when a slot that
+    carried it — the matter slot, or a reply the matter was folded into — stood."""
+    if getattr(agent, "last_narration", "") != "planned":
+        return True
+    return any(s.get("wrote") and (s.get("key") == "matter" or s.get("not_own"))
+               for s in getattr(agent, "last_prose_slots", None) or ())
+
+
 def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             player_text=None):
     """Narrate what the engine decided, then let the world answer.
@@ -4571,7 +4581,16 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 break
             # Ruskin's write-back: a card the beat carried is marked mentioned, and
             # its urgency starts again from here. The cooldown falls out of it.
-            cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))
+            carried = cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))
+            # And a quest the pull carried to the player is heard from this beat on: in
+            # their Journal as offered, in the brief as put to them, and theirs to take
+            # up (`cards.note_heard`; the owner's report of 2026-10-27). On a planned beat
+            # only when the slot that carried it stood: measured live the same day, the
+            # budget dropped the matter slot, a scheme's own tell named the giver, and the
+            # name alone counted as carrying the quest.
+            if not _matter_told(agent):
+                carried = []
+            cards_mod.note_heard(c.scene, pull, carried, turn=len(c.transcript))
             # And whoever the beat says stopped watching is in the fight, with their
             # kind: "the second guard draws" is a second guard on the initiative.
             for ref, side in judgement.joiners(c.scene, text):

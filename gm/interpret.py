@@ -1105,6 +1105,131 @@ def confirm_first_aid(span: str, patient: str, *, model: str | None = None) -> s
     return got if got in AID_ANSWERS else ""
 
 
+# --- what a trail is followed to, asked ------------------------------------------------
+#
+# The owner's report, 2026-10-27: "I continue to track the caravan" — and there was no
+# caravan anywhere in the engine. To say so, the track has to know what it is after. The
+# reader puts that in either slot, and the marks themselves in either too — probed live the
+# same day on gemma-4-12B: "I follow the tracks in search of the caravan" came back
+# `target: the tracks, object: the caravan`; "I continue to track the caravan" `object: the
+# caravan`; "I search the ground for footprints" `object: footprints`; "I follow the cart
+# ruts toward the ford" `target: the cart ruts`. Which phrase names the one who MADE the
+# trail is a reading, so it is asked, one phrase at a time, with the act's own words; a
+# phrase that names somebody the engine already holds is never asked (`acts_to_ops`).
+# Demonstrations written for this, in no world's words; none is a probed line.
+QUARRY_ANSWERS = ("the maker", "only the marks")
+
+_QUARRY_DEMOS = [
+    ("follow the drag marks back to the boar", "the boar", "the maker"),
+    ("follow the drag marks back to the boar", "the drag marks", "only the marks"),
+    ("read the mud by the ford for hoofprints", "hoofprints", "only the marks"),
+    ("track the smugglers' handcart along the dyke", "the smugglers' handcart", "the maker"),
+    ("look for a trail", "a trail", "only the marks"),
+    ("hunt for the missing shepherd's tracks", "the missing shepherd", "the maker"),
+]
+
+
+def quarry_messages(span: str, phrase: str) -> list[dict]:
+    system = ("In a role-playing game, the player's character looks for tracks or follows "
+              "a trail. One phrase of what they said is given. Answer one question: does "
+              "the phrase name WHO OR WHAT MADE the trail — a person, a creature, a group, "
+              "a cart or a wagon train — or only the marks themselves (tracks, a trail, "
+              "footprints, ruts, prints)?")
+    out = [{"role": "system", "content": system}]
+    for said, words, answer in _QUARRY_DEMOS:
+        out.append({"role": "user", "content": f"What they said: {said}\nThe phrase: {words}"})
+        out.append({"role": "assistant", "content": json.dumps({"names": answer})})
+    out.append({"role": "user", "content": f"What they said: {span}\nThe phrase: {phrase}"})
+    return out
+
+
+def confirm_quarry(span: str, phrase: str, *, model: str | None = None) -> str:
+    """One of `QUARRY_ANSWERS`; "" when the call fails (no quarry is kept: the track looks
+    for tracks, as it did before, and claims nothing about what it is after)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object", "properties": {"names": {"type": "string",
+                                                         "enum": list(QUARRY_ANSWERS)}},
+              "required": ["names"]}
+    try:
+        reply = client.chat(quarry_messages(span, phrase), model or cfg["model"],
+                            cfg["host"], as_json=True, think=False, temperature=0.0,
+                            num_predict=20, provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = str((reply.json() or {}).get("names") or "")
+    except Exception:  # noqa: BLE001
+        return ""
+    return got if got in QUARRY_ANSWERS else ""
+
+
+# --- a matter taken on, asked -----------------------------------------------------------
+#
+# Measured live 2026-10-27 on a scratch Fizspark campaign: "I tell Brix, 'I will find your
+# Coldwood for you.'" to the giver of a quest the player had heard of, and the planner
+# proposed no `quest` op — the take-up the plan's rules ask for — so the quest stayed
+# somebody else's. Whether the player's words agree to do it is a reading, asked only when
+# the engine holds such a matter from the person spoken to (`acts_to_ops.take_ups`).
+# Demonstrations written for this, in no world's words; none is a probed line.
+TAKE_UP_ANSWERS = ("agrees to do it", "does not")
+
+_TAKE_UP_DEMOS = [
+    ("tell the miller I'll get his ledger back", "the miller", "Recover the miller's ledger",
+     "agrees to do it"),
+    ("ask the miller where he last saw the ledger", "the miller",
+     "Recover the miller's ledger", "does not"),
+    ("shake the ferrywoman's hand on it and promise to bring the net back",
+     "the ferrywoman", "Find the ferrywoman's lost net", "agrees to do it"),
+    ("tell the ferrywoman to find her own net", "the ferrywoman",
+     "Find the ferrywoman's lost net", "does not"),
+    ("say \"Fine, I'll look into it\"", "the reeve", "Find out who poisoned the well",
+     "agrees to do it"),
+    ("ask the reeve what he would pay", "the reeve", "Find out who poisoned the well",
+     "does not"),
+]
+
+
+def take_up_messages(span: str, giver: str, matter: str) -> list[dict]:
+    system = ("In a role-playing game, somebody wants a task done, and the player's "
+              "character speaks to them. Answer one question: in these words, does the "
+              "player AGREE to do the task — say they will, promise it, accept it — or "
+              "not (asking about it, haggling, refusing, or talking of something else)?")
+    out = [{"role": "system", "content": system}]
+    for said, who, task, answer in _TAKE_UP_DEMOS:
+        out.append({"role": "user",
+                    "content": f"Who wants it: {who}\nThe task: {task}\nThe words: {said}"})
+        out.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    out.append({"role": "user",
+                "content": f"Who wants it: {giver}\nThe task: {matter}\nThe words: {span}"})
+    return out
+
+
+def confirm_take_up(span: str, giver: str, matter: str, *,
+                    model: str | None = None) -> str:
+    """One of `TAKE_UP_ANSWERS`; "" when the call fails (nothing is taken up: the matter
+    stays the giver's, as the plan alone would have left it)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object", "properties": {"answer": {
+        "type": "string", "enum": list(TAKE_UP_ANSWERS)}}, "required": ["answer"]}
+    try:
+        reply = client.chat(take_up_messages(span, giver, matter), model or cfg["model"],
+                            cfg["host"], as_json=True, think=False, temperature=0.0,
+                            num_predict=20, provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = str((reply.json() or {}).get("answer") or "")
+    except Exception:  # noqa: BLE001
+        return ""
+    return got if got in TAKE_UP_ANSWERS else ""
+
+
 # --- who a blow lands on, asked ---------------------------------------------------------
 #
 # The owner, 2026-10-09: "if i say I attack the closest person or i go on a rampage or i
