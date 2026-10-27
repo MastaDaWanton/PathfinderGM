@@ -284,8 +284,7 @@ def _mint(engine, label: str, words, place_id: str):
         taken += [a.name for a in scene.people.values()]
         actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref,
                                               [t for t in taken if t])
-        actor.appearance = names_mod.appearance_for(world, scene.location_id,
-                                                    ref=actor.ref)
+        actor.appearance = names_mod.face_of(world, scene.location_id, actor)
         person_words.settle_people(scene, world, actor, words=label, template=template,
                                    place=place_id, take_grant=False, keep_name=True)
     return actor
@@ -319,12 +318,13 @@ def open_escort(engine, spec: dict, employer: str, *, rng: random.Random,
     meet = meeting_minute(scene.clock_minutes)
     from . import openings
 
-    people, master = [], ""
+    people, master, roles = [], "", {}
     for row in spec.get("caravan") or ():
         for _ in range(openings.count_of(row)):
             who = _mint(engine, str(row.get("label") or "a carter"), row.get("words"),
                         head.id)
             people.append(who.ref)
+            roles[who.ref] = str(row.get("role") or "driver")
             if row.get("role") == "master" and not master:
                 master = who.ref
     master = master or (people[0] if people else "")
@@ -344,7 +344,7 @@ def open_escort(engine, spec: dict, employer: str, *, rng: random.Random,
         "route": {"from": scene.location_id, "to": leg.to_id, "to_name": leg.to_name,
                   "hours": int(hours)},
         "counterpart": {"label": _group_label(leg.to_name), "people": people,
-                        "master": master},
+                        "master": master, "roles": roles},
         "state": "open",
     }
     _price(card, pc, risk_of("escort", leg.crosses), days)
@@ -618,6 +618,85 @@ def decline(engine, card):
 
 # --- travelling with it --------------------------------------------------------------------
 
+def set_out(engine, to_id: str) -> list[str]:
+    """The player gives the word: the met caravan bound for `to_id` takes the road with
+    them. Each of its people standing here travels with the party until the wagons are in
+    (`bond.travels-with-you`, through the applicator, source `job:<id>`), and the job
+    records the minute it set out, which ends the wait at the road head (`settle`).
+
+    Why the bond and not a list of the job's own: a fight on the road is drawn by
+    `Engine._ensure_encounter`, which brings everybody who travels with the player into
+    the order on the player's side (`_companions_join`), and a companion's turn is its
+    own, decided in character (`gm/companions.py`, the owner's ruling of 2026-10-01). The
+    0.2.22 escort run met a reptoid six hours out and the caravan's four stood outside any
+    fight that came of it. Granted only on the road, never at the meeting: with the bond
+    the wagons would follow the player back across the market. Returns the refs bound."""
+    from . import cards as cards_mod
+    from . import states
+    from .activeeffect import ActiveEffect
+
+    scene = engine.scene
+    here = getattr(scene, "actors", {}) or {}
+    bound: list[str] = []
+    for c in live(scene):
+        j = c.job or {}
+        if j.get("work") != "escort" or j.get("state") != "met" \
+                or (j.get("route") or {}).get("to") != to_id:
+            continue
+        for r in (j.get("counterpart") or {}).get("people", ()):
+            a = here.get(r)
+            if a is None or a.is_down or a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            a.apply_effect(ActiveEffect(
+                name=f"on the road with {(j.get('counterpart') or {}).get('label')}",
+                kind="bond", key=f"job:{c.id}", source=f"job:{c.id}",
+                origin=f"job:{c.id}", duration="until-dismissed",
+                tags=(states.TRAVELS_WITH_YOU,)))
+            bound.append(r)
+        if not j.get("set_out"):
+            j["set_out"] = int(scene.clock_minutes)
+            cards_mod._store(scene, c)
+    return bound
+
+
+def _unbind(scene, card) -> None:
+    """The road is over for the caravan's people: the bond `set_out` gave goes."""
+    for r in ((card.job or {}).get("counterpart") or {}).get("people", ()):
+        a = (getattr(scene, "people", {}) or {}).get(r)
+        if a is not None:
+            a.remove_effects(source=f"job:{card.id}")
+
+
+def role_line(scene, ref: str) -> str:
+    """What one of a job's caravan is to the player, for their own turn (`gm/companions.
+    who_they_are`), or "" for anybody who is not. The role is the opening's own row
+    (`counterpart.roles`: master, driver, guard). Whether a teamster stands or runs is
+    theirs to decide on their turn, from this and their sheet; the engine refuses only a
+    blow at the player's side (`companions.turning_on_the_party`)."""
+    for c in jobs(scene):
+        cp = (c.job or {}).get("counterpart") or {}
+        if ref not in cp.get("people", ()) or c.job.get("state") != "met":
+            continue
+        a = (getattr(scene, "people", {}) or {}).get(ref)
+        name = getattr(a, "name", "they")
+        to = (c.job.get("route") or {}).get("to_name", "the far town")
+        role = (cp.get("roles") or {}).get(ref) or (
+            "master" if ref == cp.get("master") else
+            "guard" if "guard" in str(getattr(a, "from_template", "")) else "driver")
+        if role == "master":
+            return (f"{name} is the caravan master, who hired the player to guard the "
+                    f"wagons to {to} and pays at the end of the road; a trader, not a "
+                    f"fighter, who looks to the wagons and their own skin first")
+        if role == "guard":
+            return (f"{name} is the caravan's hired sword, paid to fight for the wagons "
+                    f"on the road to {to}, and fights for them")
+        return (f"{name} drives one of the caravan's wagons to {to} for a wage: hired to "
+                f"drive, not to fight — they defend themselves and the wagons as far as "
+                f"their nerve and their arms allow, and may run from a fight they cannot "
+                f"win")
+    return ""
+
+
 def coming_along(scene, to_id: str) -> list[str]:
     """The caravan's people standing with the party, on a job met and bound for `to_id`:
     who a journey there takes along (`Engine._op_journey`)."""
@@ -686,7 +765,9 @@ def _leave(engine, card) -> None:
                                  outskirts_mod._road_slug(route.get("from", "")))
     for ref in cp.get("people", ()):
         a = scene.people.get(ref)
-        if a is not None and a.at == (j.get("meets") or {}).get("at") and a.at != scene.at:
+        # The player standing with them does not hold them: the caravan that waited its
+        # hour for the word goes (the wait's end, `settle`).
+        if a is not None and a.at == (j.get("meets") or {}).get("at"):
             scene.move(ref, away)
             if ref in scene.came_along:
                 scene.came_along.remove(ref)
@@ -745,7 +826,13 @@ def settle(engine) -> list:
                                effects=[{"kind": "job", "id": card.id, "state": "met",
                                          "origin": f"job:{card.id}"}]))
             continue
-        if state in ("open", "met") and over and not with_them:
+        # The wagons leave at their hour (the job's own terms, `meets.minute`), and wait
+        # GRACE_MINUTES past it for the word — the same hour of grace a late guard is
+        # given, so the terms have one number, not two. Until 2026-10-27 a caravan met and
+        # never set out waited for ever, the player standing beside it: the 0.2.22 escort
+        # run's leftover. Once the road is taken (`set_out`) nothing here applies.
+        if state in ("open", "met") and over and not j.get("set_out"):
+            waited = state == "met"
             _leave(engine, card)
             if stands == cards_mod.OWN:
                 j["state"] = "lapsed"
@@ -761,10 +848,22 @@ def settle(engine) -> list:
                     fx.update({"regard_from": before, "regard_to": after,
                                "employer": employer.ref})
                     said = attitude_mod.regard_said(employer.name, before, after)
-                tell = (f"The hour has come and gone at {meets.get('where')}: the wagons "
-                        f"for {route.get('to_name')} have left without {pc.name}, and the "
-                        f"job is lost. {_cap(employer.name) if employer else 'The employer'} "
-                        f"will hear that {pc.name} did not come." + (f" {said}" if said else ""))
+                if waited:
+                    tell = (f"The hour has come and gone at {meets.get('where')}, and "
+                            f"{pc.name} has not given the word to set out: "
+                            f"{master.name if master else 'the caravan master'} takes the "
+                            f"wagons out on the road to {route.get('to_name')} without "
+                            f"{pc.name}, and the job is lost. "
+                            f"{_cap(employer.name) if employer else 'The employer'} will "
+                            f"hear that {pc.name} did not go.")
+                else:
+                    tell = (f"The hour has come and gone at {meets.get('where')}: the "
+                            f"wagons for {route.get('to_name')} have left without "
+                            f"{pc.name}, and the job is lost. "
+                            f"{_cap(employer.name) if employer else 'The employer'} will "
+                            f"hear that {pc.name} did not come.")
+                # Opens a sentence: "the guild clerk cools" was told lower-case, live.
+                tell += f" {_cap(said)}" if said else ""
                 out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
                                    effects=[fx]))
             else:
@@ -775,6 +874,7 @@ def settle(engine) -> list:
             continue
         if state == "met" and scene.location_id == route.get("to") and with_them:
             j["state"] = "paid"
+            _unbind(scene, card)
             turn = int(getattr(engine, "turn", 0))
             cards_mod._store(scene, card)
             cards_mod.objective_done(scene, card.id, 1, turn=turn)

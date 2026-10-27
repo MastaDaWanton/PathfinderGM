@@ -1133,6 +1133,17 @@ class GMAgent:
         if missing_spare:
             rejections.append(f"— no handoff: the backup narrator {missing_spare} is not "
                               f"installed on that Ollama")
+        # What the reading built whole still stands (`_built_survives` has the measurement).
+        kept = self._built_survives()
+        if kept:
+            return TurnPlan(
+                narration="" if self.intents_first else
+                f"You try — “{asked}” — and only part of it can be done.",
+                intents=kept, suggestions=[], attempts=attempts,
+                repairs=[f"turn degraded after {tried} failed attempt"
+                         f"{'s' if tried != 1 else ''}: the reading's own "
+                         f"{', '.join(dict.fromkeys(i.op for i in kept))} kept"],
+                rejections=rejections)
         return TurnPlan(
             narration=(f"You try — “{asked}” — but the moment does not "
                        f"answer: whatever you were reaching for is not here to be "
@@ -1143,6 +1154,33 @@ class GMAgent:
             repairs=[f"turn degraded to narration after {tried} failed "
                      f"attempt{'s' if tried != 1 else ''}"],
             rejections=rejections)
+
+    def _built_survives(self) -> list:
+        """The intents the act→op table built whole this turn (`acts_to_ops.Row.intents`),
+        each validated on its own, for a turn whose plan never passed: one that is refused
+        on its own is left out, never the rest with it. Blows are not kept — a fight's
+        opening is `judgement.inject_fight`'s, inside a plan.
+
+        The engine's own ops from the player's words — a job offered or taken, a request,
+        a feat of strength, a take or a sale — needed no attempt of the plan to write.
+        Measured live 2026-10-27: "I go back to the guild clerk and tell them I can fight"
+        built the job offer, the plan failed seven times on a walk the engine refused, and
+        the fallback threw the offer away with the plan: the player's words to the clerk
+        did nothing at all."""
+        from . import acts_to_ops
+
+        out = []
+        for row in getattr(self, "rows", None) or ():
+            if row.act in acts_to_ops.VIOLENT_ACTS:
+                continue
+            for built in row.intents:
+                try:
+                    out.extend(self.engine.validate([dict(built)]))
+                except IntentError:
+                    continue
+        for n, i in enumerate(out):
+            i.id = f"i{n + 1}"
+        return out
 
     # --- A refusal the player has to fix ---------------------------------------------
 

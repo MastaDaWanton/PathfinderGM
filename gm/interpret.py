@@ -1498,6 +1498,21 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             add("journey")
         elif act == "go" and a.get("place"):
             p = places_mod.find(places, a["place"]) if places else None
+            if p is None and scene is not None:
+                # A person standing here, named where a place goes: "I go back to the
+                # guild clerk" is read `go: the guild clerk`, which no place is called.
+                # Marked as a seek of somebody here is (below), so it licenses no walk
+                # (`supported`). Measured live 2026-10-27: the line kept a detector's
+                # travel, the plan wrote a walk to the market the party stood in seven
+                # times, the engine refused it seven times ("the guild clerk (c3) is HERE
+                # … this travel would leave the guild clerk behind"), and the turn
+                # degraded to narration with the player's offer to work lost.
+                from rules import scope as scope_mod
+
+                ref = scope_mod.in_the_room(scene, str(a["place"]))
+                person = (getattr(scene, "actors", {}) or {}).get(ref)
+                if person is not None and not getattr(person, "is_pc", False):
+                    a["here"] = ref
             if p is not None and p.id != here:
                 add("travel")
             elif p is None and _outward(a["place"]) and _has_outside(places):
@@ -1782,8 +1797,10 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     # Only what is done or tried now stands behind an op (`COMMITS`).
     actions = [a for a in (frame or {}).get("actions") or [] if acting(a)]
     acts = {a.get("act") for a in actions}
+    # And a `go` whose place is a person here (`ops_for` marks that too): "I go back to
+    # the guild clerk" with the clerk at the table.
     elsewhere = {a.get("act") for a in actions
-                 if not (a.get("act") == "seek" and a.get("here"))}
+                 if not (a.get("act") in ("seek", "go") and a.get("here"))}
     kept, dropped = [], []
     for op in ops:
         need = _OP_NEEDS.get(op)

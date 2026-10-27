@@ -580,8 +580,8 @@ def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, wha
     person_words.settle_people(scene, world, actor, words=shown, template=template,
                                place=at, keep_name=bool(known))
     if not actor.appearance:
-        actor.appearance = names_mod.appearance_for(world, scene.location_id,
-                                                   ref=actor.ref or wid)
+        actor.appearance = names_mod.face_of(world, scene.location_id, actor,
+                                             ref=actor.ref or wid)
     if not known and actor.true_name != name:
         # A grant drew them from another people's pool; the family the note reads is
         # theirs, so it is written again.

@@ -26,14 +26,18 @@ def _spawn(world, template):
     return scene.people[made[0]["ref"]]
 
 
-@pytest.mark.parametrize("template", ["wolf", "medium-giant-scorpion", "dire-rat"])
+# The goblin and the reptoid since 2026-10-27: humanoid races whose blocks state the ground
+# they live on are the land's, not the local people (`bestiary.has_a_people`); the 0.2.22
+# escort road met a reptoid "of the Korvu people" (tests/test_jobs_leftovers.py).
+@pytest.mark.parametrize("template", ["wolf", "medium-giant-scorpion", "dire-rat",
+                                      "goblin", "reptoid"])
 def test_a_beast_gets_no_true_name_and_no_peoples_face(worlds, template):
     beast = _spawn(worlds, template)
     assert not beast.true_name, f"{template} was given a person's name: {beast.true_name!r}"
     assert not beast.appearance, f"{template} wore a people's face: {beast.appearance[:80]!r}"
 
 
-@pytest.mark.parametrize("template", ["bandit", "goblin", "guildhand"])
+@pytest.mark.parametrize("template", ["bandit", "tian-merchant-sailor", "guildhand"])
 def test_a_person_still_gets_both(worlds, template):
     """A person keeps today's behaviour: whatever the world's pools give them here. A
     world with no name pool for this settlement names nobody, person or not, which is
