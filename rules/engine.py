@@ -5964,7 +5964,7 @@ class Engine:
         offered = (jobs_mod.priced_offer(self.scene, target.ref)
                    if kind == requests_mod.PAYMENT else None)
         if offered is not None:
-            asks = f"{actor.name} asks {target.name} for better pay for {offered.title.lower()[:1] + offered.title[1:]}."
+            asks = f"{actor.name} asks {target.name} for better pay ({offered.title})."
         why = requests_mod.refusal(target, kind, now)
         if why:
             return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
@@ -14232,6 +14232,25 @@ class Engine:
         if who.is_down:
             return self._refuse(
                 intent, f"{who.name} is not going anywhere: they are down.")
+        # One of the caravan the player was hired to guard (rules/jobs.py): they go where
+        # the wagons go, by the job's terms, and need no talking round. Measured live
+        # 2026-10-27: "I give the word and set out with the caravan" had the plan ask each
+        # of the four to join, all four were refused as indifferent, and the beat had them
+        # "remain indifferent to your command". Nothing is granted: the journey to the
+        # job's town takes them along (`jobs.coming_along`), and nowhere else does.
+        from . import jobs as jobs_mod
+
+        bound = next((c for c in jobs_mod.live(self.scene)
+                      if c.job.get("state") == "met"
+                      and who.ref in (c.job.get("counterpart") or {}).get("people", ())),
+                     None)
+        if bound is not None:
+            return Outcome(
+                intent_id=intent.id, op="company", effects=[],
+                tell=(f"{_sentence(who.name)} goes with the wagons, and the wagons go with "
+                      f"{self.scene.pc().name if self.scene.pc() else 'you'} on the road to "
+                      f"{(bound.job.get('route') or {}).get('to_name')}."),
+                because=intent.because)
         from . import attitude as attitude_mod
 
         mood = attitude_mod.of(who)
@@ -23670,6 +23689,23 @@ class Engine:
                         f"Words the player says are a `say` (its `words`), never who is "
                         f"spoken to; asking a name, a price or a question of somebody "
                         f"here is `say` to them, or narrate_only.")
+        # A job's caravan standing here is its real people (rules/jobs.py): "the wagons" or
+        # "the caravan" is them, never somebody new. Measured live 2026-10-27: "I walk out
+        # to the road to Kalixiri to meet the wagons" had the plan introduce "the wagons",
+        # and a fifth person named the wagons stood beside the caravan's four.
+        from . import jobs as jobs_mod
+
+        group = jobs_mod.group_named(self.scene, who)
+        if group is not None and group["ref"] in self.scene.actors:
+            master = self.scene.actors[group["ref"]]
+            placeholders = list(intent.params.get("placeholders") or [])
+            return Outcome(
+                intent_id=intent.id, op="introduce",
+                effects=[{"kind": "introduce", "actors": [],
+                          "bound": {placeholders[0]: master.ref} if placeholders else {},
+                          "who": master.name, "how": "already_here"}],
+                tell=f"In the scene: {master.name} ({master.ref}), with the caravan.",
+                because=intent.because)
         n = int(intent.params.get("count", 1) or 1)
         how = intent.params.get("how") or "already_here"
         template = intent.params.get("template") or "guildhand"

@@ -408,6 +408,11 @@ def open_from_opening(engine, doc: dict, slots: dict, story_seed: int) -> list[s
 
 # --- what is said of a job -----------------------------------------------------------------
 
+def _cap(name: str) -> str:
+    """A name opening a sentence: "the caravan master" is "The caravan master" there."""
+    return str(name)[:1].upper() + str(name)[1:]
+
+
 def _name(scene, ref: str, default: str = "somebody") -> str:
     a = (getattr(scene, "people", {}) or {}).get(ref)
     return str(a.name) if a is not None else default
@@ -443,8 +448,19 @@ def facts_line(engine, card) -> str:
                   f"master")
         return line + "."
     if j.get("work"):
-        return (f"A week's work to {j['work']} for {_name(scene, j.get('employer', ''))}: "
-                f"{_reward_words(engine, card)} of the week.")
+        # Measured live 2026-10-27: "A week's work to guard for the guild clerk: 3 silver a
+        # day ..., 2 gold, 1 silver in all" came back as guarding the clerk, at 3 silver a
+        # day PLUS 2 gold 1 silver at the end. Who is hired, what is guarded and that the
+        # sum is the whole week's are each said once.
+        p = pay_of(card)
+        kind = {"guard": "guard work in town",
+                "carry": "carrying work in town", "count": "counting and tallying work",
+                "labour": "labouring work in town"}.get(j["work"], f"{j['work']} work")
+        return (f"A week of {kind}, hired by {_name(scene, j.get('employer', ''))}: "
+                f"{coin_words(engine, p.get('per_day_cp', 0))} a day for "
+                f"{p.get('days', WEEK_DAYS)} days, which is "
+                f"{coin_words(engine, total_cp(card))} for the whole week, all of it paid "
+                f"at the end of the week.")
     return (f"Hands wanted for the week, to {', '.join(j.get('choices') or ())}, fed and "
             f"paid at the end of it; the pay is set by the work chosen.")
 
@@ -720,7 +736,11 @@ def settle(engine) -> list:
             tell = (f"At {meets.get('where')}, {master.name if master else 'the caravan'} "
                     f"counts {pc.name} in as the caravan's guard"
                     + (f"; {', '.join(crew)} are with the wagons" if crew else "")
-                    + f". The wagons go to {route.get('to_name')} when {pc.name} sets out.")
+                    # Not "the wagons go when ...": measured live, the beat read it as
+                    # the wagons already rolling ("begin their journey ... as you set
+                    # out") on a turn the journey had not been taken.
+                    + f". The wagons stand ready here, and wait for {pc.name} to give the "
+                      f"word to set out for {route.get('to_name')}.")
             out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
                                effects=[{"kind": "job", "id": card.id, "state": "met",
                                          "origin": f"job:{card.id}"}]))
@@ -743,7 +763,7 @@ def settle(engine) -> list:
                     said = attitude_mod.regard_said(employer.name, before, after)
                 tell = (f"The hour has come and gone at {meets.get('where')}: the wagons "
                         f"for {route.get('to_name')} have left without {pc.name}, and the "
-                        f"job is lost. {employer.name if employer else 'The employer'} "
+                        f"job is lost. {_cap(employer.name) if employer else 'The employer'} "
                         f"will hear that {pc.name} did not come." + (f" {said}" if said else ""))
                 out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
                                    effects=[fx]))
@@ -769,11 +789,11 @@ def settle(engine) -> list:
             cards_mod.objective_done(scene, card.id, 2, turn=turn)
             p = pay_of(card)
             tell = (f"The wagons are in at {route.get('to_name')}. "
-                    + (f"{master.name} pays {pc.name} {coin_words(engine, paid)} for the "
+                    + (f"{_cap(master.name)} pays {pc.name} {coin_words(engine, paid)} for the "
                        f"road, as agreed: {coin_words(engine, p.get('per_day_cp', 0))} a "
                        f"day for {p.get('days')} day{'s' if p.get('days') != 1 else ''}."
                        if paid >= owed and paid else
-                       f"{master.name} pays {pc.name} {coin_words(engine, paid)}, all the "
+                       f"{_cap(master.name)} pays {pc.name} {coin_words(engine, paid)}, all the "
                        f"coin there is, short of what was agreed." if paid else
                        "There is nobody to pay what was agreed."))
             out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
