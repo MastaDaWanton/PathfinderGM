@@ -238,6 +238,43 @@ def test_an_escort_taken_met_travelled_and_paid(worlds):
     assert goods.in_copper(s.pc().purse) - before == owed
 
 
+def test_the_wagons_introduced_are_the_caravans_people_never_somebody_new(worlds):
+    """Measured live 2026-10-27: "I walk out to the road to Kalixiri to meet the wagons" had
+    the plan introduce "the wagons", and a fifth person named the wagons stood beside the
+    caravan's four. Words that name the job's caravan bind to its master, already here."""
+    s, e, _clerk = _hiring_table(worlds)
+    esc = _escort(s)
+    e.place_party(esc.job["meets"]["at"])
+    before = set(s.people)
+    out = _run(e, [{"op": "introduce", "params": {"who": "the wagons"}}]).outcomes[0]
+    assert set(s.people) == before
+    assert out.effects[0]["how"] == "already_here"
+    assert esc.job["counterpart"]["master"] in out.tell
+
+
+def test_setting_out_with_the_caravan_owes_the_journey_and_needs_no_talking_round(worlds):
+    """Measured live 2026-10-27, at the road head with the caravan met: "I give the word and
+    set out with the caravan for Kalixiri" was read `go: Kalixiri`, which owed nothing, the
+    plan walked the party to the road head it already stood on, and asked each of the four
+    to join — all refused as indifferent, and the beat had them "remain indifferent to your
+    command". A `go` naming a town the roads reach owes the journey; the caravan's people
+    go with the wagons by the job, with nothing granted."""
+    from gm import interpret
+
+    s, e, clerk = _hiring_table(worlds)
+    _job(e, clerk, "offer", work="fight")
+    _job(e, clerk, "accept")
+    esc = _escort(s)
+    _run(e, [{"op": "travel", "params": {"place": esc.job["meets"]["where"]}}])
+    to = esc.job["route"]["to_name"]
+    frame = {"actions": [{"act": "go", "place": to, "span": f"set out for {to}"}]}
+    assert interpret.ops_for(frame, s, e.places()) == ["journey"]
+    master = esc.job["counterpart"]["master"]
+    out = _run(e, [{"op": "company", "params": {"who": master}}]).outcomes[0]
+    assert out.status != "refused" and "goes with the wagons" in out.tell
+    assert not s.people[master].has_state("bond.travels-with-you")
+
+
 # --- 4. not turning up -----------------------------------------------------------------------
 
 def test_a_job_not_turned_up_for_lapses_and_the_employers_regard_drops_a_little(worlds):
@@ -361,6 +398,15 @@ def test_asking_for_more_pay_in_words_is_the_make_request_roll(worlds):
     assert built == [{"op": "check", "actor": "pc", "target": clerk.ref,
                       "params": {"skill": "diplomacy", "request": "payment"},
                       "because": f"the player asks {clerk.name} for better pay"}]
+    # One request a sentence. Measured live: the same line read as a talk AND a request
+    # handed the player two Diplomacy popups, the second at +5.
+    both = {"question": False, "claims": [], "actions": [
+        dict(frame["actions"][0]),
+        {"span": "ask for better pay", "object": "better pay", "asks_for": "payment",
+         "act": "request"}]}
+    rows = acts_to_ops.table(both, s, places=e.places())
+    acts_to_ops.jobs_spoken(rows, both, s, ask=ask)
+    assert len([i for r in rows for i in r.intents if i["op"] == "check"]) == 1
 
 
 def test_the_owners_existing_save_is_left_as_it_is(worlds):

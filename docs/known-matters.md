@@ -447,9 +447,59 @@ the task it is; `quests()` stays the quests alone, so the quest take-up never ta
 - A job finished pays its wage and no story XP.
 - The free narrator's replies are still not read for made-up work (Planned is the default).
 - Only the hiring table lists jobs; other openings and the world's own export do not yet
-  (World Bible has no job export; see §6.5).
+  (World Bible has no job export; see §6.6).
 
-### 6.5 What World Bible would need to export
+### 6.5 The live run (2026-10-27, Pangrella, Kalimnar, gemma-4-12B, Planned)
+
+A fresh hiring-table campaign on scratch data, driven through the table:
+
+- "I tell the clerk I can fight." The job tell carried the caravan master, Kalixiri, the road
+  to Kalixiri at noon today, six days, the two teamsters and the hired sword, 1 gp a day
+  (hazardous: the road crosses desert), and "Or, in town" the guard week at 3 sp a day. The
+  clerk's reply said those numbers and places and no others.
+- "I tell the clerk a sword like mine is worth more than a gold a day and ask for better
+  pay": the Diplomacy popup ("the player asks the guild clerk for better pay", DC 15), a 19
+  (+6), margin 10: "The guild clerk raises it to 2 Eldrida gold pieces, 5 Eldrida silver
+  pieces a day" — 2.5x. **Measured defect, fixed:** the line was read as a talk AND a
+  request, and both built a check; a second popup (DC 20, +5 for the earlier request) came
+  up. Now one pay request a sentence (`acts_to_ops.jobs_spoken`).
+- "Done. Put my name down for the caravan to Kalixiri": "Kesst Vayr signs on with the guild
+  clerk to guard the wagons to Kalixiri: be at the road to Kalixiri at noon today".
+- "I walk out to the road to Kalixiri to meet the wagons": "the caravan master counts Kesst
+  Vayr in as the caravan's guard". **Measured defects, fixed:** the plan introduced "the
+  wagons" as a fifth person (now bound to the master, `Engine._op_introduce`), and "The
+  wagons go to Kalixiri when ... sets out" was narrated as the wagons already rolling (now
+  "stand ready here, and wait for ... to give the word").
+- "I give the word and set out with the caravan for Kalixiri" was read `go: Kalixiri`, the
+  plan walked to the road head the party stood on and asked each of the four to join, all
+  refused as indifferent. **Fixed:** a `go` naming a town the roads reach owes a journey
+  (`interpret.ops_for`); the caravan's people go with the wagons by the job
+  (`Engine._op_company`).
+- "I set out with the caravan for Kalixiri": six hours out, the road's own roll met a
+  reptoid in the way; the four came along to the stretch of road. "I lead the wagons wide
+  around the reptoid and carry on": "4 days and a bit on the road ... The wagons are in at
+  Kalixiri. The caravan master pays Kesst Vayr 1 Threnniria platinum piece, 5 Threnniria
+  gold pieces for the road, as agreed" (15 gp, in Kalixiri's coin).
+- Missed meeting (from the signed-on save): "I sit on a bench in the market and wait until
+  evening": "The hour has come and gone at the road to Kalixiri: the wagons for Kalixiri
+  have left without Kesst Vayr, and the job is lost." The clerk's regard went 41 to 36; the
+  caravan's four stand at Kalixiri's road back.
+- Guard week: "I'll take the week of guard work here in town": "Kesst Vayr works as a guard
+  in Kalimnar for 7 days ... 2 Eldrida gold pieces, 1 Eldrida silver piece in all". On the
+  lapsed save, after a night awake, the same take-up worked 0 days: the body gave out
+  (the `work` op's own rule) and the week was let go.
+- Silence: "Fetch Pennyroyal for Vorzhyna Xylthysia" opened unheard on day two; "I walk out
+  into the desert" fired its `reached` step silent (objective 1 ticked), no tell, and the
+  beat never named Pennyroyal.
+- `tools/table_hit_test.js` on /play/: 25 and 20 controls checked, `covered` empty.
+
+Still seen, not fixed here: a turn whose plan fails seven times degrades to narration and
+loses the table's built ops ("I go back to the guild clerk and tell them I can fight": a
+`go` to a person read as a place); the narrator garbled "1 platinum piece, 5 gold pieces in
+all" once into "plus a platinum piece at the end"; a week's work tell was narrated as if no
+time passed.
+
+### 6.6 What World Bible would need to export
 
 Nothing is required: a job is built from what every export already has (settlements,
 `play.travel` legs, the cast, the name pools). A world that wants its own work would export,
