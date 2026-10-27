@@ -499,6 +499,49 @@ loses the table's built ops ("I go back to the guild clerk and tell them I can f
 all" once into "plus a platinum piece at the end"; a week's work tell was narrated as if no
 time passed.
 
+### 6.7 Leftovers fixed for 0.2.22 (branch `fix/jobs-leftovers`)
+
+1. **A face only for a body with a people.** The reptoid the road met is "humanoid
+   (reptilian, shapechanger)", so `bestiary.has_a_people` — which read only the type —
+   called it a person and the spawn gave it a true name and a Korvu face. What separates
+   the two humanoids is the block's own ground: a block whose Environment line states where
+   it lives (`bestiary.ground_stated`) is a race the land holds; a block with none is a
+   role's numbers a local person wears (`npcs.choose`: the guard, the bandit, a merchant
+   sailor). Counted on the imported bestiary: 67 of 3,747 humanoid blocks state their
+   ground — giants 21, goblinoids, reptilians, derro, gnolls, an orc, a tengu — none a
+   plain human. Every door that writes `Actor.appearance` from the people's pools now goes
+   through `names.face_of`, which asks first; a test greps that none writes
+   `appearance_for` straight onto an actor. An earlier pin, "a goblin is a person"
+   (`tests/test_leather_final.py`), is overturned with it: a goblin drawn from the land is
+   a goblin. A save's reptoid loses its face on load (`judgement.name_the_nameless`).
+2. **The caravan in a road fight.** Setting out (`jobs.set_out`, called by the journey)
+   binds the caravan's people to the party for the road, `bond.travels-with-you` from
+   `job:<id>` through the applicator, and paying at the far end removes it. A fight drawn
+   on the road then brings them into the order on the player's side
+   (`Engine._companions_join`), and each turn is their own, decided in character by the
+   companions machinery (the owner's ruling of 2026-10-01). Their character's first fact
+   is what the job hired them for (`jobs.role_line`, read by `companions.who_they_are`):
+   the hired sword "is paid to fight for the wagons, and fights for them"; a teamster is
+   "hired to drive, not to fight — they defend themselves and the wagons as far as their
+   nerve and their arms allow, and may run"; the master is "a trader, not a fighter". The
+   evidence is the prior art the companions module already cites (Ultimate Campaign's GM
+   control, AD&D's loyalty checked only when ordered into danger, Dungeon World's hirelings)
+   and Cohorts & Companions' hirelings, who weigh risk against trust rather than refuse
+   outright. Not bound at the meeting: with the bond the wagons would follow the player
+   back into the market.
+3. **The wagons leave.** The terms' own hour (`meets.minute`, noon) is when they go; they
+   wait `GRACE_MINUTES` (60) past it for the word — the same hour a late guard is given, so
+   the terms carry one number — and then leave, the player standing there or not, and the
+   job lapses as ruling 4 says ("…has not given the word to set out: the caravan master
+   takes the wagons out on the road to Kalixiri without …"). Once set out the clock no
+   longer lapses it.
+4. **The reading's own ops survive a failed plan.** A `go` whose place is a person here
+   ("I go back to the guild clerk") is marked like a seek of somebody here
+   (`interpret.ops_for`), licenses no travel (`interpret.supported`) and has the plan's own
+   walk struck (`acts_to_ops.unasked_travel`). And when every attempt fails anyway, the
+   fallback keeps the table's built ops, each validated on its own
+   (`GMAgent._built_survives`), instead of a bare narrate_only.
+
 ### 6.6 What World Bible would need to export
 
 Nothing is required: a job is built from what every export already has (settlements,
