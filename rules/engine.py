@@ -13503,6 +13503,18 @@ class Engine:
                          None))
         if named is not None and cards_mod.standing(named) != cards_mod.OWN:
             return self._take_up(intent, named)
+        # A job is the engine's card already (rules/jobs.py): the plan's quest of the same
+        # name is a copy of it, passed over in silence. Measured on the 0.2.22 leftovers
+        # run: on the road with the caravan, two turns of three carried a `quest` "Guard the
+        # wagons to Kalixiri" with the job's own objectives and "6 Eldrida gold pieces" as
+        # its reward, refused "No numbers on a quest …" into the prose each time.
+        bare = (title.split(":", 1)[-1].strip() if ":" in title else title).lower()
+        job = next((c for c in cards_mod.load(self.scene) if c.kind == "job" and c.live
+                    and bare in (c.title.lower(), c.id.lower())), None)
+        if job is not None:
+            return Outcome(intent_id=intent.id, op="quest", tell="",
+                           effects=[{"kind": "quest", "id": job.id, "engine_owns": True}],
+                           because=intent.because)
         if wanted and named is None:
             offered = cards_mod.offered_quests(self.scene)
             return self._refuse(
@@ -13588,6 +13600,21 @@ class Engine:
         wanted = str(intent.params.get("quest") or "").strip().lower()
         live = [c for c in cards_mod.quests(self.scene) if c.live]
         card = next((c for c in live if c.id.lower() == wanted or c.title.lower() == wanted), None)
+        # A job's steps are the engine's own (`jobs.settle`: met, arrived, paid), never the
+        # plan's. Measured on the 0.2.22 leftovers run: met at the road head, the plan wrote
+        # `quest_step` for "JOB, TAKEN ON: Guard the wagons to Kalixiri" (the brief's own
+        # label), it was refused "No such quest is underway. Nothing has been taken on
+        # yet.", and the beat told the player "No formal contract is yet recorded". Passed
+        # over in silence: the job is real, and its steps tick themselves.
+        if card is None:
+            bare = wanted.split(":", 1)[-1].strip() if ":" in wanted else wanted
+            job = next((c for c in cards_mod.load(self.scene) if c.kind == "job" and c.live
+                        and bare in (c.id.lower(), c.title.lower())), None)
+            if job is not None:
+                return Outcome(intent_id=intent.id, op="quest_step", tell="",
+                               effects=[{"kind": "quest_step", "id": job.id,
+                                         "engine_owns": True}],
+                               because=intent.because)
         if card is None:
             return self._refuse(
                 intent, "No such quest is underway. "
@@ -23699,6 +23726,20 @@ class Engine:
         from . import jobs as jobs_mod
 
         group = jobs_mod.group_named(self.scene, who)
+        if group is not None and group["ref"] not in self.scene.actors \
+                and group["ref"] in self.scene.people:
+            # The caravan exists, somewhere else: nobody new is made for its name. Measured
+            # on the 0.2.22 leftovers run: stopped at the gate on the way to the road head,
+            # the plan introduced "the wagons" there, and a guildhand named "wagons" with a
+            # Korvu face stood at the gate while the caravan waited at the road.
+            from . import places as places_mod
+
+            away = self.scene.people[group["ref"]]
+            where = getattr(places_mod.find(self.places(), away.at), "name", "")
+            return self._refuse(
+                intent, f"{group['name'][:1].upper() + group['name'][1:]} is not here: "
+                        f"{away.name} has the wagons"
+                        + (f" at {where}" if where else " elsewhere") + ".")
         if group is not None and group["ref"] in self.scene.actors:
             master = self.scene.actors[group["ref"]]
             placeholders = list(intent.params.get("placeholders") or [])

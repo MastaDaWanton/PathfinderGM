@@ -862,7 +862,8 @@ def settle(engine) -> list:
                             f"{pc.name}, and the job is lost. "
                             f"{_cap(employer.name) if employer else 'The employer'} will "
                             f"hear that {pc.name} did not come.")
-                tell += f" {said}" if said else ""
+                # Opens a sentence: "the guild clerk cools" was told lower-case, live.
+                tell += f" {_cap(said)}" if said else ""
                 out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
                                    effects=[fx]))
             else:
