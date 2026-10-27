@@ -81,6 +81,7 @@ market maintains the order…") and the check, run on the page, cut the whole an
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -626,6 +627,27 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
     # first since 2026-10-27 (`Engine.run`) — is not what came of their words.
     lead_at = next((n for n, act in enumerate(grouped)
                     if any(str(getattr(o, "intent_id", "") or "") for o in act)), 0)
+    # Unless the player's own words were spoken this turn (a `say` of theirs): then the line
+    # rides the act that says them, once. Measured on the 0.2.22 release check: "I walk up to
+    # the guild clerk and tell them I can fight" made a step, the job offer and the say; the
+    # line rode the step ("You step forward … and declare to the guild clerk that you can
+    # fight"), the say slot told it again ("You state your proficiency in combat … confirm
+    # your ability to fight"), and the reply a third time — three tellings of four words.
+    pc = engine.scene.pc() if hasattr(engine.scene, "pc") else None
+    spoken_at = next((n for n, act in enumerate(grouped)
+                      if any(getattr(o, "op", "") == "say"
+                             and str(getattr(o, "intent_id", "") or "")
+                             and any(isinstance(e, dict) and e.get("kind") == "said"
+                                     and e.get("who") in ("", getattr(pc, "ref", "pc"))
+                                     for e in (getattr(o, "effects", None) or []))
+                             for o in act)), None)
+    if spoken_at is not None:
+        lead_at = spoken_at
+    # A job put to the player this turn by somebody who then answers them is said ONCE, in
+    # their answer (the reply slot carries the job's facts, `_jobs_held`): the same release
+    # check had "The clerk lists two options: …" and then the clerk listing them in quotes.
+    # Folded below, once the reply's speaker is known.
+    offered_by: dict[str, str] = {}
     for i, act in enumerate(grouped):
         tells = [o.tell for o in act]
         decided = (tells[0] if len(tells) == 1 else
@@ -692,6 +714,12 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         slots.append({"key": f"fact{i + 1}",
                       "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
                       "say": say, "tells": tells, **({"not_own": theirs} if theirs else {})})
+        employer = next((e.get("employer") for o in act
+                         for e in (getattr(o, "effects", None) or [])
+                         if isinstance(e, dict) and e.get("kind") == "job"
+                         and e.get("state") == "offered" and e.get("employer")), "")
+        if employer and len(act) == 1 and i != lead_at:
+            offered_by[f"fact{i + 1}"] = employer
     if not any(s["key"].startswith("fact") for s in slots):
         if carry_on:
             # Continue moves the scene (the ruling of 2026-09-18): with no tells, the
@@ -779,6 +807,12 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             work = (f" Of work, they know exactly this and nothing more: {held} If the "
                     "player asks about work, its pay, place or hour, they answer from it."
                     if held else "")
+            folded = [k for k, ref in offered_by.items() if ref == speaker["ref"]]
+            if folded and held:
+                # The offer's act slot goes; the answer is where it is said, once.
+                slots[:] = [x for x in slots if x["key"] not in folded]
+                work += (" They are putting this work to the player now, in this answer: "
+                         "say what it is, where and when, and what it pays, once.")
             slots.append({
                 "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
                 "speaker_name": speaker["name"], **({"not_manner": used} if used else {}),
@@ -987,6 +1021,44 @@ def compose_reply(slot: dict, words: str, manner: str) -> str:
             + (f" {manner}" if manner else "") + ".")
 
 
+# A reply as `compose_reply` writes it: the say tag, the quoted words, the speaker written in.
+_COMPOSED = re.compile(r"^(<say [^>]*>)'(.*)'(</say>\s.*)$", re.S)
+
+
+def cut_slot_sentence(text: str, said: str) -> str:
+    """`text` without the sentence `said`, always in whole sentences: "" when nothing would
+    be left, `text` unchanged when `said` is not one of its sentences.
+
+    A reply is cut INSIDE its quoted words and composed again, its speaker kept. Measured on
+    the 0.2.22 release check: the guild clerk's one-sentence reply was cut by the page's
+    sentence cutter, which (on a blanked copy) took the attribution and left
+    "'Then choose: … two gold and one silver,'." with nobody saying it; a reply of several
+    sentences cut at its first lost the opening `<say>` and quote mark, and cut at its last
+    lost the closing quote and the speaker. Code reading the composed line it wrote itself,
+    never the model's English."""
+    norm =" ".join(str(said or "").split())
+    whole = [" ".join(x.split()) for x in narration_mod._sentences(text)]
+    if norm not in whole:
+        return text
+    m = _COMPOSED.match(str(text or "").strip())
+    if m is None:
+        cut = narration_mod._cut_sentences(text, [said]).strip()
+        return cut if narration_mod._sentences(narration_mod.unquoted(cut)) else ""
+    head, words, tail = m.groups()
+    parts = narration_mod._sentences(words)
+    if len(parts) != len(whole):
+        return text
+    kept = [p for k, p in enumerate(parts) if k != whole.index(norm)]
+    if not kept:
+        return ""
+    words = " ".join(kept).strip()
+    if words[-1] == ".":
+        words = words[:-1] + ","
+    elif words[-1] not in ",!?…":
+        words += ","
+    return f"{head}'{words}'{tail}"
+
+
 def copied_from(text: str, last_beat: str, n: int = COPY_RUN) -> list[str]:
     """The `n`-word runs `text` shares with `last_beat`, as phrases. Flaw (a)'s detector."""
     if not text or not last_beat:
@@ -1144,8 +1216,8 @@ def _not_their_goal(out: Planned, plan, slots, i, written, who, s: dict, text: s
         out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: '
                          f'dropped')
         return None
-    cut = narration_mod._cut_sentences(text, [said])
-    if narration_mod._sentences(narration_mod.unquoted(cut)) and cut != text:
+    cut = cut_slot_sentence(text, said)
+    if cut and cut != text:
         out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: '
                          f'cut {said[:80]!r}')
         return cut.strip()
@@ -1192,8 +1264,8 @@ def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: s
         out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work — asked again, '
                          f'fixed')
         return text2
-    cut = narration_mod._cut_sentences(text, [said])
-    if cut != text and narration_mod._sentences(cut):
+    cut = cut_slot_sentence(text, said)
+    if cut and cut != text:
         out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work twice — cut '
                          f'{said[:80]!r}')
         return cut.strip()
