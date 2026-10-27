@@ -347,7 +347,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "haggle": ((), ("stall",), "player"),
     # `work`: a day or a week at the trade, paid by the task level and training (PF2e's
     # Earn Income table), only where there is work — inside a settlement.
-    "work": ((), ("days", "skill", "trade"), "player"),
+    # `job` (code only): the job card the week is worked for (rules/jobs.py), whose
+    # engine-priced wage it pays instead of the trade's Earn Income.
+    "work": ((), ("days", "skill", "trade", "job"), "player"),
+    # A job (rules/jobs.py, the owner's answers of 2026-10-27): `do` is offer, accept or
+    # decline; `job` the card; `work` what the player said they can do (carry, count or
+    # fight) for an offer. Written only by the act→op table from the reader's closed answer
+    # (`acts_to_ops.jobs_spoken`) — never by the plan (CODE_ONLY_OPS).
+    "job": (("do",), ("actor", "job", "work"), "hidden"),
     # Naming a creature that is the player's (`bond.owned-by-you`) — the house rule's
     # "you can name it". Aimed by `target`; `name` is the player's own word for it, never
     # the plan's invention (`judgement.declare_name` reads it off the line). Refused for
@@ -720,7 +727,13 @@ PARAM_ALIASES = {
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
-CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request"})
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job"})
+# Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
+# plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
+# down by the reader's closed answer about the player's own words, never by the planner:
+# measured on the owner's 0.2.21 save, five planned replies made up a job nobody held.
+CODE_ONLY_OPS = frozenset({"job"})
+JOB_DOES = ("offer", "accept", "decline")
 
 ENGINE_OWNED_PARAMS = {
     "damage", "damage_type", "damage_roll", "damage_dice", "dice", "die",
@@ -1592,6 +1605,17 @@ def _check_params(intent: Intent, index: int) -> None:
         skill = base_skill(str(p.get("skill") or ""))
         p["skill"] = skill if skill in ("craft", "profession") else ""
         p["trade"] = " ".join(str(p.get("trade") or "").split())[:40]
+        if p.get("job"):
+            p["job"] = str(p["job"]).strip()[:80]
+
+    elif op == "job":
+        do = str(p.get("do") or "").strip().lower()
+        if do not in JOB_DOES:
+            raise IntentError(f"job: do is one of {', '.join(JOB_DOES)}", "schema", index)
+        p["do"] = do
+        p["job"] = str(p.get("job") or "").strip()[:80]
+        work = str(p.get("work") or "").strip().lower()
+        p["work"] = work if work in ("carry", "count", "fight") else ""
 
     elif op == "call_on":
         p["who"] = " ".join(str(p["who"] or "").replace("_", " ").split())[:80]
