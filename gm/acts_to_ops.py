@@ -1756,8 +1756,10 @@ def unasked_travel(raw, frame: dict | None, scene=None, places=(), *,
     if not isinstance(raw, list) or not frame or frame.get("error"):
         return raw
     acting_acts = [a for a in frame.get("actions") or [] if interpret.acting(a)]
-    if not acting_acts or any(a.get("act") in interpret._MOVING_ACTS or a.get("place")
-                              for a in acting_acts):
+    # A go or seek whose words name a person standing here (`interpret.ops_for` marks it
+    # `here`) walks nowhere: "I go back to the guild clerk" with the clerk at the table.
+    if not acting_acts or any((a.get("act") in interpret._MOVING_ACTS or a.get("place"))
+                              and not a.get("here") for a in acting_acts):
         return raw
     here = str(getattr(scene, "at", "") or "")
     nearby = set(interpret._sought_nearby(frame, here, places)) if places else set()
