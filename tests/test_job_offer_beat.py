@@ -132,6 +132,42 @@ def test_a_told_sum_is_never_stripped_as_a_roll_that_showed_the_same_number():
     assert narration.strip_turn_numbers("Your blade hits for 6 piercing.", [rolled])[1]
 
 
+def test_a_size_word_in_a_characters_mouth_is_never_flagged_as_narration():
+    """Measured on the job-offer re-run: the clerk said "'If you prefer the city, I can offer
+    you a week … Otherwise, …,' the guild clerk says flatly." The size-words finder read the
+    first sentence of the quotation alone — a quote mark it never closes — took "city" for
+    narration, the repair dropped the opening quote, and the narrator-in-the-scene check
+    turned "I can offer" into "you can offer you". Speech is blanked over the whole text."""
+    from types import SimpleNamespace
+
+    from gm.checks import size_words
+
+    # As the truth checks read it: the say tags are lifted before them.
+    text = ("'If you prefer the city, I can offer you a week of guard duty. Otherwise, the "
+            "caravan leaves at noon,' the guild clerk says flatly.")
+    town = SimpleNamespace(id="t1", name="Kalimnar")
+    ctx = SimpleNamespace(text=text)
+    orig = size_words._small_settlement, size_words._other_places
+    size_words._small_settlement = lambda c: (town, "town")
+    size_words._other_places = lambda c, loc: []
+    try:
+        assert size_words.find(ctx) == []
+        ctx.text = "You walk into the city. " + text
+        assert size_words.find(ctx)[0].sentences == ("You walk into the city.",)
+    finally:
+        size_words._small_settlement, size_words._other_places = orig
+
+
+def test_a_sentence_opening_a_quotation_is_repaired_with_its_speaker():
+    """The same re-run: the truth-check repair took the speech unit only for a sentence that
+    began AFTER the quote mark (`qa < at`), so the quotation's opening sentence — which
+    starts ON the mark — was rewritten alone and lost it. Pinned in the source: `<=`."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(encoding="utf-8")
+    assert "if qa <= at and at + len(sentence) <= qb" in src
+
+
 # --- 4. one telling of the player's words -----------------------------------------------------------
 
 def test_the_players_words_ride_the_say_and_the_offer_is_said_once_by_its_speaker(worlds):
@@ -156,3 +192,7 @@ def test_the_players_words_ride_the_say_and_the_offer_is_said_once_by_its_speake
     assert not any("puts work to" in x["say"] for x in facts)
     reply = next(x for x in slots if x["key"] == "reply")
     assert "putting this work to the player now" in reply["say"]
+    # The re-run's second line, "I ask the clerk what the caravan job pays": the say slot
+    # was told to show "what came of it" and wrote the clerk's answer, which the reply then
+    # gave again. It shows the asking only; the answer is the reply's.
+    assert "answer is written next, so none of it here" in with_line[0]["say"]
