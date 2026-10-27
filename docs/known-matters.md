@@ -299,6 +299,164 @@ How the record moves:
    ticks. Holding those steps until the quest is taken is the stricter reading of "never
    the player's goal unless taken". It changes 18 scheme tests' stories.
 
+### 4.3 The owner's answers (2026-10-27)
+
+1. "I can fight": the clerk offers EITHER a real escort (when one is going out) or a week of
+   guard work (the existing `work` op).
+2. A caravan is SEVERAL REAL PEOPLE: drivers and guards, each a person with a sheet.
+3. Openings MAY list real jobs; the hiring table creates real work at the start.
+4. Not turning up: the job lapses and the hiring table's regard drops a little.
+5. Pay: the book's hireling wage for the work's danger; Diplomacy can raise it up to 3x,
+   through the Make Request machinery. The engine computes every number.
+6. The owner's existing save is left as it is.
+7. Someone else's errand: the objective may tick or count silently, but NOTHING about it
+   reaches the page for an unheard quest. Heard is different.
+
+## 6. Real jobs, as built (branch `feat/real-jobs`)
+
+### 6.1 More prior art (searched 2026-10-27; a critic pass corrected two claims)
+
+- **The pay.** CRB Services: "Hireling, trained 3 sp per day", "Hireling, untrained 1 sp
+  per day", "a minimum wage"; trained hirelings include "mercenary warriors ... teamsters"
+  ([CRB equipment](https://legacy.aonprd.com/coreRulebook/equipment.html)). Ultimate
+  Equipment lists no separate guard or caravan-guard wage
+  ([UE services](https://legacy.aonprd.com/ultimateEquipment/gear/lodgingAndServices.html)).
+  *Pathfinder Player Companion: Cohorts & Companions*, "Contingency Services", prices a
+  hireling by the work's Risk — harmless 3 sp, questionable 6 sp, hazardous 1 gp, deadly
+  3 gp, suicidal 3 pp a day — "multiplied by the level of each hireling squared"; Risk
+  starts at 1, +1 for challenging terrain or hostile non-sentient inhabitants, +2 for harsh
+  terrain or hostile sentient inhabitants above the hireling's level
+  ([d20pfsrd hirelings](https://www.d20pfsrd.com/equipment/goods-and-services/hirelings-servants-services/);
+  the page number could not be confirmed). The first research pass called this rule
+  third-party; the critic pass found it is Paizo's.
+- **Haggling.** Battle Brothers **abandoned** haggling the sum: the old way was "ask for
+  more money until the employer denies" and was "automatic, there's little thought behind
+  it"; contracts now negotiate how the pay is made up
+  ([dev blog 95](https://battlebrothersgame.com/dev-blog-95-contract-changes/)). Its hidden
+  "annoyance" per haggle is known only from a player's decompile, not from the developers.
+  The owner chose the sum by Diplomacy; the book's "+5 per additional request" and "a
+  refused request does not change" (CRB p.93) stand in for the employer's patience, and the
+  3x ceiling bounds it.
+- **Missing the hour.** Daggerfall's escort employer, arrived at late, "leaves in a huff
+  without paying" ([UESP](https://en.uesp.net/wiki/Daggerfall:The_Escort)); its reputation
+  runs -100..100 and a failed quest costs 2
+  ([UESP](https://en.uesp.net/wiki/Daggerfall:Reputation)). RimWorld keeps an accept-by and
+  a complete-by timer ([wiki](https://rimworldwiki.com/wiki/Quests)). Mount & Blade's
+  briefing names days and the real limit is indefinite
+  ([wiki](https://mountandblade.fandom.com/wiki/Escort_Merchant_Caravan_to_(town))).
+- **One party or several people.** Battle Brothers' and Mount & Blade's caravans are one
+  map party; Daggerfall's escort is one person; RimWorld's guests are individual pawns. The
+  owner chose people (answer 2), which "seen people are real" already asked for.
+
+### 6.2 The record
+
+A job is a card of kind `job` (`rules/cards.py`, tag `situation.quest.job`, so every prefix
+question asked of a quest is asked of a job), with its own record in `Card.job`
+(`rules/jobs.py`):
+
+| field | what it holds |
+|---|---|
+| `work` | one of `labour`, `carry`, `count`, `guard`, `escort` (`jobs.WORK`) |
+| `employer` | the clerk's ref |
+| `meets` | the road head toward the destination (a real ring place), its name, and the minute: noon today while the morning is young (to 10:00), else first light tomorrow |
+| `route` | origin and destination settlement ids (`journey.legs_from`, land roads only), the hours on foot |
+| `counterpart` | the caravan's label, its people's refs, the master's ref, and when it `left` |
+| `pay` | `base_per_day_cp`, `per_day_cp`, `days`, `risk`, `times`, `level` |
+| `terms` | `on_completion` (the opening's own "paid at the end of it") |
+| `state` | `open`, `met`, `paid`, `lapsed`, `gone`, `declined` |
+
+`standing`, the Journal (`cards.quest_log` reads `cards.tasks`), the brief ("JOB, TAKEN
+ON"), the pull's "open" press, `take_up`, `note_heard` and `objective_done` treat a job as
+the task it is; `quests()` stays the quests alone, so the quest take-up never takes a job.
+
+### 6.3 What happens, and where each answer lives
+
+- **Answer 3, real jobs at the start.** The hiring table's document lists `jobs`
+  (`content/openings/core.json`): an escort with four caravan rows (master, two teamsters,
+  a hired sword) and the week's work (`carry`, `count`, `guard`). `openings.stage` opens
+  them (`jobs.open_from_opening`), validated by `openings.validate`. Both open `heard`:
+  the clerk's call reached the player, and no particular job is put to them until the
+  clerk answers what they can do or what the work is (then `offered`, in the Journal, and
+  what "I'll take it" agrees to). Opened `offered` at first, a bare "I'll take it" signed
+  the player on to a caravan the clerk had not yet mentioned.
+- **Answer 2, people.** Each caravan row is minted by `jobs._mint`: a codex block for the
+  role (`npcs.choose`), a true name and a face from the world's pools, a people
+  (`person_words.settle_people`), standing at the road head through the arrival door. No
+  population record, so residency does not walk them off; `Engine._stays_in_the_world`
+  keeps anybody a live job holds.
+- **Answer 1, the offer.** The reader is asked one closed question when the player's
+  words reach an employer here (`interpret.confirm_job`: what the words do, which of
+  carry/count/fight, which job put to them). `acts_to_ops.jobs_spoken` builds the `job`
+  op whole; the plan never writes one (`intents.CODE_ONLY_OPS`, dropped in `apply`, out of
+  the plan's op enum). `Engine._op_job` offers the escort for "fight" while it is going out
+  (`jobs.escort_going_out`), with the week's guard work beside it; once the wagons have
+  gone, the guard week alone. Carry and count are the week's work.
+- **Answer 5, the pay.** `jobs.per_day_cp`: carry 1 sp and count 3 sp flat (CRB); guard
+  and escort by Cohorts & Companions' Risk times level squared. A road is questionable
+  (+1 for the beasts `ontheway` really rolls for), hazardous over forest, hills, marsh,
+  jungle or desert, deadly over mountain or frozen ground. The haggle is the Make Request
+  check made of the employer of the job just offered (`Engine._make_request` routes a
+  payment request to `Engine._haggle_job`): the book's DC, the player's own roll in the
+  popup, +5 per earlier request today, a refusal that stands; a granted one multiplies the
+  offer by Influence Attitude's steps at half the offer each (`jobs.haggled_times`: 1.5x,
+  2x per 5 over, never past 3x).
+- **Accepting.** The job is the player's (`known` taken). For the escort, the agreed sum
+  goes into the caravan master's purse — the guild's money for its guard, the only coin
+  the job puts into the world — and the tell says where and when to be. For the week, the
+  `work` op runs at the job's wage (`work` takes a code-only `job` param), seven days
+  through the clock and the body, and the card is done and paid.
+- **Meeting, travelling, arriving.** `jobs.settle`, once per batch beside `defeat.settle`:
+  the player at the road head by the hour is counted in (`met`). A journey to the
+  destination takes the met caravan's people along (`jobs.coming_along`, added to the
+  journey's escorts, so they reach the far end and `came_along`); the road's own encounter
+  roll is the only trouble on the way (Battle Brothers abandoned contracts that spawn
+  things to fight). Arrived with them, the master pays out of his purse
+  (`Engine._mark_payment`), and the card resolves.
+- **Answer 4, not turning up.** Past the hour plus `GRACE_MINUTES` (60), with the player
+  not standing with the wagons, the caravan leaves: its people go to the far town's road
+  back, and the road head keeps when they went. A job taken is `lapsed`, let go, and the
+  clerk's regard drops `MISSED_REGARD` (5, what a Diplomacy failure by five costs); the
+  tell says so. An offer never taken is `gone` and costs nothing.
+- **Tracking.** `tracking.quarry_of` answers "the caravan" with the job's group
+  (`jobs.group_named`: every word of the phrase is a word of the group's own label, the way
+  the counter matches a want); at the road head its trail ends where the master stands;
+  gone, the wagons' trail (Large) leads off toward another settlement, "a journey, not a
+  walk".
+- **What the clerk may say.** The planned reply slot of an employer carries the job's facts
+  (`jobs.slot_facts`: the road, the hour, the people, the days and the pay) and is marked
+  `holds`; `beat_verify.invented_job_sentence(held=...)` reads it for work that is NOT that
+  work, and `planned._no_job_made_up` asks again with the sentence named, then cuts it.
+- **Answer 7, silence.** A scheme step whose progress is on a quest the player has never
+  heard of (`schemes._unheard_progress`) is silent: the objective ticks, no outcome is
+  returned, so there is no tell, no planned slot and no line linking the place or the thing
+  to the errand, and its XP line is not banked to ride a later tell. A heard quest keeps its
+  tell, marked `not_own` for the read-back.
+- **Answer 6.** Nothing migrates a save. Jobs open only when a start is staged; an old card
+  round-trips without a `job` key.
+
+### 6.4 Not built (said, not hidden)
+
+- The caravan's own journey when the player is not with it is not walked: its people are
+  put at the far town's road back when its hour passes.
+- Once the player has reported at the road head, the wagons wait for them to set out:
+  nothing starts the journey but the player's own word, and standing with the caravan past
+  its hour does not lapse the job.
+- Pay in advance and per-head terms are not offered; the terms are the opening's.
+- The caravan's people fight beside the player only if the fight's own sides put them
+  there; a road ambush does not enrol them.
+- A job finished pays its wage and no story XP.
+- The free narrator's replies are still not read for made-up work (Planned is the default).
+- Only the hiring table lists jobs; other openings and the world's own export do not yet
+  (World Bible has no job export; see §6.5).
+
+### 6.5 What World Bible would need to export
+
+Nothing is required: a job is built from what every export already has (settlements,
+`play.travel` legs, the cast, the name pools). A world that wants its own work would export,
+per settlement, a list of standing work in the same closed vocabulary — `{"work": "escort" |
+"guard" | "carry" | "count" | "labour", "employer": <cast id>, "to": <settlement id>}` — and
+the engine would price, place and time it exactly as it does the opening's.
+
 ## 5. Files touched
 
 - `rules/cards.py` (`known`, `standing`, carriers, brief, Journal, take-up, write-back)
