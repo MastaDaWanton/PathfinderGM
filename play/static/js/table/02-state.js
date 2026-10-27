@@ -239,6 +239,9 @@ function render(s, hold) {
   // After each of the narrator's own beats (who "gm", kind "setup"), an empty slot that
   // "That's wrong" fills (23-thats-wrong.js, a render hook). Not a `.beat`: the book
   // finds beat i as the i-th `.beat` (15-book.js `storyTopOf`).
+  // Where the reader is, read before the rebuild: the rebuilt story is shorter until those
+  // slots are filled, and the browser clamps the position to it (15-book.js `storyKeep`).
+  if (typeof storyKeep === "function") storyKeep();
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
       i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}</p>${
