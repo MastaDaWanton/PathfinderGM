@@ -731,6 +731,8 @@ _ABOUT_SOMEBODY = frozenset({
     "attack", "cast", "use_ability", "check", "give", "heal", "damage", "ability_damage",
     "temp_hp", "condition", "compel", "provoke", "haggle", "judge", "rename", "repair",
     "mend", "item_damage", "hazard",
+    # The employer a job is offered by, taken from or turned down to (rules/jobs.py).
+    "job",
 })
 
 

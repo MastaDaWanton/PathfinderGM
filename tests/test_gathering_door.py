@@ -248,6 +248,11 @@ def client(tmp_path, monkeypatch):
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
         stand_on(c.scene, "mountain")
+        # Alone there too: a drawn hiring-table start keeps its caravan's real people at the
+        # road head (rules/jobs.py), which can be the very ground stood on — measured when
+        # jobs landed, the excursion was refused "You are with the caravan master, ...".
+        for ref in [r for r in c.scene.actors if r != "pc"]:
+            c.scene.depart(ref)
         c.save()
         cl = Client()
         cl.told = told

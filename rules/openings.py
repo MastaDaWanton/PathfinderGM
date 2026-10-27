@@ -444,6 +444,44 @@ def validate(doc: dict) -> list[str]:
         for name in _SLOT.findall(str(text or "")):
             if name not in declared or name == "lead":
                 p.append(f"{field}: ${name} is not a slot the incident brings in.")
+    # Real jobs a start may list (rules/jobs.py; the owner's answer 3, 2026-10-27): the
+    # work a closed word, the employer a slot, a caravan's people by role and count in
+    # words, like an incident's. The engine prices, places and times every one.
+    from . import jobs as jobs_mod
+
+    for i, j in enumerate(doc.get("jobs") or []):
+        w = f"jobs[{i + 1}]"
+        if not isinstance(j, dict):
+            p.append(f"{w}: a job is an object.")
+            continue
+        if j.get("work") not in ("escort", "week"):
+            p.append(f"{w}: work is escort (a caravan going out) or week (the week's work, "
+                     f"whose kind the player chooses).")
+        emp = str(j.get("employer") or "$lead").lstrip("$")
+        if emp not in declared:
+            p.append(f"{w}: employer is a slot the start brings in ($lead).")
+        for k in j.get("choices") or ():
+            if k not in jobs_mod.WORK:
+                p.append(f"{w}.choices: {k!r} is not work; the kinds are "
+                         f"{', '.join(jobs_mod.WORK)}.")
+        if j.get("work") == "escort":
+            rows = j.get("caravan") or []
+            if not rows:
+                p.append(f"{w}.caravan: an escort names the caravan's people — a master, "
+                         f"drivers, a guard — each a real person when it is staged.")
+            if not any(isinstance(r, dict) and r.get("role") == "master" for r in rows):
+                p.append(f"{w}.caravan: one row is the master (role: master), who pays.")
+            for n, r in enumerate(rows):
+                rw = f"{w}.caravan[{n + 1}]"
+                if not isinstance(r, dict):
+                    p.append(f"{rw}: an object.")
+                    continue
+                if not re.fullmatch(r"the [a-z' -]+", str(r.get("label") or "")):
+                    p.append(f"{rw}: label is two or three words beginning 'the'.")
+                if not r.get("words"):
+                    p.append(f"{rw}: words — what the codex is asked for.")
+                if str(r.get("count") or "one") not in COUNTS:
+                    p.append(f"{rw}: count in words: {', '.join(COUNTS)}.")
     scheme = str(doc.get("opens_scheme") or "")
     if scheme and not _ID.fullmatch(scheme):
         p.append("opens_scheme: a scheme id, or empty.")
@@ -1262,6 +1300,13 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
     opened = _open_its_scheme(engine, doc, source)
     if opened:
         record["opened"] = opened
+    # The work the start's words speak of, held before a word is written (rules/jobs.py):
+    # the hiring table's "Hands wanted for the week" and the caravan going out.
+    from . import jobs as jobs_mod
+
+    held = jobs_mod.open_from_opening(engine, doc, slots, story_seed)
+    if held:
+        record["jobs"] = held
     scene.start = record
     return record
 

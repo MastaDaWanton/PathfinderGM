@@ -1159,8 +1159,10 @@ def _progress_not_taken(scene, inst: dict, step: dict) -> str:
     ground where Glowvine grows" — for a quest the player had only overheard, and the
     beat had them "searching the soil where the luminescent Glowvine is known to take
     root". Holding the step back until the quest was taken was tried first and broke
-    eighteen scheme tests whose stories move without a take-up: an owner's question
-    (docs/known-matters.md §4.2), not this lane's to decide."""
+    eighteen scheme tests whose stories move without a take-up. The owner answered it
+    (docs/known-matters.md §4.2, question 7): the step may tick, and on a quest the player
+    has never heard of it says nothing at all (`_unheard_progress`, `tick`); this mark is
+    for one they have heard of."""
     act = step.get("action") or {}
     if not isinstance(act, dict) or act.get("do") not in _PROGRESS:
         return ""
@@ -1169,6 +1171,15 @@ def _progress_not_taken(scene, inst: dict, step: dict) -> str:
     if card is None or card.kind != "quest" or cards_mod.standing(card) == cards_mod.OWN:
         return ""
     return card.title
+
+
+def _unheard_progress(scene, inst: dict, step: dict) -> bool:
+    """Whether this step's progress is on a quest the player has never heard of
+    (`cards.standing` UNHEARD) — the owner's answer 7: such a step is silent."""
+    act = step.get("action") or {}
+    cid = (inst.get("cards") or {}).get(str((act or {}).get("card") or ""))
+    card = cards_mod.find(scene, cid) if cid else None
+    return card is not None and cards_mod.standing(card) == cards_mod.UNHEARD
 
 
 def tick(engine, outcomes) -> list:
@@ -1264,6 +1275,16 @@ def tick(engine, outcomes) -> list:
             silent = "silent" in tell or "deferred" in tell
             # Asked before the step acts (its action may finish the card).
             theirs = _progress_not_taken(scene, inst, best)
+            # The owner's answer 7 (2026-10-27): "if I am in the right spot and I get the
+            # item that is fine but no mention should be made to me about anything since
+            # my character would be unaware that I had an item someone wanted." A step on a
+            # quest the player has never heard of ticks, and says nothing: no outcome, so
+            # no tell, no planned slot and no line linking the place or the thing to the
+            # errand. One they have heard of is different — they know of it — and keeps
+            # its tell, marked `not_own` for the read-back.
+            hushed = bool(theirs) and _unheard_progress(scene, inst, best)
+            if hushed:
+                silent = True
             inst["_silent_step"] = silent
             for act in [best.get("action")] + list(best.get("also") or []):
                 if isinstance(act, dict):
@@ -1283,8 +1304,9 @@ def tick(engine, outcomes) -> list:
             if silent:
                 # Banked, not said: an XP line for a step the character did not see
                 # would tell them the price was withdrawn out of sight (the leak
-                # critic measured it). It rides the next perceptible tell.
-                if extra:
+                # critic measured it). It rides the next perceptible tell — except a
+                # line about an errand the player never heard of, which would name it.
+                if extra and not hushed:
                     inst["banked"] = (inst.get("banked", "") + " " + extra).strip()
             else:
                 pending = inst.pop("pending_resolve", None)

@@ -113,6 +113,12 @@ def trails(scene) -> list[dict]:
         gone.append({"ref": ref, "name": body.name,
                      "hours_ago": max(0, (now - int(seen)) // 60), "here": False,
                      "size": str(getattr(body, "size", "medium") or "medium").lower()})
+    # A caravan that left from this ground (rules/jobs.py): its wagons' trail, held by the
+    # job's own record of when it went, so "track the caravan" finds a thing that is real.
+    from . import jobs as jobs_mod
+
+    seen = present | {t["ref"] for t in gone}
+    gone += [t for t in jobs_mod.trails_of(scene) if t["ref"] not in seen]
     gone.sort(key=lambda t: t["hours_ago"])
     return out + gone
 
@@ -127,6 +133,14 @@ def quarry_of(scene, phrase: str, world=None) -> dict | None:
     phrase = " ".join(str(phrase or "").split())
     if not phrase or scene is None:
         return None
+    # A caravan a job holds (rules/jobs.py) is several real people; the phrase that names
+    # the group ("the caravan", "the wagons to Dustgate") means its master's trail, which
+    # is the wagons'. Asked first: the finder would call four people ambiguous.
+    from . import jobs as jobs_mod
+
+    group = jobs_mod.group_named(scene, phrase)
+    if group is not None and group["ref"] in (getattr(scene, "people", {}) or {}):
+        return group
     try:
         found = population.find(scene, phrase, log_miss=False, world=world)
     except Exception:  # noqa: BLE001 — a phrase the finder cannot read is nobody it holds

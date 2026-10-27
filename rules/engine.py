@@ -3866,6 +3866,12 @@ class Engine:
         from . import defeat as defeat_mod
 
         resolution.outcomes.extend(self._articled(o) for o in defeat_mod.settle(self))
+        # A job's meeting made or missed, and a caravan brought in and paid for
+        # (rules/jobs.py): by the clock and where the party stands, once per batch, the
+        # shape `defeat.settle` uses.
+        from . import jobs as jobs_mod
+
+        resolution.outcomes.extend(self._articled(o) for o in jobs_mod.settle(self))
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -5950,11 +5956,23 @@ class Engine:
             return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
                            tell=f"{asks} {target.name} cannot answer. Nothing changes hands.",
                            because=intent.because)
+        # Asking an employer for more than the work they just offered pays: the haggle over
+        # a job's wage (rules/jobs.py; the owner's answer 5, 2026-10-27), the same request
+        # by the same book, which raises the offer instead of paying a day's wage.
+        from . import jobs as jobs_mod
+
+        offered = (jobs_mod.priced_offer(self.scene, target.ref)
+                   if kind == requests_mod.PAYMENT else None)
+        if offered is not None:
+            asks = f"{actor.name} asks {target.name} for better pay ({offered.title})."
         why = requests_mod.refusal(target, kind, now)
         if why:
             return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
                            tell=f"{asks} {why}", because=intent.because)
         value, basis = requests_mod.dc(target, kind, now)
+        if offered is not None:
+            return self._haggle_job(intent, actor, target, mods, partial, offered,
+                                    value, basis, asks, now)
         resolved_dc = dc_mod.ResolvedDC(value=value, band=None, basis=basis)
         roll = self._roll_or_suspend(intent, actor, mods, label="Diplomacy check",
                                      dc=resolved_dc.final, partial=partial)
@@ -5981,6 +5999,58 @@ class Engine:
                         "granted": granted})
         # A request is said to somebody: they are in conversation with the player now,
         # as a `say` would have made them.
+        talk = self.join_talk(target)
+        if talk:
+            tell = f"{tell} {talk}"
+        return Outcome(intent_id=intent.id, op="check", rolls=[roll],
+                       dc=resolved_dc.as_dict(), verdict="success" if granted else "failure",
+                       margin=margin, effects=effects, tell=tell, because=intent.because)
+
+    def _haggle_job(self, intent: Intent, actor, target, mods, partial: dict, card,
+                    value: int, basis: str, asks: str, now: int) -> Outcome:
+        """Diplomacy's Make Request for better pay on a job just offered (CRB p.93; the
+        owner's answer 5): the book's DC from the employer's attitude and Charisma, +5 for
+        each request already heard today (their patience), and a refusal that stands
+        (`requests.refusal`). A granted request raises the offer by Influence Attitude's
+        steps — half the offer for making it, half again for every 5 over — never past three
+        times what was offered (`jobs.haggled_times`). The engine prices every coin of it;
+        a model never names the sum."""
+        from . import cards as cards_mod
+        from . import jobs as jobs_mod
+        from . import requests as requests_mod
+
+        resolved_dc = dc_mod.ResolvedDC(value=value, band=None,
+                                        basis=basis + "; asking for better pay")
+        roll = self._roll_or_suspend(intent, actor, mods, label="Diplomacy check",
+                                     dc=resolved_dc.final, partial=partial)
+        margin = roll.total - resolved_dc.final
+        granted = margin >= 0
+        pay = jobs_mod.pay_of(card)
+        if granted:
+            was, now_times = jobs_mod.haggle(self, card, margin)
+            card = cards_mod.find(self.scene, card.id)
+            pay = jobs_mod.pay_of(card)
+            tell = (f"{asks} {actor.name} makes the diplomacy check by {margin}."
+                    + self.reward_check(actor, "diplomacy", resolved_dc.final)
+                    + (f" {_sentence(target.name)} raises it to "
+                       f"{jobs_mod.coin_words(self, pay['per_day_cp'])} a day, "
+                       f"{jobs_mod.coin_words(self, jobs_mod.total_cp(card))} in all"
+                       + (" — three times the first offer, and no more." if now_times
+                          >= jobs_mod.HAGGLE_MOST else ".")
+                       if now_times > was else
+                       f" The offer already stands as high as that: "
+                       f"{jobs_mod.coin_words(self, pay['per_day_cp'])} a day."))
+        else:
+            tell = (f"{asks} {actor.name} misses the diplomacy check by {-margin}. "
+                    f"{_sentence(target.name)} will not pay more than "
+                    f"{jobs_mod.coin_words(self, pay.get('per_day_cp', 0))} a day.")
+        requests_mod.remember(target, now, kind=requests_mod.PAYMENT, granted=granted)
+        effects = [{"kind": "request", "ref": target.ref, "request": requests_mod.PAYMENT,
+                    "granted": granted},
+                   {"kind": "job", "id": card.id, "state": "haggled",
+                    "per_day_cp": int(pay.get("per_day_cp", 0) or 0),
+                    "times": float(pay.get("times", 1.0) or 1.0),
+                    "origin": "rule:diplomacy-request"}]
         talk = self.join_talk(target)
         if talk:
             tell = f"{tell} {talk}"
@@ -9930,6 +10000,17 @@ class Engine:
         r = tradecraft.row("day-work")
         if self.scene.initiative:
             return self._refuse(intent, "Not in the middle of a fight.")
+        # The week's work for an employer (rules/jobs.py): the hireling's wage the job was
+        # priced at — and haggled to — rather than the trade's Earn Income, with no roll:
+        # the wage is the job's terms, not a check of the trade.
+        from . import cards as cards_mod
+        from . import jobs as jobs_mod
+
+        job_card = (cards_mod.find(self.scene, str(intent.params.get("job") or ""))
+                    if intent.params.get("job") else None)
+        if job_card is not None and (job_card.kind != "job" or not job_card.live
+                                     or not jobs_mod.pay_of(job_card)):
+            return self._refuse(intent, f"{job_card.title} is not work that is open.")
         loc = self.world.get(self.scene.location_id) if (self.world and
                                                          self.scene.location_id) else None
         if loc is None or places_mod.setting_of(self.scene.at) != "in":
@@ -9946,7 +10027,16 @@ class Engine:
         trade = str(intent.params.get("trade") or "").strip()
         town = getattr(loc, "name", "") or "the town"
         roll, verdict, margin = None, "untrained", None
-        if offer["proficiency"] == "untrained":
+        if job_card is not None:
+            pay = jobs_mod.pay_of(job_card)
+            per_day = int(pay["per_day_cp"])
+            days = int(pay.get("days") or days)
+            employer = self.scene.people.get(job_card.giver)
+            how = (f"the wage agreed with {employer.name if employer else 'the guild'}: "
+                   + (f"{float(pay['times']):g} times a hireling's day wage, asked for"
+                      if float(pay.get("times", 1) or 1) > 1 else "a hireling's day wage"))
+            verdict = "success"
+        elif offer["proficiency"] == "untrained":
             per_day = int(offer["pay_cp"]["untrained"])
             how = "untrained labour (the CRB's average wage)"
         else:
@@ -9989,18 +10079,153 @@ class Engine:
             tell += f" The days cost them: {body}."
         if parted:
             tell += f" {parted}"
+        origin = f"job:{job_card.id}" if job_card is not None else "rule:day-work"
         effects = [{"ref": pc.ref, "kind": "time",
                     "minutes": worked * survival.MINUTES_PER_HOUR,
-                    "origin": "rule:day-work"},
+                    "origin": origin},
                    {"ref": pc.ref, "kind": "earned", "paid_cp": paid, "days": days_done,
                     "task": offer["task"], "proficiency": offer["proficiency"],
-                    "degree": verdict, "origin": "rule:day-work"}]
+                    "degree": verdict, "origin": origin}]
+        if job_card is not None:
+            # The week worked to its end is the job done and paid; a body that gave out
+            # part-way was paid its days, and the rest of the week is let go.
+            turn = int(getattr(self, "turn", 0) or 0)
+            jobs_mod.mark(self.scene, job_card.id,
+                          "paid" if days_done >= days else "lapsed")
+            if days_done >= days:
+                cards_mod.objective_done(self.scene, job_card.id, 0, turn=turn)
+                cards_mod.objective_done(self.scene, job_card.id, 1, turn=turn)
+            else:
+                cards_mod.resolve(self.scene, job_card.id, how="dropped", turn=turn)
+            effects.append({"kind": "job", "id": job_card.id, "state": "paid",
+                            "paid_cp": paid, "origin": origin})
         return Outcome(intent_id=intent.id, op="work", rolls=[roll] if roll else [],
                        dc=(dc_mod.ResolvedDC(value=offer["dc"], band=None).as_dict()
-                           if offer.get("dc") is not None else None),
+                           if offer.get("dc") is not None and job_card is None else None),
                        verdict=("success" if verdict in ("success", "critical success",
                                                           "untrained") else "failure"),
                        margin=margin, effects=effects, tell=tell, because=intent.because)
+
+    def _op_job(self, intent: Intent, partial: dict) -> Outcome:
+        """A job put to the player, taken on, or turned down (rules/jobs.py).
+
+        Written only by the act→op table from the reader's closed answer about the player's
+        own words to the employer (`acts_to_ops.jobs_spoken`); the plan never writes one
+        (`intents.CODE_ONLY_OPS`). The owner's report of 2026-10-27: at the hiring table five
+        planned replies made up an escort, an outpost and a caravan nobody held. Here every
+        fact of the offer — the road, the hour, the people, the days and the pay — is the
+        job card's, and the tell carries them, so the reply that dresses it has nothing to
+        invent.
+
+          offer    the employer puts the work that fits what the player said they can do:
+                   "fight" is the escort when one is going out, else a week's guard work
+                   (the owner's answer 1); carry and count are the week's work.
+          accept   the job becomes the player's; the week's work is then worked, through
+                   the `work` op's clock and body, at the job's wage.
+          decline  the escort is let go; the week's posting stays on the table.
+        """
+        from . import cards as cards_mod
+        from . import jobs as jobs_mod
+
+        pc = self.scene.pc()
+        do = str(intent.params.get("do") or "")
+        employer = self.scene.actors.get(intent.target or "")
+        named = (cards_mod.find(self.scene, str(intent.params.get("job") or ""))
+                 if intent.params.get("job") else None)
+        if employer is None and named is not None:
+            employer = self.scene.actors.get(named.giver)
+        if employer is None or not jobs_mod.held_by(self.scene, employer.ref):
+            return self._refuse(intent, "Nobody here has work to put to the player.")
+        who = employer.name
+        if do == "offer":
+            said = str(intent.params.get("work") or "")
+            if not said:
+                # Asked what the work is, or what it pays: everything this employer holds is
+                # put to the player, as the engine holds it — the caravan going out, and the
+                # week's posting with its choices still open.
+                held = [c for c in jobs_mod.held_by(self.scene, employer.ref)
+                        if c.job.get("state") == "open"
+                        and (c.job.get("work") != "escort"
+                             or jobs_mod.escort_going_out(self.scene, employer.ref))]
+                for c in sorted(held, key=lambda c: c.job.get("work") == "escort"):
+                    jobs_mod.put_to_player(self, c)
+                lines = [jobs_mod.facts_line(self, cards_mod.find(self.scene, c.id))
+                         for c in held]
+                return Outcome(intent_id=intent.id, op="job",
+                               tell=(f"{_sentence(who)} puts the work there is to "
+                                     f"{pc.name}: " + " ".join(lines)) if lines else
+                                    f"{_sentence(who)} has no work to put to {pc.name}.",
+                               effects=[{"kind": "job", "id": c.id, "state": "offered",
+                                         "employer": employer.ref,
+                                         "origin": f"job:{c.id}"} for c in held],
+                               because=intent.because)
+            card = jobs_mod.offer_for(self, employer.ref, said)
+            if card is None:
+                return self._refuse(intent, f"{_sentence(who)} has no work for hands who "
+                                            f"{said}.")
+            if cards_mod.standing(card) == cards_mod.OWN:
+                return Outcome(intent_id=intent.id, op="job", effects=[],
+                               tell=f"{card.title} is already {pc.name}'s: "
+                                    f"{jobs_mod.facts_line(self, card)}",
+                               because=intent.because)
+            jobs_mod.put_to_player(self, card)
+            card = cards_mod.find(self.scene, card.id)
+            tell = f"{_sentence(who)} puts work to {pc.name}: {jobs_mod.facts_line(self, card)}"
+            if card.job.get("work") == "escort":
+                week = jobs_mod.week_of(self.scene, employer.ref)
+                if week is not None and "guard" in (week.job.get("choices") or ()):
+                    # The owner's answer 1, both halves: a caravan going out, OR the week's
+                    # guard work in town — offered beside it, priced the same way.
+                    week = jobs_mod.choose_work(self, week, "guard")
+                    jobs_mod.put_to_player(self, week)
+                    week = cards_mod.find(self.scene, week.id)
+                    tell += f" Or, in town: {jobs_mod.facts_line(self, week)}"
+                    jobs_mod.put_to_player(self, card)    # the caravan is the one put last
+            return Outcome(intent_id=intent.id, op="job", tell=tell, because=intent.because,
+                           effects=[{"kind": "job", "id": card.id, "state": "offered",
+                                     "employer": employer.ref,
+                                     "origin": f"job:{card.id}"}])
+        card = named or jobs_mod.last_put(self.scene, employer.ref)
+        if card is None or card.giver != employer.ref or not card.live:
+            return self._refuse(intent, f"{_sentence(who)} has put no work to {pc.name} "
+                                        f"to {'take on' if do == 'accept' else 'turn down'}.")
+        if do == "decline":
+            jobs_mod.decline(self, card)
+            return Outcome(intent_id=intent.id, op="job", because=intent.because,
+                           tell=f"{pc.name} turns down {card.title.lower()[:1] + card.title[1:]}.",
+                           effects=[{"kind": "job", "id": card.id, "state": "declined",
+                                     "origin": f"job:{card.id}"}])
+        if cards_mod.standing(card) == cards_mod.UNHEARD:
+            return self._refuse(intent, f"{card.title} has never been put to {pc.name}.")
+        card = jobs_mod.accept(self, card)
+        fx = [{"kind": "job", "id": card.id, "state": "taken", "employer": employer.ref,
+               "origin": f"job:{card.id}"}]
+        if card.job.get("work") == "escort":
+            meets = card.job.get("meets") or {}
+            master = self.scene.people.get((card.job.get("counterpart") or {}).get("master", ""))
+            tell = (f"{pc.name} signs on with {who} to guard the wagons to "
+                    f"{(card.job.get('route') or {}).get('to_name')}: be at "
+                    f"{meets.get('where')} "
+                    f"{jobs_mod.when_words(meets.get('minute', 0), self.scene.clock_minutes)}, "
+                    f"where {master.name if master else 'the caravan master'} has the "
+                    f"wagons. The pay is {card.reward}.")
+            return Outcome(intent_id=intent.id, op="job", tell=tell, effects=fx,
+                           because=intent.because)
+        # The week's work: worked now, through the `work` op's own clock and body.
+        verb = {"carry": "a carrier", "count": "a tally clerk", "guard": "a guard",
+                "labour": "a labourer"}.get(card.job.get("work"), "a hand")
+        worked = self._op_work(Intent(id=intent.id, op="work", actor=pc.ref,
+                                      params={"days": jobs_mod.WEEK_DAYS,
+                                              "trade": verb.split(" ", 1)[1],
+                                              "job": card.id},
+                                      because=intent.because), partial)
+        import dataclasses
+
+        took = f"{pc.name} takes the week's work from {who}."
+        # The outcome's record of the take-up, ahead of the work's own: a new outcome, not
+        # an edit of any actor's effect store.
+        return dataclasses.replace(worked, tell=f"{took} {worked.tell}",
+                                   effects=fx + list(worked.effects or []))
 
     def _check_move(self, intent: Intent, index: int) -> None:
         """A square is a claim about geometry, and geometry is checkable.
@@ -10424,11 +10649,16 @@ class Engine:
         from . import attitude as attitude_mod
         from . import population
 
+        from . import jobs as jobs_mod
+
         if actor.has_state("state.down.dead"):
             return False
         return bool(population.of_ref(self.scene, actor.ref)
                     or getattr(actor, "world_entity_id", None)
-                    or attitude_mod._regard_effect(actor) is not None)
+                    or attitude_mod._regard_effect(actor) is not None
+                    # A caravan's people a live job holds (rules/jobs.py): the wagons do
+                    # not cease to be because the party walked off.
+                    or jobs_mod.holds_ref(self.scene, actor.ref))
 
     def _keeper_goes(self, a, here_loc: str, waited: bool = False) -> bool:
         """Move a stall's keeper home when the counter shuts and back when it opens —
@@ -11259,6 +11489,12 @@ class Engine:
         escorts += [r for r, a in self.scene.actors.items()
                     if r not in escorts and not a.is_pc
                     and a.has_state(states.TRAVELS_WITH_YOU)]
+        # And the caravan the player is guarding, when this is its road (rules/jobs.py):
+        # its people are real, and they walk it with the party (the owner's answer 2).
+        from . import jobs as jobs_mod
+
+        escorts += [r for r in jobs_mod.coming_along(self.scene, leg.to_id)
+                    if r not in escorts]
         keeping = {pc.ref if pc is not None else "", *escorts}
         left = [a.name for ref, a in list(self.scene.actors.items())
                 if ref not in keeping and not a.is_pc]
@@ -13996,6 +14232,25 @@ class Engine:
         if who.is_down:
             return self._refuse(
                 intent, f"{who.name} is not going anywhere: they are down.")
+        # One of the caravan the player was hired to guard (rules/jobs.py): they go where
+        # the wagons go, by the job's terms, and need no talking round. Measured live
+        # 2026-10-27: "I give the word and set out with the caravan" had the plan ask each
+        # of the four to join, all four were refused as indifferent, and the beat had them
+        # "remain indifferent to your command". Nothing is granted: the journey to the
+        # job's town takes them along (`jobs.coming_along`), and nowhere else does.
+        from . import jobs as jobs_mod
+
+        bound = next((c for c in jobs_mod.live(self.scene)
+                      if c.job.get("state") == "met"
+                      and who.ref in (c.job.get("counterpart") or {}).get("people", ())),
+                     None)
+        if bound is not None:
+            return Outcome(
+                intent_id=intent.id, op="company", effects=[],
+                tell=(f"{_sentence(who.name)} goes with the wagons, and the wagons go with "
+                      f"{self.scene.pc().name if self.scene.pc() else 'you'} on the road to "
+                      f"{(bound.job.get('route') or {}).get('to_name')}."),
+                because=intent.because)
         from . import attitude as attitude_mod
 
         mood = attitude_mod.of(who)
@@ -23434,6 +23689,23 @@ class Engine:
                         f"Words the player says are a `say` (its `words`), never who is "
                         f"spoken to; asking a name, a price or a question of somebody "
                         f"here is `say` to them, or narrate_only.")
+        # A job's caravan standing here is its real people (rules/jobs.py): "the wagons" or
+        # "the caravan" is them, never somebody new. Measured live 2026-10-27: "I walk out
+        # to the road to Kalixiri to meet the wagons" had the plan introduce "the wagons",
+        # and a fifth person named the wagons stood beside the caravan's four.
+        from . import jobs as jobs_mod
+
+        group = jobs_mod.group_named(self.scene, who)
+        if group is not None and group["ref"] in self.scene.actors:
+            master = self.scene.actors[group["ref"]]
+            placeholders = list(intent.params.get("placeholders") or [])
+            return Outcome(
+                intent_id=intent.id, op="introduce",
+                effects=[{"kind": "introduce", "actors": [],
+                          "bound": {placeholders[0]: master.ref} if placeholders else {},
+                          "who": master.name, "how": "already_here"}],
+                tell=f"In the scene: {master.name} ({master.ref}), with the caravan.",
+                because=intent.because)
         n = int(intent.params.get("count", 1) or 1)
         how = intent.params.get("how") or "already_here"
         template = intent.params.get("template") or "guildhand"

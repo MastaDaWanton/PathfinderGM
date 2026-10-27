@@ -2781,12 +2781,38 @@ _JOB_DEMO_USER_2 = (
 _JOB_DEMO_ANSWER_2 = {"sentence": "2"}
 
 
-def invented_job_sentence(text: str, speaker: str, *, chat=None, model: str = "",
-                          host: str = "", provider: str = "ollama",
+# With real jobs (rules/jobs.py, 2026-10-27) a speaker who holds work is read against it: the
+# question is then the sentence that puts work OTHER than what they hold — another task,
+# place, hour, people or sum. Saying the held work, in any words, is not.
+_HELD_SYSTEM = (
+    "You read what one person in a story says to the player (\"you\"), and the work that "
+    "person really has to offer. Answer with the number of the sentence in which the "
+    "speaker puts work to the player that is NOT that work: a different task, a place, a "
+    "destination, a time, people or a sum of pay that the work they have does not say. "
+    "Saying the work they have, in any words, or only part of it, is NOT. Asking what the "
+    "player can do is NOT. Answer \"none\" when no sentence does.")
+_HELD_DEMO_USER = (
+    "The speaker: the ferry master\nThe work they have: The salt barge goes down to the "
+    "weir at dawn tomorrow, two days on the river; a guard is wanted at 6 copper a day.\n\n"
+    "1. \"The barge leaves at dawn for the weir.\"\n2. \"Six copper a day, and you'll "
+    "earn it.\"")
+_HELD_DEMO_ANSWER = {"sentence": "none"}
+_HELD_DEMO_USER_2 = (
+    "The speaker: the ferry master\nThe work they have: The salt barge goes down to the "
+    "weir at dawn tomorrow, two days on the river; a guard is wanted at 6 copper a day.\n\n"
+    "1. \"Good.\"\n2. \"You'll ride the barge down to the old fort and fight off the river "
+    "pirates there.\"")
+_HELD_DEMO_ANSWER_2 = {"sentence": "2"}
+
+
+def invented_job_sentence(text: str, speaker: str, *, held: str = "", chat=None,
+                          model: str = "", host: str = "", provider: str = "ollama",
                           api_key: str = "") -> str | None:
     """The sentence of a reply in which `speaker` puts particular work to the player, as it
-    stands; "" for none; None when the call fails. Asked only of a speaker the engine holds
-    no job from (`planned.build_plan`'s `no_job`)."""
+    stands; "" for none; None when the call fails. Asked of a speaker the engine holds no
+    job from (`planned.build_plan`'s `no_job`) — and, with `held` (the work the engine
+    holds from them, `rules.jobs.slot_facts`), of one who holds work, for work that is not
+    it."""
     from . import narration as narration_mod
 
     sentences = [" ".join(s.split()) for s in narration_mod._sentences(str(text or ""))
@@ -2798,14 +2824,24 @@ def invented_job_sentence(text: str, speaker: str, *, chat=None, model: str = ""
 
         chat = client.chat
     options = ["none"] + [str(i) for i in range(1, len(sentences) + 1)]
-    user = (f"The speaker: {' '.join(str(speaker).split())}\n\n"
+    held = " ".join(str(held or "").split())
+    user = (f"The speaker: {' '.join(str(speaker).split())}\n"
+            + (f"The work they have: {held}\n" if held else "") + "\n"
             + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
-    msgs = [{"role": "system", "content": _JOB_SYSTEM},
-            {"role": "user", "content": _JOB_DEMO_USER},
-            {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER)},
-            {"role": "user", "content": _JOB_DEMO_USER_2},
-            {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_2)},
-            {"role": "user", "content": user}]
+    if held:
+        msgs = [{"role": "system", "content": _HELD_SYSTEM},
+                {"role": "user", "content": _HELD_DEMO_USER},
+                {"role": "assistant", "content": json.dumps(_HELD_DEMO_ANSWER)},
+                {"role": "user", "content": _HELD_DEMO_USER_2},
+                {"role": "assistant", "content": json.dumps(_HELD_DEMO_ANSWER_2)},
+                {"role": "user", "content": user}]
+    else:
+        msgs = [{"role": "system", "content": _JOB_SYSTEM},
+                {"role": "user", "content": _JOB_DEMO_USER},
+                {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER)},
+                {"role": "user", "content": _JOB_DEMO_USER_2},
+                {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_2)},
+                {"role": "user", "content": user}]
     if bare_template(model):
         msgs = _raw_prompt(msgs)
     try:

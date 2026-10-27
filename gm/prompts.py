@@ -21,7 +21,7 @@ import json
 from gm import ledger as ledger_mod
 from rules import spells as _spells_mod
 from rules import states
-from rules.intents import AMOUNT_OPS, OPS as _OPS
+from rules.intents import AMOUNT_OPS, CODE_ONLY_OPS, OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
 
 # One example per shape the GM actually needs. Demonstration, not description — and the
@@ -3711,7 +3711,8 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
             "op": {"type": "string",
                    "enum": (sorted(ops) if ops else
                             list(_FIGHT_OPS) if fighting else
-                            sorted(op for op in _OPS if op not in AMOUNT_OPS))},
+                            sorted(op for op in _OPS if op not in AMOUNT_OPS
+                                   and op not in CODE_ONLY_OPS))},
             "actor": ({"type": "string", "enum": list(refs)} if refs
                       else {"type": "string"}),
             "target": ({"type": "string", "enum": list(refs)} if refs
@@ -3791,7 +3792,8 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
 # the author has decided the outcome — so every `player`-visibility op (attack, check,
 # save, forage, use_item, sell, buy, use_ability) is exactly the wrong shape for one.
 CHEAT_OPS: tuple[str, ...] = tuple(
-    op for op, (_need, _may, vis) in _OPS.items() if vis != "player")
+    op for op, (_need, _may, vis) in _OPS.items()
+    if vis != "player" and op not in CODE_ONLY_OPS)
 
 
 def _op_reference() -> str:

@@ -401,6 +401,12 @@ class GMAgent:
         took = acts_to_ops.take_ups(
             self.rows, read_ok, self.engine.scene,
             ask=interpret.confirm_take_up if interpret.ENABLED else None)
+        # And the work an employer here holds (rules/jobs.py): offered, taken, turned down
+        # or haggled over by what the player's words do (`acts_to_ops.jobs_spoken`; the
+        # owner's answers of 2026-10-27).
+        hired = acts_to_ops.jobs_spoken(
+            self.rows, read_ok, self.engine.scene,
+            ask=interpret.confirm_job if interpret.ENABLED else None)
         if read_ok is not None:
             if tended:
                 read_ok["first_aid"] = tended
@@ -412,6 +418,8 @@ class GMAgent:
                 read_ok["quarries"] = after
             if took:
                 read_ok["taken_up"] = took
+            if hired:
+                read_ok["jobs"] = hired
             read_ok["table"] = [r.record() for r in self.rows]
             if held_back:
                 read_ok["sales_held_back"] = held_back
@@ -3818,8 +3826,8 @@ class GMAgent:
         # made up on the spot (`planned._no_job_made_up`; the same report's hiring table).
         job = None
         if beat_verify.ENABLED and self.prose_model:
-            def job(speaker: str, text: str):
-                return beat_verify.invented_job_sentence(text, speaker, **route)
+            def job(speaker: str, text: str, held: str = ""):
+                return beat_verify.invented_job_sentence(text, speaker, held=held, **route)
 
         try:
             beat = planned.write(

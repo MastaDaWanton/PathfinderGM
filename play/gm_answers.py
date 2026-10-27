@@ -239,7 +239,8 @@ def _carrying(c, engine) -> list[str]:
 
 
 def _quests(c, engine) -> list[str]:
-    quests = cards_mod.quests(c.scene)
+    # Jobs too (rules/jobs.py): the Journal lists them beside the quests.
+    quests = cards_mod.tasks(c.scene)
     # What the Journal shows (`cards.quest_log`): the player's own and those put to them,
     # never a scheme's quest they have not heard of.
     live = [q for q in quests if q.live
