@@ -446,7 +446,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # narrator dresses the line rather than inventing a different one; `to` is who they
     # said it to, and is absent when they addressed the room.
     "say": (("words",), ("actor", "to", "quoted"), "hidden"),
-    "quest": (("title", "objectives"), ("actor", "giver", "reward", "about"), "player"),
+    # `quest` names a quest already put to the player (its id), to take it up; the title
+    # alone does too (`Engine._op_quest`), and the objectives are then the card's own.
+    # Both stay required: made optional on 2026-10-27, the live planner proposed a new
+    # quest with no objectives at all and the engine refused it.
+    "quest": (("title", "objectives"), ("actor", "giver", "reward", "about", "quest"),
+              "player"),
     "quest_step": (("quest", "objective"), ("actor", "note"), "player"),
     # `kind` is what the place IS when its name is its own — "the Driftwood Reach" is
     # a tavern — one of `places.KINDS`; the engine refuses a kind that makes no sense
@@ -482,9 +487,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # ground that carries it — mountain, hills, underground, a bog for bog iron.
     "prospect": ((), ("actor", "hours"), "player"),
     # Looking for tracks: 1e's Survival to find tracks against the ground's DC, and what
-    # the engine knows crossed it (rules/tracking.py). No params: the ground and the trails
-    # are the scene's, never the plan's.
-    "track": ((), ("actor",), "player"),
+    # the engine knows crossed it (rules/tracking.py). The ground and the trails are the
+    # scene's, never the plan's. `quarry` (the player's words for what they are after) and
+    # `follow` (walk where the trail leads) are written by the act→op table from the
+    # reading (`acts_to_ops`); the plan's own track is replaced by the table's.
+    "track": ((), ("actor", "quarry", "follow"), "player"),
     # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
     # "leatherworker:gather", content/rules/gathering.json): the one gathering door
     # forage and prospect also run through (`Engine._gather`). The same hours, the same

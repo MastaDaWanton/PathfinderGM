@@ -240,12 +240,16 @@ def _carrying(c, engine) -> list[str]:
 
 def _quests(c, engine) -> list[str]:
     quests = cards_mod.quests(c.scene)
-    live = [q for q in quests if q.live]
+    # What the Journal shows (`cards.quest_log`): the player's own and those put to them,
+    # never a scheme's quest they have not heard of.
+    live = [q for q in quests if q.live
+            and cards_mod.standing(q) in (cards_mod.OWN, cards_mod.OFFERED)]
     if not live:
         return ["QUESTS: none open."]
     out = ["QUESTS:"]
     for q in live:
-        out.append(f"  {q.title} — {q.stage}")
+        offered = cards_mod.standing(q) == cards_mod.OFFERED
+        out.append(f"  {q.title} — {'offered, not taken up' if offered else q.stage}")
         for i, o in enumerate(q.objectives):
             out.append(f"    [{'x' if o.get('done') else ' '}] {o.get('text', '')}")
     return out

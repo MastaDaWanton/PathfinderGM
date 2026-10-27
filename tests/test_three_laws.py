@@ -750,6 +750,14 @@ _READS_MECHANICS = {
         "past dead the blow went, and a tell is a sentence, not a number. Making the "
         "narrator parse that back out of English would be a second vocabulary built in "
         "the presentation layer.",
+    "gm/agent.py:_not_their_goal":
+        "feeds a cut that runs AFTER the prose: which quest a scheme's step this turn "
+        "concerns when the player has not taken it (`not_own` on the scheme outcome's "
+        "effect, a title, no number), so the free beat is read back for making it the "
+        "player's goal. Measured live 2026-10-27: 'the approach, the ground where "
+        "Glowvine grows' came back as the player 'searching the soil where the "
+        "luminescent Glowvine is known to take root'. Nothing read here reaches the "
+        "narrator; the step reaches it as its tell.",
     "gm/planned.py:arriving":
         "decides only whether a planned beat has a 'still' slot — an arrival has no "
         "situation to keep — read off the travel outcome's own biome effect, the test "

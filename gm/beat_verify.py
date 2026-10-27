@@ -1240,6 +1240,19 @@ def _roll_label(o: dict, at: int = 0) -> str:
     return str(rolls[at].get("label") or "") if len(rolls) > at else ""
 
 
+def _track_found_it(o: dict) -> bool:
+    """Whether a `track` outcome found a trail, and — when it was after somebody — theirs
+    (`Engine._op_track`'s `tracks` effect, never the tell's words)."""
+    eff = next((e for e in _effects(o) if e.get("kind") == "tracks"), None)
+    if eff is None or not eff.get("found"):
+        return False
+    quarry = eff.get("quarry")
+    if not quarry:
+        return True
+    held = quarry.get("held") or {}
+    return bool(held) and any(t.get("ref") == held.get("ref") for t in eff["found"])
+
+
 def attempts_of(facts: Facts) -> list[Attempt]:
     """Every check and save this turn settled, with its verdict: the engine's side of the
     attempts question. Built from the outcome records only — the op, the stamped `actor`,
@@ -1253,6 +1266,16 @@ def attempts_of(facts: Facts) -> list[Attempt]:
             continue
         who = str(o.get("actor") or "")
         if not who or facts.person(who) is None:
+            continue
+        if o.get("op") == "track" and verdict == "success" and not _track_found_it(o):
+            # A track's roll that beat the ground and found nothing — or nothing of what
+            # was sought — is a success at the CHECK and nothing found on the page; "the
+            # attempt works" says the opposite. Measured live 2026-10-27: the tell said
+            # "no trail of the caravan crosses this ground", the beat said "you find no
+            # tracks of the caravan", and this question repaired it into "you find the
+            # tracks of the caravan". The tell is the record of what was found. A FAILED
+            # roll is still asked: told as "a clear, recent path", it is the contradiction
+            # the gold beat `ho-att-tracks-found` holds.
             continue
         label = _roll_label(o) or f"{str(o.get('op')).replace('_', ' ')} attempt"
         aid = next((e for e in _effects(o) if e.get("kind") == "aid"), None)
@@ -2643,6 +2666,159 @@ def ask(sentence: str, q: str, *, before: str = "", chat=None, model: str = "",
         return str((reply.json() or {}).get("answer") or "") == "yes"
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
+
+
+# --- whose matter: a quest framed as the player's own goal ------------------------------------
+#
+# The owner's report of 2026-10-27 (0.2.21, Planned narration): tracking a caravan, the beat
+# said "You keep the goal of finding Tanna Ashbourne's lost Coldwood in mind as you scout the
+# approach" — a quest the player had never heard of, let alone taken on. What a sentence
+# MEANS is the model's to read (the owner's direction: models read, code validates); which
+# matters are the player's is the engine's (`cards.standing`). So the question is asked
+# only of a matter the engine holds as not theirs, and answered by the number of a sentence
+# of the narration (speech blanked: a giver asking "will you find it?" is the ask, not the
+# player's goal), from a closed list the code supplies. A sentence number that is not on
+# the list cannot be answered: the sampler is held to the enum.
+_GOAL_SYSTEM = (
+    "You read a short passage of a story told to a player; \"you\" is the player's "
+    "character. One matter is named. Answer with the number of the sentence that presents "
+    "that matter as the player's OWN goal: something \"you\" are after, searching for, "
+    "working on, keeping in mind, have agreed to, or set out to do. A sentence that only "
+    "shows somebody else at it, somebody speaking of it, a sign of it in the place, or the "
+    "matter simply existing does NOT. Answer \"none\" when no sentence does.")
+_GOAL_DEMO_USER = (
+    "The matter: Recover the miller's stolen ledger\n\n"
+    "1. The miller paces by the sluice, muttering to his boy about the ledger somebody "
+    "took.\n2. You walk on along the towpath.")
+_GOAL_DEMO_ANSWER = {"sentence": "none"}
+_GOAL_DEMO_USER_2 = (
+    "The matter: Recover the miller's stolen ledger\n\n"
+    "1. Reeds hiss along the towpath.\n2. The stolen ledger stays on your mind as you "
+    "search the bank for any sign of it.")
+_GOAL_DEMO_ANSWER_2 = {"sentence": "2"}
+
+
+def narration_sentences(text: str) -> list[tuple[str, str]]:
+    """(the sentence as it stands on the page, its narration with speech blanked) for
+    every sentence that has any narration in it — the spans `narration._cut_sentences`
+    finds again, so a sentence answered here can be cut there."""
+    from . import narration as narration_mod
+
+    text = str(text or "")
+    blank = speech.blanked(text)
+    out = []
+    for m in narration_mod._SENTENCE.finditer(blank):
+        said = " ".join(m.group(0).split())
+        if not re.search(r"[A-Za-z]{2,}", said):
+            continue
+        out.append((" ".join(text[m.start():m.end()].split()), said))
+    return out
+
+
+def own_goal_sentence(text: str, matter: str, *, chat=None, model: str = "",
+                      host: str = "", provider: str = "ollama",
+                      api_key: str = "") -> str | None:
+    """The sentence of `text` that presents `matter` as the player's own goal, as it
+    stands on the page; "" when none does; None when the call fails (unanswered: the
+    caller leaves the passage as it is and says so)."""
+    sentences = narration_sentences(text)
+    if not sentences or not str(matter or "").strip():
+        return ""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    options = ["none"] + [str(i) for i in range(1, len(sentences) + 1)]
+    user = (f"The matter: {' '.join(str(matter).split())}\n\n"
+            + "\n".join(f"{i}. {said}" for i, (_page, said) in enumerate(sentences, 1)))
+    msgs = [{"role": "system", "content": _GOAL_SYSTEM},
+            {"role": "user", "content": _GOAL_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_GOAL_DEMO_ANSWER)},
+            {"role": "user", "content": _GOAL_DEMO_USER_2},
+            {"role": "assistant", "content": json.dumps(_GOAL_DEMO_ANSWER_2)},
+            {"role": "user", "content": user}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=20, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"sentence": {
+                         "type": "string", "enum": options}}, "required": ["sentence"]})
+        said = str((reply.json() or {}).get("sentence") or "")
+    except Exception:  # noqa: BLE001 — unanswered: the passage stands, logged by the caller
+        return None
+    if said not in options:
+        return None
+    return "" if said == "none" else sentences[int(said) - 1][0]
+
+
+# --- a job nobody holds: the reply that makes up work ------------------------------------------
+#
+# The same report, the start of it: at a hiring table the opening's own line was "Hands wanted
+# for the week, fed and paid at the end of it", and over five planned replies the guild clerk
+# made up the rest — "escort a shipment of supplies to the outpost and ensure no bandits
+# interfere", paperwork tomorrow, documents signed, the caravan "moved toward the outskirts".
+# The engine held no job, no caravan and no place for it, so the player tracked a caravan that
+# never was. Whether a reply puts particular work to the player is a reading; whether the
+# engine holds that work is the engine's (`planned.build_plan` marks a speaker who holds
+# none). Speech is what is read here — the reply IS speech.
+_JOB_SYSTEM = (
+    "You read what one person in a story says to the player (\"you\"). Answer with the "
+    "number of the sentence in which the speaker puts a PARTICULAR piece of work to the "
+    "player: what the job is (escorting, carrying, guarding, delivering, fetching or the "
+    "like, named), who or what it is for, where it is done or goes, when it starts, papers "
+    "to sign for it, or a sum of pay. Saying only that work or hands are wanted, asking "
+    "what the player can do, or taking their name is NOT. A price for goods or a room is "
+    "NOT. Answer \"none\" when no sentence does.")
+_JOB_DEMO_USER = (
+    "The speaker: the ferry master\n\n"
+    "1. \"Hands are wanted on the crossings this month.\"\n2. \"What can you do?\"")
+_JOB_DEMO_ANSWER = {"sentence": "none"}
+_JOB_DEMO_USER_2 = (
+    "The speaker: the ferry master\n\n"
+    "1. \"Good.\"\n2. \"You'll ride the salt barge down to the weir at dawn and keep the "
+    "river rats off it.\"")
+_JOB_DEMO_ANSWER_2 = {"sentence": "2"}
+
+
+def invented_job_sentence(text: str, speaker: str, *, chat=None, model: str = "",
+                          host: str = "", provider: str = "ollama",
+                          api_key: str = "") -> str | None:
+    """The sentence of a reply in which `speaker` puts particular work to the player, as it
+    stands; "" for none; None when the call fails. Asked only of a speaker the engine holds
+    no job from (`planned.build_plan`'s `no_job`)."""
+    from . import narration as narration_mod
+
+    sentences = [" ".join(s.split()) for s in narration_mod._sentences(str(text or ""))
+                 if re.search(r"[A-Za-z]{2,}", s)]
+    if not sentences:
+        return ""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    options = ["none"] + [str(i) for i in range(1, len(sentences) + 1)]
+    user = (f"The speaker: {' '.join(str(speaker).split())}\n\n"
+            + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
+    msgs = [{"role": "system", "content": _JOB_SYSTEM},
+            {"role": "user", "content": _JOB_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER)},
+            {"role": "user", "content": _JOB_DEMO_USER_2},
+            {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_2)},
+            {"role": "user", "content": user}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=20, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"sentence": {
+                         "type": "string", "enum": options}}, "required": ["sentence"]})
+        said = str((reply.json() or {}).get("sentence") or "")
+    except Exception:  # noqa: BLE001 — unanswered: the reply stands, logged by the caller
+        return None
+    if said not in options:
+        return None
+    return "" if said == "none" else sentences[int(said) - 1]
 
 
 # --- whose pronoun: the swap's two closed questions ------------------------------------------

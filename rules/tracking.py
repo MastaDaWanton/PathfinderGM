@@ -22,9 +22,28 @@ tracks lead to where they stand. A check that succeeds against ground nobody kno
 finds that nobody has — it does not find a trail the world never laid. A check that fails
 finds no sign it can trust, which says nothing either way: the book's failure.
 
-Not built (said, not hidden): following a found trail mile by mile (the `follow` act owes no
-op yet), rain since the trail was made, a group's -1 per three creatures, and the hour's wait
-before a retry outdoors.
+**A quarry is the engine's too** (2026-10-27, the owner's report on 0.2.21): "I continue to
+track the caravan" — a caravan the narrator had invented at a hiring table and the engine never
+held — rolled Survival, found the tracks of whoever the party had seen in the fields, and the
+beat called them the caravan's; "I follow the tracks in search of the caravan" walked the
+party a quarter hour to "the fields", a walk the plan made up, and the next track went
+nowhere. Now a `track` names what it is after (`quarry`, the player's own words, kept only
+when the reader says they name the maker and not the marks — `interpret.confirm_quarry`)
+and the engine answers it from what it holds (`quarry_of`): somebody it knows, whose trail is
+found or is not, or nothing at all — "no trail of the caravan crosses this ground", said
+plainly, before any narrator can lay one. CircleMUD's `track` is the same answer in a MUD:
+the target is looked up world-wide first, and "No one is around by that name" comes back
+with no roll at all (tbaMUD src/graph.c, `do_track`).
+
+**Following** a trail found (`follow`) walks the party to where its maker is now — the
+engine's own record of them (`Actor.at`), within this settlement's ground; a trail that
+leads off to another settlement is a journey, and is said so, not walked. One Survival check
+for the whole walk, not one a mile: the CRB's per-mile check is for a trail across country,
+and every walk here is inside one settlement's ground (said, not hidden).
+
+Not built (said, not hidden): following a trail mile by mile across country, rain since the
+trail was made, a group's -1 per three creatures, and the hour's wait before a retry
+outdoors.
 """
 from __future__ import annotations
 
@@ -96,6 +115,85 @@ def trails(scene) -> list[dict]:
                      "size": str(getattr(body, "size", "medium") or "medium").lower()})
     gone.sort(key=lambda t: t["hours_ago"])
     return out + gone
+
+
+def quarry_of(scene, phrase: str, world=None) -> dict | None:
+    """{ref, name} of the one person the engine holds that `phrase` means, or None — the
+    people finder's own answer (`population.find`), never a guess: an ambiguous phrase is
+    nobody in particular, and a phrase that fits nobody the campaign has seen is nothing
+    the engine holds (the caravan the narrator invented)."""
+    from . import population
+
+    phrase = " ".join(str(phrase or "").split())
+    if not phrase or scene is None:
+        return None
+    try:
+        found = population.find(scene, phrase, log_miss=False, world=world)
+    except Exception:  # noqa: BLE001 — a phrase the finder cannot read is nobody it holds
+        return None
+    if found.scope not in (population.HERE, population.ELSEWHERE) or len(found.people) != 1:
+        return None
+    ref = str(found.people[0].get("ref") or "")
+    body = (getattr(scene, "people", {}) or {}).get(ref)
+    if not ref or body is None or body.is_pc:
+        return None
+    return {"ref": ref, "name": body.name}
+
+
+def same_ground(a: str, b: str) -> bool:
+    """Whether two place ids are of one settlement's ground (the id's head, before `~`):
+    a walk, not a journey."""
+    return bool(a and b) and str(a).split("~", 1)[0] == str(b).split("~", 1)[0]
+
+
+def after(scene, *, quarry: str, quarry_held: dict | None, found: list[dict],
+          every: list[dict], follow: bool, beat_ground: bool,
+          place_name) -> tuple[str, str]:
+    """(what the tell adds about the quarry and the following, the place id the party
+    walks to — "" for none). `found` is the trails the roll read, `every` every trail the
+    engine knows on this ground; `beat_ground` whether the roll beat the ground itself;
+    `place_name(id)` names a place.
+
+    Said plainly, every branch, because the tell is the whole of what the page may say was
+    found (law 3): a quarry nothing holds has no trail; a quarry held whose trail is not
+    here has none here; one whose trail the roll did not read is not read; and a trail
+    followed goes where its maker is now, or says why it does not."""
+    words = quarry or ""
+    if words and quarry_held is None:
+        return (f"No trail of {words} crosses this ground: nothing that has passed here is "
+                f"{words}, and there is no trail of {words} to follow.", "")
+    target = None
+    if quarry_held is not None:
+        ref = quarry_held["ref"]
+        target = next((t for t in found if t["ref"] == ref), None)
+        if target is None:
+            known_here = any(t["ref"] == ref for t in every)
+            if not known_here:
+                return (f"No trail of {quarry_held['name']} crosses this ground.", "")
+            return (f"{quarry_held['name']}'s trail is not to be read from it."
+                    + (" There is nothing to follow." if follow else ""), "")
+    elif follow:
+        away = [t for t in found if not t["here"]]
+        target = away[0] if away else None
+        if target is None:
+            return ((" There is no trail here to follow." if beat_ground else
+                     " No trail could be read to follow.").strip(), "")
+    if target is None:
+        return "", ""
+    name = target["name"]
+    if target["here"]:
+        return f"{name}'s trail ends here, where {name} stands.", ""
+    if not follow:
+        return "", ""
+    body = (getattr(scene, "people", {}) or {}).get(target["ref"])
+    there = str(getattr(body, "at", "") or "")
+    here = str(getattr(scene, "at", "") or "")
+    if not there or there == here:
+        return f"{name}'s trail turns back on itself and leads nowhere further.", ""
+    if not same_ground(there, here):
+        return (f"{name}'s trail leads off this ground toward another settlement: a "
+                f"journey, not a walk, and it is not followed now.", "")
+    return f"{name}'s trail is followed toward {place_name(there)}.", there
 
 
 def dc_of(base: int, trail: dict, light: str) -> int:

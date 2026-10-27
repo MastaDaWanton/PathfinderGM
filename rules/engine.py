@@ -4228,6 +4228,14 @@ class Engine:
                 if went is not None and went["go"] != self.scene.at:
                     queue.insert(0, {"op": "travel", "params": {"place": went["go"]},
                                      "because": "calling on them"})
+            # A trail followed (`_op_track` with `follow`): the walk to where its maker is
+            # now, next in the queue, through the one door a walk goes by.
+            if intent.op == "track":
+                went = next((e for e in (outcome.effects or [])
+                             if e.get("kind") == "tracks" and e.get("go")), None)
+                if went is not None and went["go"] != self.scene.at:
+                    queue.insert(0, {"op": "travel", "params": {"place": went["go"]},
+                                     "because": "following the trail"})
             if intent.op == "provoke":
                 hit = next((e for e in (outcome.effects or [])
                             if e.get("kind") == "provoked" and e.get("strikes")), None)
@@ -12635,20 +12643,44 @@ class Engine:
         else:
             roll = self.dice.d20(mods, label=f"{actor.name} Survival (tracks)",
                                  visibility="hidden")
-        found = [t for t in tracking.trails(self.scene)
-                 if roll.total >= tracking.dc_of(base, t, light)]
+        every = tracking.trails(self.scene)
+        found = [t for t in every if roll.total >= tracking.dc_of(base, t, light)]
+        # What the player is after, and whether they mean to follow it (the act→op table,
+        # `acts_to_ops`): answered from what the engine holds, said in the tell, and a
+        # trail followed walks the party to where its maker is now — the travel next in
+        # the queue (`_drive`, as a call-on's walk is). The owner's report, 2026-10-27:
+        # a caravan nobody held was tracked twice and the party walked to "the fields".
+        quarry = " ".join(str(intent.params.get("quarry") or "").split())[:80]
+        follow = bool(intent.params.get("follow"))
+        held = tracking.quarry_of(self.scene, quarry, world=self.world) if quarry else None
+
+        def place_name(pid: str) -> str:
+            from . import places as places_mod
+
+            got = places_mod.find(self.places(), pid)
+            return getattr(got, "name", "") or "where they went"
+
+        more, go = tracking.after(
+            self.scene, quarry=quarry, quarry_held=held, found=found, every=every,
+            follow=follow, beat_ground=roll.total >= dc_shown, place_name=place_name)
+        tell = tracking.said(actor.name, roll.total, base, surface, found, light)
+        effect = {"ref": actor.ref, "kind": "tracks", "ground": surface, "dc": dc_shown,
+                  "found": [{"ref": t["ref"], "name": t["name"],
+                             "hours_ago": t["hours_ago"], "here": t["here"]}
+                            for t in found],
+                  "origin": "rule:track"}
+        if quarry:
+            effect["quarry"] = {"words": quarry, "held": held}
+        if go:
+            effect["go"] = go
         return Outcome(
             intent_id=intent.id, op="track", rolls=[roll],
             dc={"value": dc_shown, "explain": f"{surface} ground"
                 + (" in poor light" if light in tracking.LIGHT_DC else "")},
             verdict="success" if roll.total >= dc_shown else "failure",
             margin=roll.total - dc_shown,
-            effects=[{"ref": actor.ref, "kind": "tracks", "ground": surface, "dc": dc_shown,
-                      "found": [{"ref": t["ref"], "name": t["name"],
-                                 "hours_ago": t["hours_ago"], "here": t["here"]}
-                                for t in found],
-                      "origin": "rule:track"}],
-            tell=tracking.said(actor.name, roll.total, base, surface, found, light),
+            effects=[effect],
+            tell=(tell + (" " + more if more else "")).strip(),
             because=intent.because)
 
     # The word for a refused excursion, by op: "No foraging happens."
@@ -13128,6 +13160,24 @@ class Engine:
         from . import cards as cards_mod
 
         title = " ".join(str(intent.params.get("title") or "").split()).rstrip(".")
+        # Taking up a quest that was put to the player (`cards.standing` OFFERED): the
+        # card a scheme opened becomes theirs, named by its id or its exact title. Until
+        # 2026-10-27 a scheme's quest was the player's from the hour it opened, and this op
+        # refused it as "already a quest on the table"; now it waits for the player.
+        wanted = str(intent.params.get("quest") or "").strip().lower()
+        live = [c for c in cards_mod.quests(self.scene) if c.live]
+        named = (next((c for c in live if wanted and c.id.lower() == wanted), None)
+                 or next((c for c in live if title and c.title.lower() == title.lower()),
+                         None))
+        if named is not None and cards_mod.standing(named) != cards_mod.OWN:
+            return self._take_up(intent, named)
+        if wanted and named is None:
+            offered = cards_mod.offered_quests(self.scene)
+            return self._refuse(
+                intent, f"No quest {wanted!r} has been put to the player. "
+                        + ("Put to them and not taken up: "
+                           + "; ".join(f"{c.title} [{c.id}]" for c in offered) + "."
+                           if offered else "Nothing has been put to them."))
         if not (4 <= len(title) <= 80):
             return self._refuse(intent, "A quest needs a title of a few words.")
         raw = intent.params.get("objectives")
@@ -13173,6 +13223,29 @@ class Engine:
             tell=f"{pc.name if pc else 'The party'} takes it on: {card.title}"
                  + (f", for {giver_name}" if giver_name else "") + ". "
                  + " ".join(f"({i + 1}) {o}" for i, o in enumerate(objectives)) + ".",
+            because=intent.because)
+
+    def _take_up(self, intent: Intent, card) -> Outcome:
+        """The player takes on a quest that was put to them (`_op_quest`). Refused for one
+        nobody has put to them: they cannot agree to what they have never heard of."""
+        from . import cards as cards_mod
+
+        if cards_mod.standing(card) == cards_mod.UNHEARD:
+            return self._refuse(intent, f"{card.title} has never been put to the player: "
+                                        f"they cannot take on what they have not heard of.")
+        card = cards_mod.take_up(self.scene, card.id)
+        pc = self.scene.pc()
+        people = {**self.scene.people, **self.scene.actors}
+        giver = people.get(card.giver)
+        giver_name = giver.name if giver is not None else ""
+        todo = [o["text"] for o in card.objectives if not o.get("done")]
+        return Outcome(
+            intent_id=intent.id, op="quest",
+            effects=[{"kind": "quest", "id": card.id, "title": card.title,
+                      "objectives": todo, "giver": card.giver, "taken_up": True}],
+            tell=f"{pc.name if pc else 'The party'} takes it on: {card.title}"
+                 + (f", for {giver_name}" if giver_name else "") + ". "
+                 + " ".join(f"({i + 1}) {o}" for i, o in enumerate(todo)) + ".",
             because=intent.because)
 
     def _op_quest_step(self, intent: Intent, partial: dict) -> Outcome:

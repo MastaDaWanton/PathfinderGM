@@ -67,6 +67,30 @@ TAG_PLAY = "situation.play"          # arose in play
 # work on it unchanged; the quest log on the table page reads it by this tag.
 TAG_QUEST = "situation.quest"
 
+# How the player stands to a quest card (`Card.known`), in the order it can only move:
+#   unheard  the engine holds it (a scheme opened it), and nothing has reached the player
+#   heard    it reached the player in passing — the giver overheard at it, a go-between's
+#            word — a rumour, not an offer
+#   offered  it was put to the player: the giver asked them, greeted them with it, or sent
+#            word asking them to come by
+#   taken    the player took it on (the `quest` op), or it was theirs from the start (a
+#            loss to get back, `rules/defeat.py`)
+# The prior art (docs/known-matters.md §2): Inform's epistemology keeps *familiar* apart
+# from anything the player has done about it; Baldur's Gate 3's journal guidelines start a
+# quest on acceptance, a document or the personal, and NOT on "a voice bark" — the
+# overheard case; Skyrim pushed overheard rumours into the journal as objectives and its
+# players modded it out ("The Choice is Yours"). So a rumour is known and is not in the
+# Journal; an offer is in the Journal and is not the player's; only taking it makes it so.
+KNOWN = ("unheard", "heard", "offered", "taken")
+# What `standing` answers, for the readers (the pull, the brief, the Journal, the slot):
+#   own        the player's own matter: a quest taken, the errand they came with
+#   offered    a quest put to the player and not taken up
+#   heard      a quest the player has heard of in passing
+#   unheard    a quest the player has never heard of
+#   situation  everything else: a town's strain, a place, a fact of the world — never a
+#              task of the player's
+OWN, OFFERED, HEARD, UNHEARD, SITUATION = "own", "offered", "heard", "unheard", "situation"
+
 _STOP = {"the", "and", "that", "with", "from", "this", "here", "there", "their", "which",
          "have", "been", "were", "your", "into", "over", "under", "than", "them", "they",
          "what", "when", "where", "about", "after", "before", "through", "while", "would",
@@ -115,6 +139,17 @@ class Card:
     # quest's own record of its target, never a model's. Written only when there is one,
     # like `approaches`, so every card from before it round-trips unchanged.
     recover: dict = field(default_factory=dict)
+    # How the player stands to a quest (`KNOWN`): "unheard", "heard", "offered", "taken". The
+    # owner's report of 2026-10-27 (0.2.21, Planned): tracking a caravan, the beat said
+    # "You keep the goal of finding Tanna Ashbourne's lost Coldwood in mind" — a quest a
+    # scheme had opened at the market (rules/schemes.py) and nobody had ever put to the
+    # player. A scheme's quest card was on the board, in the brief and in the Journal from
+    # the moment the scheme opened, and every reader took a quest card to be the player's.
+    # Inform's epistemology (Eric Eve; docs/design-d-people.md §2) keeps *familiar* apart
+    # from *seen*; Ironsworn keeps a threat apart from a sworn vow. Written only when it
+    # is set, like `approaches`, so a card from before it round-trips byte-identically;
+    # an unset one is read by `standing`.
+    known: str = ""
 
     def as_dict(self) -> dict:
         out = {
@@ -133,6 +168,8 @@ class Card:
             out["approaches"] = [dict(a) for a in self.approaches]
         if self.recover:
             out["recover"] = copy.deepcopy(self.recover)
+        if self.known:
+            out["known"] = self.known
         return out
 
     @classmethod
@@ -162,6 +199,7 @@ class Card:
                         for a in d.get("approaches") or [] if isinstance(a, dict)],
             recover=(copy.deepcopy(d["recover"])
                      if isinstance(d.get("recover"), dict) else {}),
+            known=(str(d.get("known")) if str(d.get("known") or "") in KNOWN else ""),
         )
 
     def is_(self, query: str) -> bool:
@@ -171,6 +209,64 @@ class Card:
     @property
     def live(self) -> bool:
         return self.stage in ("open", "moving")
+
+
+# The approaches by which a matter reaches the player in a beat (rules/hooks.py), and
+# what each makes of it: in passing (a rumour), or put to them (an offer). `waits` puts
+# nothing in front of them.
+_IN_PASSING = frozenset({"overheard", "go_between"})
+_PUT_TO_THEM = frozenset({"asked", "greets", "sends_word"})
+_REACHED_BY = _IN_PASSING | _PUT_TO_THEM
+
+
+def _fresh_scheme(origin: str) -> bool:
+    """Whether the scheme an old card came from starts a story (`schemes._starts_fresh`)
+    rather than continuing the player's own; unknown schemes read as fresh."""
+    try:
+        from . import schemes as schemes_mod
+
+        doc = (schemes_mod.all_schemes() or {}).get(str(origin).split(":", 1)[-1])
+    except Exception:  # noqa: BLE001 — no catalogue to ask: read as somebody else's
+        return True
+    return doc is None or schemes_mod._starts_fresh(doc)
+
+
+def known_of(card: Card) -> str:
+    """"unheard", "heard", "offered" or "taken" for a quest; "" for any other card.
+
+    A quest card written before `known` existed answers from what it carries: one a
+    scheme opened is offered once an approach put it to the player, heard once one reached
+    them in passing, and unheard until then; any other quest (the `quest` op, a loss to
+    get back, a test's) was taken when it was opened, which is what `open_quest` meant
+    until 2026-10-27."""
+    if card.kind != "quest":
+        return ""
+    if card.known in KNOWN:
+        return card.known
+    if str(card.origin or "").startswith("scheme:") and _fresh_scheme(card.origin):
+        used = {str(a.get("approach") or "") for a in card.approaches or ()}
+        return ("offered" if used & _PUT_TO_THEM else
+                "heard" if used & _IN_PASSING else "unheard")
+    return "taken"
+
+
+def standing(card: Card) -> str:
+    """How this matter stands to the player: `OWN`, `OFFERED`, `HEARD`, `UNHEARD` or
+    `SITUATION`.
+
+    The one reader the pull, the brief, the Journal and the planned slot share, so they
+    can never disagree about whose a matter is. An errand is the player's own — it is
+    what they came for. A quest is theirs only once taken."""
+    if card.kind == "quest":
+        return {"taken": OWN, "offered": OFFERED, "heard": HEARD}.get(known_of(card),
+                                                                      UNHEARD)
+    if card.is_(TAG_ERRAND):
+        return OWN
+    return SITUATION
+
+
+def is_own(card: Card) -> bool:
+    return standing(card) == OWN
 
 
 # --- keys ----------------------------------------------------------------------------------
@@ -365,7 +461,9 @@ def active(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fal
     within the last few turns so a beat can refer to what just ended. Secret cards
     only when asked for — the plan may know them; the prose may not.
     """
-    cards = [c for c in load(scene) if secret or not c.secret]
+    # Nor, for the prose, a quest nobody has put to the player (`brief`).
+    cards = [c for c in load(scene)
+             if secret or not (c.secret or standing(c) == UNHEARD)]
     here = str(getattr(scene, "at", "") or "")
     window = " ".join((recent or [])[-SCAN_BEATS:])
     scored: list[tuple[tuple, Card]] = []
@@ -401,6 +499,13 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
     lines = ["SITUATIONS (kept by the engine; facts, not suggestions — keep them true, "
              "and let the player move them):"]
     for c in shown:
+        # A quest nobody has put to the player is the GM's alone, like a secret card:
+        # the prose never sees it, and the plan sees it marked. Until 2026-10-27 it was a
+        # "QUEST:" on every brief from the hour its scheme opened, and the beat called it
+        # the player's goal (the owner's report).
+        stands = standing(c)
+        if stands == UNHEARD and not secret:
+            continue
         # Named from the store: a person elsewhere is still a name, not a bare ref
         # the prose then copies ("with c3").
         who = ", ".join(
@@ -417,12 +522,21 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
         if c.secret:
             head += " [the GM's alone; the player does not know this]"
         if c.kind == "quest":
-            head = head.replace("  * ", "  * QUEST: ", 1)
+            label = {OWN: "QUEST: ",
+                     OFFERED: "OFFERED, NOT TAKEN UP (put to the player; it is not theirs "
+                              "until they agree to it): ",
+                     HEARD: "HEARD OF IN PASSING, NOT TAKEN UP (a rumour the player knows; "
+                            "nobody has asked it of them, and it is not theirs): ",
+                     UNHEARD: "NOT YET PUT TO THE PLAYER (the GM's alone; the player has "
+                              "never heard of it, and it is nobody's goal of theirs): "}[stands]
+            head = head.replace("  * ", "  * " + label, 1)
         lines.append(head + ".")
         if c.kind == "quest":
-            # Objectives first — what to do next — then the facts, what has happened.
+            # Objectives first — what to do next — then the facts, what has happened. A
+            # quest not taken is what its giver wants done, not the player's to-do list.
+            whose = "objective" if stands == OWN else "what they want done"
             for i, o in enumerate(c.objectives):
-                lines.append(f"      [{'x' if o.get('done') else ' '}] objective {i + 1}: "
+                lines.append(f"      [{'x' if o.get('done') else ' '}] {whose} {i + 1}: "
                              f"{o.get('text', '')}")
             if c.reward:
                 lines.append(f"      promised: {c.reward}")
@@ -449,8 +563,13 @@ def quests(scene) -> list[Card]:
 
 def open_quest(scene, *, title: str, objectives, giver: str = "", reward: str = "",
                facts=(), people=(), place: str = "", origin: str = "gm",
-               turn: int = 0) -> Card:
-    """A task taken up: a card of kind quest. The id is minted from the title."""
+               turn: int = 0, known: str = "taken") -> Card:
+    """A task: a card of kind quest. The id is minted from the title.
+
+    `known` is how the player stands to it (`KNOWN`): "taken" for a task the party took
+    on (the `quest` op) or that was theirs from the start, "unheard" for one the world
+    opened behind the player's back (a scheme's), which only a beat can make heard
+    (`note_heard`) and only the player can take up (`take_up`)."""
     n = sum(1 for c in load(scene) if c.kind == "quest") + 1
     cid = f"quest-{n}-{_slug(title)[:24]}"
     obj = [{"text": " ".join(str(o).split()), "done": False} for o in objectives
@@ -461,8 +580,52 @@ def open_quest(scene, *, title: str, objectives, giver: str = "", reward: str = 
         tags=(TAG_QUEST, TAG_PLAY), people=[p for p in people if p], place=place,
         clock_max=max(1, len(obj)), origin=origin, always_on=True,
         kind="quest", objectives=obj, giver=giver, reward=str(reward or ""),
+        known=known if known in KNOWN else "taken",
     )
     return open_card(scene, card, turn=turn)
+
+
+def offered_quests(scene) -> list[Card]:
+    """The live quests the player knows of and has not taken up — offered to them, or
+    heard of in passing: what `take_up` may take."""
+    return [c for c in quests(scene) if c.live and standing(c) in (OFFERED, HEARD)]
+
+
+def take_up(scene, card_id: str, turn: int = 0) -> Card | None:
+    """The player takes on a quest they know of: it becomes theirs. Returns the card, or
+    None when there is no such live quest. Refusing one the player never heard of is the
+    caller's (`Engine._op_quest`), which names why."""
+    card = find(scene, card_id)
+    if card is None or card.kind != "quest" or not card.live:
+        return None
+    card.known = "taken"
+    card.touched = int(turn) or card.touched
+    _store(scene, card)
+    return card
+
+
+def note_heard(scene, pull: dict | None, carried, turn: int = 0) -> str:
+    """The write-back for `known`: the pull's quest reached the player this beat — heard,
+    when it came in passing (overheard, a go-between's word), offered when it was put to
+    them (asked, greeted with it, word sent). Returns the card's id when it changed.
+
+    Only when the pull reached FOR the player (an approach other than `waits`) and the
+    beat carried the card (`note_mentions`' own test, its titles in `carried`): a pull the
+    budget dropped, or a beat that wrote past it, told the player nothing. Never moves a
+    card back: an offer is not unmade by a later rumour, nor a taken quest by either."""
+    how = str((pull or {}).get("approach") or "")
+    if how not in _REACHED_BY:
+        return ""
+    card = find(scene, str(pull.get("id") or ""))
+    if card is None or card.kind != "quest" or card.title not in set(carried or ()):
+        return ""
+    now = known_of(card)
+    becomes = "offered" if how in _PUT_TO_THEM else "heard"
+    if KNOWN.index(becomes) <= KNOWN.index(now):
+        return ""
+    card.known = becomes
+    _store(scene, card)
+    return card.id
 
 
 def objective_done(scene, card_id: str, index: int, note: str = "", turn: int = 0) -> Card | None:
@@ -502,9 +665,14 @@ def quest_log(scene) -> dict:
         return {"id": c.id, "title": c.title, "stage": c.stage, "giver": giver,
                 "reward": c.reward, "objectives": [dict(o) for o in c.objectives],
                 "facts": list(c.facts), "done": sum(1 for o in c.objectives if o.get("done")),
-                "of": len(c.objectives)}
+                "of": len(c.objectives), "standing": standing(c)}
 
-    qs = quests(scene)
+    # A quest the player has never heard of is not in their Journal (the owner's report,
+    # 2026-10-27: "not a request that i ever took or heard"), nor one they only overheard:
+    # BG3's journal guidelines start a quest on acceptance, a document or the personal and
+    # never on "a voice bark", and Skyrim's players modded out the rumours its journal
+    # took as objectives. One put to them is, marked `offered`, until they take it up.
+    qs = [c for c in quests(scene) if standing(c) in (OWN, OFFERED)]
     return {"active": [row(c) for c in qs if c.live],
             "finished": [row(c) for c in qs if not c.live]}
 
@@ -648,7 +816,7 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
     QUIET_TURNS and another past URGENT_TURNS.
 
     Which cards may be candidates at all is the correction the first run taught. The
-    player's OWN matters — a quest, the errand they came with, a situation that arose in
+    player's OWN matters — a quest they took on, the errand they came with, a situation that arose in
     play, or any card whose person is standing here — qualify on any criterion but
     time. The world's ambient cards — a town's strain, a guild's description — qualify
     only when spoken of or recently in the prose: they are the brief's business already,
@@ -682,7 +850,10 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("spoken")
         if _identity_hits(ident, window) >= 2 or _names_in(names, window):
             why.append("recent")
-        if c.kind == "quest" and any(not o.get("done") for o in c.objectives):
+        # An open objective presses only on a quest the player took on: a scheme's quest
+        # nobody has put to them has objectives too, and "open" alone had it pulled in an
+        # empty field (the owner's report, 2026-10-27).
+        if c.kind == "quest" and is_own(c) and any(not o.get("done") for o in c.objectives):
             why.append("open")
         since = int(turn) - int(c.mentioned or c.touched or 0)
         # A card whose person is standing here goes quiet in two turns, not twelve:
@@ -692,7 +863,9 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("quiet")
         if since >= URGENT_TURNS:
             why.append("urgent")
-        own = (c.kind == "quest" or c.is_(TAG_ERRAND) or c.is_(TAG_PLAY) or present)
+        # A quest is the player's own only once taken (`standing`); every quest card also
+        # carries TAG_PLAY, so the tag alone made a scheme's unheard quest "own".
+        own = (is_own(c) or (c.kind != "quest" and c.is_(TAG_PLAY)) or present)
         if own:
             qualifies = bool(set(why) - {"quiet", "urgent"})
         else:
@@ -729,26 +902,93 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
     """
     ranked = salience(scene, recent=recent, player_text=player_text, tells=tells,
                       turn=turn)
-    if not ranked:
-        return None
-    _score, why, c = ranked[0]
+    # The best-scoring matter that can reach the player here. One that is not theirs and
+    # has nobody here to carry it is passed over for the next (`_pull_one`).
+    for _score, why, c in ranked:
+        got = _pull_one(scene, c, why, player_text=player_text, turn=turn, world=world)
+        if got is not None:
+            return got
+    return None
+
+
+# The approaches that need the matter's own person standing here to carry it.
+_GIVER_CARRIES = frozenset({"overheard", "greets", "asked"})
+
+
+def _carrier(scene, giver_ref: str):
+    """Who can mention somebody else's matter in passing (the `go_between` approach): a
+    person standing here who is not the matter's own and did not come with the party —
+    somebody of this place, who would have heard. None when nobody is: the field the
+    owner tracked a caravan across (2026-10-27) held nobody, and the beat put the matter
+    in the player's head instead.
+
+    Not "somebody the player is talking with": `hooks.scene_state` makes a player in
+    conversation with anybody else BUSY, and the pull yields, so that carrier could never
+    exist (measured by this lane's first test). Not a companion: what a scheme did at the
+    market is not something the party's own people know."""
+    came = set(getattr(scene, "came_along", ()) or ())
+    for a in (getattr(scene, "actors", {}) or {}).values():
+        if a.is_pc or a.ref == giver_ref or a.ref in came or not str(a.name or "").strip():
+            continue
+        if a.has_state("state.hidden") or a.has_state("state.down"):
+            continue
+        return a
+    return None
+
+
+def _head(c: Card, why, fact: str, stands: str, giver_name: str = "") -> str:
+    """The free narrator's line for the matter, by whose it is (`standing`)."""
+    quiet = " It has not come up for a while." if "quiet" in why else ""
+    if stands == OWN:
+        return ("STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to let "
+                f"show where it fits, never to resolve for the player): {c.title}"
+                + (f" — {fact}" if fact else "") + "." + quiet)
+    if stands == SITUATION:
+        return ("STILL OPEN, NEAREST TO HAND (a matter of the world here, not a task of the "
+                "player's — let it show where it fits as something seen or heard, never as "
+                f"the player's goal, and never resolve it): {c.title}"
+                + (f" — {fact}" if fact else "") + "." + quiet)
+    # Somebody else's, put to the player or not: their trouble, never the player's goal.
+    # No objective: an objective is the player's to-do list, and "Search the approach for
+    # the Coldwood" in front of the narrator came back as the player searching for it.
+    whose = f"{giver_name}'s" if giver_name else "somebody else's"
+    never = {UNHEARD: "the player has never heard of it",
+             HEARD: "the player has only heard of it in passing and has not taken it on"
+             }.get(stands, "it was put to the player and they have not taken it on")
+    return (f"STILL OPEN, NEAREST TO HAND — {whose} matter, NOT the player's ({never}: "
+            "never write it as the player's goal or errand, or as something they keep in "
+            f"mind or set out to do): {c.title}.")
+
+
+def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dict | None:
+    """The pull for one card, or None when it cannot reach the player here.
+
+    A matter that is not the player's own reaches them only through somebody: its own
+    person, here, for `overheard`, `greets` and `asked`; a person the player is talking
+    with, for `go_between`; a runner, inside a settlement, for `sends_word`. With nobody
+    to carry it there is no pull at all — measured on the owner's 0.2.21 save, rows 90
+    and 137: the pull fired `go_between` in an empty field, the beat had nobody to put
+    the word in the mouth of, and the planned slot put the matter in the player's head
+    ("You keep the goal of finding Tanna Ashbourne's lost Coldwood in mind")."""
     names = _card_names(c, scene)
+    stands = standing(c)
     open_objective = next((str(o.get("text", "")) for o in c.objectives
                            if not o.get("done")), "")
     fact = open_objective or (c.facts[-1] if c.facts else "")
+    if stands in (OFFERED, HEARD, UNHEARD):
+        fact = ""
     since = int(turn) - int(c.mentioned or c.touched or 0)
-    head = ("STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to let "
-            f"show where it fits, never to resolve for the player): {c.title}"
-            + (f" — {fact}" if fact else "") + "."
-            + (" It has not come up for a while." if "quiet" in why else ""))
     out = {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
            "keys": identity_keys(c, names), "people": names, "since": since,
-           "urgent": "urgent" in why, "why": why, "text": head}
+           "urgent": "urgent" in why and stands == OWN, "why": why, "standing": stands,
+           "text": _head(c, why, fact, stands)}
     from . import hooks
     from . import residency
 
-    if hooks.giver_of(scene, c) is None:
-        return out
+    mine = stands in (OWN, SITUATION)
+    giver = hooks.giver_of(scene, c)
+    if giver is None:
+        return out if mine else None
     # The player's words, as the interpreter read them this turn — a cache lookup, the
     # reading already made for the plan (gm/interpret.py). Imported here: rules reads gm
     # only inside a function (the precedent is `Engine`'s own reading of it).
@@ -763,19 +1003,40 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
     if state == hooks.ELSEWHERE and not ing["hook"]:
         # A situation whose person is not here, and who wants nothing of the player:
         # nobody to send word or to mention them. The matter alone, as it always was.
-        return out
+        return out if mine else None
     how = hooks.approach(ing["to_player"]["relationship"], state, c, turn=turn,
                          rest=REST_TURNS)
     if not how:
-        return out
+        return out if mine else None
+    here = getattr(scene, "actors", {}) or {}
+    giver_here = giver.ref in here and not giver.has_state("state.hidden")
+    carrier = None
+    if how in _GIVER_CARRIES and not giver_here and not mine:
+        # "asked" when the player went looking for the giver by name and they are not
+        # here: nobody stands here to answer.
+        return None
+    if how == "go_between":
+        carrier = _carrier(scene, giver.ref)
+        if carrier is None and not mine:
+            return None
+    if how == "sends_word" and not mine:
+        from . import places as places_mod
+
+        if places_mod.setting_of(str(getattr(scene, "at", "") or "")) != "in":
+            return None     # no runner finds the player out on open ground
+    if not mine:
+        out["text"] = _head(c, why, fact, stands, ing["giver"].get("name", ""))
     first = not c.approaches and how != "waits"
     out.update({
         "approach": how, "yielded": state == hooks.BUSY,
         "giver": dict(ing["giver"]), "to_player": dict(ing["to_player"]),
         "offer": ing["offer"], "motive": ing["motive"], "doing": ing["doing"],
         "withholds": ing["withholds"] if how == "asked" else "",
-        "text": hooks.render(ing, how, head=head, first=first),
+        "text": hooks.render(ing, how, head=out["text"], first=first,
+                             carrier=getattr(carrier, "name", "")),
     })
+    if carrier is not None:
+        out["carrier"] = {"ref": carrier.ref, "name": carrier.name}
     if out["yielded"]:
         # A pull that has yielded asks nothing of the beat: the urgency check
         # (`narration.review`) must not then demand the matter be carried.

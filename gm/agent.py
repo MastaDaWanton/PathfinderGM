@@ -391,6 +391,16 @@ class GMAgent:
         # And what it is struck with: the weapon the words name, or the turn says the
         # player is not carrying it (`acts_to_ops.weapons`).
         armed = acts_to_ops.weapons(self.rows, read_ok, self.engine.scene)
+        # What a track is after, from the engine's people or one question of the reader
+        # (`acts_to_ops.quarries`; the owner's report, 2026-10-27: a caravan nothing held).
+        after = acts_to_ops.quarries(
+            self.rows, read_ok, self.engine.scene, world=self.engine.world,
+            ask=interpret.confirm_quarry if interpret.ENABLED else None)
+        # And a quest the player knows of, taken up when their words to its giver agree
+        # to it (`acts_to_ops.take_ups`; the planner proposed nothing live, 2026-10-27).
+        took = acts_to_ops.take_ups(
+            self.rows, read_ok, self.engine.scene,
+            ask=interpret.confirm_take_up if interpret.ENABLED else None)
         if read_ok is not None:
             if tended:
                 read_ok["first_aid"] = tended
@@ -398,6 +408,10 @@ class GMAgent:
                 read_ok["struck"] = struck
             if armed:
                 read_ok["armed"] = armed
+            if after:
+                read_ok["quarries"] = after
+            if took:
+                read_ok["taken_up"] = took
             read_ok["table"] = [r.record() for r in self.rows]
             if held_back:
                 read_ok["sales_held_back"] = held_back
@@ -2879,6 +2893,48 @@ class GMAgent:
     _CUT_WHEN_UNREPAIRED = frozenset({"contradicts-the-engine", "stands-elsewhere",
                                       "invented-companion"})
 
+    # Whose a matter is, as `cards.standing` says it, when it is not the player's.
+    _NOT_THEIRS = frozenset({"offered", "heard", "unheard", "situation"})
+
+    def _not_their_goal(self, text: str, pull: dict | None,
+                        outcomes=()) -> tuple[str, str]:
+        """(text, note). A free beat that makes somebody else's matter the player's own
+        goal — the pull's, when the engine holds it as not theirs (`cards.standing`), or a
+        quest a scheme's step this turn concerns (`not_own` on its outcome) — loses the
+        sentence that does: read back by `beat_verify.own_goal_sentence`, cut in code. The
+        free narrator is told the same thing the planned slot is ("NOT the player's"), and
+        an instruction alone is what CLAUDE.md says does not hold. Off with the read back
+        (the suite); a beat that is nothing but that sentence is left, and said."""
+        from . import beat_verify
+
+        if not text or not (beat_verify.ENABLED and self.prose_model):
+            return text, ""
+        matters = []
+        if pull and not pull.get("yielded") \
+                and str(pull.get("standing") or "") in self._NOT_THEIRS:
+            matters.append(str(pull.get("title") or ""))
+        matters += [str(e["not_own"]) for o in outcomes or ()
+                    for e in (getattr(o, "effects", None) or [])
+                    if isinstance(e, dict) and e.get("not_own")]
+        notes = []
+        for matter in dict.fromkeys(m for m in matters if m):
+            said = beat_verify.own_goal_sentence(
+                text, matter, model=self.prose_model, host=self.prose_host,
+                provider=self.prose_provider, api_key=self.prose_key)
+            if said is None:
+                notes.append(f"whose matter the beat makes {matter!r}: not answered, left")
+                continue
+            if not said:
+                continue
+            cut = narration_mod._cut_sentences(text, [said])
+            if cut == text or not narration_mod._sentences(narration_mod.unquoted(cut)):
+                notes.append(f"the beat made {matter!r} the player's goal and nothing else "
+                             f"in it could stand: left {said[:80]!r}")
+                continue
+            text = cut.strip()
+            notes.append(f"the beat made {matter!r} the player's goal: cut {said[:80]!r}")
+        return text, "; ".join(notes)
+
     def _cut_untrue(self, text: str, review) -> tuple[str, list[str], list]:
         """(text, notes, findings still standing). The sentences of the review's truth
         findings (`_CUT_WHEN_UNREPAIRED`) are each put to the read back's second read
@@ -3733,21 +3789,42 @@ class GMAgent:
             return (f"The words in quotes are narration, not speech ({found[0][1]}): the "
                     f"speaker says \"I\" of themselves and never their own name or title.")
 
+        # A slot carrying somebody else's matter is read back for whether it made the
+        # matter the player's own goal (`planned._not_their_goal`; the owner's report of
+        # 2026-10-27). Off with the read back (the suite), as every read back is.
+        from . import beat_verify
+
+        goal = None
+        if beat_verify.ENABLED and self.prose_model:
+            route = {"model": self.prose_model, "host": self.prose_host,
+                     "provider": self.prose_provider, "api_key": self.prose_key}
+
+            def goal(matter: str, text: str):
+                return beat_verify.own_goal_sentence(text, matter, **route)
+
+        # And the reply of somebody who holds no work for the player, read back for work
+        # made up on the spot (`planned._no_job_made_up`; the same report's hiring table).
+        job = None
+        if beat_verify.ENABLED and self.prose_model:
+            def job(speaker: str, text: str):
+                return beat_verify.invented_job_sentence(text, speaker, **route)
+
         try:
             beat = planned.write(
                 self.engine, brief=brief, outcomes=outcomes, player_input=player_input,
+                goal=goal, job=job,
                 who=(self.prose_model, self.prose_host, self.prose_provider,
                      self.prose_key),
                 # The beat before, as the bench showed it: its last 900 characters.
                 last_beat=tagged[-1][-900:] if tagged else "",
                 last_plain=plain[-1][-900:] if plain else "",
                 since=since, scene_now=scene_now,
-                # The open matter's own fact, never `text`: that is the free narrator's
-                # rendering, whose head is an instruction (gm/planned.py, rough edge 3).
-                # A pull that yielded asks nothing of the beat.
-                pull=("" if not pull or pull.get("yielded") else
-                      str(pull.get("title") or "")
-                      + (f" — {pull['fact']}" if pull.get("fact") else "")),
+                # The open matter as the engine holds it, never `text`: that is the free
+                # narrator's rendering, whose head is an instruction (gm/planned.py, rough
+                # edge 3). The slot is built from its title, fact, whose it is and how it
+                # reaches the player (`planned.matter_slot`). A pull that yielded asks
+                # nothing of the beat.
+                pull=(None if not pull or pull.get("yielded") else dict(pull)),
                 claim=prompts.false_claim_block(claim) if claim else "",
                 lift=self._lift, check=_check,
                 # The interpreter's reading of the line (`views` sets it on the agent),
@@ -3777,7 +3854,7 @@ class GMAgent:
         # remake asks exactly that call again (`planned.remake`, rough edge 5).
         self.last_prose_slots = [
             {k: s[k] for k in ("key", "messages", "reply", "wrote", "max", "speaker",
-                               "speaker_name", "dropped") if k in s}
+                               "speaker_name", "dropped", "not_own") if k in s}
             for s in beat.slots]
         self.last_prose_model = beat.model
         self.last_suggestions = list(beat.suggestions)
@@ -3956,6 +4033,12 @@ class GMAgent:
             outcomes=list(outcomes or []))
         repairs = early + repairs
         attempts.extend(groom_attempts)
+        # Somebody else's matter made the player's goal, on a free beat (the planned one
+        # read its matter slot as it wrote it): read back, and the sentence cut.
+        if not planned:
+            text, note = self._not_their_goal(text, pull, outcomes)
+            if note:
+                repairs.append(note)
         # The backstop, after the rewrite has had its chance: an authored line chosen
         # by the death's own axes and never the same one twice running. What it adds
         # is remembered on `last_added`, so the transcript can mark it and the next
