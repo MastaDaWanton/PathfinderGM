@@ -1443,6 +1443,19 @@ def reading_of(text: str) -> dict | None:
     return _READINGS.get(_key(text))
 
 
+def _road_to(phrase, scene) -> bool:
+    """Whether the phrase names a settlement a road from here reaches — the world's own
+    legs (`journey.legs_from`, `journey.find`), never the words' meaning."""
+    from rules import journey, residency
+
+    world = residency._world(None)
+    if scene is None or world is None or not str(phrase or "").strip():
+        return False
+    legs = journey.legs_from(world, str(getattr(scene, "location_id", "") or ""))
+    want = " ".join(str(phrase).split()).lower().removeprefix("the ")
+    return any(leg.to_name.lower() == want or leg.to_id == phrase for leg in legs)
+
+
 def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
     """The ops the reading commits the turn to, where the reading grounds.
 
@@ -1475,7 +1488,15 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             aim = cast_aim(frame, scene, a)
             if aim:
                 a["aim"] = aim
-        if act == "go" and a.get("place"):
+        if act == "go" and a.get("place") and _road_to(a["place"], scene):
+            # A town the roads from here reach, named whole: the journey, whatever verb the
+            # reader filed it under. Asked before the town's own places, whose finder takes
+            # "Kalixiri" for "the road to Kalixiri". Measured live 2026-10-27: "I give the
+            # word and set out with the caravan for Kalixiri" was read `go: Kalixiri`, and
+            # the plan walked the party to the road head it already stood on ("You are
+            # already at the road to Kalixiri").
+            add("journey")
+        elif act == "go" and a.get("place"):
             p = places_mod.find(places, a["place"]) if places else None
             if p is not None and p.id != here:
                 add("travel")

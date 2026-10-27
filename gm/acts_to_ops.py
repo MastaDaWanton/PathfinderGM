@@ -347,7 +347,13 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
         elif answer == "turns it down" and offered:
             built = {"do": "decline", **({"job": named.id} if named else {})}
         elif answer == "asks for more pay" and jobs_mod.priced_offer(scene, ref) is not None:
-            if not any(i.get("op") == "check" for i in row.intents):
+            # One request a sentence. Measured live 2026-10-27: "I tell the clerk a sword
+            # like mine is worth more than a gold a day and ask for better pay" was read as a
+            # talk AND a request; the request row had built its check, this talk row built
+            # a second, and the player was handed two Diplomacy popups (the second at +5).
+            if not any(i.get("op") == "check" and i.get("target") == ref
+                       and (i.get("params") or {}).get("request") == "payment"
+                       for r in rows for i in r.intents):
                 name = (f"the {who}" if who[:1].islower()
                         and not who.lower().startswith(("the ", "a ", "an ")) else who)
                 row.intents.append({"op": "check", "actor": pc.ref, "target": ref,
