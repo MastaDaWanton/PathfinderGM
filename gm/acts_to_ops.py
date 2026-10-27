@@ -265,6 +265,107 @@ def take_ups(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[st
     return notes
 
 
+def _names_too(actor, words: str) -> bool:
+    """Whether the words' head noun is a word of this person's shown or true name — the
+    room finder's own test for a description (`scope._head_noun`, `scope._words`)."""
+    from rules import scope
+
+    noun = scope._head_noun(scope.head_phrase(words))
+    called = scope._words(f"{getattr(actor, 'name', '')} {getattr(actor, 'true_name', '')}")
+    return bool(noun) and noun in called
+
+
+# The acts a player speaks to an employer in: words said, a request, what they claim to be
+# ("I can fight" is often read as a claim), anything else.
+_JOB_ACTS = frozenset({"talk", "request", "claim", "other"})
+
+
+def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str]:
+    """What the player's words do about the work an employer here holds (rules/jobs.py),
+    built whole as the engine's `job` op — or, for a request for more pay read as talk, the
+    Diplomacy request the engine turns into the haggle (`Engine._haggle_job`).
+
+    Detected in code from the engine's state — an act done now, by words, to (or in front
+    of) a person here who is the employer of a live job — and asked one closed question
+    (`interpret.confirm_job`): what the words do, the work named from the table's own three
+    words, and which of the jobs put to the player an agreement is to, from their titles.
+    `ask` None (the suite, the reader off) does nothing. Returns a line per job op built,
+    for the turn log.
+
+    The owner's report of 2026-10-27: "I tell the clerk I can fight" at the hiring table
+    and five planned replies made up an escort nobody held; the answers of the same day
+    say the clerk offers a real escort or a week's guard work (rules/jobs.py)."""
+    from rules import cards as cards_mod
+    from rules import jobs as jobs_mod
+
+    from . import interpret
+
+    notes: list[str] = []
+    if ask is None or not frame or scene is None:
+        return notes
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return notes
+    actions = frame.get("actions") or []
+    done: set[str] = set()
+    # The one person standing here who holds work: who "the clerk" means when the words do
+    # not find a name (a world character cast as the clerk carries their own name, measured
+    # on Pangrella) and the player is dealing with nobody in particular.
+    hiring = [r for r in (getattr(scene, "actors", {}) or {}) if jobs_mod.held_by(scene, r)]
+    for row in rows:
+        a = actions[row.index] if row.index < len(actions) else {}
+        if row.act not in _JOB_ACTS or not interpret.acting(a):
+            continue
+        words = " ".join(str(a.get("target") or "").split())
+        ref = ((person(scene, words) if words else "") or addressed(scene)
+               or (hiring[0] if len(hiring) == 1 else ""))
+        if ref not in hiring and len(hiring) == 1 and words and _names_too(
+                scene.actors[hiring[0]], words):
+            # Two people the words fit as well, and one of them is hiring: measured on
+            # Pangrella's guildhall, "the clerk" was the clerk of the guild at the counter
+            # (first in the room) beside the guild clerk taking names. The room's own
+            # finder words it as a tie; the work decides it.
+            ref = hiring[0]
+        if not ref or ref in done or not jobs_mod.held_by(scene, ref):
+            continue
+        offered = [c for c in jobs_mod.held_by(scene, ref)
+                   if cards_mod.standing(c) == cards_mod.OFFERED and c.job.get("work")]
+        who = scene.actors[ref].name
+        got = ask(str(a.get("span") or ""), who, [c.title for c in offered]) or {}
+        answer = got.get("answer", "")
+        named = next((c for c in offered if c.title == got.get("job")), None)
+        built = None
+        if answer == "says what work they can do":
+            said = got.get("work") if got.get("work") in jobs_mod.SAID else ""
+            built = {"do": "offer", **({"work": said} if said else {})}
+        elif answer == "asks about the work":
+            # What the work is, what it pays, where it goes: the engine's answer, every
+            # job this employer holds put to the player as the engine holds it.
+            built = {"do": "offer"}
+        elif answer == "agrees to the job" and offered:
+            built = {"do": "accept", **({"job": named.id} if named else {})}
+        elif answer == "turns it down" and offered:
+            built = {"do": "decline", **({"job": named.id} if named else {})}
+        elif answer == "asks for more pay" and jobs_mod.priced_offer(scene, ref) is not None:
+            if not any(i.get("op") == "check" for i in row.intents):
+                name = (f"the {who}" if who[:1].islower()
+                        and not who.lower().startswith(("the ", "a ", "an ")) else who)
+                row.intents.append({"op": "check", "actor": pc.ref, "target": ref,
+                                    "params": {"skill": "diplomacy", "request": "payment"},
+                                    "because": f"the player asks {name} for better pay"})
+            notes.append(f"{who}: asked for more pay")
+            done.add(ref)
+            continue
+        if answer:
+            notes.append(f"{who}: {answer}")
+        if built is None:
+            continue
+        row.intents.append({"op": "job", "actor": pc.ref, "target": ref, "params": built,
+                            "because": f"the player, to {who}: {answer}"})
+        done.add(ref)
+    return notes
+
+
 def coin_amount(words) -> tuple[str, int] | None:
     """("gp", 10) for "ten gold", "10 gp", "three silver pieces"; None otherwise."""
     from rules import goods
@@ -1476,8 +1577,21 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # A steal the table built (`_take` in a fight) is the player's blow at that person:
     # the plan's own attack on them is the same deed, and is replaced, not rolled beside it.
     stolen_from = {str(b.get("target")) for b in built if b.get("op") == "attack"}
+    # A job the table built (`jobs_spoken`) is the turn's word on the work: the plan's own
+    # week of `work`, or a `quest` it wrote for the same job, would work it or take it twice.
+    jobbing = any(b.get("op") == "job" for b in built)
     for r in raw:
         op = _op(r)
+        if op == "job":
+            # Never the plan's (`intents.CODE_ONLY_OPS`): a job is offered and taken by the
+            # reader's answer about the player's own words.
+            if notes is not None:
+                notes.append("the plan's job dropped: only the reading's answer writes one")
+            continue
+        if jobbing and op in ("work", "quest"):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's job")
+            continue
         if op == "attack" and stolen_from and str((r or {}).get("target")) in stolen_from \
                 and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):
             if notes is not None:

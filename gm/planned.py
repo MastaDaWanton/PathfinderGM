@@ -496,7 +496,16 @@ def _holds_a_job(engine, ref: str) -> bool:
     from rules import cards as cards_mod
 
     return any(c.live and c.giver == ref and cards_mod.standing(c) != cards_mod.UNHEARD
-               for c in cards_mod.quests(engine.scene))
+               for c in cards_mod.tasks(engine.scene))
+
+
+def _jobs_held(engine, ref: str) -> str:
+    """The work this person holds for the player as the engine keeps it (rules/jobs.py) —
+    the road, the hour, the people and the pay — or "". The reply slot's facts about work
+    come from here and nowhere else (the owner's answer 3, 2026-10-27)."""
+    from rules import jobs as jobs_mod
+
+    return jobs_mod.slot_facts(engine, ref)
 
 
 def matter_slot(pull) -> dict | None:
@@ -763,16 +772,24 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                 asks = (" They also ask the player for what they want, in their own words: "
                         + matter["say"].split(" asks it of the player in one or two "
                                               "sentences of their own: ", 1)[-1])
+            # The work this speaker holds, as the engine keeps it: what they may say of any
+            # work, and all of it. Their reply is read back against it, as one who holds
+            # none is read back against nothing (`_no_job_made_up`).
+            held = _jobs_held(engine, speaker["ref"])
+            work = (f" Of work, they know exactly this and nothing more: {held} If the "
+                    "player asks about work, its pay, place or hour, they answer from it."
+                    if held else "")
             slots.append({
                 "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
                 "speaker_name": speaker["name"], **({"not_manner": used} if used else {}),
                 "say": f'{speaker["name"]} answers the player, in their own voice, as '
                        "themselves (\"I\", never their own name or title), only from what "
                        "THE SCENE says they know; if THE SCENE does not say, they do not "
-                       "know and say so." + asks,
+                       "know and say so." + work + asks,
                 **({"not_own": matter["not_own"]} if asks else {}),
                 **({"no_job": speaker["name"]}
-                   if not _holds_a_job(engine, speaker["ref"]) else {})})
+                   if not _holds_a_job(engine, speaker["ref"]) else {}),
+                **({"no_job": speaker["name"], "holds": held} if held else {})})
         else:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
@@ -1150,19 +1167,26 @@ def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: s
     outpost, paperwork and a caravan over five beats, and the player then tracked a caravan
     the engine never held (docs/known-matters.md §4)."""
     speaker = s["no_job"]
-    said = job(speaker, text)
+    held = str(s.get("holds") or "")
+    # With real jobs held (rules/jobs.py), the reply is judged against them: work that is
+    # not the engine's — another task, place, hour or sum — is made up all the same.
+    ask_job = (lambda t: job(speaker, t, held)) if held else (lambda t: job(speaker, t))
+    said = ask_job(text)
     if not said:
         if said is None:
             out.notes.append(f'the "{s["key"]}" slot: whether {speaker} made up work was '
                              f'not answered — left as written')
         return text
-    redo = (f"You wrote: {text!r}. In {said!r}, {speaker} puts particular work to the "
-            f"player, and the engine holds no work from {speaker}: no task, cargo, place, "
-            f"start, papers or pay of it exists. Write it again with {speaker} saying only "
-            f"what THE SCENE says of any work, and nothing more particular.")
+    redo = (f"You wrote: {text!r}. In {said!r}, {speaker} puts work to the player that "
+            + (f"is not the work the engine holds from {speaker}, which is exactly this: "
+               f"{held} Write it again with {speaker} saying only that of any work."
+               if held else
+               f"the engine does not hold: no task, cargo, place, start, papers or pay of "
+               f"it exists. Write it again with {speaker} saying only what THE SCENE says "
+               f"of any work, and nothing more particular."))
     text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
                          core=core, redo=redo)
-    again = job(speaker, text2) if text2 else said
+    again = ask_job(text2) if text2 else said
     out.calls[-1]["note"] = "made-up work named" + (" — still there" if again else "")
     if text2 and again == "":
         out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work — asked again, '

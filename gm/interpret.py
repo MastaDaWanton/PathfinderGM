@@ -1230,6 +1230,92 @@ def confirm_take_up(span: str, giver: str, matter: str, *,
     return got if got in TAKE_UP_ANSWERS else ""
 
 
+# --- what the player's words do about a job, asked ---------------------------------------
+#
+# The owner's report of 2026-10-27: at the hiring table ("Can you carry, count or fight?")
+# the clerk's replies made up an escort nobody held. With real jobs held (rules/jobs.py),
+# what the player's words DO about them — say what work they can do, ask about it, agree to
+# it, turn it down, ask for more pay — is a reading, asked only when the engine holds work
+# from the person spoken to (`acts_to_ops.jobs_spoken`), as one closed question: the
+# answer, the work named (the table's own three words), and which of the jobs put to them
+# an agreement is to (their titles, the engine's, as the enum). Demonstrations written for
+# this, in no world's words; none is a probed line.
+JOB_ANSWERS = ("says what work they can do", "asks about the work", "agrees to the job",
+               "turns it down", "asks for more pay", "something else")
+WORK_SAID = ("carry", "count", "fight", "not said")
+NOT_SAID = "not said"
+
+_JOB_DEMOS = [
+    ("tell the reeve I can swing an axe as well as anyone", "the reeve",
+     ["Clear the north field"], "says what work they can do", "fight", NOT_SAID),
+    ("say \"I can haul sacks all day\"", "the foreman", [],
+     "says what work they can do", "carry", NOT_SAID),
+    ("ask the foreman what the job pays and where it goes", "the foreman",
+     ["Drive cattle to the ford"], "asks about the work", NOT_SAID, NOT_SAID),
+    ("tell her I'll take the cattle drive", "the drover",
+     ["Drive cattle to the ford", "A week mending fences"], "agrees to the job", NOT_SAID,
+     "Drive cattle to the ford"),
+    ("say \"Done. Put my name down.\"", "the foreman", ["A week mending fences"],
+     "agrees to the job", NOT_SAID, "A week mending fences"),
+    ("tell him that's too little for a sword arm, I want more", "the reeve",
+     ["Clear the north field"], "asks for more pay", NOT_SAID, NOT_SAID),
+    ("tell the drover I'd rather not", "the drover", ["Drive cattle to the ford"],
+     "turns it down", NOT_SAID, "Drive cattle to the ford"),
+    ("ask the foreman where the privy is", "the foreman", ["A week mending fences"],
+     "something else", NOT_SAID, NOT_SAID),
+]
+
+
+def job_messages(span: str, employer: str, jobs) -> list[dict]:
+    system = ("In a role-playing game, somebody is hiring, and the player's character speaks "
+              "to them. Answer from the words alone: what the words do about the work — say "
+              "what work the character can do (and which: carry, count, or fight — guarding "
+              "and swordwork are fight), ask about it, agree to a job (and which of the jobs "
+              "put to them), turn it down, ask for more pay, or something else.")
+    out = [{"role": "system", "content": system}]
+    for said, who, titles, answer, work, job in _JOB_DEMOS:
+        out.append({"role": "user", "content": f"Who is hiring: {who}\nJobs put to the "
+                    f"character: {'; '.join(titles) or 'none yet'}\nThe words: {said}"})
+        out.append({"role": "assistant",
+                    "content": json.dumps({"answer": answer, "work": work, "job": job})})
+    out.append({"role": "user", "content": f"Who is hiring: {employer}\nJobs put to the "
+                f"character: {'; '.join(jobs) or 'none yet'}\nThe words: {span}"})
+    return out
+
+
+def confirm_job(span: str, employer: str, jobs=(), *,
+                model: str | None = None) -> dict:
+    """{"answer", "work", "job"} from the closed lists; {} when the call fails (nothing is
+    done about the work: the turn goes on as the plan alone would have it)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    titles = [str(t) for t in jobs or ()]
+    schema = {"type": "object", "properties": {
+        "answer": {"type": "string", "enum": list(JOB_ANSWERS)},
+        "work": {"type": "string", "enum": list(WORK_SAID)},
+        "job": {"type": "string", "enum": titles + [NOT_SAID]}},
+        "required": ["answer", "work", "job"]}
+    try:
+        reply = client.chat(job_messages(span, employer, titles), model or cfg["model"],
+                            cfg["host"], as_json=True, think=False, temperature=0.0,
+                            num_predict=60, provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = reply.json() or {}
+    except Exception:  # noqa: BLE001
+        return {}
+    answer = str(got.get("answer") or "")
+    if answer not in JOB_ANSWERS:
+        return {}
+    work = str(got.get("work") or NOT_SAID)
+    job = str(got.get("job") or NOT_SAID)
+    return {"answer": answer, "work": work if work in WORK_SAID else NOT_SAID,
+            "job": job if job in titles else NOT_SAID}
+
+
 # --- who a blow lands on, asked ---------------------------------------------------------
 #
 # The owner, 2026-10-09: "if i say I attack the closest person or i go on a rampage or i
