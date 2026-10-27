@@ -168,6 +168,21 @@ def face_people(world, location_id: str | None,
     return str(pid or ""), None
 
 
+def face_of(world, location_id: str | None, actor, *, ref: str = "",
+            own: str | None = None, people_id: str | None = None) -> str:
+    """`appearance_for` for a body somebody is about to wear — "" for one that has no people
+    (`bestiary.has_a_people`: a beast, a monstrous humanoid, a humanoid race the land
+    holds). Every door that writes `Actor.appearance` from the people's pools asks through
+    here, so the rule has one copy at the point of writing as well as at the spawn: the
+    0.2.22 escort run met a reptoid on the road wearing "of the Korvu people"."""
+    from . import bestiary
+
+    if actor is not None and not bestiary.has_a_people(actor):
+        return ""
+    return appearance_for(world, location_id, people_id=people_id,
+                          ref=ref or str(getattr(actor, "ref", "") or ""), own=own)
+
+
 def appearance_for(world, location_id: str | None, people_id: str | None = None,
                    ref: str = "", own: str | None = None) -> str:
     """What a stranger would see of a person of this people: the export's own body

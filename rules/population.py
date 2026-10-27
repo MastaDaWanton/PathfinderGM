@@ -198,8 +198,8 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
                                    words=(rec or {}).get("phrase") or phrase,
                                    template=template, own=own, redraw_face=True, rec=rec)
         if not actor.appearance and person_words.is_a_person(template):
-            actor.appearance = names_mod.appearance_for(world, scene.location_id,
-                                                        ref=actor.ref, own=own)
+            actor.appearance = names_mod.face_of(world, scene.location_id, actor,
+                                                 own=own)
     if getattr(scene, "grid", None) is not None:
         scene.place_by_zone([actor.ref])
     return actor

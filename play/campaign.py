@@ -756,8 +756,8 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     rec = population.note(scene, here.who,
                           body=names_mod.appearance_for(world, scene.location_id, own=""))
     rec["ref"] = watcher.ref
-    watcher.appearance = names_mod.appearance_for(world, scene.location_id, ref=watcher.ref,
-                                                  own=rec["life"]["face"])
+    watcher.appearance = names_mod.face_of(world, scene.location_id, watcher,
+                                           own=rec["life"]["face"])
     # And on the scene's ledger, as everybody the prose introduces is. Measured live the
     # same day: the prose's "old man" was booked and stood beside the opening's own "the
     # old man ahead of you", because the ledger — whose definiteness test decides that a

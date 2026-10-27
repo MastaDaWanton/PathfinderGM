@@ -993,7 +993,22 @@ def has_a_people(creature) -> bool:
     construction; any printed type but humanoid is not. One reader for the spawn
     (`Engine._a_person`) and for the load-time sweep (`judgement.name_the_nameless`):
     the sweep asked nothing, and measured live by lane C (2026-10-08) a wolf killed on the
-    road was named "of the Korvu people" with a Korvu body line. Animals have no people."""
+    road was named "of the Korvu people" with a Korvu body line. Animals have no people.
+
+    **A humanoid race the land holds is not the local people either** (2026-10-27). On the
+    0.2.22 escort run the road's encounter roll drew a reptoid — "humanoid (reptilian,
+    shapechanger)", Bestiary 5 — and the beat said "The reptoid is of the Korvu people:
+    weathered well past what the years alone would do …": a Korvu face on a lizard-folk
+    shapechanger. The rule read only the TYPE. What tells the two humanoids apart is the
+    block's own ground (`ground_stated`): a block whose Environment line says where it
+    lives is a race of its own, drawn out of the land by the road, the night and the forage
+    (`ontheway`, `gathering`, `openings.land_foes` ask exactly that); a block with no stated
+    ground is a role's numbers — the Game Mastery Guide's guard and bandit, a merchant
+    sailor — which a local person wears (`npcs.choose`). Counted on the imported bestiary:
+    67 of 3,747 humanoid blocks state their ground, and they are giants (21), goblinoids,
+    reptilians, derro, gnolls, an orc, a tengu … — none of them a plain human; the 1,974
+    "human" blocks and every role block state none. The world owns its own races (a people
+    of the world called Orc keeps its own face); this is about bestiary blocks only."""
     if isinstance(creature, str):
         block = raw(creature) if creature.strip() else None
     elif isinstance(creature, dict):
@@ -1003,7 +1018,7 @@ def has_a_people(creature) -> bool:
         block = doc() if callable(doc) else None
     if not block or not str(block.get("creature_type") or "").strip():
         return True
-    return body_is(block, "type.humanoid")
+    return body_is(block, "type.humanoid") and not ground_stated(block)
 
 
 # How big each of the book's nine sizes is beside a grown human, in words a narrator can

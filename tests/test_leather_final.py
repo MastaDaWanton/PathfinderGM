@@ -289,8 +289,12 @@ def test_a_beast_has_no_people():
     names the nameless asked nothing; it now asks the spawn's own reader."""
     assert bestiary.has_a_people("wolf") is False
     assert bestiary.has_a_people("guard dog") is False
-    assert bestiary.has_a_people("goblin") is True
+    # A goblin drawn from the land is a race of its own, not one of the local people: its
+    # block states its ground (`bestiary.ground_stated`). Changed 2026-10-27 with the
+    # reptoid the escort road met "of the Korvu people" (tests/test_jobs_leftovers.py).
+    assert bestiary.has_a_people("goblin") is False
     assert bestiary.has_a_people("watchman") is True
+    assert bestiary.has_a_people("bandit") is True
     from gm import judgement
 
     wolf = SimpleNamespace(is_pc=False, true_name="", name="the wolf", appearance="",

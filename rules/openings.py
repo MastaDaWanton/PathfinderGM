@@ -1098,8 +1098,8 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
         actor = instantiate(template, scene=scene, name=name, world_entity_id=eid)
         actor.true_name = name
         own = names_mod.resident_appearance(world, eid)
-        actor.appearance = own or names_mod.appearance_for(world, scene.location_id,
-                                                          ref=actor.ref or eid)
+        actor.appearance = own or names_mod.face_of(world, scene.location_id, actor,
+                                                    ref=actor.ref or eid)
         scene.arrive(actor, zone=zone, source=f"start:{doc['id']}")
         speak_for(scene, eid)
         rec = population.note(scene, label, body=actor.appearance)
@@ -1120,8 +1120,8 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
         actor = instantiate(template, scene=scene, name=label)
         rec = population.note(scene, label,
                               body=names_mod.appearance_for(world, scene.location_id, own=""))
-        actor.appearance = names_mod.appearance_for(world, scene.location_id,
-                                                    ref=actor.ref, own=rec["life"]["face"])
+        actor.appearance = names_mod.face_of(world, scene.location_id, actor,
+                                             own=rec["life"]["face"])
         # The people the face was drawn from, recorded (item 10: 8 of 8 NPCs had none).
         person_words.settle_people(scene, world, actor, words=label, template=template,
                                    own=rec["life"]["face"], take_grant=False,

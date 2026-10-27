@@ -9104,18 +9104,18 @@ def name_the_nameless(scene, world) -> list[str]:
             a.true_name = a.name
             if not a.appearance:
                 a.appearance = (names_mod.resident_appearance(world, a.world_entity_id)
-                                or names_mod.appearance_for(world, scene.location_id, ref=ref))
+                                or names_mod.face_of(world, scene.location_id, a, ref=ref))
             continue
         if not descriptor:
             a.true_name = a.name
             if not a.appearance:
-                a.appearance = names_mod.appearance_for(world, scene.location_id, ref=ref)
+                a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref)
             continue
         taken = [x.true_name for x in scene.actors.values() if getattr(x, "true_name", "")]
         taken += [x.name for x in scene.actors.values()]
         a.true_name = names_mod.true_name(world, scene.location_id, ref, taken)
         if not a.appearance:
-            a.appearance = names_mod.appearance_for(world, scene.location_id, ref=ref)
+            a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref)
         done.append(ref)
     return done
 

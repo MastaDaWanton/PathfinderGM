@@ -23840,8 +23840,8 @@ class Engine:
                     actor.true_name = names_mod.true_name(
                         self.world, self.scene.location_id, actor.ref, taken)
                     if not actor.appearance:
-                        actor.appearance = names_mod.appearance_for(
-                            self.world, self.scene.location_id, ref=actor.ref)
+                        actor.appearance = names_mod.face_of(
+                            self.world, self.scene.location_id, actor)
             made.append({"ref": actor.ref, "name": actor.name})
             # Someone who arrives mid-fight rolls in. Without this they were on the
             # board but not in the order, so they never took a turn and the fight could
