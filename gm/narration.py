@@ -287,13 +287,29 @@ def strip_turn_numbers(text: str, outcomes) -> tuple[str, list[str]]:
     speech is the speaker's ("I'll give you 5 for it"). The final guard every door's groom
     runs: a backstop or a rewrite that forgot `page_line` cannot put "for 5 damage" on the
     page. Numbers the engine did not roll this turn (a price, "the 3 men") are left."""
+    from rules import intents as intents_mod
+
     nums = turn_numbers(outcomes)
     if not nums or not re.search(r"\d", text or ""):
         return text, []
     removed: list[str] = []
+    # A sum this turn's tells state is a price or a wage, never a roll, even when a die
+    # happened to show the same number: "for 2 gold" stays on a turn whose haggle rolled a
+    # 2. One reader for both guards (`intents.sums_told`), so the money row and this strip
+    # cannot disagree about a sum (the 0.2.22 release check).
+    told = intents_mod.sums_told(outcomes)
+
+    def _sparing(blank: str) -> str:
+        if not told:
+            return blank
+        for m in intents_mod.PAGE_SUM.finditer(blank):
+            if intents_mod.sum_key(m.group(1), m.group(2)) in told:
+                blank = blank[:m.start()] + " " * (m.end() - m.start()) + blank[m.end():]
+        return blank
 
     def found(blank: str) -> tuple[list[tuple[int, int]], list[int]]:
         """(lifted spans, starts of numbers that cannot be lifted)."""
+        blank = _sparing(blank)
         spans: list[tuple[int, int]] = []
         stuck: list[int] = []
         for n, units in nums.items():
@@ -2396,8 +2412,16 @@ def _cut_sentences(text: str, flagged: list[str]) -> str:
     blank = speech.blanked(text)
     # A match carries the whitespace before it, and `_without` takes the whitespace after:
     # cutting the middle sentence of "A b. C d. E f." gave "A b.E f." (found 2026-10-17
-    # cutting the felled barkeep's sentence). The span starts at the sentence's first word.
-    spans = [(m.start() + len(m.group(0)) - len(m.group(0).lstrip()), m.end())
+    # cutting the felled barkeep's sentence). The span starts at the sentence's first word
+    # — of the TEXT, never of the blanked copy, whose speech is spaces: measured on the
+    # 0.2.22 release check, a reply "'Then choose: … two gold and one silver,' the guild
+    # clerk says curtly." flagged whole had its span start after the blanked quotation,
+    # so the cut took the attribution and left "'Then choose: … silver,'." on the page.
+    def _first_word(m) -> int:
+        raw = text[m.start():m.end()]
+        return m.start() + len(raw) - len(raw.lstrip())
+
+    spans = [(_first_word(m), m.end())
              for m in _SENTENCE.finditer(blank)
              if " ".join(m.group(0).split()) in want
              or " ".join(text[m.start():m.end()].split()) in want]

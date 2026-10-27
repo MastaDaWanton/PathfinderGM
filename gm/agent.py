@@ -3224,7 +3224,8 @@ class GMAgent:
         # came from — which is how "your blade bites into the joint" reached a live
         # transcript while the pattern for it sat in rules/intents.py, matching. Spans
         # cannot miss: the match position is in the current string by construction.
-        narration, force_cut = cut_outcome_claims(narration, restrained=restrained)
+        narration, force_cut = cut_outcome_claims(narration, restrained=restrained,
+                                                  backed=backed)
         for gone in force_cut:
             repairs.append(f"still claiming an outcome after repair: cut {gone!r}")
 
