@@ -66,6 +66,13 @@ TAG_PLAY = "situation.play"          # arose in play
 # every one is reached. Kept as a card so the watcher, the brief and the XP award all
 # work on it unchanged; the quest log on the table page reads it by this tag.
 TAG_QUEST = "situation.quest"
+# A job (rules/jobs.py, 2026-10-27): a quest card of its own kind, `job`, with an employer,
+# a closed kind of work, its counterpart (a caravan's real people), a meeting place and
+# hour, a route and engine-priced pay. Under the quest family, so every prefix question
+# asked of a quest is asked of a job too.
+TAG_JOB = "situation.quest.job"
+# The kinds of card that are tasks: a quest, and a job.
+TASKS = ("quest", "job")
 
 # How the player stands to a quest card (`Card.known`), in the order it can only move:
 #   unheard  the engine holds it (a scheme opened it), and nothing has reached the player
@@ -150,6 +157,9 @@ class Card:
     # is set, like `approaches`, so a card from before it round-trips byte-identically;
     # an unset one is read by `standing`.
     known: str = ""
+    # A job's own record (rules/jobs.py): employer, work, meets, route, counterpart, pay,
+    # terms and state. Written only when there is one, like `recover`.
+    job: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
         out = {
@@ -170,6 +180,8 @@ class Card:
             out["recover"] = copy.deepcopy(self.recover)
         if self.known:
             out["known"] = self.known
+        if self.job:
+            out["job"] = copy.deepcopy(self.job)
         return out
 
     @classmethod
@@ -200,6 +212,7 @@ class Card:
             recover=(copy.deepcopy(d["recover"])
                      if isinstance(d.get("recover"), dict) else {}),
             known=(str(d.get("known")) if str(d.get("known") or "") in KNOWN else ""),
+            job=(copy.deepcopy(d["job"]) if isinstance(d.get("job"), dict) else {}),
         )
 
     def is_(self, query: str) -> bool:
@@ -239,7 +252,7 @@ def known_of(card: Card) -> str:
     them in passing, and unheard until then; any other quest (the `quest` op, a loss to
     get back, a test's) was taken when it was opened, which is what `open_quest` meant
     until 2026-10-27."""
-    if card.kind != "quest":
+    if card.kind not in TASKS:
         return ""
     if card.known in KNOWN:
         return card.known
@@ -257,7 +270,7 @@ def standing(card: Card) -> str:
     The one reader the pull, the brief, the Journal and the planned slot share, so they
     can never disagree about whose a matter is. An errand is the player's own — it is
     what they came for. A quest is theirs only once taken."""
-    if card.kind == "quest":
+    if card.kind in TASKS:
         return {"taken": OWN, "offered": OFFERED, "heard": HEARD}.get(known_of(card),
                                                                       UNHEARD)
     if card.is_(TAG_ERRAND):
@@ -381,7 +394,7 @@ def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True) -> C
     # the moment the player had accepted it. Its giver is one of the card's people,
     # so every tell that named Drenn — two of them the engine's own "is already a
     # quest on the table" refusals — ticked a clock whose maximum was two.
-    if tick and card.kind != "quest":
+    if tick and card.kind not in TASKS:
         # An errand with a need is met by meeting it (`errand_progress`: a night in a
         # bed), never by being talked about four times. Blades' clocks track the
         # obstacle, not the method; Bethesda's objectives complete on their own stage.
@@ -521,8 +534,8 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
             head += f"; with {who}"
         if c.secret:
             head += " [the GM's alone; the player does not know this]"
-        if c.kind == "quest":
-            label = {OWN: "QUEST: ",
+        if c.kind in TASKS:
+            label = {OWN: "QUEST: " if c.kind == "quest" else "JOB, TAKEN ON: ",
                      OFFERED: "OFFERED, NOT TAKEN UP (put to the player; it is not theirs "
                               "until they agree to it): ",
                      HEARD: "HEARD OF IN PASSING, NOT TAKEN UP (a rumour the player knows; "
@@ -531,7 +544,7 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
                               "never heard of it, and it is nobody's goal of theirs): "}[stands]
             head = head.replace("  * ", "  * " + label, 1)
         lines.append(head + ".")
-        if c.kind == "quest":
+        if c.kind in TASKS:
             # Objectives first — what to do next — then the facts, what has happened. A
             # quest not taken is what its giver wants done, not the player's to-do list.
             whose = "objective" if stands == OWN else "what they want done"
@@ -559,6 +572,11 @@ def _store(scene, card: Card) -> None:
 
 def quests(scene) -> list[Card]:
     return [c for c in load(scene) if c.kind == "quest"]
+
+
+def tasks(scene) -> list[Card]:
+    """Quests and jobs: what the Journal lists."""
+    return [c for c in load(scene) if c.kind in TASKS]
 
 
 def open_quest(scene, *, title: str, objectives, giver: str = "", reward: str = "",
@@ -596,7 +614,7 @@ def take_up(scene, card_id: str, turn: int = 0) -> Card | None:
     None when there is no such live quest. Refusing one the player never heard of is the
     caller's (`Engine._op_quest`), which names why."""
     card = find(scene, card_id)
-    if card is None or card.kind != "quest" or not card.live:
+    if card is None or card.kind not in TASKS or not card.live:
         return None
     card.known = "taken"
     card.touched = int(turn) or card.touched
@@ -617,7 +635,7 @@ def note_heard(scene, pull: dict | None, carried, turn: int = 0) -> str:
     if how not in _REACHED_BY:
         return ""
     card = find(scene, str(pull.get("id") or ""))
-    if card is None or card.kind != "quest" or card.title not in set(carried or ()):
+    if card is None or card.kind not in TASKS or card.title not in set(carried or ()):
         return ""
     now = known_of(card)
     becomes = "offered" if how in _PUT_TO_THEM else "heard"
@@ -632,7 +650,7 @@ def objective_done(scene, card_id: str, index: int, note: str = "", turn: int = 
     """Tick one objective. The clock is the count done; the quest resolves when every
     objective is, and the note — what was done — lands as a fact."""
     card = find(scene, card_id)
-    if card is None or card.kind != "quest" or not card.live:
+    if card is None or card.kind not in TASKS or not card.live:
         return None
     if not (0 <= index < len(card.objectives)):
         return None
@@ -665,14 +683,15 @@ def quest_log(scene) -> dict:
         return {"id": c.id, "title": c.title, "stage": c.stage, "giver": giver,
                 "reward": c.reward, "objectives": [dict(o) for o in c.objectives],
                 "facts": list(c.facts), "done": sum(1 for o in c.objectives if o.get("done")),
-                "of": len(c.objectives), "standing": standing(c)}
+                "of": len(c.objectives), "standing": standing(c),
+                **({"kind": "job"} if c.kind == "job" else {})}
 
     # A quest the player has never heard of is not in their Journal (the owner's report,
     # 2026-10-27: "not a request that i ever took or heard"), nor one they only overheard:
     # BG3's journal guidelines start a quest on acceptance, a document or the personal and
     # never on "a voice bark", and Skyrim's players modded out the rumours its journal
     # took as objectives. One put to them is, marked `offered`, until they take it up.
-    qs = [c for c in quests(scene) if standing(c) in (OWN, OFFERED)]
+    qs = [c for c in tasks(scene) if standing(c) in (OWN, OFFERED)]
     return {"active": [row(c) for c in qs if c.live],
             "finished": [row(c) for c in qs if not c.live]}
 
@@ -853,7 +872,7 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
         # An open objective presses only on a quest the player took on: a scheme's quest
         # nobody has put to them has objectives too, and "open" alone had it pulled in an
         # empty field (the owner's report, 2026-10-27).
-        if c.kind == "quest" and is_own(c) and any(not o.get("done") for o in c.objectives):
+        if c.kind in TASKS and is_own(c) and any(not o.get("done") for o in c.objectives):
             why.append("open")
         since = int(turn) - int(c.mentioned or c.touched or 0)
         # A card whose person is standing here goes quiet in two turns, not twelve:
@@ -865,7 +884,7 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("urgent")
         # A quest is the player's own only once taken (`standing`); every quest card also
         # carries TAG_PLAY, so the tag alone made a scheme's unheard quest "own".
-        own = (is_own(c) or (c.kind != "quest" and c.is_(TAG_PLAY)) or present)
+        own = (is_own(c) or (c.kind not in TASKS and c.is_(TAG_PLAY)) or present)
         if own:
             qualifies = bool(set(why) - {"quiet", "urgent"})
         else:
