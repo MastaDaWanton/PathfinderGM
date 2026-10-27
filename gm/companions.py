@@ -244,10 +244,17 @@ def who_they_are(scene, actor) -> str:
         return animal_companion.character_words(scene, actor)
     name = actor.name
     bits = []
+    # One of a caravan the player was hired to guard (rules/jobs.py): hired hands, not
+    # friends who came along, and what each is hired for is their character's first fact.
+    from rules import jobs as jobs_mod
+
+    hired = jobs_mod.role_line(scene, actor.ref)
+    if hired:
+        bits.append(hired)
     if owned(actor):
         bits.append(f"{name} belongs to the player, who claimed them, and is devoted to "
                     f"them: told plainly, {name} does it, as literally as it was said")
-    else:
+    elif not hired:
         mood = attitude_mod.of(actor)
         bits.append(f"{name} is {mood} towards the player — a friend who came along, "
                     f"not a servant, and free to say no")

@@ -318,12 +318,13 @@ def open_escort(engine, spec: dict, employer: str, *, rng: random.Random,
     meet = meeting_minute(scene.clock_minutes)
     from . import openings
 
-    people, master = [], ""
+    people, master, roles = [], "", {}
     for row in spec.get("caravan") or ():
         for _ in range(openings.count_of(row)):
             who = _mint(engine, str(row.get("label") or "a carter"), row.get("words"),
                         head.id)
             people.append(who.ref)
+            roles[who.ref] = str(row.get("role") or "driver")
             if row.get("role") == "master" and not master:
                 master = who.ref
     master = master or (people[0] if people else "")
@@ -343,7 +344,7 @@ def open_escort(engine, spec: dict, employer: str, *, rng: random.Random,
         "route": {"from": scene.location_id, "to": leg.to_id, "to_name": leg.to_name,
                   "hours": int(hours)},
         "counterpart": {"label": _group_label(leg.to_name), "people": people,
-                        "master": master},
+                        "master": master, "roles": roles},
         "state": "open",
     }
     _price(card, pc, risk_of("escort", leg.crosses), days)
@@ -617,6 +618,85 @@ def decline(engine, card):
 
 # --- travelling with it --------------------------------------------------------------------
 
+def set_out(engine, to_id: str) -> list[str]:
+    """The player gives the word: the met caravan bound for `to_id` takes the road with
+    them. Each of its people standing here travels with the party until the wagons are in
+    (`bond.travels-with-you`, through the applicator, source `job:<id>`), and the job
+    records the minute it set out, which ends the wait at the road head (`settle`).
+
+    Why the bond and not a list of the job's own: a fight on the road is drawn by
+    `Engine._ensure_encounter`, which brings everybody who travels with the player into
+    the order on the player's side (`_companions_join`), and a companion's turn is its
+    own, decided in character (`gm/companions.py`, the owner's ruling of 2026-10-01). The
+    0.2.22 escort run met a reptoid six hours out and the caravan's four stood outside any
+    fight that came of it. Granted only on the road, never at the meeting: with the bond
+    the wagons would follow the player back across the market. Returns the refs bound."""
+    from . import cards as cards_mod
+    from . import states
+    from .activeeffect import ActiveEffect
+
+    scene = engine.scene
+    here = getattr(scene, "actors", {}) or {}
+    bound: list[str] = []
+    for c in live(scene):
+        j = c.job or {}
+        if j.get("work") != "escort" or j.get("state") != "met" \
+                or (j.get("route") or {}).get("to") != to_id:
+            continue
+        for r in (j.get("counterpart") or {}).get("people", ()):
+            a = here.get(r)
+            if a is None or a.is_down or a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            a.apply_effect(ActiveEffect(
+                name=f"on the road with {(j.get('counterpart') or {}).get('label')}",
+                kind="bond", key=f"job:{c.id}", source=f"job:{c.id}",
+                origin=f"job:{c.id}", duration="until-dismissed",
+                tags=(states.TRAVELS_WITH_YOU,)))
+            bound.append(r)
+        if not j.get("set_out"):
+            j["set_out"] = int(scene.clock_minutes)
+            cards_mod._store(scene, c)
+    return bound
+
+
+def _unbind(scene, card) -> None:
+    """The road is over for the caravan's people: the bond `set_out` gave goes."""
+    for r in ((card.job or {}).get("counterpart") or {}).get("people", ()):
+        a = (getattr(scene, "people", {}) or {}).get(r)
+        if a is not None:
+            a.remove_effects(source=f"job:{card.id}")
+
+
+def role_line(scene, ref: str) -> str:
+    """What one of a job's caravan is to the player, for their own turn (`gm/companions.
+    who_they_are`), or "" for anybody who is not. The role is the opening's own row
+    (`counterpart.roles`: master, driver, guard). Whether a teamster stands or runs is
+    theirs to decide on their turn, from this and their sheet; the engine refuses only a
+    blow at the player's side (`companions.turning_on_the_party`)."""
+    for c in jobs(scene):
+        cp = (c.job or {}).get("counterpart") or {}
+        if ref not in cp.get("people", ()) or c.job.get("state") != "met":
+            continue
+        a = (getattr(scene, "people", {}) or {}).get(ref)
+        name = getattr(a, "name", "they")
+        to = (c.job.get("route") or {}).get("to_name", "the far town")
+        role = (cp.get("roles") or {}).get(ref) or (
+            "master" if ref == cp.get("master") else
+            "guard" if "guard" in str(getattr(a, "from_template", "")) else "driver")
+        if role == "master":
+            return (f"{name} is the caravan master, who hired the player to guard the "
+                    f"wagons to {to} and pays at the end of the road; a trader, not a "
+                    f"fighter, who looks to the wagons and their own skin first")
+        if role == "guard":
+            return (f"{name} is the caravan's hired sword, paid to fight for the wagons "
+                    f"on the road to {to}, and fights for them")
+        return (f"{name} drives one of the caravan's wagons to {to} for a wage: hired to "
+                f"drive, not to fight — they defend themselves and the wagons as far as "
+                f"their nerve and their arms allow, and may run from a fight they cannot "
+                f"win")
+    return ""
+
+
 def coming_along(scene, to_id: str) -> list[str]:
     """The caravan's people standing with the party, on a job met and bound for `to_id`:
     who a journey there takes along (`Engine._op_journey`)."""
@@ -774,6 +854,7 @@ def settle(engine) -> list:
             continue
         if state == "met" and scene.location_id == route.get("to") and with_them:
             j["state"] = "paid"
+            _unbind(scene, card)
             turn = int(getattr(engine, "turn", 0))
             cards_mod._store(scene, card)
             cards_mod.objective_done(scene, card.id, 1, turn=turn)

@@ -11495,6 +11495,9 @@ class Engine:
 
         escorts += [r for r in jobs_mod.coming_along(self.scene, leg.to_id)
                     if r not in escorts]
+        # And they travel with the party from here to the far end: a fight on the road
+        # draws them in on the player's side (`jobs.set_out`).
+        jobs_mod.set_out(self, leg.to_id)
         keeping = {pc.ref if pc is not None else "", *escorts}
         left = [a.name for ref, a in list(self.scene.actors.items())
                 if ref not in keeping and not a.is_pc]
