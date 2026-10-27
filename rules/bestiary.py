@@ -1006,6 +1006,77 @@ def has_a_people(creature) -> bool:
     return body_is(block, "type.humanoid")
 
 
+# How big each of the book's nine sizes is beside a grown human, in words a narrator can
+# use and no number it could copy. From the d20 size table ("typical" height or length:
+# Medium 4-8 ft., Large 8-16 ft., Small 2-4 ft. …; d20pfsrd, "Space, Reach & Threatened
+# Area Templates" — I could not find the table in the PF1e Core Rulebook itself, which
+# prints space and reach only, so the d20 SRD's is the source).
+SIZE_BESIDE_A_MAN = {
+    "fine": "no bigger than a hand",
+    "diminutive": "about the size of a rat",
+    "tiny": "about the size of a cat",
+    "small": "about half a grown man's height",
+    "medium": "about a grown man's height — no bigger",
+    "large": "head and shoulders above a man, up to twice his height",
+    "huge": "several times a man's height",
+    "gargantuan": "as tall as a house or taller",
+    "colossal": "as tall as a tower",
+}
+
+
+def body_words(creature) -> str:
+    """What a creature that is no person IS, from its own record: its size and its kind,
+    "Medium monstrous humanoid". "" for a person (`has_a_people`): a person's body is their
+    people's and their face's (`names.appearance_for`, rules/faces.py), never a block's.
+
+    The size is the actor's own (`Actor.size`, set from the block when it was made, a
+    troop's from its footprint); the kind is the block's type in the book's own word
+    (`states.type_word`), so core.json's truncated "monstrous" (55 blocks) and "magical"
+    (107) are said as "monstrous humanoid" and "magical beast".
+
+    The owner's report, 2026-10-27 (0.2.21): "A Griol which is a medium sized creature was
+    described as large". The grioth is a Medium monstrous humanoid (Bestiary 5); the
+    excursion's scene call was told "a grioth (medium, monstrous)" and wrote "a massive
+    creature … a large, monstrous figure", and no other narrator was told its size at all.
+    Takes an Actor or a template."""
+    from . import states
+    from .tables import SIZE_ORDER
+
+    if isinstance(creature, str):
+        block = raw(creature) if creature.strip() else None
+        size = str((block or {}).get("size") or "").strip().lower()
+    else:
+        doc = getattr(creature, "_creature_doc", None)
+        block = doc() if callable(doc) else None
+        size = str(getattr(creature, "size", "") or "").strip().lower()
+    if not block or has_a_people(block):
+        return ""
+    printed = str(block.get("creature_type") or "")
+    kind = (states.type_word(printed) or "").replace("-", " ") or " ".join(printed.split())
+    size = size if size in SIZE_ORDER else ""
+    return " ".join(w for w in (size.title(), kind.lower()) if w)
+
+
+def body_said(words: str) -> str:
+    """`body_words` as a narrator is told it: "a Medium monstrous humanoid, about a grown
+    man's height — no bigger". "" for "" (a person)."""
+    words = " ".join(str(words or "").split())
+    if not words:
+        return ""
+    beside = SIZE_BESIDE_A_MAN.get(words.split()[0].lower(), "")
+    article = "an" if words[:1].lower() in "aeiou" else "a"
+    return f"{article} {words}" + (f", {beside}" if beside else "")
+
+
+def body_size(creature) -> str:
+    """The creature's size, one of the book's nine (`tables.SIZE_ORDER`), when it is no
+    person; "" otherwise. The size half of `body_words`."""
+    from .tables import SIZE_ORDER
+
+    words = body_words(creature).split()
+    return words[0].lower() if words and words[0].lower() in SIZE_ORDER else ""
+
+
 def never_harvested(creature) -> bool:
     """Whether this body is a people's, never a carcass: no part of it is ever offered.
 

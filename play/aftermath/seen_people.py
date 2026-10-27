@@ -137,6 +137,20 @@ def step(ctx) -> list[dict]:
                          "why": "a group, not one person"})
             n.where = ""
             continue
+        if n.being == beat_reader.CREATURE:
+            # A beast, an animal or a monster is nobody's people: the population is a
+            # people's records, and a body made here is a guildhand with the place's own
+            # people's face (`population.embody`). Measured on the owner's save
+            # (2026-10-27, 0.2.21): "the towering figure" — the grioth that had just given
+            # way — was made c9, "guildhand, human", with the village's Gnome face, and
+            # did daily rounds for the rest of the session. A creature comes into the scene
+            # only through the engine's own doors (`_bring_in`: an encounter, a forage, the
+            # road), from a stat block; the prose's word for one is never a stat block.
+            # The reader's closed answer decides it, never the words.
+            rows.append({"kind": "seen-people", "made": "", "phrase": n.words,
+                         "why": "a creature, not a person: creatures come in by the "
+                                "engine's doors, never the prose's"})
+            continue
         heard = population.heard_of_match(scene, n.words, turn=turn)
         if heard is not None and heard["id"] in claimed:
             heard = None

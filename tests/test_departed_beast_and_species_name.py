@@ -221,7 +221,8 @@ def test_the_readers_are_told_what_a_creature_is_not_human(town):
     clerk = instantiate("guildhand", scene=town, name="clerk")
     town.add(clerk)
     shown = {p["ref"]: p["what"] for p in mentions.people(town)}
-    assert shown[hag.ref] == "monstrous humanoid"
+    # With its size in front since 2026-10-27 (`bestiary.body_words`, the grioth report).
+    assert shown[hag.ref].endswith("monstrous humanoid") and "human," not in shown[hag.ref]
     assert "human" in shown[clerk.ref], "a person with no people keeps their race"
 
 

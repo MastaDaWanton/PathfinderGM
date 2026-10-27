@@ -938,7 +938,7 @@ def _moves_words(row: dict) -> str:
 def encounter_facts(c, enc: dict, haul: list[dict], place: str, when: str) -> dict:
     """Everything the scene call may use, from the engine and the world, and nothing
     else. Also what the floor is written from, so the two cannot disagree."""
-    from rules import bestiary, biomes, geography
+    from rules import bestiary, biomes, geography, states
 
     who = c.scene.actors.get(str(enc.get("ref") or ""))
     name = (who.name if who is not None else "") or str(enc.get("creature") or "")
@@ -960,8 +960,14 @@ def encounter_facts(c, enc: dict, haul: list[dict], place: str, when: str) -> di
     return {
         "name": name, "row": row,
         "size": str(row.get("size") or "").lower(),
+        # The type in the book's own word (`states.type_word`): core.json prints the
+        # grioth's as "monstrous", and "a grioth (medium, monstrous)" came back "a massive
+        # creature … a large, monstrous figure" (owner's report, 2026-10-27).
         "kind": " ".join(x for x in (str(row.get("subtype") or "").lower(),
-                                     str(row.get("creature_type") or "").lower()) if x),
+                                     (states.type_word(row.get("creature_type")) or "")
+                                     .replace("-", " ")
+                                     or str(row.get("creature_type") or "").lower()) if x),
+        "beside": bestiary.SIZE_BESIDE_A_MAN.get(str(row.get("size") or "").lower(), ""),
         "organization": str(row.get("organization") or "").lower(),
         "senses": _senses_words(row),
         "moves": _moves_words(row),
@@ -1011,9 +1017,14 @@ def _scene_messages(f: dict) -> list[dict]:
         lines.append(f"Already in the satchel from the hours of work: "
                      f"{', '.join(f['carried'])}.")
     lines.append(f"Where they were heading next: a {f['spot']} of the same.")
-    body = ", ".join(x for x in (f["size"], f["kind"]) if x)
+    body = " ".join(x for x in (f["size"].title(), f["kind"]) if x)
     lines.append(f"What is there: a {f['name']}" + (f" ({body})" if body else "")
                  + (f", {f['organization']}" if f["organization"] else "") + ".")
+    if f.get("beside"):
+        # Its size beside a man, as a fact (`bestiary.SIZE_BESIDE_A_MAN`): told only
+        # "medium", the scene wrote the Medium grioth "massive" and "large" (2026-10-27).
+        lines.append(f"How big it is: {f['size'].title()} — {f['beside']}. Never write "
+                     f"it bigger or smaller than that.")
     if f["senses"]:
         lines.append(f"Its senses: {f['senses']}.")
     lines.append(f"How it moves: {f['moves']}.")

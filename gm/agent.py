@@ -2084,11 +2084,17 @@ class GMAgent:
         # rest (play/aftermath), reading it as `ctx.attribution`.
         from . import beat_reader
 
+        # Who this beat's own outcomes took out of the scene (`Scene.gone_in`): the grioth
+        # that gave way was gone before its going was written, and its "towering figure"
+        # was read as a newcomer and made a Gnome (owner's report, 2026-10-27).
+        told = list(outcomes or ()) or list(getattr(ctx, "outcomes", None) or ())
         self.attribution = beat_reader.read(
             text, self.engine.scene, engine=self.engine, said=self.last_said,
             acting=acting, facts=facts,
             model=self.prose_model, host=self.prose_host,
-            provider=self.prose_provider, api_key=self.prose_key)
+            provider=self.prose_provider, api_key=self.prose_key,
+            gone=(self.engine.scene.gone_in(told)
+                  if hasattr(self.engine.scene, "gone_in") else ()))
         if self.attribution.mentions:
             self.mention_rows.append(self.attribution.as_log())
         # The narrator checks (gm/checks): here and not inside `review()`, because
