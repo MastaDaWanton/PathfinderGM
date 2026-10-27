@@ -217,9 +217,10 @@ _LITERAL_KEY_SITES = {
     # 36 since 2026-09-27: apply_nonlethal_state lifts the knockout it wrote when the
     # nonlethal heals back to exactly the hit points (staggered, awake) — the writer
     # undoing its own write, found when nonlethal first healed by the hour.
-    "rules/sheet.py": (36,"apply_hp_state, apply_nonlethal_state, bleed_out, the "
+    "rules/sheet.py": (32,"apply_hp_state, apply_nonlethal_state, bleed_out, the "
                            "ability-zero states and rest's exhausted-to-fatigued "
-                           "downgrade — the writers of the 1e ladders themselves"),
+                           "downgrade — the writers of the 1e ladders themselves; "
+                           "rest asks state.impaired.* since 2026-10-27"),
     "rules/engine.py": (11, "the dying/stable resolution, flat-footed and stunned as "
                             "combat rules, grappled as a maneuver result, and dead as "
                             "'this square holds a corpse'"),

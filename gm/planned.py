@@ -512,7 +512,13 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
                    "event: nobody moves, speaks, strikes or does anything in it, and it "
                    "does not say where the player is. In new words; never reuse a phrase "
                    "from the last thing you wrote."})
-    for i, act in enumerate(acts(outcomes)):
+    grouped = acts(outcomes)
+    # The player's own line rides the first act that came of something they did. An act of
+    # the engine's own before it — what the clock did at a bench before this turn, told
+    # first since 2026-10-27 (`Engine.run`) — is not what came of their words.
+    lead_at = next((n for n, act in enumerate(grouped)
+                    if any(str(getattr(o, "intent_id", "") or "") for o in act)), 0)
+    for i, act in enumerate(grouped):
         tells = [o.tell for o in act]
         decided = (tells[0] if len(tells) == 1 else
                    "these, which are ONE moment (show them together, once, not one "
@@ -542,7 +548,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
             # under it. Measured 2026-10-16 before this: fight beats of 120-190
             # characters, "You lunge forward and strike at the Korvu, but your blow fails
             # to connect" — true, and all there was.
-            lead = (f'The player said: "{player_input}". ' if i == 0 and not carry_on
+            lead = (f'The player said: "{player_input}". ' if i == lead_at and not carry_on
                     else "")
             say = (f"{lead}The engine decided this: {decided}\nTHE BLOW (engine facts, "
                    "in order):\n" + "\n".join(f"- {b}" for b in blows)
@@ -558,7 +564,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull: str = "",
             say = (f"The engine decided this: {decided} Show the player squaring up to "
                    "them from where they stand, and stop there: nobody moves, no blow lands "
                    "and nobody is hurt.")
-        elif i == 0 and not carry_on:
+        elif i == lead_at and not carry_on:
             say = (f'The player said: "{player_input}". The engine decided what came of '
                    f"it: {decided} {show}")
         else:

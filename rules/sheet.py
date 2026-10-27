@@ -5525,12 +5525,23 @@ class Actor:
                     self.remove_condition(gone)
         return changed
 
-    def rest(self, kind: str = "night") -> dict:
+    # The hours of complete rest the two conditions take to lift (CRB Appendix 2,
+    # Conditions): "After 1 hour of complete rest, an exhausted character becomes
+    # fatigued"; "After 8 hours of complete rest, fatigued characters are no longer
+    # fatigued."
+    EXHAUSTION_REST_HOURS = 1
+    FATIGUE_REST_HOURS = 8
+
+    def rest(self, kind: str = "night", slept: int | None = None) -> dict:
         """Natural healing (CRB p.191).
 
         "With a full night's rest (8 hours of sleep or more), you recover 1 hit point per
         character level... If you undergo complete bed rest for an entire day and night,
         you recover twice your character level in hit points."
+
+        `slept` is the hours actually slept, when the night ran longer than the book's
+        eight (a sleep to the dawn): healing is per night whatever its length, but fatigue
+        and exhaustion lift by the hour (`EXHAUSTION_REST_HOURS`, `FATIGUE_REST_HOURS`).
 
         Nobody heals from below zero by sleeping it off — a dying character needs
         stabilising first, which is `bleed_out`'s business, not this one.
@@ -5542,6 +5553,7 @@ class Actor:
 
         per_level = 2 if kind == "bed rest" else 1
         hours = 24 if kind == "bed rest" else 8
+        slept = max(hours, int(slept)) if slept is not None else hours
 
         before = self.hp
         # Below zero you are not resting, you are bleeding. Healing starts from 0 so a
@@ -5554,16 +5566,42 @@ class Actor:
         # fight the night before is the sort of stale state that quietly poisons every
         # roll for the rest of the campaign.
         self.clear_states("recovery.rest")
-        # A night's sleep is what fatigue is for. Exhaustion becomes fatigue instead.
-        # Except the fatigue thirst and hunger leave: "Characters who have taken nonlethal
-        # damage from lack of food or water are fatigued" (CRB p.444) for as long as that
-        # damage is held, and the owner ruled it stays until they drink or eat (2026-10-05).
-        # A night's sleep cleared it while the thirst damage it came with still stood.
-        if self.has_condition("exhausted"):
-            self.remove_condition("exhausted")
-            self.add_condition("fatigued", source="slept off exhaustion")
-        elif self.has_condition("fatigued") and not self.withheld_nonlethal():
-            self.remove_condition("fatigued")
+        # A night's sleep is what fatigue is for, by the hour (CRB Appendix 2): an hour
+        # turns exhaustion into fatigue, and eight more lift the fatigue. Except the fatigue
+        # thirst and hunger leave: "Characters who have taken nonlethal damage from lack of
+        # food or water are fatigued" (CRB p.444) for as long as that damage is held, and
+        # the owner ruled it stays until they drink or eat (2026-10-05). A night's sleep
+        # cleared it while the thirst damage it came with still stood.
+        #
+        # Every night used to count as eight hours here, so exhaustion only ever became
+        # fatigue. Measured on the owner's 0.2.21 report (2026-10-27): exhausted by 21
+        # hours at the herb bench, Jason slept fifteen hours in his bedroll and woke
+        # "fatigued (slept off exhaustion)"; every beat after said "your limbs heavy and
+        # your movements sluggish", and nothing on the page said why.
+        fatigue = {"lifted": [], "left": "", "why": ""}
+        held = self.withheld_nonlethal()
+        # Asked of the vocabulary (`state.impaired.*`), so a homebrew fatigue that tags
+        # itself so is lifted by the same hours.
+        exhausted, fatigued = "state.impaired.exhausted", "state.impaired.fatigued"
+        if self.has_state(exhausted):
+            self.clear_states(exhausted)
+            fatigue["lifted"].append("exhausted")
+            if slept - self.EXHAUSTION_REST_HOURS >= self.FATIGUE_REST_HOURS and not held:
+                self.clear_states(fatigued)
+                fatigue["lifted"].append("fatigued")
+            elif not self.has_state(fatigued):
+                self.add_condition("fatigued", source="slept off exhaustion")
+            if fatigue["lifted"] == ["exhausted"]:
+                fatigue["left"] = "fatigued"
+                fatigue["why"] = "need" if held else "short"
+        elif self.has_state(fatigued):
+            if not held:
+                self.clear_states(fatigued)
+                fatigue["lifted"].append("fatigued")
+            else:
+                fatigue["left"], fatigue["why"] = "fatigued", "need"
+        if fatigue["why"] == "need":
+            fatigue["needs"] = sorted(held)
 
         # "Ability damage returns at a rate of 1 point per day, or 2 points per day of
         # complete bed rest, for each affected ability score." Per ability, not shared
@@ -5598,9 +5636,10 @@ class Actor:
         return {"healed": self.hp - before, "hours": hours, "woke": woke,
                 "per_level": per_level, "kind": kind, "ability": restored,
                 "nonlethal_healed": nonlethal_gone,
-                "nonlethal_withheld": self.withheld_nonlethal()}
+                "nonlethal_withheld": self.withheld_nonlethal(),
+                "slept": slept, "fatigue": fatigue}
 
-    def sleep_through(self, kind: str = "night", dice=None) -> dict:
+    def sleep_through(self, kind: str = "night", dice=None, slept: int | None = None) -> dict:
         """Everything a full night's sleep gives, through one door.
 
         `rest` is the body's half — natural healing, the night's conditions, the awake
@@ -5626,7 +5665,7 @@ class Actor:
         # Before the rest itself, so the new hit die is part of the night's recovery.
         if kind == "night" and self.is_pc and xp_mod.ready_to_level(self):
             levelled = leveling_mod.level_up(self, dice=dice)
-        result = self.rest(kind)
+        result = self.rest(kind, slept)
         refilled = self.refresh_pools("rest.night", dice)
         prepared = ""
         if casting.is_caster(self):

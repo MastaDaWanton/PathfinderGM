@@ -534,6 +534,9 @@ def rested_said(actor, slept: dict) -> list[str]:
     healed = int(slept.get("healed") or 0)
     if healed:
         out.append(heal_said(actor, healed, str(slept.get("kind") or "night")))
+    tired = fatigue_said(actor, slept)
+    if tired:
+        out.append(tired)
     if slept.get("refilled"):
         out.append("Recovered: " + ", ".join(slept["refilled"]) + ".")
     if slept.get("prepared"):
@@ -544,6 +547,36 @@ def rested_said(actor, slept: dict) -> list[str]:
         out.append(f"In the sleep, level {lv['level']} settles for {name}: +{lv['hp']} hp"
                    + (f", {grants}" if grants else "") + ".")
     return out
+
+
+def fatigue_said(actor, slept: dict) -> str:
+    """What the night did to fatigue and exhaustion, with the rule beside it (law 3: a
+    condition lifted is an effect, and an effect is told) — or "" when there was neither.
+
+    Until 2026-10-27 the night lifted them in silence, and a fatigue it left told nothing
+    either: the owner's report woke Jason "fatigued (slept off exhaustion)" after fifteen
+    hours, and the page said only that his limbs were heavy, every beat after."""
+    f = slept.get("fatigue") or {}
+    name = getattr(actor, "name", "") or "They"
+    lifted, left = list(f.get("lifted") or ()), str(f.get("left") or "")
+    if not lifted and not left:
+        return ""
+    if left:
+        if f.get("why") == "need":
+            needs = [{"thirst": "drinks", "hunger": "eats"}.get(n, "") for n in
+                     f.get("needs") or ()]
+            needs = [n for n in needs if n]
+            until = (" until " + name + " " + " and ".join(needs)) if needs else ""
+            what = ("hunger and thirst hold" if len(needs) > 1 else
+                    "thirst holds" if needs == ["drinks"] else "hunger holds")
+            return (f"{name} wakes still fatigued: {what} it{until}, and no sleep "
+                    f"lifts it.")
+        # Short of the hours: exhaustion eases to fatigue after an hour of rest, and the
+        # fatigue needs eight more.
+        return (f"The sleep eases {name}'s exhaustion to fatigue; it takes "
+                f"{actor.FATIGUE_REST_HOURS} more hours of rest to lift.")
+    words = " and ".join("exhaustion" if c == "exhausted" else "fatigue" for c in lifted)
+    return f"The sleep lifts {name}'s {words}."
 
 
 def heal_said(actor, healed: int, kind: str = "night") -> str:
