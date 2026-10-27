@@ -158,8 +158,9 @@ class Reading(Attribution):
     dropped: list[dict] = field(default_factory=list)
     refs: set = field(default_factory=set)          # the people here
     away: set = field(default_factory=set)          # known elsewhere in this town
-    # Taken out of the scene by the batch this beat tells of (`Scene.gone_in`): a mention
-    # may be them, and nobody is made in their place.
+    # Taken out of the scene by the batch this beat tells of, or from this place within
+    # the hour (`Scene.gone_in`, `Scene.gone_lately`): a mention may be them, and nobody
+    # is made in their place.
     gone: set = field(default_factory=set)
     arrived: list = field(default_factory=list)     # away refs the passage shows here
     read: bool = False        # the people call answered
@@ -356,7 +357,7 @@ _PEOPLE_SYSTEM = (
     "Numbered lines {q1} are words spoken aloud. For each, answer who says it (a code, "
     "\"you\" for the player's character, or the marked phrase of a newcomer) and who it is "
     "said to.\n"
-    "Somebody listed as gone during this passage has just left: a mention of them, "
+    "Somebody listed as gone from here has just left: a mention of them, "
     "however it describes them, is their code, not somebody new.\n"
     "Under \"new\", give each newcomer once, by their first marked phrase: \"here\" if the "
     "passage shows them in the scene now, \"elsewhere\" if they are only spoken of; "
@@ -382,7 +383,7 @@ _PEOPLE_EXAMPLE_USER = (
     "shows here and now is not one of them unless it says they came:\n"
     "c2: the harbour clerk\n"
     "c6: the net-mender with the limp\n\n"
-    "Gone from here during this passage — not here now:\n"
+    "Gone from here just now — not here any more:\n"
     "c7: hound — Medium animal\n\n"
     "Passage:\n"
     "[m1: The man at the barrel] does not look up. He is [m2: a broad man], his apron "
@@ -424,7 +425,7 @@ def people_messages(text: str, found: list[Mention], lines: list[Line], cast: li
                  "came:",
                  *_cast_lines(list(away))]
     if gone:
-        body += ["\nGone from here during this passage — not here now:",
+        body += ["\nGone from here just now — not here any more:",
                  *_cast_lines(list(gone))]
     if acting:
         body.append(f"\nIt is {acting}'s turn.")
@@ -666,7 +667,7 @@ def read(text: str, scene, *, engine=None, said=(), acting: str = "",
     `chat` is passed — the suite's way of asking for a reading.
 
     `gone` is who the batch this beat tells of took out of the scene (`Scene.gone_in`):
-    shown as gone during the passage, offered as answers, and never newcomers."""
+    shown as gone from here just now, offered as answers, and never newcomers."""
     from .narration import _sentences
 
     cast = mentions.people(scene)

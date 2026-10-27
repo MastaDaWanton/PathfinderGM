@@ -117,9 +117,28 @@ def test_the_guard_that_gives_way_is_gone_in_the_batch_that_tells_it(monkeypatch
     assert ref not in s.people, "it left the campaign, as the engine's rule says"
     gone = s.gone_in(out)
     assert gone == [{"ref": ref, "name": "grioth", "body": "Medium monstrous humanoid",
-                     "people": ""}]
+                     "people": "", "at": s.at, "minute": s.clock_minutes}]
     # Only who THIS batch speaks of: an outcome that names nobody gone names nobody.
     assert s.gone_in([Outcome("i1", "move", effects=[{"ref": "pc", "kind": "position"}])]) == []
+
+
+def test_the_beat_after_still_knows_who_left_here_within_the_hour(monkeypatch):
+    """Measured live on this branch: the turn after the grioth gave way, "I look for the
+    towering figure in the trees" came back "tracks left by the towering figure", and with
+    only the batch's removals shown (none that turn) the reader answered a newcomer, a
+    person. Whoever left THIS place within the hour is still shown; another place's, or an
+    older going, is not."""
+    s, e = _forest()
+    ref = _guarded(monkeypatch, s, e)
+    _gives_way(monkeypatch, s, e, ref)
+    assert [g["ref"] for g in s.gone_lately()] == [ref]
+    s.advance(Scene.GONE_WITHIN + 1, charge_body=False)
+    assert s.gone_lately() == []
+    s2, e2 = _forest()
+    ref2 = _guarded(monkeypatch, s2, e2)
+    _gives_way(monkeypatch, s2, e2, ref2)
+    s2.at = places.region_set(VORMOOR.id, "hills")[0].id
+    assert s2.gone_lately() == [], "somebody who left another place is not here's"
 
 
 def test_gone_keeps_only_the_latest_removals():
@@ -135,7 +154,7 @@ def test_gone_keeps_only_the_latest_removals():
 # --- the reader: the gone are offered, and nobody is made of them -------------------------
 
 def test_the_reader_is_shown_the_guard_gone_and_offered_its_code(monkeypatch):
-    """The reader's people call is shown "Gone from here during this passage" with the
+    """The reader's people call is shown "Gone from here just now" with the
     grioth's size and kind, and every mention may be answered with its code — the enum
     is the engine's (Ollama enforces it, 6/6)."""
     s, e = _forest()
@@ -148,7 +167,7 @@ def test_the_reader_is_shown_the_guard_gone_and_offered_its_code(monkeypatch):
     kind, schema, msgs = calls[0]
     assert kind == "people"
     asked = msgs[-1]["content"]
-    assert "Gone from here during this passage" in asked
+    assert "Gone from here just now" in asked
     assert f"{ref}: grioth — Medium monstrous humanoid" in asked
     for mid in (m.id for m in reading.mentions):
         assert ref in schema["properties"][mid]["enum"]

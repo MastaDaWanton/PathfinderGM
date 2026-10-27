@@ -2405,8 +2405,32 @@ class Scene:
         self.gone.append({
             "ref": actor.ref, "name": str(actor.name or ""), "body": body,
             "people": faces_mod.people_of(str(getattr(actor, "appearance", "") or "")),
+            "at": str(getattr(actor, "at", "") or ""), "minute": int(self.clock_minutes or 0),
         })
         del self.gone[:-self.GONE_KEPT]
+
+    # How long, in game minutes, somebody who left this place is still who a beat here
+    # may be talking about (`gone_lately`).
+    GONE_WITHIN = 60
+
+    def gone_lately(self, within: int | None = None) -> list[dict]:
+        """Who `remove` took from the place the party stands, within the last hour of the
+        world's clock: the beats after a going still talk of them. Measured live on this
+        branch (2026-10-27): the beat after the grioth gave way, "I look for the towering
+        figure in the trees" was written back as "tracks left by the towering figure", and
+        with only the batch's own removals shown (`gone_in`, empty that turn) the reader
+        answered it a newcomer, a person — a population record, one "here" away from
+        another body with a people's face."""
+        within = self.GONE_WITHIN if within is None else int(within)
+        now = int(self.clock_minutes or 0)
+        out, seen = [], set()
+        for g in reversed(self.gone):
+            if (g["ref"] in self.people or g["ref"] in seen or g.get("at") != self.at
+                    or now - int(g.get("minute") or 0) > within):
+                continue
+            seen.add(g["ref"])
+            out.append(dict(g))
+        return list(reversed(out))
 
     def gone_in(self, outcomes) -> list[dict]:
         """Who this batch's outcomes speak of and `remove` has taken away: the people a
@@ -2415,7 +2439,7 @@ class Scene:
         reused (`bestiary.next_ref`), so a ref in this batch's effects that is gone went
         in this batch or is somebody the batch still tells of.
 
-        The beat reader shows them as "gone during this passage" so its mentions are them
+        The beat reader shows them as "gone from here just now" so its mentions are them
         and not newcomers (gm/beat_reader.py), and the planned narrator names them as gone
         just now with their size and kind (gm/planned.py)."""
         said: set[str] = set()
