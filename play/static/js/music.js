@@ -25,9 +25,34 @@
  *
  * NO LIBRARY, no loop of its own: the fade is stepped by a timer that runs only while a
  * fade is in progress, and the page asks nothing of it while a song simply plays.
+ *
+ * ONE PLAYER PER WINDOW, the top page's. The table opens Settings in a frame over itself
+ * (`/?tab=settings&embed=1`, 12-shell.js), and that page loads this script and calls
+ * `start()` like any other. Measured 2026-10-27 in the owner's save: the frame picked up
+ * the saved position and played the table's own song 2.7 seconds behind it, two decks of
+ * the same track a beat apart ("overlapping instrumentation", the owner). Inside any frame
+ * (`window !== window.top`, or the page's own `embed=1`) every call is a no-op: the
+ * table's music carries on under the panel, and the Settings sliders still reach it
+ * through PGMPrefs's `storage` event. Sound effects are sound.js's and are not touched.
  */
 (function () {
   "use strict";
+
+  var EMBEDDED = (function () {
+    try { if (window.self !== window.top) return true; }
+    catch (e) { return true; }          // a frame whose top refuses to be read is a frame
+    try { return new URLSearchParams(location.search).get("embed") === "1"; }
+    catch (e) { return false; }
+  })();
+  if (EMBEDDED) {
+    window.Music = {
+      start: function () {}, stop: function () {}, mode: function () {},
+      playing: function () { return null; },
+      lists: function () { return {}; },
+      embedded: true,
+    };
+    return;
+  }
 
   var BASE = (function () {
     try {
