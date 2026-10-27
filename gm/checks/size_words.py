@@ -146,9 +146,23 @@ def find(ctx) -> list[Finding]:
         return []
     name = str(getattr(location, "name", "") or "")
     others = _other_places(ctx, location)
+    from gm import speech
+
     flagged: list[tuple[str, list[str]]] = []
+    # The speech is blanked over the WHOLE text, then each sentence read off it: a sentence
+    # inside a quotation of several ("'If you prefer the city, I can offer you … Otherwise,
+    # …,' the guild clerk says flatly.") opens with a quote mark it never closes, so reading
+    # it alone took the clerk's own words for narration. Measured on the 0.2.22 job-offer
+    # re-run: "city" in the clerk's mouth was flagged, the repair dropped the opening quote,
+    # and the narrator-in-the-scene check then turned the clerk's "I can offer" into "you
+    # can offer you".
+    blank = speech.blanked(ctx.text or "")
+    at = 0
     for s in _space.sentences(ctx.text):
-        words = words_in(_space.unquoted(s), scale, name, others)
+        start = (ctx.text or "").find(s, at)
+        at = start + len(s) if start >= 0 else at
+        plain = blank[start:start + len(s)] if start >= 0 else _space.unquoted(s)
+        words = words_in(plain, scale, name, others)
         if words:
             flagged.append((s, words))
     if not flagged:
