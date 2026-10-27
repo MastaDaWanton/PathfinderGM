@@ -471,7 +471,8 @@ def slot_facts(engine, ref: str) -> str:
 
     rows = [facts_line(engine, c) for c in held_by(engine.scene, ref)
             if cards_mod.standing(c) != cards_mod.UNHEARD]
-    return " ".join(rows)
+    # One job a line: the read-back numbers them (`beat_verify.invented_job_sentence`).
+    return "\n".join(rows)
 
 
 # --- offering, choosing, taking -----------------------------------------------------------
