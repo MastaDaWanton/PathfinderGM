@@ -879,8 +879,16 @@ def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
     already in the pack is only carried; a person is never goods."""
     from rules import holding
 
+    from rules import jobs as jobs_mod
+
     thing = _object(frame, i, pc, recent)
     if not thing or _a_person(scene, thing) or not _a_thing(thing):
+        return
+    if jobs_mod.group_named(scene, thing) is not None:
+        # A job's caravan is people and their wagons, never a thing to pick up. Measured on
+        # the 0.2.22 leftovers run: "I … lead the wagons on toward Kalixiri" was read `go`
+        # with `object: the wagons`, and the table built "Kesst Vayr takes the wagons".
+        row.note = f"{thing}: the caravan, led, not carried"
         return
     if holding.key_in(pc.goods, thing):
         row.note = f"{thing} carried along"
@@ -1586,6 +1594,13 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # A job the table built (`jobs_spoken`) is the turn's word on the work: the plan's own
     # week of `work`, or a `quest` it wrote for the same job, would work it or take it twice.
     jobbing = any(b.get("op") == "job" for b in built)
+    # A go the reading owes a journey for (`interpret.ops_for`: a town the roads reach) is
+    # that journey, and the plan's own walk beside it is not: measured on the 0.2.22
+    # leftovers run, "I … lead the wagons on toward Kalixiri" from a stretch of the road
+    # was planned as a travel to "the outskirts" AND the journey; the travel walked the
+    # party a day back to the town they had left, shed the caravan, and the journey was
+    # then refused as the turn's second.
+    journeying = any(r.act == "go" and "journey" in r.ops for r in rows)
     for r in raw:
         op = _op(r)
         if op == "job":
@@ -1597,6 +1612,10 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         if jobbing and op in ("work", "quest"):
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's job")
+            continue
+        if journeying and op == "travel":
+            if notes is not None:
+                notes.append("the plan's travel struck: the reading's go is a journey")
             continue
         if op == "attack" and stolen_from and str((r or {}).get("target")) in stolen_from \
                 and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):

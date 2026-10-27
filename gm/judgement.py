@@ -364,8 +364,13 @@ def _does_what_was_declared(intents, player_text: str) -> bool:
     # same `attack c1` — the guard refused it twice and the turn degraded to narration,
     # the blow the player declared never struck. Here, not in `_OP_NEEDS`, which also
     # decides which detector ops the reading supports.
+    # And a journey the words' `go` owes (`interpret.ops_for`: a town the roads reach). The
+    # 0.2.22 leftovers run: on a road broken off by an aasimar in the way, "I lead the
+    # wagons around the aasimar and on to Kalixiri" planned the same `journey` as the turn
+    # before — the road taken up again, which is what a broken road IS — and the guard
+    # refused it twice and the turn degraded to narration with the caravan standing still.
     need = dict(interpret._OP_NEEDS, give={"give", "take"}, buy={"buy"},
-                attack={"attack"})
+                attack={"attack"}, journey={"journey", "go"})
     loud = [i for i in intents if i.op not in QUIET_OPS]
     return bool(loud) and all(need.get(i.op, set()) & acts for i in loud)
 
