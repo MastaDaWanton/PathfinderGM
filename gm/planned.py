@@ -807,6 +807,22 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             work = (f" Of work, they know exactly this and nothing more: {held} If the "
                     "player asks about work, its pay, place or hour, they answer from it."
                     if held else "")
+            # The player's own words to this speaker: their slot shows them said, and the
+            # answer is this slot's alone. Measured on the 0.2.22 job-offer re-run: "I ask the
+            # clerk what the caravan job pays" — the say slot, told to show "what came of
+            # it", wrote "The clerk confirms that the contract offers one … gold piece a day",
+            # and the reply then said the pay again.
+            if spoken_at is not None and any(
+                    isinstance(e, dict) and e.get("kind") == "said"
+                    and e.get("to") == speaker["ref"]
+                    for o in grouped[spoken_at] for e in (getattr(o, "effects", None) or [])):
+                for x in slots:
+                    if x["key"] == f"fact{spoken_at + 1}":
+                        x["say"] = x["say"].replace(
+                            "Show the player doing it and what came of it, once.",
+                            f"Show the player saying it, once, and stop there: "
+                            f"{speaker['name']}'s answer is written next, so none of it "
+                            f"here.")
             folded = [k for k, ref in offered_by.items() if ref == speaker["ref"]]
             if folded and held:
                 # The offer's act slot goes; the answer is where it is said, once.
