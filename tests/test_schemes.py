@@ -74,6 +74,15 @@ def _instance(scene, sid="the-lost-thing"):
     return next(i for i in scene.schemes if i["scheme"] == sid)
 
 
+def _heard(scene, inst):
+    """The player has heard of the errand. The owner's answer of 2026-10-27 (question 7):
+    a step on a quest the player has NEVER heard of ticks in silence, with no tell — so a
+    test that reads a step's tell is a story the player knows of."""
+    q = cards.find(scene, inst["cards"]["errand"])
+    q.known = "heard"
+    cards._store(scene, q)
+
+
 def _meet(engine, inst):
     """The player speaks to the giver. The `noticed` step keys on `event:talk($giver)`
     since Phase 3 (I4): the glance away is seen in an exchange, not by walking past."""
@@ -154,6 +163,7 @@ def test_arriving_where_the_rival_is_fires_the_most_specific_step_with_a_tell():
     s, e, pc = _table()
     _wait(e, 1)
     inst = _instance(s)
+    _heard(s, inst)
     _meet(e, inst)
     rival = s.people[inst["slots"]["rival"]["ref"]]
     res = _out(e, inst)
@@ -226,6 +236,7 @@ def test_returning_the_thing_pays_the_story_award_and_regard_through_the_applica
     s, e, pc = _table()
     _wait(e, 1)
     inst = _instance(s)
+    _heard(s, inst)
     giver = s.people[inst["slots"]["giver"]["ref"]]
     _out(e, inst)
     _wait(e, 1)
