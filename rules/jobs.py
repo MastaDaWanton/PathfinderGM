@@ -765,7 +765,9 @@ def _leave(engine, card) -> None:
                                  outskirts_mod._road_slug(route.get("from", "")))
     for ref in cp.get("people", ()):
         a = scene.people.get(ref)
-        if a is not None and a.at == (j.get("meets") or {}).get("at") and a.at != scene.at:
+        # The player standing with them does not hold them: the caravan that waited its
+        # hour for the word goes (the wait's end, `settle`).
+        if a is not None and a.at == (j.get("meets") or {}).get("at"):
             scene.move(ref, away)
             if ref in scene.came_along:
                 scene.came_along.remove(ref)
@@ -824,7 +826,13 @@ def settle(engine) -> list:
                                effects=[{"kind": "job", "id": card.id, "state": "met",
                                          "origin": f"job:{card.id}"}]))
             continue
-        if state in ("open", "met") and over and not with_them:
+        # The wagons leave at their hour (the job's own terms, `meets.minute`), and wait
+        # GRACE_MINUTES past it for the word — the same hour of grace a late guard is
+        # given, so the terms have one number, not two. Until 2026-10-27 a caravan met and
+        # never set out waited for ever, the player standing beside it: the 0.2.22 escort
+        # run's leftover. Once the road is taken (`set_out`) nothing here applies.
+        if state in ("open", "met") and over and not j.get("set_out"):
+            waited = state == "met"
             _leave(engine, card)
             if stands == cards_mod.OWN:
                 j["state"] = "lapsed"
@@ -840,10 +848,21 @@ def settle(engine) -> list:
                     fx.update({"regard_from": before, "regard_to": after,
                                "employer": employer.ref})
                     said = attitude_mod.regard_said(employer.name, before, after)
-                tell = (f"The hour has come and gone at {meets.get('where')}: the wagons "
-                        f"for {route.get('to_name')} have left without {pc.name}, and the "
-                        f"job is lost. {_cap(employer.name) if employer else 'The employer'} "
-                        f"will hear that {pc.name} did not come." + (f" {said}" if said else ""))
+                if waited:
+                    tell = (f"The hour has come and gone at {meets.get('where')}, and "
+                            f"{pc.name} has not given the word to set out: "
+                            f"{master.name if master else 'the caravan master'} takes the "
+                            f"wagons out on the road to {route.get('to_name')} without "
+                            f"{pc.name}, and the job is lost. "
+                            f"{_cap(employer.name) if employer else 'The employer'} will "
+                            f"hear that {pc.name} did not go.")
+                else:
+                    tell = (f"The hour has come and gone at {meets.get('where')}: the "
+                            f"wagons for {route.get('to_name')} have left without "
+                            f"{pc.name}, and the job is lost. "
+                            f"{_cap(employer.name) if employer else 'The employer'} will "
+                            f"hear that {pc.name} did not come.")
+                tell += f" {said}" if said else ""
                 out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
                                    effects=[fx]))
             else:
