@@ -1342,8 +1342,14 @@ SHOWN = ("succeeds", "fails", "unsure")
 # Not an attack, a manoeuvre or a spell: their verdicts are hits and misses, and the blow
 # lane owns them. A whitelist, so an op that grows a verdict later is asked about only once
 # somebody has looked at what its verdict means.
+#
+# `make` since 2026-10-28 (rules/typed_craft.py): a typed craft is the bench's chain of
+# checks, and its verdict is whether the thing asked for was made — "success" only when the
+# last step landed it. A beat that forges the dagger the engine spoiled is this lane's
+# contradiction; the item itself, when made, is an effect `to` the player, which the hands
+# lane already reads (`_anything_into`, `Facts.things`).
 _ATTEMPT_OPS = ("check", "save", "judge", "mend", "trade_lore", "haggle", "work", "track",
-                "extinguish", "break_free", "repair")
+                "extinguish", "break_free", "repair", "make")
 
 
 @dataclass(frozen=True)
@@ -1401,6 +1407,16 @@ def attempts_of(facts: Facts) -> list[Attempt]:
             # the gold beat `ho-att-tracks-found` holds.
             continue
         label = _roll_label(o) or f"{str(o.get('op')).replace('_', ' ')} attempt"
+        if o.get("op") == "make":
+            # The step whose verdict this is, and what the work was for: the bench effect's
+            # `target`, the engine's name for the thing asked for, never the tell's words.
+            rolls = [r for r in o.get("rolls") or () if isinstance(r, dict)]
+            label = str(rolls[-1].get("label") or label) if rolls else label
+            point = next((e for e in _effects(o) if e.get("kind") == "bench"), {})
+            what = str(point.get("target") or "the thing")
+            out.append(Attempt(f"a{len(out) + 1}", who, label, verdict,
+                               why=f"making {what} by hand"))
+            continue
         aid = next((e for e in _effects(o) if e.get("kind") == "aid"), None)
         asked = next((e for e in _effects(o) if e.get("kind") == "request"), None)
         if aid is not None:
