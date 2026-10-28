@@ -48,7 +48,7 @@ KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
                    "beat-omits-outcome", "beat-condition", "beat-attempt", "beat-setting",
                    "beat-struck-with", "beat-swing-early", "beat-foe-struck-with",
-                   "beat-struck-at-early"})
+                   "beat-struck-at-early", "beat-aimed-wrong"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -91,7 +91,12 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          # A creature swinging at the player on the player's own beat, before its turn:
          # the barkeep's sap on the dagger beat of round 4 (live, 2026-10-17), swung again
          # on his own turn after it. A blow no die threw, as heavy as the early one.
-         "at_you": ("beat-struck-at-early", 3)}
+         "at_you": ("beat-struck-at-early", 3),
+         # A blow on a creature's turn told at somebody the engine did not aim it at: the
+         # caravan's hired sword at the toll-keeper written "you pivot away from the arc of
+         # the swing" (the 0.2.22 road fight, 4 of 5 allied misses; docs/ally-swings.md).
+         # The player reads a blow at them that no die threw — as heavy as the early one.
+         "aimed": ("beat-aimed-wrong", 3)}
 
 # The kinds repaired by the backstop alone, never a one-sentence rewrite. A rewrite is
 # checked by reading the rewritten sentence back ALONE (`beat_verify.read_beat` reads only
@@ -105,7 +110,16 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
 # A creature's swing on the player's beat joins it for the same reason: "He lunges forward,
 # swinging the heavy sap" rewritten and re-read alone is nobody's swing, and there is no
 # engine line to stand in its place — nothing happened — so the sentence simply goes.
-CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early", "beat-struck-at-early"})
+#
+# A blow told at the wrong person joins it, measured 2026-10-27 on the five wrong sentences
+# of the 0.2.22 road fight, three rewrites each (docs/ally-swings.md): 6 of 15 rewrites
+# were right; 9 put the blow on another wrong person or landed a miss ("the blade strikes
+# the hired sword"), and the re-read of the rewritten sentence alone passed 6 of those 9 —
+# alone, "the blade" is nobody's, and a blow whose striker is not shown at someone other
+# than the player is not judged. The engine's line ("the hired sword's attack with the
+# halberd misses Toll-Keeper") takes the first wrong sentence's place instead.
+CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early", "beat-struck-at-early",
+                      "beat-aimed-wrong"})
 
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair
 # asks `find` again after each rewrite and once more before the backstops; a sentence it
@@ -203,17 +217,20 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
             continue
         if d.category == "move" or d.sentence not in text:
             continue
-        if d.category == "foe_weapon" and d.line:
+        if d.category in ("foe_weapon", "aimed") and d.line:
             # The engine's own line in the cut sentence's place, its numbers off (the
             # creature's roll is hidden): "the one behind the bar's attack with the sap
             # misses Kesst Vayr." The name becomes "you" later in the groom.
             # `page_line`, not `plain_tell`: plain_tell keeps a hit's damage amount ("for
             # 4 non-lethal bludgeoning"), which is a number on the page.
+            # A blow told at the wrong person (`aimed`) is the same: the engine's line names
+            # who swung at whom ("the hired sword's attack with the halberd misses
+            # Toll-Keeper"), once; a second wrong sentence is cut.
             line = narration_mod.page_line(d.line)
             line = line[:1].upper() + line[1:]
             if line and line not in text:
                 text = text.replace(d.sentence, line, 1)
-                notes.append(f"beat read back: foe_weapon: {d.sentence[:60]!r} -> the "
+                notes.append(f"beat read back: {d.category}: {d.sentence[:60]!r} -> the "
                              f"engine's line")
                 continue
         text = cut(text, [d.sentence])

@@ -214,6 +214,13 @@ class Facts:
     # shown swinging at the player swung on a turn that is not theirs (`_struck_unrolled`).
     at_you: bool = False
     struck_by: tuple[str, ...] = ()
+    # On a creature's turn (`ctx.acting`): every blow the engine resolved this turn as
+    # (attacker ref, target ref), off the outcome's `actor` and each blow's `ref`
+    # (`planned.blows_aimed`). Non-empty asks who the page shows striking at whom
+    # (`aimed`), judged by `_aimed_wrong`. The 0.2.22 road fight (docs/ally-swings.md): the
+    # caravan's hired hands swung at the toll-keeper, and 4 of 5 allied misses reached the
+    # page aimed at the player.
+    aimed: tuple[tuple[str, str], ...] = ()
 
     @property
     def bodies(self) -> bool:
@@ -266,7 +273,7 @@ class Facts:
                            [(a.code, a.who, a.verdict) for a in attempts_of(self)],
                            self.settings, self.blows, self.arms, self.joined,
                            self.foe, self.foe_blows, self.foe_arms, self.foe_natural,
-                           self.at_you, self.struck_by],
+                           self.at_you, self.struck_by, self.aimed],
                           default=str, sort_keys=True)
 
 
@@ -401,7 +408,8 @@ def facts_from(ctx) -> Facts:
                  settings=tuple(sorted(settings)),
                  **_blows_of(ctx, outcomes, pc),
                  **_foe_blows_of(ctx, outcomes, scene),
-                 **_struck_by_of(ctx, outcomes, pc, scene))
+                 **_struck_by_of(ctx, outcomes, pc, scene),
+                 **_aimed_of(ctx, outcomes, scene))
 
 
 UNARMED = "unarmed strike"
@@ -561,6 +569,21 @@ def _struck_by_of(ctx, outcomes, pc, scene) -> dict:
         if who != pc_ref:
             struck.append(who)
     return {"at_you": True, "struck_by": tuple(dict.fromkeys(struck))}
+
+
+def _aimed_of(ctx, outcomes, scene) -> dict:
+    """{"aimed"} for `Facts`: on a creature's turn in a fight, every blow resolved this turn
+    as (attacker, target). Not asked on the player's own beat (`at_you` is that beat's
+    question), in an intimate scene, out of a fight, or when some blow cannot say who swung
+    or at whom (`planned.blows_aimed` answers None: judged by nothing rather than wrongly)."""
+    if not getattr(ctx, "acting", "") or getattr(ctx, "intimate", False):
+        return {}
+    if not bool(getattr(scene, "in_encounter", False)):
+        return {}
+    from .planned import blows_aimed
+
+    pairs = blows_aimed(outcomes)
+    return {"aimed": tuple(pairs)} if pairs else {}
 
 
 def asks_bodies(ctx) -> bool:
@@ -1122,6 +1145,106 @@ def at_you_messages(text: str, facts: Facts) -> list[dict]:
             {"role": "user", "content": f"People: {_people_line(facts)}\n\nPassage:\n{text}"}]
 
 
+# --- who strikes at whom on a creature's turn ------------------------------------------------
+#
+# The NPC-turn door is the only one that writes a blow nobody is the player's, and its call
+# was written for foes. Measured 2026-10-27 on the 0.2.22 road fight (docs/ally-swings.md):
+# the caravan's hired hands swung at the toll-keeper, the tells said "the hired sword's
+# attack with the halberd misses Toll-Keeper", and the page said "you pivot away from the
+# arc of the swing" — 4 of 5 allied misses. Asked as two codes per blow (who swings, at
+# whom), compared in code with the engine's own (attacker, target) pairs (`Facts.aimed`).
+# Both demonstrations are the ferry's, nowhere near the shipped world, and between them they
+# show a blow at somebody else, a blow at "you", a blow whose striker the sentence leaves to
+# "the oar", and a threat that is no blow.
+_AIMED_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") in a fight, and report every "
+    "sentence that shows a blow — a swing, cut, thrust, bite, shot or thrown thing, landing "
+    "or missing — with WHO strikes it and at WHOM, in the codes given. \"pc\" is the player, "
+    "\"you\". Use the passage before a sentence for who \"he\", \"she\", \"they\" or \"the "
+    "blade\" are. Striker \"not shown\" when the passage never says whose blow it is; target "
+    "\"not shown\" when it never says at whom the blow goes — a swing \"in a wide arc\" "
+    "goes at nobody named. Never "
+    "what a character only says, and not a threat that is no blow yet: raising or drawing a "
+    "weapon, circling, stepping closer, getting ready. One entry per SENTENCE that shows a "
+    "blow — a blow told across two sentences is two entries — copying that sentence's own "
+    "words into \"quote\". Leave the list empty when no blow is shown.")
+_AIMED_DEMO_USER = (
+    "People: pc: you (the player); c4: Dunmar Oake — ferryman; c5: the deckhand — sailor; "
+    "c6: the drover — commoner; someone not listed\n\n"
+    "Passage:\n"
+    "The deckhand hefts the oar and swings it in a wide arc. He swings it low at Dunmar "
+    "Oake's knees, and the old ferryman skips back from it with a curse. The blade slaps "
+    "the wet planks between them. The drover raises his cudgel and edges toward you along "
+    "the rail.")
+_AIMED_DEMO_ANSWER = {"aimed_at": [
+    {"striker": "c5", "target": "not shown",
+     "quote": "The deckhand hefts the oar and swings it in a wide arc"},
+    {"striker": "c5", "target": "c4",
+     "quote": "He swings it low at Dunmar Oake's knees"},
+    {"striker": "c5", "target": "c4",
+     "quote": "The blade slaps the wet planks between them"}]}
+_AIMED_DEMO2_USER = (
+    "People: pc: you (the player); c4: Dunmar Oake — ferryman; c5: the deckhand — sailor; "
+    "c6: the drover — commoner; someone not listed\n\n"
+    "Passage:\n"
+    "The drover comes off the rail in a rush. His cudgel whistles past your ear and cracks "
+    "against the mast. The oar sweeps round after it and you duck under the blade.")
+_AIMED_DEMO2_ANSWER = {"aimed_at": [
+    {"striker": "c6", "target": "pc", "quote": "His cudgel whistles past your ear"},
+    {"striker": "not shown", "target": "pc",
+     "quote": "The oar sweeps round after it and you duck under the blade"}]}
+
+
+def aimed_striker_codes(facts: Facts) -> list[str]:
+    return [*(p.ref for p in facts.people if p.here), NEW_PERSON, NOT_SHOWN]
+
+
+def aimed_target_codes(facts: Facts) -> list[str]:
+    # "not shown" for a target too. Without it the read guessed one for "The hired sword
+    # lunges forward, swinging the heavy flail in a wide, desperate arc" — the player, and
+    # the second read agreed: 3 false alarms in 56 sound generations on the first bench
+    # run (2026-10-27), each a sentence that names no target at all.
+    return [*(p.ref for p in facts.people if p.here), NEW_PERSON, NOT_SHOWN]
+
+
+def aimed_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"aimed_at": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "striker": {"type": "string", "enum": aimed_striker_codes(facts)},
+            "target": {"type": "string", "enum": aimed_target_codes(facts)}, "quote": s},
+            "required": ["striker", "target", "quote"]}}},
+        "required": ["aimed_at"]}
+
+
+def _aimed_people(facts: Facts) -> str:
+    """Everybody here, the player first as "pc: you (the player)", then the rest."""
+    rows = [f"{p.ref}: you (the player)" for p in facts.people if p.here and p.pc]
+    rows += [f"{p.ref}: {p.name}" + (f" — {p.what}" if p.what else "")
+             for p in facts.people if p.here and not p.pc]
+    return "; ".join([*rows, NEW_PERSON])
+
+
+def aimed_messages(text: str, facts: Facts) -> list[dict]:
+    # The demonstrations use "pc" for the player; the live call's code is the engine's
+    # own (`Facts.pc_ref`, "pc" in every save so far).
+    def coded(answer: dict) -> dict:
+        return {"aimed_at": [dict(r, **({"target": facts.pc_ref} if r["target"] == "pc"
+                                         else {}))
+                             for r in answer["aimed_at"]]}
+
+    def people(line: str) -> str:
+        return line.replace("pc: you", f"{facts.pc_ref}: you")
+
+    return [{"role": "system", "content": _AIMED_SYSTEM.replace('"pc"', f'"{facts.pc_ref}"')},
+            {"role": "user", "content": people(_AIMED_DEMO_USER)},
+            {"role": "assistant", "content": json.dumps(coded(_AIMED_DEMO_ANSWER))},
+            {"role": "user", "content": people(_AIMED_DEMO2_USER)},
+            {"role": "assistant", "content": json.dumps(coded(_AIMED_DEMO2_ANSWER))},
+            {"role": "user", "content": f"People: {_aimed_people(facts)}\n\nPassage:\n{text}"}]
+
+
 def setting_schema() -> dict:
     from rules.places import SETTINGS
 
@@ -1553,7 +1676,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("setting", "setting", ("kind",)),
                             ("struck_with", "weapon", ("weapon",)),
                             ("foe_struck_with", "foe_weapon", ("weapon",)),
-                            ("at_you", "at_you", ("who",))):
+                            ("at_you", "at_you", ("who",)),
+                            ("aimed_at", "aimed", ("striker", "target"))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -1583,7 +1707,9 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "who": set(_who(facts)), "how": set(HOW), "place": set(_places(facts)),
                "part": set(PARTS), "condition": set(CONDITIONS),
                "attempt": {a.code for a in attempts_of(facts)}, "shown": set(SHOWN),
-               "kind": set(_settings()), "weapon": set(swing_codes(facts))}
+               "kind": set(_settings()), "weapon": set(swing_codes(facts)),
+               "striker": set(aimed_striker_codes(facts)),
+               "target": set(aimed_target_codes(facts))}
     # A creature's weapons are its own codes, not the player's (`foe_swing_codes`).
     foe_codes = set(foe_swing_codes(facts)) if facts.foe_blows else set()
     seen: set[str] = set()
@@ -1726,6 +1852,17 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                        schema=at_you_schema(facts))
             result.raw += "\n" + hit.text
             answer = dict(answer or {}, at_you=(hit.json() or {}).get("at_you") or [])
+        if facts.aimed:
+            # Who strikes at whom on a creature's turn, in a call of its own
+            # (`_AIMED_SYSTEM`).
+            msgs = aimed_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            whom = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                        num_predict=300, provider=provider, api_key=api_key,
+                        schema=aimed_schema(facts))
+            result.raw += "\n" + whom.text
+            answer = dict(answer or {}, aimed_at=(whom.json() or {}).get("aimed_at") or [])
         claims = claims_of(answer, facts)
         attempts = attempts_of(facts)
         if attempts:
@@ -2055,6 +2192,54 @@ def _struck_unrolled(c: Claim, facts: Facts) -> Discrepancy | None:
         f"after yours.", c.sentence, "", c, ref=who)
 
 
+def _aimed_words(facts: Facts, pairs) -> str:
+    """"the hired sword swung at Toll-Keeper; Toll-Keeper swung at you", by name."""
+    def called(ref: str) -> str:
+        return "you" if ref == facts.pc_ref else _name(facts, ref)
+
+    return "; ".join(f"{called(a)} swung at {called(t)}" for a, t in pairs)
+
+
+def aimed_mismatch(striker: str, target: str, facts: Facts) -> bool:
+    """Whether a blow shown from `striker` at `target` is one the engine did not aim, by
+    the codes alone:
+      * at the player when no blow this turn was aimed at the player — whoever the page
+        says swung it, or "not shown" ("you pivot away from the arc of the swing");
+      * from somebody here who did strike this turn, at anybody here they did not strike
+        at (the toll-keeper's halberd at the player told as at the hired sword).
+    "someone not listed" is never judged (a fighter the engine does not hold is
+    `phantom_fighter`'s), nor a striker the engine let strike nobody (on a creature's turn
+    that is an unrolled blow — `at_you`'s question on the player's beat, and none asked
+    here), nor the player's own blow."""
+    if not facts.aimed or target == NEW_PERSON or striker == facts.pc_ref:
+        return False
+    tp = facts.person(target)
+    if tp is None or not tp.here:
+        return False
+    if target == facts.pc_ref and not any(t == facts.pc_ref for _a, t in facts.aimed):
+        return True
+    struck = [t for a, t in facts.aimed if a == striker]
+    return bool(struck) and target not in struck
+
+
+def _aimed_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A blow on a creature's turn shown aimed at somebody the engine's blows were not, or
+    None (`aimed_mismatch`). The fact names whom each blow WAS aimed at; the engine's own
+    line for the striker's blow (else the turn's first) is the backstop's stand-in."""
+    striker = str(c.slots.get("striker") or "")
+    target = str(c.slots.get("target") or "")
+    if not aimed_mismatch(striker, target, facts):
+        return None
+    them = "you (the player)" if target == facts.pc_ref else _name(facts, target)
+    words = _aimed_words(facts, facts.aimed)
+    fact = f"{words[:1].upper() + words[1:]}. No blow was aimed at {them}."
+    tells = [o for o in _resolved(facts) if o.get("op") == "attack" and o.get("blows")
+             and o.get("tell")]
+    line = next((str(o["tell"]) for o in tells if str(o.get("actor") or "") == striker),
+                str(tells[0]["tell"]) if tells else "")
+    return Discrepancy("contradiction", "aimed", fact, c.sentence, line, c, ref=target)
+
+
 def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
     """The player shown picking up a thing on a turn the engine refused a pick-up of
     something that is not there (`Engine._picked_from_nowhere`, code `not_here`), or None.
@@ -2332,6 +2517,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             found = _struck_unrolled(c, facts)
             if found is not None:
                 out.append(found)
+        elif c.category == "aimed":
+            found = _aimed_wrong(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "setting":
             found = _setting_wrong(c, facts)
             if found is not None:
@@ -2515,6 +2704,11 @@ def question(d: Discrepancy, facts: Facts) -> str:
         # key and the record of what was asked.
         return (f"Which of these people does this sentence show striking or swinging at you "
                 f"(the player)? ({_name(facts, s['who'])} was named.)")
+    if c.category == "aimed":
+        # Asked in `_aimed_whom`'s shape (who at whom, from the codes); this line is the
+        # cache key and the record of what was asked.
+        return (f"Who does this sentence show striking at whom? ({_name(facts, s['striker'])}"
+                f" at {_name(facts, s['target'])} was read.)")
     if c.category == "foe_weapon":
         # Asked in `_struck_with`'s shape too; this line is the cache key.
         return f"Which weapon does this sentence show {facts.foe_name}'s blow struck with?"
@@ -2614,6 +2808,13 @@ def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,
             # "He lunges forward, swinging the heavy sap", after two more sentences of "he".
             lead = " ".join(sentences[max(0, at - 4):at]) if at > 0 else ""
             (kept if _strikes_at_you(d, lead, facts, chat, model, host, provider, api_key)
+             else refuted).append(d)
+            continue
+        if d.category == "aimed":
+            # The passage up to the sentence: "you pivot away from the arc of the swing"
+            # says whose swing only in the sentence before it.
+            lead = " ".join(sentences[max(0, at - 3):at]) if at > 0 else ""
+            (kept if _aimed_whom(d, lead, facts, chat, model, host, provider, api_key)
              else refuted).append(d)
             continue
         if d.category == "weapon":
@@ -3229,6 +3430,46 @@ def _strikes_at_you(d: Discrepancy, before: str, facts: Facts, chat, model, host
         return True
     return any((p := facts.person(code)) is not None and p.here and not p.pc
                and code not in facts.struck_by for code in named)
+
+
+def _aimed_whom(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
+                api_key) -> bool:
+    """The second read of an `aimed` contradiction, in `_strikes_at_you`'s shape: WHO the
+    one sentence shows striking and at WHOM, from the codes, with the passage before it for
+    "he" and "the swing" — kept when any blow it names is one the engine did not aim
+    (`aimed_mismatch`, the first read's own rule). The turn's tells are NOT shown: the
+    question is what the sentence says, and shown the engine's answer a reader agrees with
+    it. A call that fails keeps the contradiction, as every second read does."""
+    ask = ((f"The passage before it, for who \"he\", \"she\", \"they\" and \"the blade\" "
+            f"are: {before}\n" if before else "")
+           + f"The sentence: {d.sentence}\n\nPeople: {_aimed_people(facts)}\n\nQuestion: "
+           f"what blow does this sentence show — a swing, cut, thrust, bite or shot, landing "
+           f"or missing — WHO strikes it and at WHOM? Every blow it shows; striker "
+           f"\"{NOT_SHOWN}\" if it never says whose, target \"{NOT_SHOWN}\" if it never says "
+           f"at whom. An empty list if it shows no blow: not only raising a weapon, circling "
+           f"or getting ready.")
+    msgs = [{"role": "system", "content": _CONFIRM_SYSTEM.replace(
+                "one yes-or-no question", "one question")},
+            {"role": "user", "content": ask}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=120, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"blows": {
+                         "type": "array", "maxItems": 4,
+                         "items": {"type": "object", "properties": {
+                             "striker": {"type": "string",
+                                         "enum": aimed_striker_codes(facts)},
+                             "target": {"type": "string",
+                                        "enum": aimed_target_codes(facts)}},
+                             "required": ["striker", "target"]}}},
+                         "required": ["blows"]})
+        rows = [r for r in (reply.json() or {}).get("blows") or [] if isinstance(r, dict)]
+    except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
+        return True
+    return any(aimed_mismatch(str(r.get("striker") or ""), str(r.get("target") or ""), facts)
+               for r in rows)
 
 
 def _in_condition(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
