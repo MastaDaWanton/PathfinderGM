@@ -841,20 +841,12 @@ def leather_roll(request):
         out["band"] = lw.band_for(plan)
     else:
         miss = -margin
-        losses = lw.failure_losses(plan, miss)
-        out["lost"] = lw.spend(pc, losses)
-        if out["lost"]:
-            ruined = ", ".join(f"{x['count']} {x['name']}" for x in out["lost"])
-            said = f"Missed by {miss}. Half of what was on the bench is ruined: {ruined}."
-        else:
-            said = f"Missed by {miss}. The time is lost; the materials are kept."
+        # The rule the bench and a typed line share (`leatherworker.settle_miss`).
+        settled = lw.settle_miss(pc, progress, plan, miss)
+        out["lost"] = settled["lost"]
+        said = settled["said"]
         out["said"] = said
-        got = worldclass.award_step(track, progress, method=plan.method,
-                                    ingredient_id=plan.lead_id,
-                                    rarity_rank=plan.rank_in, quality_index=0,
-                                    success=False, name=lw.doc_name(plan.lead_id)
-                                    if plan.lead_id else "",
-                                    count=max(1, plan.units), noun=plan.noun)
+        got = settled["mastery"]
         out["mastery"] = _mastery(got, progress)
         line = (f"{plan.method.title()} at the leather bench: spoiled (d20 {face}"
                 f"{plan.bonus:+d} = {total} vs DC {plan.dc}). {said}")
@@ -868,9 +860,8 @@ def leather_roll(request):
 # --- finish ------------------------------------------------------------------------------------
 
 def _first(progress, key: str) -> bool:
-    seen = int(progress.crafted.get(key, 0))
-    progress.crafted[key] = seen + 1
-    return seen == 0
+    """`leatherworker.first_time`, the one copy."""
+    return lw.first_time(progress, key)
 
 
 def _next_step(thing) -> str:
@@ -939,76 +930,14 @@ def leather_finish(request):
     tier, score = crafting.tier_from_score(body.get("score"), plan.step_ceiling)
     _PENDING.pop(c.id, None)
     now = _now(c)
-    lw.spend(pc, [(fresh[p.key], n) for p, n in plan.consumes])
-    paid = []
-    if vat:
-        from rules import goods
-
-        purse, ok = goods.spend(pc.purse, vat)
-        if ok:
-            pc.purse = purse
-            paid.append({"cp": vat, "for": f"{plan.vats} vat{'s' if plan.vats != 1 else ''} "
-                                           f"for the wait"})
-    made = lw.make(plan, tier, now=now)
-    where = dict(pend.get("where") or {})
-    landed = lw.land(pc, plan, made, now=now, where=where, setup_score=score)
-
-    lines: list[dict] = []
-    levelled: list[int] = []
-    got = worldclass.award_step(track, progress, method=plan.method,
-                                ingredient_id=plan.lead_id, rarity_rank=plan.rank_in,
-                                quality_index=tier, success=True,
-                                name=lw.doc_name(plan.lead_id) if plan.lead_id else "",
-                                count=max(1, plan.units), noun=plan.noun)
-    lines += list(got.get("reasons") or [])
-    levelled += list(got.get("levelled") or [])
-
-    def bonus(why: str) -> None:
-        res = worldclass.award_bonus(track, progress, why=why, mp=worldclass.FIRST_MP)
-        lines.extend(res.get("reasons") or [])
-        levelled.extend(res.get("levelled") or [])
-
-    for row in landed:
-        what = (row.get("record") or {}).get("product") if row.get("record") else \
-            row["hide"].form
-        if what and _first(progress, f"made:{what}"):
-            bonus(f"first {lw._pattern_word(what).lower() if row.get('record') else what}")
-    worked = []
-    for p, _ in plan.consumes:
-        if p.hide is not None and p.material not in worked:
-            worked.append(p.material)
-    for mid in worked:
-        if _first(progress, f"hide:{mid}"):
-            bonus(f"first work with {lw.doc_name(mid)}")
-
-    # Working a hide reveals its working traits: you watched it behave (plan §16). So does
-    # working WITH a consumable: the tannin that slowed the tan, the oil that made the hide
-    # supple. Measured by the marks lane (2026-10-08): only the hides were asked, so a
-    # tannin's `slow_tan` stayed unknown however many hides went through it. A consumable's
-    # mark is not a working trait and stays Grade's to find (`working_keys` is the "t" list).
-    used = list(worked)
-    for p, _ in plan.consumes:
-        if p.hide is None and p.record is None and p.material and p.material not in used:
-            used.append(p.material)
-    discoveries = []
-    how = f"worked it, day {now // 1440 + 1}"
-    kn = lw._lane("knowledge")
-    for mid in used:
-        doc = lw.material(mid)
-        if doc is None or kn is None:
-            continue
-        try:
-            keys = lw.working_keys(doc)
-            new = lw.reveal(pc, mid, keys, how) if keys else []
-            rows = {r.get("key"): r for r in kn.properties(pc, doc)} if new else {}
-        except Exception:      # noqa: BLE001 - a discovery is never worth losing the work
-            new, rows = [], {}
-        for k in new:
-            text = str((rows.get(k) or {}).get("text") or "")
-            discoveries.append({"material": mid, "name": lw.doc_name(mid), "key": k,
-                                "text": text})
-            bonus(f"learned: {lw.doc_name(mid)}, {text}" if text
-                  else f"learned: {lw.doc_name(mid)}")
+    # The step settled by the rule both doors share (`leatherworker.settle_made`).
+    settled = lw.settle_made(pc, progress, plan, tier,
+                             [(fresh[p.key], n) for p, n in plan.consumes], now=now,
+                             where=dict(pend.get("where") or {}), setup_score=score,
+                             vat_cp=vat)
+    landed, paid = settled["landed"], settled["paid"]
+    lines, levelled = settled["lines"], settled["levelled"]
+    discoveries = settled["discoveries"]
 
     r = pend["roll"]
     tier_name = worldclass.quality_name(tier)
