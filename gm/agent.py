@@ -4547,10 +4547,24 @@ class GMAgent:
             said = getattr(self.engine.scene, "said", None)
             blows = planned.blow_facts(outcomes, self.engine, said)
             opening = planned.blow_opening(said) if blows else ""
+        # Whom the blows were aimed at, and whether any was aimed at the player — on a
+        # creature's turn, on both narrators. The call was written for foes: its one
+        # demonstration swung at "you", and on the 0.2.22 road fight 4 of 5 of the
+        # caravan's allied misses at the toll-keeper reached the page aimed at the player
+        # (docs/ally-swings.md). Read off the engine's blows, never the tell's words.
+        aimed, at_you = "", None
+        if acting:
+            from . import planned
+
+            pairs = planned.blows_aimed(outcomes)
+            if pairs:
+                aimed = planned.aimed_line(self.engine, outcomes)
+                at_you = bool(pc is not None and any(t == pc.ref for _a, t in pairs))
         reply = client.chat(
             prompts.call_two_messages(narration, tells, because, player_input,
                                       acting=acting, pc_name=pc.name if pc else "",
-                                      manner=manner, blows=blows, blow_start=opening),
+                                      manner=manner, blows=blows, blow_start=opening,
+                                      aimed=aimed, at_you=at_you),
             # 700 rather than 250, and it is free. `num_predict` is a ceiling, not a
             # target: llama3.1 writes its two sentences and stops either way. A reasoning
             # model does not — measured on R4C3R/qwen3-8b-heretic, every consequence call
@@ -4565,8 +4579,7 @@ class GMAgent:
         # answer word for word, looped four times — and 2,897 characters of it went
         # straight into the transcript, because nothing stood between this return and
         # `c.transcript.append`. An empty answer is safe: the caller renders the tells.
-        example = (prompts.CONSEQUENCE_NPC_EXAMPLE if acting
-                   else prompts.CONSEQUENCE_EXAMPLE)
+        example = prompts.consequence_example(acting, at_you)
         cleaned = narration_mod.clean_consequence(
             self._lift(reply.text.strip()), example["assistant"],
             # So a turn genuinely about the example's scenery keeps its sentences: the

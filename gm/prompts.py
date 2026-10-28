@@ -2542,35 +2542,86 @@ CONSEQUENCE_NPC_EXAMPLE = {
 }
 
 
+# A creature's turn whose blow is aimed at somebody else — an ally of the player's swinging
+# at a foe, a foe at the player's ally. The example above was the call's ONLY demonstration
+# of a creature's turn, and it is the victim's message: the creature swings, "you duck under
+# it". Measured 2026-10-27 on the 0.2.22 road fight (docs/ally-swings.md): the caravan's
+# hired hands swung at the toll-keeper, every tell said so, and 4 of the 5 allied misses
+# reached the page as aimed at the player — "you pivot away from the arc of the swing". The
+# MUDs settled this decades ago: tbaMUD writes every combat message three times, to the
+# attacker, to the victim and to the room (fight.c `dam_message`: TO_CHAR, TO_VICT,
+# TO_NOTVICT), and sends each reader the one for their part in it. This is the room's
+# message: the player is in none of it. Picked in code by whom the engine's blows were
+# aimed at (`consequence_example`), never by asking the model. The same ferry, for the same
+# reason as the two above: a copied answer must be catchable.
+CONSEQUENCE_NPC_ASIDE_EXAMPLE = {
+    "user": (
+        "It is the deckhand's turn, not the player's. The deckhand acted; the player's "
+        "character is \"you\".\n\n"
+        "You had already narrated: The ferryman backs along the rail, the boathook up, "
+        "and the deckhand comes at him with an oar.\n\n"
+        "What the engine decided:\n"
+        "- The deckhand's attack with the oar misses the ferryman.\n\n"
+        "Whom each blow was aimed at: the deckhand at the ferryman. No blow this turn was "
+        "aimed at you (the player).\n"
+    ),
+    "assistant": (
+        "The deckhand swings the oar low at the ferryman's knees, and the old man skips "
+        "back from it with a curse; the blade slaps the wet planks between them. The "
+        "deckhand hauls it up again, breathing hard."
+    ),
+}
+
+
+def consequence_example(acting: str = "", at_you: bool | None = None) -> dict:
+    """The consequence call's one demonstration: the player's turn, a creature's turn at
+    the player, or a creature's turn at somebody else (`at_you` False — the engine's blows
+    this turn aimed at nobody who is the player). `at_you` None, when the turn struck no
+    blow or the engine cannot say, keeps the creature-at-you example it always had."""
+    if not acting:
+        return CONSEQUENCE_EXAMPLE
+    return CONSEQUENCE_NPC_ASIDE_EXAMPLE if at_you is False else CONSEQUENCE_NPC_EXAMPLE
+
+
 def call_two_messages(narration: str, tells: list[str], because: list[str],
                       player_input: str, *, acting: str = "",
                       pc_name: str = "", manner: str = "",
                       blows: list[str] | None = None,
-                      blow_start: str = "") -> list[dict]:
+                      blow_start: str = "", aimed: str = "",
+                      at_you: bool | None = None) -> list[dict]:
     """The consequence call. `acting` is set on a creature's own turn: then the call
     says whose turn it is instead of "The player said: <creature> acts", shows the
     tells with the player already as "you" (Inform's adaptive text does the same — one
     report, rendered "you" for the player and by name for anyone else, the story's
     viewpoint applied by the system rather than guessed by the writer), and
-    demonstrates a creature's turn rather than the player's."""
+    demonstrates a creature's turn rather than the player's.
+
+    `aimed` is whom this turn's blows were aimed at, by name (`planned.aimed_line`), and
+    `at_you` whether any was aimed at the player: False picks the bystander's
+    demonstration (`consequence_example`). Both narrators get them — the fault was the
+    call's, not one narrator's."""
     if acting and pc_name:
         from .narration import pc_to_second_person
 
         tells = [pc_to_second_person(t, pc_name)[0] if t else t for t in tells]
     facts = "\n".join(f"- {t}" for t in tells if t)
     why = "\n".join(f"- {b}" for b in because if b)
+    example = consequence_example(acting, at_you)
     if acting:
         opening = (f"It is {acting}'s turn, not the player's. {acting} acted; the "
                    f"player's character is \"you\".\n\n")
-        example = CONSEQUENCE_NPC_EXAMPLE
     else:
         opening = f"The player said: {player_input}\n\n"
-        example = CONSEQUENCE_EXAMPLE
     content = (
         opening
         + f"You had already narrated: {narration}\n\n"
         + f"What the engine decided:\n{facts}\n"
     )
+    # Beside the tells, where the aside example has it: the tell already names the one
+    # struck, and the model still wrote "you" — a fact stated once in the tell's long
+    # sentence lost to the demonstration. Said again on its own line, by name.
+    if acting and aimed:
+        content += f"\n{aimed}\n"
     if why:
         content += f"\nWhy it was rolled:\n{why}\n"
     # A companion's turn: how they do it, as a fact beside the tells (gm/companions.py
@@ -2602,10 +2653,14 @@ def call_two_messages(narration: str, tells: list[str], because: list[str],
 
 # The targeted repair under `wrong-actor`: a creature's turn told the wrong way round.
 # One call per beat, and only when the check fired — never a standing cost of a round.
+# It said the player was "the one it is done to" until 2026-10-27: true of a foe's turn, and
+# on an ally's — the caravan's hired sword at the toll-keeper — an order to turn the blow on
+# the player (docs/ally-swings.md). The tells name the one it is done to; it follows them.
 ACTOR_REPAIR_BRIEFING = """You narrated a creature's turn in a fight, and wrote it the
 wrong way round: the creature's act was given to the player, or the player's name to the
 creature. Rewrite the passage so the creature named is the one who acts, called by its
-name, and the player's character is "you" — the one it is done to — and never named.
+name, and the player's character is "you" and never named. It is done to whoever the
+tells say it is done to: to you only where the tells say "you".
 
 Keep what happened exactly as the tells say, the voice, and about the same length. Do not
 say how any roll turned out beyond what the tells say.
@@ -3970,6 +4025,7 @@ def demonstrations() -> tuple[tuple[str, str], ...]:
             out.append((f"CONFIDE_EXAMPLES[{kind}][{i}]", str(ex["line"])))
     out.append(("CONSEQUENCE_EXAMPLE", CONSEQUENCE_EXAMPLE["assistant"]))
     out.append(("CONSEQUENCE_NPC_EXAMPLE", CONSEQUENCE_NPC_EXAMPLE["assistant"]))
+    out.append(("CONSEQUENCE_NPC_ASIDE_EXAMPLE", CONSEQUENCE_NPC_ASIDE_EXAMPLE["assistant"]))
     out.append(("ACTOR_REPAIR_EXAMPLE",
                 str(json.loads(ACTOR_REPAIR_EXAMPLE["assistant"])["narration"])))
     for key, line in json.loads(MANNER_REPAIR_EXAMPLE["assistant"]).items():

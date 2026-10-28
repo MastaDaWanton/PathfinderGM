@@ -374,14 +374,37 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
     Read off `Outcome.blows`, the tell's structured twin the engine writes as each swing
     falls: a hit's weapon and its wound, its severity against the one struck, a confirmed
     critical, how they are left; a miss's kind. The bands are the engine's; this only
-    words them, three ways each, least recently used."""
+    words them, three ways each, least recently used.
+
+    Each line opens on who swung at whom, by name ("the hired sword at Toll-Keeper", "you
+    at the cutpurse", "Jarek at you"): Diku's three audiences, where every combat message
+    names its attacker and its victim and the reader's own part in it decides "you"
+    (tbaMUD fight.c, `dam_message`: TO_CHAR, TO_VICT, TO_NOTVICT). Until 2026-10-27 a miss
+    named nobody at all — "MISS — weapon: halberd; it is evaded" — and the NPC-turn
+    narrator, whose one demonstration had the creature swinging at "you", filled the hole
+    with the player: an ally's swing at the toll-keeper told as "you pivot away from the
+    arc of the swing" on 4 of 5 allied misses in the 0.2.22 road fight. Every hit named
+    the one struck ("Toll-Keeper after it: …") and none was turned round."""
     out: list[str] = []
+    scene = engine.scene
+
+    def called(ref) -> str:
+        who = scene.actors.get(ref) if ref else None
+        if who is None:
+            return ""
+        return "you" if who.is_pc else narration_mod.definite(str(who.name))
+
     for o in outcomes or []:
+        attacker = called(getattr(o, "actor", "") or "")
         for b in getattr(o, "blows", None) or []:
+            target = called(b.get("ref"))
+            # "the hired sword at Toll-Keeper — " when both are known; an outcome from
+            # before the actor was stamped, or a blow from before misses carried their
+            # target, keeps the old shape rather than guessing.
+            head = (f"{attacker} at {target} — " if attacker and target and attacker != target
+                    else "")
             if b.get("result") == "hit":
-                who = engine.scene.actors.get(b.get("ref"))
-                name = (narration_mod.definite(str(who.name))
-                        if who is not None and not who.is_pc else "you")
+                name = target or "you"
                 severity = str(b.get("severity") or "solid")
                 bits = [f"weapon: {b.get('weapon') or 'a blow'}"
                         + (f" ({b['type']})" if b.get("type") else ""),
@@ -394,15 +417,73 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
                 left = str(b.get("left") or "hurt")
                 bits.append(f"{name} after it: "
                             + _pick(said, f"blow:left:{left}", _LEFT.get(left, _LEFT["hurt"])))
-                out.append("HIT — " + "; ".join(bits))
+                out.append("HIT — " + head + "; ".join(bits))
             elif b.get("result") == "miss":
                 how = str(b.get("how") or "plain")
                 # The weapon on a miss too: told only "it misses", the consequence call
                 # took the wind-up's invented crossbow and wrote "the heavy bolt whistles
                 # past" for a swung sap (the 2026-10-16 planned fight bench).
-                out.append("MISS — " + (f"weapon: {b['weapon']}; " if b.get("weapon") else "")
+                out.append("MISS — " + head
+                           + (f"weapon: {b['weapon']}; " if b.get("weapon") else "")
                            + _pick(said, f"blow:miss:{how}", _MISS.get(how, _MISS["plain"])))
     return out
+
+
+def blows_aimed(outcomes) -> list[tuple[str, str]] | None:
+    """(attacker ref, target ref) for every blow resolved this turn, in order and once
+    each — read off the outcome's stamped `actor` and each blow's `ref` (the engine's own
+    record of the one swung at, hit or miss), never off the tell's English. A creature's
+    turn can hold other people's blows too: the toll-keeper's walk in drew two attacks of
+    opportunity from the caravan's hands, and that beat told one of them at "you".
+
+    None when some resolved blow cannot say who swung or at whom (a recording from before
+    misses carried their target): then nobody may judge the beat by it. [] when the turn
+    struck no blow at all."""
+    out: list[tuple[str, str]] = []
+    for o in outcomes or []:
+        d = o if isinstance(o, dict) else None
+        op = d.get("op") if d is not None else getattr(o, "op", "")
+        status = d.get("status") if d is not None else getattr(o, "status", "")
+        actor = str((d.get("actor") if d is not None else getattr(o, "actor", "")) or "")
+        blows = (d.get("blows") if d is not None else getattr(o, "blows", None)) or []
+        if op != "attack" or status == "refused" or not blows:
+            continue
+        for b in blows:
+            if not isinstance(b, dict) or not b.get("ref") or not actor:
+                return None
+            out.append((actor, str(b["ref"])))
+    return list(dict.fromkeys(out))
+
+
+def aimed_line(engine, outcomes) -> str:
+    """Whom this turn's blows were aimed at, by name, as one fact for the NPC-turn call —
+    and, when none was aimed at the player, that the player was not struck at. "" when the
+    turn struck no blow or the engine cannot say.
+
+    The call's opening said only "the player's character is 'you'", and its one
+    demonstration had the creature swinging at "you"; on an ally's turn nothing said the
+    blow went anywhere else."""
+    pairs = blows_aimed(outcomes)
+    if not pairs:
+        return ""
+    scene = engine.scene
+
+    def called(ref: str) -> str:
+        who = scene.actors.get(ref)
+        if who is None:
+            return ""
+        return "you" if who.is_pc else narration_mod.definite(str(who.name))
+
+    said = [f"{called(a)} at {called(t)}" for a, t in pairs if called(a) and called(t)]
+    if not said:
+        return ""
+    line = "Whom each blow was aimed at: " + "; ".join(dict.fromkeys(said)) + "."
+    pc = scene.pc()
+    if pc is not None and not any(t == pc.ref for _a, t in pairs):
+        # Said plainly and without the moves it rules out: a phrase put in front of the
+        # model, even as a thing not to write, is a phrase it has been shown (CLAUDE.md).
+        line += " No blow this turn was aimed at you (the player)."
+    return line
 
 
 # Where a blow's telling begins, one a blow, least recently used. Measured on the 2026-10-16
