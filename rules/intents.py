@@ -408,6 +408,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # to be checked against the input there, not the result. See `Engine._check_craft`.
     "craft": (("track", "recipe"), ("actor", "tier", "stages", "risky", "failed",
                                     "milestone", "concentrating"), "hidden"),
+    # A craft typed at the table, made for real (rules/typed_craft.py): `craft` is one of
+    # `typed_craft.CRAFTS`, `item` the player's own words for the thing, `work` the
+    # reader's closed answer whether the words ask for the plain item or finer work. The
+    # engine walks the bench's own chain for the base item, a player's d20 per step.
+    # `words` is the whole action as the player wrote it ("brew a tea from the yarrow"),
+    # for what the work is made FROM, grounded in the craft's catalogue by the engine.
+    # Written only by the act->op table from the reader's `craft` act (CODE_ONLY_OPS).
+    "make": (("craft",), ("item", "work", "words"), "player"),
     # Spending or granting a pool: ki, rage rounds, a use per day, a stack on an enemy.
     # `to` because a stack lives on the creature it was applied to, not on whoever
     # applied it.
@@ -732,7 +740,13 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
 # measured on the owner's 0.2.21 save, five planned replies made up a job nobody held.
-CODE_ONLY_OPS = frozenset({"job"})
+#
+# `make` and `craft` since 2026-10-28 (rules/typed_craft.py). The plan's `craft` paid
+# mastery and made nothing, from a tier, stages and a risk the model chose: a door to
+# mastery with no item, no roll and no material spent. A typed craft line is the reader's
+# `craft` act, built whole into `make`; the chain bench (play/craft_views.py) still writes
+# `craft` itself, from code.
+CODE_ONLY_OPS = frozenset({"job", "make", "craft"})
 JOB_DOES = ("offer", "accept", "decline")
 
 ENGINE_OWNED_PARAMS = {

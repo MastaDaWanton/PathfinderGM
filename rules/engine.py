@@ -3508,6 +3508,14 @@ class Engine:
 
         if intent.op == "craft":
             self._check_craft(intent, index)
+        if intent.op == "make":
+            from . import typed_craft
+
+            if str(intent.params.get("craft") or "").strip().lower() \
+                    not in typed_craft.CRAFTS:
+                raise IntentError(
+                    f"make: craft is one of {', '.join(typed_craft.CRAFTS)}", "schema",
+                    index)
 
         if intent.op == "cast":
             self._check_cast(intent, index)
@@ -10433,6 +10441,122 @@ class Engine:
             effects=[{"ref": actor.ref, "kind": "craft", **result, "was": was}],
             tell=" ".join(bits), because=intent.because,
         )
+
+    def _op_make(self, intent: Intent, partial: dict) -> Outcome:
+        """A craft typed at the table: the base item, made by the bench's own chain
+        (rules/typed_craft.py has the why, the prior art and each craft's chain).
+
+        The report it answers, 2026-10-28: "My wife tries to level up blacksmithing through
+        narration and didn't get real items or experience." The reader read every craft
+        line `other`, which owes no op; nothing was rolled, spent or made.
+
+        Each step is the player's own d20 (`_roll_or_suspend_stage`, as an attack's stages
+        are), and what the steps already did rides the suspension in `make_state` — the
+        world has already changed by then (a blank on the shelf), so on the way back the
+        chain is asked again from the pack and goes on from where the work stands. A step
+        that cannot be worked is refused in words before anything changes (Inform's check
+        rule); after a step has been worked, the refusal ends the work where it is and the
+        steps done are kept. Anything finer than the plain item is refused with the bench
+        named (the owner's ruling), and every tell ends by pointing to the bench.
+        """
+        from . import typed_craft
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("make: nobody here to do the work", "refs")
+        craft_id = str(intent.params.get("craft") or "").strip().lower()
+        craft = typed_craft.get(craft_id)
+        bench = typed_craft.BENCHES.get(craft_id) or {}
+        point = {"ref": actor.ref, "kind": "bench", "craft": craft_id,
+                 "bench": bench.get("key", "")}
+        pointer = typed_craft.pointer(craft_id)
+
+        def refused(why: str, code: str) -> Outcome:
+            out = self._refuse(intent, f"{why} {pointer}".strip() if pointer not in why
+                               else why, code=code, for_a_person=why)
+            out.effects = [point]
+            return out
+
+        if craft is None:
+            return refused(f"{typed_craft.BENCHES.get(craft_id, {}).get('name', 'The bench')}"
+                           f" is where that work is done.", "at_the_bench")
+        if self.scene.in_encounter:
+            return refused("There is a fight going on: no craft is worked until it is "
+                           "over.", "in_a_fight")
+        if str(intent.params.get("work") or "plain") != "plain":
+            return refused(f"That is finer work than the plain item a few words can make.",
+                           "beyond_base")
+        target = craft.target(str(intent.params.get("item") or ""), actor,
+                              str(intent.params.get("words") or ""))
+        if isinstance(target, typed_craft.Refusal):
+            return refused(target.why, target.code)
+        # What was asked for, in the engine's name for it: the read-back's attempt is
+        # "making <this>" (gm/beat_verify.py `attempts_of`).
+        point["target"] = target.name
+
+        state = partial.pop("make_state", None) or {"done": []}
+        done = state.setdefault("done", [])
+        rolls: list = []
+        verdict = None
+        for _ in range(6):
+            step = craft.next_step(self, actor, target, done)
+            if step is None:
+                break
+            if isinstance(step, typed_craft.Refusal):
+                if not done:
+                    return refused(step.why, step.code)
+                done.append({"tell": f"The work stops there: {step.why}", "effects": [],
+                             "made": [], "final": False})
+                break
+            mods = [Modifier(int(t["value"]), str(t.get("label") or t.get("why") or ""))
+                    for t in step.terms if int(t.get("value", 0) or 0)]
+            roll = self._roll_or_suspend_stage(intent, actor, mods, step.label, step.dc,
+                                               partial, state, "1d20",
+                                               state_key="make_state")
+            rolls.append(roll)
+            if step.roll_twice:
+                # A `pure` lead: twice, the better kept (Pathfinder Unchained), as the
+                # bench rolls it — the second die the engine's, shown beside the first.
+                again = self.dice.d20(mods, label=f"{step.label} (pure)",
+                                      visibility="player")
+                rolls.append(again)
+                if again.total > roll.total:
+                    roll = again
+            # A skill check: no natural 20 or natural 1 (CRB p.180), as at every bench.
+            made = roll.total >= step.dc
+            self._judge(roll, made)
+            verdict = "success" if made else "failure"
+            # The time passes and the forge's hours are paid either way, as at the bench.
+            self.scene.advance(step.minutes)
+            if step.rent_cp:
+                from . import goods
+
+                purse, ok = goods.spend(actor.purse, step.rent_cp)
+                if ok:
+                    actor.purse = purse
+            report = step.settle(made, roll.total - step.dc)
+            if step.rent_cp:
+                report["effects"].append({"ref": actor.ref, "kind": "rent", "cp":
+                                          step.rent_cp, "to": step.rent_to or ""})
+            done.append(report)
+            # `stop`: the step's product waits on the clock (a tan in the vat, a potion
+            # setting), so the chain goes no further this turn.
+            if not made or step.final or report.get("stop"):
+                break
+
+        effects = [e for d in done for e in d.get("effects") or []] + [point]
+        tell = " ".join(d["tell"] for d in done if d.get("tell"))
+        # The verdict is the work's, not the last die's: made only when the step that
+        # lands the thing asked for landed it (or set it waiting on the clock). A blank
+        # forged and then no haft to finish it is a dagger NOT made.
+        if any(d.get("made") and (d.get("final") or d.get("stop")) for d in done):
+            verdict = "success"
+        elif rolls:
+            verdict = "failure"
+        return Outcome(intent_id=intent.id, op="make", rolls=rolls, verdict=verdict,
+                       effects=effects, tell=f"{tell} {pointer}".strip(),
+                       because=intent.because)
 
     def _op_resource(self, intent: Intent, partial: dict) -> Outcome:
         """Spend or grant a pool.
