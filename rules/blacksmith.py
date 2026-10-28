@@ -3329,3 +3329,149 @@ def reveal(actor, material_id: str, keys, how: str) -> list[str]:
 
         fn = herbknowledge.reveal
     return list(fn(actor, material_id, list(keys), how) or [])
+
+
+# --- settling a step (shared by the bench and a typed line) ------------------------------
+#
+# Lifted out of play/forge_views.py on 2026-10-28, when a typed line ("I forge a dagger at
+# the anvil") began making a base item through the engine's `make` op (rules/typed_craft.py).
+# Two doors to one step would be two copies of the failure rule, the batch's mastery and the
+# first-work bonuses, and the copy nobody looks at is the one that drifts (CLAUDE.md, "when
+# you fix a rule, grep for every copy of it"). The bench's roll and finish and the engine's
+# op both settle a step here.
+
+def step_units(plan) -> tuple[int, str]:
+    """How many steps a forge batch is for mastery, and what one of them is called.
+
+    The owner, 2026-10-05: "batch crafting does not give equivalent experience". Measured
+    before this: a smelt of 5 iron ingots paid 1 step MP where five single smelts paid 3.
+    A batch of N at Smelt, Alloy, Forge or Strengthen (the bulk rows, plan §4.5) is now N
+    steps through `award_step`, paid exactly as N singles would be (every success pays
+    since the owner's "batch of 10 should pay 10", the same day).
+    The unit is the batch's own (`plan.units`): one per ingot smelted, blank or plate
+    forged and bar strengthened, which is also one unit of the rule's inputs. Every other
+    method works one piece at a time and is 1.
+
+    Alloy is counted in pours, not bars: one pour of a 9:1 bronze makes ten bars from a
+    charge the player sized, and the shares' windows decide how small a pour can be, so a
+    pour is the smallest Alloy there is. Batch repeats the pour.
+    """
+    units = max(1, int(getattr(plan, "units", 1) or 1))
+    if plan.method == "alloy":
+        return units, "pour"
+    return units, plan.noun or "piece"
+
+
+def first_time(progress, key: str) -> bool:
+    """Count one more of `key` in the track's ledger; True the first time."""
+    seen = int(progress.crafted.get(key, 0))
+    progress.crafted[key] = seen + 1
+    return seen == 0
+
+
+def settle_miss(actor, progress, plan: ForgePlan, miss: int) -> dict:
+    """A failed roll at the forge, by the book's Craft rule (`failure_losses`): what is
+    ruined is spent now, and the failed step is paid as mastery (a failure still teaches,
+    up to `worldclass.MISHAP_LIMIT`). Returns {"lost", "said", "mastery"}; `mastery` is
+    `award_step`'s answer."""
+    track = wc.get(TRACK_ID)
+    lost = spend(actor, failure_losses(plan, miss))
+    if lost:
+        ruined = ", ".join(f"{x['count']} {x['name']}" for x in lost)
+        said = f"Missed by {miss}. Half of what was on the anvil is ruined: {ruined}."
+    elif miss >= 5 and plan.lead is not None and plan.lead.has("malleable"):
+        said = (f"Missed by {miss}. The metal is malleable and forgives it: the time is "
+                f"lost, nothing is ruined.")
+    else:
+        said = f"Missed by {miss}. The time is lost; the materials are kept."
+    lead = plan.lead
+    # The whole batch failed on one roll: that many failed steps (`step_units`).
+    count, noun = step_units(plan)
+    got = wc.award_step(track, progress, method=plan.method,
+                        ingredient_id=lead.id if lead else "",
+                        rarity_rank=plan.rank_in, quality_index=0,
+                        success=False, name=lead.name if lead else "",
+                        count=count, noun=noun)
+    return {"lost": lost, "said": said, "mastery": got}
+
+
+def settle_made(actor, progress, plan: ForgePlan, tier: int, consumes, *, dice=None,
+                now: int = 0) -> dict:
+    """A made roll at the forge, finished at `tier`: the materials in `consumes` (the
+    rack's own pieces, read fresh) are spent, the product lands, the step and the firsts
+    are paid, and working a material reveals its working traits (plan §9.2: "you watched
+    it behave").
+
+    The Yield perk's d100 is rolled here on `dice` (the one random reward, shown: plan
+    §4.2); with no dice there is no roll and no extra. Returns {"landed", "lines",
+    "levelled", "discoveries", "tier"}: `landed` is `land`'s [(stock key, Work, count)]."""
+    track = wc.get(TRACK_ID)
+    perks = wc.perk_multipliers(progress)
+    chance = float(perks.get("yield_chance", 0) or 0)
+    extra, yield_line = 0, None
+    if dice is not None and chance > 0 and plan.yields:
+        roll = dice.roll("1d100", label="Yield perk", visibility="player")
+        at = int(round(chance * 100))
+        extra = 1 if roll.total <= at else 0
+        yield_line = {"why": f"Yield perk: d100 {roll.total} against {at} or less, "
+                             f"{'one more ' + plan.noun if extra else 'nothing extra'}",
+                      "mp": 0}
+
+    spend(actor, list(consumes))
+    made = make(plan, tier, extra=extra)
+    landed = land(actor, made)
+
+    lines: list[dict] = []
+    levelled: list[int] = []
+    lead = plan.lead
+    # A batch pays as its units worked one at a time would (`step_units`).
+    count, noun = step_units(plan)
+    got = wc.award_step(track, progress, method=plan.method,
+                        ingredient_id=lead.id if lead else "",
+                        rarity_rank=plan.rank_in, quality_index=tier, success=True,
+                        name=lead.name if lead else "", count=count, noun=noun)
+    lines += list(got.get("reasons") or [])
+    levelled += list(got.get("levelled") or [])
+
+    def bonus(why: str) -> None:
+        res = wc.award_bonus(track, progress, why=why, mp=wc.FIRST_MP)
+        lines.extend(res.get("reasons") or [])
+        levelled.extend(res.get("levelled") or [])
+
+    for _key, w, _n in landed:
+        if first_time(progress, f"made:{w.form}"):
+            bonus(f"first {w.form}")
+    # The smith's own materials: a leather base, grip or lacing set is the tanner's work,
+    # learned at the leather bench (lane F's Grade), so fitting it pays no "first work
+    # with Deer Hide" and reveals none of the hide's traits as the smith's discovery.
+    worked = []
+    for p, _ in plan.consumes:
+        if p.material and p.material not in worked and not p.from_leather:
+            worked.append(p.material)
+    for mid in worked:
+        if first_time(progress, f"metal:{mid}"):
+            m = metal(mid)
+            bonus(f"first work with {m.name if m else mid}")
+
+    # Working a material reveals its working traits: you watched it behave (plan §9.2).
+    discoveries = []
+    how = f"worked it, day {int(now) // 1440 + 1}"
+    kn = _lane("knowledge")
+    for mid in worked:
+        m = metal(mid)
+        if m is None or kn is None:
+            continue
+        try:
+            keys = working_keys(m.doc)
+            new = reveal(actor, mid, keys, how) if keys else []
+            rows = {r.get("key"): r for r in kn.properties(actor, m.doc)} if new else {}
+        except Exception:      # noqa: BLE001 - a discovery is never worth losing the work
+            new, rows = [], {}
+        for k in new:
+            text = str((rows.get(k) or {}).get("text") or "")
+            discoveries.append({"material": mid, "name": m.name, "key": k, "text": text})
+            bonus(f"learned: {m.name}, {text}" if text else f"learned: {m.name}")
+    if yield_line:
+        lines.append(yield_line)
+    return {"landed": landed, "lines": lines, "levelled": levelled,
+            "discoveries": discoveries}

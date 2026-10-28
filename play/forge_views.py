@@ -798,25 +798,8 @@ def _face(body) -> tuple[int | None, JsonResponse | None]:
 
 
 def _step_units(plan) -> tuple[int, str]:
-    """How many steps a forge batch is for mastery, and what one of them is called.
-
-    The owner, 2026-10-05: "batch crafting does not give equivalent experience". Measured
-    before this: a smelt of 5 iron ingots paid 1 step MP where five single smelts paid 3.
-    A batch of N at Smelt, Alloy, Forge or Strengthen (the bulk rows, plan §4.5) is now N
-    steps through `award_step`, paid exactly as N singles would be (every success pays
-    since the owner's "batch of 10 should pay 10", the same day).
-    The unit is the batch's own (`plan.units`): one per ingot smelted, blank or plate
-    forged and bar strengthened, which is also one unit of the rule's inputs. Every other
-    method works one piece at a time and is 1.
-
-    Alloy is counted in pours, not bars: one pour of a 9:1 bronze makes ten bars from a
-    charge the player sized, and the shares' windows decide how small a pour can be, so a
-    pour is the smallest Alloy there is. Batch repeats the pour.
-    """
-    units = max(1, int(getattr(plan, "units", 1) or 1))
-    if plan.method == "alloy":
-        return units, "pour"
-    return units, plan.noun or "piece"
+    """`blacksmith.step_units`, the one copy (the bench and a typed line share it)."""
+    return bs.step_units(plan)
 
 
 def _mastery(got: dict, progress) -> dict:
@@ -892,25 +875,11 @@ def forge_roll(request):
         out["heat"] = _heat(plan)
     else:
         miss = -margin
-        losses = bs.failure_losses(plan, miss)
-        out["lost"] = bs.spend(pc, losses)
-        if out["lost"]:
-            ruined = ", ".join(f"{x['count']} {x['name']}" for x in out["lost"])
-            said = f"Missed by {miss}. Half of what was on the anvil is ruined: {ruined}."
-        elif miss >= 5 and plan.lead is not None and plan.lead.has("malleable"):
-            said = (f"Missed by {miss}. The metal is malleable and forgives it: the time is "
-                    f"lost, nothing is ruined.")
-        else:
-            said = f"Missed by {miss}. The time is lost; the materials are kept."
+        settled = bs.settle_miss(pc, progress, plan, miss)
+        out["lost"] = settled["lost"]
+        said = settled["said"]
         out["said"] = said
-        lead = plan.lead
-        # The whole batch failed on one roll: that many failed steps (`_step_units`).
-        count, noun = _step_units(plan)
-        got = worldclass.award_step(track, progress, method=plan.method,
-                                    ingredient_id=lead.id if lead else "",
-                                    rarity_rank=plan.rank_in, quality_index=0,
-                                    success=False, name=lead.name if lead else "",
-                                    count=count, noun=noun)
+        got = settled["mastery"]
         out["mastery"] = _mastery(got, progress)
         line = (f"{plan.method.title()} at the forge: spoiled (d20 {best}{plan.bonus:+d} = "
                 f"{total} vs DC {plan.dc}). {said}")
@@ -924,9 +893,8 @@ def forge_roll(request):
 # --- finish ------------------------------------------------------------------------------
 
 def _first(progress, key: str) -> bool:
-    seen = int(progress.crafted.get(key, 0))
-    progress.crafted[key] = seen + 1
-    return seen == 0
+    """`blacksmith.first_time`, the one copy."""
+    return bs.first_time(progress, key)
 
 
 @require_POST
@@ -960,80 +928,20 @@ def forge_finish(request):
     reheats = read_int(body, "reheats", 0, lo=0, hi=50)
     engine = c.engine()
 
-    # The Yield perk: the one random reward, so its roll is shown (plan §4.2).
-    perks = worldclass.perk_multipliers(progress)
-    chance = float(perks.get("yield_chance", 0) or 0)
-    extra, yield_line = 0, None
-    if chance > 0 and plan.yields:
-        roll = engine.dice.roll("1d100", label="Yield perk", visibility="player")
-        at = int(round(chance * 100))
-        extra = 1 if roll.total <= at else 0
-        yield_line = {"why": f"Yield perk: d100 {roll.total} against {at} or less, "
-                             f"{'one more ' + plan.noun if extra else 'nothing extra'}",
-                      "mp": 0}
-
     _PENDING.pop(c.id, None)
-    bs.spend(pc, [(fresh[p.key], n) for p, n in plan.consumes])
-    made = bs.make(plan, tier, extra=extra)
-    landed = bs.land(pc, made)
     # A reheat costs world time (plan §11: "5 minutes of world time", proposed).
     extra_minutes = reheats * int(bs.bench_rules().get("reheat_minutes", 5))
     if extra_minutes:
         c.scene.advance(extra_minutes)
-
-    lines: list[dict] = []
-    levelled: list[int] = []
-    lead = plan.lead
-    # A batch pays as its units worked one at a time would (`_step_units`).
-    count, noun = _step_units(plan)
-    got = worldclass.award_step(track, progress, method=plan.method,
-                                ingredient_id=lead.id if lead else "",
-                                rarity_rank=plan.rank_in, quality_index=tier, success=True,
-                                name=lead.name if lead else "", count=count, noun=noun)
-    lines += list(got.get("reasons") or [])
-    levelled += list(got.get("levelled") or [])
-
-    def bonus(why: str) -> None:
-        res = worldclass.award_bonus(track, progress, why=why, mp=worldclass.FIRST_MP)
-        lines.extend(res.get("reasons") or [])
-        levelled.extend(res.get("levelled") or [])
-
-    for _key, w, _n in landed:
-        if _first(progress, f"made:{w.form}"):
-            bonus(f"first {w.form}")
-    # The smith's own materials: a leather base, grip or lacing set is the tanner's work,
-    # learned at the leather bench (lane F's Grade), so fitting it pays no "first work
-    # with Deer Hide" and reveals none of the hide's traits as the smith's discovery.
-    worked = []
-    for p, _ in plan.consumes:
-        if p.material and p.material not in worked and not p.from_leather:
-            worked.append(p.material)
-    for mid in worked:
-        if _first(progress, f"metal:{mid}"):
-            m = bs.metal(mid)
-            bonus(f"first work with {m.name if m else mid}")
-
-    # Working a material reveals its working traits: you watched it behave (plan §9.2).
-    discoveries = []
-    now = int(c.scene.clock_minutes or 0)
-    how = f"worked it, day {now // 1440 + 1}"
-    kn = bs._lane("knowledge")
-    for mid in worked:
-        m = bs.metal(mid)
-        if m is None or kn is None:
-            continue
-        try:
-            keys = bs.working_keys(m.doc)
-            new = bs.reveal(pc, mid, keys, how) if keys else []
-            rows = {r.get("key"): r for r in kn.properties(pc, m.doc)} if new else {}
-        except Exception:      # noqa: BLE001 - a discovery is never worth losing the work
-            new, rows = [], {}
-        for k in new:
-            text = str((rows.get(k) or {}).get("text") or "")
-            discoveries.append({"material": mid, "name": m.name, "key": k, "text": text})
-            bonus(f"learned: {m.name}, {text}" if text else f"learned: {m.name}")
-    if yield_line:
-        lines.append(yield_line)
+    # The step settled by the rule both doors share (`blacksmith.settle_made`): the Yield
+    # perk's d100, the spend, the product, the step's mastery, the firsts and the
+    # discoveries.
+    settled = bs.settle_made(pc, progress, plan, tier,
+                             [(fresh[p.key], n) for p, n in plan.consumes],
+                             dice=engine.dice, now=int(c.scene.clock_minutes or 0))
+    landed = settled["landed"]
+    lines, levelled = settled["lines"], settled["levelled"]
+    discoveries = settled["discoveries"]
 
     r = pend["roll"]
     tier_name = worldclass.quality_name(tier)
