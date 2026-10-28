@@ -2495,6 +2495,13 @@ class Outcome:
     # critical, the weapon and its wound — or how a miss missed (`how`). Words, never a
     # number: the planned narrator's fights are written from these (gm/planned.py
     # `blow_facts`) so the colour has a fact under it. Empty on everything but an attack.
+    #
+    # Every blow carries `ref`, the one it was swung at, hit or miss. Until 2026-10-27 only
+    # a hit did, so a miss's facts named nobody: on the road fights of 0.2.22 the caravan's
+    # hired hands swung at the toll-keeper, the tell said so, and the NPC-turn narrator,
+    # handed "MISS — weapon: halberd; it is evaded", wrote "you pivot away from the arc of
+    # the swing" on 4 of 5 allied misses (docs/ally-swings.md). tbaMUD's every miss message
+    # names its victim ("$n tries to #w $N, but misses", fight.c `dam_weapons`).
     blows: list[dict] = field(default_factory=list)
     # The ref of whoever made the attempt (`Intent.actor`), stamped where every op leaves
     # the engine (`_resolve_one`). Emitted only when set, as `mode` is.
@@ -6991,7 +6998,7 @@ class Engine:
                 if natural == 1:
                     self._judge(atk, False)
                     state.setdefault("blows", []).append(
-                        {"result": "miss", "how": "wild",
+                        {"result": "miss", "how": "wild", "ref": defender.ref,
                          "weapon": str(weapon.get("name") or weapon_key)})
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
@@ -7007,7 +7014,8 @@ class Engine:
                 if not d20_succeeds(atk, swing_ac):
                     self._judge(atk, False)
                     state.setdefault("blows", []).append(
-                        {"result": "miss", "weapon": str(weapon.get("name") or weapon_key),
+                        {"result": "miss", "ref": defender.ref,
+                         "weapon": str(weapon.get("name") or weapon_key),
                          # The cover took it only when, without it, the roll would hit.
                          "how": miss_how(swing_ac - atk.total, bool(cover_mods) and (
                              swing_ac - atk.total <= sum(m.value for m in cover_mods)))})
