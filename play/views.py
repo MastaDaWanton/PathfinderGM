@@ -4705,6 +4705,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
         c.transcript.append({"who": "gm", "text": text, "kind": "consequence"})
         c.history.append({"role": "assistant", "content": text})
 
+    _point_to_the_bench(c, resolution.outcomes)
+
     if plan is not None:
         _log_turn(c, plan, resolution, replace=True)
     else:
@@ -4741,6 +4743,33 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # answer lands through `watcher.drain` on a later request, staleness-checked.
     watcher.kick(c)
     return JsonResponse(_state(c))
+
+
+def _point_to_the_bench(c, outcomes) -> None:
+    """After a typed craft (the engine's `make`, rules/typed_craft.py), a line under the beat
+    with the craft's bench on a button: the owner's "we should try to direct people to the
+    forge menu" (2026-10-28).
+
+    Offered, not opened. The counter opens itself on a purchase (`_trade_offer`) because a
+    purchase cannot happen anywhere else; a typed craft has already happened — the item is
+    in the pack, or the refusal says why not — and a bench thrown open over the table would
+    cover the beat that says so. No source was found for which games auto-open a detailed
+    crafting screen after a quick craft and which offer it (docs/typed-crafting.md); Inform's
+    model is a report that says what happened and stops. One line per bench, after the beat,
+    so it is never the narrator's to write and never on the page twice."""
+    from rules import typed_craft
+
+    seen: list[str] = []
+    for o in outcomes or ():
+        if getattr(o, "op", "") != "make":
+            continue
+        for e in o.effects or ():
+            if e.get("kind") == "bench" and e.get("bench") and e["bench"] not in seen:
+                seen.append(e["bench"])
+                craft = str(e.get("craft") or "")
+                name = (typed_craft.BENCHES.get(craft) or {}).get("name", "the bench")
+                c.transcript.append({"who": "gm", "kind": "bench", "bench": e["bench"],
+                                     "text": f"For finer work, {name} is open to you."})
 
 
 def _companions_heard(c, player_text: str, door: str) -> dict:

@@ -204,6 +204,16 @@ async function post(url, body) {
    under their eyes, mid-read, and replace the number they had just been shown. So the
    caller that knows a mat is open passes `hold` and opens the next popup itself once
    the player has closed the last one. */
+// Each bench's key in a typed craft's pointer (rules/typed_craft.py `BENCHES`), the
+// attribute that opens it, and the button's words.
+const BENCH_DOORS = {
+  forge: ["data-forge-open", "Open the forge"],
+  leather: ["data-leather-open", "Open the leather bench"],
+  alchemy: ["data-alchemy-open", "Open the alchemy bench"],
+  bench: ["data-bench-open", "Open the herb bench"],
+  enchant: ["data-enchant-open", "Open the enchanting circle"],
+};
+
 function render(s, hold) {
   // What was on screen before this draw, for the render hooks below.
   const prev = STATE;
@@ -242,9 +252,17 @@ function render(s, hold) {
   // Where the reader is, read before the rebuild: the rebuilt story is shorter until those
   // slots are filled, and the browser clamps the position to it (15-book.js `storyKeep`).
   if (typeof storyKeep === "function") storyKeep();
+  // After a typed craft, the craft's own bench on a button (play/views.py
+  // `_point_to_the_bench`): offered, never opened over the beat that says what was made.
+  // The attribute is the one each bench opens by (29-bench-core.js `openWith`).
+  const benchDoor = b => {
+    const door = BENCH_DOORS[b.bench];
+    return b.kind === "bench" && door ? ` <button type="button"
+      class="v2-btn is-quiet is-small benchdoor" ${door[0]}>${esc(door[1])}</button>` : "";
+  };
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
-      i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}</p>${
+      i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}${benchDoor(b)}</p>${
       b.who === "gm" && b.kind === "setup" ? `<div class="beatfix" data-beat="${i}"></div>` : ""}`
   ).join("");
   window._beatsSeen = s.transcript.length;
