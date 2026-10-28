@@ -1566,6 +1566,94 @@ def attempts_messages(text: str, facts: Facts, attempts: list[Attempt]) -> list[
                                         f"\n\nPassage:\n{text}"}]
 
 
+# --- what the page says the player made (typed crafting, 2026-10-28) ------------------------
+#
+# Measured live 2026-10-28: "I forge a mithral longsword" was refused, and with the attempt
+# asked (a refused make is one, `attempts_of`) the reader answered rightly that it failed —
+# and the beat it judged ended "Your efforts produce nothing but a duller blade of common
+# steel": a blade the engine never made, on a sentence the attempt question had passed. No
+# lane asked what the page said was MADE; a thing made is no hand-over (`changed_hands`).
+# So on a beat with a typed craft — and on no other, a call for nothing otherwise — the page
+# is asked what it says the player made, in a call of its own (the `attacks` slot folded
+# into the first read cost the harm lane 12/14 -> 8/14; docs/beat-verify.md), with the
+# engine's made things as the codes and "something else" for the rest. Code then diffs it
+# with the make outcomes' `made` effects.
+
+def made_things(facts: Facts) -> list[str]:
+    """What the engine made for the player this turn: the `made` effects of `make`."""
+    out: list[str] = []
+    for o in _resolved(facts):
+        if o.get("op") != "make":
+            continue
+        for e in _effects(o):
+            if e.get("kind") == "made" and e.get("item") and e["item"] not in out:
+                out.append(str(e["item"]))
+    return out
+
+
+def crafted(facts: Facts) -> bool:
+    """A beat with a typed craft on it, made or refused: the one where `made` is asked."""
+    return any(o.get("op") == "make" for o in facts.outcomes)
+
+
+_MADE_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") and list every thing the "
+    "NARRATOR says the player made, forged, brewed, tanned, mixed, crafted or produced by "
+    "their own work in it. item is one of the codes given, or \"something else\" for a "
+    "made thing that is not listed. Copy the passage's own words into \"quote\". A thing "
+    "only tried for, planned, ruined, or left unmade is not made. Leave the list empty "
+    "when the passage says nothing was made.")
+_MADE_DEMO_USER = (
+    "Things: Iron Blank (Dagger), Iron Dagger, something else\n\n"
+    "Passage:\n"
+    "You draw the glowing bar out on the anvil until it is a dagger's blank, then fit it "
+    "to the ash haft: an iron dagger, plain and sound. While it cools you hammer out a "
+    "spare hinge for the smith's door.")
+_MADE_DEMO_ANSWER = {"made": [
+    {"item": "Iron Blank (Dagger)", "quote": "until it is a dagger's blank"},
+    {"item": "Iron Dagger", "quote": "an iron dagger, plain and sound"},
+    {"item": "something else", "quote": "you hammer out a spare hinge for the smith's door"}]}
+_MADE_DEMO2_USER = (
+    "Things: something else\n\n"
+    "Passage:\n"
+    "The mithral will not take the shape. You work it until your arms ache, and in the "
+    "end there is nothing on the anvil but a ruined, cooling lump.")
+_MADE_DEMO2_ANSWER = {"made": []}
+
+
+def made_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"made": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "item": {"type": "string", "enum": [*made_things(facts), OTHER_THING]},
+            "quote": s}, "required": ["item", "quote"]}}},
+        "required": ["made"]}
+
+
+def made_messages(text: str, facts: Facts) -> list[dict]:
+    things = ", ".join([*made_things(facts), OTHER_THING])
+    return [{"role": "system", "content": _MADE_SYSTEM},
+            {"role": "user", "content": _MADE_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_MADE_DEMO_ANSWER)},
+            {"role": "user", "content": _MADE_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_MADE_DEMO2_ANSWER)},
+            {"role": "user", "content": f"Things: {things}\n\nPassage:\n{text}"}]
+
+
+def _made_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """A thing the page says the player made that no `make` made: the engine's list is
+    the whole of what was made this turn."""
+    made = made_things(facts)
+    item = str(c.slots.get("item") or "")
+    if item in made:
+        return None
+    fact = ("You (the player) made only " + ", ".join(made) + " this turn, nothing else."
+            if made else "You (the player) made nothing this turn: no item was made.")
+    return Discrepancy("contradiction", "made", fact, c.sentence, "", c,
+                       ref=facts.pc_ref)
+
+
 def attempt_claims(answer: dict, attempts: list[Attempt]) -> list[Claim]:
     """The attempts answer as claims: one per attempt the passage shows either way.
     "unsure" is no claim — it abstains, as "not listed" does."""
@@ -1709,7 +1797,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("struck_with", "weapon", ("weapon",)),
                             ("foe_struck_with", "foe_weapon", ("weapon",)),
                             ("at_you", "at_you", ("who",)),
-                            ("aimed_at", "aimed", ("striker", "target"))):
+                            ("aimed_at", "aimed", ("striker", "target")),
+                            ("made", "made", ("item",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -1895,6 +1984,16 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                         schema=aimed_schema(facts))
             result.raw += "\n" + whom.text
             answer = dict(answer or {}, aimed_at=(whom.json() or {}).get("aimed_at") or [])
+        if crafted(facts):
+            # What the page says the player made, on a typed craft's beat (`_MADE_SYSTEM`).
+            msgs = made_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            mk = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                      num_predict=300, provider=provider, api_key=api_key,
+                      schema=made_schema(facts))
+            result.raw += "\n" + mk.text
+            answer = dict(answer or {}, made=(mk.json() or {}).get("made") or [])
         claims = claims_of(answer, facts)
         attempts = attempts_of(facts)
         if attempts:
@@ -2537,6 +2636,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             if a is not None and (s["shown"] == "succeeds") != (a.verdict == "success"):
                 out.append(Discrepancy("contradiction", "attempt", _attempt_fact(a, facts),
                                        c.sentence, "", c, ref=a.who))
+        elif c.category == "made":
+            found = _made_wrong(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "weapon":
             found = _struck_early(c, facts) or _weapon_wrong(c, facts)
             if found is not None:
@@ -2702,6 +2805,10 @@ def question(d: Discrepancy, facts: Facts) -> str:
         be = "are" if s["who"] == facts.pc_ref else "is"
         return (f"Does this sentence say that {who} {be} {_COND_WHAT[s['condition']]} — "
                 f"actually so, not only grabbed at, aimed at, threatened or nearly?")
+    if c.category == "made":
+        what = ("something" if s.get("item") == OTHER_THING else str(s.get("item") or ""))
+        return (f"Does this sentence say that you (the player) made or produced {what} by "
+                f"your own work? Answer yes only if it says the thing was made.")
     if c.category == "attempt":
         a = next((x for x in attempts_of(facts) if x.code == s["attempt"]), None)
         if a is None:

@@ -369,3 +369,45 @@ def test_the_bench_is_offered_under_the_beat_once_never_opened(world):
     js = Path("play/static/js/table/02-state.js").read_text(encoding="utf-8")
     for row in typed_craft.BENCHES.values():
         assert f"  {row['key']}: [\"data-" in js, row["key"]
+
+
+MADE = {"intent_id": "i1", "op": "make", "status": "resolved", "actor": "pc",
+        "verdict": "success",
+        "rolls": [{"label": "Blacksmithing: Assemble", "visibility": "player"}],
+        "effects": [{"ref": "pc", "kind": "made", "craft": "blacksmith",
+                     "item": "Iron Dagger", "to": "pc"},
+                    {"ref": "pc", "kind": "bench", "craft": "blacksmith", "bench": "forge",
+                     "target": "Dagger"}]}
+
+
+def test_a_thing_made_on_the_page_that_no_make_made_is_a_contradiction():
+    """Measured live 2026-10-28, after the refusal fix: the refused mithral longsword's
+    beat ended "Your efforts produce nothing but a duller blade of common steel", and the
+    attempt question passed it (the mithral DID fail). Nothing asked what the page said
+    was made. Now, on a typed craft's beat only, a call of its own lists the made things
+    against the engine's codes, and anything else made is a contradiction."""
+    from gm.checks import beat_verified
+
+    refused = bv.Facts(start="the forge", end="the forge", places=("the forge",),
+                       people=(PC,), clock=600, outcomes=(REFUSED,))
+    assert bv.crafted(refused) and bv.made_things(refused) == []
+    steel = "Your efforts produce nothing but a duller blade of common steel."
+    claims = bv.claims_of({"made": [{"item": bv.OTHER_THING, "quote": steel}]}, refused)
+    for c in claims:
+        c.sentence, c.valid = steel, True
+    found = bv.diff(claims, refused, steel)
+    assert [d.category for d in found] == ["made"]
+    assert "made nothing" in found[0].fact
+    assert "made or produced something" in bv.question(found[0], refused)
+    # What the engine made is no contradiction; anything beside it is.
+    made = bv.Facts(start="the forge", end="the forge", places=("the forge",),
+                    people=(PC,), clock=600, outcomes=(MADE,))
+    ok = bv.Claim("made", {"item": "Iron Dagger"}, quote="x", sentence="x", valid=True)
+    assert bv.diff([ok], made, "x") == []
+    assert bv.made_schema(made)["properties"]["made"]["items"]["properties"]["item"][
+        "enum"] == ["Iron Dagger", bv.OTHER_THING]
+    assert beat_verified._KIND["made"] == ("beat-makes-item", 3)
+    assert "beat-makes-item" in beat_verified.KINDS
+    # Asked on no other beat.
+    assert not bv.crafted(bv.Facts(start="x", end="x", places=(), people=(PC,),
+                                   clock=600, outcomes=()))
