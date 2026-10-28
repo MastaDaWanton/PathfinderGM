@@ -2594,8 +2594,13 @@ class GMAgent:
                 if not sentence or sentence not in text:
                     continue
                 at = text.find(sentence)
+                # `<=`: a sentence that OPENS a quotation starts on its mark. With `<` it
+                # was repaired alone, the model dropped the mark, and the clerk's words
+                # became narration ("'If you prefer the city, I can offer…" came back
+                # "If you prefer the town, I can offer…", then "you can offer you": the
+                # 0.2.22 job-offer re-run).
                 inner = next(((qa, qb) for qa, qb in speech.spans(text)
-                              if qa < at and at + len(sentence) <= qb), None)
+                              if qa <= at and at + len(sentence) <= qb), None)
                 if inner is not None:
                     ua, ub = unit(text, *inner)
                     sentence = text[ua:ub]
@@ -3224,7 +3229,8 @@ class GMAgent:
         # came from — which is how "your blade bites into the joint" reached a live
         # transcript while the pattern for it sat in rules/intents.py, matching. Spans
         # cannot miss: the match position is in the current string by construction.
-        narration, force_cut = cut_outcome_claims(narration, restrained=restrained)
+        narration, force_cut = cut_outcome_claims(narration, restrained=restrained,
+                                                  backed=backed)
         for gone in force_cut:
             repairs.append(f"still claiming an outcome after repair: cut {gone!r}")
 

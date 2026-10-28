@@ -429,6 +429,8 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
     woman's card. Ticks the clock only for a tell with a person on it: a check
     beaten near the jar is movement, weather is not. Returns the card ids touched.
     """
+    from .intents import _TOLD_SUM
+
     cards = load(scene)
     if not cards:
         return []
@@ -438,6 +440,12 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
         tell = " ".join(str(getattr(o, "tell", "") or "").split())
         if not tell or len(tell) < 12:
             continue
+        # The coin as the engine names it ("6 Eldrida gold pieces") is money, never a word
+        # about the nation it is named for. Measured on the 0.2.22 job-offer re-run: the job
+        # tell hit the Cartographers' Conclave's keys "work" and "eldrida" (the coin's name),
+        # landed on that world card as its newest fact twice, and the matter slot — told
+        # the card's latest fact — wrote the caravan as the Conclave's matter.
+        keyed = _TOLD_SUM.sub(" ", tell)
         # A refusal is nothing happening (`Engine._refuse`), and nothing happening is
         # not a fact about a situation. The same quest above carried "Find Drenn
         # Ironvale's lost Power leaf is already a quest on the table." as its first
@@ -457,7 +465,7 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
                 if name and name in low:
                     named = True
                     break
-            if named or _hits(card, tell) >= 2:
+            if named or _hits(card, keyed) >= 2:
                 touch(scene, card.id, tell[:200], turn=turn, tick=named)
                 touched.append(card.id)
     return touched

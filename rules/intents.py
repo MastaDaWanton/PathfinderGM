@@ -2012,7 +2012,44 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
         # when an op actually took them through one.
         if op in ("travel", "move"):
             allow("moved")
+        # The sums this turn's tells state, as tokens: a sum the engine said may be said
+        # again (`sums_told`, below).
+        backed.update(f"sum:{s}" for s in sums_told([o]))
     return frozenset(backed)
+
+
+# Coin as the engine writes it (`goods.purse_line`): a number, the coin's own name words, a
+# metal — "6 Eldrida gold pieces", "1 Eldrida silver piece". Read only off the engine's own
+# tells, and only for the number and the metal; never a reading of the page's English.
+_TOLD_SUM = re.compile(r"\b(\d+)\s+(?:[A-Z][\w'’-]*\s+)*(gold|silver|copper|platinum)\b")
+# A sum on the page, as `_OUTCOME_PATTERNS`' money rows catch it: "6 gold", "2 gp".
+PAGE_SUM = re.compile(r"\b(\d+)\s*(gold|silver|copper|platinum|gp|sp|cp|pp)\b", re.I)
+_METAL = {"gp": "gold", "sp": "silver", "cp": "copper", "pp": "platinum"}
+
+
+def sum_key(number: str, metal: str) -> str:
+    """"6 gold" for ("6", "gold") or ("6", "GP")."""
+    m = str(metal or "").lower()
+    return f"{int(number)} {_METAL.get(m, m)}"
+
+
+def sums_told(outcomes) -> frozenset[str]:
+    """Every sum this turn's tells state, as `sum_key`s: the pay a job offers, a price, a
+    wage. An engine fact the page may carry — unlike a sum the page made up, which is still
+    a claim ("states a sum of money").
+
+    Measured on the 0.2.22 release check: the job tell offered "6 Eldrida gold pieces in
+    all" and "2 Eldrida gold pieces, 1 Eldrida silver piece for the whole week", the beat
+    said "for 6 gold pieces, or … for 2 gold and 1 silver", and the money row rewrote the
+    engine's own sums into "a handful of gold pieces … a few coins". Numbers compared with
+    the engine's own text, which is what `narration.strip_turn_numbers` does from the
+    other side (it lifts a number the turn rolled and leaves a price)."""
+    out: set[str] = set()
+    for o in outcomes or ():
+        tell = o.get("tell") if isinstance(o, dict) else getattr(o, "tell", "")
+        for m in _TOLD_SUM.finditer(str(tell or "")):
+            out.add(sum_key(m.group(1), m.group(2)))
+    return frozenset(out)
 
 
 # A denial in the words before an escape verb: "doesn't pull away", "without breaking
@@ -2049,6 +2086,11 @@ def find_outcome_claims(narration: str, backed=(), restrained: bool = True) -> l
         for m in rx.finditer(narration or ""):
             if why == "states an escape" and _NEGATED.search(narration[max(0, m.start() - 40):m.start()]):
                 continue
+            # A sum the turn's tells state is the engine's, and may stand (`sums_told`).
+            if why == "states a sum of money":
+                said = PAGE_SUM.match(m.group(0))
+                if said and f"sum:{sum_key(said.group(1), said.group(2))}" in allowed:
+                    continue
             claims.append(
                 OutcomeClaim(
                     pattern=rx.pattern, why=why, text=_sentence_around(narration, m.start()),
@@ -2068,7 +2110,8 @@ def _sentence_around(text: str, index: int) -> str:
     return text[start + 1:end].strip()
 
 
-def cut_outcome_claims(text: str, restrained: bool = True) -> tuple[str, list[str]]:
+def cut_outcome_claims(text: str, restrained: bool = True,
+                       backed=()) -> tuple[str, list[str]]:
     """The text with every outcome-claiming sentence removed, by character span.
 
     The backstop behind the targeted repair, and it exists because the repair's
@@ -2077,8 +2120,11 @@ def cut_outcome_claims(text: str, restrained: bool = True) -> tuple[str, list[st
     blade bites into the joint" reached a live transcript while the pattern for it sat
     in this file, matching. Spans cannot miss: the match position is in the current
     string by construction.
+
+    `backed` is the same set the repair was asked with: without it the backstop cut what
+    the repair had just let stand — every claim the dice backed, and a sum the tells state.
     """
-    claims = find_outcome_claims(text or "", restrained=restrained)
+    claims = find_outcome_claims(text or "", backed=backed, restrained=restrained)
     if not claims:
         return text, []
 

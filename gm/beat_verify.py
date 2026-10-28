@@ -2805,14 +2805,80 @@ _HELD_DEMO_USER_2 = (
 _HELD_DEMO_ANSWER_2 = {"sentence": "2"}
 
 
+# The held question as built first ("the sentence that puts work that is NOT that work",
+# above, the held jobs in one paragraph) was measured on the 0.2.22 release check's save, the
+# guild clerk holding the caravan and the guard week: 10 false alarms of 24 true replies
+# (5 lines, the same 5 both runs), every one of them a line about the SECOND job ("Or a week
+# of guard work here in town, three silver a day") — the paragraph read as one job, and a
+# negated question ("NOT that work") asked of it. The first live beat lost a true reply to
+# it. Asked instead the way a matcher is: each job numbered on its own line, and of each
+# sentence on its own, WHICH of them it speaks of — a closed choice whose wrong answer is
+# "other work" — so the model names a match rather than proving an absence.
+WORK_NONE, WORK_SEVERAL, WORK_OTHER = "no work", "several of them", "other work"
+_WHICH_SYSTEM = (
+    "You read one sentence a person in a story says to the player (\"you\"), and a numbered "
+    "list of the work that person really has to offer. Answer which work the sentence "
+    "speaks of: the number of the work from the list (said in any words, or only part of "
+    "it — its place, its hour, its pay, its people), \"several of them\" when it speaks of "
+    "more than one, \"no work\" when it speaks of no work at all, or \"other work\" only "
+    "when it puts work, a place, a destination, a time, people or a sum of pay to the "
+    "player that NONE of the listed work has.")
+_WHICH_DEMOS = [
+    ("1. The salt barge goes down to the weir at dawn tomorrow, two days on the river; a "
+     "guard is wanted at 6 copper a day.\n2. A week of mending nets in town: 2 copper a day.",
+     "\"The barge leaves at dawn for the weir.\"", "1"),
+    ("1. The salt barge goes down to the weir at dawn tomorrow, two days on the river; a "
+     "guard is wanted at 6 copper a day.\n2. A week of mending nets in town: 2 copper a day.",
+     "\"Or stay and mend nets for the week, two copper a day.\"", "2"),
+    ("1. The salt barge goes down to the weir at dawn tomorrow, two days on the river; a "
+     "guard is wanted at 6 copper a day.\n2. A week of mending nets in town: 2 copper a day.",
+     "\"The barge or the nets, six copper or two, your choice.\"", WORK_SEVERAL),
+    ("1. The salt barge goes down to the weir at dawn tomorrow, two days on the river; a "
+     "guard is wanted at 6 copper a day.",
+     "\"You'll ride the barge down to the old fort and fight off the river pirates there.\"",
+     WORK_OTHER),
+    ("1. The salt barge goes down to the weir at dawn tomorrow, two days on the river; a "
+     "guard is wanted at 6 copper a day.", "\"Well, then.\"", WORK_NONE),
+]
+
+
+def _which_work(sentence: str, jobs: list[str], speaker: str, *, chat, model, host,
+                provider, api_key) -> str | None:
+    """`_WHICH_SYSTEM` asked of one sentence: one of the job numbers, `WORK_SEVERAL`,
+    `WORK_NONE` or `WORK_OTHER`; None when the call fails."""
+    options = [str(i) for i in range(1, len(jobs) + 1)] + [WORK_SEVERAL, WORK_NONE,
+                                                            WORK_OTHER]
+    listed = "\n".join(f"{i}. {j}" for i, j in enumerate(jobs, 1))
+    msgs = [{"role": "system", "content": _WHICH_SYSTEM}]
+    for work, said, answer in _WHICH_DEMOS:
+        msgs.append({"role": "user", "content": f"The speaker: the ferry master\nThe work "
+                                                f"they have:\n{work}\n\nThe sentence: {said}"})
+        msgs.append({"role": "assistant", "content": json.dumps({"work": answer})})
+    msgs.append({"role": "user", "content": f"The speaker: {' '.join(str(speaker).split())}"
+                                            f"\nThe work they have:\n{listed}\n\nThe "
+                                            f"sentence: {sentence}"})
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=20, provider=provider, api_key=api_key,
+                     schema={"type": "object", "properties": {"work": {
+                         "type": "string", "enum": options}}, "required": ["work"]})
+        got = str((reply.json() or {}).get("work") or "")
+    except Exception:  # noqa: BLE001 — unanswered: the caller leaves the reply standing
+        return None
+    return got if got in options else None
+
+
 def invented_job_sentence(text: str, speaker: str, *, held: str = "", chat=None,
                           model: str = "", host: str = "", provider: str = "ollama",
                           api_key: str = "") -> str | None:
     """The sentence of a reply in which `speaker` puts particular work to the player, as it
     stands; "" for none; None when the call fails. Asked of a speaker the engine holds no
     job from (`planned.build_plan`'s `no_job`) — and, with `held` (the work the engine
-    holds from them, `rules.jobs.slot_facts`), of one who holds work, for work that is not
-    it."""
+    holds from them, `rules.jobs.slot_facts`, one job a line), of one who holds work, for
+    work that is not it: each sentence asked which of the held jobs it speaks of
+    (`_which_work`), and the first answered "other work" returned."""
     from . import narration as narration_mod
 
     sentences = [" ".join(s.split()) for s in narration_mod._sentences(str(text or ""))
@@ -2823,6 +2889,17 @@ def invented_job_sentence(text: str, speaker: str, *, held: str = "", chat=None,
         from . import client
 
         chat = client.chat
+    jobs = [" ".join(j.split()) for j in str(held or "").splitlines() if j.strip()]
+    if jobs:
+        unanswered = False
+        for s in sentences:
+            got = _which_work(s, jobs, speaker, chat=chat, model=model, host=host,
+                              provider=provider, api_key=api_key)
+            if got is None:
+                unanswered = True
+            elif got == WORK_OTHER:
+                return s
+        return None if unanswered else ""
     options = ["none"] + [str(i) for i in range(1, len(sentences) + 1)]
     held = " ".join(str(held or "").split())
     user = (f"The speaker: {' '.join(str(speaker).split())}\n"

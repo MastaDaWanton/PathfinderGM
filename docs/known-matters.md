@@ -604,6 +604,51 @@ hiring-table campaign):
   reached the road head. The walk that caused it is fixed; the rejoining is not built.
 - In road fight 1 "I close in on the toll-keeper" ran no move (the turn was narrate_only).
 
+### 6.8 The job offer's first beat (branch `fix/job-offer-beat`, 2026-10-27)
+
+The release check's line "I walk up to the guild clerk and tell them I can fight." shipped
+"…for a handful of gold pieces, or … for a few coins. … 'Then choose: … two gold and one
+silver,'. What do you do?". Measured and fixed (tests in `tests/test_job_offer_beat.py`):
+
+- **The read-back's false alarm.** `held` did reach it; the reader answered wrongly. With
+  both jobs in one paragraph and a negated question ("work that is NOT that work") it
+  flagged 10 of 24 true replies on the release save (2 runs, 12 true and 12 invented lines,
+  gemma-4-12B) — every one about the second job — and missed 0 of 24. Now the jobs are
+  numbered one a line and each sentence is asked WHICH it speaks of, "other work" the flag
+  (`beat_verify._which_work`): 0 of 24 false alarms, 2 of 24 missed (one line, "Sign the
+  papers at the counting house tomorrow", both runs).
+- **The broken cut.** `narration._cut_sentences` started a span after the blanked speech, so
+  it took the attribution and left the quote. Fixed there, and a reply is now cut inside
+  its quoted words and composed again (`planned.cut_slot_sentence`), used by both read-back
+  cuts.
+- **The engine's own sums.** A sum the turn's tells state (`intents.sums_told`: number and
+  metal off the engine's coin text) backs the money row, and `strip_turn_numbers` spares it
+  even when a die showed the same number; the backstop cut now gets the same backing (it
+  had none, and would have undone any backed claim the repair let stand).
+- **Three tellings.** The player's line rides their `say` act, not the first act; a step
+  before it is said to be written already; a job offer folds into the answer of the one
+  who made it; a say to the one who answers shows only the asking; a sentence an earlier
+  slot wrote word for word is cut.
+- **Found on the re-runs:** the size-words check read a sentence inside a multi-sentence
+  quotation as narration, its repair dropped the quote, and "I can offer" became "you can
+  offer you" (speech is now blanked over the whole text, and a sentence that opens a
+  quotation is repaired with its speech unit); the job tell had filed itself on the
+  Cartographers' Conclave card through the coin's name "Eldrida" plus "work", and the matter
+  slot then wrote the caravan as the Conclave's matter (coin text is stripped before keys
+  are counted; the matter slot is read back for its own identity words).
+
+Live, the same line now reads: "You step forward, closing the gap until you stand directly
+before the guild clerk at the trestle table. "I can fight." 'Good. A caravan master needs a
+guard for the road to Kalixiri, leaving at noon today for a six-day trek; it pays one gold
+piece a day. Or, I can hire you for a week of local guard work for two gold and one
+silver,' the guild clerk says flatly. What do you do?" — no repairs but the budget's and the
+hand-back. "I ask the clerk what the caravan job pays": ""What does the caravan job pay?"
+you ask the clerk. Nearby, the hushed rumors of travelers suggest that Lyraea Flynn's
+estate remains a place where the Conclave's activities are viewed with deep suspicion. 'The
+caravan to Kalixiri pays one gold piece a day for six days, paid at the end of the road;
+local guard work pays three silver pieces a day for a week, totaling two gold and one
+silver,' the guild clerk says dryly."
+
 ### 6.6 What World Bible would need to export
 
 Nothing is required: a job is built from what every export already has (settlements,

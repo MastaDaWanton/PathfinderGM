@@ -81,6 +81,7 @@ market maintains the order…") and the check, run on the page, cut the whole an
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -626,6 +627,27 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
     # first since 2026-10-27 (`Engine.run`) — is not what came of their words.
     lead_at = next((n for n, act in enumerate(grouped)
                     if any(str(getattr(o, "intent_id", "") or "") for o in act)), 0)
+    # Unless the player's own words were spoken this turn (a `say` of theirs): then the line
+    # rides the act that says them, once. Measured on the 0.2.22 release check: "I walk up to
+    # the guild clerk and tell them I can fight" made a step, the job offer and the say; the
+    # line rode the step ("You step forward … and declare to the guild clerk that you can
+    # fight"), the say slot told it again ("You state your proficiency in combat … confirm
+    # your ability to fight"), and the reply a third time — three tellings of four words.
+    pc = engine.scene.pc() if hasattr(engine.scene, "pc") else None
+    spoken_at = next((n for n, act in enumerate(grouped)
+                      if any(getattr(o, "op", "") == "say"
+                             and str(getattr(o, "intent_id", "") or "")
+                             and any(isinstance(e, dict) and e.get("kind") == "said"
+                                     and e.get("who") in ("", getattr(pc, "ref", "pc"))
+                                     for e in (getattr(o, "effects", None) or []))
+                             for o in act)), None)
+    if spoken_at is not None:
+        lead_at = spoken_at
+    # A job put to the player this turn by somebody who then answers them is said ONCE, in
+    # their answer (the reply slot carries the job's facts, `_jobs_held`): the same release
+    # check had "The clerk lists two options: …" and then the clerk listing them in quotes.
+    # Folded below, once the reply's speaker is known.
+    offered_by: dict[str, str] = {}
     for i, act in enumerate(grouped):
         tells = [o.tell for o in act]
         decided = (tells[0] if len(tells) == 1 else
@@ -692,6 +714,19 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         slots.append({"key": f"fact{i + 1}",
                       "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
                       "say": say, "tells": tells, **({"not_own": theirs} if theirs else {})})
+        employer = next((e.get("employer") for o in act
+                         for e in (getattr(o, "effects", None) or [])
+                         if isinstance(e, dict) and e.get("kind") == "job"
+                         and e.get("state") == "offered" and e.get("employer")), "")
+        if employer and len(act) == 1 and i != lead_at:
+            offered_by[f"fact{i + 1}"] = employer
+    if spoken_at is not None and any(getattr(o, "op", "") in ("move", "travel")
+                                     for act in grouped[:spoken_at] for o in act):
+        # The player's line rides their words, and a walk in it already has its slot.
+        for x in slots:
+            if x["key"] == f"fact{spoken_at + 1}":
+                x["say"] += (" Their walk or step is already written in its own sentence "
+                             "before this one: none of it here, only the words.")
     if not any(s["key"].startswith("fact") for s in slots):
         if carry_on:
             # Continue moves the scene (the ruling of 2026-09-18): with no tells, the
@@ -741,6 +776,11 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                                  "or way out; nobody acts in it."})
     matter = matter_slot(pull)
     if matter is not None:
+        # The matter's own identity words (`cards.identity_keys`, the pull's `keys`): what
+        # its sentence is read back for (`_matter_is_its_own`).
+        if isinstance(pull, dict) and pull.get("keys"):
+            matter["keys"] = [str(k) for k in pull["keys"]]
+            matter["about"] = _one_line(pull.get("title"), 120)
         slots.append(matter)
     people = [p for p in present(engine) if p["can_answer"]]
     if people and not fighting:
@@ -779,6 +819,28 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             work = (f" Of work, they know exactly this and nothing more: {held} If the "
                     "player asks about work, its pay, place or hour, they answer from it."
                     if held else "")
+            # The player's own words to this speaker: their slot shows them said, and the
+            # answer is this slot's alone. Measured on the 0.2.22 job-offer re-run: "I ask the
+            # clerk what the caravan job pays" — the say slot, told to show "what came of
+            # it", wrote "The clerk confirms that the contract offers one … gold piece a day",
+            # and the reply then said the pay again.
+            if spoken_at is not None and any(
+                    isinstance(e, dict) and e.get("kind") == "said"
+                    and e.get("to") == speaker["ref"]
+                    for o in grouped[spoken_at] for e in (getattr(o, "effects", None) or [])):
+                for x in slots:
+                    if x["key"] == f"fact{spoken_at + 1}":
+                        x["say"] = x["say"].replace(
+                            "Show the player doing it and what came of it, once.",
+                            f"Show the player saying it, once, and stop there: "
+                            f"{speaker['name']}'s answer is written next, so none of it "
+                            f"here.")
+            folded =[k for k, ref in offered_by.items() if ref == speaker["ref"]]
+            if folded and held:
+                # The offer's act slot goes; the answer is where it is said, once.
+                slots[:] = [x for x in slots if x["key"] not in folded]
+                work += (" They are putting this work to the player now, in this answer: "
+                         "say what it is, where and when, and what it pays, once.")
             slots.append({
                 "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
                 "speaker_name": speaker["name"], **({"not_manner": used} if used else {}),
@@ -987,6 +1049,44 @@ def compose_reply(slot: dict, words: str, manner: str) -> str:
             + (f" {manner}" if manner else "") + ".")
 
 
+# A reply as `compose_reply` writes it: the say tag, the quoted words, the speaker written in.
+_COMPOSED = re.compile(r"^(<say [^>]*>)'(.*)'(</say>\s.*)$", re.S)
+
+
+def cut_slot_sentence(text: str, said: str) -> str:
+    """`text` without the sentence `said`, always in whole sentences: "" when nothing would
+    be left, `text` unchanged when `said` is not one of its sentences.
+
+    A reply is cut INSIDE its quoted words and composed again, its speaker kept. Measured on
+    the 0.2.22 release check: the guild clerk's one-sentence reply was cut by the page's
+    sentence cutter, which (on a blanked copy) took the attribution and left
+    "'Then choose: … two gold and one silver,'." with nobody saying it; a reply of several
+    sentences cut at its first lost the opening `<say>` and quote mark, and cut at its last
+    lost the closing quote and the speaker. Code reading the composed line it wrote itself,
+    never the model's English."""
+    norm =" ".join(str(said or "").split())
+    whole = [" ".join(x.split()) for x in narration_mod._sentences(text)]
+    if norm not in whole:
+        return text
+    m = _COMPOSED.match(str(text or "").strip())
+    if m is None:
+        cut = narration_mod._cut_sentences(text, [said]).strip()
+        return cut if narration_mod._sentences(narration_mod.unquoted(cut)) else ""
+    head, words, tail = m.groups()
+    parts = narration_mod._sentences(words)
+    if len(parts) != len(whole):
+        return text
+    kept = [p for k, p in enumerate(parts) if k != whole.index(norm)]
+    if not kept:
+        return ""
+    words = " ".join(kept).strip()
+    if words[-1] == ".":
+        words = words[:-1] + ","
+    elif words[-1] not in ",!?…":
+        words += ","
+    return f"{head}'{words}'{tail}"
+
+
 def copied_from(text: str, last_beat: str, n: int = COPY_RUN) -> list[str]:
     """The `n`-word runs `text` shares with `last_beat`, as phrases. Flaw (a)'s detector."""
     if not text or not last_beat:
@@ -1144,14 +1244,45 @@ def _not_their_goal(out: Planned, plan, slots, i, written, who, s: dict, text: s
         out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: '
                          f'dropped')
         return None
-    cut = narration_mod._cut_sentences(text, [said])
-    if narration_mod._sentences(narration_mod.unquoted(cut)) and cut != text:
+    cut = cut_slot_sentence(text, said)
+    if cut and cut != text:
         out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: '
                          f'cut {said[:80]!r}')
         return cut.strip()
     out.notes.append(f'the "{s["key"]}" slot made {matter!r} the player\'s goal twice: left '
                      f'standing, nothing else in it')
     return text
+
+
+def _matter_is_its_own(out: Planned, plan, slots, i, written, who, s: dict, text: str, *,
+                       final: bool, lift) -> str | None:
+    """The matter slot as it may stand: about its own matter, by that matter's identity words
+    (`cards.identity_keys`, compared as `note_mentions` compares them), asked once more with
+    the matter named, else dropped (the matter is never core). None when dropped.
+
+    Measured twice on the 0.2.22 job-offer re-run: "I ask the clerk what the caravan job
+    pays" with the open matter "A network of mapmakers, cartographers, and travelers who
+    share knowledge…", and the matter slot wrote "The clerk's mutterings mention a caravan
+    master departing at noon for Kalixiri, a journey of six days" and then "The clerk's
+    ledger contains the details of a caravan bound for Kalixiri" — the job a third time, the
+    matter not at all. The slot leans to whatever the beat is already about."""
+    from rules import cards as cards_mod
+
+    keys, about = list(s.get("keys") or ()), str(s.get("about") or "the matter")
+    if cards_mod._identity_hits(keys, text):
+        return text
+    redo = (f"You wrote: {text!r}. That is not about {about}. Write one sentence about "
+            f"{about} itself, as the slot asks, and about nothing else.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    ok = bool(text2) and bool(cards_mod._identity_hits(keys, text2))
+    out.calls[-1]["note"] = "not its own matter, named" + ("" if ok else " — still not")
+    if ok:
+        out.notes.append('the "matter" slot wrote another matter — asked again, fixed')
+        return text2
+    out.notes.append(f'the "matter" slot wrote another matter twice: dropped '
+                     f'({text[:80]!r})')
+    return None
 
 
 def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: str, job,
@@ -1192,8 +1323,8 @@ def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: s
         out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work — asked again, '
                          f'fixed')
         return text2
-    cut = narration_mod._cut_sentences(text, [said])
-    if cut != text and narration_mod._sentences(cut):
+    cut = cut_slot_sentence(text, said)
+    if cut and cut != text:
         out.notes.append(f'the "{s["key"]}" slot: {speaker} made up work twice — cut '
                          f'{said[:80]!r}')
         return cut.strip()
@@ -1268,6 +1399,12 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
             out.calls[-1]["note"] = "fault named" + (" — still there" if again else "")
             out.notes.append(f'the "{s["key"]}" slot: {wrong} — asked again'
                              + (", still there" if again else ", fixed"))
+        if s["key"] == "matter" and s.get("keys"):
+            text = _matter_is_its_own(out, plan, slots, i, written, who, s, text,
+                                      final=final, lift=lift)
+            if text is None:
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
         if s.get("no_job") and job is not None:
             text = _no_job_made_up(out, plan, slots, i, written, who, s, text, job,
                                    final=final, lift=lift, core=core)
@@ -1277,6 +1414,23 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
             if text is None:
                 out.slots.append({**s, "wrote": "", "dropped": True})
                 continue
+        # A sentence an earlier slot of this beat already wrote, word for word, goes: measured
+        # on the 0.2.22 job-offer re-run, the step's slot and the say's slot (which carries
+        # the player's "I walk up to the guild clerk and…") both wrote "You step forward,
+        # closing the distance until you stand directly before the trestle table." A slot
+        # with nothing else in it goes whole. Code comparing the beat with itself.
+        before = {" ".join(x.lower().split()) for w in written
+                  for x in narration_mod._sentences(w)}
+        twice = [x for x in narration_mod._sentences(text)
+                 if " ".join(x.lower().split()) in before]
+        if twice:
+            kept = narration_mod._cut_sentences(text, twice).strip()
+            out.notes.append(f'the "{s["key"]}" slot repeated an earlier sentence: cut '
+                             f'{twice[0][:80]!r}')
+            if not narration_mod._sentences(kept):
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
+            text = kept
         if final:
             from .agent import _suggestions
 
