@@ -808,35 +808,15 @@ def alchemy_roll(request):
         out["liquid"] = _liquid_view(al.liquid_for(plan))
     else:
         miss = -margin
-        losses = al.failure_losses(plan, miss)
-        out["lost"] = al.spend(pc, losses)
-        mishap = []
-        if miss >= 5 and plan.mishaps:
-            # Once, not once per unit: one flash in one crucible (plan §15.2).
-            mishap = al.apply_rule(engine, pc, plan.mishaps, kind="mishap")
+        # The rule the bench and a typed line share (`alchemist.settle_miss`).
+        settled = al.settle_miss(engine, pc, progress, plan, miss)
+        out["lost"] = settled["lost"]
+        if settled["flare"]:
             out["flare"] = True
-            out["mishap"] = _outcome_rows(mishap)
-        if out["lost"]:
-            ruined = ", ".join(f"{x['count']} {x['name']}" for x in out["lost"])
-            said = f"Missed by {miss}. Half of what was on the bench is ruined: {ruined}."
-        else:
-            said = f"Missed by {miss}. The time is lost; the materials are kept."
-        if out["flare"]:
-            # The mishap's own tells: an outcome that carries an effect, its full stop taken
-            # off before they are joined. Seen live (lane U1, 2026-10-07): the line read
-            # "It flares: Kesst Vayr takes 2 fire damage from Brimstone.; Kesst Vayr's
-            # Potion of Cure Light Wounds is ready to collect.; ...", a doubled stop after
-            # each tell and an In progress line the engine had queued from an earlier wait
-            # (`Scene.take_works_said` hands queued lines to the next run's outcomes).
-            tells = [m["tell"].rstrip(". ") for m in out["mishap"]
-                     if m["tell"] and m["effects"]]
-            said += (" It flares: " + "; ".join(tells) + ".") if tells else " It flares."
+            out["mishap"] = _outcome_rows(settled["mishap"])
+        said = settled["said"]
         out["said"] = said
-        got = worldclass.award_step(track, progress, method=plan.method,
-                                    ingredient_id=plan.lead, rarity_rank=plan.rank_in,
-                                    quality_index=0, success=False,
-                                    name=(items.doc_of(plan.lead) or {}).get("name", ""),
-                                    count=plan.units, noun=plan.noun)
+        got = settled["mastery"]
         out["mastery"] = _mastery(got, progress)
         line = (f"{plan.method.title()} at the alchemy bench: it fails (d20 {best}"
                 f"{plan.bonus:+d} = {total} vs DC {plan.dc}). {said}")
@@ -850,9 +830,8 @@ def alchemy_roll(request):
 # --- finish ------------------------------------------------------------------------------------
 
 def _first(progress, key: str) -> bool:
-    seen = int(progress.crafted.get(key, 0))
-    progress.crafted[key] = seen + 1
-    return seen == 0
+    """`alchemist.first_time`, the one copy."""
+    return al.first_time(progress, key)
 
 
 @require_POST
@@ -887,85 +866,27 @@ def alchemy_finish(request):
     # than it cost is accepted knowingly. Lane H's `pricing.coin_to_make` (the book's
     # making fraction less the inputs' worth) was built and is deliberately not called.
     engine = c.engine()
-    perks = worldclass.perk_multipliers(progress)
-    chance = float(perks.get("yield_chance", 0) or 0)
-    extra, yield_line = 0, None
-    if chance > 0 and plan.yields:
-        roll = engine.dice.roll("1d100", label="Yield perk", visibility="player")
-        at = int(round(chance * 100))
-        extra = 1 if roll.total <= at else 0
-        yield_line = {"why": f"Yield perk: d100 {roll.total} against {at} or less, "
-                             f"{'one more' if extra else 'nothing extra'}", "mp": 0}
-
     _PENDING.pop(c.id, None)
-    al.spend(pc, [(fresh[it.key], n) for it, n in plan.consumes])
-    made = al.make(plan, tier, extra=extra, now=now)
-    landed = al.land(pc, plan, made, now=now, where=_where(c, pc))
-
-    lines: list[dict] = []
-    levelled: list[int] = []
-    got = worldclass.award_step(track, progress, method=plan.method,
-                                ingredient_id=plan.lead, rarity_rank=plan.rank_in,
-                                quality_index=tier, success=True,
-                                name=(items.doc_of(plan.lead) or {}).get("name", ""),
-                                count=plan.units, noun=plan.noun)
-    lines += list(got.get("reasons") or [])
-    levelled += list(got.get("levelled") or [])
-
-    def bonus(why: str, mp: int = worldclass.FIRST_MP) -> None:
-        res = worldclass.award_bonus(track, progress, why=why, mp=mp)
-        lines.extend(res.get("reasons") or [])
-        levelled.extend(res.get("levelled") or [])
-
-    # Firsts (plan §4.4): a product family made, a reagent worked, a formula written.
-    for rec in made:
-        fam = rec.get("form") or rec.get("family")
-        if fam and _first(progress, f"made:{fam}"):
-            bonus(f"first {items.form_row(fam).get('word', '').lower() or items.FAMILY_WORDS.get(fam, fam)}")
-    raw = [it.material for it, _ in plan.inputs if it.material and it.doc is not None]
-    raw += [plan.solvent.material] if plan.solvent is not None and plan.solvent.material else []
-    for mid in dict.fromkeys(raw):
-        if _first(progress, f"reagent:{mid}"):
-            bonus(f"first work with {(items.doc_of(mid) or {}).get('name', mid)}")
     found = None
-    if plan.method == "bottle" and plan.experiment and (plan.match or {}).get("found"):
-        fid = plan.match["formula"]
-        if formulae.learn(pc, fid, "experiment", clock=now):
-            found = _formula_row(pc, fid, progress.level)
-            bonus(f"first formula written: {found['name'] if found else fid}")
 
-    # What the work taught (plan §13.1): a material's working traits by working it, and
-    # every trait the product actually carries (Skyrim's rule).
-    discoveries = []
-    how = f"worked it, day {now // 1440 + 1}"
-    teach: dict[str, list[str]] = {}
-    for mid in dict.fromkeys(raw + [c_.material for c_ in plan.catalysts if c_.material]):
-        teach.setdefault(mid, []).extend(al.working_keys(mid))
-    for rec in made:
-        for r in list(rec.get("traits") or []) + list(rec.get("drawbacks") or []):
-            for mid in r.get("from") or ():
-                teach.setdefault(mid, []).extend(al.keys_for(mid, r["key"]))
-    for mid, keys in teach.items():
-        doc = items.doc_of(mid)
-        if doc is None or not keys:
-            continue
-        try:
-            new = al.reveal(pc, mid, list(dict.fromkeys(keys)), how)
-            rows = {r.get("key"): r for r in knowledge.properties(pc, doc)} if new else {}
-        except Exception:      # noqa: BLE001 - a discovery is never worth losing the work
-            new, rows = [], {}
-        for k in new:
-            text = str((rows.get(k) or {}).get("text") or "")
-            discoveries.append({"material": mid, "name": doc.get("name"), "key": k,
-                                "text": text})
-            # 1 a property, as an assay pays (the owner, 2026-10-06). The forge pays its
-            # first-property 3 for each key a step reveals; at 3 a key, one Dissolve of
-            # brimstone in lamp oil paid 28 mastery (six keys learned) and took a new
-            # alchemist past level 2 in a single step (measured on this bench).
-            bonus(f"learned: {doc.get('name')}, {text}" if text
-                  else f"learned: {doc.get('name')}", STUDY_MP)
-    if yield_line:
-        lines.append(yield_line)
+    def learned(bonus) -> None:
+        # A formula an Experiment found is written down, and paid as a first, where the
+        # bench always paid it: after the other firsts, before the discoveries.
+        nonlocal found
+        if plan.method == "bottle" and plan.experiment and (plan.match or {}).get("found"):
+            fid = plan.match["formula"]
+            if formulae.learn(pc, fid, "experiment", clock=now):
+                found = _formula_row(pc, fid, progress.level)
+                bonus(f"first formula written: {found['name'] if found else fid}")
+
+    # The step settled by the rule both doors share (`alchemist.settle_made`).
+    settled = al.settle_made(pc, progress, plan, tier,
+                             [(fresh[it.key], n) for it, n in plan.consumes],
+                             dice=engine.dice, now=now, where=_where(c, pc),
+                             after_firsts=learned)
+    made, landed = settled["made"], settled["landed"]
+    lines, levelled = settled["lines"], settled["levelled"]
+    discoveries = settled["discoveries"]
 
     r = pend["roll"]
     tier_name = worldclass.quality_name(tier)

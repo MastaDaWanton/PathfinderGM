@@ -1988,6 +1988,145 @@ def preview(level: int, chain: Chain, **_kw):
     raise CraftError(MOVED_WORDS)
 
 
+# =============================================================================================
+# Settling a step (shared by the bench and a typed line)
+# =============================================================================================
+#
+# Lifted out of play/alchemy_views.py on 2026-10-28 for the engine's `make` op
+# (rules/typed_craft.py): "I bottle a flask of acid" settles its step by the same rule the
+# bench's roll and finish do, never a second copy of it.
+
+def first_time(progress, key: str) -> bool:
+    seen = int(progress.crafted.get(key, 0))
+    progress.crafted[key] = seen + 1
+    return seen == 0
+
+
+def settle_miss(engine, actor, progress, plan: AlchemyPlan, miss: int) -> dict:
+    """A failed roll at the alchemy bench: half of what was on the bench ruined at a miss
+    of 5 or more (`failure_losses`), a volatile mix flaring once through the one hazard
+    door (`apply_rule`, plan §15.2), and the failed step paid. Returns {"lost", "said",
+    "flare", "mishap": outcomes, "mastery"}."""
+    track = wc.get(TRACK_ID)
+    lost = spend(actor, failure_losses(plan, miss))
+    mishap = []
+    if miss >= 5 and plan.mishaps:
+        # Once, not once per unit: one flash in one crucible (plan §15.2).
+        mishap = apply_rule(engine, actor, plan.mishaps, kind="mishap")
+    if lost:
+        ruined = ", ".join(f"{x['count']} {x['name']}" for x in lost)
+        said = f"Missed by {miss}. Half of what was on the bench is ruined: {ruined}."
+    else:
+        said = f"Missed by {miss}. The time is lost; the materials are kept."
+    if miss >= 5 and plan.mishaps:
+        # The mishap's own tells: an outcome that carries an effect, its full stop taken
+        # off before they are joined. Seen live (lane U1, 2026-10-07): the line read
+        # "It flares: Kesst Vayr takes 2 fire damage from Brimstone.; Kesst Vayr's
+        # Potion of Cure Light Wounds is ready to collect.; ...", a doubled stop after
+        # each tell and an In progress line the engine had queued from an earlier wait
+        # (`Scene.take_works_said` hands queued lines to the next run's outcomes).
+        tells = [str(o.tell).rstrip(". ") for o in mishap
+                 if getattr(o, "tell", "") and getattr(o, "effects", None)]
+        said += (" It flares: " + "; ".join(tells) + ".") if tells else " It flares."
+    got = wc.award_step(track, progress, method=plan.method,
+                        ingredient_id=plan.lead, rarity_rank=plan.rank_in,
+                        quality_index=0, success=False,
+                        name=(items.doc_of(plan.lead) or {}).get("name", ""),
+                        count=plan.units, noun=plan.noun)
+    return {"lost": lost, "said": said, "flare": bool(miss >= 5 and plan.mishaps),
+            "mishap": mishap, "mastery": got}
+
+
+def settle_made(actor, progress, plan: AlchemyPlan, tier: int, consumes, *, dice=None,
+                now: int = 0, where: dict | None = None, after_firsts=None) -> dict:
+    """A made roll at the alchemy bench, finished at `tier`: the Yield perk's d100 on
+    `dice`, the materials in `consumes` (read fresh) spent, the product made and landed
+    (work that waits goes In progress), the step and the firsts paid, and what the work
+    taught revealed (plan §13.1). A formula an Experiment found is the caller's to write
+    (the bench names it on its page): `after_firsts(bonus)` is called after the firsts and
+    before the discoveries, where the bench always paid it. Returns {"made", "landed",
+    "lines", "levelled", "discoveries"}."""
+    from . import knowledge
+
+    track = wc.get(TRACK_ID)
+    perks = wc.perk_multipliers(progress)
+    chance = float(perks.get("yield_chance", 0) or 0)
+    extra, yield_line = 0, None
+    if dice is not None and chance > 0 and plan.yields:
+        roll = dice.roll("1d100", label="Yield perk", visibility="player")
+        at = int(round(chance * 100))
+        extra = 1 if roll.total <= at else 0
+        yield_line = {"why": f"Yield perk: d100 {roll.total} against {at} or less, "
+                             f"{'one more' if extra else 'nothing extra'}", "mp": 0}
+
+    spend(actor, list(consumes))
+    made = make(plan, tier, extra=extra, now=now)
+    landed = land(actor, plan, made, now=now, where=where)
+
+    lines: list[dict] = []
+    levelled: list[int] = []
+    got = wc.award_step(track, progress, method=plan.method,
+                        ingredient_id=plan.lead, rarity_rank=plan.rank_in,
+                        quality_index=tier, success=True,
+                        name=(items.doc_of(plan.lead) or {}).get("name", ""),
+                        count=plan.units, noun=plan.noun)
+    lines += list(got.get("reasons") or [])
+    levelled += list(got.get("levelled") or [])
+
+    def bonus(why: str, mp: int = wc.FIRST_MP) -> None:
+        res = wc.award_bonus(track, progress, why=why, mp=mp)
+        lines.extend(res.get("reasons") or [])
+        levelled.extend(res.get("levelled") or [])
+
+    # Firsts (plan §4.4): a product family made, a reagent worked.
+    for rec in made:
+        fam = rec.get("form") or rec.get("family")
+        if fam and first_time(progress, f"made:{fam}"):
+            bonus(f"first {items.form_row(fam).get('word', '').lower() or items.FAMILY_WORDS.get(fam, fam)}")
+    raw = [it.material for it, _ in plan.inputs if it.material and it.doc is not None]
+    raw += [plan.solvent.material] if plan.solvent is not None and plan.solvent.material else []
+    for mid in dict.fromkeys(raw):
+        if first_time(progress, f"reagent:{mid}"):
+            bonus(f"first work with {(items.doc_of(mid) or {}).get('name', mid)}")
+    if after_firsts is not None:
+        after_firsts(bonus)
+
+    # What the work taught (plan §13.1): a material's working traits by working it, and
+    # every trait the product actually carries (Skyrim's rule).
+    discoveries = []
+    how = f"worked it, day {int(now) // 1440 + 1}"
+    teach: dict[str, list[str]] = {}
+    for mid in dict.fromkeys(raw + [c_.material for c_ in plan.catalysts if c_.material]):
+        teach.setdefault(mid, []).extend(working_keys(mid))
+    for rec in made:
+        for r in list(rec.get("traits") or []) + list(rec.get("drawbacks") or []):
+            for mid in r.get("from") or ():
+                teach.setdefault(mid, []).extend(keys_for(mid, r["key"]))
+    for mid, keys in teach.items():
+        doc = items.doc_of(mid)
+        if doc is None or not keys:
+            continue
+        try:
+            new = reveal(actor, mid, list(dict.fromkeys(keys)), how)
+            rows = {r.get("key"): r for r in knowledge.properties(actor, doc)} if new else {}
+        except Exception:      # noqa: BLE001 - a discovery is never worth losing the work
+            new, rows = [], {}
+        for k in new:
+            text = str((rows.get(k) or {}).get("text") or "")
+            discoveries.append({"material": mid, "name": doc.get("name"), "key": k,
+                                "text": text})
+            # 1 a property, as an assay pays (the owner, 2026-10-06). The forge pays its
+            # first-property 3 for each key a step reveals; at 3 a key, one Dissolve of
+            # brimstone in lamp oil paid 28 mastery (six keys learned) and took a new
+            # alchemist past level 2 in a single step (measured on this bench).
+            bonus(f"learned: {doc.get('name')}, {text}" if text
+                  else f"learned: {doc.get('name')}", int(getattr(wc, "STUDY_MP", 1)))
+    if yield_line:
+        lines.append(yield_line)
+    return {"made": made, "landed": landed, "lines": lines, "levelled": levelled,
+            "discoveries": discoveries}
+
+
 __all__ = ["ACQUISITION", "AlchemyPlan", "CraftError", "Item", "KIND_GLYPH", "METHODS",
            "METHOD_GLYPH", "Material", "TRACK_ID", "apply_rule", "assay_dangers",
            "assay_source", "bench_rules", "check_bonus", "check_odds", "check_terms",
