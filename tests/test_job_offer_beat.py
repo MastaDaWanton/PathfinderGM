@@ -168,6 +168,30 @@ def test_a_sentence_opening_a_quotation_is_repaired_with_its_speaker():
     assert "if qa <= at and at + len(sentence) <= qb" in src
 
 
+def test_a_sentence_an_earlier_slot_wrote_is_never_written_twice(monkeypatch):
+    """Measured on the re-run: the step's slot and the say's slot both wrote "You step
+    forward, closing the distance until you stand directly before the trestle table." The
+    second copy goes; a slot with nothing else in it goes whole."""
+    from tests.test_planned_narration import LAST_BEAT, _fake as plan_fake, _scene
+
+    s, engine = _scene()
+    step = "You step forward, closing the distance until you stand before the table."
+    calls: list = []
+    monkeypatch.setattr(planned.client, "chat", plan_fake(calls, slot_text={
+        "fact1": step, "fact2": step + " You tell the smith you can fight."}))
+    smith = next(a for a in s.actors.values() if not a.is_pc)
+    outcomes = [Outcome("i1", "move", tell="Kesst Vayr moves to near (10 ft)."),
+                Outcome("i2", "say", tell=f"Kesst Vayr speaks to {smith.name}, to the effect "
+                                          f"that I can fight",
+                        effects=[{"kind": "said", "who": "pc", "to": smith.ref}])]
+    out = planned.write(engine, brief="BRIEF", player_input="I walk up and say I can fight.",
+                        outcomes=outcomes, who=("stub-12b", "http://x", "ollama", ""),
+                        last_beat=LAST_BEAT)
+    assert out.text.count("You step forward") == 1
+    assert "You tell the smith you can fight." in out.text
+    assert any("repeated an earlier sentence" in n for n in out.notes)
+
+
 def test_a_coins_name_never_lands_a_tell_on_the_nation_it_is_named_for():
     """The cause under the next test, measured on the re-run's save: the job tell ("…6
     Eldrida gold pieces in all… work…") hit the Cartographers' Conclave card's keys "work" and
@@ -243,6 +267,8 @@ def test_the_players_words_ride_the_say_and_the_offer_is_said_once_by_its_speake
     assert not any("puts work to" in x["say"] for x in facts)
     reply = next(x for x in slots if x["key"] == "reply")
     assert "putting this work to the player now" in reply["say"]
+    # The step before the words: the say's slot is told the walk is written already.
+    assert "already written in its own sentence" in with_line[0]["say"]
     # The re-run's second line, "I ask the clerk what the caravan job pays": the say slot
     # was told to show "what came of it" and wrote the clerk's answer, which the reply then
     # gave again. It shows the asking only; the answer is the reply's.

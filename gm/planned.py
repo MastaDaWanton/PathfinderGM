@@ -720,6 +720,13 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                          and e.get("state") == "offered" and e.get("employer")), "")
         if employer and len(act) == 1 and i != lead_at:
             offered_by[f"fact{i + 1}"] = employer
+    if spoken_at is not None and any(getattr(o, "op", "") in ("move", "travel")
+                                     for act in grouped[:spoken_at] for o in act):
+        # The player's line rides their words, and a walk in it already has its slot.
+        for x in slots:
+            if x["key"] == f"fact{spoken_at + 1}":
+                x["say"] += (" Their walk or step is already written in its own sentence "
+                             "before this one: none of it here, only the words.")
     if not any(s["key"].startswith("fact") for s in slots):
         if carry_on:
             # Continue moves the scene (the ruling of 2026-09-18): with no tells, the
@@ -1407,6 +1414,23 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
             if text is None:
                 out.slots.append({**s, "wrote": "", "dropped": True})
                 continue
+        # A sentence an earlier slot of this beat already wrote, word for word, goes: measured
+        # on the 0.2.22 job-offer re-run, the step's slot and the say's slot (which carries
+        # the player's "I walk up to the guild clerk and…") both wrote "You step forward,
+        # closing the distance until you stand directly before the trestle table." A slot
+        # with nothing else in it goes whole. Code comparing the beat with itself.
+        before = {" ".join(x.lower().split()) for w in written
+                  for x in narration_mod._sentences(w)}
+        twice = [x for x in narration_mod._sentences(text)
+                 if " ".join(x.lower().split()) in before]
+        if twice:
+            kept = narration_mod._cut_sentences(text, twice).strip()
+            out.notes.append(f'the "{s["key"]}" slot repeated an earlier sentence: cut '
+                             f'{twice[0][:80]!r}')
+            if not narration_mod._sentences(kept):
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
+            text = kept
         if final:
             from .agent import _suggestions
 
