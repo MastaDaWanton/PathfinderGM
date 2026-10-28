@@ -314,10 +314,17 @@ class Blacksmith:
             return self._smelt(engine, actor, progress, where, known, target, ores[0],
                                fuels[0], max(1, bars_needed - have))
         have = max((p.count for p in bars), default=0)
-        short = (f" ({have} carried, {bars_needed} needed)" if have else "")
-        return Refusal(f"There is no {metal_word} to forge {_a(name)} from{short}: it takes "
-                       f"{bars_needed} bar{'s' if bars_needed != 1 else ''} of a common "
-                       f"metal, or ore and a smithy to smelt it.", "no_material")
+        bars_words = f"{bars_needed} bar{'s' if bars_needed != 1 else ''}"
+        if have:
+            # Measured live 2026-10-28: "There is no metal to forge a chain shirt from (2
+            # carried, 3 needed)" — "no metal" beside two bars in the pack.
+            return Refusal(f"There is not enough {metal_word} to forge {_a(name)}: it takes "
+                           f"{bars_words} of one common metal, and {have} "
+                           f"{'is' if have == 1 else 'are'} in the pack — or ore and a "
+                           f"smithy to smelt more.", "no_material")
+        return Refusal(f"There is no {metal_word} to forge {_a(name)} from: it takes "
+                       f"{bars_words} of a common metal, or ore and a smithy to smelt it.",
+                       "no_material")
 
     # --- the three steps ------------------------------------------------------------------
     def _plan(self, engine, actor, progress, where, known, method, slots, batch, shape):

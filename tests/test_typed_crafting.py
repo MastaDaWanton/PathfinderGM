@@ -118,6 +118,12 @@ def test_no_iron_is_refused_naming_what_is_missing(world):
     out, asked = _make(e, "blacksmith", "an iron spear")
     assert out.status == "refused" and out.code == "no_material" and asked == []
     assert "no iron to forge a spear" in out.tell
+    # Short, not missing: measured live, "no metal … (2 carried, 3 needed)" said both.
+    e, pc = _engine(world, carry=(("iron", 2), ("charcoal", 1), ("ash-haft", 1)))
+    out, asked = _make(e, "blacksmith", "a chain shirt")
+    assert out.code == "no_material" and asked == []
+    assert "not enough metal to forge a chain shirt" in out.tell and "2 are in the pack" \
+        in out.tell
 
 
 def test_ore_at_a_field_kit_is_refused_because_smelting_needs_a_smithy(world):
@@ -363,7 +369,10 @@ def test_the_bench_is_offered_under_the_beat_once_never_opened(world):
     out, _ = _make(e, "blacksmith", "a dagger")
     c = SimpleNamespace(transcript=[])
     views._point_to_the_bench(c, [out, out])
-    assert c.transcript == [{"who": "gm", "kind": "bench", "bench": "forge",
+    # Never kind "bench": a beat's kind is its class on the page, and `.bench` is the herb
+    # bench's fixed full-screen layer — live, a "bench" line covered the people buttons
+    # (tools/table_hit_test.js, 2026-10-28).
+    assert c.transcript == [{"who": "gm", "kind": "benchline", "bench": "forge",
                              "text": typed_craft.bench_line("blacksmith")}]
     assert "masterwork" in c.transcript[0]["text"]
     js = Path("play/static/js/table/02-state.js").read_text(encoding="utf-8")

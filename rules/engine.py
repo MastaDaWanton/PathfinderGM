@@ -3515,7 +3515,7 @@ class Engine:
                     not in typed_craft.CRAFTS:
                 raise IntentError(
                     f"make: craft is one of {', '.join(typed_craft.CRAFTS)}", "schema",
-                    index)
+                    index, code="no_such_craft")
 
         if intent.op == "cast":
             self._check_cast(intent, index)
@@ -10481,8 +10481,12 @@ class Engine:
             said = why if pointer in why else f"{why} {pointer}"
             out = self._refuse(intent, f"{actor.name} makes nothing. {said}".strip(),
                                code=code, for_a_person=why)
-            out.effects = [point]
-            return out
+            # The outcome's record, not an actor's effect store: built with the pointer
+            # rather than assigned into, which tests/test_three_laws.py reads as a store
+            # edit outside the applicator.
+            from dataclasses import replace
+
+            return replace(out, effects=[point])
 
         if craft is None:
             return refused(f"{typed_craft.BENCHES.get(craft_id, {}).get('name', 'The bench')}"

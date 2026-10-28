@@ -257,7 +257,7 @@ function render(s, hold) {
   // The attribute is the one each bench opens by (29-bench-core.js `openWith`).
   const benchDoor = b => {
     const door = BENCH_DOORS[b.bench];
-    return b.kind === "bench" && door ? ` <button type="button"
+    return b.kind === "benchline" && door ? ` <button type="button"
       class="v2-btn is-quiet is-small benchdoor" ${door[0]}>${esc(door[1])}</button>` : "";
   };
   $("#story").innerHTML = s.transcript.map((b, i) =>

@@ -4766,7 +4766,11 @@ def _point_to_the_bench(c, outcomes) -> None:
         for e in o.effects or ():
             if e.get("kind") == "bench" and e.get("bench") and e["bench"] not in seen:
                 seen.append(e["bench"])
-                c.transcript.append({"who": "gm", "kind": "bench", "bench": e["bench"],
+                # Kind "benchline", never "bench": the page draws a beat's kind as its
+                # class, and `.bench` is the herb bench's full-screen layer (position fixed,
+                # z 35). Measured live 2026-10-28 by tools/table_hit_test.js: a line of
+                # kind "bench" covered the table's people buttons, the 0.2.13 defect.
+                c.transcript.append({"who": "gm", "kind": "benchline", "bench": e["bench"],
                                      "text": typed_craft.bench_line(str(e.get("craft")
                                                                         or ""))})
 
