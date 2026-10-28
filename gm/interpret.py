@@ -41,8 +41,20 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
-    "follow", "request", "claim", "other",
+    "follow", "request", "claim", "craft", "other",
 )
+# `craft` since 2026-10-28. The report: "My wife tries to level up blacksmithing through
+# narration and didn't get real items or experience." Probed on gemma-4-12B before the
+# change: of eleven craft lines ("I forge a dagger at the anvil", "I brew a basic healing
+# draught", "I tan this hide into leather" …) ten came back `other` and one `cast`; `other`
+# owes no op, so nothing was rolled, spent or made, and the narrator wrote the work done.
+# The owner's ruling the same day: a typed craft line makes the craft's base item for real
+# (rules/typed_craft.py). `craft` owes the engine's `make` op, built whole
+# (`acts_to_ops._craft`). Which craft is a closed choice (`CRAFTS`), never read out of the
+# words in code; whether the words ask for the plain item or finer work is another
+# (`WORKS`): a special material, masterwork, a finish or an enchantment is the bench's.
+CRAFTS = ("blacksmith", "leatherworker", "alchemist", "herbalist", "enchanter")
+WORKS = ("plain", "finer")
 # `exert` since 2026-10-16. The owner: "my wife was playing and a man needed help with his
 # cart. When she helped him the game narrated that i lifted his cart but never gave a
 # strength check." Probed the same day (gemma-4-12B heretic): "I help the man lift his
@@ -184,7 +196,11 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "stealth": ("target", "place"), "athletics": ("place",),
     # What is heaved, and who is helped with it ("join the ferryman in hauling his boat").
     "exert": ("object", "target", "place"), "gather": ("object", "time"),
-    "follow": ("target", "object", "time"), "claim": (), "other": ("target", "object", "place"),
+    "follow": ("target", "object", "time"), "claim": (),
+    # What is made or worked (the thing named: "a dagger", "this hide"), and where. Which
+    # craft and how fine are the closed `craft` and `work`, written after (`per_act_schema`).
+    "craft": ("object", "place"),
+    "other": ("target", "object", "place"),
 }
 
 _WHAT_EACH_IS = """\
@@ -229,6 +245,13 @@ exert     lift, push, pull, heave, drag, hold up or shift something heavy by mai
 gather   forage, gather, fill waterskins
 follow    follow somebody or a trail
 claim     assert who or what you are
+craft     make or work something yourself at a trade: forge, smith, hammer out or
+          assemble metal work; tan, cure or stitch leather; brew, mix or bottle alchemy;
+          grind, steep or brew herbs into a remedy; enchant. The object is the thing
+          made or worked. `craft` is which trade: blacksmith, leatherworker, alchemist,
+          herbalist or enchanter. `work` is plain for the ordinary thing, or finer when
+          the words ask for more: a special metal or hide, masterwork, a finish, an
+          enchantment. Asking somebody else to make it is talk or buy, never craft
 other     anything else
 
 Each action also says by what MEANS it is done:
@@ -594,6 +617,39 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "make the shutters fly open by pointing at them",
           "object": "the shutters", "means": "beyond", "act": "other"}]}),
+    # Crafts (2026-10-28): the player's own work at a trade is `craft`, with the trade and
+    # how fine closed. None of these is a probe line or a labelled line; a trade asked of
+    # somebody else stays talk or buy, and walking to a workshop stays go.
+    # A common metal named is still the plain item (the first probe read "an iron spear"
+    # as finer); a special one, masterwork or a finish is not (the warhammer, below).
+    ("I heat the bar and hammer out a steel mace on the anvil.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "heat the bar and hammer out a steel mace on the anvil",
+          "object": "a steel mace", "place": "the anvil", "craft": "blacksmith",
+          "work": "plain", "act": "craft"}]}),
+    ("I cure the wolf pelt and stitch it into a jerkin.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "cure the wolf pelt and stitch it into a jerkin", "object": "a jerkin",
+          "craft": "leatherworker", "work": "plain", "act": "craft"}]}),
+    ("I steep the chamomile into a calming infusion.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "steep the chamomile into a calming infusion",
+          "object": "a calming infusion", "craft": "herbalist", "work": "plain",
+          "act": "craft"}]}),
+    ("I bottle a flask of acid at my kit.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "bottle a flask of acid at my kit", "object": "a flask of acid",
+          "place": "my kit", "craft": "alchemist", "work": "plain", "act": "craft"}]}),
+    ("I forge a masterwork warhammer of adamantine.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "forge a masterwork warhammer of adamantine",
+          "object": "a masterwork warhammer of adamantine", "craft": "blacksmith",
+          "work": "finer", "act": "craft"}]}),
+    ("I walk over to the tannery and look at the drying hides.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "walk over to the tannery", "place": "the tannery", "act": "go"},
+         {"span": "look at the drying hides", "object": "the drying hides",
+          "act": "look"}]}),
 ]
 
 
@@ -656,6 +712,10 @@ def per_act_schema() -> dict:
                  # the words for it (the slots before the label, as everywhere here).
                  **({"asks_for": {"type": "string", "enum": list(REQUESTS)}}
                     if act == "request" else {}),
+                 # Which craft and how fine, closed enums after the words, as `asks_for`.
+                 **({"craft": {"type": "string", "enum": list(CRAFTS)},
+                     "work": {"type": "string", "enum": list(WORKS)}}
+                    if act == "craft" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -687,7 +747,10 @@ def _demo_reply(frame: dict) -> str:
         acts.append({"span": a.get("span", ""), "commit": commit, "act": a["act"],
                      **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())},
                      **({"asks_for": a.get("asks_for") or REQUESTS[1]}
-                        if a["act"] == "request" else {}), **means})
+                        if a["act"] == "request" else {}),
+                     **({"craft": a.get("craft") or CRAFTS[0],
+                         "work": a.get("work") or WORKS[0]}
+                        if a["act"] == "craft" else {}), **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -785,6 +848,18 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
                 kept["act"] = "talk"
                 if kept.get("object"):
                     kept["says"] = kept.pop("object")
+        if kept["act"] == "craft":
+            # Which craft is the enum's, never words, as a request's `asks_for` is: outside
+            # it the work is `other`, which owes no op — and nothing is made. How fine is
+            # the enum's too; outside it the plain item is the reading.
+            trade = str(a.get("craft") or "").strip().lower()
+            if trade in CRAFTS:
+                kept["craft"] = trade
+                work = str(a.get("work") or "").strip().lower()
+                kept["work"] = work if work in WORKS else WORKS[0]
+            else:
+                dropped.append(f"craft.craft={a.get('craft')!r}")
+                kept["act"] = "other"
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is

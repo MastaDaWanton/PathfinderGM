@@ -711,8 +711,30 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _exert(row, frame, i, scene, pc)
             if act == "request" and pc is not None:
                 _request(row, a, scene, pc)
+            if act == "craft" and pc is not None:
+                _craft(row, a, pc)
         rows.append(row)
     return rows
+
+
+def _craft(row: Row, a: dict, pc) -> None:
+    """A craft worked by the player's own hands, built whole: the engine's `make` op
+    (rules/typed_craft.py), which walks the bench's chain for the base item — the player's
+    d20 per step, the materials out of the pack, the time, the item and the mastery.
+
+    The report, 2026-10-28: "My wife tries to level up blacksmithing through narration and
+    didn't get real items or experience." The reader read every craft line `other`, which
+    owes no op. Which craft and how fine are the reader's closed answers (`interpret.CRAFTS`,
+    `WORKS`); what is made is the player's own words, grounded in the craft's catalogue by
+    the engine's finders, never here."""
+    params = {"craft": str(a.get("craft") or ""), "work": str(a.get("work") or "plain")}
+    if a.get("object"):
+        params["item"] = " ".join(str(a["object"]).split())
+    if a.get("span"):
+        params["words"] = " ".join(str(a["span"]).split())
+    row.intents.append({"op": "make", "actor": pc.ref, "params": params,
+                        "because": "the player works at their craft"})
+    row.note = f"a {params['craft']}'s work: {params.get('item') or 'unnamed'}"
 
 
 # The band a feat of strength is built at before the plan names one (`apply` carries the
@@ -1594,6 +1616,7 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # A job the table built (`jobs_spoken`) is the turn's word on the work: the plan's own
     # week of `work`, or a `quest` it wrote for the same job, would work it or take it twice.
     jobbing = any(b.get("op") == "job" for b in built)
+    making = any(b.get("op") == "make" for b in built)
     # A go the reading owes a journey for (`interpret.ops_for`: a town the roads reach) is
     # that journey, and the plan's own walk beside it is not: measured on the 0.2.22
     # leftovers run, "I … lead the wagons on toward Kalixiri" from a stretch of the road
@@ -1608,6 +1631,20 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             # reader's answer about the player's own words.
             if notes is not None:
                 notes.append("the plan's job dropped: only the reading's answer writes one")
+            continue
+        if op in ("make", "craft"):
+            # Never the plan's either (`intents.CODE_ONLY_OPS`, 2026-10-28): the plan's
+            # `craft` paid mastery from a tier it chose and made nothing. A craft is the
+            # reading's `craft` act, built whole into `make` (`_craft`).
+            if notes is not None:
+                notes.append(f"the plan's {op} dropped: only the reading's craft makes")
+            continue
+        if making and op == "check" and str(((r or {}).get("params") or {}).get(
+                "skill") or "").lower().startswith(("craft", "profession")):
+            # The make op rolls the craft's own check, step by step; the plan's Craft
+            # check beside it would be a second roll for the same work.
+            if notes is not None:
+                notes.append("the plan's craft check replaced by the reading's make")
             continue
         if jobbing and op in ("work", "quest"):
             if notes is not None:

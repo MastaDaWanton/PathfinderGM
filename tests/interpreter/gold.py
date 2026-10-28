@@ -363,8 +363,9 @@ GOLD = [
       [A("athletics", place="the roof"), A("wait", time="for dark")], "authored"),
     G("I swim across the river.", [A("athletics", place="the river")], "authored"),
     G("I pray at the shrine.", [A("other", place="the shrine")], "authored"),
+    # `craft` since 2026-10-28 (gm/interpret.py): the act the vocabulary gained for this.
     G("I craft a healing salve from the herbs I found.",
-      [A("other", object="a healing salve")], "authored"),
+      [A("craft", object="a healing salve")], "authored"),
     G("I read the letter she gave me.", [A("look", object="the letter she gave me")], "authored"),
     G("I put on the chain shirt.", [A("use", object="the chain shirt")], "authored"),
     # `drop` since 2026-10-03 (lane F): the act the vocabulary gained for exactly this. The

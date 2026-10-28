@@ -809,12 +809,10 @@ one objective of a quest on the SITUATIONS list: {"op": "quest_step", "params":
 {"quest": "<the quest's id>", "objective": 1, "note": "what was done"}}. The last
 objective done finishes the quest and pays the award; never narrate a quest as finished
 unless the engine says it is.
-Foraging, harvesting or brewing at a world class — a craft the character works at rather
-than a skill they roll: {"op": "craft", "params": {"track": "herbalist", "recipe":
-"woundwort styptic", "tier": "common", "stages": 2, "risky": false}}. `stages` is how many
-methods the work passed through, `risky` if the harvesting was dangerous, and
-"failed": true when it spoils — a ruined batch still teaches something. The character does
-not need to have chosen the class; doing the work is how they take it up.
+Making something with the character's own hands at a craft — forging, tanning, brewing,
+grinding herbs, bottling, enchanting — is the engine's, read from the player's own words:
+write no op for it. What was made, what it cost and what was learned are in the engine's
+words; the prose never makes an item or a skill gain the engine did not.
 Selling something out of the satchel:
 {"op": "sell", "actor": "pc", "params": {"item": "<the jar's id>", "count": 1,
 "to": "<the buyer's ref, if they are in the scene>"}} — the engine prices it, checks what
