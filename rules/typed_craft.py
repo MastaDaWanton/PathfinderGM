@@ -73,10 +73,25 @@ BENCHES: dict[str, dict] = {
 
 
 def pointer(craft: str) -> str:
-    """The sentence a typed craft's tell ends on: the bench exists for finer work."""
+    """The sentence a typed craft's tell ends on: the bench exists for finer work.
+
+    Short, and naming no finer work. Measured live 2026-10-28: the first pointer listed it
+    ("Finer work — better metals, quenching and tempering, honing, masterwork and finishes
+    — is done at the forge bench") on the tell of a REFUSED mithral longsword, and the
+    planned narrator's fact slot wrote "quenching and tempering the rare metal to create a
+    masterwork blade. The mithral longsword emerges with a flawless finish" — the list
+    dressed as the deed. The shape of the tell became the shape of the beat (CLAUDE.md).
+    The list lives on the line under the beat, which code writes (`bench_line`)."""
     b = BENCHES.get(craft) or {}
-    return (f"Finer work — {b.get('finer', 'anything beyond the plain item')} — is done "
-            f"at {b.get('name', 'the bench')}.")
+    return f"Finer work is done at {b.get('name', 'the bench')}."
+
+
+def bench_line(craft: str) -> str:
+    """The line under the beat, beside the bench's button (play/views.py
+    `_point_to_the_bench`): what the bench is for, which the tell must not carry."""
+    b = BENCHES.get(craft) or {}
+    return (f"For finer work — {b.get('finer', 'anything beyond the plain item')} — "
+            f"{b.get('name', 'the bench')} is open to you.")
 
 
 @dataclass

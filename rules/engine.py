@@ -10469,12 +10469,18 @@ class Engine:
         craft = typed_craft.get(craft_id)
         bench = typed_craft.BENCHES.get(craft_id) or {}
         point = {"ref": actor.ref, "kind": "bench", "craft": craft_id,
-                 "bench": bench.get("key", "")}
+                 "bench": bench.get("key", ""),
+                 # The player's words for the thing until the catalogue names it (below).
+                 "target": " ".join(str(intent.params.get("item") or "the thing").split())}
         pointer = typed_craft.pointer(craft_id)
 
         def refused(why: str, code: str) -> Outcome:
-            out = self._refuse(intent, f"{why} {pointer}".strip() if pointer not in why
-                               else why, code=code, for_a_person=why)
+            # "makes nothing" first: the refusal is a fact the narrator dresses, and a
+            # refusal tell that opened on what was asked for was written as done (the
+            # mithral longsword, live 2026-10-28; `typed_craft.pointer`).
+            said = why if pointer in why else f"{why} {pointer}"
+            out = self._refuse(intent, f"{actor.name} makes nothing. {said}".strip(),
+                               code=code, for_a_person=why)
             out.effects = [point]
             return out
 

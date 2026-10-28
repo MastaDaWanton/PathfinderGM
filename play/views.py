@@ -4766,10 +4766,9 @@ def _point_to_the_bench(c, outcomes) -> None:
         for e in o.effects or ():
             if e.get("kind") == "bench" and e.get("bench") and e["bench"] not in seen:
                 seen.append(e["bench"])
-                craft = str(e.get("craft") or "")
-                name = (typed_craft.BENCHES.get(craft) or {}).get("name", "the bench")
                 c.transcript.append({"who": "gm", "kind": "bench", "bench": e["bench"],
-                                     "text": f"For finer work, {name} is open to you."})
+                                     "text": typed_craft.bench_line(str(e.get("craft")
+                                                                        or ""))})
 
 
 def _companions_heard(c, player_text: str, door: str) -> dict:

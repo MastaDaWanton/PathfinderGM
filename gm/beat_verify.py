@@ -1446,6 +1446,22 @@ def attempts_of(facts: Facts) -> list[Attempt]:
             continue
         out.append(Attempt(f"a{len(out) + 1}", who, label, verdict, why=why,
                            save=o.get("op") == "save" or label.lower().endswith(" save")))
+    # A typed craft the engine refused made nothing, and the page must not make it either.
+    # Measured live 2026-10-28: "I forge a mithral longsword" was refused (finer work, the
+    # forge bench's), and the planned beat read "The mithral longsword emerges with a
+    # flawless finish" — with no attempt listed, nothing here asked. A refused make is the
+    # one refusal asked about: its words are a deed the player set out to do, and "made"
+    # is the claim a beat can get wrong.
+    for o in facts.outcomes:
+        if o.get("op") != "make" or o.get("status") != "refused":
+            continue
+        who = str(o.get("actor") or "")
+        if not who or facts.person(who) is None:
+            continue
+        point = next((e for e in _effects(o) if e.get("kind") == "bench"), {})
+        what = str(point.get("target") or "the thing")
+        out.append(Attempt(f"a{len(out) + 1}", who, "craft work", "failure",
+                           why=f"making {what} by hand"))
     return out
 
 

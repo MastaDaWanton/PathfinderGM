@@ -131,7 +131,7 @@ def test_a_special_metal_named_is_refused_and_sent_to_the_bench(world):
     e, pc = _engine(world, carry=(("iron", 2), ("charcoal", 2), ("ash-haft", 1)))
     out, asked = _make(e, "blacksmith", "a mithral longsword")
     assert out.status == "refused" and out.code == "beyond_base" and asked == []
-    assert "forge bench" in out.tell
+    assert out.tell.startswith("Kesst Vayr makes nothing.") and "forge bench" in out.tell
     assert pc.inventory.get("iron") == 2
 
 
@@ -324,6 +324,31 @@ def test_a_beat_that_forges_the_dagger_the_engine_spoiled_is_a_contradiction():
     assert [d.category for d in bv.diff([claim], facts, said)] == ["attempt"]
 
 
+REFUSED = {"intent_id": "i2", "op": "make", "status": "refused", "actor": "pc",
+           "code": "beyond_base", "rolls": [],
+           "effects": [{"ref": "pc", "kind": "bench", "craft": "blacksmith",
+                        "bench": "forge", "target": "a mithral longsword"}],
+           "tell": "Kesst Vayr makes nothing. Mithral is rare metal: a longsword of it is "
+                   "finer work than a plain one. Finer work is done at the forge bench."}
+
+
+def test_a_refused_craft_shown_made_is_a_contradiction():
+    """Measured live 2026-10-28: "I forge a mithral longsword" was refused, and the planned
+    beat read "quenching and tempering the rare metal to create a masterwork blade. The
+    mithral longsword emerges with a flawless finish". The tell had listed the finer work
+    the bench does (now it names none: `typed_craft.pointer`), and the read-back asked
+    nothing, because a refused outcome had no attempt. A refused make is one now."""
+    facts = bv.Facts(start="the forge", end="the forge", places=("the forge",),
+                     people=(PC,), clock=600, outcomes=(REFUSED,))
+    att = bv.attempts_of(facts)
+    assert [(a.code, a.verdict) for a in att] == [("a1", "failure")]
+    said = "The mithral longsword emerges with a flawless finish."
+    claim = bv.Claim("attempt", {"attempt": "a1", "shown": "succeeds"}, quote=said,
+                     sentence=said, valid=True)
+    assert [d.category for d in bv.diff([claim], facts, said)] == ["attempt"]
+    assert "quench" not in typed_craft.pointer("blacksmith")
+
+
 # --- the pointer -----------------------------------------------------------------------------
 
 def test_the_bench_is_offered_under_the_beat_once_never_opened(world):
@@ -339,7 +364,8 @@ def test_the_bench_is_offered_under_the_beat_once_never_opened(world):
     c = SimpleNamespace(transcript=[])
     views._point_to_the_bench(c, [out, out])
     assert c.transcript == [{"who": "gm", "kind": "bench", "bench": "forge",
-                             "text": "For finer work, the forge bench is open to you."}]
+                             "text": typed_craft.bench_line("blacksmith")}]
+    assert "masterwork" in c.transcript[0]["text"]
     js = Path("play/static/js/table/02-state.js").read_text(encoding="utf-8")
     for row in typed_craft.BENCHES.values():
         assert f"  {row['key']}: [\"data-" in js, row["key"]
