@@ -95,7 +95,7 @@ def test_an_unarmed_barkeep_does_not_swing_a_weapon():
     borin.equipped, borin.weapons = "unarmed", []
     [(_, why)] = state_claims("His weapon slams into a heavy oak table instead of your "
                               "chest.", scene, [])
-    assert "nobody facing you here is armed" in why
+    assert "nobody here is armed" in why
 
 
 def test_the_live_verification_run_caught_a_weapon_and_a_stun_nobody_had():
@@ -114,6 +114,66 @@ def test_the_live_verification_run_caught_a_weapon_and_a_stun_nobody_had():
     [(_, why)] = state_claims("He is momentarily stunned by the loss of his reach, his "
                               "stance wide and unbalanced.", scene, [])
     assert why.startswith("says they are stunned, and they are not")
+
+
+# --- a printed weapon is a weapon (2026-10-28) -------------------------------------------
+
+def _road(*templates: str):
+    """The escort job's road fight: the player, and bestiary bodies whose weapons are
+    lines of print — `equipped` None, `weapons` empty, as every one was in the saves."""
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    bodies = []
+    for t in templates:
+        a = instantiate(t, scene=scene)
+        a.equipped, a.weapons = None, []
+        scene.add(a)
+        bodies.append(a)
+    return scene, bodies
+
+
+@pytest.mark.parametrize("templates, text", [
+    (("varisian-wagon-driver", "riding-dog"),
+     "The second teamster swings their club in a heavy, practiced arc, the wood "
+     "whistling through the air before it connects with the riding dog."),
+    (("guard",),
+     "A desperate roar echoes as the Toll-Keeper swings his halberd in a wide, desperate "
+     "arc to drive you back."),
+    (("guard", "varisian-wagon-driver"),
+     "The hired sword steps forward and swings their halberd in a wide, punishing arc at "
+     "the Toll-Keeper."),
+])
+def test_eight_road_fight_sentences_cut_for_a_weapon_only_the_stat_block_held(templates,
+                                                                               text):
+    """Measured 2026-10-28 on two escort-job road fights (kesst-vayr saves rj-data-
+    roadfight and rj-data-escort2): every caravan hand and the Toll-Keeper had `equipped`
+    None and no `weapons` — club, halberd, heavy flail are print (`stat_block_attacks`) —
+    so "nobody facing you here is armed" cut 8 sentences across 7 of the 18 creature
+    turns, 7 of them true: the second teamster's club on a turn whose tell was "hits the
+    riding dog with the club for 4 bludgeoning", the Toll-Keeper's halberd on a halberd
+    turn. The cut took the sentence naming the attacker and left "the wood whistles ...
+    missing you" orphaned behind it. Allies and foes alike."""
+    scene, bodies = _road(*templates)
+    assert all(b.stat_block_attacks() for b in bodies)   # the bodies are print, not kit
+    assert state_claims(text, scene, []) == []
+
+
+def test_a_bite_is_not_a_weapon_in_a_hand():
+    """The other side of it: a printed attack the body makes — the riding dog's bite —
+    arms nobody, so a dog alone with "its blade" is still caught."""
+    scene, (dog,) = _road("riding-dog")
+    assert dog.stat_block_attacks()                       # the bite is printed
+    [(_, why)] = state_claims("It swings its blade in a wide arc at your throat.", scene, [])
+    assert "nobody here is armed" in why
+
+
+def test_a_disarmed_creature_is_not_armed_by_its_print():
+    """`equipped` "unarmed" is the sheet saying the hand is empty (`Engine._let_go`); the
+    print does not put the halberd back."""
+    scene, (keeper,) = _road("guard")
+    keeper.equipped = "unarmed"
+    [(_, why)] = state_claims("He swings his halberd in a wide arc.", scene, [])
+    assert "nobody here is armed" in why
 
 
 # --- what the recorded corpus taught ---------------------------------------------------
