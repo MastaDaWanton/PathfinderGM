@@ -508,6 +508,11 @@ class Actor:
     # contradict pockets that were never opened, and the watcher gets the whole
     # player turn to garnish the claim before it collapses.
     kit_pending: dict = field(default_factory=dict)
+    # Set once the weapons this body's stat block prints were put on `weapons` and in
+    # `equipped` (`take_up_printed_arms`). A marker, not "equipped is None": a riding dog
+    # fights with its bite and keeps `equipped` None for good, and a guard robbed of its
+    # sap must not have it handed back by the print on the next load.
+    print_armed: bool = False
     # The carcass's own record (leatherworking contracts §5.2; rules/harvest.py): the world
     # minute this body died (stamped by `harvest.mark_the_dead` from `Engine._drive`; a
     # carcass is harvestable for 24 hours after it, owner answer 5 of 2026-10-08), and
@@ -2935,6 +2940,72 @@ class Actor:
         from . import statblock_attacks
 
         return statblock_attacks.of_block(doc)
+
+    def printed_item(self, key: str) -> str:
+        """The weapons-table key of the made weapon a printed attack named `key` stands
+        on ("heavy flail" -> "heavy-flail", "broken scimitar" -> "scimitar"), or "" when
+        the attack is the body's own — a bite, a claw, "tendrils" — or nothing printed.
+        The print says what it carries; whether it still has it is the sheet's."""
+        found = self._find_stat_block_attack(key)
+        if found is None:
+            return ""
+        a, _ = found
+        return str(a["base"]) if a["base"] and not a["natural"] else ""
+
+    def has_printed(self, key: str) -> bool:
+        """Can this body still strike with the printed attack named `key`? Always, for
+        the body's own (a bite cannot be dropped); for a made weapon, while the sheet
+        has it in hand or pack (`weapons`, `equipped`) — a disarmed halberd is still on
+        the print and no longer the guard's to swing."""
+        from . import weapons as weapons_mod
+
+        item = self.printed_item(key)
+        if not item:
+            return self._find_stat_block_attack(key) is not None
+        had = {weapons_mod.key_for(w) or str(w).lower()
+               for w in [*self.weapons, self.equipped or ""] if w}
+        return item in had
+
+    def printed_arms(self) -> list[str]:
+        """The printed attacks this body can still make, by printed name, print order:
+        what a creature's turn is told it fights with."""
+        return [k for k in dict.fromkeys(
+                    a["key"] for cat in ("melee", "ranged")
+                    for opt in self.stat_block_attacks().get(cat) or () for a in opt)
+                if self.has_printed(k)]
+
+    def take_up_printed_arms(self) -> None:
+        """Put what the stat block says this body carries on the sheet, once: every
+        printed made weapon onto `weapons`, and the primary one in `equipped` when it is
+        one. Run by `from_dict`, so a creature spawned and a creature loaded from a save
+        made before this are the same shape as a hand-written template's thug.
+
+        Possession only. The numbers stay the print's, read live by `stat_block_weapon`
+        through `weapon()` (docs/printed-attacks.md: corrected on the bench, corrected on
+        every creature standing in a scene). What a body has in hand and in its pack is
+        play state — a disarm empties the hand, a pick-up fills it, a looter takes it —
+        and until 2026-10-28 it lived in two shapes: `equipped`/`weapons` for the thug,
+        the print alone for the 4,722 of 7,111 imported blocks that print a made weapon.
+        Each reader of the hand grew a fallback for the second shape and most did not:
+        a disarm by 15 told "Guard holds nothing that can be knocked loose" and its next
+        turn swung the halberd; a sunder broke nothing; `wear` refused the guard's own
+        heavy flail; a fallen ogre's greatclub could not be looted; and the prose check
+        cut true sentences about a teamster's club as a weapon nobody here held.
+        """
+        if self.print_armed:
+            return
+        from . import weapons as weapons_mod
+
+        made = [self.printed_item(a["key"]) for cat in ("melee", "ranged")
+                for opt in self.stat_block_attacks().get(cat) or () for a in opt]
+        made = [m for m in dict.fromkeys(made) if m]
+        if not made:
+            return                       # a dog's bite is not a thing it carries
+        self.print_armed = True
+        have = {weapons_mod.key_for(w) or str(w).lower() for w in self.weapons}
+        self.weapons += [m for m in made if (weapons_mod.key_for(m) or m) not in have]
+        if not self.equipped:
+            self.equipped = self.printed_item(self.primary_attack_key()) or None
 
     def primary_attack_key(self) -> str:
         """The first attack of the first melee option, else of the first ranged one, or "".
@@ -7203,6 +7274,8 @@ def to_dict(actor: Actor) -> dict:
         "picked_at": dict(actor.picked_at),
         "preserved": {k: bool(v) for k, v in actor.preserved.items() if v},
         "kit_pending": dict(actor.kit_pending),
+        # Only once set: every save without a printed weapon round-trips byte for byte.
+        **({"print_armed": True} if actor.print_armed else {}),
         # A carcass's record (rules/harvest.py), only once there is one: every save
         # written before it round-trips byte for byte.
         **({"died_at": int(actor.died_at)} if actor.died_at is not None else {}),
@@ -7733,6 +7806,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         picked_at={str(k): int(v) for k, v in (data.get("picked_at") or {}).items()},
         preserved={str(k): bool(v) for k, v in (data.get("preserved") or {}).items()},
         kit_pending=dict(data.get("kit_pending") or {}),
+        print_armed=bool(data.get("print_armed")),
         died_at=(int(data["died_at"]) if data.get("died_at") is not None else None),
         harvested={str(k): int(v) for k, v in (data.get("harvested") or {}).items()},
         goods={str(k): int(v) for k, v in (data.get("goods") or {}).items()
@@ -7892,6 +7966,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         total += a._feat_hp()
     a.set_hp_max(total)
     _bind_targets(a)
+    a.take_up_printed_arms()
     # The gear records' numbers re-read off the book (2026-10-07): a save made under the
     # inch-of-steel rule holds a longsword at 30 hit points, and the book gives it 5.
     # Last, so the forged records it reads (`stock`, `worn`) are loaded.

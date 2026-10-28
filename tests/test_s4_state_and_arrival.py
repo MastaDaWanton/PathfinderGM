@@ -435,6 +435,23 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
             k = weapons_mod.key_for(w)
             goods_was[k] = goods_was.get(k, 0) + weapons_mod.rounds_per(k)
         was["goods"] = goods_was
+    # The third (2026-10-28, tests/test_printed_arms.py; owner ruling: normalise on
+    # load): a creature from an imported block takes the weapons its stat block prints
+    # onto its sheet, once (`Actor.take_up_printed_arms`). Bobby's saves hold five —
+    # Ashla, Drenn, Mokra and both guards — as `equipped` None, `weapons` []. Only those
+    # three keys may move, only on a body that carried no marker, the hand only if it was
+    # empty, and the list only by adding weapons-table keys.
+    for ref, was in (orig["scene"].get("people") or {}).items():
+        got = now["scene"]["people"][ref]
+        if not got.get("print_armed") or was.get("print_armed"):
+            continue
+        migrated = True
+        assert was.get("equipped") in (None, got.get("equipped")), ref
+        old_list = list(was.get("weapons") or [])
+        assert got["weapons"][:len(old_list)] == old_list, ref
+        assert all(weapons_mod.has(w) for w in got["weapons"][len(old_list):]), ref
+        for key in ("equipped", "weapons", "print_armed"):
+            was[key] = got.get(key)
     orig.pop("world_source", None)
     now.pop("world_source", None)
     assert now == orig

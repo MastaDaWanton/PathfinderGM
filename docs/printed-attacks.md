@@ -74,7 +74,18 @@ was found that defines "or" outright. The monster-entry-format page's Dagon exam
   or an attack printed with no bonus. Those keep the old behaviour rather than a guess.
 - **`Actor.stat_block_attacks`** reads the lines *live* off `_creature_doc()`, the way
   `movement_modes` reads a climb speed. Correcting a creature on the bench corrects every
-  one already standing in a scene, and nothing is copied into a save.
+  one already standing in a scene, and no number is copied into a save.
+- **Possession is the sheet's (2026-10-28).** What the print says a creature *carries* is
+  play state, and it goes on `weapons` and `equipped` once, at spawn or load
+  (`Actor.take_up_printed_arms`, marked `print_armed`): every printed made weapon (a
+  `base` in the weapons table), the primary in hand. A bite or "tendrils" stays the
+  body's. Before it, an imported block arrived `equipped` None, `weapons` [], and every
+  reader of the hand needed a fallback most did not have: a disarm by 15 told "Guard
+  holds nothing that can be knocked loose", sunder broke nothing, `wear` refused the
+  guard's own heavy flail, loot took nothing from an ogre, and the prose check cut a
+  teamster's club as a weapon nobody held. The attack gate passes a printed made weapon
+  only while the sheet still has it (`Actor.has_printed`). Owner rulings: printed weapons
+  are lootable; saves are normalised on load. Tests: `tests/test_printed_arms.py`.
 - **`Actor.weapon(key)`** answers a printed attack before the natural-weapon and table
   lookups. The table supplies what the print omits (hands, traits). The print overrides
   the dice (a Large greatclub's 2d8, not the table's 1d10), the crit and the type.
