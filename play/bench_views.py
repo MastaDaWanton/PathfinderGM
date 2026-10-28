@@ -394,22 +394,12 @@ def bench_roll(request):
         line = ""
     else:
         miss = -margin
-        losses = crafting.failure_losses(plan, miss)
-        out["lost"] = crafting.spend(pc, losses)
-        if out["lost"]:
-            ruined = ", ".join(f"{x['count']} {x['name']}" for x in out["lost"])
-            said = f"Missed by {miss}. Half the materials are ruined: {ruined}."
-        else:
-            said = f"Missed by {miss}. The time is lost; the materials are kept."
+        # The rule the bench and a typed line share (`crafting.settle_miss`).
+        settled = crafting.settle_miss(pc, progress, plan, miss)
+        out["lost"] = settled["lost"]
+        said = settled["said"]
         out["said"] = said
-        lead = plan.lead
-        # The whole stack failed on one roll, so it is that many failed steps: see the
-        # finish below for why a batch counts its doses.
-        got = worldclass.award_step(track, progress, method=plan.method,
-                         ingredient_id=lead.ingredient_id if lead else "",
-                         rarity_rank=plan.rank_in, quality_index=0, success=False,
-                         name=crafting._lead_name(lead) if lead else "",
-                         count=plan.doses, noun="dose")
+        got = settled["mastery"]
         out["mastery"] = {"lines": list(got.get("reasons") or []),
                           "total": got.get("total", progress.mp),
                           "level": got.get("level", progress.level),
@@ -426,12 +416,8 @@ def bench_roll(request):
 # --- §3.4 ---------------------------------------------------------------------------------
 
 def _first(progress, key: str) -> bool:
-    """Whether this is the first time, recorded in the track's own ledger so it survives
-    a save. Keys are `form:<form>` and `herb:<id>`, apart from the (method, ingredient)
-    keys the step award uses."""
-    seen = int(progress.crafted.get(key, 0))
-    progress.crafted[key] = seen + 1
-    return seen == 0
+    """`crafting.first_time`, the one copy."""
+    return crafting.first_time(progress, key)
 
 
 @require_POST
@@ -461,76 +447,17 @@ def bench_finish(request):
     ceiling = worldclass.ceiling_index(progress)
     tier, score = crafting.tier_from_score(body.get("score"), ceiling)
     now = int(c.scene.clock_minutes or 0)
-    made = crafting.make(plan, tier, now)
-
-    # The extra-yield perk: the one random reward, so its roll is shown (plan §3).
-    perks = perk_multipliers(progress)
-    chance = float(perks.get("yield_chance", 0) or 0)
-    extra, yield_line = 0, None
     engine = c.engine()
-    if chance > 0:
-        roll = engine.dice.roll("1d100", label="Yield perk", visibility="player")
-        need = int(round(chance * 100))
-        extra = 1 if roll.total <= need else 0
-        yield_line = {"why": f"Yield perk: d100 {roll.total} against {need} or less, "
-                             f"{'one more dose' if extra else 'no extra dose'}", "mp": 0}
-
     _PENDING.pop(c.id, None)
-    crafting.spend(pc, [(fresh[m.key], n) for m, n in plan.consumes])
-    count = int(made.count) + extra
-    pc.add_stock(made, count)
-
-    # Mastery: the step, the quality bonus (inside the step award), then firsts.
-    #
-    # A batch pays as its doses made one at a time would (owner, 2026-10-05: "batch
-    # crafting does not give equivalent experience"): one step per dose, every one paid
-    # ("batch of 10 should pay 10"), each with its bands and the stack's one quality bonus. Doses, not
-    # `plan.batch`: three Mint on the mortar at batch 1 is three grinds as surely as one
-    # Mint at batch 3, and the smallest craft any method allows is one dose. The yield
-    # perk's extra dose is a gift of the perk, not a step worked, so it is not counted.
-    # Firsts and discoveries stay once per finish, however many doses.
-    lines: list[dict] = []
-    levelled: list[int] = []
-    lead = plan.lead
-    got = worldclass.award_step(track, progress, method=plan.method,
-                     ingredient_id=lead.ingredient_id if lead else "",
-                     rarity_rank=plan.rank_in, quality_index=tier, success=True,
-                     name=crafting._lead_name(lead) if lead else "",
-                     count=plan.doses, noun="dose")
-    lines += list(got.get("reasons") or [])
-    levelled += list(got.get("levelled") or [])
-
-    def bonus(why: str) -> None:
-        res = worldclass.award_bonus(track, progress, why=why, mp=FIRST_MP)
-        lines.extend(res.get("reasons") or [])
-        levelled.extend(res.get("levelled") or [])
-
-    form_name = crafting.product_row(plan.form).get("name", plan.form or "")
-    if plan.form and _first(progress, f"form:{plan.form}"):
-        bonus(f"first {form_name.lower()}")
-    for m, _ in plan.picks:
-        if m.reagent or not m.ingredient_id:
-            continue
-        if _first(progress, f"herb:{m.ingredient_id}"):
-            bonus(f"first work with {crafting._lead_name(m)}")
-
-    discoveries = []
-    how = f"made it, day {now // 1440 + 1}"
-    for iid, keys in crafting.revealed_keys(made).items():
-        new = herbknowledge.reveal(pc, iid, keys, how)
-        try:
-            ing = ingredients.get(iid)
-        except KeyError:
-            continue
-        pairs = ing.pairs
-        for k in new:
-            idx = int(k[1:]) if k[1:].isdigit() else -1
-            text = pairs[idx][0] if 0 <= idx < len(pairs) else ""
-            discoveries.append({"ingredient_id": iid, "name": ing.name, "key": k,
-                                "text": text})
-            bonus(f"learned: {ing.name}, {text}" if text else f"learned: {ing.name}")
-    if yield_line:
-        lines.append(yield_line)
+    # The step settled by the rule both doors share (`crafting.settle_made`): the
+    # product, the Yield perk's d100, the spend, the step's mastery, the firsts and the
+    # discoveries.
+    settled = crafting.settle_made(pc, progress, plan, tier,
+                                   [(fresh[m.key], n) for m, n in plan.consumes],
+                                   dice=engine.dice, now=now)
+    made, count = settled["made"], settled["count"]
+    lines, levelled = settled["lines"], settled["levelled"]
+    discoveries = settled["discoveries"]
 
     # The loaded recipe's next step (UI plan §5 step 7). The finish body may name the
     # recipe too, and wins: the page knows which step it is on.

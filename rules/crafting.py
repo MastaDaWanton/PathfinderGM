@@ -2702,3 +2702,125 @@ def tuning_for(plan: StepPlan) -> dict:
             # Unrounded: 0.3333 x 3 floors to Crude where the strip showed Sound (measured
             # by the test that pins this, before the epsilon in `tier_from_score`).
             "bands": [t / (ceiling + 1) for t in range(ceiling + 1)]}
+
+
+# --- settling a herb bench step (shared by the bench and a typed line) -------------------
+#
+# Lifted out of play/bench_views.py on 2026-10-28 for the engine's `make` op
+# (rules/typed_craft.py): "I brew a tea from the yarrow" settles its step by the same rule
+# the bench's roll and finish do, never a second copy of it.
+
+HERB_TRACK = "herbalist"
+
+
+def settle_miss(actor, progress, plan: StepPlan, miss: int) -> dict:
+    """A failed roll at the herb bench (`failure_losses`, the book's rule as the plan
+    states it): what is ruined is spent now, and the stack is paid as that many failed
+    steps. Returns {"lost", "said", "mastery"}."""
+    track = wc.get(HERB_TRACK)
+    lost = spend(actor, failure_losses(plan, miss))
+    if lost:
+        ruined = ", ".join(f"{x['count']} {x['name']}" for x in lost)
+        said = f"Missed by {miss}. Half the materials are ruined: {ruined}."
+    else:
+        said = f"Missed by {miss}. The time is lost; the materials are kept."
+    lead = plan.lead
+    # The whole stack failed on one roll, so it is that many failed steps (the finish's
+    # reason, below).
+    got = wc.award_step(track, progress, method=plan.method,
+                        ingredient_id=lead.ingredient_id if lead else "",
+                        rarity_rank=plan.rank_in, quality_index=0, success=False,
+                        name=_lead_name(lead) if lead else "",
+                        count=plan.doses, noun="dose")
+    return {"lost": lost, "said": said, "mastery": got}
+
+
+def first_time(progress, key: str) -> bool:
+    """Whether this is the first time, recorded in the track's own ledger so it survives
+    a save. Keys are `form:<form>` and `herb:<id>`, apart from the (method, ingredient)
+    keys the step award uses."""
+    seen = int(progress.crafted.get(key, 0))
+    progress.crafted[key] = seen + 1
+    return seen == 0
+
+
+def settle_made(actor, progress, plan: StepPlan, tier: int, consumes, *, dice=None,
+                now: int = 0) -> dict:
+    """A made roll at the herb bench, finished at `tier`: the product is made, the Yield
+    perk's d100 rolled on `dice` (none, no roll), the materials in `consumes` (read fresh)
+    spent, the product put in the satchel, and the step, the firsts and the discoveries
+    paid. Returns {"made": Stock, "count", "lines", "levelled", "discoveries"}.
+
+    A batch pays as its doses made one at a time would (owner, 2026-10-05: "batch
+    crafting does not give equivalent experience"): one step per dose, every one paid
+    ("batch of 10 should pay 10"), each with its bands and the stack's one quality bonus.
+    Doses, not `plan.batch`: three Mint on the mortar at batch 1 is three grinds as surely
+    as one Mint at batch 3, and the smallest craft any method allows is one dose. The yield
+    perk's extra dose is a gift of the perk, not a step worked, so it is not counted.
+    Firsts and discoveries stay once per finish, however many doses."""
+    from . import herbknowledge
+
+    track = wc.get(HERB_TRACK)
+    made = make(plan, tier, now)
+    got_perks = dict(wc.perk_multipliers(progress))
+    chance = float(got_perks.get("yield_chance", 0) or 0)
+    # A fraction is the contract; a percentage would read as a certainty (bench_views'
+    # `perk_multipliers` brings it back to one the same way).
+    if chance > 1:
+        chance = chance / 100.0
+    extra, yield_line = 0, None
+    if dice is not None and chance > 0:
+        roll = dice.roll("1d100", label="Yield perk", visibility="player")
+        need = int(round(chance * 100))
+        extra = 1 if roll.total <= need else 0
+        yield_line = {"why": f"Yield perk: d100 {roll.total} against {need} or less, "
+                             f"{'one more dose' if extra else 'no extra dose'}", "mp": 0}
+
+    spend(actor, list(consumes))
+    count = int(made.count) + extra
+    actor.add_stock(made, count)
+
+    lines: list[dict] = []
+    levelled: list[int] = []
+    lead = plan.lead
+    got = wc.award_step(track, progress, method=plan.method,
+                        ingredient_id=lead.ingredient_id if lead else "",
+                        rarity_rank=plan.rank_in, quality_index=tier, success=True,
+                        name=_lead_name(lead) if lead else "",
+                        count=plan.doses, noun="dose")
+    lines += list(got.get("reasons") or [])
+    levelled += list(got.get("levelled") or [])
+
+    def bonus(why: str) -> None:
+        res = wc.award_bonus(track, progress, why=why, mp=wc.FIRST_MP)
+        lines.extend(res.get("reasons") or [])
+        levelled.extend(res.get("levelled") or [])
+
+    form_name = product_row(plan.form).get("name", plan.form or "")
+    if plan.form and first_time(progress, f"form:{plan.form}"):
+        bonus(f"first {form_name.lower()}")
+    for m, _ in plan.picks:
+        if m.reagent or not m.ingredient_id:
+            continue
+        if first_time(progress, f"herb:{m.ingredient_id}"):
+            bonus(f"first work with {_lead_name(m)}")
+
+    discoveries = []
+    how = f"made it, day {int(now) // 1440 + 1}"
+    for iid, keys in revealed_keys(made).items():
+        new = herbknowledge.reveal(actor, iid, keys, how)
+        try:
+            ing = ing_mod.get(iid)
+        except KeyError:
+            continue
+        pairs = ing.pairs
+        for k in new:
+            idx = int(k[1:]) if k[1:].isdigit() else -1
+            text = pairs[idx][0] if 0 <= idx < len(pairs) else ""
+            discoveries.append({"ingredient_id": iid, "name": ing.name, "key": k,
+                                "text": text})
+            bonus(f"learned: {ing.name}, {text}" if text else f"learned: {ing.name}")
+    if yield_line:
+        lines.append(yield_line)
+    return {"made": made, "count": count, "lines": lines, "levelled": levelled,
+            "discoveries": discoveries}
