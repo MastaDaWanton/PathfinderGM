@@ -245,6 +245,22 @@ def test_typed_enchanting_is_sent_to_the_circle(world):
     assert "enchanting circle" in out.tell
 
 
+def test_a_thing_in_another_crafts_catalogue_goes_to_that_craft(world):
+    """Measured live 2026-10-28: "I forge myself a chain shirt with my field kit" was read
+    `craft: leatherworker`, and the leather bench refused a chain shirt it has no pattern
+    for. The catalogues are the engine's: a thing only the forge's shapes name is the
+    forge's, whatever the reader's closed answer said."""
+    assert typed_craft.craft_for("leatherworker", "a chain shirt") == "blacksmith"
+    assert typed_craft.craft_for("leatherworker", "leather armour") == "leatherworker"
+    assert typed_craft.craft_for("blacksmith", "a flask of acid") == "alchemist"
+    assert typed_craft.craft_for("herbalist", "something odd") == "herbalist"
+    # An enchantment names an existing thing, never a request to forge one.
+    assert typed_craft.craft_for("enchanter", "my longsword") == "enchanter"
+    e, pc = _engine(world, carry=(("iron", 2), ("charcoal", 2), ("ash-haft", 1)))
+    out, asked = _make(e, "leatherworker", "a dagger")
+    assert asked == ["Blacksmithing: Forge", "Blacksmithing: Assemble"], out.tell
+
+
 def test_every_craft_has_a_typed_door_and_a_bench_pointer():
     assert set(typed_craft.CRAFTS) == set(interpret.CRAFTS)
     for craft in typed_craft.CRAFTS:

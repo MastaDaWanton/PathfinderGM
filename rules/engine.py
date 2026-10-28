@@ -10465,7 +10465,8 @@ class Engine:
         actor = self.scene.actors.get(who) if who else None
         if actor is None:
             raise IntentError("make: nobody here to do the work", "refs")
-        craft_id = str(intent.params.get("craft") or "").strip().lower()
+        craft_id = typed_craft.craft_for(str(intent.params.get("craft") or "").strip().lower(),
+                                         str(intent.params.get("item") or ""))
         craft = typed_craft.get(craft_id)
         bench = typed_craft.BENCHES.get(craft_id) or {}
         point = {"ref": actor.ref, "kind": "bench", "craft": craft_id,

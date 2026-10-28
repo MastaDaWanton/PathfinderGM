@@ -1079,3 +1079,45 @@ _CRAFTS: dict[str, object] = {"blacksmith": Blacksmith(), "herbalist": Herbalist
 def get(craft: str):
     """The craft's typed-line adapter, or None for a craft with none yet."""
     return _CRAFTS.get(str(craft or "").strip().lower())
+
+
+def _names_in(craft: str, item: str) -> bool:
+    """Whether `item` names a thing in this craft's own catalogue — the forge's shapes, the
+    herb bench's products, the known-or-not formulae, the leather patterns — by the same
+    finders the chains use. Closed vocabularies, never English."""
+    from . import blacksmith as bs
+
+    spans = [s for s, _r in _spans(item)]
+    if craft == "blacksmith":
+        return any(bs.shape_info(s) for s in spans)
+    if craft == "herbalist":
+        products = Herbalist()._products()
+        return any(s in products for s in spans)
+    if craft == "alchemist":
+        from . import formulae
+
+        names = {n for r in formulae.all().values()
+                 for n in (str(r.get("name") or "").lower(),
+                           str(r.get("id") or "").replace("-", " ").lower())}
+        return any(s in names for s in spans)
+    if craft == "leatherworker":
+        from . import leatherworker as lw
+
+        names = set(lw.PRODUCTS) | {str(r.get("word") or "").lower()
+                                    for r in lw.PRODUCTS.values()}
+        return any(s in names for s in spans)
+    return False
+
+
+def craft_for(craft: str, item: str) -> str:
+    """The craft the thing belongs to: the reader's, unless the thing is in exactly one
+    OTHER craft's catalogue and not in the reader's own. Measured live 2026-10-28: "I forge
+    myself a chain shirt with my field kit" came back `craft: leatherworker`, and the
+    leather bench refused a chain shirt it has no pattern for. The reader's closed answer
+    is a model's; the catalogues are the engine's (models read, code validates)."""
+    # An enchantment's object is a thing that already exists ("I enchant my longsword"): it
+    # names the forge's shape and is never a request to forge one.
+    if craft == "enchanter" or not str(item or "").strip() or _names_in(craft, item):
+        return craft
+    owners = [c for c in CRAFTS if c != craft and _names_in(c, item)]
+    return owners[0] if len(owners) == 1 else craft
