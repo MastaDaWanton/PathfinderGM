@@ -37,7 +37,8 @@ mechanics on the page, and is a `light-contradicted` finding too — the rewrite
 the fiction.
 
 **Repair** is one rewrite of the anchor with the fact named; the backstop is an authored
-line per cell (miss by the player, miss at the player, the gloom; dim or dark),
+line per cell (miss by the player, miss at the player, miss between two others — read off
+the blow's own record, `Outcome.blows` — the gloom; dim or dark),
 least-recently-used per campaign, marked ours (`authored_in`, D4), and a contradicting
 sentence the rewrite could not fix is cut. Every authored line carries a `SIGHT` word, so
 the detector recognises its own backstop.
@@ -340,6 +341,20 @@ POOL: dict[str, tuple[str, ...]] = {
         "In the blackness the strike meant for you finds nothing.",
         "Somebody swings at you blind in the dark, and misses.",
     ),
+    # A blow between two others — an ally's at a foe, a foe's at an ally — with no "you" in
+    # it: tbaMUD's room message (TO_NOTVICT). Until 2026-10-27 every blow that was not the
+    # player's got a "theirs" line, and the caravan master's spear lost in the dim at the
+    # riding dog reached the page as "A blow comes at you out of the gloom".
+    "aside:dim": (
+        "In the poor light the blow goes wide of its mark, lost in the gloom.",
+        "The swing finds only empty air where the dim light made the mark seem to be.",
+        "Lost in the gloom, the strike meets nothing but empty air.",
+    ),
+    "aside:dark": (
+        "In the dark the blow goes wide, aimed at a shape that cannot be seen.",
+        "The strike cuts through blackness and finds nothing.",
+        "Blind in the dark, the swing meets only empty air.",
+    ),
     "gloom:dim": (
         "The light is poor; shapes blur at the edge of sight, and you can barely make out "
         "who stands where.",
@@ -369,6 +384,18 @@ def _the_player_swung(ctx, who: str) -> bool:
     return bool(name) and (who == name or who.endswith(" " + name) or name in who)
 
 
+def _at_the_player(ctx) -> bool:
+    """Whether the blow the light swallowed was swung at the player: read off the engine's
+    own record of it (`Outcome.blows`, `how` "unseen", `ref` the one swung at), never off
+    the tell's words. Without a record it was not — the room's line is true of a blow at
+    anybody, and "a blow comes at you" is false of a blow at the dog."""
+    pc = ctx.scene.pc() if hasattr(ctx.scene, "pc") else None
+    pc_ref = str(getattr(pc, "ref", "pc") or "pc")
+    return any(isinstance(b, dict) and b.get("how") == "unseen"
+               and str(b.get("ref") or "") == pc_ref
+               for o in ctx.outcomes or () for b in (field(o, "blows") or ()))
+
+
 def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
     from ._page import cut
 
@@ -384,7 +411,8 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
 
     if misses and not _miss_shown(text):
         m = misses[0]
-        side = "mine" if _the_player_swung(ctx, m["who"]) else "theirs"
+        side = ("mine" if _the_player_swung(ctx, m["who"])
+                else "theirs" if _at_the_player(ctx) else "aside")
         cell = f"{side}:{'dark' if m['why'] == 'darkness' else 'dim'}"
         line = _pick(ctx, cell)
         text = narration_mod.put_before_the_hand_back(text, line)

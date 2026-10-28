@@ -361,6 +361,10 @@ _MISS = {
               "so close it stirs the air at their ear"),
     "wide": ("well wide of the mark", "it never comes close", "easily avoided"),
     "plain": ("turned aside", "it misses", "it is evaded"),
+    # The light's miss chance decided it (`miss_how` never says this; the engine's
+    # concealment step does): the mark could barely be seen.
+    "unseen": ("lost in the poor light, it finds nothing", "it falls where the mark only "
+               "seemed to be", "the gloom hides the mark, and it meets empty air"),
 }
 
 

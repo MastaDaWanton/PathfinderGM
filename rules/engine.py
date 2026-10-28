@@ -7070,6 +7070,14 @@ class Engine:
                         # The die beat the AC and the blow still found nothing: to the
                         # player that is a miss, whatever the face said.
                         self._judge(atk, False)
+                        # A blow like any other miss, at the one it was swung at: without
+                        # it the light's backstop could only guess whom, and guessed the
+                        # player — the caravan master's spear lost in the dim at the dog
+                        # was written "A blow comes at you out of the gloom" (live,
+                        # 2026-10-27; docs/ally-swings.md).
+                        state.setdefault("blows", []).append(
+                            {"result": "miss", "how": "unseen", "ref": defender.ref,
+                             "weapon": str(weapon.get("name") or weapon_key)})
                         state["tells"].append(
                             f"{actor.name} finds nothing there — {why}, {chance}% miss "
                             f"chance ({miss.total}).")

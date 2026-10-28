@@ -168,13 +168,42 @@ def test_the_live_miss_whose_gloom_sat_in_another_sentence_is_a_finding():
 def test_somebody_elses_blow_lost_in_the_dark_is_held_on_their_outcome_line_too():
     s, e, pc = _night(at=CAVE)
     tell = "the thug finds nothing there — darkness, 50% miss chance (31)."
+    # The engine's record of the blow: swung at the player (`Outcome.blows`, "unseen").
+    swing = {"op": "attack", "actor": "c1", "tell": tell,
+             "blows": [{"result": "miss", "how": "unseen", "ref": "pc", "weapon": "sap"}]}
     text = "The thug lunges at you with his sap and misses."
-    found = L.find(_ctx(s, text, tells=[tell], door="outcome"))
+    ctx = _ctx(s, text, tells=[tell], door="outcome", outcomes=[swing])
+    found = L.find(ctx)
     assert _kinds(found) == {"light-miss-unshown"}
-    fixed, notes = L.backstop(_ctx(s, text, tells=[tell], door="outcome"), text, found)
+    fixed, notes = L.backstop(ctx, text, found)
     added = L.authored_in(fixed)
     assert added and added[0] in L.POOL["theirs:dark"], fixed
-    assert L.find(_ctx(s, fixed, tells=[tell], door="outcome")) == []
+    assert L.find(_ctx(s, fixed, tells=[tell], door="outcome", outcomes=[swing])) == []
+
+
+def test_an_allys_blow_lost_in_the_dim_is_not_written_at_the_player():
+    """Live, 2026-10-27 (docs/ally-swings.md), the escort's riding-dog fight at night: the
+    caravan master's spear, lost in the dim at the dog, reached the page as "A blow comes at
+    you out of the gloom and goes wide, finding only the place you stood a moment before" —
+    this backstop's own line, because every blow not the player's got a "theirs" line. The
+    engine's record says whom it was swung at; a blow at anybody else gets the room's line,
+    with no "you" in it — and so does a blow with no record at all."""
+    s, e, pc = _night()
+    tell = "the caravan master finds nothing there — dim light, 20% miss chance (8)."
+    spear = {"op": "attack", "actor": "c4", "tell": tell,
+             "blows": [{"result": "miss", "how": "unseen", "ref": "c11",
+                        "weapon": "shortspear"}]}
+    text = "The caravan master moves with a practiced, heavy deliberation."
+    for outcomes in ([spear], []):
+        ctx = _ctx(s, text, tells=[tell], door="outcome", outcomes=outcomes)
+        found = L.find(ctx)
+        assert _kinds(found) == {"light-miss-unshown"}
+        fixed, _notes = L.backstop(ctx, text, found)
+        added = L.authored_in(fixed)
+        assert added and added[0] in L.POOL["aside:dim"], fixed
+        assert not re.search(r"\byou\b", added[0], re.I)
+        assert L.find(_ctx(s, fixed, tells=[tell], door="outcome",
+                           outcomes=outcomes)) == []
 
 
 def test_through_the_real_door_a_thugs_blow_lost_in_the_dim_reaches_the_page(monkeypatch):
@@ -196,6 +225,9 @@ def test_through_the_real_door_a_thugs_blow_lost_in_the_dim_reaches_the_page(mon
                                  "because": "he swings"}]))
         if L.light_misses([o.tell for o in res.outcomes]):
             break
+    # The engine records the swallowed blow like any miss, at the one swung at.
+    assert any(b.get("how") == "unseen" and b.get("ref") == "pc"
+               for o in res.outcomes for b in o.blows)
     gm = agent_mod.GMAgent(_World(), e)
     calls = []
 

@@ -94,6 +94,28 @@ def test_every_miss_names_the_one_it_was_swung_at():
         assert blows[0]["ref"] == keeper
 
 
+def test_a_blow_the_light_swallows_names_its_target_and_its_line_no_number():
+    """Live on the branch, 2026-10-27, the riding-dog fight at night: the caravan master's
+    spear lost in the dim at the dog was written "A blow comes at you out of the gloom" —
+    the light check's backstop, which had no record of whom the swallowed blow was swung
+    at. And on the player's beat the blow-shown repair, handed "You find nothing there —
+    dim light, 20% miss chance.", wrote it back word for word as the beat's first line."""
+    from gm import narration
+
+    assert planned._MISS["unseen"]
+    s, engine, sword, keeper = _scene()
+    lost = Outcome("i1", "attack", verdict="miss", actor=sword,
+                   tell="the hired sword finds nothing there — dim light, 20% miss chance (7).",
+                   blows=[{"result": "miss", "how": "unseen", "ref": keeper,
+                           "weapon": "halberd"}])
+    fact = planned.blow_facts([lost], engine, said={})[0]
+    assert fact.startswith("MISS — the hired sword at Toll-Keeper — weapon: halberd; ")
+    assert any(p in fact for p in planned._MISS["unseen"])
+    assert narration.page_line(lost.tell) == "the hired sword finds nothing there."
+    assert narration.page_line("Toll-Keeper finds nothing there — darkness, 50% miss "
+                               "chance (31).") == "Toll-Keeper finds nothing there."
+
+
 # --- what the call is told ------------------------------------------------------------------
 
 def test_every_blow_fact_names_who_swung_at_whom():

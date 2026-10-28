@@ -109,6 +109,27 @@ alarms in 56 sound "before" generations and 1 in 78 "after"; with it, none.
 `tests/replay` was not used: its 2026-09-25 fight recordings have no allied fighters, no
 `Outcome.blows` and no stamped actors, and most of their creature attacks carry no tell.
 
+## Found live: our own backstop said it too
+
+Played on a copy of the riding-dog save (the dog's hit points raised so the fight would
+last), the planned narrator, gemma-4-12B. The model's allied beats were all aimed at the
+dog. One beat was not, and the sentence was ours: the caravan master's spear, lost to the
+dim light's miss chance, reached the page as "A blow comes at you out of the gloom and goes
+wide, finding only the place you stood a moment before" — `light_shown`'s backstop, whose
+pool had a line for the player's blow and a line for a blow at the player and nothing
+else, so every swallowed blow not the player's was written at the player. The miss chance
+left no record of whom the blow was swung at, so nothing could say otherwise.
+
+- The engine records the swallowed blow like any miss (`how` "unseen", `ref`, `weapon`).
+- The light backstop picks by that record: the player's, at the player, or a new pool for a
+  blow between two others with no "you" in it (tbaMUD's room message again). With no record
+  it takes the room's line, which is true of a blow at anybody.
+- `narration.page_line` takes the miss chance's rule clause off ("— dim light, 20% miss
+  chance"): the blow-shown repair was handed the line with it, wrote it back word for word,
+  and it opened the player's beat ("You find nothing there — dim light, 20% miss chance.").
+  The `aimed` backstop writes `page_line` too, and a swallowed blow is now an attack outcome
+  with blows, so it could have written the same.
+
 ## Left
 
 - The state-claim check (`gm/state_claims.py`, section 3) cuts true sentences about

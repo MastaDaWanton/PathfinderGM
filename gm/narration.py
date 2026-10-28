@@ -215,14 +215,21 @@ _MARGIN = re.compile(r"\s+by \d+(?=[.,:;]|\s|$)")
 # bludgeoning", "for 6 fire damage". Engine text, fixed format — not the page's English.
 _AMOUNT = re.compile(r"\s+for \d+(?:\s+(?:non-?lethal|points? of))?(?:\s+[a-z][a-z-]*){0,2}?"
                      r"(?=\s*(?:[.,;:!?]|\(|$))")
+# The miss chance's rule clause in the engine's own phrasing (`Engine._attack`: "<who> finds
+# nothing there — <why>, <n>% miss chance (<roll>)."): the percentage is a number and the
+# clause is the rule printed. Live, 2026-10-27 (docs/ally-swings.md): the blow-shown repair
+# was handed "You find nothing there — dim light, 20% miss chance.", wrote it back word for
+# word, and it opened the player's beat.
+_MISS_CHANCE = re.compile(r"\s*[—–-]+\s*[^—–.,]+,\s*\d+% miss chance")
 
 
 def page_line(tell: str) -> str:
-    """An engine line made fit to stand in prose: no roll arithmetic and no damage amount.
-    "Kesst Vayr hits the one behind the bar with the dagger for 5 piercing." -> "Kesst Vayr
-    hits the one behind the bar with the dagger." Every backstop that writes the engine's
-    own line onto a narrated beat writes this."""
+    """An engine line made fit to stand in prose: no roll arithmetic, no damage amount and
+    no miss chance. "Kesst Vayr hits the one behind the bar with the dagger for 5 piercing."
+    -> "Kesst Vayr hits the one behind the bar with the dagger." Every backstop that writes
+    the engine's own line onto a narrated beat writes this."""
     text = _PAREN_NUMBERS.sub("", str(tell or ""))
+    text = _MISS_CHANCE.sub("", text)
     text = _MARGIN.sub("", text)
     text = _AMOUNT.sub("", text)
     return " ".join(text.split())
