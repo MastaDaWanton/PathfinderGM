@@ -342,6 +342,12 @@ def test_a_band_the_prose_booked_arrives_as_a_unit(table):
     assert made == ["raider"]
     assert len(bodies) == 1
     assert bodies[0].troop.members == 12
-    assert bodies[0].hp == 348
+    # Twelve of the member's own hit points: 348 when the member was an adventure's
+    # 29-hp Raider, the app's own raider's now (2026-10-28, `raider-level-1`).
+    from rules import troops as troops_mod
+    from rules.bestiary import instantiate as _one
+
+    member = _one(bodies[0].from_template)
+    assert bodies[0].hp == troops_mod.pool_for(12, member.hp)
     assert bodies[0].has_state("role.bystander"), "in the room, not in the order"
     assert split_collective_name("a band of twelve raiders") == (12, "raider")

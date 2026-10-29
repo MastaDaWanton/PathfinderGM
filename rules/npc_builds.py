@@ -32,6 +32,10 @@ from __future__ import annotations
 
 ABILITIES = ("str", "dex", "con", "int", "wis", "cha")
 
+# What a built person's `source` reads, and what `npcs.source_rank` ranks with the NPC
+# Codex: the most generic source there is, a role and nothing else.
+SOURCE = "Pathfinder GM builds (Core Rulebook, Chapter 14)"
+
 # Step 2's two arrays, assigned in an order the build gives.
 ARRAYS = {"basic": (13, 12, 11, 10, 9, 8), "heroic": (15, 14, 13, 12, 10, 8)}
 
@@ -145,10 +149,7 @@ def build(doc: dict) -> tuple[dict | None, list[str]]:
         if ab in scores:
             scores[ab] += 1
 
-    int_mod = (scores["int"] - 10) // 2
-    selections = max(1, int(cls.get("skill_ranks") or 0) + int_mod)
-    if race_id == "human":
-        selections += 1      # humans' skilled, one rank a level (CRB p. 27)
+    selections = _selections(cls, scores, race_id)
     skills = [str(s).strip().lower() for s in doc.get("skills") or ()]
     from .tables import SKILLS
 
@@ -162,8 +163,7 @@ def build(doc: dict) -> tuple[dict | None, list[str]]:
                         f"{scores['int']} has {selections} (CRB Table 14-8).")
 
     feats = [str(f) for f in doc.get("feats") or ()]
-    owed = 1 + (level - 1) // 2 + (1 if race_id == "human" else 0)
-    owed += len(_class_bonus_feats(cid, level))
+    owed = feats_owed(doc)
     if len(feats) != owed:
         problems.append(f"feats: {len(feats)} taken, {owed} owed — one at 1st and every odd "
                         f"level after{', one for being human' if race_id == 'human' else ''} "
@@ -194,6 +194,49 @@ def build(doc: dict) -> tuple[dict | None, list[str]]:
         if doc.get(passthrough):
             sheet[passthrough] = doc[passthrough]
     return sheet, []
+
+
+def _selections(cls: dict, scores: dict, race_id: str) -> int:
+    """Table 14-8: the class's ranks + Int modifier (at least 1), and humans one more
+    ("skilled", one rank a level, CRB p. 27)."""
+    n = max(1, int(cls.get("skill_ranks") or 0) + (int(scores["int"]) - 10) // 2)
+    return n + (1 if race_id == "human" else 0)
+
+
+def skill_selections(doc: dict) -> int:
+    """How many skills this build may select, by the same arithmetic `build` checks."""
+    from . import classes as classes_mod
+    from . import creation
+    from . import races as races_mod
+
+    cid = str(doc.get("class") or "").strip().lower()
+    race_id = str(doc.get("race") or "human").strip().lower()
+    scores = _scores(doc, heroic=cid not in classes_mod.npc_classes(), problems=[])
+    creation.place_racial_adjustments({"choices": list(doc.get("racial_choices") or [])},
+                                      races_mod.get(race_id), scores)
+    for ab in doc.get("increases") or ():
+        if ab in scores:
+            scores[ab] += 1
+    return _selections(classes_mod.get(cid), scores, race_id)
+
+
+def _real_target(target: str) -> bool:
+    from . import weapons
+    from .tables import SKILLS
+
+    t = str(target).strip().lower()
+    return (t in SKILLS or t.split(" (")[0] in ("craft", "profession", "perform")
+            or weapons.key_for(t) is not None or weapons.has(t))
+
+
+def feats_owed(doc: dict) -> int:
+    """Step 4's count: 1 at 1st and one per two levels beyond, humans one more, and the
+    class table's bonus feats."""
+    level = int(doc.get("level") or 1)
+    race_id = str(doc.get("race") or "human").strip().lower()
+    cid = str(doc.get("class") or "").strip().lower()
+    return (1 + (level - 1) // 2 + (1 if race_id == "human" else 0)
+            + len(_class_bonus_feats(cid, level)))
 
 
 def _class_bonus_feats(cid: str, level: int) -> list:
@@ -233,9 +276,14 @@ def check(doc: dict) -> list[str]:
     for f in a.feats:
         # Through the one normaliser, so "Skill Focus (Handle Animal)" is Skill Focus
         # with its target, as a player's sheet writes it.
-        feat, _target = feats_mod.resolve(f)
+        feat, target = feats_mod.resolve(f)
         if feat is None:
             problems.append(f"feats: no feat {f!r}.")
+            continue
+        # A target is a real skill or weapon: the roster's first run wrote "Skill Focus
+        # (Stealth2)", and `meets` passed it — the prerequisite does not read the target.
+        if target and not _real_target(target):
+            problems.append(f"feats: {f} — {target!r} is no skill or weapon.")
             continue
         verdict = feats_mod.meets(a, feat)
         # `unknown` refuses too: "an unreadable prerequisite makes the answer honest

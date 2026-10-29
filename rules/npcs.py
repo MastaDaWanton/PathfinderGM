@@ -27,6 +27,7 @@ import re
 from pathlib import Path
 
 from . import bestiary
+from .npc_builds import SOURCE as _BUILT_SOURCE
 from . import registry
 from pathfindergm import files
 
@@ -39,7 +40,9 @@ from pathfindergm import files
 # is everyone else: a specific person from a specific story, whose name is stripped
 # before the block is offered as a role. The core Bestiary is tier 3: it has almost no
 # people in it, and the few it has are the species' plain stat block.
-_GENERIC = ("NPC Codex", "Inner Sea NPC Codex", "Game Mastery Guide")
+# The app's own builds (`rules/npc_builds.SOURCE`) rank with the NPC Codex: a role, built
+# from the Core Rulebook's NPC rules, and nobody's story.
+_GENERIC = ("NPC Codex", "Inner Sea NPC Codex", "Game Mastery Guide", _BUILT_SOURCE)
 _ORGANISED = ("Villain Codex", "Monster Codex", "Inner Sea Monster Codex",
               "NPC Guide", "NPC Guide Web")
 _BESTIARY = re.compile(r"^Bestiary", re.I)
@@ -187,8 +190,14 @@ def _words(role_words) -> list[str]:
 def _hits(word: str, tokens: list[str]) -> bool:
     # "priest" finds "priestess", "guard" finds "guards" and "guardsman"; a short word
     # matches only itself and its plural, so "kin" cannot find "kingpin".
+    # And a plural word finds its singular: the GM's words arrive as "thugs", "guards",
+    # "raiders", "pirates", and measured 2026-10-28 every one of them fell to the floor
+    # past a block called "Thug" or "Guard" — the plural was only ever read on the block.
+    singular = {word[:-2]} if word.endswith("es") else set()
+    if word.endswith("s") and len(word) > 3:
+        singular.add(word[:-1])
     for t in tokens:
-        if t == word or t == word + "s" or t == word + "es":
+        if t == word or t == word + "s" or t == word + "es" or t in singular:
             return True
         if len(word) >= 5 and t.startswith(word):
             return True

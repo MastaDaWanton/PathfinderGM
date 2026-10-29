@@ -67,8 +67,14 @@ def test_every_imported_creature_has_what_combat_needs():
     roll against wrongly, with nobody ever questioning it."""
     for c in bestiary.imported().values():
         assert c["hp"] is not None, c["id"]
-        assert c["flat_ac"] is not None, c["id"]
         assert c["abilities"], c["id"]
+        if c.get("build"):
+            # The app's own people (rules/npc_builds.py) print no total: their AC is the
+            # class sheet's, derived from armour, Dex and size, so the class and level are
+            # what combat needs of them.
+            assert c.get("class") and c.get("level"), c["id"]
+        else:
+            assert c["flat_ac"] is not None, c["id"]
 
 
 def test_a_creature_becomes_an_actor_that_can_fight():

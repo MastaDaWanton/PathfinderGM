@@ -1116,7 +1116,13 @@ def template_for(phrase: str, level: int = 1, floor: str = "guildhand") -> str:
         if not word:
             continue
         got = npcs.choose(word, max(1, int(level or 1))) or {}
-        if str(got.get("id") or "").lower() == word:
+        # The role's base id, its level rung stripped (`npcs._base_id`): the app's own
+        # people are `raider-level-1`, `guardsman-level-4`, and the exact-id test sent
+        # every one of them to the floor (2026-10-28). A single-word base that begins
+        # with the word is the same role ("guardsman" for "guard"); a hyphen is another
+        # word, and "gnoll-bruiser" is still never a bruiser.
+        base = npcs._base_id(str(got.get("id") or "").lower())
+        if base == word or (base.startswith(word) and "-" not in base):
             return str(got["id"])
     return floor
 

@@ -268,11 +268,13 @@ def test_specialists_are_separable_from_the_anywhere_crowd():
     """4,636 of the 7,133 the app loads are found anywhere — not of the 7,188 the two files
     hold, because 55 names are in both and the printed block wins. Asked without the filter
     a swamp answers with 4,761 of 7,133, which is two thirds of the book and therefore not
-    an answer; with it, 125.
+    an answer; with it, 125. Since the app's own people and templated creatures joined
+    (2026-10-28: 272 and 164, met where their work or their base is, rarely a swamp) it is
+    4,832 of 8,143 — still most of the book, which is the point.
     """
     everything = bestiary.search(biome="swamp", limit=99999)
     specialists = bestiary.search(biome="swamp", specialists=True, limit=99999)
-    assert len(everything) > len(bestiary.search(limit=99999)) * 0.6
+    assert len(everything) > len(bestiary.search(limit=99999)) * 0.55
     assert len(specialists) < len(everything) / 10
 
 

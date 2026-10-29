@@ -573,15 +573,17 @@ def imported() -> dict[str, dict]:
 
         from . import pristine
 
+        home = Path(settings.CAMPAIGN_DIR).parent / "homebrew"
         _IMPORTED = pristine.memo(
-            "bestiary", [Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"],
-            _build_imported)
+            "bestiary", [home / "creatures", home / "npc-builds"], _build_imported)
         _INDEX = sorted(set(list(TEMPLATES) + list(_IMPORTED)))
     return _IMPORTED
 
 
-def _build_imported() -> dict[str, dict]:
-    """The two content files and the homebrew creatures, read and merged."""
+def _build_imported(printed_only: bool = False) -> dict[str, dict]:
+    """The two content files and the homebrew creatures, read and merged — then the
+    templated creatures and the app's own people built on top, unless `printed_only`
+    (the harvest-tag pass, which writes into the printed files and nothing else)."""
     from django.conf import settings
 
     out: dict[str, dict] = {}
@@ -610,8 +612,61 @@ def _build_imported() -> dict[str, dict]:
                     out[e["id"]] = base
             if isinstance(data, dict) and isinstance(data.get("derived"), list):
                 derived.extend(data["derived"])
+    if printed_only:
+        return out
     _derive(out, derived)
+    _people(out, [Path(settings.BASE_DIR) / "content" / "npc-builds",
+                  Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "npc-builds"])
     return out
+
+
+def _people(out: dict[str, dict], folders) -> None:
+    """People built from the rules (`rules/npc_builds.py`), each one a block in the store.
+
+    The build is made into an actor by the engine — every number derived from its race,
+    class, level, scores, skills, feats and gear — and stored as that sheet plus the
+    block fields every reader of a block asks (`cr`, `creature_type`, `biomes`). Its
+    ground is the build's own and marked as no Bestiary line (`biomes_inferred`): people
+    are found by their work through `npcs.choose`, never drawn out of the land as a kind
+    (`ground_stated`). A build the rules refuse is reported and left out."""
+    from . import npc_builds
+    from .sheet import to_dict
+
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            for doc in (data.get("builds") if isinstance(data, dict) else None) or []:
+                try:
+                    actor = npc_builds.actor(doc)
+                except (ValueError, KeyError) as exc:
+                    files.unreadable(path, exc)
+                    continue
+                sheet, _ = npc_builds.build(doc)
+                block = to_dict(actor)
+                block.pop("ref", None)
+                block.update({
+                    "id": sheet["id"], "name": sheet["name"], "kind": "npc",
+                    "cr": sheet["cr"], "cr_value": sheet["cr_value"],
+                    "creature_type": "humanoid", "subtype": sheet["subtype"],
+                    "alignment": str(doc.get("alignment") or "N"),
+                    "biomes": list(doc.get("biomes") or ()), "climates": [],
+                    "biomes_any": not doc.get("biomes"), "biomes_inferred": True,
+                    "biomes_from": "build", "source": npc_builds.SOURCE,
+                    "description": str(doc.get("description") or ""),
+                    "role": str(doc.get("role") or ""),
+                    "build": doc,
+                })
+                if not block["biomes"]:
+                    from . import biomes as biomes_mod
+
+                    block["biomes"] = list(biomes_mod.LAND)
+                out.setdefault(block["id"], block)
 
 
 def _derive(out: dict[str, dict], declared: list) -> None:
@@ -635,7 +690,17 @@ def _derive(out: dict[str, dict], declared: list) -> None:
             continue
         if decl.get("id"):
             block["id"] = str(decl["id"]).strip().lower()
-        out.setdefault(block["id"], block)
+        # Reached by name — the GM's spawn, a summon, a scheme — never drawn out of the
+        # land as a kind (`ground_stated`): a zombie wolf in every forest's encounter pool
+        # would remake the encounter tables, which nobody asked of a template.
+        block["biomes_inferred"] = True
+        block["biomes_from"] = "template"
+        # Over an adventure's row of the same name (the rules' own build is the better
+        # one, docs/compiled-bestiary-plan.md), never over a printed Bestiary block.
+        held = out.get(block["id"])
+        if held is not None and str(held.get("source") or "").startswith("Bestiary"):
+            continue
+        out[block["id"]] = block
 
 
 def everything() -> dict[str, dict]:
@@ -974,6 +1039,11 @@ def vocabularies() -> dict:
             if v:
                 counts[field][v] = counts[field].get(v, 0) + 1
         if c.get("biomes_any"):
+            continue
+        # The app's own people and templated creatures carry a ground (a farmer's farmland,
+        # a zombie wolf's forests) that is where they are met, not a habitat: counting it
+        # told a reader farmland had 56 specialists the land itself never printed.
+        if c.get("biomes_from") in ("build", "template"):
             continue
         for field, key in (("biomes", "biomes"), ("climates", "climates")):
             for v in c.get(key) or ():
