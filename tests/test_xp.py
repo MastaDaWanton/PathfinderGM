@@ -172,27 +172,41 @@ def test_a_renamed_creature_still_knows_what_it_is_worth():
     spawned from `black-bear` lost every link back to its stat block — and `worth` reads
     the stat block. A creature was worth nothing the moment anybody named it. The
     template is kept now, because the display name is the GM's to change and the
-    template is not."""
-    from rules import xp
+    template is not.
+
+    The example moved to a shipped block on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the black bear (CR 3, 800 XP) was an adventure row. The
+    Bestiary's grizzly bear is CR 4, 1,200 XP; and a save's `black-bear` lands on it
+    through content/bestiary/aliases.json, at the grizzly's worth."""
+    from rules import bestiary, xp
     from rules.bestiary import instantiate
 
-    bear = instantiate("black-bear", name="a bear")
-    assert bear.from_template == "black-bear"
-    assert xp.worth(bear) == 800
+    bear = instantiate("bear-grizzly", name="a bear")
+    assert bear.from_template == "bear-grizzly"
+    assert xp.worth(bear) == 1200
+    assert bestiary.alias_of("black-bear") == "bear-grizzly"
+    saved = instantiate("black-bear", name="a bear")
+    assert saved.from_template == "black-bear"
+    assert xp.worth(saved) == 1200
 
 
 def test_a_creature_from_an_older_save_is_recovered_by_name():
     """Healed on read rather than migrated, the way `Campaign.biome` heals a save
     written before biomes existed: every creature already in a scene when `xp_value`
-    arrived carries a zero."""
-    from rules import xp
+    arrived carries a zero.
+
+    Since option D (2026-10-29) the black bear is no shipped block: the name is
+    recovered through its alias in content/bestiary/aliases.json, to the grizzly bear's
+    1,200 XP where the removed row was worth 800."""
+    from rules import bestiary, xp
     from rules.sheet import from_dict
 
     old = from_dict({"name": "black bear", "kind": "npc", "hp": 1,
                      "abilities": {"str": 10, "dex": 10, "con": 10,
                                    "int": 2, "wis": 10, "cha": 5}}, ref="c1")
     assert old.xp_value == 0            # nothing was stored
-    assert xp.worth(old) == 800         # and it is recovered anyway
+    assert bestiary.alias_of("black bear") == "bear-grizzly"
+    assert xp.worth(old) == 1200        # and it is recovered anyway, as the alias body
 
 
 def test_a_name_that_names_no_creature_is_worth_nothing_and_says_so():

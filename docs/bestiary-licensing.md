@@ -1,7 +1,18 @@
 # The shipped bestiary and Paizo's Product Identity: options for a decision
 
-**Status: waiting on the project owner. Nothing has been removed or changed.** Written
-2026-09-27, in answer to the question `docs/enemy-tactics-plan.md` raised under decision D1.
+**Status: decided 2026-10-28 — option D, the rulebook line only, plus the app's own
+world-agnostic people built from the Core Rulebook's rules in place of the adventures'
+(the owner's words: "change the name to a world agnostic/more basic name ... write your own
+version we dont need licencing for"). Applied 2026-10-29 by tools/ship_rulebook_line.py:
+757 rows kept, 5,649 removed (iconics included), every removed id aliased to a shipped body
+in content/bestiary/aliases.json so no save loses a creature. The own versions of the
+adventures' items come after (owner's order).** Written 2026-09-27, in answer to the
+question `docs/enemy-tactics-plan.md` raised under decision D1.
+
+A caution the measurement owes the decision: the alias ids themselves are the removed
+rows' ids — `aelzeldra`, `choral-the-conqueror` — kept as keys so old saves resolve. They
+are names from Paizo's adventures. They carry no stat block, description or text, only a
+pointer, but they are names; dropping them would break those saves.
 
 **This is not legal advice.** It is a measurement of what the repository ships, a reading
 of the licences' own words, and a survey of what other open projects did. Where a claim

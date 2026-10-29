@@ -2383,7 +2383,8 @@
    "size": "huge",
    "fresh_hours": 48,
    "from_creatures": [
-    "cave bear"
+    "cave bear",
+    "dire bear"
    ],
    "craft_dc": null,
    "risky": false,

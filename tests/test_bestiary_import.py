@@ -21,7 +21,11 @@ from tests._board import face_to_face
 # --- what was imported ------------------------------------------------------------------
 
 def test_the_bestiary_loaded():
-    assert len(bestiary.imported()) > 7000
+    """More than 7,000 blocks before option D; 2,605 measured 2026-10-29, after option D
+    (docs/bestiary-licensing.md) removed the 5,649 adventure, society and module rows and
+    left the rulebook line, the six Bestiaries, the derived creatures and the app's own
+    people."""
+    assert len(bestiary.imported()) > 2600
 
 
 def test_the_core_creatures_are_there():
@@ -105,9 +109,14 @@ def test_an_imported_creature_can_actually_hit_the_player():
 
 def test_damage_reduction_survived_the_import():
     """1,483 creatures carry DR, and the engine has DR — so it has to arrive as something
-    `Actor.reductions` can use rather than as a string nobody reads."""
+    `Actor.reductions` can use rather than as a string nobody reads.
+
+    The floor was 1,000; 795 measured 2026-10-29, after option D removed the adventure
+    rows, many of which carried DR. 787 the same day, after the Bestiaries' DR was read
+    from each block's own DEFENSE: prose DR (a lycanthrope template's, a cave fisher's
+    filament) had given 8 creatures a DR their blocks do not print."""
     with_dr = [c for c in bestiary.imported().values() if c["reductions"]]
-    assert len(with_dr) > 1000
+    assert len(with_dr) > 780
 
     actor = bestiary.instantiate(with_dr[0]["id"], scene=Scene())
     assert actor.reductions
@@ -205,8 +214,11 @@ def client(tmp_path):
 
 
 def test_the_creatures_bench_counts_the_whole_bestiary(client):
+    """More than 6,000 shipped before option D; 2,609 measured 2026-10-29, after option D
+    (the rulebook line, the Bestiaries, the derived creatures, the people and the four
+    hand-written townsfolk)."""
     d = client.get("/api/bench/creatures").json()
-    assert d["bench"]["shipped"] > 6000
+    assert d["bench"]["shipped"] > 2600
     assert d["rows"]
     assert len(d["rows"]) <= 210
 

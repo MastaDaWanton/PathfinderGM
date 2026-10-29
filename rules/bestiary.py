@@ -284,7 +284,7 @@ def instantiate(
         data["name"] = name_apart(scene, str(data.get("name") or ""))
     data["world_entity_id"] = world_entity_id
     actor = from_dict(data, ref=_next_ref(scene))
-    _assemble_kit(actor, data)
+    _assemble_kit(actor, data, block)
     # `raw`, not `found`: `lookup` drops `subtype` with the rest of `_NOT_ON_THE_SHEET`,
     # so the one field that says "this is a crowd" is gone by the time `found` is built.
     # The same arrangement `Actor._creature_doc` uses, and for the same reason.
@@ -323,7 +323,7 @@ def _form_if_a_troop(actor, doc: dict) -> None:
     actor.size = troops_mod.size_for(members)
 
 
-def _assemble_kit(actor, data: dict) -> None:
+def _assemble_kit(actor, data: dict, block: dict | None = None) -> None:
     """Pockets for the spawned — as a CLAIM, not yet as contents.
 
     The loot op made empty pockets visible — "I take everything" off a thug who owns a
@@ -340,6 +340,37 @@ def _assemble_kit(actor, data: dict) -> None:
     """
     if int((data.get("abilities") or {}).get("int", 10) or 10) <= 2:
         return                                  # animals carry teeth, not coin
+    # What the book prints it carries, compiled (rules/compile_block.py): its coin and
+    # the things in its pack, in place of the purse derived from its XP. The owner's
+    # ruling of 2026-10-28: loot is the printed gear. Weapons are already on the sheet
+    # (`take_up_printed_arms`); a suit or shield goes in the pack, not on the body,
+    # because the printed AC already counts it.
+    from . import compile_block
+
+    rec = compile_block.record_for(block)
+    printed = [it for it in (rec or {}).get("carries") or ()
+               if it.get("key") and it.get("table") not in ("weapon", "magic item")]
+    if printed:
+        coin = [f"{it.get('dice') or it['count']} {it['key']}"
+                for it in printed if it["table"] == "coin"]
+        # A masterwork or magic suit is the forge's record, its +N laid on by the
+        # enchanter's writer — the shape the app's own people's gear takes
+        # (`npc_gear.records`) — so "+1 chainmail" loots as itself, not as chainmail.
+        # Shields stay plain, `npc_gear`'s rule and reason: a shield's +N is an armour-
+        # bonus channel the forged row does not fold.
+        made = [it for it in printed if it["table"] == "armour"
+                and (it.get("masterwork") or it.get("enhancement"))]
+        from . import forge_items, npc_gear
+
+        for it in made:
+            gear = {"armour": {"base": it["key"], "masterwork": bool(it.get("masterwork")),
+                               "enhancement": int(it.get("enhancement") or 0)}}
+            for rec in npc_gear.records(gear):
+                actor.add_stock(forge_items.stock_item(rec), 1)
+        pockets = [str(it["key"]) for it in printed if it["table"] != "coin"
+                   and it not in made for _ in range(_units(it))]
+        actor.kit_pending = {"kit": "printed", "wealth": ", ".join(coin), "pockets": pockets}
+        return
     kit_key = str(data.get("kit") or "").strip().lower()
     kit = KITS.get(kit_key, {})
     wealth = str(data.get("wealth") or kit.get("wealth") or "").strip()
@@ -353,6 +384,16 @@ def _assemble_kit(actor, data: dict) -> None:
     pockets = [str(p) for p in (data.get("pockets") or kit.get("pockets") or [])]
     if wealth or pockets:
         actor.kit_pending = {"kit": kit_key, "wealth": wealth, "pockets": pockets}
+
+
+def _units(item: dict) -> int:
+    """How many of a carried thing's key go in the pack. Rounds come in the table's
+    bundles ("crossbow-bolts-10"): "with 20 bolts" is two of them, not twenty."""
+    count = max(1, int(item.get("count") or 1))
+    bundle = re.search(r"-(\d+)$", str(item.get("key") or ""))
+    if item.get("table") == "ammunition" and bundle:
+        count = -(-count // int(bundle.group(1)))
+    return min(count, 50)
 
 
 def collapse_kit(actor) -> list[str]:
@@ -374,12 +415,23 @@ def collapse_kit(actor) -> list[str]:
         # Merged, never assigned: play may already have put coin on this body (a
         # bribe taken, a payout pocketed), and the claim collapsing must add the
         # kit's coin to the facts, not overwrite them.
-        rolled = creation_mod.starting_purse({"starting_wealth": wealth}) or {}
-        for coin, n in rolled.items():
-            actor.purse[coin] = int(actor.purse.get(coin, 0)) + int(n)
+        # A printed purse is exact coin and may be several ("46 gp, 5 sp"); a derived
+        # or printed roll ("2d6 sp", "3d6 gp") is rolled.
+        for part in [p.strip() for p in wealth.split(",") if p.strip()]:
+            flat = re.fullmatch(r"(\d+)\s*([a-z]{2})", part.lower())
+            rolled = ({flat.group(2): int(flat.group(1))} if flat else
+                      creation_mod.starting_purse({"starting_wealth": part}) or {})
+            for coin, n in rolled.items():
+                actor.purse[coin] = int(actor.purse.get(coin, 0)) + int(n)
         made.append(f"a purse ({wealth})")
+    from . import goods as goods_mod
+
     for thing in pending.get("pockets") or []:
-        key = str(thing).strip().lower().replace(" ", "-")
+        key = str(thing).strip().lower()
+        # A suit or a round keeps its table key ("chain shirt"; `goods.canonical`), which
+        # a hyphen would turn into a word no table knows.
+        if not goods_mod.known_item(key) and key not in goods_mod.GEAR:
+            key = key.replace(" ", "-")
         if key:
             actor.carry(key, 1)
             made.append(key)
@@ -511,6 +563,10 @@ _NOT_ON_THE_SHEET = (
     "senses", "languages", "special_attacks", "special_abilities", "spell_like",
     "environment", "organization", "treasure", "source", "playable", "id", "feats",
     "biomes", "climates", "biomes_any", "biomes_inferred", "biomes_from",
+    # What the book prints a creature carries, as printed (tools/ship_rulebook_line.py):
+    # read by the compile into `carries`, never by the sheet, whose own `gear` is a dict
+    # of worn slots — the first cut wrote the text there and 258 tests failed on load.
+    "printed_gear", "printed_other_gear",
 )
 
 
@@ -600,6 +656,10 @@ def _build_imported(printed_only: bool = False) -> dict[str, dict]:
         # an adventure-path variant that happens to share a name must not replace it.
         for path in sorted(folder.glob("*.json"),
                            key=lambda q: (q.stem == "core", q.stem)):
+            # Not stat blocks: the compiled records (rules/compile_block.py) and the alias
+            # map (`_aliases`), each read by its own reader.
+            if path.stem in ("compiled", "aliases") and folder.name == "bestiary":
+                continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
@@ -775,7 +835,7 @@ def raw_block(key: str) -> dict | None:
     # it shares with the spreadsheet (`_build_imported` loads core.json last for that). The
     # alias was consulted last at first, and `zombie` — the Bestiary's human zombie before
     # the re-read — answered with an adventure's zombie from the spreadsheet.
-    alias = _aliases().get(key) or _aliases().get(key.replace(" ", "-"))
+    alias = alias_of(key)
     if alias and alias in store:
         return store[alias]
     return (store.get(key)
@@ -788,19 +848,52 @@ def _aliases() -> dict[str, str]:
     core.json, written by tools/extract_bestiary_pdfs.py). The file was re-read on
     2026-10-28 by every printed header instead of one index anchor per page, and 20 old
     ids name no block any more — `skeleton` is now `human-skeleton`, `elephant-mastodon`
-    the `mastodon` — while saves still hold them as `from_template`."""
+    the `mastodon` — while saves still hold them as `from_template`.
+
+    And content/bestiary/aliases.json (tools/ship_rulebook_line.py): since 2026-10-29 that
+    file is the rulebook line alone (option D, docs/bestiary-licensing.md), and each of the
+    5,538 adventure, society and module ids it no longer carries lands on a shipped body —
+    one of the app's own people for a person, the nearest printed Bestiary creature of its
+    type for anything else — so a save made on 0.2.22 keeps every creature in it.
+
+    That file's keys are hashes of the old ids (`alias_key`), not the ids: many were the
+    names of Paizo's adventure characters, the very thing option D stopped shipping. A
+    save's "aelzeldra" is hashed at lookup and finds its body; the name is in no file."""
     global _ALIAS_MAP
     if _ALIAS_MAP is None:
         from django.conf import settings
 
-        try:
-            doc = json.loads((Path(settings.BASE_DIR) / "content" / "bestiary" / "core.json")
-                             .read_text(encoding="utf-8"))
-            _ALIAS_MAP = {str(k): str(v) for k, v in (doc.get("aliases") or {}).items()}
-        except Exception as exc:  # noqa: BLE001 — a missing file is no aliases
-            files.unreadable(Path("content/bestiary/core.json"), exc)
-            _ALIAS_MAP = {}
+        _ALIAS_MAP = {}
+        # A file of its own, not a key in the 16 MB creatures.json, which this would parse
+        # again every time a test moves CAMPAIGN_DIR and clears the map.
+        for name in ("aliases.json", "core.json"):
+            try:
+                doc = json.loads((Path(settings.BASE_DIR) / "content" / "bestiary" / name)
+                                 .read_text(encoding="utf-8"))
+                mark = "#" if doc.get("hashed") else ""
+                _ALIAS_MAP.update({mark + str(k): str(v)
+                                   for k, v in (doc.get("aliases") or {}).items()})
+            except Exception as exc:  # noqa: BLE001 — a missing file is no aliases
+                files.unreadable(Path(f"content/bestiary/{name}"), exc)
     return _ALIAS_MAP
+
+
+def alias_key(key: str) -> str:
+    """The hashed form aliases.json files an old id under."""
+    import hashlib
+
+    return hashlib.sha1(str(key or "").strip().lower().encode("utf-8")).hexdigest()[:16]
+
+
+def alias_of(key: str) -> str:
+    """The id a removed or renamed creature id now lands on, or "" when it names itself."""
+    key = (key or "").strip().lower()
+    m = _aliases()
+    for k in (key, key.replace(" ", "-")):
+        hit = m.get(k) or m.get("#" + alias_key(k))
+        if hit:
+            return hit
+    return ""
 
 
 _ALIAS_MAP: dict[str, str] | None = None

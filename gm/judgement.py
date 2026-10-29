@@ -9090,8 +9090,13 @@ def name_the_nameless(scene, world) -> list[str]:
             if ":" in str(a.appearance or "") and head in peoples:
                 a.appearance = ""
             row = bestiary_mod.raw_block(template.strip().lower()) or {}
-            if str(getattr(a, "true_name", "") or "").lower() == \
-                    str(row.get("name") or "").lower():
+            # The template's own name is also its id's words when the id is an alias: since
+            # option D (2026-10-29) "aelzeldra" lands on the annis hag, whose name is not
+            # the one this loop once copied onto the owner's hag.
+            own = {str(row.get("name") or "").lower()}
+            if bestiary_mod.alias_of(template):
+                own.add(template.strip().lower().replace("-", " "))
+            if str(getattr(a, "true_name", "") or "").lower() in own:
                 a.true_name = ""
             continue
         if a.is_pc or getattr(a, "true_name", ""):

@@ -16,17 +16,61 @@ from django.test import Client, override_settings
 from rules import bestiary, npcs, schemes
 
 
+# A story block is a named somebody from an adventure, ranked 2 by `npcs.source_rank`. None
+# ships since option D (2026-10-29, docs/bestiary-licensing.md): the shipped people are
+# the NPC Codex, Villain Codex, Monster Codex and Game Mastery Guide galleries, the app's
+# own builds and the Bestiaries' plain peoples, so every source in the index ranks 0, 1 or
+# 3. A homebrew author's named villain is still one, so the chooser's handling of them is
+# kept alive with three made-up ones written where a homebrew author would put them, in the
+# shapes of the adventure rows these tests were first written on (Rappan Athuk's
+# `trillok-captain-of-the-guard`, PFS S1-32's `jevana-drow-noble-priestess`, AP 46's
+# `caleb-voltiaro-vicar-of-the-indomitable-sea`) and two of nothing but a name.
+_STORY = [
+    {"id": "brask-captain-of-the-guard", "name": "Brask, Captain of the Guard", "cr": "7",
+     "cr_value": 7.0, "size": "small", "subtype": "goblinoid"},
+    {"id": "vessa-drow-noble-priestess", "name": "Vessa, Drow Noble Priestess", "cr": "9",
+     "cr_value": 9.0, "size": "medium", "subtype": "elf"},
+    {"id": "orrin-tallow-vicar-of-the-indomitable-sea",
+     "name": "Orrin Tallow, Vicar of the Indomitable Sea", "cr": "8", "cr_value": 8.0,
+     "size": "medium", "subtype": "human"},
+    {"id": "captain-hollis-dray", "name": "Captain Hollis Dray", "cr": "4", "cr_value": 4.0,
+     "size": "medium", "subtype": "human"},
+    {"id": "kell-varra", "name": "Kell Varra", "cr": "3", "cr_value": 3.0, "size": "medium",
+     "subtype": "human"},
+]
+
+
+@pytest.fixture
+def story(tmp_path):
+    """The bestiary with the five story blocks above as a homebrew author's creatures."""
+    folder = tmp_path / "homebrew" / "creatures"
+    folder.mkdir(parents=True)
+    rows = [dict(r, kind="npc", creature_type="humanoid", alignment="NE",
+                 source="A homebrew adventure", hp=40, abilities={"str": 12, "dex": 12},
+                 biomes=["urban"]) for r in _STORY]
+    (folder / "story.json").write_text(json.dumps({"creatures": rows}), encoding="utf-8")
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        yield
+    npcs._BUILT = ()
+
+
 # --- the index -------------------------------------------------------------------------------
 
 def test_the_index_is_people_only_and_tiers_are_one_person():
     """Measured on the shipped bestiary: 7,136 blocks, 3,747 typed humanoid, 3,518 of
     those small or medium; 207 ids carry a Society "-tier-N-M" suffix (four of them
     spelt "-teir-") and 93 a "-level-N" one, each a separate block for the same
-    person. Collapsed, the index holds 3,063 people over 3,515 rungs."""
+    person. Collapsed, the index holds 3,063 people over 3,515 rungs.
+
+    Measured 2026-10-29, after option D (docs/bestiary-licensing.md) removed the adventure
+    and Society rows: 2,605 blocks, 1,059 typed humanoid, 987 of those small or medium; no
+    Society tier is left, and the 272 "-level-N" ids are the app's own builds, which
+    collapse onto each other and onto the gallery block of the same name ("bandit"). The
+    index holds 786 people over 987 rungs."""
     ix = npcs.index()
-    assert 2900 <= len(ix) <= 3300, len(ix)
+    assert 750 <= len(ix) <= 850, len(ix)
     rungs = sum(len(e["ladder"]) for e in ix.values())
-    assert rungs > len(ix) + 300, "the tiers did not collapse"
+    assert rungs > len(ix) + 200, "the tiers did not collapse"
     assert not any(npcs._TIER.search(k) for k in ix)
     for e in ix.values():
         for _, bid in e["ladder"]:
@@ -39,52 +83,71 @@ def test_tiers_collapse_and_the_nearest_rung_is_picked():
     """`bandit-archer` (CR 1) and `bandit-archer-tier-8-9` (CR 5) are one Society
     archer at two subtiers. Asked at 2nd level the low rung answers, at 6th the high
     one; the first draft indexed them as two people and offered the CR 5 archer to a
-    2nd-level party because its id sorted first."""
-    assert npcs.ladder("bandit-archer") == [(1.0, "bandit-archer"), (5.0, "bandit-archer-tier-8-9")]
-    assert npcs.ladder("bandit-archer-tier-8-9") == npcs.ladder("bandit-archer")
-    low = npcs.choose("bandit archer", 2, prefer_named=True)
-    high = npcs.choose("bandit archer", 6, prefer_named=True)
-    assert low["id"] == "bandit-archer" and high["id"] == "bandit-archer-tier-8-9"
-    assert low["role"] == high["role"] == "bandit archer"
+    2nd-level party because its id sorted first.
+
+    The example moved to shipped blocks on 2026-10-29 under option D: the Society archer
+    was an adventure row. The Game Mastery Guide's Bandit (CR 1/2) and the app's own
+    bandit builds at 1st, 3rd, 6th and 9th level are one bandit at five rungs; asked at 2nd
+    level the CR 1 rung answers, at 8th the CR 7 one, and never the id that sorts first."""
+    assert npcs.ladder("bandit") == [(1 / 3, "bandit-level-1"), (0.5, "bandit"),
+                                     (1.0, "bandit-level-3"), (4.0, "bandit-level-6"),
+                                     (7.0, "bandit-level-9")]
+    assert npcs.ladder("bandit-level-9") == npcs.ladder("bandit")
+    low = npcs.choose("bandit", 2)
+    high = npcs.choose("bandit", 8)
+    assert low["id"] == "bandit-level-3" and high["id"] == "bandit-level-9"
+    assert low["role"] == high["role"] == "bandit"
 
 
 # --- choosing ----------------------------------------------------------------------------------
 
-def test_the_generic_galleries_beat_an_adventure_path_for_a_guard_captain():
+def test_the_generic_galleries_beat_an_adventure_path_for_a_guard_captain(story):
     """Both "guard" and "captain" appear in Rappan Athuk's `trillok-captain-of-the-guard`
     and in nothing the NPC Codex prints; sorted by words matched alone, a 5th-level
     party's guard captain was a named dungeon lieutenant at CR 7. The galleries come
     first because their numbers were built to be anybody's: the NPC Codex Border Guard
-    (CR 3) is the answer, and only `prefer_named` reaches for the story block."""
+    (CR 3) is the answer, and only `prefer_named` reaches for the story block.
+
+    Since option D (2026-10-29) no story block ships, so the rival is a homebrew one in
+    Trillok's shape (`_STORY`)."""
     got = npcs.choose("guard captain", 5)
     assert got["source"] in npcs._GENERIC, got
     assert not got["floor"]
-    assert "trillok-captain-of-the-guard" in npcs.index(), "the rival candidate is real"
+    assert "brask-captain-of-the-guard" in npcs.index(), "the rival candidate is real"
     named = npcs.choose("guard captain", 8, prefer_named=True)
     assert npcs.source_rank(named["source"]) == 2
     assert named["role"] == "captain of the guard"
 
 
-def test_a_proper_name_is_stripped_and_the_block_is_usable_as_a_role():
+def test_a_proper_name_is_stripped_and_the_block_is_usable_as_a_role(story):
     """`jevana-drow-noble-priestess` is a Society villain with a name and a job. The
     name is the one token nothing else shares (measured: "jevana" is in 2 of 7,136 ids,
     "drow" in 17, "noble" in 11, "priestess" in 5), so it goes and the job stays. Asked
     for a noble priestess near 10th level with story blocks preferred, she is the
-    pick — as a drow noble priestess, never as Jevana."""
-    assert npcs.strip_name("jevana-drow-noble-priestess") == "drow noble priestess"
-    assert npcs.strip_name("captain-gortus-svard") == "captain"
-    assert npcs.strip_name("abra-lopati") == "", "a name and nothing else is nobody's role"
+    pick — as a drow noble priestess, never as Jevana.
+
+    Since option D (2026-10-29) no story block ships, so she is a homebrew villain in
+    Jevana's shape (`_STORY`), as are Captain Gortus Svard and Abra Lopati. Measured
+    2026-10-29 over the 786 shipped people: "drow" is in 9, "noble" in 4, "priestess" in
+    1 — the job word that the rare-token line of three was measured to clear on 7,136
+    ids."""
+    assert npcs.strip_name("vessa-drow-noble-priestess") == "drow noble priestess"
+    assert npcs.strip_name("captain-hollis-dray") == "captain"
+    assert npcs.strip_name("kell-varra") == "", "a name and nothing else is nobody's role"
     got = npcs.choose("noble priestess", 10, prefer_named=True)
-    assert got["id"] == "jevana-drow-noble-priestess"
+    assert got["id"] == "vessa-drow-noble-priestess"
     assert got["role"] == "drow noble priestess"
-    assert "jevana" not in got["role"]
+    assert "vessa" not in got["role"]
 
 
-def test_the_joining_words_do_not_survive_the_name_they_joined():
+def test_the_joining_words_do_not_survive_the_name_they_joined(story):
     """`caleb-voltiaro-vicar-of-the-indomitable-sea` stripped to "of the sea": "of" and
-    "the" are common enough to clear the count and the vicar was not. Trimmed."""
-    assert npcs.strip_name("caleb-voltiaro-vicar-of-the-indomitable-sea") == "sea"
-    assert npcs.strip_name("trillok-captain-of-the-guard") == "captain of the guard"
+    "the" are common enough to clear the count and the vicar was not. Trimmed.
+
+    Since option D (2026-10-29) no story block ships, so the two are homebrew blocks in
+    Caleb's and Trillok's shapes (`_STORY`)."""
+    assert npcs.strip_name("orrin-tallow-vicar-of-the-indomitable-sea") == "sea"
+    assert npcs.strip_name("brask-captain-of-the-guard") == "captain of the guard"
 
 
 def test_unknown_words_fall_to_the_townsfolk_floor_by_shape():
@@ -181,7 +244,8 @@ def test_an_unreadable_codex_file_does_not_stop_a_scheme(tmp_path):
 def test_the_npcs_bench_is_ready_and_lists_the_codex(tmp_path):
     """The bench shipped `ready=False` with a shipped count of 0 while the app held
     3,063 people to choose from. Now it says how many, and a remembered person is a
-    row that names the block, the role and the world entity."""
+    row that names the block, the role and the world entity. 786 people measured
+    2026-10-29, after option D removed the adventure rows."""
     from play import campaign as cm
     from rules.sheet import load_pc
 
@@ -192,7 +256,7 @@ def test_the_npcs_bench_is_ready_and_lists_the_codex(tmp_path):
         d = Client().get("/api/bench/npcs").json()
         cm._LIVE.clear()
     assert d["bench"]["ready"] is True
-    assert d["bench"]["shipped"] == npcs.humanoid_count() > 2900
+    assert d["bench"]["shipped"] == npcs.humanoid_count() > 780
     # The border guard remembered above, plus a keeper only if the room the opening
     # stands the party in is one somebody keeps. At schema 1.5 that room is a city's
     # great square — a junction, not a shop — so it is one.

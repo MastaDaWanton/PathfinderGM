@@ -76,17 +76,25 @@ def test_the_forage_draws_only_what_the_book_puts_on_the_ground():
     Thora Petska, Doctor Oathsday, Mrs. Pedipalp, a Restraining Chair, a Supply Sack. The
     Bestiary's own encounter tables list kinds and never a named somebody. Every pick of
     the forage's table is now a block whose ground is stated, and the hag is not among
-    them."""
+    them.
+
+    The example moved to a shipped creature on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the adventure rows are gone, Aelzeldra with them (her id
+    now lands on the annis hag, a stated kind), and the shipped corpus carries no named
+    somebody with a guessed ground. The guessed pool in those hills is 70 against 66 stated
+    (measured 2026-10-29); among the four only guessed is the celestial dire lion, a
+    templated creature reached by name and never drawn out of the land."""
     everything = _window("hills", 5, stated=False)
     stated = _window("hills", 5, stated=True)
-    assert any(r["id"] == "aelzeldra" for r in everything), "the guessed pool held her"
+    guessed = {r["id"] for r in everything} - {r["id"] for r in stated}
+    assert "celestial-dire-lion" in guessed, "the guessed pool holds a templated creature"
     assert 20 <= len(stated) < len(everything)
     drawn = set()
     for k in range(1, len(stated) + 1):
         row = gathering.creature_for("hills", 5, _Dice(what_lives_here=k))
         assert bestiary.ground_stated(row), row["name"]
         drawn.add(row["id"])
-    assert "aelzeldra" not in drawn and len(drawn) == len(stated)
+    assert not (guessed & drawn) and len(drawn) == len(stated)
 
 
 @pytest.mark.parametrize("biome", ["forest", "hills", "mountain", "swamp", "desert",
@@ -138,13 +146,21 @@ def test_a_kind_spawned_without_a_name_goes_by_its_kind():
     reader in the app takes a capitalised name for a proper one. A printed kind goes by its
     kind, lower-case, the way the hand-written townsfolk read; a name actually given is
     kept; and a spreadsheet row's name is left as written, because that is where the
-    adventures' named individuals live."""
+    adventures' named individuals live.
+
+    The spreadsheet example moved to a shipped row on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the adventures' named individuals are no longer shipped,
+    so the row left as written is the Game Mastery Guide's "Barkeep", and Aelzeldra's old
+    id now lands on her alias in content/bestiary/aliases.json — a printed annis hag,
+    called by its kind."""
     assert instantiate("wyvern").name == "wyvern"
     assert instantiate("wyvern", name="Wyvern").name == "wyvern"
     assert instantiate("wyvern", name="Grisk").name == "Grisk"
     assert instantiate("wolf-dire").name == "dire wolf", "the index's 'Wolf, Dire'"
     assert instantiate("guildhand").name == "guildhand"
-    assert instantiate("aelzeldra").name == "Aelzeldra", "her name, in the book"
+    assert instantiate("barkeep").name == "Barkeep", "a spreadsheet row, as written"
+    assert bestiary.alias_of("aelzeldra") == "annis-hag"
+    assert instantiate("aelzeldra").name == "annis hag", "the save's hag, by its kind"
 
 
 def test_the_forage_tell_says_what_it_met():
@@ -188,15 +204,21 @@ def test_a_creature_gets_no_peoples_face_and_no_name(world, town):
     given "Aelzeldra" as a true name and "Goblin: Small, wiry, sharp-toothed …" as a face —
     which the brief then gave the narrator as fact, and the page wrote "its small, wiry
     frame". A save that already holds them is put back; a name the player gave their
-    creature is kept; a person still gets both."""
-    hag = instantiate("aelzeldra", scene=town)
+    creature is kept; a person still gets both.
+
+    The example moved to a shipped creature on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): Aelzeldra's row is gone and her id lands on the printed
+    annis hag, the same monstrous humanoid, so the rule is shown on that block. The
+    owner's own save — `from_template` "aelzeldra", true name "Aelzeldra" — is asked last,
+    by the alias."""
+    hag = instantiate("annis-hag", scene=town)
     town.add(hag)
     judgement.name_the_nameless(town, world)
     assert hag.true_name == "" and hag.appearance == ""
 
-    hag.true_name, hag.appearance = "Aelzeldra", "Goblin: Small, wiry, sharp-toothed."
+    hag.true_name, hag.appearance = "Annis Hag", "Goblin: Small, wiry, sharp-toothed."
     judgement.name_the_nameless(town, world)
-    assert hag.true_name == "" and hag.appearance == "", "the owner's save, put back"
+    assert hag.true_name == "" and hag.appearance == "", "a save like the owner's, put back"
 
     pet = instantiate("wyvern", scene=town)
     town.add(pet)
@@ -208,6 +230,13 @@ def test_a_creature_gets_no_peoples_face_and_no_name(world, town):
     town.add(clerk)
     judgement.name_the_nameless(town, world)
     assert clerk.true_name and clerk.appearance, "a person is still named and given a face"
+
+    owners = instantiate("aelzeldra", scene=town)
+    assert owners.from_template == "aelzeldra"
+    town.add(owners)
+    owners.true_name, owners.appearance = "Aelzeldra", "Goblin: Small, wiry, sharp-toothed."
+    judgement.name_the_nameless(town, world)
+    assert owners.true_name == "" and owners.appearance == "", "the owner's save, put back"
 
 
 def test_the_readers_are_told_what_a_creature_is_not_human(town):

@@ -110,13 +110,19 @@ def test_a_name_nobody_here_wears_is_unchanged(table):
 
 def test_a_troop_member_is_not_numbered(table):
     """`troops.form` instantiates a throwaway member for its name and hit points; told
-    apart from a Raider already here, the unit's members would have been "second Raider"."""
-    from rules import troops
+    apart from a Raider already here, the unit's members would have been "second Raider".
+
+    The Raider moved to a shipped body on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the adventure row named "Raider" is gone, and "raider"
+    lands (content/bestiary/aliases.json) on the app's own raider build, which goes by its
+    kind in lower case, "raider" — so the numbered name to refuse is "second raider"."""
+    from rules import bestiary, troops
 
     s, _ = table
+    assert bestiary.alias_of("raider") == "raider-level-4"
     s.add(instantiate("raider", scene=s))
     unit = troops.form("raider", 6, scene=s)
-    assert unit.troop.member_name == "Raider", unit.troop.member_name
+    assert unit.troop.member_name == "raider", unit.troop.member_name
 
 
 # --- the cut ------------------------------------------------------------------------------

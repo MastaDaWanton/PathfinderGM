@@ -1,6 +1,35 @@
 # Compiling the bestiary: no interpretation at play time
 
-*Plan, 2026-10-28. Nothing here is built. It follows `fix/disarm-printed-weapon`, which put a
+## Built, 2026-10-29 (branch build/bestiary-rebuild, step 6)
+
+- **Option D applied** (tools/ship_rulebook_line.py): creatures.json keeps the 757 rulebook
+  rows, the 5,649 others removed; each removed id lands on a shipped body in
+  content/bestiary/aliases.json (a person on one of the app's own builds or a kept codex
+  row; anything else on the printed Bestiary creature of its type sharing the most name
+  words, then subtypes, then alignment, then CR or Hit Dice). The owner's five saves load
+  with every one of their 21 such people armed (`Actor._arms_of_the_alias`).
+- **The Bestiaries re-read for what they never gave** (tools/extract_bestiary_pdfs.py): whole
+  two-word types (207 blocks were "magical"/"monstrous"), subtypes, XP, speed (505 fly),
+  skills (7,780 of 7,826 printed totals), feats, spell-like abilities, special abilities
+  (145 printed poisons now run in the harvest; 6 did after the cut), gear from the
+  Treasure line (306 blocks), and DR from the block's own DEFENSE (the ancient dragons
+  carried every age's DR from the page's table).
+- **The compile** (rules/compile_block.py, tools/compile_bestiary.py,
+  content/bestiary/compiled.json): 2,169 records, `source_hash` + `compiler` stamped;
+  counts in tests/test_compiled_bestiary.py, whose ratchet holds the unread.
+- **The runtime reads it**: `Actor.stat_block_attacks` (the record when fresh, the live
+  parse for homebrew, templated and built creatures), `take_up_printed_arms` (plus the
+  weapons the gear line lists), `bestiary._assemble_kit` (the printed coin, potions, gear
+  and suits in place of the XP-derived purse; a masterwork or magic suit as a forge
+  record).
+
+**Not done, said plainly:** a looted magic WEAPON is still the plain weapon (its +N is on
+the record, `carries[].enhancement`, with no item built from it); shields stay plain
+(`npc_gear`'s reason); riders stay unfired; the bench does not compile a homebrew creature
+on save (it is read live, as before); World Bible's side is proposed in
+docs/campaign-format.md, not built.
+
+*Plan, 2026-10-28, as written then:* It follows `fix/disarm-printed-weapon`, which put a
 stat block's weapons on the creature's sheet (`Actor.take_up_printed_arms`,
 docs/printed-attacks.md "Possession is the sheet's") and measured what the parser gets wrong
 while doing it. The owner asked whether every creature should be set up so nothing is

@@ -109,7 +109,10 @@ def test_a_frost_giant_no_longer_takes_damage_from_cold(giant):
 
 
 def test_vulnerability_is_half_again_and_rounds_down():
-    snowman = bestiary.instantiate("abominable-snowman")
+    """The example moved to a shipped creature on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the abominable snowman was an adventure row; the
+    Bestiary's yeti prints the same "Weaknesses vulnerability to fire"."""
+    snowman = bestiary.instantiate("yeti")
     assert snowman.vulnerabilities == ["fire"]
     assert snowman.take_damage(20, "fire")["taken"] == 30
     assert snowman.take_damage(15, "fire")["taken"] == 22        # 22.5, rounded down

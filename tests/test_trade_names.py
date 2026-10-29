@@ -70,12 +70,17 @@ def test_every_trade_feat_can_now_be_met_by_ranks_in_the_base():
 
 def test_a_printed_sailor_can_take_the_helm():
     """'Caulky' Tarroon prints Profession (sailor) +6 and nothing under the bare id. Before
-    the fold his ram was refused as untrained."""
+    the fold his ram was refused as untrained.
+
+    The example moved to a shipped block on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): Caulky Tarroon was an adventure row (his id now lands on
+    a townsfolk build). The NPC Codex's Old Sailor prints Profession (sailor) +4 and
+    nothing under the bare id."""
     scene = Scene(location_id=None)
-    sailor = scene.add(instantiate("caulky-tarroon", scene=scene), zone="near")
+    sailor = scene.add(instantiate("old-sailor", scene=scene), zone="near")
     assert "profession" not in sailor.flat_skills
     mods = sailor.skill_modifiers("profession")
-    assert sum(m.value for m in mods) == 6
+    assert sum(m.value for m in mods) == 4
     assert mods[0].source == "Profession (Sailor)"
 
 

@@ -106,7 +106,11 @@ def test_a_bestiary_creatures_turn_is_the_one_named_exception():
     (measured 2026-09-02 by the recon). On such a creature's turn `damage` and
     `ability_damage` come back, stamped `creature:<template>` by the engine — the
     one door where the model still authors a number, listed here by name and by
-    count so the creature-document stage that retires it knows its size."""
+    count so the creature-document stage that retires it knows its size.
+
+    Measured 2026-10-29, after option D (docs/bestiary-licensing.md) removed the
+    adventure rows: 1,857 of the 2,605 shipped creatures carry `special_attacks`. The
+    floor was 5,000; still not small."""
     from rules import bestiary
 
     assert {"damage", "ability_damage"} <= set(prompts._CREATURE_OPS)
@@ -114,7 +118,7 @@ def test_a_bestiary_creatures_turn_is_the_one_named_exception():
                 & set(prompts._CREATURE_OPS))
     blocks = bestiary.imported()
     with_specials = sum(1 for b in blocks.values() if b.get("special_attacks"))
-    assert with_specials >= 5000, with_specials      # the exception is not small
+    assert with_specials >= 1800, with_specials      # the exception is not small
     # A path-less creature's turn stamps its template; a classed one does not.
     s, engine = _yard()
     thug = s.actors["c1"]

@@ -50,6 +50,25 @@ _CLASS_WORDS = {"adept", "aristocrat", "commoner", "expert", "warrior", "barbari
                 "psychic", "spiritualist", "vigilante"}
 
 
+# The thirteen creature types (Bestiary 1, Appendix 2), the word after the size on the
+# alignment line. Read as one free word until 2026-10-29, which cut both two-word types in
+# half: 246 of 1,417 blocks were "magical" or "monstrous", and 4 kerned "construc t" read
+# "construc" — so no rule asking for a magical beast or a monstrous humanoid found one.
+# Each letter may be followed by one stray space (the PDFs' kerning, as `join_kerned`).
+_TYPES = ("aberration", "animal", "construct", "dragon", "fey", "humanoid", "magical beast",
+          "monstrous humanoid", "ooze", "outsider", "plant", "undead", "vermin")
+def _kerned(type_name: str) -> str:
+    return r"\s+".join(r" ?".join(word) for word in type_name.split())
+
+
+_TYPE_ALT = "|".join(_kerned(t) for t in _TYPES)
+
+
+def _type_of(text: str) -> str:
+    """The type as the book names it, the kerning's stray spaces gone."""
+    return next(t for t in _TYPES if re.fullmatch(_kerned(t), text.strip(), re.I))
+
+
 def slug(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
     return s or "creature"
@@ -76,6 +95,141 @@ def _between(text: str, start: str, *stops: str) -> str:
     stop = "|".join(stops) if stops else r"$"
     m = re.search(rf"\b{start}\b\s+(.+?)(?=\s*(?:{stop})|$)", text, re.I | re.S)
     return re.sub(r"\s+", " ", m.group(1)).strip(" ;,.") if m else ""
+
+
+_RACIAL = r"R\s?acial\s+M\s?odifiers?"
+
+
+def _xp(t: str) -> int | None:
+    m = re.search(r"\bXP\s+(\d[\d,]*)", t)
+    return int(m.group(1).replace(",", "")) if m else None
+
+
+def _top_level(text: str) -> list[str]:
+    """Split on the commas and semicolons outside parentheses: "Knowledge (arcana, planes)
+    +25, Perception +25" is two parts, not three."""
+    parts, depth, cur = [], 0, ""
+    for ch in text:
+        depth += (ch == "(") - (ch == ")")
+        if ch in ",;" and depth <= 0:
+            parts.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur.strip())
+    return [p for p in parts if p]
+
+
+def _skills(text: str) -> dict[str, int]:
+    """The Skills line as {name: total}, in the sheet's spelling (lower case, the sub-skill
+    in parentheses). "Knowledge (arcana, planes) +25" is both knowledge skills at +25 —
+    the spreadsheet split it on the comma and filed a skill called "planes)". A situational
+    total in parentheses ("Acrobatics +5 (+9 when jumping)") is left out, as the printed
+    AC's conditional parts are."""
+    out: dict[str, int] = {}
+    for part in _top_level(text):
+        m = re.match(r"([A-Za-z][A-Za-z' \-]*?)\s*(?:\(([^)]*)\))?\s*([+-]\s?\d+)", part)
+        if not m:
+            continue
+        name = re.sub(r"\s+", " ", m.group(1)).strip().lower()
+        value = int(m.group(3).replace(" ", ""))
+        # "(arcana, dungeoneering, and religion)", "(arcana and nature)": each one.
+        subs = [s.strip().lower() for s in re.split(r",|\band\b", m.group(2) or "")
+                if s.strip()]
+        if subs:
+            for s in subs:
+                out[f"{name} ({s})"] = value
+        else:
+            out[name] = value
+    return out
+
+
+def _feats(text: str) -> list[str]:
+    """The Feats line as names, the bonus-feat and mythic marks off ("Power AttackB",
+    "Toughness M")."""
+    out = []
+    for part in _top_level(text):
+        name = re.sub(r"\s+", " ", part).strip(" .")
+        name = re.sub(r"(?:(?<=[a-z)])|\s+)[BM]$", "", name).strip()
+        if name and len(name) <= 60:
+            out.append(name)
+    return out
+
+
+def _special_abilities(t: str, name: str = "") -> str:
+    """The SPECIAL ABILITIES section: "Poison (Ex) Sting—injury; save Fort DC 17; ...".
+    Unread until 2026-10-29, so the harvest's poison, burn and heat rounds (rules/
+    harvest.py reads "Name (Ex)" paragraphs) had nothing to read on a Bestiary block —
+    after option D they ran on 6 shipped creatures. The description's prose follows the
+    last entry with no heading, so the section ends at the first full stop past the last
+    "(Ex)", "(Su)" or "(Sp)" entry's first 600 characters: an entry's tail can be cut, an
+    ecology's prose is never read as an ability."""
+    m = re.search(r"\bS\s?P\s?E\s?C\s?I\s?A\s?L\s+A\s?B\s?I\s?L\s?I\s?T\s?I\s?E\s?S\b", t, re.I)
+    if not m:
+        return ""
+    body = t[m.end():].strip()
+    marks = list(re.finditer(r"\((?:Ex|Su|Sp)\)", body))
+    if not marks:
+        return ""
+    limit = min(len(body), marks[-1].end() + 600)
+    # The description opens on the creature itself: "Giant scorpions are monstrous
+    # versions...". A sentence past the last entry that names it in its first words ends
+    # the section; failing that, the last full stop inside the window.
+    head = (name.split()[-1].lower() if name else "")
+    end = None
+    if head:
+        for s in re.finditer(r"\.\s+(?=[A-Z])", body[marks[-1].end():limit]):
+            start = marks[-1].end() + s.end()
+            if re.search(rf"\b{re.escape(head)}(?:e?s)?\b", body[start:start + 60], re.I):
+                end = marks[-1].end() + s.start() + 1
+                break
+    if end is None:
+        stop = body.rfind(". ", marks[-1].end(), limit)
+        end = stop + 1 if stop != -1 else limit
+    return re.sub(r"\s+", " ", body[:end]).strip()[:4000]
+
+
+_GEAR_STOPS = ("ECOLOGY", "SPECIAL ABILITIES", "Environment", "Organization", "DESCRIPTION")
+
+
+def _gear(t: str) -> dict:
+    """The Bestiaries print a people's possessions in the Treasure line — "Treasure NPC
+    gear (leather armor, short sword, short bow with 20 arrows, other treasure)" — and a
+    statted caster's in STATISTICS ("Combat Gear ...; Other Gear ..."). The first cut read
+    the word "gear" wherever it fell and took the description's prose after it."""
+    combat = _between(t, "Combat Gear", "Other Gear", *_GEAR_STOPS)[:400]
+    other = _between(t, "Other Gear", *_GEAR_STOPS)[:400]
+    if not (combat or other):
+        # "NPC gear (...)", and a monster's "standard (hide armor, greatclub, other
+        # treasure)" or "double (...)" — the ogre's club is in its Treasure line too.
+        m = re.search(r"\bTreasure\s+(?:[A-Za-z]+\s+){0,2}\(((?:[^()]|\([^()]*\))*)\)", t,
+                      re.I)
+        if m:
+            other = m.group(1)
+        else:
+            # A "Gear" entry is capitalised and sits in STATISTICS, before ECOLOGY; the
+            # word anywhere else is prose ("or armor the yai carries", "the gear it used
+            # in life"), which the case-blind first cut read for 13 blocks.
+            eco = re.search(r"\bECOLOGY\b", t, re.I)
+            g = re.search(r"\bGear\s+(.+?)(?=\s*(?:\bECOLOGY\b|\bSPECIAL ABILITIES\b|"
+                          r"\bEnvironment\b|\bOrganization\b)|$)", t[:eco.start()] if eco
+                          else t)
+            other = g.group(1)[:400] if g else ""
+    # Page furniture the PDF text runs into a list's end ("400 gp 115115 757046").
+    other = re.sub(r"(?:\s+\d{5,})+.*$", "", other)
+    # "darts [10]", "drow poison [2 doses]": the book's brackets inside a parenthesis are
+    # a count, written as every other count is; "other treasure" is not a thing carried.
+    other = re.sub(r"\[(\d+)[^\]]*\]", r"(\1)", other)
+    parts = [p.strip() for p in other.split(",")]
+    other = ", ".join(p for p in parts if p and p.lower() != "other treasure")
+    return {"printed_gear": combat, "printed_other_gear": other}
+
+
+def _spell_like(t: str) -> str:
+    """The Spell-Like Abilities entry, its heading kept as the spreadsheet keeps it."""
+    m = re.search(r"\bSpell-Like Abilities\b.+?(?=\s*(?:\bSpells Known\b|\bSpells Prepared\b|"
+                  r"\bTACTICS\b|\bSTATISTICS\b|\bStr\s+\d)|$)", t, re.I | re.S)
+    return re.sub(r"\s+", " ", m.group(0)).strip()[:600] if m else ""
 
 
 def parse_block(text: str, name: str, cr: str) -> dict | None:
@@ -124,8 +278,11 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         # block with no AC — never a creature with no scores for the engine to roll.
         return None
 
-    head = re.search(rf"({'|'.join(ALIGNMENTS)})\s+({'|'.join(SIZES)})\s+([a-z]+)"
-                     r"(?:\s*\(([^)]+)\))?", t, re.I)
+    # "Any alignment (same as creator) Tiny construct" (the homunculus) and "N (but see
+    # below)" (the soulbound doll): a qualified alignment, which read as no header at all
+    # and left three blocks Medium and of no type.
+    head = re.search(rf"({'|'.join(ALIGNMENTS)}|Any alignment|Any)(?:\s*\([^)]*\))?\s+"
+                     rf"({'|'.join(SIZES)})\s+({_TYPE_ALT})(?:\s*\(([^)]+)\))?", t, re.I)
     init = re.search(r"\bInit\s*([+-]\s?\d+)", t, re.I)
     cmd = re.search(r"\bCMD\s+(\d+)", t, re.I)
     cmb = re.search(r"\bCMB\s*([+-]\s?\d+)", t, re.I)
@@ -139,11 +296,42 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
     dmg = re.search(r"\((\d+d\d+(?:[+-]\d+)?)", melee)
 
     dr = []
-    for m2 in re.finditer(r"\bDR\s+(\d+)\s*/\s*([^;,]+)", t, re.I):
+    # The bypass is the words a DR can name, joined by "and"/"or" — not everything up to
+    # the next comma: a dragon's age table ran on into the ancient red dragon's DR ("magic
+    # 3rd Old Freezing fog 5th Very old DR 15/magic ...", found 2026-10-29).
+    # And only the block's own, in its DEFENSE section: a dragon's page prints every age
+    # category's DR in its table, and all five went on each age's block — the ancient
+    # black dragon carried the great wyrm's DR 20/magic beside its own 15/magic. Kerning
+    # ("m agic", Bestiary 3's forest dragon) is read as the word.
+    words = ("alchemical silver", "cold iron", "nonmagical weapons", "magic", "epic", "good", "evil", "lawful",
+             "chaotic", "silver", "adamantine", "mithral", "bludgeoning", "piercing",
+             "slashing", "wood", "bone", "glass", "vorpal", "aligned")
+    word = "(?:" + "|".join(_kerned(w) for w in words) + r"|—|-|–|�)"
+    # Every DEFENSE section to its OFFENSE: a lycanthrope prints two blocks (the
+    # werewolf's DR 10/silver is its hybrid form's, after the first OFFENSE). Prose DR —
+    # a lycanthrope template's, the bandersnatch's offspring's, a cave fisher's filament —
+    # is in no DEFENSE section, and 1e gives it to no one this block describes.
+    heads = [m.end() for m in re.finditer(r"\bD\s?E\s?F\s?E\s?N\s?S\s?E\b", t, re.I)]
+    offenses = [m.start() for m in re.finditer(r"\bO\s?F\s?F\s?E\s?N\s?S\s?E\b", t, re.I)]
+    if heads:
+        defence = " ".join(t[h:next((o for o in offenses if o > h), len(t))] for h in heads)
+    else:
+        defence = t[:offenses[0]] if offenses else t
+    # And the line after the saves, where a DR is printed: a page that sets two blocks
+    # side by side loses one block's DEFENSE heading to the other column (Bestiary 1's
+    # medium fire elemental, "Will +6 DR 5/—").
+    defence += " " + " ".join(t[m.end():m.end() + 200]
+                              for m in re.finditer(r"\bWill\s*[+-]\s?\d+", t))
+    for m2 in re.finditer(rf"\bDR\s+(\d+)\s*/\s*({word}(?:\s*(?:,|and|or)\s*{word})*)",
+                          defence, re.I):
         bypass = m2.group(2).strip()
-        dr.append({"amount": int(m2.group(1)),
-                   "bypass": "" if bypass in ("—", "-", "–") else bypass,
-                   "source": "natural"})
+        for w in words:
+            bypass = re.sub(_kerned(w), w, bypass, flags=re.I)
+        row = {"amount": int(m2.group(1)),
+               "bypass": "" if bypass in ("—", "-", "–", "�") else bypass,
+               "source": "natural"}
+        if row not in dr:                   # the two anchors overlap: one DR, read twice
+            dr.append(row)
 
     def sign(m2):
         return int(m2.group(1).replace(" ", "")) if m2 else None
@@ -155,9 +343,9 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         "cr": cr,
         "cr_value": cr_value(cr),
         "size": (head.group(2).lower() if head else "medium"),
-        "creature_type": (head.group(3).lower() if head else ""),
+        "creature_type": (_type_of(head.group(3)) if head else ""),
         "subtype": (head.group(4).lower() if head and head.group(4) else ""),
-        "alignment": (head.group(1).upper() if head else ""),
+        "alignment": ((head.group(1).upper() if len(head.group(1)) <= 2 else "Any") if head else ""),
         "abilities": abil,
         "hp": int(hp.group(1)),
         "hit_dice": hp.group(2).strip(),
@@ -179,6 +367,29 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         "cmb": sign(cmb),
         "base_attack": sign(bab),
         "speed": _num(speed),
+        # Five fields the Bestiaries never gave until 2026-10-29. For the 112 creatures the
+        # spreadsheet also carried, its row filled them in the merged store; option D
+        # removed those rows, and the measurement before it found 104 of them would lose
+        # their fly, climb and swim speeds, 91 their skills and 86 their feats — and the
+        # other 1,300 had never had any.
+        "xp": _xp(t),
+        "speed_note": _between(t, "Speed", "Melee", "Ranged", "Space", "Special Attacks",
+                               "Spell-Like Abilities", "Spells Known", "Spells Prepared",
+                               "STATISTICS", "TACTICS", "Reach")[:160],
+        # Stops kerning-tolerant ("r acial m odifiers", Bestiary 2), and Feats among them:
+        # a dragon's page prints a second, abridged set ("feats Hover, Imp. Critical")
+        # that ran on into the first one's skills.
+        "flat_skills": _skills(_between(t, "Skills", _RACIAL, "Languages?", "SQ", "Feats",
+                                        "ECOLOGY", "Combat Gear", "Gear", "SPECIAL")),
+        "feats": _feats(_between(t, "Feats", "Skills", _RACIAL, "Languages?", "SQ",
+                                 "ECOLOGY")),
+        "spell_like": _spell_like(t),
+        "special_abilities": _special_abilities(t, name),
+        # What the block says it carries ("Gear leather armor, longsword, longbow with 20
+        # arrows"; a caster's "Combat Gear ... Other Gear ..."), as printed: the compile's
+        # `carries` (rules/compile_block.py). Unread before 2026-10-29, so every Bestiary
+        # creature's possessions were guessed from its attack line.
+        **_gear(t),
         "reductions": dr,
         # `trim` on all three, because these are the only fields that split on commas and
         # so the only ones a runaway `_between` turns into a list of plausible short terms

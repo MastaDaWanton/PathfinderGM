@@ -23,7 +23,7 @@ import inspect
 import pytest
 
 from gm import judgement
-from rules import troops, xp
+from rules import bestiary, troops, xp
 from rules.bestiary import instantiate, split_collective_name
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -53,12 +53,20 @@ def _hit(engine, unit, amount, traits=()):
 def test_a_crowd_is_one_actor_with_the_combined_hit_points_of_its_members(table):
     """13th Age's mob: "a collective HP pool equal to the sum of the HP of the mooks in the
     mob". Twelve raiders at 29 each is 348, and the bestiary's Raider has shipped at 29 hp
-    all along — it was reachable by `spawn` and by nothing else."""
+    all along — it was reachable by `spawn` and by nothing else.
+
+    The Raider moved to a shipped body on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the 29-hp Raider was an adventure row, and the GM's word
+    "raider" now lands, through content/bestiary/aliases.json, on the app's own 4th-level
+    raider build — 30 hp, CR 2, 600 XP — so twelve of them are 360. Every number in this
+    file that was a raider's 29 is that build's 30."""
     scene, _ = table
+    assert bestiary.alias_of("raider") == "raider-level-4"
+    assert bestiary.raw_block("raider")["hp"] == 30
     unit = troops.form("raider", 12, scene=scene)
     assert unit.troop is not None
-    assert unit.troop.members == 12 and unit.troop.member_hp == 29
-    assert unit.hp == unit.hp_max == 348
+    assert unit.troop.members == 12 and unit.troop.member_hp == 30
+    assert unit.hp == unit.hp_max == 360
     assert unit.name == "twelve raiders"
     # And it fights like a raider, because it is built out of one: the block's numbers
     # stand for the whole, which is how Pathfinder's own troops are put together.
@@ -103,7 +111,7 @@ def test_a_spawn_of_five_or_more_arrives_as_one_unit(table):
     bodies = [a for a in scene.actors.values() if not a.is_pc]
     assert len(bodies) == 1
     assert bodies[0].troop.members == 8
-    assert bodies[0].hp == 8 * 29
+    assert bodies[0].hp == 8 * 30          # the raider build's 30 since option D (29 before)
 
 
 # --- the attrition ----------------------------------------------------------------------
@@ -115,11 +123,12 @@ def test_every_members_worth_of_damage_takes_one_of_them_off_their_feet(table):
     scene, engine = table
     unit = troops.form("raider", 12, scene=scene)
     scene.add(unit)
-    eff = _hit(engine, unit, 29)
+    # One raider's worth: 30 since option D, the raider build's hit points (29 before).
+    eff = _hit(engine, unit, 30)
     assert eff["fell"] == 1 and eff["members"] == 11
     assert unit.size == "gargantuan"
-    # Excess cascades: 87 is three raiders' worth.
-    eff = _hit(engine, unit, 87)
+    # Excess cascades: 90 is three raiders' worth.
+    eff = _hit(engine, unit, 90)
     assert eff["fell"] == 3 and eff["members"] == 8
     assert unit.size == "huge", "eight fit in a 3x3; the footprint shrinks with them"
     assert "3 raiders go down" in eff["unit_note"]
@@ -205,7 +214,7 @@ def test_the_fallen_are_paid_for_even_when_the_rest_run(table):
     engine.run(engine.validate([{"op": "begin_encounter", "because": "the road",
                                  "params": {"sides": {"pc": ["pc"], "them": [unit.ref]}}}]))
     unit.troop.morale = troops.MORALE_FEARLESS      # no rout: measure the standing case
-    _hit(engine, unit, 87)
+    _hit(engine, unit, 90)                          # three raider builds' worth (30 each)
     assert unit.troop.fallen == 3
     assert troops.xp_owed(unit.troop) == 3 * 600
     total, names = xp.award_for_fallen(scene, scene.pc())
@@ -220,7 +229,7 @@ def test_a_routed_units_debt_is_settled_once(table):
     engine.run(engine.validate([{"op": "begin_encounter", "because": "the road",
                                  "params": {"sides": {"pc": ["pc"], "them": [unit.ref]}}}]))
     unit.troop.morale = 2                            # they break at the first death
-    _hit(engine, unit, 29)
+    _hit(engine, unit, 30)                           # one raider build's worth
     assert unit.ref not in scene.actors
     total, _ = xp.award_for_fallen(scene, scene.pc())
     assert total == 600, "one raider fell and the other five ran"

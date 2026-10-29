@@ -24,9 +24,12 @@ def test_every_shipped_harvest_tag_passes_the_validator():
     """Plan §5.3's validators on every load: no harvest tag on a humanoid or a native
     outsider ("109 humanoids yielded a hide", inventory §0.4; deeds answer 3b), none naming
     a material no shelf holds, no true dragon tagged with another colour's dragonhide (the
-    red dragon that offered all eleven colours)."""
+    red dragon that offered all eleven colours).
+
+    More than 1,000 tagged blocks before option D; 844 measured 2026-10-29, after option D
+    (docs/bestiary-licensing.md) removed the adventure rows and the tag pass was re-run."""
     blocks = _tagged_blocks()
-    assert len(blocks) > 1000
+    assert len(blocks) > 840
     problems = [p for b in blocks for p in harvest.validate_tags(b)]
     assert problems == [], problems[:10]
 

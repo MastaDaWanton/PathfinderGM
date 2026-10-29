@@ -342,11 +342,17 @@ def test_alignment_traits_are_spelled_as_the_bestiary_prints_its_damage_reductio
     """The contract wrote `law` and `chaos`. `Reduction.bypassed_by` compares whole words
     with the stat block, and the bestiary prints 'DR 10/chaotic' (10 blocks), 'DR
     5/lawful' (4) and 'cold iron or lawful' (3) — never law or chaos. An axiomatic blade
-    spelled `law` would bounce off every one of them."""
+    spelled `law` would bounce off every one of them.
+
+    Read from creatures.json alone until 2026-10-29, when option D (docs/bestiary-licensing.md)
+    left it the rulebook line and no block in it prints 'lawful' any more; the words are now
+    read from both shipped files, and the six Bestiaries (core.json) print 'DR 10/chaotic' and
+    the like 8 times, 'DR x/lawful' 17 and 'cold iron or lawful' 4 (measured 2026-10-29)."""
     from rules.sheet import Reduction
 
-    creatures = json.loads((ROOT / "content" / "bestiary" / "creatures.json")
-                           .read_text(encoding="utf-8"))["creatures"]
+    creatures = [c for name in ("creatures.json", "core.json")
+                 for c in json.loads((ROOT / "content" / "bestiary" / name)
+                                     .read_text(encoding="utf-8"))["creatures"]]
     words = set()
     for c in creatures:
         for r in c.get("reductions") or ():

@@ -88,18 +88,24 @@ def _gives_way(monkeypatch, s, e, ref):
 def test_the_grioth_is_a_medium_monstrous_humanoid_and_no_person():
     """Bestiary 5's grioth is Medium; core.json prints its type as "monstrous", and the
     scene call was told "a grioth (medium, monstrous)". The kind is said in the book's
-    word, with its size from the record."""
+    word, with its size from the record.
+
+    The data changed on 2026-10-29: the Bestiaries were re-read with option D
+    (docs/bestiary-licensing.md) and core.json now prints the two-word types whole —
+    "monstrous humanoid", "magical beast" — where it had "monstrous" and "magical". The
+    body words read the same, which is what this still proves."""
     assert bestiary.raw("grioth")["size"] == "medium"
-    assert bestiary.raw("grioth")["creature_type"] == "monstrous"     # the truncated data
+    assert bestiary.raw("grioth")["creature_type"] == "monstrous humanoid"  # no longer cut
     assert not bestiary.has_a_people("grioth")
     assert bestiary.body_words("grioth") == "Medium monstrous humanoid"
     assert bestiary.body_said("Medium monstrous humanoid") == \
         "a Medium monstrous humanoid, about a grown man's height — no bigger"
     # A person's body is their people's and their face's, never a block's.
     assert bestiary.body_words("guildhand") == ""
-    # The other truncation, 107 blocks: "magical" is a magical beast.
+    # The other truncation, 107 blocks: "magical" is a magical beast (whole in the data
+    # since 2026-10-29).
     owlbear = bestiary.raw("owlbear")
-    assert owlbear["creature_type"] == "magical"
+    assert owlbear["creature_type"] == "magical beast"
     assert bestiary.body_words("owlbear") == "Large magical beast"
 
 

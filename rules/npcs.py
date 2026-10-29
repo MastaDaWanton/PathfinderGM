@@ -130,9 +130,13 @@ def index() -> dict[str, dict]:
         # The iconics sit in the NPC Codex at three levels and in the Society pregens at
         # two more, under one base id: the most generic source on the ladder ranks it.
         entry["rank"] = min(entry["rank"], source_rank(c.get("source")))
+    # Counted over every block in the store, each rung its own — not over the collapsed
+    # people. Option D (2026-10-29) left 786 people, and counted collapsed the job words
+    # fell under the line: "priestess" 1 (the priestess builds are one ladder), "bandit" 2,
+    # so a homebrew drow noble priestess displayed as "drow noble".
     freq: dict[str, int] = {}
-    for e in out.values():
-        for t in set(e["tokens"]):
+    for bid in imported:
+        for t in set(_tokens(_base_id(bid))):
             freq[t] = freq.get(t, 0) + 1
     for e in out.values():
         e["ladder"].sort()
@@ -143,7 +147,11 @@ def index() -> dict[str, dict]:
 
 def _display_role(entry: dict, freq: dict[str, int]) -> str:
     """The name as a role: a gallery name whole, a story name with the person removed."""
-    if entry["rank"] < 2:
+    # A gallery name, and a Bestiary's, is all description: the Bestiary names a species,
+    # never a person, and counted rare its people lost their names — "dark creeper"
+    # displayed as "dark", and the skulk, the derro and the merfolk as nothing (measured
+    # after option D, 2026-10-29).
+    if entry["rank"] != 2:
         return " ".join(entry["tokens"])
     kept = [t for t in entry["tokens"] if freq.get(t, 0) >= _RARE]
     # "Caleb Voltiaro Vicar of the Indomitable Sea" strips to "of the sea": the joining

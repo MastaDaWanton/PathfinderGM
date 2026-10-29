@@ -148,11 +148,14 @@ def test_the_stated_and_the_guessed_are_counted_separately(core, spread):
     """782 from real prose, 6,406 guessed — and since the re-read, 1,373 stated and 6,450
     guessed (the 6,406 and 44 printed blocks with no line of their own that reads). The flag is the
     same one ingredients carry and exists for the same reason: a guess that cannot be told
-    from an observation is a guess that gets quoted back as fact."""
+    from an observation is a guess that gets quoted back as fact.
+
+    Measured 2026-10-29, after option D (docs/bestiary-licensing.md) left creatures.json
+    the 757 rulebook rows: 1,373 stated still, and 801 guessed (the 757 and the 44)."""
     stated = [c for c in core + spread if not c["biomes_inferred"]]
     guessed = [c for c in core + spread if c["biomes_inferred"]]
     assert len(stated) == 1373
-    assert len(guessed) == 6450
+    assert len(guessed) == 801
     assert all(c["biomes_from"] in ("environment", "") for c in stated)
 
 
@@ -163,22 +166,33 @@ def test_every_route_records_which_one_it_was(spread):
     1,180 from a subtype, 465 from the creature type, and 3,952 left with nothing to read.
     Against the re-read Bestiaries (1,417 printed blocks, 2026-10-28) more of them find the
     creature they are a variant of: 125, 938, 1,103, 359 and 3,881.
+
+    Measured 2026-10-29, after option D left the spreadsheet its 757 rulebook rows: 8,
+    185, 6, 6 and 552 — the Codexes' people are mostly named for their work ("Barkeep",
+    "Mayor"), so most fall to the floor, and the Monster Codex's goblins, giants and
+    boggards read their species out of the name.
     """
     routes = {}
     for c in spread:
         routes[c["biomes_from"]] = routes.get(c["biomes_from"], 0) + 1
-    assert routes == {"name": 125, "name-word": 938, "subtype": 1103,
-                      "type": 359, "floor": 3881}
+    assert routes == {"name": 8, "name-word": 185, "subtype": 6,
+                      "type": 6, "floor": 552}
 
 
 def test_the_species_in_a_name_carries_the_ecology(spread):
     """"Frost Giant Battle Priest" has no Environment line and never will; the Bestiary
     printed the frost giant on cold mountains and the species is right there in the name.
-    754 rows are reached this way that would otherwise have fallen to "any land"."""
+    754 rows are reached this way that would otherwise have fallen to "any land".
+
+    The hobgoblin example moved to a shipped row on 2026-10-29 under option D: the
+    hobgoblin archer was an adventure row; the Monster Codex's hobgoblin commander reads
+    the same species out of its name. 185 rows are reached this way since (measured
+    2026-10-29)."""
     by_id = {c["id"]: c for c in spread}
     assert by_id["frost-giant-battle-priest"]["biomes"] == ["mountain", "tundra"]
     assert by_id["frost-giant-battle-priest"]["climates"] == ["cold"]
-    assert by_id["hobgoblin-archer"]["biomes"] == ["hills"]
+    assert by_id["hobgoblin-commander"]["biomes"] == ["hills"]
+    assert by_id["hobgoblin-commander"]["biomes_from"] == "name-word"
     assert by_id["boggard-brute"]["biomes"] == ["swamp"]
 
 
@@ -186,9 +200,11 @@ def test_a_named_npc_falls_to_any_land_and_admits_it(spread):
     """3,952 rows are adventure-path people — "Nereza Rigalio, human" — with no ecology to
     read. "Any land" is the honest answer for a person and a useless one for a search, so
     it is recorded as the floor rather than as a habitat. 3,881 since the re-read, which
-    gave 71 of them a printed creature to inherit from."""
+    gave 71 of them a printed creature to inherit from. 552 measured 2026-10-29, after
+    option D removed the adventure-path people: the floor is now the rulebook's own people
+    named for their work ("Barkeep", "Border Guard"), with no species in the name."""
     floor = [c for c in spread if c["biomes_from"] == "floor"]
-    assert len(floor) == 3881
+    assert len(floor) == 552
     assert all(c["biomes_any"] and c["biomes_inferred"] for c in floor)
 
 
@@ -196,10 +212,14 @@ def test_a_native_outsider_is_not_filed_off_the_material_plane(spread):
     """The outsider profile derived from core is `planar`, because 52 of the 63 core
     outsiders that name a habitat name a plane. 211 spreadsheet outsiders carry the
     `native` subtype, which means precisely the opposite, and inheriting the type would
-    have sent every summoned creature and half the villains off-world."""
+    have sent every summoned creature and half the villains off-world.
+
+    Measured 2026-10-29, after option D removed the adventure rows: three spreadsheet
+    native outsiders are left (the boroboroton, the diabolist and the kasa-obake), and the
+    rule holds for each of them."""
     natives = [c for c in spread
                if "native" in c["subtype"] and c["creature_type"] == "outsider"]
-    assert len(natives) > 100
+    assert len(natives) >= 3
     assert all("planar" not in c["biomes"] for c in natives)
 
 
@@ -271,11 +291,15 @@ def test_specialists_are_separable_from_the_anywhere_crowd():
     an answer; with it, 125. Since the app's own people and templated creatures joined
     (2026-10-28: 272 and 164, met where their work or their base is, rarely a swamp) it is
     4,832 of 8,143 — still most of the book, which is the point.
+
+    Measured 2026-10-29, after option D removed the adventure rows (most of them people
+    found "anywhere"): 1,081 of 2,605 answer a swamp, two fifths of the book and still not
+    an answer, and 131 of them are specialists — an eighth.
     """
     everything = bestiary.search(biome="swamp", limit=99999)
     specialists = bestiary.search(biome="swamp", specialists=True, limit=99999)
-    assert len(everything) > len(bestiary.search(limit=99999)) * 0.55
-    assert len(specialists) < len(everything) / 10
+    assert len(everything) > len(bestiary.search(limit=99999)) * 0.4
+    assert len(specialists) < len(everything) / 8
 
 
 def test_an_empty_climate_list_means_any_climate_not_no_climate():
