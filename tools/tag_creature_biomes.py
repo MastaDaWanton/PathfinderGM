@@ -310,6 +310,13 @@ def main() -> None:
     core_counts = tag_core(core)
     profiles = build_profiles(core)
     spread_counts = tag_spread(spread, core, profiles)
+    # A printed block whose family's ecology is printed outside every block (the earth,
+    # water and aether elementals in their sizes, the wysps; 2026-10-28's re-read left 43
+    # of 1,417 with no Environment line after sharing what families do print) goes the
+    # spreadsheet's routes, against the blocks that did state one, and says it guessed.
+    stated = [c for c in core if c.get("biomes_from") == "environment"]
+    unstated = [c for c in core if c.get("biomes_from") != "environment"]
+    core_counts["inferred"] = sum(tag_spread(unstated, stated, profiles).values())
 
     write(CORE, core_doc)
     write(SPREAD, spread_doc)

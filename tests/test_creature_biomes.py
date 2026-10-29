@@ -64,11 +64,16 @@ def test_281_lines_that_produced_no_biome_at_all_now_do(core):
     """The count that started this: run over the 782 printed stat blocks, the biome matcher
     came back empty for 281 of them — every line whose only terrain word was "any", "land",
     "water" or the name of a plane the alias table spelled differently. One is left, the
-    stat block whose Environment line is blank in the book."""
-    empty = [c for c in core if not biomes.parse_environment(c["environment"]).biomes]
-    assert len(empty) == 1
-    assert empty[0]["id"] == "exoskeleton"
-    assert empty[0]["environment"] == ""
+    stat block whose Environment line is blank in the book.
+
+    Since the re-read by header (2026-10-28, tests/test_bestiary_rescan.py) the file has
+    1,417 blocks, and the blank lines are counted apart: 43 blocks whose family prints its ecology
+    outside every block and are tagged by inference instead. Of the lines that ARE read, one
+    yields nothing — the leucrotta's, which its page's two columns interleaved ("temperate or
+    tropical the effects of a suggestion…")."""
+    read = [c for c in core if c["environment"]]
+    empty = [c for c in read if not biomes.parse_environment(c["environment"]).biomes]
+    assert [c["id"] for c in empty] == ["leucrotta"]
 
 
 def test_a_split_word_from_the_pdf_is_repaired():
@@ -130,22 +135,24 @@ def test_wilderness_is_not_a_city():
 
 # --- what the two files ended up carrying ----------------------------------------------
 
-def test_every_creature_but_one_knows_where_it_lives(core, spread):
-    """7,188 creatures, 782 of which stated an environment. The one exception is the stat
-    block whose Environment line is blank in the book — it is left empty rather than given
-    a default, the same way a missing AC is."""
-    untagged = [c for c in core + spread if not c["biomes"]]
-    assert [c["id"] for c in untagged] == ["exoskeleton"]
+def test_every_creature_knows_where_it_lives(core, spread):
+    """7,188 creatures, 782 of which stated an environment, and one exception: the stat
+    block whose Environment line is blank in the book, left empty rather than given a
+    default. Since the re-read (7,823 creatures, 1,417 printed) a printed block with no line
+    of its own goes the spreadsheet's routes and says it guessed (`biomes_inferred`) — the
+    old exception was the cockroach exoskeleton, now one of 44 such."""
+    assert [c["id"] for c in core + spread if not c["biomes"]] == []
 
 
 def test_the_stated_and_the_guessed_are_counted_separately(core, spread):
-    """782 from real prose, 6,406 guessed. The flag is the same one ingredients carry and
-    exists for the same reason: a guess that cannot be told from an observation is a guess
-    that gets quoted back as fact."""
+    """782 from real prose, 6,406 guessed — and since the re-read, 1,373 stated and 6,450
+    guessed (the 6,406 and 44 printed blocks with no line of their own that reads). The flag is the
+    same one ingredients carry and exists for the same reason: a guess that cannot be told
+    from an observation is a guess that gets quoted back as fact."""
     stated = [c for c in core + spread if not c["biomes_inferred"]]
     guessed = [c for c in core + spread if c["biomes_inferred"]]
-    assert len(stated) == 782
-    assert len(guessed) == 6406
+    assert len(stated) == 1373
+    assert len(guessed) == 6450
     assert all(c["biomes_from"] in ("environment", "") for c in stated)
 
 
@@ -154,12 +161,14 @@ def test_every_route_records_which_one_it_was(spread):
     the one before, so each is counted on its own rather than under one "inferred" bit.
     Measured on this import: 55 exact name matches, 754 species read out of a longer name,
     1,180 from a subtype, 465 from the creature type, and 3,952 left with nothing to read.
+    Against the re-read Bestiaries (1,417 printed blocks, 2026-10-28) more of them find the
+    creature they are a variant of: 125, 938, 1,103, 359 and 3,881.
     """
     routes = {}
     for c in spread:
         routes[c["biomes_from"]] = routes.get(c["biomes_from"], 0) + 1
-    assert routes == {"name": 55, "name-word": 754, "subtype": 1180,
-                      "type": 465, "floor": 3952}
+    assert routes == {"name": 125, "name-word": 938, "subtype": 1103,
+                      "type": 359, "floor": 3881}
 
 
 def test_the_species_in_a_name_carries_the_ecology(spread):
@@ -176,9 +185,10 @@ def test_the_species_in_a_name_carries_the_ecology(spread):
 def test_a_named_npc_falls_to_any_land_and_admits_it(spread):
     """3,952 rows are adventure-path people — "Nereza Rigalio, human" — with no ecology to
     read. "Any land" is the honest answer for a person and a useless one for a search, so
-    it is recorded as the floor rather than as a habitat."""
+    it is recorded as the floor rather than as a habitat. 3,881 since the re-read, which
+    gave 71 of them a printed creature to inherit from."""
     floor = [c for c in spread if c["biomes_from"] == "floor"]
-    assert len(floor) == 3952
+    assert len(floor) == 3881
     assert all(c["biomes_any"] and c["biomes_inferred"] for c in floor)
 
 

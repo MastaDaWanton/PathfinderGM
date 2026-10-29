@@ -672,9 +672,39 @@ def raw_block(key: str) -> dict | None:
     """
     key = (key or "").strip().lower()
     store = imported()
+    # An alias first: it is the printed Bestiary's own block, and the Bestiary wins a name
+    # it shares with the spreadsheet (`_build_imported` loads core.json last for that). The
+    # alias was consulted last at first, and `zombie` — the Bestiary's human zombie before
+    # the re-read — answered with an adventure's zombie from the spreadsheet.
+    alias = _aliases().get(key) or _aliases().get(key.replace(" ", "-"))
+    if alias and alias in store:
+        return store[alias]
     return (store.get(key)
             or store.get(key.replace(" ", "-"))
             or store.get(_index_order(key)))
+
+
+def _aliases() -> dict[str, str]:
+    """Ids the Bestiary file used to carry, to the block each now is (`aliases` in
+    core.json, written by tools/extract_bestiary_pdfs.py). The file was re-read on
+    2026-10-28 by every printed header instead of one index anchor per page, and 20 old
+    ids name no block any more — `skeleton` is now `human-skeleton`, `elephant-mastodon`
+    the `mastodon` — while saves still hold them as `from_template`."""
+    global _ALIAS_MAP
+    if _ALIAS_MAP is None:
+        from django.conf import settings
+
+        try:
+            doc = json.loads((Path(settings.BASE_DIR) / "content" / "bestiary" / "core.json")
+                             .read_text(encoding="utf-8"))
+            _ALIAS_MAP = {str(k): str(v) for k, v in (doc.get("aliases") or {}).items()}
+        except Exception as exc:  # noqa: BLE001 — a missing file is no aliases
+            files.unreadable(Path("content/bestiary/core.json"), exc)
+            _ALIAS_MAP = {}
+    return _ALIAS_MAP
+
+
+_ALIAS_MAP: dict[str, str] | None = None
 
 
 def lookup(key: str) -> dict | None:
@@ -727,7 +757,8 @@ def details(key: str) -> dict | None:
     key = (key or "").strip().lower()
     if key in TEMPLATES:
         return {"id": key, "hand_written": True, **TEMPLATES[key]}
-    return imported().get(key)
+    # Through the one resolver, aliases included: `skeleton` is `human-skeleton` now.
+    return raw_block(key)
 
 
 def suggestion(key: str) -> str:
@@ -793,7 +824,7 @@ def kind_names(template: str) -> set[str]:
     out: set[str] = set()
     if key in TEMPLATES:
         out |= {key, str(TEMPLATES[key].get("name") or "").lower()}
-    row = imported().get(key) or imported().get(key.replace(" ", "-"))
+    row = raw_block(key)
     if row:
         if row.get("creature_type"):
             out.add(str(row["creature_type"]).lower())

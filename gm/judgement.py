@@ -9083,7 +9083,7 @@ def name_the_nameless(scene, world) -> list[str]:
             head = str(a.appearance or "").split(":", 1)[0].strip().lower()
             if ":" in str(a.appearance or "") and head in peoples:
                 a.appearance = ""
-            row = bestiary_mod.imported().get(template.strip().lower()) or {}
+            row = bestiary_mod.raw_block(template.strip().lower()) or {}
             if str(getattr(a, "true_name", "") or "").lower() == \
                     str(row.get("name") or "").lower():
                 a.true_name = ""

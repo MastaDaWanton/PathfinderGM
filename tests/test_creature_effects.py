@@ -100,10 +100,12 @@ def giant():
 
 def test_a_frost_giant_no_longer_takes_damage_from_cold(giant):
     """It took the full 20 before this. `Immune cold` was in the file and was dropped on
-    the way to the sheet."""
+    the way to the sheet. And since the re-read by header (2026-10-28) its printed
+    "Weaknesses vulnerability to fire" reaches the sheet too: the anchor file carried no
+    Bestiary weakness at all, so fire took 20 where the book takes 30."""
     assert giant.immunities == ["cold"]
     assert giant.take_damage(20, "cold")["taken"] == 0
-    assert giant.take_damage(20, "fire")["taken"] == 20
+    assert giant.take_damage(20, "fire")["taken"] == 30
 
 
 def test_vulnerability_is_half_again_and_rounds_down():

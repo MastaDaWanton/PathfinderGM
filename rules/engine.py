@@ -19064,7 +19064,7 @@ class Engine:
         if not cls:
             from . import bestiary
 
-            row = bestiary.imported().get(
+            row = bestiary.raw_block(
                 str(getattr(actor, "from_template", "") or "").strip().lower()) or {}
             dice = [int(d) for d in self._MARTIAL_DIE.findall(str(row.get("hit_dice") or ""))]
             if dice and all(d >= 10 for d in dice):

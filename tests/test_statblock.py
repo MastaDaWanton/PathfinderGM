@@ -63,6 +63,12 @@ def test_the_length_limit_is_set_where_it_costs_least_and_says_what_it_costs():
 
     So a mid-length prose fragment with no other tell gets through, and that is the known
     edge of this rule rather than an oversight.
+
+    Since the Bestiaries were re-read by header (2026-10-28, 1,417 blocks for 782), ten:
+    six real ("bludgeoning and piercing damage", "one energy type (see Celestial Focus)",
+    "spell completion and spell trigger effects" among them) and four spill — the two
+    above, "don't count towards the spell's Hit Die limit" and "flanking mind-affecting
+    effects", a missing comma.
     """
     assert sb.MAX_TERM == 45
     assert not sb.is_spill("raid caravans and humanoid settlements")   # 38, and spill
@@ -74,7 +80,7 @@ def test_the_length_limit_is_set_where_it_costs_least_and_says_what_it_costs():
         rows += d.get("creatures") or d
     long = {t for r in rows for t in (r.get("immune") or []) + (r.get("resist") or [])
             if len(t) > 30}
-    assert len(long) <= 8, sorted(long)
+    assert len(long) <= 10, sorted(long)
 
 
 def test_a_conjunction_at_the_front_is_removed_rather_than_taken_as_spill():
@@ -148,9 +154,12 @@ def test_no_purchasers_email_address_ships_with_the_app():
 def test_the_immunity_vocabulary_is_the_size_of_the_games():
     """1,144 distinct terms in the printed blocks before the cut, 79 after. Pathfinder's
     whole immunity vocabulary is energy types, conditions, a handful of "X traits" lines
-    and a few named effects."""
+    and a few named effects. 108 since the re-read by header (2026-10-28): 636 more printed
+    blocks, after the welds it exposed were cut ("sleep Weakness vulnerability to cold",
+    "mind-affecting effects; s r 13") and its kerned words rejoined ("ooze trait s")."""
     terms = {t.lower() for r in ROWS for t in (r.get("immune") or [])}
-    assert len(terms) < 100
+    assert len(terms) < 115
+    assert not any("weakness" in t or " s r " in t or "trait s" in t for t in terms)
     assert {"cold", "poison", "undead traits", "mind-affecting effects"} <= terms
 
 
@@ -171,14 +180,19 @@ def test_every_resistance_is_an_energy_and_a_number():
         for t in r.get("resist") or []:
             assert sb.RESISTANCE.match(t), t
             kinds.add(t.rsplit(" ", 1)[0].lower())
-    assert kinds <= {"acid", "cold", "electricity", "fire", "sonic", "negative energy"}
+    # "adaptive": Bestiary 5's manasaputras print "Resist adaptive 10" (their adaptive
+    # resistance picks the energy), read as printed and matching no energy the engine deals.
+    assert kinds <= {"acid", "cold", "electricity", "fire", "sonic", "negative energy",
+                     "adaptive"}
 
 
 @pytest.mark.parametrize("name,immune", [
-    ("Giant, Frost", ["cold"]),
+    # Named as the block prints them since the re-read by header; the index-style
+    # "Giant, Frost" and the bare "Skeleton" were the anchor file's.
+    ("Frost Giant", ["cold"]),
     ("Ghost", ["undead traits"]),
-    ("Skeleton", ["cold", "undead traits"]),
-    ("Zombie", ["undead traits"]),
+    ("Human Skeleton", ["cold", "undead traits"]),
+    ("Human Zombie", ["undead traits"]),
 ])
 def test_creatures_whose_defence_line_can_be_checked_by_hand(name, immune):
     assert by_name(name)["immune"] == immune
@@ -202,9 +216,7 @@ def test_an_emptied_list_means_the_line_was_never_captured():
     assert by_name("Ghoul")["immune"] == []
 
 
-@pytest.mark.xfail(reason="known and not mechanically detectable — see the docstring",
-                   strict=True)
-def test_a_single_plausible_term_from_prose_still_gets_through():
+def test_a_single_plausible_term_from_prose_no_longer_gets_through():
     """The cut removes what can be proven wrong. A goblin has no immunities in the book,
     and its entry reads `["disease"]` — one short, well-formed, entirely plausible term the
     parser lifted out of a sentence. Nothing in the shape of it says so.
@@ -212,5 +224,9 @@ def test_a_single_plausible_term_from_prose_still_gets_through():
     Recorded as a failing test rather than fixed, because fixing it needs the source PDFs
     to compare against and they are not in the repository. It marks the boundary: the
     immunity lists are now clean of page spill, which is not the same as verified.
+
+    Passing since 2026-10-28: the anchor walk parsed the whole page the goblin shares, and
+    the re-read cuts the book at each block's header, so the goblin's block no longer holds
+    the sentence its "disease" came from.
     """
     assert by_name("Goblin")["immune"] == []

@@ -82,10 +82,12 @@ def test_ordinals_count_on_and_keep_the_article(table):
 
 
 def test_a_template_name_is_told_apart_as_well(table):
-    """No name given: two wolves off one stat block were two actors called "Wolf"."""
+    """No name given: two wolves off one stat block were two actors called "Wolf". Lower
+    case since the Bestiary's own wolf ships (2026-10-28): a printed kind goes by its kind
+    (`bestiary.kind_word`), where the adventure's "Wolf" row kept its capital."""
     s, _ = table
     s.add(instantiate("wolf", scene=s))
-    assert instantiate("wolf", scene=s).name == "second Wolf"
+    assert instantiate("wolf", scene=s).name == "second wolf"
 
 
 def test_a_resident_of_the_world_keeps_their_own_name(table):
