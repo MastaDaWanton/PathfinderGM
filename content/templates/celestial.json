@@ -54,5 +54,6 @@
   }
  ],
  "sr_over_cr": 5,
- "special_attack": "smite evil 1/day"
+ "special_attack": "smite evil 1/day",
+ "describe": "{A_base} from the higher planes, its eyes bright with a light that is not the sun's."
 }

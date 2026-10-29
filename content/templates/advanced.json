@@ -17,5 +17,6 @@
   "cha": 4
  },
  "natural_armour": 2,
- "dc": 2
+ "dc": 2,
+ "describe": "{A_base} bigger, quicker and fiercer than most of its kind."
 }

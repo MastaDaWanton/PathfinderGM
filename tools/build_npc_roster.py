@@ -317,8 +317,12 @@ def build_for(role, level: int) -> dict:
     rid, arch_id, _levels, skills, weapon, biomes, line = role
     arch = ARCHETYPES[arch_id]
     cls = arch["class"]
+    # A shield for a one-handed fighter in heavy armour only: a bow or a crossbow needs
+    # both hands, and a caster's or a skill-worker's hands are busy otherwise.
+    wants_shield = (arch["armour"] == "heavy" and weapon not in ("longbow", "light-crossbow")
+                    and arch_id != "adept")
     armour, shield = _armour_for(arch["armour"], level)
-    if weapon in ("longbow", "light-crossbow") or arch_id == "adept":
+    if not wants_shield:
         shield = "none"
     over = OVERRIDES.get(rid, {})
     preset = over.get("preset", arch["preset"])
@@ -361,7 +365,19 @@ def build_for(role, level: int) -> dict:
         if feats.meets(actor, feat).get("ok"):
             taken.append(name)
     doc["feats"] = taken
+    # Step 6, Gear: Table 14-9 spent as the game's own items (`rules/npc_gear.outfit`).
+    from rules import npc_gear
+
+    # The table for the people who fight and for rank; the trades carry their tools and a
+    # small purse (the owner's ruling, 2026-10-28, `npc_gear.trade_outfit`).
+    fights = arch_id in ("warrior", "ranger-ish", "adept", "aristocrat") or rid in FIGHTING_EXPERTS
+    doc["gear"] = (npc_gear.outfit(doc, arch["armour"], wants_shield) if fights
+                   else npc_gear.trade_outfit(doc))
     return doc
+
+
+# Experts whose work is violence or theft, outfitted by the table like the warriors.
+FIGHTING_EXPERTS = {"thief", "cutthroat", "spy", "smuggler", "saboteur", "poacher"}
 
 
 def _pad(n: int) -> list[str]:

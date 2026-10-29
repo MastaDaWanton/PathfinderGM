@@ -105,6 +105,17 @@ def test_a_templated_creature_is_reached_by_name_never_drawn_from_the_land():
                        for v in bestiary.search(biome=biome, stated=True, limit=10000))
 
 
+def test_every_templated_creature_has_a_line_of_our_own():
+    """No printed block describes a celestial dog or a shark zombie; the template document's
+    `describe` does, in the app's own words. The first cut wrote "the bones of a owlbear"."""
+    built = [v for v in bestiary.imported().values() if v.get("biomes_from") == "template"]
+    assert all(v.get("description") for v in built)
+    assert bestiary.raw_block("owlbear-skeleton")["description"].startswith(
+        "The bones of an owlbear")
+    assert not any(w in v["description"] for v in built
+                   for w in ("Golarion", "Abyss", "Hell", "Heaven", "Absalom"))
+
+
 def test_the_rules_build_replaces_an_adventures_row_of_the_same_name():
     """`ogre-zombie` was an adventure's row with 8 Hit Dice; the template gives 6."""
     block = bestiary.raw_block("ogre-zombie")

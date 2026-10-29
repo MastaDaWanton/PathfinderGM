@@ -109,5 +109,6 @@
    "swarm"
   ],
   "why": "A skeleton needs a skeletal system; an ooze, a plant, a vermin's shell or a swarm has none to raise."
- }
+ },
+ "describe": "The bones of {a_base}, held together by necromancy and moving at a dead thing's will."
 }

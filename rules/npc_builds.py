@@ -193,6 +193,15 @@ def build(doc: dict) -> tuple[dict | None, list[str]]:
                         "description", "role"):
         if doc.get(passthrough):
             sheet[passthrough] = doc[passthrough]
+    gear = doc.get("gear")
+    if isinstance(gear, dict):
+        # Step 6's purchases (`rules/npc_gear.outfit`): the suit and shield by their table
+        # keys, the kit as a pocket claim, the leftover as coin. A masterwork or enchanted
+        # weapon or suit is a forge record, worn by `actor`.
+        sheet["armour"] = str((gear.get("armour") or {}).get("base") or "none")
+        sheet["shield"] = str(gear.get("shield") or "none")
+        sheet["pockets"] = list(gear.get("pockets") or [])
+        sheet["coin_gp"] = int(gear.get("coin_gp") or 0)
     return sheet, []
 
 
@@ -256,10 +265,26 @@ def actor(doc: dict, ref: str | None = None):
     if sheet is None:
         raise ValueError("; ".join(problems))
     base = sheet.pop("hit_die_avg")
+    coin = int(sheet.pop("coin_gp", 0) or 0)
     a = from_dict(sheet, ref=ref)
     # The rolled part only: the sheet adds Constitution per Hit Die and the feat channel
     # (Toughness) itself (`Actor.hp_max`), so the total follows the scores as a PC's does.
     a.hp_base = base
+    # The bought weapon and suit worn as their records, read on their own swing and in
+    # their own AC; the weapon held by its record, and its plain key off the carried list
+    # so a looter takes one sword, not the record and a second plain one.
+    from . import forge_items, npc_gear
+
+    for rec in npc_gear.records(doc.get("gear") or {}):
+        # On the shelf and worn, as a player's forged item is: the pack holds the thing
+        # (what a looter takes, `Engine._op_loot`), the slot holds the copy `wear` keeps.
+        a.add_stock(forge_items.stock_item(rec), 1)
+        a.wear(rec)
+        if rec.get("gear") == "weapon":
+            a.weapons = [w for w in a.weapons if w != rec.get("base")]
+            a.equipped = rec["id"]
+    if coin:
+        a.purse["gp"] = int(a.purse.get("gp", 0)) + coin
     a.hp = a.hp_max
     return a
 

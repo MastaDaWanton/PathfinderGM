@@ -119,5 +119,6 @@
  "standing_tags": [
   "state.impaired.staggered"
  ],
- "standing_tags_why": "Staggered (Ex): poor reflexes, one move or standard action a round. A trait of the body, never lifted by rest, so a standing tag rather than the condition (whose recovery is recovery.rest)."
+ "standing_tags_why": "Staggered (Ex): poor reflexes, one move or standard action a round. A trait of the body, never lifted by rest, so a standing tag rather than the condition (whose recovery is recovery.rest).",
+ "describe": "{A_base} dragged back from death: slow, rotting and relentless, it does not stop."
 }

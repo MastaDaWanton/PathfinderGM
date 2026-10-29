@@ -356,6 +356,13 @@ def _finish(out: dict, base: dict, tpl: dict, unstepped=()) -> dict:
     out["base"] = base.get("base") or base.get("id")
     out["source"] = f"{base.get('source', '')}; {tpl['name']} template, {tpl['source']}"
     out["notes"] = f"CR {out['cr']} {out.get('creature_type', '')}".strip()
+    # The app's own words (the template document's `describe`), never a page's: a line a
+    # bench or a GM can show for a creature no printed block describes.
+    if tpl.get("describe"):
+        noun = str(base.get("name") or "creature").lower()
+        a_noun = ("an " if noun[:1] in "aeiou" else "a ") + noun
+        out["description"] = str(tpl["describe"]).format(
+            base=noun, a_base=a_noun, A_base=a_noun[:1].upper() + a_noun[1:])
     if unstepped:
         out["unstepped"] = sorted(set(unstepped))
     return out

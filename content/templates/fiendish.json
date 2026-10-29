@@ -51,5 +51,6 @@
   }
  ],
  "sr_over_cr": 5,
- "special_attack": "smite good 1/day"
+ "special_attack": "smite good 1/day",
+ "describe": "{A_base} from the lower planes, its eyes lit with a malice no beast was born with."
 }

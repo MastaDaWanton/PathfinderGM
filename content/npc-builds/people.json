@@ -46,7 +46,27 @@
     "farmland"
    ],
    "role": "farmer",
-   "description": "Works the fields from first light, and knows the weather by its smell."
+   "description": "Works the fields from first light, and knows the weather by its smell.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "farmer-level-3",
@@ -93,7 +113,27 @@
     "farmland"
    ],
    "role": "farmer",
-   "description": "Works the fields from first light, and knows the weather by its smell."
+   "description": "Works the fields from first light, and knows the weather by its smell.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "villager-level-1",
@@ -142,7 +182,27 @@
     "hills"
    ],
    "role": "villager",
-   "description": "Lives where the road thins out, and knows every face on it."
+   "description": "Lives where the road thins out, and knows every face on it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "villager-level-3",
@@ -192,7 +252,27 @@
     "hills"
    ],
    "role": "villager",
-   "description": "Lives where the road thins out, and knows every face on it."
+   "description": "Lives where the road thins out, and knows every face on it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "peasant-level-1",
@@ -237,7 +317,27 @@
     "farmland"
    ],
    "role": "peasant",
-   "description": "Owes the land more than it owes back."
+   "description": "Owes the land more than it owes back.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "servant-level-1",
@@ -282,7 +382,27 @@
     "urban"
    ],
    "role": "servant",
-   "description": "Fetches, carries and overhears."
+   "description": "Fetches, carries and overhears.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "servant-level-3",
@@ -328,7 +448,27 @@
     "urban"
    ],
    "role": "servant",
-   "description": "Fetches, carries and overhears."
+   "description": "Fetches, carries and overhears.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "attendant-level-1",
@@ -373,7 +513,27 @@
     "urban"
    ],
    "role": "attendant",
-   "description": "Stands a step behind someone more important."
+   "description": "Stands a step behind someone more important.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "attendant-level-3",
@@ -419,7 +579,27 @@
     "urban"
    ],
    "role": "attendant",
-   "description": "Stands a step behind someone more important."
+   "description": "Stands a step behind someone more important.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "gardener-level-1",
@@ -465,7 +645,27 @@
     "farmland"
    ],
    "role": "gardener",
-   "description": "Keeps green things growing behind someone else's walls."
+   "description": "Keeps green things growing behind someone else's walls.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "gardener-level-3",
@@ -512,7 +712,27 @@
     "farmland"
    ],
    "role": "gardener",
-   "description": "Keeps green things growing behind someone else's walls."
+   "description": "Keeps green things growing behind someone else's walls.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "laborer-level-1",
@@ -558,7 +778,27 @@
     "farmland"
    ],
    "role": "laborer",
-   "description": "Lifts, hauls and digs for a day's coin."
+   "description": "Lifts, hauls and digs for a day's coin.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "laborer-level-3",
@@ -605,7 +845,27 @@
     "farmland"
    ],
    "role": "laborer",
-   "description": "Lifts, hauls and digs for a day's coin."
+   "description": "Lifts, hauls and digs for a day's coin.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "laborer-level-5",
@@ -655,7 +915,27 @@
     "farmland"
    ],
    "role": "laborer",
-   "description": "Lifts, hauls and digs for a day's coin."
+   "description": "Lifts, hauls and digs for a day's coin.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "dockworker-level-1",
@@ -701,7 +981,27 @@
     "coast"
    ],
    "role": "dockworker",
-   "description": "Loads and unloads cargo where the boats come in."
+   "description": "Loads and unloads cargo where the boats come in.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "dockworker-level-3",
@@ -748,7 +1048,27 @@
     "coast"
    ],
    "role": "dockworker",
-   "description": "Loads and unloads cargo where the boats come in."
+   "description": "Loads and unloads cargo where the boats come in.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "teamster-level-1",
@@ -797,7 +1117,27 @@
     "desert"
    ],
    "role": "teamster",
-   "description": "Drives a wagon and its animals, and knows every rut on the road."
+   "description": "Drives a wagon and its animals, and knows every rut on the road.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "teamster-level-3",
@@ -847,7 +1187,27 @@
     "desert"
    ],
    "role": "teamster",
-   "description": "Drives a wagon and its animals, and knows every rut on the road."
+   "description": "Drives a wagon and its animals, and knows every rut on the road.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "drover-level-1",
@@ -895,7 +1255,27 @@
     "farmland"
    ],
    "role": "drover",
-   "description": "Moves herds over long roads to market."
+   "description": "Moves herds over long roads to market.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "drover-level-3",
@@ -944,7 +1324,27 @@
     "farmland"
    ],
    "role": "drover",
-   "description": "Moves herds over long roads to market."
+   "description": "Moves herds over long roads to market.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "ostler-level-1",
@@ -989,7 +1389,27 @@
     "urban"
    ],
    "role": "ostler",
-   "description": "Grooms, feeds and saddles other people's horses."
+   "description": "Grooms, feeds and saddles other people's horses.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "ostler-level-3",
@@ -1035,7 +1455,27 @@
     "urban"
    ],
    "role": "ostler",
-   "description": "Grooms, feeds and saddles other people's horses."
+   "description": "Grooms, feeds and saddles other people's horses.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "fisher-level-1",
@@ -1081,7 +1521,27 @@
     "water"
    ],
    "role": "fisher",
-   "description": "Lives off what the water gives up."
+   "description": "Lives off what the water gives up.",
+   "gear": {
+    "weapon": {
+     "base": "shortspear",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 4,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "fisher-level-3",
@@ -1128,7 +1588,27 @@
     "water"
    ],
    "role": "fisher",
-   "description": "Lives off what the water gives up."
+   "description": "Lives off what the water gives up.",
+   "gear": {
+    "weapon": {
+     "base": "shortspear",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 4,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "ferryman-level-1",
@@ -1175,7 +1655,27 @@
     "swamp"
    ],
    "role": "ferryman",
-   "description": "Takes people across for a fee, and remembers who crossed."
+   "description": "Takes people across for a fee, and remembers who crossed.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "ferryman-level-3",
@@ -1223,7 +1723,27 @@
     "swamp"
    ],
    "role": "ferryman",
-   "description": "Takes people across for a fee, and remembers who crossed."
+   "description": "Takes people across for a fee, and remembers who crossed.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "townsfolk-level-1",
@@ -1268,7 +1788,27 @@
     "urban"
    ],
    "role": "townsfolk",
-   "description": "One of the many people a town is made of."
+   "description": "One of the many people a town is made of.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "urchin-level-1",
@@ -1314,7 +1854,27 @@
     "urban"
    ],
    "role": "urchin",
-   "description": "Lives on the street and knows its back ways."
+   "description": "Lives on the street and knows its back ways.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "cook-level-1",
@@ -1359,7 +1919,27 @@
     "urban"
    ],
    "role": "cook",
-   "description": "Feeds a house, an inn or a camp."
+   "description": "Feeds a house, an inn or a camp.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "cook-level-3",
@@ -1405,7 +1985,27 @@
     "urban"
    ],
    "role": "cook",
-   "description": "Feeds a house, an inn or a camp."
+   "description": "Feeds a house, an inn or a camp.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "brewer-level-1",
@@ -1489,7 +2089,27 @@
     "farmland"
    ],
    "role": "brewer",
-   "description": "Turns grain into ale and gossip into custom."
+   "description": "Turns grain into ale and gossip into custom.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "brewer-level-3",
@@ -1574,7 +2194,27 @@
     "farmland"
    ],
    "role": "brewer",
-   "description": "Turns grain into ale and gossip into custom."
+   "description": "Turns grain into ale and gossip into custom.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "traveler-level-1",
@@ -1623,7 +2263,27 @@
     "farmland"
    ],
    "role": "traveler",
-   "description": "Somebody on the road for reasons of their own."
+   "description": "Somebody on the road for reasons of their own.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "traveler-level-3",
@@ -1673,7 +2333,27 @@
     "farmland"
    ],
    "role": "traveler",
-   "description": "Somebody on the road for reasons of their own."
+   "description": "Somebody on the road for reasons of their own.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "peddler-level-1",
@@ -1758,7 +2438,27 @@
     "grassland"
    ],
    "role": "peddler",
-   "description": "Carries a pack of small goods from door to door."
+   "description": "Carries a pack of small goods from door to door.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "peddler-level-3",
@@ -1844,7 +2544,27 @@
     "grassland"
    ],
    "role": "peddler",
-   "description": "Carries a pack of small goods from door to door."
+   "description": "Carries a pack of small goods from door to door.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "stallholder-level-1",
@@ -1927,7 +2647,27 @@
     "urban"
    ],
    "role": "stallholder",
-   "description": "Keeps a stall in the market and an eye on everyone at it."
+   "description": "Keeps a stall in the market and an eye on everyone at it.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "stallholder-level-3",
@@ -2011,7 +2751,27 @@
     "urban"
    ],
    "role": "stallholder",
-   "description": "Keeps a stall in the market and an eye on everyone at it."
+   "description": "Keeps a stall in the market and an eye on everyone at it.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "shopkeeper-level-1",
@@ -2094,7 +2854,27 @@
     "urban"
    ],
    "role": "shopkeeper",
-   "description": "Runs a shop, its ledger and its door."
+   "description": "Runs a shop, its ledger and its door.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "shopkeeper-level-3",
@@ -2178,7 +2958,27 @@
     "urban"
    ],
    "role": "shopkeeper",
-   "description": "Runs a shop, its ledger and its door."
+   "description": "Runs a shop, its ledger and its door.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "shopkeeper-level-6",
@@ -2265,7 +3065,27 @@
     "urban"
    ],
    "role": "shopkeeper",
-   "description": "Runs a shop, its ledger and its door."
+   "description": "Runs a shop, its ledger and its door.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "merchant-level-1",
@@ -2349,7 +3169,27 @@
     "urban"
    ],
    "role": "merchant",
-   "description": "Buys low, sells high, and remembers both prices."
+   "description": "Buys low, sells high, and remembers both prices.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "merchant-level-3",
@@ -2434,7 +3274,27 @@
     "urban"
    ],
    "role": "merchant",
-   "description": "Buys low, sells high, and remembers both prices."
+   "description": "Buys low, sells high, and remembers both prices.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "merchant-level-6",
@@ -2522,7 +3382,27 @@
     "urban"
    ],
    "role": "merchant",
-   "description": "Buys low, sells high, and remembers both prices."
+   "description": "Buys low, sells high, and remembers both prices.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "merchant-level-9",
@@ -2613,7 +3493,27 @@
     "urban"
    ],
    "role": "merchant",
-   "description": "Buys low, sells high, and remembers both prices."
+   "description": "Buys low, sells high, and remembers both prices.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "trader-level-1",
@@ -2699,7 +3599,27 @@
     "desert"
    ],
    "role": "trader",
-   "description": "Moves goods between places that each want what the other has."
+   "description": "Moves goods between places that each want what the other has.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "trader-level-3",
@@ -2786,7 +3706,27 @@
     "desert"
    ],
    "role": "trader",
-   "description": "Moves goods between places that each want what the other has."
+   "description": "Moves goods between places that each want what the other has.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "trader-level-6",
@@ -2876,7 +3816,27 @@
     "desert"
    ],
    "role": "trader",
-   "description": "Moves goods between places that each want what the other has."
+   "description": "Moves goods between places that each want what the other has.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "clerk-level-1",
@@ -2959,7 +3919,27 @@
     "urban"
    ],
    "role": "clerk",
-   "description": "Keeps the records somebody will one day need."
+   "description": "Keeps the records somebody will one day need.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "clerk-level-3",
@@ -3043,7 +4023,27 @@
     "urban"
    ],
    "role": "clerk",
-   "description": "Keeps the records somebody will one day need."
+   "description": "Keeps the records somebody will one day need.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "clerk-level-6",
@@ -3130,7 +4130,27 @@
     "urban"
    ],
    "role": "clerk",
-   "description": "Keeps the records somebody will one day need."
+   "description": "Keeps the records somebody will one day need.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "clerk-level-9",
@@ -3220,7 +4240,27 @@
     "urban"
    ],
    "role": "clerk",
-   "description": "Keeps the records somebody will one day need."
+   "description": "Keeps the records somebody will one day need.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "artisan-level-1",
@@ -3303,7 +4343,27 @@
     "urban"
    ],
    "role": "artisan",
-   "description": "Makes fine things with practised hands."
+   "description": "Makes fine things with practised hands.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "artisan-level-3",
@@ -3387,7 +4447,27 @@
     "urban"
    ],
    "role": "artisan",
-   "description": "Makes fine things with practised hands."
+   "description": "Makes fine things with practised hands.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "artisan-level-6",
@@ -3474,7 +4554,27 @@
     "urban"
    ],
    "role": "artisan",
-   "description": "Makes fine things with practised hands."
+   "description": "Makes fine things with practised hands.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "craftsman-level-1",
@@ -3557,7 +4657,27 @@
     "farmland"
    ],
    "role": "craftsman",
-   "description": "Makes useful things and mends broken ones."
+   "description": "Makes useful things and mends broken ones.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "craftsman-level-3",
@@ -3641,7 +4761,27 @@
     "farmland"
    ],
    "role": "craftsman",
-   "description": "Makes useful things and mends broken ones."
+   "description": "Makes useful things and mends broken ones.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "craftsman-level-6",
@@ -3728,7 +4868,27 @@
     "farmland"
    ],
    "role": "craftsman",
-   "description": "Makes useful things and mends broken ones."
+   "description": "Makes useful things and mends broken ones.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "barkeep-level-1",
@@ -3811,7 +4971,27 @@
     "urban"
    ],
    "role": "barkeep",
-   "description": "Pours, listens and decides who has had enough."
+   "description": "Pours, listens and decides who has had enough.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "barkeep-level-3",
@@ -3895,7 +5075,27 @@
     "urban"
    ],
    "role": "barkeep",
-   "description": "Pours, listens and decides who has had enough."
+   "description": "Pours, listens and decides who has had enough.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "barkeep-level-6",
@@ -3982,7 +5182,27 @@
     "urban"
    ],
    "role": "barkeep",
-   "description": "Pours, listens and decides who has had enough."
+   "description": "Pours, listens and decides who has had enough.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "innkeeper-level-1",
@@ -4066,7 +5286,27 @@
     "grassland"
    ],
    "role": "innkeeper",
-   "description": "Keeps the beds, the board and the peace under one roof."
+   "description": "Keeps the beds, the board and the peace under one roof.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "innkeeper-level-3",
@@ -4151,7 +5391,27 @@
     "grassland"
    ],
    "role": "innkeeper",
-   "description": "Keeps the beds, the board and the peace under one roof."
+   "description": "Keeps the beds, the board and the peace under one roof.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "innkeeper-level-6",
@@ -4239,7 +5499,27 @@
     "grassland"
    ],
    "role": "innkeeper",
-   "description": "Keeps the beds, the board and the peace under one roof."
+   "description": "Keeps the beds, the board and the peace under one roof.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "blacksmith-level-1",
@@ -4323,7 +5603,27 @@
     "farmland"
    ],
    "role": "blacksmith",
-   "description": "Works iron at the forge, and knows a good blade from a bad one."
+   "description": "Works iron at the forge, and knows a good blade from a bad one.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "blacksmith-level-4",
@@ -4410,7 +5710,27 @@
     "farmland"
    ],
    "role": "blacksmith",
-   "description": "Works iron at the forge, and knows a good blade from a bad one."
+   "description": "Works iron at the forge, and knows a good blade from a bad one.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "blacksmith-level-8",
@@ -4500,7 +5820,27 @@
     "farmland"
    ],
    "role": "blacksmith",
-   "description": "Works iron at the forge, and knows a good blade from a bad one."
+   "description": "Works iron at the forge, and knows a good blade from a bad one.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "blacksmith-level-12",
@@ -4593,7 +5933,27 @@
     "farmland"
    ],
    "role": "blacksmith",
-   "description": "Works iron at the forge, and knows a good blade from a bad one."
+   "description": "Works iron at the forge, and knows a good blade from a bad one.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "blacksmith-level-16",
@@ -4689,7 +6049,27 @@
     "farmland"
    ],
    "role": "blacksmith",
-   "description": "Works iron at the forge, and knows a good blade from a bad one."
+   "description": "Works iron at the forge, and knows a good blade from a bad one.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "smith-level-1",
@@ -4772,7 +6152,27 @@
     "farmland"
    ],
    "role": "smith",
-   "description": "Shapes metal into tools and blades."
+   "description": "Shapes metal into tools and blades.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "smith-level-4",
@@ -4858,7 +6258,27 @@
     "farmland"
    ],
    "role": "smith",
-   "description": "Shapes metal into tools and blades."
+   "description": "Shapes metal into tools and blades.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "smith-level-8",
@@ -4947,7 +6367,27 @@
     "farmland"
    ],
    "role": "smith",
-   "description": "Shapes metal into tools and blades."
+   "description": "Shapes metal into tools and blades.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "smith-level-12",
@@ -5039,7 +6479,27 @@
     "farmland"
    ],
    "role": "smith",
-   "description": "Shapes metal into tools and blades."
+   "description": "Shapes metal into tools and blades.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "smith-level-16",
@@ -5134,7 +6594,27 @@
     "farmland"
    ],
    "role": "smith",
-   "description": "Shapes metal into tools and blades."
+   "description": "Shapes metal into tools and blades.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "weaponsmith-level-2",
@@ -5216,7 +6696,27 @@
     "urban"
    ],
    "role": "weaponsmith",
-   "description": "Forges weapons and tests every edge."
+   "description": "Forges weapons and tests every edge.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "weaponsmith-level-6",
@@ -5302,7 +6802,27 @@
     "urban"
    ],
    "role": "weaponsmith",
-   "description": "Forges weapons and tests every edge."
+   "description": "Forges weapons and tests every edge.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "weaponsmith-level-10",
@@ -5391,7 +6911,27 @@
     "urban"
    ],
    "role": "weaponsmith",
-   "description": "Forges weapons and tests every edge."
+   "description": "Forges weapons and tests every edge.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "armorer-level-2",
@@ -5473,7 +7013,27 @@
     "urban"
    ],
    "role": "armorer",
-   "description": "Fits armour to the body that will trust its life to it."
+   "description": "Fits armour to the body that will trust its life to it.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "armorer-level-6",
@@ -5559,7 +7119,27 @@
     "urban"
    ],
    "role": "armorer",
-   "description": "Fits armour to the body that will trust its life to it."
+   "description": "Fits armour to the body that will trust its life to it.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "armorer-level-10",
@@ -5648,7 +7228,27 @@
     "urban"
    ],
    "role": "armorer",
-   "description": "Fits armour to the body that will trust its life to it."
+   "description": "Fits armour to the body that will trust its life to it.",
+   "gear": {
+    "weapon": {
+     "base": "light-mace",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 8,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "alchemist-level-2",
@@ -5732,7 +7332,27 @@
     "urban"
    ],
    "role": "alchemist",
-   "description": "Mixes reagents into cures, poisons and sometimes both."
+   "description": "Mixes reagents into cures, poisons and sometimes both.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "alchemist-level-5",
@@ -5820,7 +7440,27 @@
     "urban"
    ],
    "role": "alchemist",
-   "description": "Mixes reagents into cures, poisons and sometimes both."
+   "description": "Mixes reagents into cures, poisons and sometimes both.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "alchemist-level-8",
@@ -5910,7 +7550,27 @@
     "urban"
    ],
    "role": "alchemist",
-   "description": "Mixes reagents into cures, poisons and sometimes both."
+   "description": "Mixes reagents into cures, poisons and sometimes both.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "alchemist-level-12",
@@ -6003,7 +7663,27 @@
     "urban"
    ],
    "role": "alchemist",
-   "description": "Mixes reagents into cures, poisons and sometimes both."
+   "description": "Mixes reagents into cures, poisons and sometimes both.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "apothecary-level-1",
@@ -6086,7 +7766,27 @@
     "urban"
    ],
    "role": "apothecary",
-   "description": "Sells remedies, and knows which ones work."
+   "description": "Sells remedies, and knows which ones work.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "apothecary-level-4",
@@ -6172,7 +7872,27 @@
     "urban"
    ],
    "role": "apothecary",
-   "description": "Sells remedies, and knows which ones work."
+   "description": "Sells remedies, and knows which ones work.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "apothecary-level-8",
@@ -6261,7 +7981,27 @@
     "urban"
    ],
    "role": "apothecary",
-   "description": "Sells remedies, and knows which ones work."
+   "description": "Sells remedies, and knows which ones work.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "herbalist-level-1",
@@ -6346,7 +8086,27 @@
     "hills"
    ],
    "role": "herbalist",
-   "description": "Gathers and prepares the plants that heal or harm."
+   "description": "Gathers and prepares the plants that heal or harm.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "herbalist-level-4",
@@ -6434,7 +8194,27 @@
     "hills"
    ],
    "role": "herbalist",
-   "description": "Gathers and prepares the plants that heal or harm."
+   "description": "Gathers and prepares the plants that heal or harm.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "herbalist-level-8",
@@ -6525,7 +8305,27 @@
     "hills"
    ],
    "role": "herbalist",
-   "description": "Gathers and prepares the plants that heal or harm."
+   "description": "Gathers and prepares the plants that heal or harm.",
+   "gear": {
+    "weapon": {
+     "base": "sickle",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 9,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sailor-level-1",
@@ -6609,7 +8409,27 @@
     "water"
    ],
    "role": "sailor",
-   "description": "Lives on a deck and trusts the rigging more than the land."
+   "description": "Lives on a deck and trusts the rigging more than the land.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sailor-level-4",
@@ -6696,7 +8516,27 @@
     "water"
    ],
    "role": "sailor",
-   "description": "Lives on a deck and trusts the rigging more than the land."
+   "description": "Lives on a deck and trusts the rigging more than the land.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sailor-level-8",
@@ -6786,7 +8626,27 @@
     "water"
    ],
    "role": "sailor",
-   "description": "Lives on a deck and trusts the rigging more than the land."
+   "description": "Lives on a deck and trusts the rigging more than the land.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sailor-level-12",
@@ -6879,7 +8739,27 @@
     "water"
    ],
    "role": "sailor",
-   "description": "Lives on a deck and trusts the rigging more than the land."
+   "description": "Lives on a deck and trusts the rigging more than the land.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sailor-level-16",
@@ -6975,7 +8855,27 @@
     "water"
    ],
    "role": "sailor",
-   "description": "Lives on a deck and trusts the rigging more than the land."
+   "description": "Lives on a deck and trusts the rigging more than the land.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "harbormaster-level-4",
@@ -7063,7 +8963,27 @@
     "urban"
    ],
    "role": "harbormaster",
-   "description": "Says which ships may berth, and what they owe for it."
+   "description": "Says which ships may berth, and what they owe for it.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "harbormaster-level-8",
@@ -7154,7 +9074,27 @@
     "urban"
    ],
    "role": "harbormaster",
-   "description": "Says which ships may berth, and what they owe for it."
+   "description": "Says which ships may berth, and what they owe for it.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "harbormaster-level-12",
@@ -7248,7 +9188,27 @@
     "urban"
    ],
    "role": "harbormaster",
-   "description": "Says which ships may berth, and what they owe for it."
+   "description": "Says which ships may berth, and what they owe for it.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "harbormaster-level-16",
@@ -7345,7 +9305,27 @@
     "urban"
    ],
    "role": "harbormaster",
-   "description": "Says which ships may berth, and what they owe for it."
+   "description": "Says which ships may berth, and what they owe for it.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "harbormaster-level-20",
@@ -7445,7 +9425,27 @@
     "urban"
    ],
    "role": "harbormaster",
-   "description": "Says which ships may berth, and what they owe for it."
+   "description": "Says which ships may berth, and what they owe for it.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "customs-officer-level-3",
@@ -7531,7 +9531,27 @@
     "coast"
    ],
    "role": "customs officer",
-   "description": "Counts what comes through the gate, and what it owes."
+   "description": "Counts what comes through the gate, and what it owes.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "customs-officer-level-6",
@@ -7620,7 +9640,27 @@
     "coast"
    ],
    "role": "customs officer",
-   "description": "Counts what comes through the gate, and what it owes."
+   "description": "Counts what comes through the gate, and what it owes.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "customs-officer-level-9",
@@ -7712,7 +9752,27 @@
     "coast"
    ],
    "role": "customs officer",
-   "description": "Counts what comes through the gate, and what it owes."
+   "description": "Counts what comes through the gate, and what it owes.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "customs-officer-level-12",
@@ -7806,7 +9866,27 @@
     "coast"
    ],
    "role": "customs officer",
-   "description": "Counts what comes through the gate, and what it owes."
+   "description": "Counts what comes through the gate, and what it owes.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "customs-officer-level-15",
@@ -7902,7 +9982,27 @@
     "coast"
    ],
    "role": "customs officer",
-   "description": "Counts what comes through the gate, and what it owes."
+   "description": "Counts what comes through the gate, and what it owes.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 38,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "thief-level-1",
@@ -7987,7 +10087,31 @@
     "urban"
    ],
    "role": "thief",
-   "description": "Takes what is not theirs and is gone before it is missed."
+   "description": "Takes what is not theirs and is gone before it is missed.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 154,
+    "spent_gp": 105,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "thief-level-4",
@@ -8075,7 +10199,33 @@
     "urban"
    ],
    "role": "thief",
-   "description": "Takes what is not theirs and is gone before it is missed."
+   "description": "Takes what is not theirs and is gone before it is missed.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 994,
+    "spent_gp": 655,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "thief-level-8",
@@ -8166,7 +10316,37 @@
     "urban"
    ],
    "role": "thief",
-   "description": "Takes what is not theirs and is gone before it is missed."
+   "description": "Takes what is not theirs and is gone before it is missed.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2144,
+    "spent_gp": 3855,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "thief-level-12",
@@ -8260,7 +10440,37 @@
     "urban"
    ],
    "role": "thief",
-   "description": "Takes what is not theirs and is gone before it is missed."
+   "description": "Takes what is not theirs and is gone before it is missed.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 9494,
+    "spent_gp": 6855,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "thief-level-16",
@@ -8357,7 +10567,37 @@
     "urban"
    ],
    "role": "thief",
-   "description": "Takes what is not theirs and is gone before it is missed."
+   "description": "Takes what is not theirs and is gone before it is missed.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 10144,
+    "spent_gp": 34855,
+    "table_gp": 45000,
+    "table": true
+   }
   },
   {
    "id": "pickpocket-level-1",
@@ -8440,7 +10680,27 @@
     "urban"
    ],
    "role": "pickpocket",
-   "description": "Works crowds with light fingers."
+   "description": "Works crowds with light fingers.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "pickpocket-level-3",
@@ -8524,7 +10784,27 @@
     "urban"
    ],
    "role": "pickpocket",
-   "description": "Works crowds with light fingers."
+   "description": "Works crowds with light fingers.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "smuggler-level-2",
@@ -8610,7 +10890,31 @@
     "urban"
    ],
    "role": "smuggler",
-   "description": "Moves goods where the law would rather they did not go."
+   "description": "Moves goods where the law would rather they did not go.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 284,
+    "spent_gp": 105,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "smuggler-level-6",
@@ -8700,7 +11004,37 @@
     "urban"
    ],
    "role": "smuggler",
-   "description": "Moves goods where the law would rather they did not go."
+   "description": "Moves goods where the law would rather they did not go.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1594,
+    "spent_gp": 1855,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "smuggler-level-10",
@@ -8793,7 +11127,37 @@
     "urban"
    ],
    "role": "smuggler",
-   "description": "Moves goods where the law would rather they did not go."
+   "description": "Moves goods where the law would rather they did not go.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 6194,
+    "spent_gp": 3855,
+    "table_gp": 10050,
+    "table": true
+   }
   },
   {
    "id": "smuggler-level-14",
@@ -8889,7 +11253,37 @@
     "urban"
    ],
    "role": "smuggler",
-   "description": "Moves goods where the law would rather they did not go."
+   "description": "Moves goods where the law would rather they did not go.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 9144,
+    "spent_gp": 17855,
+    "table_gp": 27000,
+    "table": true
+   }
   },
   {
    "id": "fixer-level-2",
@@ -8973,7 +11367,27 @@
     "urban"
    ],
    "role": "fixer",
-   "description": "Knows who can get what, and takes a cut for knowing."
+   "description": "Knows who can get what, and takes a cut for knowing.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "fixer-level-5",
@@ -9061,7 +11475,27 @@
     "urban"
    ],
    "role": "fixer",
-   "description": "Knows who can get what, and takes a cut for knowing."
+   "description": "Knows who can get what, and takes a cut for knowing.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "fixer-level-8",
@@ -9151,7 +11585,27 @@
     "urban"
    ],
    "role": "fixer",
-   "description": "Knows who can get what, and takes a cut for knowing."
+   "description": "Knows who can get what, and takes a cut for knowing.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "fixer-level-12",
@@ -9244,7 +11698,27 @@
     "urban"
    ],
    "role": "fixer",
-   "description": "Knows who can get what, and takes a cut for knowing."
+   "description": "Knows who can get what, and takes a cut for knowing.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "broker-level-2",
@@ -9327,7 +11801,27 @@
     "urban"
    ],
    "role": "broker",
-   "description": "Arranges deals between people who would rather not meet."
+   "description": "Arranges deals between people who would rather not meet.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "broker-level-5",
@@ -9414,7 +11908,27 @@
     "urban"
    ],
    "role": "broker",
-   "description": "Arranges deals between people who would rather not meet."
+   "description": "Arranges deals between people who would rather not meet.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "broker-level-8",
@@ -9503,7 +12017,27 @@
     "urban"
    ],
    "role": "broker",
-   "description": "Arranges deals between people who would rather not meet."
+   "description": "Arranges deals between people who would rather not meet.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "broker-level-12",
@@ -9595,7 +12129,27 @@
     "urban"
    ],
    "role": "broker",
-   "description": "Arranges deals between people who would rather not meet."
+   "description": "Arranges deals between people who would rather not meet.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "informant-level-1",
@@ -9678,7 +12232,27 @@
     "urban"
    ],
    "role": "informant",
-   "description": "Sells what they hear, to whoever pays most."
+   "description": "Sells what they hear, to whoever pays most.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "informant-level-4",
@@ -9764,7 +12338,27 @@
     "urban"
    ],
    "role": "informant",
-   "description": "Sells what they hear, to whoever pays most."
+   "description": "Sells what they hear, to whoever pays most.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "spy-level-3",
@@ -9850,7 +12444,32 @@
     "urban"
    ],
    "role": "spy",
-   "description": "Is somebody else, for long enough to learn a secret."
+   "description": "Is somebody else, for long enough to learn a secret.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 324,
+    "spent_gp": 455,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "spy-level-7",
@@ -9940,7 +12559,37 @@
     "urban"
    ],
    "role": "spy",
-   "description": "Is somebody else, for long enough to learn a secret."
+   "description": "Is somebody else, for long enough to learn a secret.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 794,
+    "spent_gp": 3855,
+    "table_gp": 4650,
+    "table": true
+   }
   },
   {
    "id": "spy-level-11",
@@ -10033,7 +12682,37 @@
     "urban"
    ],
    "role": "spy",
-   "description": "Is somebody else, for long enough to learn a secret."
+   "description": "Is somebody else, for long enough to learn a secret.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 5894,
+    "spent_gp": 6855,
+    "table_gp": 12750,
+    "table": true
+   }
   },
   {
    "id": "spy-level-15",
@@ -10129,7 +12808,37 @@
     "urban"
    ],
    "role": "spy",
-   "description": "Is somebody else, for long enough to learn a secret."
+   "description": "Is somebody else, for long enough to learn a secret.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 16944,
+    "spent_gp": 17855,
+    "table_gp": 34800,
+    "table": true
+   }
   },
   {
    "id": "sage-level-3",
@@ -10215,7 +12924,27 @@
     "urban"
    ],
    "role": "sage",
-   "description": "Has read more than most people will ever see."
+   "description": "Has read more than most people will ever see.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sage-level-7",
@@ -10305,7 +13034,27 @@
     "urban"
    ],
    "role": "sage",
-   "description": "Has read more than most people will ever see."
+   "description": "Has read more than most people will ever see.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sage-level-11",
@@ -10398,7 +13147,27 @@
     "urban"
    ],
    "role": "sage",
-   "description": "Has read more than most people will ever see."
+   "description": "Has read more than most people will ever see.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "sage-level-15",
@@ -10494,7 +13263,27 @@
     "urban"
    ],
    "role": "sage",
-   "description": "Has read more than most people will ever see."
+   "description": "Has read more than most people will ever see.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "scholar-level-2",
@@ -10577,7 +13366,27 @@
     "urban"
    ],
    "role": "scholar",
-   "description": "Studies the past for what it says about now."
+   "description": "Studies the past for what it says about now.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "scholar-level-6",
@@ -10664,7 +13473,27 @@
     "urban"
    ],
    "role": "scholar",
-   "description": "Studies the past for what it says about now."
+   "description": "Studies the past for what it says about now.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "performer-level-1",
@@ -10747,7 +13576,27 @@
     "urban"
    ],
    "role": "performer",
-   "description": "Entertains for coin, and remembers every crowd."
+   "description": "Entertains for coin, and remembers every crowd.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "performer-level-4",
@@ -10833,7 +13682,27 @@
     "urban"
    ],
    "role": "performer",
-   "description": "Entertains for coin, and remembers every crowd."
+   "description": "Entertains for coin, and remembers every crowd.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "performer-level-8",
@@ -10922,7 +13791,27 @@
     "urban"
    ],
    "role": "performer",
-   "description": "Entertains for coin, and remembers every crowd."
+   "description": "Entertains for coin, and remembers every crowd.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "poacher-level-1",
@@ -11007,7 +13896,31 @@
     "grassland"
    ],
    "role": "poacher",
-   "description": "Hunts where hunting is forbidden."
+   "description": "Hunts where hunting is forbidden.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 121,
+    "spent_gp": 138,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "poacher-level-4",
@@ -11095,7 +14008,33 @@
     "grassland"
    ],
    "role": "poacher",
-   "description": "Hunts where hunting is forbidden."
+   "description": "Hunts where hunting is forbidden.",
+   "gear": {
+    "weapon": {
+     "base": "light-crossbow",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 961,
+    "spent_gp": 688,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "soldier-level-1",
@@ -11131,7 +14070,31 @@
     "hills"
    ],
    "role": "soldier",
-   "description": "Serves under orders, with spear and shield."
+   "description": "Serves under orders, with spear and shield.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 171,
+    "spent_gp": 88,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "soldier-level-4",
@@ -11170,7 +14133,33 @@
     "hills"
    ],
    "role": "soldier",
-   "description": "Serves under orders, with spear and shield."
+   "description": "Serves under orders, with spear and shield.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 461,
+    "spent_gp": 1188,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "soldier-level-8",
@@ -11212,7 +14201,37 @@
     "hills"
    ],
    "role": "soldier",
-   "description": "Serves under orders, with spear and shield."
+   "description": "Serves under orders, with spear and shield.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1711,
+    "spent_gp": 4288,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "soldier-level-12",
@@ -11257,7 +14276,37 @@
     "hills"
    ],
    "role": "soldier",
-   "description": "Serves under orders, with spear and shield."
+   "description": "Serves under orders, with spear and shield.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8061,
+    "spent_gp": 8288,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "soldier-level-16",
@@ -11305,7 +14354,37 @@
     "hills"
    ],
    "role": "soldier",
-   "description": "Serves under orders, with spear and shield."
+   "description": "Serves under orders, with spear and shield.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8711,
+    "spent_gp": 36288,
+    "table_gp": 45000,
+    "table": true
+   }
   },
   {
    "id": "fighter-level-1",
@@ -11342,7 +14421,31 @@
     "forest"
    ],
    "role": "fighter",
-   "description": "Makes a living with a blade."
+   "description": "Makes a living with a blade.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 171,
+    "spent_gp": 88,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "fighter-level-4",
@@ -11382,7 +14485,33 @@
     "forest"
    ],
    "role": "fighter",
-   "description": "Makes a living with a blade."
+   "description": "Makes a living with a blade.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 461,
+    "spent_gp": 1188,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "fighter-level-8",
@@ -11425,7 +14554,37 @@
     "forest"
    ],
    "role": "fighter",
-   "description": "Makes a living with a blade."
+   "description": "Makes a living with a blade.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1711,
+    "spent_gp": 4288,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "fighter-level-12",
@@ -11471,7 +14630,37 @@
     "forest"
    ],
    "role": "fighter",
-   "description": "Makes a living with a blade."
+   "description": "Makes a living with a blade.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8061,
+    "spent_gp": 8288,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "fighter-level-16",
@@ -11520,7 +14709,37 @@
     "forest"
    ],
    "role": "fighter",
-   "description": "Makes a living with a blade."
+   "description": "Makes a living with a blade.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8711,
+    "spent_gp": 36288,
+    "table_gp": 45000,
+    "table": true
+   }
   },
   {
    "id": "officer-level-3",
@@ -11555,7 +14774,32 @@
     "urban"
    ],
    "role": "officer",
-   "description": "Gives the orders the soldiers follow."
+   "description": "Gives the orders the soldiers follow.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chainmail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 241,
+    "spent_gp": 538,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "officer-level-7",
@@ -11594,7 +14838,37 @@
     "urban"
    ],
    "role": "officer",
-   "description": "Gives the orders the soldiers follow."
+   "description": "Gives the orders the soldiers follow.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 511,
+    "spent_gp": 4138,
+    "table_gp": 4650,
+    "table": true
+   }
   },
   {
    "id": "officer-level-11",
@@ -11636,7 +14910,37 @@
     "urban"
    ],
    "role": "officer",
-   "description": "Gives the orders the soldiers follow."
+   "description": "Gives the orders the soldiers follow.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 7461,
+    "spent_gp": 5288,
+    "table_gp": 12750,
+    "table": true
+   }
   },
   {
    "id": "officer-level-15",
@@ -11681,7 +14985,37 @@
     "urban"
    ],
    "role": "officer",
-   "description": "Gives the orders the soldiers follow."
+   "description": "Gives the orders the soldiers follow.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 15511,
+    "spent_gp": 19288,
+    "table_gp": 34800,
+    "table": true
+   }
   },
   {
    "id": "officer-level-19",
@@ -11729,7 +15063,37 @@
     "urban"
    ],
    "role": "officer",
-   "description": "Gives the orders the soldiers follow."
+   "description": "Gives the orders the soldiers follow.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 5
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 36711,
+    "spent_gp": 59288,
+    "table_gp": 96000,
+    "table": true
+   }
   },
   {
    "id": "captain-level-4",
@@ -11767,7 +15131,33 @@
     "coast"
    ],
    "role": "captain",
-   "description": "Commands a company, a watch or a ship."
+   "description": "Commands a company, a watch or a ship.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 461,
+    "spent_gp": 1188,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "captain-level-8",
@@ -11808,7 +15198,37 @@
     "coast"
    ],
    "role": "captain",
-   "description": "Commands a company, a watch or a ship."
+   "description": "Commands a company, a watch or a ship.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1711,
+    "spent_gp": 4288,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "captain-level-12",
@@ -11852,7 +15272,37 @@
     "coast"
    ],
    "role": "captain",
-   "description": "Commands a company, a watch or a ship."
+   "description": "Commands a company, a watch or a ship.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8061,
+    "spent_gp": 8288,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "captain-level-16",
@@ -11899,7 +15349,37 @@
     "coast"
    ],
    "role": "captain",
-   "description": "Commands a company, a watch or a ship."
+   "description": "Commands a company, a watch or a ship.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8711,
+    "spent_gp": 36288,
+    "table_gp": 45000,
+    "table": true
+   }
   },
   {
    "id": "captain-level-20",
@@ -11949,7 +15429,37 @@
     "coast"
    ],
    "role": "captain",
-   "description": "Commands a company, a watch or a ship."
+   "description": "Commands a company, a watch or a ship.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 5
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 5
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 45711,
+    "spent_gp": 77288,
+    "table_gp": 123000,
+    "table": true
+   }
   },
   {
    "id": "warden-level-3",
@@ -11986,7 +15496,32 @@
     "hills"
    ],
    "role": "warden",
-   "description": "Keeps a place and what is kept in it."
+   "description": "Keeps a place and what is kept in it.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chainmail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 241,
+    "spent_gp": 538,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "warden-level-7",
@@ -12027,7 +15562,37 @@
     "hills"
    ],
    "role": "warden",
-   "description": "Keeps a place and what is kept in it."
+   "description": "Keeps a place and what is kept in it.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 511,
+    "spent_gp": 4138,
+    "table_gp": 4650,
+    "table": true
+   }
   },
   {
    "id": "warden-level-11",
@@ -12071,7 +15636,37 @@
     "hills"
    ],
    "role": "warden",
-   "description": "Keeps a place and what is kept in it."
+   "description": "Keeps a place and what is kept in it.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 7461,
+    "spent_gp": 5288,
+    "table_gp": 12750,
+    "table": true
+   }
   },
   {
    "id": "warden-level-15",
@@ -12118,7 +15713,37 @@
     "hills"
    ],
    "role": "warden",
-   "description": "Keeps a place and what is kept in it."
+   "description": "Keeps a place and what is kept in it.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 15511,
+    "spent_gp": 19288,
+    "table_gp": 34800,
+    "table": true
+   }
   },
   {
    "id": "warden-level-19",
@@ -12168,7 +15793,37 @@
     "hills"
    ],
    "role": "warden",
-   "description": "Keeps a place and what is kept in it."
+   "description": "Keeps a place and what is kept in it.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 5
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 36711,
+    "spent_gp": 59288,
+    "table_gp": 96000,
+    "table": true
+   }
   },
   {
    "id": "jailer-level-1",
@@ -12202,7 +15857,31 @@
     "urban"
    ],
    "role": "jailer",
-   "description": "Holds the keys, and the prisoners behind them."
+   "description": "Holds the keys, and the prisoners behind them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 186,
+    "spent_gp": 73,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "jailer-level-4",
@@ -12239,7 +15918,33 @@
     "urban"
    ],
    "role": "jailer",
-   "description": "Holds the keys, and the prisoners behind them."
+   "description": "Holds the keys, and the prisoners behind them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 476,
+    "spent_gp": 1173,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "jailer-level-8",
@@ -12279,7 +15984,37 @@
     "urban"
    ],
    "role": "jailer",
-   "description": "Holds the keys, and the prisoners behind them."
+   "description": "Holds the keys, and the prisoners behind them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1726,
+    "spent_gp": 4273,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "jailer-level-12",
@@ -12322,7 +16057,37 @@
     "urban"
    ],
    "role": "jailer",
-   "description": "Holds the keys, and the prisoners behind them."
+   "description": "Holds the keys, and the prisoners behind them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8076,
+    "spent_gp": 8273,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "pit-fighter-level-2",
@@ -12356,7 +16121,31 @@
     "urban"
    ],
    "role": "pit fighter",
-   "description": "Fights for a crowd and a purse."
+   "description": "Fights for a crowd and a purse.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 306,
+    "spent_gp": 83,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "pit-fighter-level-6",
@@ -12394,7 +16183,37 @@
     "urban"
    ],
    "role": "pit fighter",
-   "description": "Fights for a crowd and a purse."
+   "description": "Fights for a crowd and a purse.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2066,
+    "spent_gp": 1383,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "pit-fighter-level-10",
@@ -12435,7 +16254,37 @@
     "urban"
    ],
    "role": "pit fighter",
-   "description": "Fights for a crowd and a purse."
+   "description": "Fights for a crowd and a purse.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 4766,
+    "spent_gp": 5283,
+    "table_gp": 10050,
+    "table": true
+   }
   },
   {
    "id": "gladiator-level-1",
@@ -12469,7 +16318,31 @@
     "urban"
    ],
    "role": "gladiator",
-   "description": "Fights in the arena, and plays to the stands."
+   "description": "Fights in the arena, and plays to the stands.",
+   "gear": {
+    "weapon": {
+     "base": "trident",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 171,
+    "spent_gp": 88,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "gladiator-level-5",
@@ -12507,7 +16380,37 @@
     "urban"
    ],
    "role": "gladiator",
-   "description": "Fights in the arena, and plays to the stands."
+   "description": "Fights in the arena, and plays to the stands.",
+   "gear": {
+    "weapon": {
+     "base": "trident",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1011,
+    "spent_gp": 1388,
+    "table_gp": 2400,
+    "table": true
+   }
   },
   {
    "id": "gladiator-level-9",
@@ -12548,7 +16451,37 @@
     "urban"
    ],
    "role": "gladiator",
-   "description": "Fights in the arena, and plays to the stands."
+   "description": "Fights in the arena, and plays to the stands.",
+   "gear": {
+    "weapon": {
+     "base": "trident",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2511,
+    "spent_gp": 5288,
+    "table_gp": 7800,
+    "table": true
+   }
   },
   {
    "id": "brawler-level-1",
@@ -12582,7 +16515,31 @@
     "urban"
    ],
    "role": "brawler",
-   "description": "Settles things with fists and whatever is to hand."
+   "description": "Settles things with fists and whatever is to hand.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 186,
+    "spent_gp": 73,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "brawler-level-4",
@@ -12619,7 +16576,33 @@
     "urban"
    ],
    "role": "brawler",
-   "description": "Settles things with fists and whatever is to hand."
+   "description": "Settles things with fists and whatever is to hand.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 476,
+    "spent_gp": 1173,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "brawler-level-8",
@@ -12659,7 +16642,37 @@
     "urban"
    ],
    "role": "brawler",
-   "description": "Settles things with fists and whatever is to hand."
+   "description": "Settles things with fists and whatever is to hand.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1726,
+    "spent_gp": 4273,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "bandit-level-1",
@@ -12696,7 +16709,31 @@
     "desert"
    ],
    "role": "bandit",
-   "description": "Takes from travellers what they will not give."
+   "description": "Takes from travellers what they will not give.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 176,
+    "spent_gp": 83,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "bandit-level-3",
@@ -12734,7 +16771,32 @@
     "desert"
    ],
    "role": "bandit",
-   "description": "Takes from travellers what they will not give."
+   "description": "Takes from travellers what they will not give.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chainmail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 246,
+    "spent_gp": 533,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "bandit-level-6",
@@ -12775,7 +16837,37 @@
     "desert"
    ],
    "role": "bandit",
-   "description": "Takes from travellers what they will not give."
+   "description": "Takes from travellers what they will not give.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2066,
+    "spent_gp": 1383,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "bandit-level-9",
@@ -12819,7 +16911,37 @@
     "desert"
    ],
    "role": "bandit",
-   "description": "Takes from travellers what they will not give."
+   "description": "Takes from travellers what they will not give.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2516,
+    "spent_gp": 5283,
+    "table_gp": 7800,
+    "table": true
+   }
   },
   {
    "id": "rustler-level-2",
@@ -12854,7 +16976,31 @@
     "hills"
    ],
    "role": "rustler",
-   "description": "Steals herds by night and sells them by day."
+   "description": "Steals herds by night and sells them by day.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 306,
+    "spent_gp": 83,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "rustler-level-5",
@@ -12893,7 +17039,37 @@
     "hills"
    ],
    "role": "rustler",
-   "description": "Steals herds by night and sells them by day."
+   "description": "Steals herds by night and sells them by day.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1016,
+    "spent_gp": 1383,
+    "table_gp": 2400,
+    "table": true
+   }
   },
   {
    "id": "rustler-level-8",
@@ -12934,7 +17110,37 @@
     "hills"
    ],
    "role": "rustler",
-   "description": "Steals herds by night and sells them by day."
+   "description": "Steals herds by night and sells them by day.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1716,
+    "spent_gp": 4283,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "hunter-level-1",
@@ -12972,7 +17178,31 @@
     "mountain"
    ],
    "role": "hunter",
-   "description": "Lives by the bow and the patience to use it."
+   "description": "Lives by the bow and the patience to use it.",
+   "gear": {
+    "weapon": {
+     "base": "longbow",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 81,
+    "spent_gp": 178,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "hunter-level-4",
@@ -13013,7 +17243,33 @@
     "mountain"
    ],
    "role": "hunter",
-   "description": "Lives by the bow and the patience to use it."
+   "description": "Lives by the bow and the patience to use it.",
+   "gear": {
+    "weapon": {
+     "base": "longbow",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 921,
+    "spent_gp": 728,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "hunter-level-8",
@@ -13057,7 +17313,37 @@
     "mountain"
    ],
    "role": "hunter",
-   "description": "Lives by the bow and the patience to use it."
+   "description": "Lives by the bow and the patience to use it.",
+   "gear": {
+    "weapon": {
+     "base": "longbow",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2071,
+    "spent_gp": 3928,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "thug-level-1",
@@ -13091,7 +17377,31 @@
     "urban"
    ],
    "role": "thug",
-   "description": "Is paid to make people afraid, and is good at it."
+   "description": "Is paid to make people afraid, and is good at it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 186,
+    "spent_gp": 73,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "thug-level-3",
@@ -13126,7 +17436,32 @@
     "urban"
    ],
    "role": "thug",
-   "description": "Is paid to make people afraid, and is good at it."
+   "description": "Is paid to make people afraid, and is good at it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chainmail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 256,
+    "spent_gp": 523,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "thug-level-6",
@@ -13164,7 +17499,37 @@
     "urban"
    ],
    "role": "thug",
-   "description": "Is paid to make people afraid, and is good at it."
+   "description": "Is paid to make people afraid, and is good at it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2076,
+    "spent_gp": 1373,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "thug-level-9",
@@ -13205,7 +17570,37 @@
     "urban"
    ],
    "role": "thug",
-   "description": "Is paid to make people afraid, and is good at it."
+   "description": "Is paid to make people afraid, and is good at it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2526,
+    "spent_gp": 5273,
+    "table_gp": 7800,
+    "table": true
+   }
   },
   {
    "id": "cutthroat-level-1",
@@ -13288,7 +17683,31 @@
     "urban"
    ],
    "role": "cutthroat",
-   "description": "Does the work nobody else will, for the right price."
+   "description": "Does the work nobody else will, for the right price.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 154,
+    "spent_gp": 105,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "cutthroat-level-4",
@@ -13374,7 +17793,33 @@
     "urban"
    ],
    "role": "cutthroat",
-   "description": "Does the work nobody else will, for the right price."
+   "description": "Does the work nobody else will, for the right price.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 994,
+    "spent_gp": 655,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "cutthroat-level-8",
@@ -13463,7 +17908,37 @@
     "urban"
    ],
    "role": "cutthroat",
-   "description": "Does the work nobody else will, for the right price."
+   "description": "Does the work nobody else will, for the right price.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2144,
+    "spent_gp": 3855,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "cutthroat-level-12",
@@ -13555,7 +18030,37 @@
     "urban"
    ],
    "role": "cutthroat",
-   "description": "Does the work nobody else will, for the right price."
+   "description": "Does the work nobody else will, for the right price.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 9494,
+    "spent_gp": 6855,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "ruffian-level-1",
@@ -13589,7 +18094,31 @@
     "urban"
    ],
    "role": "ruffian",
-   "description": "Starts fights and seldom finishes losing them."
+   "description": "Starts fights and seldom finishes losing them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 186,
+    "spent_gp": 73,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "ruffian-level-3",
@@ -13624,7 +18153,32 @@
     "urban"
    ],
    "role": "ruffian",
-   "description": "Starts fights and seldom finishes losing them."
+   "description": "Starts fights and seldom finishes losing them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chainmail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 256,
+    "spent_gp": 523,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "ruffian-level-6",
@@ -13662,7 +18216,37 @@
     "urban"
    ],
    "role": "ruffian",
-   "description": "Starts fights and seldom finishes losing them."
+   "description": "Starts fights and seldom finishes losing them.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2076,
+    "spent_gp": 1373,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "raider-level-1",
@@ -13699,7 +18283,31 @@
     "forest"
    ],
    "role": "raider",
-   "description": "Strikes fast, takes what can be carried, and is gone."
+   "description": "Strikes fast, takes what can be carried, and is gone.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 176,
+    "spent_gp": 83,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "raider-level-4",
@@ -13739,7 +18347,33 @@
     "forest"
    ],
    "role": "raider",
-   "description": "Strikes fast, takes what can be carried, and is gone."
+   "description": "Strikes fast, takes what can be carried, and is gone.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 466,
+    "spent_gp": 1183,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "raider-level-8",
@@ -13782,7 +18416,37 @@
     "forest"
    ],
    "role": "raider",
-   "description": "Strikes fast, takes what can be carried, and is gone."
+   "description": "Strikes fast, takes what can be carried, and is gone.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1716,
+    "spent_gp": 4283,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "raider-level-12",
@@ -13828,7 +18492,37 @@
     "forest"
    ],
    "role": "raider",
-   "description": "Strikes fast, takes what can be carried, and is gone."
+   "description": "Strikes fast, takes what can be carried, and is gone.",
+   "gear": {
+    "weapon": {
+     "base": "battleaxe",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8066,
+    "spent_gp": 8283,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "marauder-level-2",
@@ -13864,7 +18558,31 @@
     "desert"
    ],
    "role": "marauder",
-   "description": "Roams in a band that lives by plunder."
+   "description": "Roams in a band that lives by plunder.",
+   "gear": {
+    "weapon": {
+     "base": "light-flail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 308,
+    "spent_gp": 81,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "marauder-level-6",
@@ -13904,7 +18622,37 @@
     "desert"
    ],
    "role": "marauder",
-   "description": "Roams in a band that lives by plunder."
+   "description": "Roams in a band that lives by plunder.",
+   "gear": {
+    "weapon": {
+     "base": "light-flail",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2068,
+    "spent_gp": 1381,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "marauder-level-10",
@@ -13947,7 +18695,37 @@
     "desert"
    ],
    "role": "marauder",
-   "description": "Roams in a band that lives by plunder."
+   "description": "Roams in a band that lives by plunder.",
+   "gear": {
+    "weapon": {
+     "base": "light-flail",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 4768,
+    "spent_gp": 5281,
+    "table_gp": 10050,
+    "table": true
+   }
   },
   {
    "id": "looter-level-1",
@@ -13993,7 +18771,27 @@
     "ruins"
    ],
    "role": "looter",
-   "description": "Picks over what others left behind."
+   "description": "Picks over what others left behind.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "looter-level-3",
@@ -14040,7 +18838,27 @@
     "ruins"
    ],
    "role": "looter",
-   "description": "Picks over what others left behind."
+   "description": "Picks over what others left behind.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "outlaw-level-1",
@@ -14076,7 +18894,31 @@
     "grassland"
    ],
    "role": "outlaw",
-   "description": "Lives beyond the law's reach and means to stay there."
+   "description": "Lives beyond the law's reach and means to stay there.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 176,
+    "spent_gp": 83,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "outlaw-level-4",
@@ -14115,7 +18957,33 @@
     "grassland"
    ],
    "role": "outlaw",
-   "description": "Lives beyond the law's reach and means to stay there."
+   "description": "Lives beyond the law's reach and means to stay there.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 466,
+    "spent_gp": 1183,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "outlaw-level-8",
@@ -14157,7 +19025,37 @@
     "grassland"
    ],
    "role": "outlaw",
-   "description": "Lives beyond the law's reach and means to stay there."
+   "description": "Lives beyond the law's reach and means to stay there.",
+   "gear": {
+    "weapon": {
+     "base": "shortsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1716,
+    "spent_gp": 4283,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "pirate-level-1",
@@ -14192,7 +19090,31 @@
     "water"
    ],
    "role": "pirate",
-   "description": "Takes ships, and the cargo in them."
+   "description": "Takes ships, and the cargo in them.",
+   "gear": {
+    "weapon": {
+     "base": "cutlass",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 171,
+    "spent_gp": 88,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "pirate-level-4",
@@ -14230,7 +19152,33 @@
     "water"
    ],
    "role": "pirate",
-   "description": "Takes ships, and the cargo in them."
+   "description": "Takes ships, and the cargo in them.",
+   "gear": {
+    "weapon": {
+     "base": "cutlass",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 461,
+    "spent_gp": 1188,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "pirate-level-8",
@@ -14271,7 +19219,37 @@
     "water"
    ],
    "role": "pirate",
-   "description": "Takes ships, and the cargo in them."
+   "description": "Takes ships, and the cargo in them.",
+   "gear": {
+    "weapon": {
+     "base": "cutlass",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1711,
+    "spent_gp": 4288,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "pirate-level-12",
@@ -14315,7 +19293,37 @@
     "water"
    ],
    "role": "pirate",
-   "description": "Takes ships, and the cargo in them."
+   "description": "Takes ships, and the cargo in them.",
+   "gear": {
+    "weapon": {
+     "base": "cutlass",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 8061,
+    "spent_gp": 8288,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "mercenary-level-2",
@@ -14351,7 +19359,31 @@
     "hills"
    ],
    "role": "mercenary",
-   "description": "Fights for whoever pays, until they stop paying."
+   "description": "Fights for whoever pays, until they stop paying.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 301,
+    "spent_gp": 88,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "mercenary-level-6",
@@ -14391,7 +19423,37 @@
     "hills"
    ],
    "role": "mercenary",
-   "description": "Fights for whoever pays, until they stop paying."
+   "description": "Fights for whoever pays, until they stop paying.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2061,
+    "spent_gp": 1388,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "mercenary-level-10",
@@ -14434,7 +19496,37 @@
     "hills"
    ],
    "role": "mercenary",
-   "description": "Fights for whoever pays, until they stop paying."
+   "description": "Fights for whoever pays, until they stop paying.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 4761,
+    "spent_gp": 5288,
+    "table_gp": 10050,
+    "table": true
+   }
   },
   {
    "id": "mercenary-level-14",
@@ -14480,7 +19572,37 @@
     "hills"
    ],
    "role": "mercenary",
-   "description": "Fights for whoever pays, until they stop paying."
+   "description": "Fights for whoever pays, until they stop paying.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 7711,
+    "spent_gp": 19288,
+    "table_gp": 27000,
+    "table": true
+   }
   },
   {
    "id": "guardsman-level-1",
@@ -14514,7 +19636,31 @@
     "urban"
    ],
    "role": "guardsman",
-   "description": "Walks a wall or a gate, and stops whoever should be stopped."
+   "description": "Walks a wall or a gate, and stops whoever should be stopped.",
+   "gear": {
+    "weapon": {
+     "base": "longspear",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 181,
+    "spent_gp": 78,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "guardsman-level-4",
@@ -14551,7 +19697,33 @@
     "urban"
    ],
    "role": "guardsman",
-   "description": "Walks a wall or a gate, and stops whoever should be stopped."
+   "description": "Walks a wall or a gate, and stops whoever should be stopped.",
+   "gear": {
+    "weapon": {
+     "base": "longspear",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 471,
+    "spent_gp": 1178,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "guardsman-level-8",
@@ -14591,7 +19763,37 @@
     "urban"
    ],
    "role": "guardsman",
-   "description": "Walks a wall or a gate, and stops whoever should be stopped."
+   "description": "Walks a wall or a gate, and stops whoever should be stopped.",
+   "gear": {
+    "weapon": {
+     "base": "longspear",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1721,
+    "spent_gp": 4278,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "rider-level-1",
@@ -14626,7 +19828,31 @@
     "hills"
    ],
    "role": "rider",
-   "description": "Fights from the saddle and trusts the horse."
+   "description": "Fights from the saddle and trusts the horse.",
+   "gear": {
+    "weapon": {
+     "base": "lance",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "scale mail",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 176,
+    "spent_gp": 83,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "rider-level-5",
@@ -14665,7 +19891,37 @@
     "hills"
    ],
    "role": "rider",
-   "description": "Fights from the saddle and trusts the horse."
+   "description": "Fights from the saddle and trusts the horse.",
+   "gear": {
+    "weapon": {
+     "base": "lance",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "half-plate",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1016,
+    "spent_gp": 1383,
+    "table_gp": 2400,
+    "table": true
+   }
   },
   {
    "id": "rider-level-10",
@@ -14707,7 +19963,37 @@
     "hills"
    ],
    "role": "rider",
-   "description": "Fights from the saddle and trusts the horse."
+   "description": "Fights from the saddle and trusts the horse.",
+   "gear": {
+    "weapon": {
+     "base": "lance",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 4766,
+    "spent_gp": 5283,
+    "table_gp": 10050,
+    "table": true
+   }
   },
   {
    "id": "rider-level-15",
@@ -14753,7 +20039,37 @@
     "hills"
    ],
    "role": "rider",
-   "description": "Fights from the saddle and trusts the horse."
+   "description": "Fights from the saddle and trusts the horse.",
+   "gear": {
+    "weapon": {
+     "base": "lance",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 15516,
+    "spent_gp": 19283,
+    "table_gp": 34800,
+    "table": true
+   }
   },
   {
    "id": "rider-level-19",
@@ -14802,7 +20118,37 @@
     "hills"
    ],
    "role": "rider",
-   "description": "Fights from the saddle and trusts the horse."
+   "description": "Fights from the saddle and trusts the horse.",
+   "gear": {
+    "weapon": {
+     "base": "lance",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "armour": {
+     "base": "full plate",
+     "masterwork": true,
+     "enhancement": 5
+    },
+    "shield": "heavy shield",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 36716,
+    "spent_gp": 59283,
+    "table_gp": 96000,
+    "table": true
+   }
   },
   {
    "id": "commoner-level-1",
@@ -14849,7 +20195,27 @@
     "farmland"
    ],
    "role": "commoner",
-   "description": "An ordinary person going about an ordinary day."
+   "description": "An ordinary person going about an ordinary day.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "commoner-level-3",
@@ -14897,7 +20263,27 @@
     "farmland"
    ],
    "role": "commoner",
-   "description": "An ordinary person going about an ordinary day."
+   "description": "An ordinary person going about an ordinary day.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "driver-level-1",
@@ -14944,7 +20330,27 @@
     "farmland"
    ],
    "role": "driver",
-   "description": "Drives a cart or a carriage for whoever hires it."
+   "description": "Drives a cart or a carriage for whoever hires it.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "driver-level-3",
@@ -14992,7 +20398,27 @@
     "farmland"
    ],
    "role": "driver",
-   "description": "Drives a cart or a carriage for whoever hires it."
+   "description": "Drives a cart or a carriage for whoever hires it.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "apprentice-level-1",
@@ -15037,7 +20463,27 @@
     "urban"
    ],
    "role": "apprentice",
-   "description": "Learns a trade at a master's elbow."
+   "description": "Learns a trade at a master's elbow.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "apprentice-level-3",
@@ -15083,7 +20529,27 @@
     "urban"
    ],
    "role": "apprentice",
-   "description": "Learns a trade at a master's elbow."
+   "description": "Learns a trade at a master's elbow.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 3,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "scribe-level-1",
@@ -15166,7 +20632,27 @@
     "urban"
    ],
    "role": "scribe",
-   "description": "Copies, records and reads aloud what others cannot."
+   "description": "Copies, records and reads aloud what others cannot.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "scribe-level-3",
@@ -15250,7 +20736,27 @@
     "urban"
    ],
    "role": "scribe",
-   "description": "Copies, records and reads aloud what others cannot."
+   "description": "Copies, records and reads aloud what others cannot.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "scribe-level-6",
@@ -15337,7 +20843,27 @@
     "urban"
    ],
    "role": "scribe",
-   "description": "Copies, records and reads aloud what others cannot."
+   "description": "Copies, records and reads aloud what others cannot.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 0,
+    "spent_gp": 5,
+    "table_gp": 0,
+    "table": false
+   }
   },
   {
    "id": "saboteur-level-3",
@@ -15422,7 +20948,32 @@
     "urban"
    ],
    "role": "saboteur",
-   "description": "Breaks what others built, and is gone before the noise."
+   "description": "Breaks what others built, and is gone before the noise.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 324,
+    "spent_gp": 455,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "saboteur-level-7",
@@ -15511,7 +21062,37 @@
     "urban"
    ],
    "role": "saboteur",
-   "description": "Breaks what others built, and is gone before the noise."
+   "description": "Breaks what others built, and is gone before the noise.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 794,
+    "spent_gp": 3855,
+    "table_gp": 4650,
+    "table": true
+   }
   },
   {
    "id": "saboteur-level-11",
@@ -15603,7 +21184,37 @@
     "urban"
    ],
    "role": "saboteur",
-   "description": "Breaks what others built, and is gone before the noise."
+   "description": "Breaks what others built, and is gone before the noise.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 5894,
+    "spent_gp": 6855,
+    "table_gp": 12750,
+    "table": true
+   }
   },
   {
    "id": "saboteur-level-15",
@@ -15698,7 +21309,37 @@
     "urban"
    ],
    "role": "saboteur",
-   "description": "Breaks what others built, and is gone before the noise."
+   "description": "Breaks what others built, and is gone before the noise.",
+   "gear": {
+    "weapon": {
+     "base": "dagger",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 16944,
+    "spent_gp": 17855,
+    "table_gp": 34800,
+    "table": true
+   }
   },
   {
    "id": "leader-level-2",
@@ -15737,7 +21378,31 @@
     "hills"
    ],
    "role": "leader",
-   "description": "Speaks for others, and is followed."
+   "description": "Speaks for others, and is followed.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 271,
+    "spent_gp": 118,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "leader-level-6",
@@ -15780,7 +21445,37 @@
     "hills"
    ],
    "role": "leader",
-   "description": "Speaks for others, and is followed."
+   "description": "Speaks for others, and is followed.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1581,
+    "spent_gp": 1868,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "leader-level-10",
@@ -15826,7 +21521,37 @@
     "hills"
    ],
    "role": "leader",
-   "description": "Speaks for others, and is followed."
+   "description": "Speaks for others, and is followed.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 6181,
+    "spent_gp": 3868,
+    "table_gp": 10050,
+    "table": true
+   }
   },
   {
    "id": "leader-level-14",
@@ -15875,7 +21600,37 @@
     "hills"
    ],
    "role": "leader",
-   "description": "Speaks for others, and is followed."
+   "description": "Speaks for others, and is followed.",
+   "gear": {
+    "weapon": {
+     "base": "longsword",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 9131,
+    "spent_gp": 17868,
+    "table_gp": 27000,
+    "table": true
+   }
   },
   {
    "id": "representative-level-3",
@@ -15913,7 +21668,32 @@
     "urban"
    ],
    "role": "representative",
-   "description": "Carries someone else's authority, and their instructions."
+   "description": "Carries someone else's authority, and their instructions.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 306,
+    "spent_gp": 473,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "representative-level-7",
@@ -15955,7 +21735,37 @@
     "urban"
    ],
    "role": "representative",
-   "description": "Carries someone else's authority, and their instructions."
+   "description": "Carries someone else's authority, and their instructions.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 776,
+    "spent_gp": 3873,
+    "table_gp": 4650,
+    "table": true
+   }
   },
   {
    "id": "representative-level-11",
@@ -16000,7 +21810,37 @@
     "urban"
    ],
    "role": "representative",
-   "description": "Carries someone else's authority, and their instructions."
+   "description": "Carries someone else's authority, and their instructions.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 5876,
+    "spent_gp": 6873,
+    "table_gp": 12750,
+    "table": true
+   }
   },
   {
    "id": "priestess-level-1",
@@ -16035,7 +21875,27 @@
     "farmland"
    ],
    "role": "priestess",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 256,
+    "spent_gp": 3,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "priestess-level-3",
@@ -16071,7 +21931,28 @@
     "farmland"
    ],
    "role": "priestess",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 426,
+    "spent_gp": 353,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "priestess-level-6",
@@ -16110,7 +21991,33 @@
     "farmland"
    ],
    "role": "priestess",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2846,
+    "spent_gp": 603,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "priestess-level-9",
@@ -16152,7 +22059,33 @@
     "farmland"
    ],
    "role": "priestess",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 5196,
+    "spent_gp": 2603,
+    "table_gp": 7800,
+    "table": true
+   }
   },
   {
    "id": "priestess-level-12",
@@ -16196,7 +22129,33 @@
     "farmland"
    ],
    "role": "priestess",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 13746,
+    "spent_gp": 2603,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "shrine-keeper-level-1",
@@ -16232,7 +22191,27 @@
     "hills"
    ],
    "role": "shrine keeper",
-   "description": "Keeps a small holy place swept and lit."
+   "description": "Keeps a small holy place swept and lit.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 256,
+    "spent_gp": 3,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "shrine-keeper-level-4",
@@ -16271,7 +22250,29 @@
     "hills"
    ],
    "role": "shrine keeper",
-   "description": "Keeps a small holy place swept and lit."
+   "description": "Keeps a small holy place swept and lit.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1246,
+    "spent_gp": 403,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "shrine-keeper-level-8",
@@ -16313,7 +22314,33 @@
     "hills"
    ],
    "role": "shrine keeper",
-   "description": "Keeps a small holy place swept and lit."
+   "description": "Keeps a small holy place swept and lit.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 3396,
+    "spent_gp": 2603,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "priest-level-1",
@@ -16348,7 +22375,27 @@
     "farmland"
    ],
    "role": "priest",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 256,
+    "spent_gp": 3,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "priest-level-3",
@@ -16384,7 +22431,28 @@
     "farmland"
    ],
    "role": "priest",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 426,
+    "spent_gp": 353,
+    "table_gp": 780,
+    "table": true
+   }
   },
   {
    "id": "priest-level-6",
@@ -16423,7 +22491,33 @@
     "farmland"
    ],
    "role": "priest",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2846,
+    "spent_gp": 603,
+    "table_gp": 3450,
+    "table": true
+   }
   },
   {
    "id": "priest-level-9",
@@ -16465,7 +22559,33 @@
     "farmland"
    ],
    "role": "priest",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 5196,
+    "spent_gp": 2603,
+    "table_gp": 7800,
+    "table": true
+   }
   },
   {
    "id": "priest-level-12",
@@ -16509,7 +22629,33 @@
     "farmland"
    ],
    "role": "priest",
-   "description": "Tends a shrine and the people who come to it."
+   "description": "Tends a shrine and the people who come to it.",
+   "gear": {
+    "weapon": {
+     "base": "club",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 13746,
+    "spent_gp": 2603,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "healer-level-1",
@@ -16545,7 +22691,27 @@
     "forest"
    ],
    "role": "healer",
-   "description": "Mends what can be mended, and knows what cannot."
+   "description": "Mends what can be mended, and knows what cannot.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 256,
+    "spent_gp": 3,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "healer-level-4",
@@ -16584,7 +22750,29 @@
     "forest"
    ],
    "role": "healer",
-   "description": "Mends what can be mended, and knows what cannot."
+   "description": "Mends what can be mended, and knows what cannot.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1246,
+    "spent_gp": 403,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "healer-level-8",
@@ -16626,7 +22814,33 @@
     "forest"
    ],
    "role": "healer",
-   "description": "Mends what can be mended, and knows what cannot."
+   "description": "Mends what can be mended, and knows what cannot.",
+   "gear": {
+    "weapon": {
+     "base": "quarterstaff",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": null,
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 3396,
+    "spent_gp": 2603,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "patron-level-2",
@@ -16663,7 +22877,31 @@
     "urban"
    ],
    "role": "patron",
-   "description": "Pays for things done in their name."
+   "description": "Pays for things done in their name.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 266,
+    "spent_gp": 123,
+    "table_gp": 390,
+    "table": true
+   }
   },
   {
    "id": "patron-level-5",
@@ -16704,7 +22942,37 @@
     "urban"
    ],
    "role": "patron",
-   "description": "Pays for things done in their name."
+   "description": "Pays for things done in their name.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 1526,
+    "spent_gp": 873,
+    "table_gp": 2400,
+    "table": true
+   }
   },
   {
    "id": "patron-level-8",
@@ -16747,7 +23015,37 @@
     "urban"
    ],
    "role": "patron",
-   "description": "Pays for things done in their name."
+   "description": "Pays for things done in their name.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2126,
+    "spent_gp": 3873,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "noble-level-1",
@@ -16785,7 +23083,31 @@
     "urban"
    ],
    "role": "noble",
-   "description": "Born to rank, and expects it to be noticed."
+   "description": "Born to rank, and expects it to be noticed.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": false,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 136,
+    "spent_gp": 123,
+    "table_gp": 260,
+    "table": true
+   }
   },
   {
    "id": "noble-level-4",
@@ -16826,7 +23148,33 @@
     "urban"
    ],
    "role": "noble",
-   "description": "Born to rank, and expects it to be noticed."
+   "description": "Born to rank, and expects it to be noticed.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 0
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 976,
+    "spent_gp": 673,
+    "table_gp": 1650,
+    "table": true
+   }
   },
   {
    "id": "noble-level-8",
@@ -16870,7 +23218,37 @@
     "urban"
    ],
    "role": "noble",
-   "description": "Born to rank, and expects it to be noticed."
+   "description": "Born to rank, and expects it to be noticed.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 2126,
+    "spent_gp": 3873,
+    "table_gp": 6000,
+    "table": true
+   }
   },
   {
    "id": "noble-level-12",
@@ -16917,7 +23295,37 @@
     "urban"
    ],
    "role": "noble",
-   "description": "Born to rank, and expects it to be noticed."
+   "description": "Born to rank, and expects it to be noticed.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 1
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 2
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 9476,
+    "spent_gp": 6873,
+    "table_gp": 16350,
+    "table": true
+   }
   },
   {
    "id": "noble-level-16",
@@ -16967,7 +23375,37 @@
     "urban"
    ],
    "role": "noble",
-   "description": "Born to rank, and expects it to be noticed."
+   "description": "Born to rank, and expects it to be noticed.",
+   "gear": {
+    "weapon": {
+     "base": "rapier",
+     "masterwork": true,
+     "enhancement": 3
+    },
+    "armour": {
+     "base": "chain shirt",
+     "masterwork": true,
+     "enhancement": 4
+    },
+    "shield": "none",
+    "pockets": [
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "potion-of-cure-light-wounds",
+     "rations",
+     "bedroll",
+     "rope",
+     "backpack",
+     "torch"
+    ],
+    "coin_gp": 10126,
+    "spent_gp": 34873,
+    "table_gp": 45000,
+    "table": true
+   }
   }
  ]
 }

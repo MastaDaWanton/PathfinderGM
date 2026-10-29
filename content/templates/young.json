@@ -25,5 +25,6 @@
    "dragon"
   ],
   "why": "This template cannot be applied to creatures that increase in power through aging or feeding (such as dragons or barghests) or creatures that are Fine-sized."
- }
+ },
+ "describe": "A young {base}, not yet grown into its strength."
 }

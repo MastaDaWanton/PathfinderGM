@@ -12879,6 +12879,14 @@ class Engine:
         # at all.
         for attr in ("armour", "shield"):
             worn = str(getattr(body, attr, "none") or "none")
+            # A forged suit worn is its record, and the record is in the pack below
+            # (`body.stock`): the plain key beside it names the same suit. Measured
+            # 2026-10-28 on the app's own soldier in masterwork full plate, looted as
+            # "full plate" AND "masterwork full plate" — two suits off one body.
+            held = body.armour_record() if attr == "armour" else body.shield_record()
+            if held is not None and worn != "none":
+                setattr(body, attr, "none")
+                continue
             if worn != "none":
                 stowed, _ = goods.stow(looter, worn, 1)
                 if not stowed:

@@ -343,7 +343,10 @@ def _assemble_kit(actor, data: dict) -> None:
     kit_key = str(data.get("kit") or "").strip().lower()
     kit = KITS.get(kit_key, {})
     wealth = str(data.get("wealth") or kit.get("wealth") or "").strip()
-    if not wealth and data.get("kind") == "npc":
+    # Not for the app's own people who carry Table 14-9's coin, which is in the purse
+    # already; a trade's build (`npc_gear.trade_outfit`) keeps the small derived purse.
+    table_coin = bool(((data.get("build") or {}).get("gear") or {}).get("table"))
+    if not wealth and data.get("kind") == "npc" and not table_coin:
         # Derived, roughly: what defeating them is worth maps to what they carry.
         xp = int(data.get("xp_value", 0) or 0)
         wealth = "2d6 sp" if xp >= 100 else "1d4 sp"
@@ -661,6 +664,9 @@ def _people(out: dict[str, dict], folders) -> None:
                     "description": str(doc.get("description") or ""),
                     "role": str(doc.get("role") or ""),
                     "build": doc,
+                    # Step 6's kit as a pocket claim (`_assemble_kit`), opened on first
+                    # look like any creature's; its coin is in the sheet's purse already.
+                    "pockets": list(sheet.get("pockets") or []),
                 })
                 if not block["biomes"]:
                     from . import biomes as biomes_mod
