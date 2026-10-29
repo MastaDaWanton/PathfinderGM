@@ -1,0 +1,21 @@
+{
+ "id": "advanced",
+ "name": "advanced",
+ "kind": "simple",
+ "source": "Bestiary 1, Appendix 1: Simple Templates, p. 294-295",
+ "text": "Creatures with the advanced template are fiercer and more powerful than their ordinary cousins.",
+ "quick_rules": "+2 on all rolls (including damage rolls) and special ability DCs; +4 to AC and CMD; +2 hp/HD.",
+ "cr": {
+  "add": 1
+ },
+ "abilities": {
+  "str": 4,
+  "dex": 4,
+  "con": 4,
+  "int": 4,
+  "wis": 4,
+  "cha": 4
+ },
+ "natural_armour": 2,
+ "dc": 2
+}

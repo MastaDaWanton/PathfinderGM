@@ -1,0 +1,113 @@
+{
+ "id": "skeleton",
+ "name": "skeleton",
+ "kind": "undead",
+ "source": "Bestiary 1, Skeleton, p. 250-251",
+ "text": "\"Skeleton\" is an acquired template that can be added to any corporeal creature (other than an undead) that has a skeletal system.",
+ "name_after": true,
+ "alignment": "NE",
+ "cr_by_hd": [
+  [
+   0.5,
+   "1/6"
+  ],
+  [
+   1,
+   "1/3"
+  ],
+  [
+   3,
+   "1"
+  ],
+  [
+   5,
+   "2"
+  ],
+  [
+   7,
+   "3"
+  ],
+  [
+   9,
+   "4"
+  ],
+  [
+   11,
+   "5"
+  ],
+  [
+   14,
+   "6"
+  ],
+  [
+   17,
+   "7"
+  ],
+  [
+   20,
+   "8"
+  ]
+ ],
+ "natural_armour_by_size": {
+  "fine": 0,
+  "diminutive": 0,
+  "tiny": 0,
+  "small": 1,
+  "medium": 2,
+  "large": 2,
+  "huge": 3,
+  "gargantuan": 6,
+  "colossal": 10
+ },
+ "bonus_hd_by_size": {},
+ "max_hd": 20,
+ "abilities": {
+  "dex": 2
+ },
+ "no_scores": [
+  "con",
+  "int"
+ ],
+ "set_scores": {
+  "wis": 10,
+  "cha": 10
+ },
+ "dr": {
+  "amount": 5,
+  "bypass": "bludgeoning"
+ },
+ "immune": [
+  "cold",
+  "undead traits"
+ ],
+ "bonus_feats": [
+  "Improved Initiative"
+ ],
+ "gains_attack": {
+  "kind": "claw",
+  "per_hand": true
+ },
+ "fly": "none",
+ "drops_attacks": [
+  "tongue",
+  "tentacle",
+  "tentacles",
+  "slam",
+  "touch",
+  "engulf",
+  "sting"
+ ],
+ "refuse": {
+  "types": [
+   "undead",
+   "ooze",
+   "plant",
+   "vermin"
+  ],
+  "subtypes": [
+   "incorporeal",
+   "swarm"
+  ],
+  "why": "A skeleton needs a skeletal system; an ooze, a plant, a vermin's shell or a swarm has none to raise."
+ }
+}

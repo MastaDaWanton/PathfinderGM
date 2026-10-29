@@ -585,6 +585,7 @@ def _build_imported() -> dict[str, dict]:
     from django.conf import settings
 
     out: dict[str, dict] = {}
+    derived: list = []
     for folder in (Path(settings.BASE_DIR) / "content" / "bestiary",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"):
         if not folder.is_dir():
@@ -607,7 +608,34 @@ def _build_imported() -> dict[str, dict]:
                     base = dict(out.get(e["id"], {}))
                     base.update({k: v for k, v in e.items() if v not in (None, "")})
                     out[e["id"]] = base
+            if isinstance(data, dict) and isinstance(data.get("derived"), list):
+                derived.extend(data["derived"])
+    _derive(out, derived)
     return out
+
+
+def _derive(out: dict[str, dict], declared: list) -> None:
+    """Creatures made from a Bestiary creature and Bestiary templates (`rules/templates.py`),
+    declared `{"base": "shark", "templates": ["zombie"]}` in a bestiary file's `derived`
+    list and built here, after every printed block is read, so the numbers are always the
+    rules' applied to the block as it now stands. A declaration the rules refuse is
+    reported (`files.unreadable`) and skipped, never shipped half-made."""
+    from . import templates as templates_mod
+
+    for decl in declared:
+        if not isinstance(decl, dict):
+            continue
+        base = out.get(str(decl.get("base") or "").strip().lower())
+        if base is None:
+            files.unreadable(Path("derived"), ValueError(f"no base creature {decl.get('base')!r}"))
+            continue
+        block, why = templates_mod.apply_chain(dict(base), list(decl.get("templates") or []))
+        if block is None:
+            files.unreadable(Path("derived"), ValueError(f"{decl}: {why}"))
+            continue
+        if decl.get("id"):
+            block["id"] = str(decl["id"]).strip().lower()
+        out.setdefault(block["id"], block)
 
 
 def everything() -> dict[str, dict]:

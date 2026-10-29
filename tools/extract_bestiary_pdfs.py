@@ -39,6 +39,17 @@ SIZES = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
 ALIGNMENTS = ("LG", "NG", "CG", "LN", "N", "CN", "LE", "NE", "CE")
 
 
+# The classes a Bestiary block's class line can name: the core and base classes and the NPC
+# classes. Whole words, so "Goblin warrior 1" is warrior 1 and "Huge 3" is nothing.
+_CLASS_WORDS = {"adept", "aristocrat", "commoner", "expert", "warrior", "barbarian", "bard",
+                "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer",
+                "wizard", "alchemist", "cavalier", "inquisitor", "oracle", "summoner", "witch",
+                "magus", "gunslinger", "antipaladin", "ninja", "samurai", "arcanist",
+                "bloodrager", "brawler", "hunter", "investigator", "shaman", "skald", "slayer",
+                "swashbuckler", "warpriest", "kineticist", "medium", "mesmerist", "occultist",
+                "psychic", "spiritualist", "vigilante"}
+
+
 def slug(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
     return s or "creature"
@@ -74,6 +85,23 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
     # The comma after the AC is sometimes missing ("AC 17 touch 10", Bestiary 5's swamp
     # mummy), and a block printed for a group gives "hp 127 each (15d8+60)" (the adlets).
     ac = re.search(r"\bAC\s+(\d+)\s*,?\s*touch\s+(\d+)\s*,?\s*flat-?\s?footed\s+(\d+)", t, re.I)
+    # And what the AC is made of, "(+2 Dex, +2 natural)": kept since 2026-10-28, because a
+    # template that replaces natural armour (the zombie's, the skeleton's) has to know which
+    # part of the printed total was natural and which was a chain shirt.
+    parts = re.match(r"\s*\(([^()]{2,120})\)", t[ac.end():]) if ac else None
+    # The class line under the XP, "Goblin warrior 1" or "Human cleric 3/rogue 2": which of
+    # the Hit Dice are class levels. A humanoid's may be racial (the ogre's 4d8, the
+    # troll's 6d8) or a class's (the goblin's 1d10 is warrior 1), and the zombie and
+    # skeleton keep racial dice and drop class ones (Bestiary 1 pp. 250, 288).
+    classes = {}
+    desc = re.search(r"\bXP\s+[\d,]+\s+(?:each\s+)?(.{0,80}?)\s+(?:LG|NG|CG|LN|N|CN|LE|NE|CE)"
+                     r"\s+(?:Fine|Diminutive|Tiny|Small|Medium|Large|Huge|Gargantuan|Colossal)\b",
+                     t)
+    if desc:
+        for cls, lvl in re.findall(r"\b([a-z]+(?: [a-z]+)?)\s+(\d{1,2})\b", desc.group(1).lower()):
+            word = cls.split()[-1]
+            if word in _CLASS_WORDS:
+                classes[word] = classes.get(word, 0) + int(lvl)
     hp = re.search(r"\bhp\s+(\d+)\s*(?:each\s*)?\(([^)]{2,40})\)", t, re.I)
     saves = re.search(r"\bFort\s*([+-]\s?\d+)\s*,\s*Ref\s*([+-]\s?\d+)\s*,\s*Will\s*([+-]\s?\d+)",
                       t, re.I)
@@ -134,7 +162,9 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         "hp": int(hp.group(1)),
         "hit_dice": hp.group(2).strip(),
         "flat_ac": int(ac.group(1)),
-        "ac_note": f"touch {ac.group(2)}, flat-footed {ac.group(3)}",
+        "class_levels": classes,
+        "ac_note": f"touch {ac.group(2)}, flat-footed {ac.group(3)}"
+                   + (f" ({re.sub(r'[–—]', '-', parts.group(1)).strip()})" if parts else ""),
         "flat_saves": {"fort": sign(re.match(r"([+-]\s?\d+)", saves.group(1))) if saves else None,
                        "ref": sign(re.match(r"([+-]\s?\d+)", saves.group(2))) if saves else None,
                        "will": sign(re.match(r"([+-]\s?\d+)", saves.group(3))) if saves else None}

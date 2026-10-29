@@ -50,6 +50,7 @@ CONTENT_DIRS = [
     "class-features",  # classes' passive numbers as documents (rules/classfeatures.py)
     "class-options",  # bloodlines, schools, rage powers… (rules/classes.py catalogues)
     "npc-classes",  # adept, aristocrat, commoner, expert, warrior (rules/classes.npc_classes)
+    "templates",   # the Bestiary's templates, zombie to advanced (rules/templates.py)
     "class-abilities",  # the core classes' active abilities (rules/class_abilities.py)
     "style",       # the intimate-scene passages the app ships (gm/intimate.shipped_path)
     "bloodlines",  # what a sorcerer's bloodline powers do (rules/grantedpowers.py)

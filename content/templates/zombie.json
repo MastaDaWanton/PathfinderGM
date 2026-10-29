@@ -1,0 +1,123 @@
+{
+ "id": "zombie",
+ "name": "zombie",
+ "kind": "undead",
+ "source": "Bestiary 1, Zombie, p. 288-289",
+ "text": "\"Zombie\" is an acquired template that can be added to any corporeal creature (other than an undead).",
+ "name_after": true,
+ "alignment": "NE",
+ "cr_by_hd": [
+  [
+   0.5,
+   "1/8"
+  ],
+  [
+   1,
+   "1/4"
+  ],
+  [
+   2,
+   "1/2"
+  ],
+  [
+   4,
+   "1"
+  ],
+  [
+   6,
+   "2"
+  ],
+  [
+   8,
+   "3"
+  ],
+  [
+   10,
+   "4"
+  ],
+  [
+   12,
+   "5"
+  ],
+  [
+   16,
+   "6"
+  ],
+  [
+   20,
+   "7"
+  ],
+  [
+   24,
+   "8"
+  ],
+  [
+   28,
+   "9"
+  ]
+ ],
+ "natural_armour_by_size": {
+  "fine": 0,
+  "diminutive": 0,
+  "tiny": 0,
+  "small": 1,
+  "medium": 2,
+  "large": 3,
+  "huge": 4,
+  "gargantuan": 7,
+  "colossal": 11
+ },
+ "bonus_hd_by_size": {
+  "fine": 0,
+  "diminutive": 0,
+  "tiny": 0,
+  "small": 1,
+  "medium": 1,
+  "large": 2,
+  "huge": 4,
+  "gargantuan": 6,
+  "colossal": 10
+ },
+ "abilities": {
+  "str": 2,
+  "dex": -2
+ },
+ "no_scores": [
+  "con",
+  "int"
+ ],
+ "set_scores": {
+  "wis": 10,
+  "cha": 10
+ },
+ "dr": {
+  "amount": 5,
+  "bypass": "slashing"
+ },
+ "immune": [
+  "undead traits"
+ ],
+ "bonus_feats": [
+  "Toughness"
+ ],
+ "gains_attack": {
+  "kind": "slam",
+  "size_steps": 1
+ },
+ "fly": "clumsy",
+ "qualities": [
+  "staggered"
+ ],
+ "refuse": {
+  "types": [
+   "undead"
+  ],
+  "subtypes": [
+   "incorporeal"
+  ]
+ },
+ "standing_tags": [
+  "state.impaired.staggered"
+ ],
+ "standing_tags_why": "Staggered (Ex): poor reflexes, one move or standard action a round. A trait of the body, never lifted by rest, so a standing tag rather than the condition (whose recovery is recovery.rest)."
+}
