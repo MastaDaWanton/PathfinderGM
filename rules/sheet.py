@@ -2076,9 +2076,18 @@ class Actor:
         own = tuple(self.class_data.get("class_skills", ()) or ())
         if not (self.domains or self.class_choices):
             return own
+        from . import classes as classes_mod
         from . import grantedpowers
 
-        return own + tuple(s for s in grantedpowers.class_skills(self) if s not in own)
+        more = list(grantedpowers.class_skills(self))
+        # Any class-option pick's `class_skill`, not only a bloodline's: the expert "can
+        # choose any 10 skills to be class skills" (CRB p. 450), ten picks of a catalogue.
+        for ch in classes_mod.choices_for(self.char_class or "", self.level):
+            for pick in classes_mod.chosen(self, str(ch.get("id") or "")):
+                skill = str((pick.get("entry") or {}).get("class_skill") or "").strip().lower()
+                if skill and skill not in more:
+                    more.append(skill)
+        return own + tuple(s for s in more if s not in own)
 
     def ability_score(self, ab: str) -> int:
         """The score as it stands, after everything that has happened to it.
@@ -4713,6 +4722,16 @@ class Actor:
                 # Written in the weapon table's own key, so "heavy crossbow" and the
                 # row "heavy-crossbow" are one permission (E1).
                 out.append(f"proficient.weapon.{weapons_mod.key_for(p) or p}")
+        # A class-option pick's own `tags`, held like a feat's: the commoner "is proficient
+        # with one simple weapon" (CRB p. 449) — a choice, not a list, so the pick carries
+        # its `proficient.weapon.<key>`. Generic: any catalogue entry may grant a tag.
+        if self.class_choices:
+            from . import classes as classes_mod
+
+            for ch in classes_mod.choices_for(self.char_class or "", self.level):
+                for pick in classes_mod.chosen(self, str(ch.get("id") or "")):
+                    for tag in (pick.get("entry") or {}).get("tags") or ():
+                        out.append(str(tag))
         for raw in self.feats:
             doc = feats_mod.document(raw)
             for tag in (doc or {}).get("tags") or ():

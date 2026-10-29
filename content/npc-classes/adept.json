@@ -1,0 +1,207 @@
+{
+ "npc": true,
+ "source": "Core Rulebook, Chapter 14: Creating NPCs, pp. 448-451",
+ "id": "adept",
+ "name": "Adept",
+ "hit_die": 6,
+ "bab": "half",
+ "good_saves": [
+  "will"
+ ],
+ "skill_ranks": 2,
+ "proficiencies": [
+  "simple"
+ ],
+ "class_skills": [
+  "craft",
+  "handle animal",
+  "heal",
+  "knowledge (arcana)",
+  "knowledge (dungeoneering)",
+  "knowledge (engineering)",
+  "knowledge (geography)",
+  "knowledge (history)",
+  "knowledge (local)",
+  "knowledge (nature)",
+  "knowledge (nobility)",
+  "knowledge (planes)",
+  "knowledge (religion)",
+  "profession",
+  "spellcraft",
+  "survival"
+ ],
+ "summary": "A village priest, hedge witch or shaman: divine spells off Wisdom from a short list of its own, and a familiar from 2nd level.",
+ "casting": {
+  "ability": "wis",
+  "kind": "prepared",
+  "progression": "adept",
+  "list": "adept",
+  "prepare_from": "list",
+  "note": "An adept prays an hour a day for her spells, from her own list.",
+  "spell_list": {
+   "0": [
+    "create water",
+    "detect magic",
+    "ghost sound",
+    "guidance",
+    "light",
+    "mending",
+    "purify food and drink",
+    "read magic",
+    "stabilize",
+    "touch of fatigue"
+   ],
+   "1": [
+    "bless",
+    "burning hands",
+    "cause fear",
+    "command",
+    "comprehend languages",
+    "cure light wounds",
+    "detect chaos",
+    "detect evil",
+    "detect good",
+    "detect law",
+    "endure elements",
+    "obscuring mist",
+    "protection from chaos",
+    "protection from evil",
+    "protection from good",
+    "protection from law",
+    "sleep"
+   ],
+   "2": [
+    "aid",
+    "animal trance",
+    "bear's endurance",
+    "bull's strength",
+    "cat's grace",
+    "cure moderate wounds",
+    "darkness",
+    "delay poison",
+    "invisibility",
+    "mirror image",
+    "resist energy",
+    "scorching ray",
+    "see invisibility",
+    "web"
+   ],
+   "3": [
+    "animate dead",
+    "bestow curse",
+    "contagion",
+    "continual flame",
+    "cure serious wounds",
+    "daylight",
+    "deeper darkness",
+    "lightning bolt",
+    "neutralize poison",
+    "remove curse",
+    "remove disease",
+    "tongues"
+   ],
+   "4": [
+    "cure critical wounds",
+    "minor creation",
+    "polymorph",
+    "restoration",
+    "stoneskin",
+    "wall of fire"
+   ],
+   "5": [
+    "baleful polymorph",
+    "break enchantment",
+    "commune",
+    "heal",
+    "major creation",
+    "raise dead",
+    "true seeing",
+    "wall of stone"
+   ]
+  }
+ },
+ "levels": [
+  {
+   "level": 1,
+   "grants": []
+  },
+  {
+   "level": 2,
+   "grants": [
+    "summon familiar"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": []
+  },
+  {
+   "level": 4,
+   "grants": []
+  },
+  {
+   "level": 5,
+   "grants": []
+  },
+  {
+   "level": 6,
+   "grants": []
+  },
+  {
+   "level": 7,
+   "grants": []
+  },
+  {
+   "level": 8,
+   "grants": []
+  },
+  {
+   "level": 9,
+   "grants": []
+  },
+  {
+   "level": 10,
+   "grants": []
+  },
+  {
+   "level": 11,
+   "grants": []
+  },
+  {
+   "level": 12,
+   "grants": []
+  },
+  {
+   "level": 13,
+   "grants": []
+  },
+  {
+   "level": 14,
+   "grants": []
+  },
+  {
+   "level": 15,
+   "grants": []
+  },
+  {
+   "level": 16,
+   "grants": []
+  },
+  {
+   "level": 17,
+   "grants": []
+  },
+  {
+   "level": 18,
+   "grants": []
+  },
+  {
+   "level": 19,
+   "grants": []
+  },
+  {
+   "level": 20,
+   "grants": []
+  }
+ ]
+}

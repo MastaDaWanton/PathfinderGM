@@ -1,0 +1,405 @@
+{
+ "id": "commoner-weapons",
+ "name": "Commoner weapon proficiency",
+ "source": "Core Rulebook, Chapter 14: Creating NPCs, pp. 448-451",
+ "_unconfirmed": [],
+ "rules": {},
+ "options": [
+  {
+   "id": "baston-fighting-stick",
+   "name": "Baston fighting stick",
+   "text": "Proficient with the baston fighting stick.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.baston-fighting-stick"
+   ]
+  },
+  {
+   "id": "battle-aspergillum",
+   "name": "Battle aspergillum",
+   "text": "Proficient with the battle aspergillum.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.battle-aspergillum"
+   ]
+  },
+  {
+   "id": "bayonet",
+   "name": "Bayonet",
+   "text": "Proficient with the bayonet.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.bayonet"
+   ]
+  },
+  {
+   "id": "blowgun",
+   "name": "Blowgun",
+   "text": "Proficient with the blowgun.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.blowgun"
+   ]
+  },
+  {
+   "id": "boar-spear",
+   "name": "Boar spear",
+   "text": "Proficient with the boar spear.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.boar-spear"
+   ]
+  },
+  {
+   "id": "boarding-pike",
+   "name": "Boarding pike",
+   "text": "Proficient with the boarding pike.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.boarding-pike"
+   ]
+  },
+  {
+   "id": "brass-knife",
+   "name": "Brass knife",
+   "text": "Proficient with the brass knife.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.brass-knife"
+   ]
+  },
+  {
+   "id": "brass-knuckles",
+   "name": "Brass knuckles",
+   "text": "Proficient with the brass knuckles.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.brass-knuckles"
+   ]
+  },
+  {
+   "id": "cestus",
+   "name": "Cestus",
+   "text": "Proficient with the cestus.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.cestus"
+   ]
+  },
+  {
+   "id": "club",
+   "name": "club",
+   "text": "Proficient with the club.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.club"
+   ]
+  },
+  {
+   "id": "dagger",
+   "name": "dagger",
+   "text": "Proficient with the dagger.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.dagger"
+   ]
+  },
+  {
+   "id": "dart",
+   "name": "Dart",
+   "text": "Proficient with the dart.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.dart"
+   ]
+  },
+  {
+   "id": "gauntlet",
+   "name": "Gauntlet",
+   "text": "Proficient with the gauntlet.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.gauntlet"
+   ]
+  },
+  {
+   "id": "hanbo",
+   "name": "Hanbo",
+   "text": "Proficient with the hanbo.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.hanbo"
+   ]
+  },
+  {
+   "id": "handwraps",
+   "name": "Handwraps",
+   "text": "Proficient with the handwraps.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.handwraps"
+   ]
+  },
+  {
+   "id": "heavy-crossbow",
+   "name": "Heavy crossbow",
+   "text": "Proficient with the heavy crossbow.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.heavy-crossbow"
+   ]
+  },
+  {
+   "id": "heavy-mace",
+   "name": "Heavy mace",
+   "text": "Proficient with the heavy mace.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.heavy-mace"
+   ]
+  },
+  {
+   "id": "hook-hand",
+   "name": "Hook hand",
+   "text": "Proficient with the hook hand.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.hook-hand"
+   ]
+  },
+  {
+   "id": "javelin",
+   "name": "Javelin",
+   "text": "Proficient with the javelin.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.javelin"
+   ]
+  },
+  {
+   "id": "kumade",
+   "name": "Kumade",
+   "text": "Proficient with the kumade.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.kumade"
+   ]
+  },
+  {
+   "id": "kumade-collapsible",
+   "name": "Kumade, collapsible",
+   "text": "Proficient with the kumade, collapsible.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.kumade-collapsible"
+   ]
+  },
+  {
+   "id": "kunai",
+   "name": "Kunai",
+   "text": "Proficient with the kunai.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.kunai"
+   ]
+  },
+  {
+   "id": "lantern-staff",
+   "name": "Lantern staff",
+   "text": "Proficient with the lantern staff.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.lantern-staff"
+   ]
+  },
+  {
+   "id": "light-crossbow",
+   "name": "light crossbow",
+   "text": "Proficient with the light crossbow.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.light-crossbow"
+   ]
+  },
+  {
+   "id": "light-mace",
+   "name": "Light mace",
+   "text": "Proficient with the light mace.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.light-mace"
+   ]
+  },
+  {
+   "id": "longspear",
+   "name": "Longspear",
+   "text": "Proficient with the longspear.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.longspear"
+   ]
+  },
+  {
+   "id": "mere-club",
+   "name": "Mere club",
+   "text": "Proficient with the mere club.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.mere-club"
+   ]
+  },
+  {
+   "id": "morningstar",
+   "name": "Morningstar",
+   "text": "Proficient with the morningstar.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.morningstar"
+   ]
+  },
+  {
+   "id": "punching-dagger",
+   "name": "Punching dagger",
+   "text": "Proficient with the punching dagger.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.punching-dagger"
+   ]
+  },
+  {
+   "id": "quarterstaff",
+   "name": "quarterstaff",
+   "text": "Proficient with the quarterstaff.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.quarterstaff"
+   ]
+  },
+  {
+   "id": "shortspear",
+   "name": "Shortspear",
+   "text": "Proficient with the shortspear.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.shortspear"
+   ]
+  },
+  {
+   "id": "sickle",
+   "name": "Sickle",
+   "text": "Proficient with the sickle.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.sickle"
+   ]
+  },
+  {
+   "id": "sling",
+   "name": "Sling",
+   "text": "Proficient with the sling.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.sling"
+   ]
+  },
+  {
+   "id": "spear",
+   "name": "Spear",
+   "text": "Proficient with the spear.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.spear"
+   ]
+  },
+  {
+   "id": "spider-leg-sickle",
+   "name": "Spider-leg sickle",
+   "text": "Proficient with the spider-leg sickle.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.spider-leg-sickle"
+   ]
+  },
+  {
+   "id": "spiked-gauntlet",
+   "name": "Spiked gauntlet",
+   "text": "Proficient with the spiked gauntlet.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.spiked-gauntlet"
+   ]
+  },
+  {
+   "id": "spring-blade",
+   "name": "Spring blade",
+   "text": "Proficient with the spring blade.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.spring-blade"
+   ]
+  },
+  {
+   "id": "stingchuck",
+   "name": "Stingchuck",
+   "text": "Proficient with the stingchuck.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.stingchuck"
+   ]
+  },
+  {
+   "id": "stonebow",
+   "name": "Stonebow",
+   "text": "Proficient with the stonebow.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.stonebow"
+   ]
+  },
+  {
+   "id": "traveling-kettle",
+   "name": "Traveling kettle",
+   "text": "Proficient with the traveling kettle.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.traveling-kettle"
+   ]
+  },
+  {
+   "id": "underwater-heavy-crossbow",
+   "name": "Underwater heavy crossbow",
+   "text": "Proficient with the underwater heavy crossbow.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.underwater-heavy-crossbow"
+   ]
+  },
+  {
+   "id": "underwater-light-crossbow",
+   "name": "Underwater light crossbow",
+   "text": "Proficient with the underwater light crossbow.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.underwater-light-crossbow"
+   ]
+  },
+  {
+   "id": "weighted-spear",
+   "name": "Weighted spear",
+   "text": "Proficient with the weighted spear.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.weighted-spear"
+   ]
+  },
+  {
+   "id": "wooden-stake",
+   "name": "Wooden stake",
+   "text": "Proficient with the wooden stake.",
+   "requires": [],
+   "tags": [
+    "proficient.weapon.wooden-stake"
+   ]
+  }
+ ]
+}

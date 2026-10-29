@@ -1869,10 +1869,67 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
     for folder in (Path(settings.BASE_DIR) / "content" / "spells" / "mechanics",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spell-mechanics"):
         raw = _layer_read_mechanics(folder, raw)
+    _class_spell_lists(raw)
     # Normalised after the merge rather than per file, because the mechanics file and
     # the Codex file each hold half of what a derivation needs — an element read from
     # a scaling formula in one and from descriptors in the other.
     return {k: from_dict(normalise(v)) for k, v in raw.items()}, meta
+
+
+def _spell_key(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(name or "").lower()).strip("-")
+
+
+def _class_spell_lists(raw: dict[str, dict]) -> None:
+    """Write a class's own printed spell list into each spell's `lists`.
+
+    A list is printed with its class sometimes rather than on its spells: the adept's
+    (CRB p. 449, "Adept Spell List") is on no spell in the corpus — 0 of 3,040 name
+    "adept" — so its document declares it (`casting.spell_list`: {"0": [names], ...})
+    and it lands here, in the one field every reader asks (`casting.level_on_list`, the
+    forge, scroll pricing), rather than in a second reader beside it. A name that finds no
+    spell is reported by `class_list_misses()`, which a test refuses."""
+    by_key = _keys_of(raw)
+    for list_name, level, name in _declared_lists():
+        sid = by_key.get(_spell_key(name))
+        if sid is not None:
+            lists = dict(raw[sid].get("lists") or {})
+            lists[list_name] = int(level)
+            raw[sid]["lists"] = lists
+
+
+def _keys_of(raw: dict[str, dict]) -> dict[str, str]:
+    by_key: dict[str, str] = {}
+    for sid, e in raw.items():
+        by_key.setdefault(_spell_key(e.get("name") or sid), sid)
+        by_key.setdefault(_spell_key(sid), sid)
+    return by_key
+
+
+def _declared_lists():
+    """(list name, spell level, spell name) for every class document that prints its own
+    spell list, playable or NPC."""
+    from . import classes as classes_mod
+
+    docs = list(classes_mod.all_classes().values()) + list(classes_mod.npc_classes().values())
+    for cls in docs:
+        casting = cls.get("casting") or {}
+        declared = casting.get("spell_list") if isinstance(casting, dict) else None
+        if not isinstance(declared, dict):
+            continue
+        list_name = str(casting.get("list") or cls.get("id") or "").strip().lower()
+        for level, names in declared.items():
+            for name in names or ():
+                yield list_name, level, str(name)
+
+
+def class_list_misses() -> list[tuple[str, str]]:
+    """(list, name) for every name a class's declared spell list could not find —
+    computed on asking, because the spells are kept for the process (`rules.pristine`)."""
+    by_key = {_spell_key(s.name): sid for sid, s in all_spells().items()}
+    by_key.update({_spell_key(sid): sid for sid in all_spells()})
+    return [(lst, name) for lst, _, name in _declared_lists()
+            if _spell_key(name) not in by_key]
 
 
 def meta() -> dict:
