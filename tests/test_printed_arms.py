@@ -162,6 +162,34 @@ def test_a_lizardfolk_with_a_morningstar_on_its_sheet_still_bites():
                       "params": {"weapon": "bite"}}])
 
 
+@pytest.mark.parametrize("template, held, carried, not_carried", [
+    # The fist stands on the table's "unarmed" row, which calls itself wieldable: 489
+    # unarmed-strike and flurry attacks put "unarmed" on 1e monks' weapons lists.
+    ("battle-monk", None, ["kama"], ["unarmed"]),
+    # 97 printed bombs and 9 alchemist's fires went into packs as things to carry: a
+    # bomb is made and thrown in the one action, never held (`weapons.wieldable`).
+    ("chemist", "morningstar", ["morningstar"], ["bomb"]),
+    # Armour spikes are the suit's, and the fiend-born rager prints them first: the
+    # first cut put them in its hand, where a disarm could knock them loose.
+    ("fiend-born-rager", None, [], ["spiked-armor"]),
+])
+def test_only_what_a_hand_can_hold_goes_on_the_sheet(template, held, carried, not_carried):
+    """Measured 2026-10-28 over the 7,111 blocks, on the commit before this one."""
+    _, _, body = _fight(template)
+    assert body.equipped == held
+    assert all(w in body.weapons for w in carried), body.weapons
+    assert not any(w in body.weapons for w in not_carried), body.weapons
+
+
+def test_a_monk_still_strikes_with_its_printed_fist():
+    """Left as the body, the fist still swings at the print's numbers."""
+    _, engine, monk = _fight("battle-monk")
+    assert monk.wielded_key() == "unarmed strike"
+    assert monk.weapon(monk.wielded_key()).get("stat_block")
+    engine.validate([{"op": "attack", "actor": monk.ref, "target": "pc",
+                      "params": {"weapon": "unarmed strike"}}])
+
+
 # --- saves ----------------------------------------------------------------------------------
 
 def test_a_save_made_before_this_loads_with_the_guards_weapons_on_its_sheet():

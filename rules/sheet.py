@@ -2945,12 +2945,27 @@ class Actor:
         """The weapons-table key of the made weapon a printed attack named `key` stands
         on ("heavy flail" -> "heavy-flail", "broken scimitar" -> "scimitar"), or "" when
         the attack is the body's own — a bite, a claw, "tendrils" — or nothing printed.
-        The print says what it carries; whether it still has it is the sheet's."""
+        The print says what it carries; whether it still has it is the sheet's.
+
+        A carried thing is one a hand can hold: `weapons.wieldable`, the answer `wear`
+        and the re-arm already ask (E1), and the fist besides, which the table calls
+        wieldable and which is still the body. Measured 2026-10-28 over the corpus, the
+        first cut put "unarmed" on the weapons list of the monks (489 unarmed-strike and
+        flurry-of-blows attacks), a "bomb" in the chemist's pack (97 bombs, alchemist's
+        fire 9), the fiend-born rager's armour spikes in its hand (19), and shields,
+        bolts and cannons (54 more) on the list of things to swing — 179 refused by
+        `wieldable`, and the fists by name.
+        """
+        from . import weapons as weapons_mod
+
         found = self._find_stat_block_attack(key)
         if found is None:
             return ""
         a, _ = found
-        return str(a["base"]) if a["base"] and not a["natural"] else ""
+        base = str(a["base"] or "")
+        if not base or a["natural"] or base == "unarmed":
+            return ""
+        return base if weapons_mod.wieldable(base)[0] else ""
 
     def has_printed(self, key: str) -> bool:
         """Can this body still strike with the printed attack named `key`? Always, for
