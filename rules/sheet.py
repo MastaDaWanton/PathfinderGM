@@ -2935,13 +2935,21 @@ class Actor:
     def stat_block_attacks(self) -> dict[str, list[list[dict]]]:
         """The creature's printed attacks, read live off its stat block.
 
-        Only for a body whose numbers ARE a stat block (`flat_attack` set, no class): a
-        printed "+7" is a total, and it is only honest on the sheet that printed it. Read
-        live like `movement_modes` reads a climb speed, so correcting a creature on the
-        bench corrects every one already standing in a scene, and nothing is copied onto
-        the actor to go stale in a save.
+        Only for a body whose numbers ARE a stat block (no class): a printed "+7" is a
+        total, and it is only honest on the sheet that printed it. Read live like
+        `movement_modes` reads a climb speed, so correcting a creature on the bench
+        corrects every one already standing in a scene, and nothing is copied onto the
+        actor to go stale in a save.
+
+        Asked of the block's own lines, never of `flat_attack`. That number is the import's
+        first signed figure on the melee line, and a block can print attacks without one:
+        a swarm makes no attack roll ("swarm (1d6 plus disease)", Bestiary 1 p. 313), a
+        troop neither, and the PDF's en-dash minus ("heavy mace –1") read as no number.
+        Gated on it until 2026-10-30, 43 printed blocks — 29 swarms and troops, and the
+        aasimar, the naiad, the ratfolk, the sylph and ten more — had no attacks at all,
+        and every one fought with 1d3 nonlethal fists.
         """
-        if self.flat_attack is None or self.class_data:
+        if self.class_data:
             return {}
         doc = self._creature_doc()
         if not doc or not (doc.get("melee") or doc.get("ranged")):
@@ -3048,7 +3056,7 @@ class Actor:
 
     def _carried_weapons(self) -> list[str]:
         """The wieldable weapons in this body's compiled `carries`, by table key."""
-        if self.flat_attack is None or self.class_data:
+        if self.class_data:             # the same gate as `stat_block_attacks`, and why
             return []
         from . import compile_block
         from . import weapons as weapons_mod

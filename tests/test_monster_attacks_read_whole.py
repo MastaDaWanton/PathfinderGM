@@ -29,6 +29,9 @@ import pytest
 
 from rules import bestiary, compile_block
 from rules import statblock_attacks as sa
+from rules.dice import Dice
+from rules.engine import Engine, Scene
+from rules.sheet import load_pc
 
 # A printed attack's shape: a bonus (or a run of them) and its damage parenthesis, with
 # the optional category and touch words between — or a swarm's or troop's bonusless one.
@@ -151,3 +154,89 @@ def test_the_magic_property_order_does_not_depend_on_the_hash_seed():
     properties and churn every record."""
     props = compile_block._properties()
     assert props == sorted(props, key=lambda n: (-len(n), n))
+
+
+# --- the creatures the review named, as play builds them ---------------------------------
+
+@pytest.mark.parametrize("bid, want", [
+    ("boar", ["gore"]),
+    ("boar-dire", ["gore"]),
+    ("bone-devil", ["bite", "claws", "sting"]),
+    ("ghoul", ["bite", "claws"]),
+    ("crocodile", ["bite", "tail slap"]),
+    ("minotaur", ["greataxe", "gore"]),
+    ("wyvern", ["sting", "bite", "wings"]),
+    ("rat-swarm", ["swarm"]),
+    ("spider-swarm", ["swarm"]),
+    ("aasimar", ["heavy mace", "light crossbow"]),
+    ("naiad", ["dagger", "dagger"]),
+])
+def test_the_named_creatures_fight_with_what_they_print(bid, want):
+    a = bestiary.instantiate(bid)
+    got = [x["key"] for cat in ("melee", "ranged")
+           for opt in a.stat_block_attacks().get(cat) or () for x in opt][:len(want)]
+    assert got == want
+    assert a.wielded_key() != "unarmed"
+
+
+def _fight(template: str, seed: int):
+    scene = Scene(location_id="5bbd0c40345f")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    foe = scene.add(bestiary.instantiate(template, scene=scene))
+    engine = Engine(scene, Dice(seed=seed))
+    engine._ensure_encounter(foe.ref)
+    if scene.has_grid:
+        scene.positions[pc.ref] = (4, 5)
+        scene.positions[foe.ref] = (5, 5)
+        scene.resync_zones()
+    pc.hp = pc.hp_max = 500
+    return engine, pc, foe
+
+
+def _turn(engine, foe):
+    return engine.run(engine.validate([
+        {"op": "attack", "actor": foe.ref, "target": "pc", "because": "the test"}])).outcomes
+
+
+def test_a_boar_gores():
+    """The boar's 1d8+4: 5 to 12, never the fist's 1d3."""
+    engine, pc, boar = _fight("boar", 3)
+    hits = []
+    for _ in range(80):
+        for o in _turn(engine, boar):
+            hits += [e for e in o.effects if e.get("kind") == "damage" and e.get("ref") == pc.ref]
+    assert hits and {e.get("weapon") for e in hits} == {"gore"}
+
+
+def test_a_rat_swarm_hurts_without_a_roll_and_distracts():
+    """Bestiary 1 p. 313: "they deal automatic damage to any creature whose space they
+    occupy ... with no attack roll needed", and "Swarms possess the distraction universal
+    monster rule" (p. 299: nauseated 1 round, Fortitude negates; the rat swarm prints DC
+    12). Before 2026-10-30 the swarm had no attack and punched for 1d3 nonlethal."""
+    saw_save = saw_nausea = False
+    for seed in range(1, 40):
+        engine, pc, swarm = _fight("rat-swarm", seed)
+        # In the space it damages, as the rule has it (from beside, its turn is the move).
+        engine.scene.positions[swarm.ref] = engine.scene.positions[pc.ref]
+        engine.scene.resync_zones()
+        outcomes = _turn(engine, swarm)
+        tells = " ".join(o.tell or "" for o in outcomes)
+        assert "no roll to make" in tells
+        dmg = [e for o in outcomes for e in o.effects
+               if e.get("kind") == "damage" and e.get("ref") == pc.ref]
+        assert dmg and dmg[0]["weapon"] == "swarm" and not dmg[0].get("nonlethal")
+        saw_save |= "Fortitude save" in tells
+        if pc.has_state("state.impaired.nauseated"):
+            saw_nausea = True
+            eff = next(e for e in pc.effects if e.key == "nauseated")
+            assert eff.rounds_left == 1 and eff.origin == "creature:rat-swarm"
+    assert saw_save and saw_nausea
+
+
+def test_distraction_spares_what_is_not_alive():
+    """"Any living creature": a skeleton in a rat swarm is bitten and not sickened by it."""
+    engine, pc, swarm = _fight("rat-swarm", 5)
+    bones = engine.scene.add(bestiary.instantiate("human-skeleton", scene=engine.scene))
+    assert engine._distraction(swarm, bones, {"automatic": True}) == []
+    assert engine._distraction(swarm, pc, {"automatic": False}) == []
