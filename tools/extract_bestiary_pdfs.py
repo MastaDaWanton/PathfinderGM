@@ -36,6 +36,11 @@ from rules.statblock import RESISTANCE, trim  # noqa: E402
 
 SIZES = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
          "gargantuan", "colossal")
+
+# A signed figure as the books print it: "+3", "-1", and the typeset minus — an en dash
+# "–1" (and the true minus sign) — which `sign` writes back as a hyphen.
+_SIGNED = "[+\\-–−]\\s?\\d+"
+_MINUS = str.maketrans({"–": "-", "−": "-"})
 ALIGNMENTS = ("LG", "NG", "CG", "LN", "N", "CN", "LE", "NE", "CE")
 
 
@@ -232,6 +237,19 @@ def _spell_like(t: str) -> str:
     return re.sub(r"\s+", " ", m.group(0)).strip()[:600] if m else ""
 
 
+def _special_attacks(t: str) -> str:
+    """The block's Special Attacks line, or "".
+
+    A block that prints none and whose page runs on into a template's rules caught the
+    template's own heading instead: "Special Attacks: A lycanthrope retains all the
+    special attacks ..." became the lizardfolk's special attacks, and four more blocks
+    (the human skeleton and zombie, the petitioner, the taxidermic grizzly) carried their
+    template's rebuild prose the same way. A stat block's heading is never followed by a
+    colon; a template's always is."""
+    found = _between(t, "Special Attacks", "STATISTICS", "TACTICS")[:300]
+    return "" if found.lstrip().startswith(":") else found
+
+
 def parse_block(text: str, name: str, cr: str) -> dict | None:
     """One stat block, or None if the page did not actually hold one."""
     t = re.sub(r"\s+", " ", text)
@@ -257,8 +275,17 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
             if word in _CLASS_WORDS:
                 classes[word] = classes.get(word, 0) + int(lvl)
     hp = re.search(r"\bhp\s+(\d+)\s*(?:each\s*)?\(([^)]{2,40})\)", t, re.I)
-    saves = re.search(r"\bFort\s*([+-]\s?\d+)\s*,\s*Ref\s*([+-]\s?\d+)\s*,\s*Will\s*([+-]\s?\d+)",
-                      t, re.I)
+    # The book prints a minus as an en dash ("Will –1"), and every signed figure below
+    # was read with an ASCII "-" only: 39 blocks lost all three saves (the goblin, the
+    # orc, the kobold, every ooze), each to one negative save, and fell back to numbers
+    # derived from scores — the goblin 1/2/−1 where the book prints +3/+2/−1. `_SIGNED`
+    # reads either, and `sign` writes the hyphen.
+    # And a save can carry its own qualifier before the next one: "Fort +8 (+10 vs.
+    # nonmagical disease), Ref +5, Will +3" (the hippopotamus), and the kerning can split
+    # the word ("w ill +2", the cassisian).
+    q = r"(?:\s*\([^()]{0,60}\))?\s*[,;]?\s*"
+    saves = re.search(rf"\bF\s?o\s?r\s?t\s*({_SIGNED}){q}R\s?e\s?f\s*({_SIGNED}){q}"
+                      rf"W\s?i\s?l\s?l\s*({_SIGNED})", t, re.I)
     # Without an AC and hit points there is no creature here — the anchor pointed at a
     # page of prose, or the extraction failed. Reported, never invented.
     if not (ac and hp):
@@ -283,16 +310,16 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
     # and left three blocks Medium and of no type.
     head = re.search(rf"({'|'.join(ALIGNMENTS)}|Any alignment|Any)(?:\s*\([^)]*\))?\s+"
                      rf"({'|'.join(SIZES)})\s+({_TYPE_ALT})(?:\s*\(([^)]+)\))?", t, re.I)
-    init = re.search(r"\bInit\s*([+-]\s?\d+)", t, re.I)
+    init = re.search(rf"\bInit\s*({_SIGNED})", t, re.I)
     cmd = re.search(r"\bCMD\s+(\d+)", t, re.I)
-    cmb = re.search(r"\bCMB\s*([+-]\s?\d+)", t, re.I)
-    bab = re.search(r"\bBase Atk\s*([+-]\s?\d+)", t, re.I)
+    cmb = re.search(rf"\bCMB\s*({_SIGNED})", t, re.I)
+    bab = re.search(rf"\bBase Atk\s*({_SIGNED})", t, re.I)
     speed = re.search(r"\bSpeed\s+(\d+)\s*ft", t, re.I)
     sr = re.search(r"\bSR\s+(\d+)", t, re.I)
 
     melee = _between(t, "Melee", "Ranged", "Special Attacks", "STATISTICS", "Space",
                      "Reach", "TACTICS")
-    atk = re.search(r"([+-]\d+)", melee)
+    atk = re.search(rf"({_SIGNED})", melee)
     dmg = re.search(r"\((\d+d\d+(?:[+-]\d+)?)", melee)
 
     dr = []
@@ -321,7 +348,7 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
     # side by side loses one block's DEFENSE heading to the other column (Bestiary 1's
     # medium fire elemental, "Will +6 DR 5/—").
     defence += " " + " ".join(t[m.end():m.end() + 200]
-                              for m in re.finditer(r"\bWill\s*[+-]\s?\d+", t))
+                              for m in re.finditer(rf"\bWill\s*{_SIGNED}", t))
     for m2 in re.finditer(rf"\bDR\s+(\d+)\s*/\s*({word}(?:\s*(?:,|and|or)\s*{word})*)",
                           defence, re.I):
         bypass = m2.group(2).strip()
@@ -334,7 +361,7 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
             dr.append(row)
 
     def sign(m2):
-        return int(m2.group(1).replace(" ", "")) if m2 else None
+        return int(m2.group(1).replace(" ", "").translate(_MINUS)) if m2 else None
 
     return {
         "id": slug(name),
@@ -353,12 +380,12 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         "class_levels": classes,
         "ac_note": f"touch {ac.group(2)}, flat-footed {ac.group(3)}"
                    + (f" ({re.sub(r'[–—]', '-', parts.group(1)).strip()})" if parts else ""),
-        "flat_saves": {"fort": sign(re.match(r"([+-]\s?\d+)", saves.group(1))) if saves else None,
-                       "ref": sign(re.match(r"([+-]\s?\d+)", saves.group(2))) if saves else None,
-                       "will": sign(re.match(r"([+-]\s?\d+)", saves.group(3))) if saves else None}
+        "flat_saves": {"fort": sign(re.match(rf"({_SIGNED})", saves.group(1))),
+                       "ref": sign(re.match(rf"({_SIGNED})", saves.group(2))),
+                       "will": sign(re.match(rf"({_SIGNED})", saves.group(3)))}
         if saves else {},
         "flat_initiative": sign(init),
-        "flat_attack": int(atk.group(1)) if atk else None,
+        "flat_attack": sign(atk),
         "flat_damage": dmg.group(1) if dmg else "",
         "melee": melee[:200],
         "ranged": _between(t, "Ranged", "Special Attacks", "STATISTICS", "Space",
@@ -414,7 +441,7 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         # come from the spreadsheet and none from the six Bestiaries.
         "weaknesses": _between(t, "Weaknesses", "OFFENSE", "STATISTICS")[:160],
         "senses": _between(t, "Senses", "DEFENSE", "Aura")[:160],
-        "special_attacks": _between(t, "Special Attacks", "STATISTICS", "TACTICS")[:300],
+        "special_attacks": _special_attacks(t),
         "languages": trim([x.strip() for x in
                            _between(t, "Languages", "SQ", "ECOLOGY", "SPECIAL").split(",")
                            if x.strip()]),
