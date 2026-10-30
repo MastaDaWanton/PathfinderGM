@@ -121,6 +121,10 @@ def render_attack(a: dict) -> str:
         dmg += f" plus {x.get('dice')} {x.get('type', '')}".rstrip()
     for r in a.get("riders") or ():
         dmg += f" plus {r}"
+    if a.get("automatic"):
+        # "swarm (1d6 plus disease)": no bonus, because it makes no attack roll. Written
+        # "+0" it read back as an attack rolled at +0, and an advanced rat swarm missed.
+        return f"{name} ({dmg})"
     touch = " touch" if a.get("touch") and "touch" not in name.lower() else ""
     return f"{lead} {bonuses}{touch} ({dmg})"
 
@@ -158,6 +162,16 @@ def refusal(block: dict, tpl: dict) -> str:
         return why or f"The {tpl['name']} template cannot be applied to {ctype}."
     if any(s in sub for s in rules.get("subtypes") or ()):
         return why or f"The {tpl['name']} template cannot be applied to this creature."
+    grows = rules.get("grows") or {}
+    if grows:
+        name = " ".join(str(block.get("name") or "").lower().split())
+        aged = ctype in (grows.get("age_types") or ()) and any(
+            name.startswith(w + " ") for w in grows.get("age_words") or ())
+        text = " ".join(str(block.get(f) or "") for f in
+                        ("special_attacks", "special_abilities")).lower()
+        fed = bool(grows.get("text")) and str(grows["text"]).lower() in text
+        if aged or fed:
+            return why or f"The {tpl['name']} template cannot be applied to this creature."
     if not hit_dice(block):
         return f"{block.get('name')}'s Hit Dice ({block.get('hit_dice')!r}) cannot be read."
     if tpl.get("max_hd") and total_hd(block) > int(tpl["max_hd"]):
@@ -272,13 +286,23 @@ def _simple(block: dict, tpl: dict) -> tuple[dict, str]:
             first = max((a["bonuses"][0] for a in opt if a.get("bonuses")), default=0)
             natural_count = sum(int(a.get("count") or 1) for a in opt if a.get("natural"))
             for a in opt:
-                to_hit = (dm["dex"] if cat == "ranged" or finesse else dm["str"]) + d_size_ac
-                a["bonuses"] = [int(b) + to_hit for b in a.get("bonuses") or [0]]
+                # Weapon Finesse uses Dex only when it is the better: the giant ghoul's
+                # Str 17 now beats its Dex 13, so its claws move with the better of the
+                # two, not with the Dex it no longer swings with (a giant ghoul's claws
+                # were -2 to hit for growing stronger).
+                fin = (max(_mod(new.get("str")) or 0, _mod(new.get("dex")) or 0)
+                       - max(_mod(old.get("str")) or 0, _mod(old.get("dex")) or 0))
+                to_hit = (dm["dex"] if cat == "ranged" else fin if finesse
+                          else dm["str"]) + d_size_ac
+                if not a.get("automatic"):          # a swarm rolls nothing to move
+                    a["bonuses"] = [int(b) + to_hit for b in a.get("bonuses") or [0]]
                 secondary = a.get("natural") and a.get("bonuses") and \
                     a["bonuses"][0] - to_hit <= first - 5
                 share = 0.5 if secondary else (1.5 if (a.get("natural") and natural_count == 1)
                                                else 1.0)
-                if cat == "melee" or _thrown(a):
+                # A swarm's damage is its Hit Dice's (Bestiary 1 p. 313's table), with no
+                # Strength in it to move.
+                if (cat == "melee" or _thrown(a)) and not a.get("automatic"):
                     a["bonus"] = int(a.get("bonus") or 0) + math.floor(dm["str"] * share)
                 steps = int(tpl.get("damage_dice_steps") or 0)
                 if steps and a.get("dice"):
@@ -316,11 +340,101 @@ def _simple(block: dict, tpl: dict) -> tuple[dict, str]:
     if tpl.get("special_attack"):
         out["special_attacks"] = ", ".join(x for x in (str(block.get("special_attacks") or ""),
                                                        tpl["special_attack"]) if x)
-    if tpl.get("dc"):
-        out["special_attacks"] = re.sub(
-            r"\bDC\s+(\d+)", lambda m: f"DC {int(m.group(1)) + int(tpl['dc'])}",
-            str(out.get("special_attacks") or ""))
+    unmoved = _shift_dcs(out, dm, int(tpl.get("dc") or 0))
+    if unmoved:
+        out["dcs_unmoved"] = unmoved
     return _finish(out, block, tpl, unstepped), ""
+
+
+# What each special ability's save DC is built on, by the Bestiary's universal monster
+# rules (Bestiary 1, Appendix 3, pp. 298-305, read from the book 2026-10-30): "DC 10 + 1/2
+# ... HD + ... Con modifier" for breath weapon, burn, disease, distraction, paralysis,
+# poison, stench and web; Str for trample ("10 + 1/2 creature's HD + creature's Str
+# modifier") and engulf; Cha for fear, frightful presence and gaze. A block that says
+# otherwise in its own words ("The save DC is Charisma-based", the ghoul's paralysis) is
+# believed over this table.
+_DC_BASIS = {"breath weapon": "con", "burn": "con", "disease": "con", "distraction": "con",
+             "paralysis": "con", "poison": "con", "stench": "con", "web": "con",
+             "trample": "str", "engulf": "str", "fear": "cha", "frightful presence": "cha",
+             "gaze": "cha"}
+_BASED = re.compile(r"\b(strength|dexterity|constitution|intelligence|wisdom|charisma)-based",
+                    re.I)
+# Where one described ability ends and the next begins: "Poison (Ex) ... saves. Web (Ex)":
+# a heading at the start or after a sentence's end, so "Blood Drain (Ex)" is one heading
+# and not "Blood " and "Drain (Ex)".
+_ABILITY_HEAD = re.compile(r"(?:^|(?<=[.;:)] )|(?<=[.;:)]))"
+                           r"(?=[A-Z][A-Za-z' -]{1,40}\s*\((?:Ex|Su|Sp)\))")
+
+
+def _top_level_segments(text: str) -> list[str]:
+    """`text` cut after each comma outside parentheses, the commas kept, so the pieces
+    join back to exactly the text."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(text):
+        depth += ch == "("
+        depth -= ch == ")" and depth > 0
+        if ch == "," and depth == 0:
+            out.append(text[start:i + 1])
+            start = i + 1
+    out.append(text[start:])
+    return [s for s in out if s]
+
+
+def _dc_basis(segment: str, field: str) -> str:
+    said = _BASED.search(segment)
+    if said:
+        return said.group(1)[:3].lower()
+    head = segment.strip().lower()
+    for name in sorted(_DC_BASIS, key=len, reverse=True):
+        # The ability's own name leads its segment ("poison (DC 14)", "Poison (Ex)"), and
+        # a poison's description says "Sting—injury; save Fort DC 17" after it.
+        if head.startswith(name) or (field == "special_abilities"
+                                     and re.match(rf"[a-z' -]*\b{name}\b", head)):
+            return _DC_BASIS[name]
+    return ""
+
+
+def _shift_dcs(out: dict, dm: dict[str, int], flat: int) -> list[str]:
+    """Move every printed special-ability DC by its ability's modifier change.
+
+    A save DC is "10 + 1/2 HD + an ability modifier", so a template that changes the
+    ability changes the DC: the giant's +4 Con is +2 on a poison's DC and its +4 Str +2 on
+    a trample's; the young template's -4 takes 2 off both. Until 2026-10-30 only the
+    advanced template moved a DC (its quick rules' flat +2, and only in Special Attacks),
+    so a giant wyvern's sting was as easy to shrug off as a wyvern's. `flat` is that quick
+    rule for a DC whose ability nothing names: advanced moves every score alike, so its +2
+    is right whatever the basis; for the giant and the young, a DC of no known basis is
+    left as printed and named in the returned list.
+    """
+    unmoved: list[str] = []
+    # The block's own word on an ability, wherever it says it: "paralysis (1d4+1 rounds,
+    # DC 13)" in Special Attacks is described, with its basis, in Special Abilities.
+    described = {}
+    for seg in _ABILITY_HEAD.split(str(out.get("special_abilities") or "")):
+        said = _BASED.search(seg)
+        name = re.match(r"\s*([A-Za-z' -]+?)\s*\((?:Ex|Su|Sp)\)", seg)
+        if said and name:
+            described[name.group(1).strip().lower()] = said.group(1)[:3].lower()
+    for field in ("special_attacks", "special_abilities"):
+        text = str(out.get(field) or "")
+        if not re.search(r"\bDC\s+\d", text):
+            continue
+        if field == "special_abilities":
+            segments = [s for s in _ABILITY_HEAD.split(text) if s]
+        else:
+            segments = _top_level_segments(text)
+        moved = []
+        for seg in segments:
+            head = re.match(r"\s*([a-z' -]+)", seg.lower())
+            ab = described.get(head.group(1).strip()) if head else None
+            ab = ab or _dc_basis(seg, field)
+            step = dm.get(ab, 0) if ab else flat
+            if not ab and not flat and re.search(r"\bDC\s+\d", seg) and any(dm.values()):
+                unmoved.append(seg.strip()[:60])
+            moved.append(re.sub(r"\bDC\s+(\d+)", lambda m: f"DC {int(m.group(1)) + step}",
+                                seg) if step else seg)
+        out[field] = "".join(moved)
+    return unmoved
 
 
 _SKILL_ABILITY = {"acrobatics": "dex", "appraise": "int", "bluff": "cha", "climb": "str",
@@ -396,6 +510,47 @@ _SLAM = {"fine": "", "diminutive": "1", "tiny": "1d2", "small": "1d3", "medium":
 _HANDED = ("humanoid", "monstrous humanoid", "giant")
 
 
+def _average(dice: str) -> float:
+    """The mean of "2d6" (7.0), "1d8" (4.5), "1" (1.0); 0 for nothing readable."""
+    m = re.fullmatch(r"\s*(\d+)d(\d+)\s*", str(dice or ""))
+    if m:
+        return int(m.group(1)) * (int(m.group(2)) + 1) / 2
+    return float(dice) if str(dice or "").strip().isdigit() else 0.0
+
+
+# A fly speed in a speed line, with its manoeuvrability: "fly 60 ft. (average)".
+_FLY = re.compile(r",?\s*\bfly\s+\d+\s*(?:ft|feet)\.?(?:\s*\((?P<grade>[a-z]+)\))?", re.I)
+# A block that says it flies by magic: "flight (Su)", "fly ... (Su)", "flies magically".
+_MAGIC_FLIGHT = re.compile(r"\bflight\s*\((?:su|sp)\)|\bfl(?:y|ies)\b[^.;]{0,40}\(su\)"
+                           r"|\bfl(?:y|ies)\s+magically|\bmagical\s+flight", re.I)
+
+
+def _undead_flight(block: dict, rule: str) -> str:
+    """The speed line after the template's Speed clause (`fly`, quoted in `fly_rule`).
+
+    "none": a winged skeleton can't use its wings to fly. "clumsy": a winged zombie still
+    flies, at clumsy. Either way, flight the block says is magical is kept as printed.
+    Until 2026-10-30 both documents carried the clause and nothing read it, so a wyvern
+    skeleton flew at its living speed and manoeuvrability."""
+    note = str(block.get("speed_note") or "")
+    if not rule or not _FLY.search(note):
+        return note
+    text = " ".join(str(block.get(f) or "") for f in
+                    ("speed_note", "special_abilities", "special_attacks", "qualities"))
+    if _MAGIC_FLIGHT.search(text):
+        return note
+    if rule == "none":
+        return _FLY.sub("", note).strip(" ,")
+    if rule in ("clumsy", "poor", "average", "good", "perfect"):
+        def grade(m: re.Match) -> str:
+            head = m.group(0)
+            if m.group("grade"):
+                return head.replace(f"({m.group('grade')})", f"({rule})")
+            return f"{head} ({rule})"
+        return _FLY.sub(grade, note)
+    return note
+
+
 def _cr_by_hd(tpl: dict, hd: int) -> str | None:
     for upper, cr in tpl.get("cr_by_hd") or ():
         if hd <= upper:
@@ -466,12 +621,36 @@ def _undead(block: dict, tpl: dict) -> tuple[dict | None, str]:
     gains = tpl.get("gains_attack") or {}
     if gains.get("kind") == "slam":
         big = SIZE_ORDER[min(len(SIZE_ORDER) - 1, SIZE_ORDER.index(size) + int(gains.get("size_steps", 0)))]
+        # One slam (the document's `slam_rule`): a base's own slams are the same blow, and
+        # the zombie keeps the better die. Measured 2026-10-30: the hill giant zombie swung
+        # "2 slams" and a third, where Paizo's printed one swings one.
+        own = [a for a in natural_attacks if a.get("kind") == "slam"]
+        dice = max([_SLAM[big]] + [str(a.get("dice") or "") for a in own], key=_average)
+        natural_attacks = [a for a in natural_attacks if a.get("kind") != "slam"]
         natural_attacks.append({"name": "slam", "key": "slam", "count": 1, "natural": True,
-                                "kind": "slam", "dice": _SLAM[big], "riders": [], "extra": []})
+                                "kind": "slam", "dice": dice, "riders": [], "extra": []})
     elif gains.get("kind") == "claw" and ctype in _HANDED:
-        if not any(a.get("kind") == "claw" for a in natural_attacks):
+        # "A creature with hands gains one claw attack per hand ... If the base creature
+        # already had claw attacks with its hands, use the skeleton claw damage only if it's
+        # better" (p. 250).
+        #
+        # A hand strikes once. A base whose hands already strike — its claws, or the slams
+        # a giant's fists are printed as ("2 slams +13") — has those hands' attack already:
+        # the skeleton keeps it, at the claw's die where that is better, and one per hand
+        # now that no weapon fills one (the lizardfolk prints one claw beside its
+        # morningstar). The first cut added two claws beside a hill giant's two slams:
+        # four blows from two hands.
+        own = next((a for a in natural_attacks if a.get("kind") in ("claw", "slam")), None)
+        if own is None:
             natural_attacks.append({"name": "claws", "key": "claws", "count": 2, "natural": True,
                                     "kind": "claw", "dice": _SLAM[size], "riders": [], "extra": []})
+        else:
+            if _average(_SLAM[size]) > _average(str(own.get("dice") or "")):
+                own.update(dice=_SLAM[size], name="claws", key="claws", kind="claw")
+            if int(own.get("count") or 1) < 2:
+                own["count"] = 2
+                own["name"] = sa.singular(own["name"]) + "s" \
+                    if not str(own["name"]).endswith("s") else own["name"]
     n_natural = sum(int(a.get("count") or 1) for a in natural_attacks)
     primary_kinds = {"bite", "claw", "gore", "slam", "sting", "talon", "talons"}
     # Its body's attacks only: the base's weapons were gear (above), and a zombie "retains
@@ -503,6 +682,7 @@ def _undead(block: dict, tpl: dict) -> tuple[dict | None, str]:
         "base_attack": bab, "cmb": bab + s_mod + size_cm,
         "flat_cmd": 10 + bab + s_mod + d_mod + size_cm,
         "melee": render_line(melee), "ranged": render_line(ranged),
+        "speed_note": _undead_flight(block, str(tpl.get("fly") or "")),
         "feats": feats, "flat_skills": {}, "languages": [],
         "special_attacks": "", "immune": list(tpl.get("immune") or []),
         "reductions": [{**tpl["dr"], "source": f"template:{tpl['id']}"}] if tpl.get("dr") else [],

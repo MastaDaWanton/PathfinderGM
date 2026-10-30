@@ -21,9 +21,13 @@
   "sizes": [
    "fine"
   ],
-  "types": [
-   "dragon"
-  ],
+  "grows": {
+   "age_words": ["wyrmling", "very young", "young adult", "young", "juvenile", "mature adult",
+                 "adult", "very old", "old", "ancient", "great wyrm", "wyrm"],
+   "age_types": ["dragon"],
+   "text": "growth point",
+   "rule": "Bestiary 1 p. 295: not 'creatures that increase in power through aging or feeding (such as dragons or barghests)'. A true dragon is printed by its age category ('Adult Red Dragon'); a feeder says it gains growth points (the barghest, the nabasu). A wyvern or a pseudodragon is of the dragon type and does neither, and until 2026-10-30 the type alone refused all 126 dragon-type blocks, 36 of them ageless."
+  },
   "why": "This template cannot be applied to creatures that increase in power through aging or feeding (such as dragons or barghests) or creatures that are Fine-sized."
  },
  "describe": "A young {base}, not yet grown into its strength."

@@ -105,6 +105,8 @@
   "size_steps": 1
  },
  "fly": "clumsy",
+ "fly_rule": "Bestiary 1 p. 288, Speed: 'Winged zombies can still fly, but maneuverability drops to clumsy. If the base creature flew magically, so can the zombie. Retain all other movement types.'",
+ "slam_rule": "Bestiary 1 p. 288: 'It also gains a slam attack that deals damage based on the zombie's size, but as if it were one size category larger than its actual size.' One slam: a base that already strikes with slams (the hill giant's '2 slams') keeps the better of its own die and the template's, and does not add a third. Paizo's own application, the zombie hill giant of Rise of the Runelords Anniversary Edition (via d20pfsrd, 'Zombie, Giant (Hill)'), prints 'slam +17 (1d8+13)', one slam.",
  "qualities": [
   "staggered"
  ],
