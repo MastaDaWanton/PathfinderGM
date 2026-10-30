@@ -32,6 +32,13 @@
    up: 59.5px tall at 1024 (was 108.4), 61 at 1200 (was 109.4); 0 of 310 widths overlap,
    none scroll sideways, the tab key's order is the same, and every word is the same.
 
+4. The story over End turn (integrate/0.2.25 and master 0.2.24 alike, 2026-10-30). In a fight
+   at 794x608 with four rows of people in the book's head, the story's box (never shorter
+   than its 44px of padding) ran 65px below the leaf, and the leaf is laid over the desk:
+   a real click on End turn's visible part landed on `p.beat` and the turn did not end.
+   tools/table_hit_test.js caught it only when End turn happened to be scrolled into the
+   desk's 17px strip of choices; scrolled out, it was never checked at all.
+
 There is no layout engine in the suite, so these hold the rules the measurements came
 from: the frame's reach is computed from the same numbers the browser uses, and the bar
 is held to the shape that cannot overlap (a wrapping flex row whose parts keep their own
@@ -39,10 +46,14 @@ widths).
 """
 from __future__ import annotations
 
+import json
 import re
+import shutil
+import subprocess
 from html.parser import HTMLParser
 from pathlib import Path
 
+import pytest
 from django.test import Client
 
 from pagesource import ROOT, TABLE
@@ -285,3 +296,129 @@ def test_the_tab_key_meets_the_bar_in_the_order_it_is_drawn():
     for sel in (".topbar", ".worldnav", ".modes", ".topend"):
         for block in _rules(desktop, sel):
             assert "order:" not in block, sel
+
+
+# --- 4. the story over End turn ------------------------------------------------------------
+
+HIT_TEST = ROOT / "tools" / "table_hit_test.js"
+BOOK_JS = ROOT / "play" / "static" / "js" / "table" / "15-book.js"
+PACKAGING = ROOT / "docs" / "packaging.md"
+
+
+def test_the_leaf_draws_nothing_below_itself():
+    """At 794x608 with four rows of people in the head, `#story` measured 372-416 against a
+    leaf ending at 351, and `.bookin` (z-index 1) laid that 65px over the desk: End turn's
+    visible middle answered `p.beat`, and a real click there did not end the turn. The leaf
+    clips down, with `clip`, not `hidden`: `hidden` would make the leaf a scroller and clip
+    its sides too. The phone keeps a leaf that scrolls, head and all (its own later rule),
+    and the book still asks the story's own overflow which box scrolls, so the clip cannot
+    change where a beat lands."""
+    css = _style(TABLE)
+    desktop = css[:css.index("/* --- Phone: the story is the page")]
+    assert ".bookin { overflow-y: clip; }" in desktop
+    assert not any("overflow-y: hidden" in b or "overflow: hidden" in b
+                   for b in _rules(desktop, ".bookin")), "a hidden leaf is a scroller"
+    assert ".bookin { display: block; height: 100%; overflow-y: auto; }" in _phone(css), \
+        "the phone's leaf must still scroll, and come after the desktop's clip"
+    book = BOOK_JS.read_text(encoding="utf-8")
+    assert 'getComputedStyle(story).overflowY === "visible"' in book
+
+
+# The page as measured on integrate/0.2.25 (ae28efe2) at 794x608 in a fight, End turn
+# scrolled into the desk's choices: the choices 382-399 (a 17px strip, overflow auto),
+# End turn 383-417 in it, and the story's paragraph over its visible middle. And the same
+# page at 1366x850, where it all fits. Rects are [left, top, right, bottom].
+_HIT_STUB = r"""
+const geometry = JSON.parse(process.argv[2]);
+const root = {tagName: "HTML", parentElement: null};
+const box = (id, cls, tag, parent, rect, overflow) => ({
+  id, className: cls, tagName: tag, parentElement: parent, innerText: id, value: "",
+  _rect: rect, _overflow: overflow || "visible",
+  getBoundingClientRect() { const [l, t, r, b] = this._rect;
+    return {left: l, top: t, right: r, bottom: b, width: r - l, height: b - t}; },
+  getClientRects() { return [this.getBoundingClientRect()]; },
+  getAttribute() { return null; }, closest() { return null; },
+  contains(o) { for (let p = o; p; p = p.parentElement) if (p === this) return true; return false; },
+});
+const g = geometry;
+const body = box("", "", "BODY", root, [0, 0, g.vw, g.vh]);
+const desk = box("desk", "desk", "SECTION", body, g.desk);
+const choices = box("", "choices", "DIV", desk, g.choices, "auto");
+const bar = box("combatbar", "", "DIV", choices, g.bar);
+const end = box("cb-end", "v2-btn", "BUTTON", bar, g.end);
+const commit = box("cb-commit", "v2-btn", "BUTTON", bar, g.commit);
+const form = box("sayform", "pen", "FORM", desk, g.say);
+const input = box("input", "v2-well", "INPUT", form, g.input);
+const say = box("", "v2-btn", "BUTTON", form, g.sayButton);
+const story = box("story", "story", "DIV", body, g.story, "auto");
+const beat = box("", "beat setup fresh", "P", story, g.story);
+document.documentElement = root;
+const all = [end, commit, input, say];
+document.querySelectorAll = (sel) => ({
+  "#cb-end": [end], "#cb-commit": [commit], "#input": [input],
+  "#sayform button[type=submit]": [say]})[sel] || all;
+global.getComputedStyle = (el) => ({display: "block", visibility: "visible",
+  pointerEvents: "auto", overflowX: el._overflow, overflowY: el._overflow});
+const inside = (el, x, y) => { const r = el.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
+document.elementFromPoint = (x, y) => {
+  if (g.storyOnTop && inside(story, x, y)) return beat;
+  for (const el of all) if (inside(el, x, y)) return el;
+  return body;
+};
+global.innerWidth = g.vw; global.innerHeight = g.vh;
+console.log(JSON.stringify(eval(require("fs").readFileSync(process.argv[3], "utf8"))));
+"""
+
+_AT_794 = {"vw": 794, "vh": 608, "desk": [318, 367, 774, 592],
+           "choices": [335, 382, 757, 399], "bar": [335, 147, 747, 502],
+           "end": [350, 383, 438, 417], "commit": [620, 343, 732, 377],
+           "say": [335, 409, 757, 565], "input": [335, 459, 661, 511],
+           "sayButton": [669, 459, 757, 511], "story": [318, 372, 774, 416],
+           "storyOnTop": True}
+_AT_1366 = {"vw": 1366, "vh": 850, "desk": [300, 462, 1060, 834],
+            "choices": [316, 477, 1044, 714], "bar": [316, 477, 1044, 832],
+            "end": [350, 636, 438, 670], "commit": [900, 590, 1010, 624],
+            "say": [316, 724, 1044, 818], "input": [316, 760, 800, 812],
+            "sayButton": [810, 760, 900, 812], "story": [300, 200, 1060, 446],
+            "storyOnTop": True}
+
+
+def _hit_test(tmp_path, geometry: dict) -> dict:
+    stub = tmp_path / "stub.js"
+    stub.write_text("const document = {}; global.document = document;\n" + _HIT_STUB,
+                    encoding="utf-8")
+    done = subprocess.run(["node", str(stub), json.dumps(geometry), str(HIT_TEST)],
+                          capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on this machine")
+def test_the_hit_test_names_the_story_over_end_turn_and_the_strip_it_sits_in(tmp_path):
+    """The release hit test, run over the measured 794x608 page: it must name End turn as
+    covered by the story's paragraph, and name End turn and Commit turn as unreachable, a
+    34px button in a 17px box that no scroll shows whole (a mouse wheel's 100px step
+    skipped past it live). Before, a control scrolled out of its box was never checked, so
+    the same page with End turn scrolled away passed clean. Over the page at 1366x850,
+    where everything fits, it must pass."""
+    out = _hit_test(tmp_path, _AT_794)
+    assert {"control": "#cb-end", "label": "cb-end", "under": "p.beat.setup.fresh"} \
+        in out["covered"]
+    gone = {u["control"]: u for u in out["unreachable"]}
+    assert gone["#cb-end"] == {"control": "#cb-end", "box": 17, "of": 34}
+    assert gone["#cb-commit"]["box"] == 17
+    assert "#input" not in gone
+    wide = _hit_test(tmp_path, _AT_1366)
+    assert wide["covered"] == [] and wide["unreachable"] == [] and wide["checked"] == 4
+
+
+def test_a_release_needs_both_lists_empty():
+    """The release step reads the hit test's answer; a step that still said only `covered`
+    would let a turn's buttons squeezed out of reach ship."""
+    src = HIT_TEST.read_text(encoding="utf-8")
+    assert ('const MUST_SHOW = ["#cb-commit", "#cb-end", "#input", '
+            '"#sayform button[type=submit]"];') in src
+    assert "return {checked: seen.length, covered, unreachable};" in src
+    step = " ".join(PACKAGING.read_text(encoding="utf-8").split())
+    assert "`covered` and `unreachable` must both be empty" in step

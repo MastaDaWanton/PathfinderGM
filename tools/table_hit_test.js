@@ -8,9 +8,22 @@
 //
 // Run it in the page (the preview tools' javascript_exec, or a browser console) on /play/
 // served by the PACKAGED backend over scratch data, as docs/packaging.md's release steps say.
-// It returns {checked, covered}: `covered` lists each visible control whose on-screen middle
-// belongs to something else, with what is on top. An empty list is the pass.
+// It returns {checked, covered, unreachable}: `covered` lists each visible control whose
+// on-screen middle belongs to something else, with what is on top; `unreachable` lists each
+// control a turn cannot do without (MUST_SHOW) that sits in a box too short to show it
+// whole at any scroll, with the box's height. Both empty is the pass.
+//
+// Why the second list: a control scrolled wholly out of its box is not "seen", so it was
+// never checked. On integrate/0.2.25 and master 0.2.24 alike, in a fight at 794x608, the
+// desk's choices were a 17px strip holding the 355px combat bar; End turn (34px) could not
+// be shown whole at any scroll, a mouse wheel's 100px step skipped past it, and this
+// script passed. Below the foot of a box that can show it (End turn 3 to 63px under the
+// choices at 1000x609, 1024x700 and 1280x720) is one scroll away, and is not listed: the
+// book keeps 45% of the stage and the desk's choices scroll past that by design.
 (() => {
+  // What a fight cannot be played without, and the pen. Up and down only: on a phone the
+  // turn's buttons are one row that scrolls sideways by design (the mock README's phone).
+  const MUST_SHOW = ["#cb-commit", "#cb-end", "#input", "#sayform button[type=submit]"];
   // The part of a control the player can actually see: its box cut to the window and to
   // every ancestor that clips its overflow. Two false alarms measured on 2026-10-10, both
   // "That's wrong" links on beats scrolled out of the story pane (#bookin): inside the
@@ -48,5 +61,24 @@
       covered.push({control: name(el), label: (el.innerText || el.value || el.getAttribute("aria-label") || "").trim().slice(0, 40), under: name(top)});
     }
   }
-  return {checked: seen.length, covered};
+  // The tallest the window onto a control can be: the window cut to every ancestor that
+  // clips up and down, wherever the control itself is scrolled to.
+  const room = (el) => {
+    let upper = 0, lower = innerHeight;
+    for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+      if (getComputedStyle(p).overflowY === "visible") continue;
+      const c = p.getBoundingClientRect();
+      upper = Math.max(upper, c.top); lower = Math.min(lower, c.bottom);
+    }
+    return Math.max(0, lower - upper);
+  };
+  const unreachable = [];
+  for (const el of MUST_SHOW.flatMap((s) => [...document.querySelectorAll(s)])) {
+    if (el.closest("[hidden]")) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden" || el.getClientRects().length === 0) continue;
+    const box = room(el), of = el.getBoundingClientRect().height;
+    if (box < of) unreachable.push({control: name(el), box: Math.round(box), of: Math.round(of)});
+  }
+  return {checked: seen.length, covered, unreachable};
 })();

@@ -2087,6 +2087,15 @@
               radial-gradient(80% 60% at 35% 15%, rgba(240, 214, 158, .07), transparent 70%),
               rgba(17, 14, 10, var(--leaf-a));
             -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  /* Nothing of the leaf is drawn below the leaf. The story's track is what the head
+     leaves, but its box is never shorter than its own padding (44px at 761-1180px), and
+     the leaf (z-index 1) is laid over the desk: with four rows of people in the head at
+     794x608 the story's box ran 65px past the book, and its paragraph lay on the desk's
+     choices, over End turn (elementFromPoint: p.beat), found by the hit test on
+     integrate/0.2.25. Clipped down only: `clip`, unlike `hidden`, leaves the other axis
+     visible and makes no scroller (15-book.js asks which box scrolls). The phone's leaf
+     scrolls instead (its own rule, below). */
+  .bookin { overflow-y: clip; }
   /* The head stays opaque, the page as it was drawn: the paper under the page's dimming. */
   .bookhead { position: relative; padding: 24px 50px 10px 58px;
               border-bottom: 1px solid rgba(125, 104, 69, .45);

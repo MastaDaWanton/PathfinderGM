@@ -401,10 +401,13 @@ build rather than trusting it.
 4. `prove_build.py`, then `prove_shell.py` and `prove_shell.py --packaged`.
    Then **hit-test the table**: start `dist/PathfinderGM.exe --no-browser` with
    `PATHFINDER_GM_DATA` on a scratch copy holding a campaign, open its `/play/` in a real
-   browser, and run `tools/table_hit_test.js` in the page. `covered` must be empty. 0.2.13
-   shipped with an invisible full-screen layer over the table that took every click
-   (`#harvest`, whose own `display:grid` outranked `.bench[hidden]`); every check above
-   passed, because none of them asks the browser what is under the pointer.
+   browser, and run `tools/table_hit_test.js` in the page. `covered` and `unreachable` must
+   both be empty. 0.2.13 shipped with an invisible full-screen layer over the table that
+   took every click (`#harvest`, whose own `display:grid` outranked `.bench[hidden]`);
+   every check above passed, because none of them asks the browser what is under the
+   pointer. `unreachable` (2026-10-30) names a turn's buttons or the pen squeezed into a
+   box too short to show them whole: at 794x608 in a fight, End turn sat in a 17px strip
+   of the desk's choices, and the story's paragraph lay over the part that showed.
    **Close that browser tab when done.** The page sends heartbeats, and the packaged
    backend binds the same port (8917) every time, so a tab left open keeps the next
    backend alive. On 2026-10-16 a tab left from 0.2.18's hit test made 0.2.19's
