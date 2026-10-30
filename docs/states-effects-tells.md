@@ -86,6 +86,41 @@ to the viewer") and Ultimate Intrigue's (four steps of awareness per pair) are t
 art. Ends on a deed: `Engine._ends_on_act` reads `ends_when.acts` at the attack,
 manoeuvre and harmful-cast doors, and tells the end.
 
+**Its "what's left", built 2026-10-30** (branch `fix/hidden-state-followups`;
+`tests/test_hidden_state_followups.py`):
+* *Aimed at the unfound, any deed, anybody.* `Engine._unseen_aim` is the one question the
+  validate gate (creatures) and the doors' floors (the player, printed) ask of attacks,
+  casts and abilities. A spell's aim needs what `_cast_needs` says: "square" (an area —
+  a guessed one is `cast guess=true`, `_guess_point`), "locate" (touch, ray, emanation:
+  the pinpoint serves, the miss chance still rolls — `_touches` rolls it now), or "sight"
+  ("You must be able to see or touch the target", Aiming a Spell): a pinpointed invisible
+  creature cannot be a targeted spell's target.
+* *The player finds what hides.* The player's own Perception (a search, or any plain
+  check) is set against each hiding at its DC (`_player_finds`, `awareness.judge`), and
+  the find is `knows.where.<npc>` on the PLAYER. A scheme's bare `state.hidden` is its
+  hider's 10 (Taking 10). The player's blows at the unfound are refused with the ways
+  round; `attack guess=true square=[x,y]` is the player's chosen square.
+* *A diversion.* `check bluff diversion=true` against every watcher's Sense Motive holds
+  `state.diverting` (the watchers in the payload, one turn); the Stealth check after it
+  ignores them, walks to the nearest unobserved square in reach (`_unobserved_spot`) and
+  rolls at -10. The reader's `stealth` act carries closed `pace` and `diversion` enums
+  (`gm/interpret.py`), built whole by `acts_to_ops._sneak`.
+* *The -5 band.* `pace: full` lays `sneaking-fast` (no `state.slowed`) with -5 on the roll.
+* *+20 settled.* "Using Stealth: Stealth Check +20" is Perception's "Creature or object is
+  invisible +20" on Perception's "Notice a creature using Stealth: Opposed by Stealth"; the
+  condition's +20/+40 is a different bonus on the Stealth roll. Result + 20 it is.
+* *Groups.* `ends_when` may carry `group`, `recipient`, `together` (anyone | recipient),
+  `apart` ({from: nearest|recipient, ft}) and `see_each_other` (`_shared_ends`):
+  mass invisibility breaks for all on anyone's attack ("is broken when anyone in the group
+  attacks") and for the mover past 180 ft; the sphere's members see each other, a
+  member's attack ends its own, the recipient's ends all, and 10 ft from the recipient
+  ends a member's (`_group_apart`, on the map only).
+Still open: creatures' spell-like invisibility (`spell_like` is stripped off the sheet,
+`bestiary._NOT_ON_THE_SHEET`) and the potions in their pockets (`kit_pending` until
+looted) never fire, so an NPC hides only by its own Stealth check or a scheme; the player
+gets no reactive Perception at the top of their turn; crowd squares (CRB Urban, "The
+crowds provide cover ..., enabling a Stealth check") do not exist on the map.
+
 ## The mind had no gate (2026-09-09)
 
 *Widened 2026-10-05 (docs/means-gate.md): the declaration door below leaked by its gaps

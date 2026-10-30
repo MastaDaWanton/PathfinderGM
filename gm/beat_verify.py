@@ -2974,9 +2974,14 @@ def question(d: Discrepancy, facts: Facts) -> str:
         return (f"Which of these people does this sentence show striking or swinging at you "
                 f"(the player)? ({_name(facts, s['who'])} was named.)")
     if c.category == "unseen":
+        # The first read's own list (`_UNSEEN_SYSTEM`), whole. Measured 2026-10-30 on the
+        # gold beats (tools/unseen_bench.py, gemma, two runs): this question named only
+        # looking, turning and aiming, so the first read's "speaking to you" catch — "The
+        # gate guard tells you to move along" — was refuted here both runs, recall 13/14.
         return (f"Does this sentence show {_name(facts, s['who'])} looking at you (the "
-                f"player), turning to you, or aiming or striking at you — not looking "
-                f"around, searching, or swinging at empty air?")
+                f"player), turning to you, speaking to you, reaching for you, or aiming "
+                f"or striking at you — not looking around, searching, or swinging at "
+                f"empty air?")
     if c.category == "aimed":
         # Asked in `_aimed_whom`'s shape (who at whom, from the codes); this line is the
         # cache key and the record of what was asked.

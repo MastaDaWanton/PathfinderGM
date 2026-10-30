@@ -287,7 +287,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `search`: Perception against what is hidden here, at the hiding's own DC (a move
     # action, CRB p.102; `Engine._search`, rules/awareness.py) — a creature's answer to an
     # enemy it cannot find.
-    "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search"),
+    # `pace` (Stealth: "half" or "full", CRB p.106's -5 band) and `diversion` (a Bluff to
+    # draw the watchers' eyes away so a Stealth check may follow) are the reader's closed
+    # answers about the player's words (`acts_to_ops._sneak`), never a word list.
+    "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
+                           "pace", "diversion"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -555,7 +559,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `point:<x>,<y>[,<z>]`, `object:<words>`. "Burning hands into the tree tops" could not
     # be said at all before it (item 21.2), and a cone sent with no target resolved as
     # `targets: []` (item 22). `at` is still read, as `ref:<at>`.
-    "cast": (("spell",), ("at", "level", "defensively", "square", "choose", "aim"),
+    # `guess`: an area spell cast at a square the caster guesses at, for somebody hidden
+    # from it it has not found — the engine's die picks the square (`Engine._guess_point`;
+    # Concealment, CRB p.196), as an attack's `guess` does.
+    "cast": (("spell",), ("at", "level", "defensively", "square", "choose", "aim",
+                          "guess"),
              "hidden"),
     # Crafted potions and tinctures doing something. `how` is drink, apply, throw or coat,
     # and the difference is real: a splash weapon is a ranged touch attack and a coated
@@ -749,7 +757,7 @@ PARAM_ALIASES = {
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
 CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
-                              "ends_when"})
+                              "ends_when", "pace", "diversion"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
@@ -1288,7 +1296,20 @@ def _check_params(intent: Intent, index: int) -> None:
             raise IntentError("check: a search is rolled against what is hidden, at its "
                               "own DC. Drop the dc and opposed_by and keep search.",
                               "schema", index)
-        if not p.get("dc") and not p.get("opposed_by") and not social and not search:
+        if p.get("pace") not in (None, "", "half", "full") or (
+                p.get("pace") and p.get("skill") != "stealth"):
+            raise IntentError('check: pace is "half" or "full", and only on a stealth '
+                              "check.", "schema", index)
+        diversion = bool(p.get("diversion"))
+        if diversion and p.get("skill") != "bluff":
+            raise IntentError("check: a diversion is a bluff. Make the skill bluff, or "
+                              "drop diversion.", "schema", index)
+        if diversion and (p.get("dc") or p.get("opposed_by")):
+            raise IntentError("check: a diversion is rolled against every watcher's "
+                              "sense motive, by the engine. Drop the dc and opposed_by "
+                              "and keep diversion.", "schema", index)
+        if not p.get("dc") and not p.get("opposed_by") and not social and not search \
+                and not diversion:
             raise IntentError(
                 "check: a check needs something to beat. Add either "
                 '"dc": {"band": "tough"} (one of ' + ", ".join(DC_BANDS) + "), or "

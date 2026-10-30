@@ -875,13 +875,18 @@
       "acts": [
        "attack",
        "cast_offensive"
-      ]
+      ],
+      "together": "anyone",
+      "apart": {
+       "from": "nearest",
+       "ft": 180
+      }
      }
     },
     {
      "type": "narrative",
      "target": "As invisibility, but on any number of creatures no two of which are more than 180 feet apart. The effect moves with the group and breaks when anyone in it attacks. Members cannot see one another. It breaks for anyone moving more than 180 feet from the nearest member; with only two subjects the one moving away loses invisibility, and if both move apart both become visible once the gap passes 180 feet.",
-     "note": "Not modelled: the 180-ft spread-apart rule, members not seeing each other, and one member's attack breaking it for the whole group — each member's ends on their own attack."
+     "note": "Modelled 2026-10-30 (Engine._lay_condition, _shared_ends): one group per casting; anyone's attack breaks it for the whole group (\"is broken when anyone in the group attacks\", CRB p.302); the one who moves more than 180 ft from the nearest member loses it, on the map only; members cannot see one another. Not modelled: both of two subjects moving apart at once, and a member leaving the place."
     }
    ],
    "duration": {
@@ -891,7 +896,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "Every creature caught gets the invisible condition, ending on its own attack. Duration corrected to 1 min./level (CRB p.302; it read 1 round/level)."
+   "notes": "Every creature named gets the invisible condition in one group: anyone's attack breaks it for all, and 180 ft from the nearest member breaks it for the one who went (CRB p.302). Duration corrected to 1 min./level (CRB p.302; it read 1 round/level)."
   },
   "invisibility-purge": {
    "effects": [
@@ -918,13 +923,19 @@
       "acts": [
        "attack",
        "cast_offensive"
-      ]
+      ],
+      "together": "recipient",
+      "apart": {
+       "from": "recipient",
+       "ft": 10
+      },
+      "see_each_other": true
      }
     },
     {
      "type": "narrative",
      "target": "As invisibility, but every creature within 10 feet of the recipient at the moment of casting turns invisible, in a 10-foot emanation that travels with the recipient. Those affected see each other and themselves normally. Anyone leaving the area becomes visible, and anyone entering afterwards is not hidden. An affected creature other than the recipient who attacks loses only its own invisibility; if the recipient attacks, the whole sphere ends.",
-     "note": "Not modelled: the emanation travelling with the recipient, leaving it making a creature visible, and the recipient's attack ending it for everyone — each creature's ends on its own attack."
+     "note": "Modelled 2026-10-30 (Engine._lay_condition, _shared_ends): everyone in the 10-ft emanation at casting, the recipient always; members see each other; a member more than 10 ft from the recipient after a move (theirs or the recipient's) becomes visible; a member's attack ends only its own, the recipient's ends the sphere for all. On the map only."
     }
    ],
    "duration": {
@@ -934,7 +945,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "Every creature caught in the 10-ft emanation at casting gets the invisible condition, ending on its own attack."
+   "notes": "Every creature caught in the 10-ft emanation at casting gets the invisible condition, held together by the recipient (CRB p.302)."
   },
   "invoke-deity": {
    "effects": [
