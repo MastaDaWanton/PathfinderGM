@@ -2,7 +2,7 @@
  "partition": 1,
  "source": "read from the spell descriptions in content/spells/spells.json",
  "spells": {
-  "abadar-s-truthtelling": {
+  "touch-of-truthtelling": {
    "effects": [
     {
      "type": "narrative",
@@ -879,7 +879,7 @@
    "notes": "Duration emitted is the total pool before it is divided among the targets.",
    "converted_by": "read"
   },
-  "akashic-communion": {
+  "memory-communion": {
    "effects": [
     {
      "type": "situational_mod",
@@ -901,11 +901,11 @@
    "notes": "The +10 is stated as an insight bonus and applies only to the checks this spell buys, hence situational_mod rather than a blanket skill_mod on every Knowledge skill.",
    "converted_by": "read"
   },
-  "akashic-form": {
+  "remembered-form": {
    "effects": [
     {
      "type": "narrative",
-     "target": "Stores a snapshot of your body - hit points, physical ability scores, and physical conditions such as ability damage, disease, negative levels and poison - in the Akashic Record. If you drop below 0 hit points or are killed by a non-mind-affecting death effect while the spell lasts, you may let the body die and take up the stored record on your next turn: the corpse vanishes and you reappear in its place wearing whatever clothing was still on it, or anywhere you have been within 500 feet of the corpse with no gear at all. Your mind is unchanged, so no spells return; mental influences and energy drain carry over, but physical afflictions acquired since casting do not. It cannot dodge death by old age, and recasting overwrites the stored copy."
+     "target": "Stores a snapshot of your body - hit points, physical ability scores, and physical conditions such as ability damage, disease, negative levels and poison - in the memory of the cosmos. If you drop below 0 hit points or are killed by a non-mind-affecting death effect while the spell lasts, you may let the body die and take up the stored record on your next turn: the corpse vanishes and you reappear in its place wearing whatever clothing was still on it, or anywhere you have been within 500 feet of the corpse with no gear at all. Your mind is unchanged, so no spells return; mental influences and energy drain carry over, but physical afflictions acquired since casting do not. It cannot dodge death by old age, and recasting overwrites the stored copy."
     }
    ],
    "duration": {
@@ -931,7 +931,7 @@
    },
    "converted_by": "read"
   },
-  "alaznist-s-jinx": {
+  "burning-jinx": {
    "effects": [
     {
      "type": "save_gate",
@@ -984,7 +984,7 @@
    "notes": "The Fortitude save is an object save for an item someone else holds, not a gate on the transformation the caster performs on their own gear, so no save_gate.",
    "converted_by": "read"
   },
-  "aldori-alacrity": {
+  "duelist-s-alacrity": {
    "effects": [
     {
      "type": "speed",
@@ -2236,7 +2236,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "As plane shift, but you and up to four willing creatures - none of whom may currently be on their home plane - are sent to a randomly rolled plane instead of a chosen one: 1-7 Abyss, 8-14 Abaddon, 15-20 Hell, 21-24 Shadow Plane, 25-28 First World, 29-35 Maelstrom, 36-42 Boneyard, 43-49 Axis, 50-56 Ethereal, 57-63 Elysium, 64-70 Nirvana, 71-77 Heaven, 78-84 Astral, 85-90 a random demiplane, 91-95 a random world on the Material Plane, 96-100 the GM's choice. You always arrive somewhere not inherently harmful, but the exact spot is the GM's. A creature moved this way cannot be moved by another casting for 24 hours, though other planar travel works normally."
+     "target": "As plane shift, but you and up to four willing creatures - none of whom may currently be on their home plane - are sent to a randomly rolled plane instead of a chosen one: 1-7 Abyss, 8-14 the daemon wastes, 15-20 Hell, 21-24 Shadow Plane, 25-28 the fey realm, 29-35 the churning chaos, 36-42 the court of the dead, 43-49 the city of law, 50-56 Ethereal, 57-63 the free heavens, 64-70 the serene heavens, 71-77 Heaven, 78-84 Astral, 85-90 a random demiplane, 91-95 a random world on the Material Plane, 96-100 the GM's choice. You always arrive somewhere not inherently harmful, but the exact spot is the GM's. A creature moved this way cannot be moved by another casting for 24 hours, though other planar travel works normally."
     }
    ],
    "duration": {
@@ -2445,7 +2445,7 @@
    "notes": "Corpus duration is 'instantaneous or hours/level (1)': sending resolves at once, receiving waits up to 1 hour per level for its trigger. The waiting form is emitted.",
    "converted_by": "read"
   },
-  "apsu-s-shining-scales": {
+  "shining-scales": {
    "effects": [
     {
      "type": "combat_mod",
@@ -2531,7 +2531,7 @@
    "notes": "The opening 2d6 is emitted; the identical 2d6 taken each round while engulfed is repeating damage and is left narrative, as is the engulf itself, which needs a second save the shape cannot chain.",
    "converted_by": "read"
   },
-  "aram-zey-s-focus": {
+  "trapfinder-s-focus": {
    "effects": [
     {
      "type": "narrative",
@@ -2547,7 +2547,7 @@
    "notes": "The +5 and the granted trapfinding are alternatives decided by whether the caster already has trapfinding, so emitting the skill_mod would hand +5 Disable Device to a wizard who should instead be getting the ability itself.",
    "converted_by": "read"
   },
-  "aram-zey-s-trap-ward": {
+  "trap-ward": {
    "effects": [
     {
      "type": "narrative",

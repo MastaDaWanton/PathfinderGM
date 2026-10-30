@@ -415,12 +415,12 @@
    "book": false
   },
   {
-   "id": "abysium-ore",
-   "name": "Abysium Ore",
+   "id": "fever-skymetal-ore",
+   "name": "Fever Skymetal Ore",
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A skymetal ore that glows blue-green in the dark and warms the hand that holds it. It smelts to abysium, and it sickens whoever carries it: assaying it is genuinely dangerous.",
+   "text": "A skymetal ore that glows blue-green in the dark and warms the hand that holds it. It smelts to fever skymetal, and it sickens whoever carries it: assaying it is genuinely dangerous.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -447,7 +447,7 @@
    "effects_converted": true,
    "obtain": "mined",
    "form": "ore",
-   "material": "abysium",
+   "material": "fever-skymetal",
    "working": [
     {
      "type": "working",
@@ -457,8 +457,8 @@
    "book": false
   },
   {
-   "id": "djezet-ore",
-   "name": "Djezet Seep",
+   "id": "quick-skymetal-ore",
+   "name": "Quick Skymetal Seep",
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
@@ -472,7 +472,7 @@
    "effects_converted": true,
    "obtain": "mined",
    "form": "ore",
-   "material": "djezet",
+   "material": "quick-skymetal",
    "working": [
     {
      "type": "working",
@@ -482,12 +482,12 @@
    "book": false
   },
   {
-   "id": "inubrix-ore",
-   "name": "Inubrix Ore",
+   "id": "ghost-skymetal-ore",
+   "name": "Ghost Skymetal Ore",
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "The ghost iron. Seams of it are found threaded through iron deposits they have visibly sunk through. It smelts to inubrix, only slightly less malleable than lead.",
+   "text": "The ghost iron. Seams of it are found threaded through iron deposits they have visibly sunk through. It smelts to ghost skymetal, only slightly less malleable than lead.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -497,7 +497,7 @@
    "effects_converted": true,
    "obtain": "mined",
    "form": "ore",
-   "material": "inubrix",
+   "material": "ghost-skymetal",
    "working": [
     {
      "type": "working",
@@ -507,12 +507,12 @@
    "book": false
   },
   {
-   "id": "noqual-ore",
-   "name": "Noqual Ore",
+   "id": "null-skymetal-ore",
+   "name": "Null Skymetal Ore",
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale green skymetal crystal, found in crater rims. Detect magic slides off a nugget of it as though there were nothing there. It smelts to noqual, which the book says is worked as iron.",
+   "text": "Pale green skymetal crystal, found in crater rims. Detect magic slides off a nugget of it as though there were nothing there. It smelts to null skymetal, which the book says is worked as iron.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -522,7 +522,7 @@
    "effects_converted": true,
    "obtain": "mined",
    "form": "ore",
-   "material": "noqual",
+   "material": "null-skymetal",
    "working": [
     {
      "type": "working",
@@ -532,12 +532,12 @@
    "book": false
   },
   {
-   "id": "siccatite-ore",
-   "name": "Siccatite Ore",
+   "id": "searing-skymetal-ore",
+   "name": "Searing Skymetal Ore",
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A skymetal that comes out of the ground either searing hot or freezing cold and never changes its mind. It smelts to siccatite, and assaying it burns.",
+   "text": "A skymetal that comes out of the ground either searing hot or freezing cold and never changes its mind. It smelts to searing skymetal, and assaying it burns.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -555,7 +555,7 @@
    "effects_converted": true,
    "obtain": "mined",
    "form": "ore",
-   "material": "siccatite",
+   "material": "searing-skymetal",
    "working": [
     {
      "type": "working",
@@ -565,12 +565,12 @@
    "book": false
   },
   {
-   "id": "horacalcum-ore",
-   "name": "Horacalcum Ore",
+   "id": "time-skymetal-ore",
+   "name": "Time Skymetal Ore",
    "kind": "ore",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "The rarest skymetal: a dull coppery ore around which time runs a half-step slow. It smelts to horacalcum in the narrowest band of any ore.",
+   "text": "The rarest skymetal: a dull coppery ore around which time runs a half-step slow. It smelts to time skymetal in the narrowest band of any ore.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -581,7 +581,7 @@
    "effects_converted": true,
    "obtain": "mined",
    "form": "ore",
-   "material": "horacalcum",
+   "material": "time-skymetal",
    "working": [
     {
      "type": "working",
@@ -1794,8 +1794,8 @@
    "book": true
   },
   {
-   "id": "abysium",
-   "name": "Abysium",
+   "id": "fever-skymetal",
+   "name": "Fever Skymetal",
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
@@ -1882,8 +1882,8 @@
    "book": true
   },
   {
-   "id": "djezet",
-   "name": "Djezet",
+   "id": "quick-skymetal",
+   "name": "Quick Skymetal",
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
@@ -1921,12 +1921,12 @@
    "book": false
   },
   {
-   "id": "inubrix",
-   "name": "Inubrix",
+   "id": "ghost-skymetal",
+   "name": "Ghost Skymetal",
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Ghost iron, the softest of the skymetals. An inubrix head is always broken in the book, deals damage as a size smaller and cannot harm iron or steel, but passes through iron and steel armour as if it were not there; here it swings truer against a metal-armoured foe. Poor for armour, so it fills no armour piece.",
+   "text": "Ghost iron, the softest of the skymetals. An ghost skymetal head is always broken in the book, deals damage as a size smaller and cannot harm iron or steel, but passes through iron and steel armour as if it were not there; here it swings truer against a metal-armoured foe. Poor for armour, so it fills no armour piece.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -2002,12 +2002,12 @@
    "book": true
   },
   {
-   "id": "noqual",
-   "name": "Noqual",
+   "id": "null-skymetal",
+   "name": "Null Skymetal",
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale green and crystalline, and magic slides off it. Noqual is half weight; its weapons bite constructs and made undead harder, and its armour moves a class lighter and wards its wearer against spells, at a fifth more spell failure for any caster. Any magic item made with it costs 5,000 gp more to enchant. Worked as iron, but assaying it is dangerous: magic recoils from it, and whatever spells and wards the assayer carries go quiet for a few moments (a house rule).",
+   "text": "Pale green and crystalline, and magic slides off it. Null skymetal is half weight; its weapons bite constructs and made undead harder, and its armour moves a class lighter and wards its wearer against spells, at a fifth more spell failure for any caster. Any magic item made with it costs 5,000 gp more to enchant. Worked as iron, but assaying it is dangerous: magic recoils from it, and whatever spells and wards the assayer carries go quiet for a few moments (a house rule).",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -2156,12 +2156,12 @@
    "book": true
   },
   {
-   "id": "siccatite",
-   "name": "Siccatite",
+   "id": "searing-skymetal",
+   "name": "Searing Skymetal",
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "The skymetal of extremes; this is the hot kind. A siccatite head brands what it hits for a point of fire and burns its wielder a point each round of combat. Siccatite armour burns its wearer and anyone who grapples them, and keeps the cold off. Assaying it burns.",
+   "text": "The skymetal of extremes; this is the hot kind. A searing skymetal head brands what it hits for a point of fire and burns its wielder a point each round of combat. Searing skymetal armour burns its wearer and anyone who grapples them, and keeps the cold off. Assaying it burns.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -2173,14 +2173,14 @@
      "dice": "1",
      "damage_type": "fire",
      "lethality": "lethal",
-     "note": "hot siccatite, each round of bare contact — including the wielder's ungloved grip"
+     "note": "hot searing skymetal, each round of bare contact — including the wielder's ungloved grip"
     },
     {
      "type": "damage",
      "dice": "1",
      "damage_type": "cold",
      "lethality": "lethal",
-     "note": "frigid siccatite, each round of bare contact"
+     "note": "frigid searing skymetal, each round of bare contact"
     }
    ],
    "effects_converted": true,
@@ -2200,7 +2200,7 @@
      "damage_type": "fire",
      "lethality": "lethal",
      "trigger": "hit",
-     "note": "hot siccatite; cold siccatite deals cold",
+     "note": "hot searing skymetal; cold searing skymetal deals cold",
      "book": true
     },
     {
@@ -2254,7 +2254,7 @@
      "type": "resistance",
      "target": "cold",
      "amount": 5,
-     "note": "hot siccatite armour; cold siccatite gives fire resistance 5 instead",
+     "note": "hot searing skymetal armour; cold searing skymetal gives fire resistance 5 instead",
      "book": true
     },
     {
@@ -2277,12 +2277,12 @@
    "book": true
   },
   {
-   "id": "horacalcum",
-   "name": "Horacalcum",
+   "id": "time-skymetal",
+   "name": "Time Skymetal",
    "kind": "metal",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "The rarest skymetal, a dull coppery gold around which time runs slow. A horacalcum blade gives the book's +1 on the attack and puts its bearer ahead in the fight, though it lands lightly. Horacalcum armour quickens the wearer by its weight, +1 to +3 initiative, and sits stiffly.",
+   "text": "The rarest skymetal, a dull coppery gold around which time runs slow. A time skymetal blade gives the book's +1 on the attack and puts its bearer ahead in the fight, though it lands lightly. Time skymetal armour quickens the wearer by its weight, +1 to +3 initiative, and sits stiffly.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -2295,7 +2295,7 @@
      "amount": 1,
      "bonus_type": "circumstance",
      "target": "attack",
-     "note": "a horacalcum weapon; armour instead gives +1/+2/+3 initiative by weight"
+     "note": "a time skymetal weapon; armour instead gives +1/+2/+3 initiative by weight"
     }
    ],
    "effects_converted": true,
@@ -2981,8 +2981,8 @@
    "ferrous": true
   },
   {
-   "id": "nexavaran-steel",
-   "name": "Nexavaran Steel",
+   "id": "frontier-steel",
+   "name": "Frontier Steel",
    "kind": "alloy",
    "tier": "uncommon",
    "craft_dc": 15,
@@ -3059,8 +3059,8 @@
    "ferrous": true
   },
   {
-   "id": "elysian-bronze",
-   "name": "Elysian Bronze",
+   "id": "celestial-bronze",
+   "name": "Celestial Bronze",
    "kind": "alloy",
    "tier": "rare",
    "craft_dc": 20,
@@ -4669,8 +4669,8 @@
    "book": false
   },
   {
-   "id": "styx-water",
-   "name": "Styx Water",
+   "id": "oblivion-water",
+   "name": "Oblivion Water",
    "kind": "quenchant",
    "tier": "exotic",
    "craft_dc": 25,
@@ -4703,7 +4703,7 @@
    ],
    "quench_mark": {
     "type": "bundle",
-    "label": "Styx-quenched",
+    "label": "Oblivion-quenched",
     "effects": [
      {
       "type": "combat_mod",

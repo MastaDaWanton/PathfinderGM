@@ -348,9 +348,87 @@ before any option that keeps them.
 
 ## 7. Follow-up, 2026-10-29: Golarion names outside the bestiary
 
-**Status: measured, waiting on the owner. No content has been changed.** The owner chose
-option D for the bestiary on 2026-10-28: ship Paizo's rulebook line and no Product
-Identity. The spells and feats came in through the same kind of spreadsheet import, from
+**Status: decided 2026-10-29 — F3, falling back to F2 (the owner's words: "go with F3,
+falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the table in
+`tools/golarion_rewrites.py`:**
+
+- **Renamed:** 36 spells, 12 feats and 2 weapons, plus 7 feat ids re-slugged. Examples:
+  Spellbane, Touch of Truthtelling, Dueling Sword Mastery, the dueling sword.
+- **Prose rewritten:** 136 rows edited sentence by sentence (109 spells, 27 feats), with
+  the mechanics untouched.
+- **Columns cleared:** the deity and bloodline column entries.
+- **Deity gates:** 13 feats now ask for a god by portfolio ("a god of battle").
+- **Product prefixes:** stripped from the book citations.
+- **Dropped, the F2 fallback:**
+  - 17 prestige-award feats;
+  - Improved Day Job, Eagle Knight Candidate and Osirionology;
+  - an import duplicate of Lastwall Phalanx;
+  - Cultural Adaptation (Taldan), the rulebook's spell with a Taldan origin story;
+  - What Grows Within, which was built on AP 113's Great Old One.
+- **Result:** spells 3,040 → 3,038, feats 1,474 → 1,453, and zero Golarion names in
+  shipped content outside the bestiary. `tests/test_no_golarion_names.py` holds that.
+- **Old saves:** they resolve through `content/spells/aliases.json`,
+  `content/feats/aliases.json` and the weapon aliases in `rules/weapons.py`.
+- **The myth names went the same way on 2026-10-30** (the owner: "rewrite the myth names
+  too, same way"). That is the 27 myth-only rows, plus every myth name in other rows and
+  columns:
+  - Apsu and Dahak became a good and an evil dragon god.
+  - Asmodeus became the lord of Hell, or a god of tyranny in feat gates.
+  - Lamashtu became a demon goddess, or a god of monsters in feat gates.
+  - Mammon became an archdevil of greed, and Hastur the god of the sign.
+  - Abaddon became the daemon wastes, and Charon's River Styx the river of forgetting.
+  - 6 spells were renamed: Shining Scales, Blessing of the Bull, Ferryman's Dispensation,
+    Draconic Release, Vision of Nightmares and Foul Waters. Nothing was dropped.
+- **Left as they were, on purpose:**
+  - Cosmology words (Boneyard, Elysium, First World), which were never ruled on.
+- **The app's own river materials were renamed on 2026-10-30** (the owner: "rename the Styx
+  materials too"). Styx Water is now Oblivion Water, quenching "Oblivion-quenched"; Styx
+  Mordant is now Oblivion Mordant. Their text already called it "the river of forgetting".
+  Old ids resolve through `materials.RENAMED`, and saves are rewritten on load
+  (`sheet._current_materials`). "Styx" is on the deny-list now.
+- **The cosmology words, 2026-10-30** (the owner: "rename the cosmology words too").
+  Paizo's own plane names became what each place is:
+  - the Boneyard → the court of the dead;
+  - the Maelstrom → the churning chaos;
+  - Axis → the city of law;
+  - Elysium → the free heavens;
+  - Nirvana → the serene heavens;
+  - the First World → the fey realm;
+  - the Great Beyond → the planes beyond;
+  - the River of Souls → the river of the dead;
+  - the Akashic Record → the memory of the cosmos.
+
+  Five spells were renamed: Memory Communion, Remembered Form, Glimpse of All Memory, Fey
+  Revisions and Fey Kiss. The SRD's generic planes (Heaven, Hell, the Abyss, the Shadow,
+  Ethereal, Astral and Material Planes) and book titles in `source` stay.
+- **Golarion's coined metals, the same day** (the owner: "rename the skymetals and
+  nexavaran steel too, using the adjective skymetal is fine"). Each is named for what its
+  own entry says it does:
+
+  | was | now |
+  |---|---|
+  | abysium | fever skymetal |
+  | djezet | quick skymetal |
+  | inubrix | ghost skymetal |
+  | noqual | null skymetal |
+  | siccatite | searing skymetal |
+  | horacalcum | time skymetal |
+  | nexavaran steel | frontier steel |
+  | elysian bronze | celestial bronze |
+  | the herb Elysium | nullgrass |
+
+  Their ores follow. Old ids resolve through `materials.RENAMED` and
+  `ingredients.RENAMED`, and saves are rewritten on load.
+  - Updated: code, tests, data passes, the generated review pages, and the contract docs
+    (`campaign-format.md`, `from-world-bible.md`).
+  - Not updated: the dated design records (plans, prior art, contracts, questions). They
+    still quote the book's names, as a record of what was read.
+- **Still outstanding:** Section 15 for the setting books.
+
+The section below is the measurement and the options as they were put.
+
+The owner chose option D for the bestiary on 2026-10-28: ship Paizo's rulebook line and no
+Product Identity. The spells and feats came in through the same kind of spreadsheet import, from
 the whole Pathfinder line. This section measures how much Golarion they carry and sets out
 the options. The letters run F1–F4 so they cannot be confused with A–E above.
 

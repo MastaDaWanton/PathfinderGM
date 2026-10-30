@@ -348,7 +348,7 @@
    "converted_by": "read",
    "notes": "Only the immediate on-contraction damage is executable. The identical daily damage is deliberately left narrative - converting it would make the engine apply it once, at cast time, on top of the immediate hit."
   },
-  "rovagug-s-fury": {
+  "quaking-fury": {
    "effects": [
     {
      "type": "narrative",
@@ -412,7 +412,7 @@
    "converted_by": "read",
    "notes": ""
   },
-  "rune-of-jandelay": {
+  "rune-of-order": {
    "effects": [
     {
      "type": "narrative",
@@ -817,7 +817,7 @@
    "converted_by": "read",
    "notes": "The prose is only 'functions as sand whirlwind except as noted above'. The mechanics were carried across from that spell rather than delegated, since they are fully known; the area difference is already in the corpus as area_value."
   },
-  "sarzari-shadow-memory": {
+  "shadow-memory": {
    "effects": [
     {
      "type": "narrative",

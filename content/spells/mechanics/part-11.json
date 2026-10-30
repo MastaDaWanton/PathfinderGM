@@ -1631,7 +1631,7 @@
      "on_failure": [
       {
        "type": "narrative",
-       "target": "For the next minute the target's soul is damned: if it dies in that time its soul goes to Hell, Abaddon or the Abyss according to your own evil alignment, and it cannot be raised by normal means."
+       "target": "For the next minute the target's soul is damned: if it dies in that time its soul goes to Hell, the daemon wastes or the Abyss according to your own evil alignment, and it cannot be raised by normal means."
       }
      ]
     },

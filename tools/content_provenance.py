@@ -103,7 +103,7 @@ GOLARION = {
         Hallit Tien Varki Jistkan Andoren Andorens Irriseni Gebite Gebites Nexian Nexians
         Mendevian Molthuni Galtan Brevic Isgeri Thuvian Katapeshi Qadiran Rahadoumi
         Ustalavic Sarkorian Iobarian Sargavan Aldori Razmiri Numerian Jalmeri Absalomian
-        Korvosan Magnimarian Shoki Novotnian
+        Korvosan Magnimarian Shoki Novotnian Hermean Lissalan
     """,
     "organisation": """
         Hellknight Hellknights Aspis Sczarni Magaambya Arcanamirium Acadamae Riftwardens
@@ -141,6 +141,12 @@ GOLARION = {
         Abadius Calistril Pharast Gozran Desnus Sarenith Erastus Arodus Rova Lamashan
         Neth Kuthona Toilday Wealday Oathday Fireday Starday
     """,
+    # Golarion's coined metals: the skymetals of Numeria and the steel named for Nex. Both
+    # cases, because a material's id and its prose are lower-case (renamed 2026-10-30).
+    "material": """
+        abysium Abysium djezet Djezet inubrix Inubrix noqual Noqual siccatite Siccatite
+        horacalcum Horacalcum nexavaran Nexavaran
+    """,
 }
 
 # Older than Paizo: real-world myth, demonology and the Mythos, taken into Golarion as its
@@ -150,7 +156,7 @@ MYTH = {
         Asmodeus Asmodean Lamashtu Lamashtan Baphomet Mammon Mephistopheles Dagon Pazuzu
         Moloch Belial Baalzebul Dispater Geryon Barbatos Abraxas Haagenti Shax Hastur
         Azathoth Cthulhu Nyarlathotep Yog-Sothoth Shub-Niggurath Erebus Abaddon Abaddonian
-        Apollyon Charon Ahriman Cernunnos Apsu Dahak Leng Carcosa
+        Apollyon Charon Ahriman Cernunnos Apsu Dahak Leng Carcosa Styx
     """,
     "myth phrase": ["Baba Yaga", "Sun Wukong"],
 }
@@ -164,11 +170,11 @@ PRODUCT = [
     r"Archives of Nethys", r"Pathfinder Society (?:FAQ|Roleplaying Guild)",
 ]
 
-# Paizo-coined cosmology that reads as ordinary words, or real words Golarion made places.
-# Reported on its own line and in no total: whether "the Boneyard" is a name is the
-# reader's call, not this tool's.
-COSMOLOGY = ["Boneyard", "Maelstrom", "Great Beyond", "First World", "Akashic Record",
-             "Elysium", "Nirvana"]
+# Paizo's names for its planes, some of them ordinary words Golarion made places. Reported
+# on their own line. The owner had them rewritten on 2026-10-30, and
+# tests/test_no_golarion_names.py holds them at zero with the rest.
+COSMOLOGY = ["Boneyard", "Maelstrom", "Great Beyond", "First World", "Akashic", "Elysium",
+             "Elysian", "Nirvana", "Axis", "River of Souls"]
 
 
 def _terms(table: dict) -> dict[str, str]:
@@ -299,6 +305,9 @@ BOOK_FILES = {
     "content/feats/feats.json": "feats",
 }
 SKIP_DIRS = {"bestiary"}  # measured on its own in tools/bestiary_provenance.py
+# `aliases.json` files are skipped too: old id -> new id, kept so a save written before a
+# rename still loads (tools/strip_golarion.py). They are the one sanctioned home of the
+# old names, as content/bestiary/aliases.json is for the bestiary's.
 # This project's typed mechanics for the imported rows, keyed by the rows' ids and quoting
 # their prose: not separate content, but a copy any rename or drop has to follow.
 DERIVED = re.compile(r"^content/(spells/mechanics/|spells/spells-mechanics|feats/mechanics/)")
@@ -381,7 +390,7 @@ def measure():
     rows, totals = [], collections.defaultdict(collections.Counter)
     for path in sorted((ROOT / "content").rglob("*.json")):
         rel = path.relative_to(ROOT).as_posix()
-        if SKIP_DIRS & set(path.relative_to(ROOT).parts):
+        if SKIP_DIRS & set(path.relative_to(ROOT).parts) or path.name == "aliases.json":
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         if rel in BOOK_FILES:
@@ -406,7 +415,7 @@ def measure():
 
 # --- report ------------------------------------------------------------------------------------
 
-LORE = {"deity", "place", "people", "organisation", "character", "calendar"}
+LORE = {"deity", "place", "people", "organisation", "character", "calendar", "material"}
 
 # Columns that are lists and gates rather than prose: the spells' "which god grants this"
 # and "which bloodline gets it" columns, and the feats' prerequisites. A name only here

@@ -23,6 +23,9 @@ from pathlib import Path
 
 import openpyxl
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import golarion_rewrites  # noqa: E402
+
 # The 26 canonical descriptors, exactly as the Codex names them. Read from columns, never
 # inferred: a descriptor is a rules fact with mechanical consequences (a [fire] spell is
 # stopped by fire immunity), and guessing one is worse than having none.
@@ -237,7 +240,10 @@ def build(src: Path, out: Path) -> dict:
                  "to make three thousand spells searchable, and are never rules."),
         "descriptors": [c.strip("[]").lower() for c in DESCRIPTOR_COLUMNS],
         "classes": [c.lower() for c in CLASS_COLUMNS],
-        "spells": sorted(spells, key=lambda s: s["name"].lower()),
+        # Golarion's names out, the way the shipped file has them (the owner's ruling of
+        # 2026-10-29, docs/bestiary-licensing.md §7): a re-import must not put them back.
+        "spells": golarion_rewrites.apply_spells(
+            sorted(spells, key=lambda s: s["name"].lower()))[0],
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")

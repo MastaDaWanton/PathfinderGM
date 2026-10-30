@@ -155,7 +155,7 @@ def _track(track, progress) -> dict:
 # Approximate surface colours of the bare metal, by eye from reference photographs of each
 # (iron's grey, bronze's brown-gold, copper's salmon, mithral's blue-white per the UI plan
 # §4). The fantasy metals follow their book descriptions where one exists (adamantine
-# "dark", noqual "pale", djezet "rust-red", abysium "blue-green glow").
+# "dark", null skymetal "pale", quick skymetal "rust-red", fever skymetal "blue-green glow").
 _COLOUR = {
     "iron": "#8a8d91", "wrought-iron": "#7b7a76", "steel": "#a7adb3",
     "high-carbon-steel": "#9097a0", "cold-iron": "#5f6670", "copper": "#b8733f",
@@ -163,9 +163,9 @@ _COLOUR = {
     "lead": "#6f7477", "zinc": "#a9b0b5", "bismuth": "#c2b8c8", "pewter": "#9a9d9a",
     "gold": "#d4af37", "silver": "#c8ccd0", "electrum": "#d8c47a", "platinum": "#d9dad7",
     "mithral": "#cfe0ee", "adamantine": "#3d4a4f", "star-iron": "#59606e",
-    "viridium": "#5e8f5a", "abysium": "#5ab6a8", "djezet": "#b0462e", "inubrix": "#8f8a7a",
-    "noqual": "#c9cfc4", "siccatite": "#a7b9c9", "horacalcum": "#c7a86a",
-    "elysian-bronze": "#c8964a", "nexavaran-steel": "#7d8a95", "pattern-steel": "#8e939a",
+    "viridium": "#5e8f5a", "fever-skymetal": "#5ab6a8", "quick-skymetal": "#b0462e", "ghost-skymetal": "#8f8a7a",
+    "null-skymetal": "#c9cfc4", "searing-skymetal": "#a7b9c9", "time-skymetal": "#c7a86a",
+    "celestial-bronze": "#c8964a", "frontier-steel": "#7d8a95", "pattern-steel": "#8e939a",
     "fire-forged-steel": "#9a6a55", "frost-forged-steel": "#a9c2d4",
     "living-steel": "#6c8a5c", "singing-steel": "#b9c3cc", "wyrmsteel": "#7a3b33",
     "quicksilver": "#b9bec2",
@@ -1041,7 +1041,7 @@ def forge_assay(request):
     # The danger of a reactive metal, applied for real (contracts §6): lane E's assay
     # only NAMES it ("the caller runs it through the engine with `apply_danger`", its own
     # docstring), and until 2026-10-04 this view showed it and applied nothing, so
-    # assaying abysium never sickened anyone (lane U5's report). Through the engine, so it
+    # assaying fever skymetal never sickened anyone (lane U5's report). Through the engine, so it
     # lands as an ActiveEffect through the one applicator and is told (laws 2 and 3).
     danger = got.get("danger")
     applied = []
@@ -1173,7 +1173,7 @@ def forge_material(request, material_id: str):
             # `assay_danger` only when the metal's own effect says what testing does (lane
             # U5's contract, 44-forge-ledger.js `needsConfirm`): absent, the card falls back
             # on `reactive` and warns in general words, so a reactive metal whose effect is
-            # not yet written (noqual, until lane H adds §13.2's recoil) still asks first.
+            # not yet written (null skymetal, until lane H adds §13.2's recoil) still asks first.
             found = kn.danger_of(m.doc)
             if found and _danger_words(found[1]):
                 card["assay_danger"] = _danger_words(found[1])
@@ -1190,7 +1190,7 @@ def _danger_words(effect: dict | None) -> str:
     line = _render(effect)
     note = str(effect.get("note") or effect.get("text") or "")
     # An effect type with no renderer comes back as its own id ("suppress_magic", lane H's
-    # noqual recoil, 2026-10-04): an id is not words, so the card says nothing of its own
+    # null skymetal recoil, 2026-10-04): an id is not words, so the card says nothing of its own
     # and lane U5's confirm falls back on its general warning rather than print the id.
     if " " not in line.strip():
         return note

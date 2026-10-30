@@ -57,6 +57,10 @@ ALIASES: dict[str, str] = {
     "blowgun darts": "blowgun-darts-10", "firearm bullets": "firearm-bullet-1",
     # The CRB monk's list says "crossbow (light or heavy)"; the bare word is the light one.
     "crossbow": "light-crossbow",
+    # Renamed when the imports lost Golarion's names (tools/golarion_rewrites.py,
+    # docs/bestiary-licensing.md §7). A pack saved before then still holds the old key.
+    "aldori dueling sword": "dueling-sword", "aldori-dueling-sword": "dueling-sword",
+    "shoanti bolas": "heavy-bolas", "shoanti-bolas": "heavy-bolas",
 }
 
 # Sections the weaponsmith does not stock (owner's ruling E5, 2026-09-30): engines of war

@@ -1936,7 +1936,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Conjures one dose per three caster levels of aether, flayleaf, opium, pesh, scour, shiver or zerk. Doses must be used within 1 minute or they decay, though a drug taken before then runs its normal course. They cannot be sold but can be given away; a creature usually must be willing or helpless to take one, though some can be inhaled, applied to a wound, or slipped into food. The DC to resist a drug made this way is based on your caster level, not the drug's usual DC. A lawful evil worshipper of Mahathallah may instead create adyton, once per week regardless of level or castings."
+     "target": "Conjures one dose per three caster levels of aether, flayleaf, opium, pesh, scour, shiver or zerk. Doses must be used within 1 minute or they decay, though a drug taken before then runs its normal course. They cannot be sold but can be given away; a creature usually must be willing or helpless to take one, though some can be inhaled, applied to a wound, or slipped into food. The DC to resist a drug made this way is based on your caster level, not the drug's usual DC. A lawful evil worshipper of a goddess of illusions may instead create adyton, once per week regardless of level or castings."
     }
    ],
    "duration": {
@@ -2126,7 +2126,7 @@
     },
     {
      "type": "narrative",
-     "target": "As create undead, except that from a corpse steeped at least 24 hours in a peat bog it raises one of three variant mummies: a bog mummy, an ice mummy, or an Osirian tomb guardian."
+     "target": "As create undead, except that from a corpse steeped at least 24 hours in a peat bog it raises one of three variant mummies: a bog mummy, an ice mummy, or a desert tomb guardian."
     }
    ],
    "duration": {
@@ -2418,40 +2418,6 @@
    "converted_by": "read",
    "notes": "Both +2s are scoped to one culture chosen at casting, so they are situational rather than flat skill_mods on Diplomacy and Disguise. The +1 raises the DC of spells you cast rather than modifying anything on your own sheet, and the prose gives it no type."
   },
-  "cultural-adaptation-taldan": {
-   "effects": [
-    {
-     "type": "situational_mod",
-     "amount": 2,
-     "bonus_type": "untyped",
-     "target": "Diplomacy checks to influence members of the culture you adapted to"
-    },
-    {
-     "type": "situational_mod",
-     "amount": 2,
-     "bonus_type": "circumstance",
-     "target": "Disguise checks to pass yourself off as a member of that culture"
-    },
-    {
-     "type": "situational_mod",
-     "amount": 1,
-     "bonus_type": "untyped",
-     "target": "the DC of enchantment (charm) spells you cast against natives of that culture"
-    },
-    {
-     "type": "narrative",
-     "target": "Choose a culture at casting. If you already speak its native language you speak it with a native accent — the spell teaches no language but combines with tongues. Your body language, gestures and small unconscious choices mark you as a native."
-    }
-   ],
-   "duration": {
-    "kind": "per_level",
-    "amount": 10,
-    "unit": "minute",
-    "dismissible": false
-   },
-   "converted_by": "read",
-   "notes": "This Taldan variant words the Diplomacy bonus as a bare '+2' with no type, where the general cultural adaptation calls its equivalent a circumstance bonus. The two are recorded as the prose writes them rather than levelled with each other — the Diplomacy bonus here is untyped, the Disguise bonus circumstance."
-  },
   "cup-of-dust": {
    "effects": [
     {
@@ -2542,7 +2508,7 @@
      "on_failure": [
       {
        "type": "narrative",
-       "target": "The object becomes flawed and prone to failure, according to what it is. Magic item: it functions intermittently, gaining either an unreliable curse or a random dependent curse. Nonmagical armour or shield: it gains the fragile armour quality. Nonmagical weapon: it gains the fragile weapon quality. Tool: it gains the broken condition whenever a creature rolls a natural 1 on a skill check with it. Anything else: 5% chance per day of use of gaining the broken condition. Artifacts are unaffected. The bearer is not compelled to keep the item and may sell or discard it. A cleric of Groetus using an affected item may make a DC 20 Will save to override the curse for 1 day."
+       "target": "The object becomes flawed and prone to failure, according to what it is. Magic item: it functions intermittently, gaining either an unreliable curse or a random dependent curse. Nonmagical armour or shield: it gains the fragile armour quality. Nonmagical weapon: it gains the fragile weapon quality. Tool: it gains the broken condition whenever a creature rolls a natural 1 on a skill check with it. Anything else: 5% chance per day of use of gaining the broken condition. Artifacts are unaffected. The bearer is not compelled to keep the item and may sell or discard it. A cleric of a god of the end times using an affected item may make a DC 20 Will save to override the curse for 1 day."
       }
      ],
      "note": "Will negates (object)."

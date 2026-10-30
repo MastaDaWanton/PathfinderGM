@@ -1842,6 +1842,8 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
         if not folder.is_dir():
             continue
         for path in sorted(folder.glob("*.json")):
+            if path.name == "aliases.json":
+                continue                        # old id -> new id, read by `aliases()`
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
@@ -1880,8 +1882,39 @@ def meta() -> dict:
     return _META
 
 
+_ALIASES: dict[str, str | None] | None = None
+
+
+def aliases() -> dict[str, str | None]:
+    """Old spell id -> the id it ships under now, or None for a spell no longer shipped.
+
+    `content/spells/aliases.json`, written by tools/strip_golarion.py when the imported
+    spells lost Golarion's names (docs/bestiary-licensing.md §7): "aroden-s-spellbane" is
+    "spellbane" now, and a spellbook saved before that must still hold it."""
+    global _ALIASES
+    if _ALIASES is None:
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "spells" / "aliases.json"
+        try:
+            _ALIASES = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        except (ValueError, OSError) as exc:
+            files.unreadable(path, exc)
+            _ALIASES = {}
+    return _ALIASES
+
+
+def current_id(spell_id: str) -> str | None:
+    """The id a stored spell id reads as today: itself while it ships (a homebrew spell
+    under an old id wins over the alias), its new id once renamed, None once dropped."""
+    key = (spell_id or "").strip().lower()
+    if key not in aliases() or key in all_spells():     # the cheap question first
+        return spell_id
+    return aliases()[key]
+
+
 def get(spell_id: str) -> Spell:
-    s = all_spells().get((spell_id or "").strip().lower())
+    s = all_spells().get((current_id(spell_id) or "").strip().lower())
     if s is None:
         raise KeyError(f"no spell {spell_id!r}")
     return s

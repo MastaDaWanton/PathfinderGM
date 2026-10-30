@@ -31,11 +31,11 @@ player still reads them, and listed here so they are not forgotten):
   No "after exposure" trigger.
 - **Living steel**: repairs 2 hp a day; breaks a weapon that rolls a natural 1 against
   its armour. No item repair, no "struck on a natural 1" trigger.
-- **Inubrix**: ignores iron and steel armour bonuses, cannot damage iron or steel,
+- **Ghost skymetal**: ignores iron and steel armour bonuses, cannot damage iron or steel,
   damage as one size smaller. Approximated by a house +3 attack against a
   metal-armoured target (`when: {"target": {"armour_metal": true}}`, evaluated since
   lane H: the defender's suit or shield is iron or steel, `armour.wears_metal`).
-- **Noqual**: +4 on the *object's* saves against magic. Items have no saves yet. The
+- **Null skymetal**: +4 on the *object's* saves against magic. Items have no saves yet. The
   +5,000 gp enchanting surcharge is the field `enchant_surcharge_gp` for the enchanter.
   Assaying it is a **house rule** (the owner, 2026-10-04): magic recoils, and the
   assayer's buffs and wards are suppressed for 1d4 rounds (`assay_danger`).
@@ -44,21 +44,21 @@ player still reads them, and listed here so they are not forgotten):
   spends a finish yet, as for holy anointing.
 - **Wyroot**: stores a life point for ki or arcane pools. Approximated by 1 temporary hp
   on a critical, once a day.
-- **Abysium**: glows like a candle. No light vocabulary.
+- **Fever skymetal**: glows like a candle. No light vocabulary.
 - **Singing steel**: speeds bardic performance. Approximated by a house Perform bonus.
-- **Horacalcum**: +¼ hit points. Only its hardness is carried.
+- **Time skymetal**: +¼ hit points. Only its hardness is carried.
 
 `when` clauses this data uses, all evaluated since lane H (2026-10-04; a clause nothing
 can evaluate is still dropped, never applied): `{"target": {"type": ...}}` and
 `{"target": {"subtype": ...}}` against the struck creature, where a **list** value means
 "any of"; `{"armour": {"weight": ...}}` against the base armour at build time
-(adamantine's DR 1/2/3, horacalcum's initiative, elysian bronze); `{"attacker": {"type":
-[...]}}` for elysian bronze's DR (the "natural weapons and unarmed strikes only" in its
-note is not yet asked); `{"against": "spell"}` for noqual's saves; `{"weapon":
+(adamantine's DR 1/2/3, time skymetal's initiative, celestial bronze); `{"attacker": {"type":
+[...]}}` for celestial bronze's DR (the "natural weapons and unarmed strikes only" in its
+note is not yet asked); `{"against": "spell"}` for null skymetal's saves; `{"weapon":
 {"slashing_or_piercing": true}}` for silver's −1 damage.
 
 Quench marks are a single effect (contract §3). Dragon blood's plan wanted resistance on
-armour or +1 energy damage on a weapon; it is resistance on both. Styx water's two parts
+armour or +1 energy damage on a weapon; it is resistance on both. Oblivion water's two parts
 are one `bundle`.
 
 
@@ -80,13 +80,13 @@ are one `bundle`.
 | Mithral | rare | weapon: head, fittings; armour: body, fastenings | +2 Attack rolls; **-2 Damage rolls** | **-2 hit points per inch** | weapon: Strikes as silver; weapon: Weighs 50% less; weapon: +5 hardness; armour: Armour check penalty 3 lighter; armour: +2 maximum Dexterity bonus; armour: -10% arcane spell failure; armour: Weighs 50% less; armour: Moves as one weight class lighter; armour: +5 hardness | forgiving |
 | Platinum | rare | weapon: head, fittings; armour: body, fastenings | +3 Damage rolls; +2 hit points per inch; **-2 Attack rolls** | Resist acid 3; +2 Armour class; **Weighs 30% more** | – | narrow_window, pure |
 | Star Iron | rare | weapon: head, fittings; armour: body, fastenings | Strikes as cold iron; +3 Damage rolls; **-2 hit points per inch** | +3 Armour class; +2 hardness; **-2 armour check penalty** | – | easily_worked, slaggy |
-| Abysium | exotic | weapon: head, fittings; armour: body, fastenings | +3 Damage rolls; +2 Attack rolls | +3 Armour class; +2 hardness | weapon: **Causes sickened, while carried**; armour: **Causes sickened, while carried** | reactive, narrow_window |
 | Adamantine | exotic | weapon: head, fittings; armour: body, fastenings | +2 Damage rolls; **Weighs 20% more** | +2 Armour class; **-2 armour check penalty** | weapon: Strikes as adamantine; weapon: +10 hardness; weapon: +10 hit points per inch; armour: DR 1/— (when armour weight light); armour: DR 2/— (when armour weight medium); armour: DR 3/— (when armour weight heavy); armour: +10 hardness; armour: +10 hit points per inch | narrow_window |
-| Djezet | exotic | feeds alloy | – | – | – | malleable, pure, weld_aid |
-| Inubrix | exotic | weapon: head | +3 Attack rolls house approximation of the book's 'ignores armour and shield bonuses from iron or steel' (when target armour_metal True) | – | weapon: **-2 Attack rolls always broken**; weapon: **-2 Damage rolls always broken; and damage as one size smaller**; weapon: **-5 hardness**; weapon: **-20 hit points per inch** | malleable, narrow_window |
-| Noqual | exotic | weapon: head, fittings; armour: body, fastenings | **-2 hit points per inch** | – | weapon: Weighs 50% less; weapon: +1 Damage rolls constructs made by feats or spells (when target type construct); weapon: +1 Damage rolls undead made by feats or spells (when target type undead); armour: **+20% arcane spell failure**; armour: +2 Fortitude (when against spell); armour: +2 Reflex (when against spell); armour: +2 Will (when against spell); armour: Weighs 50% less; armour: Moves as one weight class lighter; armour: +2 maximum Dexterity bonus; armour: Armour check penalty 3 lighter | forgiving, reactive |
-| Siccatite | exotic | weapon: head; armour: body | +2 Damage rolls | +2 Armour class | weapon: 1 fire damage, on a hit; weapon: **1 fire damage, every round, on whoever has it (permanent)**; armour: **1 fire damage, every round, on whoever has it (permanent)**; armour: 1 fire damage, when grappled, on whoever struck them (permanent); armour: Resist cold 5 | reactive, narrow_window |
-| Horacalcum | legendary | weapon: head, fittings; armour: body, fastenings | +4 Initiative; **-2 Damage rolls** | **-2 armour check penalty** | weapon: +1 Attack rolls not ammunition; weapon: +5 hardness; armour: +1 Initiative (when armour weight light); armour: +2 Initiative (when armour weight medium); armour: +3 Initiative (when armour weight heavy); armour: +5 hardness | narrow_window, pure |
+| Fever Skymetal | exotic | weapon: head, fittings; armour: body, fastenings | +3 Damage rolls; +2 Attack rolls | +3 Armour class; +2 hardness | weapon: **Causes sickened, while carried**; armour: **Causes sickened, while carried** | reactive, narrow_window |
+| Ghost Skymetal | exotic | weapon: head | +3 Attack rolls house approximation of the book's 'ignores armour and shield bonuses from iron or steel' (when target armour_metal True) | – | weapon: **-2 Attack rolls always broken**; weapon: **-2 Damage rolls always broken; and damage as one size smaller**; weapon: **-5 hardness**; weapon: **-20 hit points per inch** | malleable, narrow_window |
+| Null Skymetal | exotic | weapon: head, fittings; armour: body, fastenings | **-2 hit points per inch** | – | weapon: Weighs 50% less; weapon: +1 Damage rolls constructs made by feats or spells (when target type construct); weapon: +1 Damage rolls undead made by feats or spells (when target type undead); armour: **+20% arcane spell failure**; armour: +2 Fortitude (when against spell); armour: +2 Reflex (when against spell); armour: +2 Will (when against spell); armour: Weighs 50% less; armour: Moves as one weight class lighter; armour: +2 maximum Dexterity bonus; armour: Armour check penalty 3 lighter | forgiving, reactive |
+| Quick Skymetal | exotic | feeds alloy | – | – | – | malleable, pure, weld_aid |
+| Searing Skymetal | exotic | weapon: head; armour: body | +2 Damage rolls | +2 Armour class | weapon: 1 fire damage, on a hit; weapon: **1 fire damage, every round, on whoever has it (permanent)**; armour: **1 fire damage, every round, on whoever has it (permanent)**; armour: 1 fire damage, when grappled, on whoever struck them (permanent); armour: Resist cold 5 | reactive, narrow_window |
+| Time Skymetal | legendary | weapon: head, fittings; armour: body, fastenings | +4 Initiative; **-2 Damage rolls** | **-2 armour check penalty** | weapon: +1 Attack rolls not ammunition; weapon: +5 hardness; armour: +1 Initiative (when armour weight light); armour: +2 Initiative (when armour weight medium); armour: +3 Initiative (when armour weight heavy); armour: +5 hardness | narrow_window, pure |
 
 ## Alloys
 
@@ -98,10 +98,10 @@ are one `bundle`.
 | Steel | common | weapon: head, fittings; armour: body, fastenings | +2 Attack rolls; +2 hardness; **-2 hit points per inch** | +2 Armour class; +2 hardness; **-2 maximum Dexterity bonus** | – | forgiving |
 | Bell Bronze | uncommon | weapon: fittings; armour: fastenings | +2 Intimidate; +2 hardness; **-2 hit points per inch** | +2 Intimidate; +2 hardness; **-2 hit points per inch** | – | brittle, easily_worked |
 | Electrum | uncommon | weapon: fittings; armour: fastenings | +2 Diplomacy; +2 Damage rolls (when target subtype shapechanger); **-2 hardness** | +2 Diplomacy; +2 maximum Dexterity bonus; **-2 hardness** | – | pure, malleable |
+| Frontier Steel | uncommon | weapon: head, fittings; armour: body, fastenings | +2 Damage rolls; **-2 hardness** | +2 Will; +2 hardness; **-2 armour check penalty** | weapon: Strikes as cold iron | narrow_window, forgiving |
 | High-Carbon Steel | uncommon | weapon: head; armour: body | +2 Damage rolls; +2 hardness; **-2 hit points per inch** | +2 Armour class; +2 hardness; **-2 hit points per inch** | – | quench_sensitive, narrow_window |
-| Nexavaran Steel | uncommon | weapon: head, fittings; armour: body, fastenings | +2 Damage rolls; **-2 hardness** | +2 Will; +2 hardness; **-2 armour check penalty** | weapon: Strikes as cold iron | narrow_window, forgiving |
 | Pattern Steel | uncommon | weapon: head; armour: body | +2 Damage rolls; +2 hit points per inch; **-2 hardness** | +2 Armour class; +2 hit points per inch; **-2 hardness** | – | flawless, narrow_window |
-| Elysian Bronze | rare | weapon: head, fittings; armour: body, fastenings | **-2 hardness** | **-2 armour check penalty** | weapon: +1 Damage rolls multiplied on a critical hit (when target type magical beast or monstrous humanoid); weapon: +1 Attack rolls after it damages one, against that kind of creature for 24 hours, on a hit, on whoever has it, for 24 hours (when target type magical beast or monstrous humanoid); armour: DR 1/— (when armour weight light, attacker type magical beast or monstrous humanoid); armour: DR 2/— (when armour weight medium, attacker type magical beast or monstrous humanoid); armour: DR 3/— (when armour weight heavy, attacker type magical beast or monstrous humanoid) | forgiving |
+| Celestial Bronze | rare | weapon: head, fittings; armour: body, fastenings | **-2 hardness** | **-2 armour check penalty** | weapon: +1 Damage rolls multiplied on a critical hit (when target type magical beast or monstrous humanoid); weapon: +1 Attack rolls after it damages one, against that kind of creature for 24 hours, on a hit, on whoever has it, for 24 hours (when target type magical beast or monstrous humanoid); armour: DR 1/— (when armour weight light, attacker type magical beast or monstrous humanoid); armour: DR 2/— (when armour weight medium, attacker type magical beast or monstrous humanoid); armour: DR 3/— (when armour weight heavy, attacker type magical beast or monstrous humanoid) | forgiving |
 | Fire-Forged Steel | rare | weapon: head, fittings; armour: body, fastenings | +2 Damage rolls (when target subtype cold); +2 hit points per inch; **-2 hardness** | +2 Armour class; **-2 armour check penalty** | armour: Resist fire 2 | narrow_window |
 | Frost-Forged Steel | rare | weapon: head, fittings; armour: body, fastenings | +2 Damage rolls (when target subtype fire); +2 hit points per inch; **-2 hardness** | +2 Armour class; **-2 maximum Dexterity bonus** | armour: Resist cold 2 | narrow_window |
 | Living Steel | rare | weapon: head, fittings; armour: body, fastenings | +3 CMD; **-2 Attack rolls** | +2 Armour class; **-2 armour check penalty** | weapon: +5 hardness; weapon: +5 hit points per inch; armour: +5 hardness; armour: +5 hit points per inch | forgiving, malleable |
@@ -158,7 +158,7 @@ are one `bundle`.
 | Troll Blood | rare | Fast healing 1, on the first wound it deals each day, on whoever has it, for 1 minute (1× per day) | malleable, narrow_window |
 | Wyvern Blood | rare | Fortitude DC 17 · fail: 1d4 Constitution damage, on the first wound it deals each day | narrow_window, reactive |
 | Dragon Blood | exotic | Resist fire 2 | narrow_window, pure |
-| Styx Water | exotic | +1 Damage rolls (when target type outsider); **-1 Will, on whoever has it** | narrow_window, reactive |
+| Oblivion Water | exotic | +1 Damage rolls (when target type outsider); **-1 Will, on whoever has it** | narrow_window, reactive |
 
 ## Ores (assayed for their metal)
 
@@ -177,13 +177,13 @@ are one `bundle`.
 | Silver Ore | uncommon | smelts to silver | slaggy |
 | Mithral Ore | rare | smelts to mithral | forgiving |
 | Platinum Ore | rare | smelts to platinum | narrow_window, pure |
-| Abysium Ore | exotic | smelts to abysium | reactive |
 | Adamantine Ore | exotic | smelts to adamantine | narrow_window |
-| Djezet Seep | exotic | smelts to djezet | malleable |
-| Inubrix Ore | exotic | smelts to inubrix | malleable |
-| Noqual Ore | exotic | smelts to noqual | forgiving |
-| Siccatite Ore | exotic | smelts to siccatite | reactive |
-| Horacalcum Ore | legendary | smelts to horacalcum | narrow_window |
+| Fever Skymetal Ore | exotic | smelts to fever-skymetal | reactive |
+| Ghost Skymetal Ore | exotic | smelts to ghost-skymetal | malleable |
+| Null Skymetal Ore | exotic | smelts to null-skymetal | forgiving |
+| Quick Skymetal Seep | exotic | smelts to quick-skymetal | malleable |
+| Searing Skymetal Ore | exotic | smelts to searing-skymetal | reactive |
+| Time Skymetal Ore | legendary | smelts to time-skymetal | narrow_window |
 
 ## Fuels (working traits only)
 

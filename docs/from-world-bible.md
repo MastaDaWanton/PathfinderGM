@@ -239,7 +239,7 @@ surcharges, and it is answered from data, never a name.
 |---|---|---|
 | `play.materials[].kind` | Absent (the whole of `play.materials[]` is proposed) | The substance for anything a piece can be made of: `metal` or `alloy` (both metal), `hide` or `leather`, `thread` (cord), `wood`, `bone`, `horn`, `cloth`, `stone`, `glass`. A world's "blue iron of the eastern hills" with `kind: "metal"` is metal to every spell that asks. The forge's other kinds (`fuel`, `flux`, `quenchant`, `fitting`, `treatment`) say what it does at the bench, not what it is |
 | `play.materials[].material` on a fitting | Absent | **Required on a fitting** (and any form): the root material it is made of, `"material": "brass"`. A fitting's kind is only "fitting", so this link is the one way the tag learns that "the guild's riveted grips" are brass and metal. Without it the fitting is made of nothing the tag can name, and nothing is guessed |
-| `play.materials[].enchant_surcharge_gp` | Absent | Only for a metal that should resist magic, as the book's cold iron (+2,000 gp the first time a weapon of it is enchanted) and noqual (+5,000) do: the extra gold, which the app turns into motes. Absent is no surcharge |
+| `play.materials[].enchant_surcharge_gp` | Absent | Only for a metal that should resist magic, as the book's cold iron (+2,000 gp the first time a weapon of it is enchanted) and null skymetal (+5,000) do: the extra gold, which the app turns into motes. Absent is no surcharge |
 
 **Essences** (lane D: `materials.essences()`, checked by `materials.essence_problems`). The
 enchanter binds essences, and a world's own creatures and places are where the found ones
@@ -362,6 +362,19 @@ stat block on every build), a tannery's rent, a fauna list, or a sky.
 | `play.places[].kind: "tannery"` | Read since 2026-10-06 (the places row's `kind`). Lane G measured 2026-10-08: the three shipped exports author twelve tanneries, all as authored rooms with no `kind` | `"kind": "tannery"` on a world's own tannery by any name ("the Tanyard"): its keeper is then a tanner, and it has the vats, the lime pit and the hardening kettle. Beside `smithy` and `laboratory`. The kind word itself must be `tannery`: "tanyard" does not fold to it yet (`places.KIND_WORDS`) |
 | a settlement's words that imply tanners | Read (`places.TANNERY_CUES`, lane G): a settlement with no authored tannery whose own facts or paragraphs say `tanner`, `tannery`, `tanning`, `tanyard`, `tan pits`, `currier`, `leatherworker`, `the leather trade`, `leather goods` or `the hide trade` gets one on its outskirts. Measured 2026-10-08: no cue fires in any shipped export (their tanneries are authored) | Nothing new: describe a town's trades in its own words. "Leather" alone and "hides" or "pelts" alone are deliberately not cues (what people wear; trappers selling pelts). A world that wants a tannery in a town it lists rooms for authors the room |
 | the leatherworker's counter | Every settlement, village up (`stall-lines.json` `leatherworker`, lane G) | Nothing from a world, besides the `play.places[].supplies[]` ask above (`"supplies": ["leatherworker"]` on a world's own saddler or cobbler). A tanner, currier, saddler or cobbler in `play.cast[]` is the occupation `tanner` by their words |
+
+### Gods, and what each keeps (2026-10-29)
+
+The imported feats and spells lost Golarion's gods (docs/bestiary-licensing.md §7). Where
+a god was a gate, the gate now names what the god keeps: 13 feats ask for "worshiper of a
+god of battle", "of a god of commerce", "of a god of magic", and a few spells are
+"associated with" a god of the hunt or of wealth. Today those gates are unparsed, so the
+feats cannot be taken (`rules/feats.py` `meets` answers "cannot tell"), which is what they
+were before.
+
+| field | today | ask |
+|---|---|---|
+| a world's gods, each with an `id`, its `name` and what it keeps | Absent. The fixtures say only that "gods are real, distant, and plural" | Per god, the things it keeps in plain words (`battle`, `commerce`, `the sea`, `death`, `secrets`), so a gate reading "a god of battle" can be answered by the world's own god of battle. Words only, no domains or alignments: the rules side maps words to its gates. No reader yet. Until one exists the gates stay closed, as above |
 
 ## Things worth stealing
 

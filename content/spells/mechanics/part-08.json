@@ -971,7 +971,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "A rite of sacrifice to Mammon channels his power into one coin; which of three effects you get depends on the value offered."
+     "target": "A rite of sacrifice to an archdevil of greed channels his power into one coin; which of three effects you get depends on the value offered."
     },
     {
      "type": "narrative",
@@ -979,7 +979,7 @@
     },
     {
      "type": "narrative",
-     "target": "Mammon's Mantle (3,000 gp sacrifice): a creature that swallows the coin gains a bonus to Charisma equal to 1 per 3 caster levels, maximum 5 at 15th level, immunity to poison, disease and aging, automatic stabilisation below 0 hit points, and can eat gold to heal 1 hit point per 20 gp consumed. Lasts 1 day per caster level."
+     "target": "Miser's Mantle (3,000 gp sacrifice): a creature that swallows the coin gains a bonus to Charisma equal to 1 per 3 caster levels, maximum 5 at 15th level, immunity to poison, disease and aging, automatic stabilisation below 0 hit points, and can eat gold to heal 1 hit point per 20 gp consumed. Lasts 1 day per caster level."
     },
     {
      "type": "narrative",
@@ -1558,7 +1558,7 @@
    "converted_by": "read",
    "notes": "Duration is 'until landing or minutes/level'; the per_level part is emitted and the landing cut-off is in the narrative."
   },
-  "glimpse-of-the-akashic": {
+  "glimpse-of-all-memory": {
    "effects": [
     {
      "type": "narrative",
@@ -1566,7 +1566,7 @@
     },
     {
      "type": "narrative",
-     "target": "When that minute ends the Akashic Record assaults your psyche: you are stunned for 2 rounds and then sickened for 1 minute."
+     "target": "When that minute ends the memory of the cosmos assaults your psyche: you are stunned for 2 rounds and then sickened for 1 minute."
     }
    ],
    "duration": {
@@ -1857,7 +1857,7 @@
    "converted_by": "read",
    "notes": "The corpus duration field for this spell is empty, so no duration was emitted rather than supplying one."
   },
-  "gorum-s-armor": {
+  "quill-armor": {
    "effects": [
     {
      "type": "narrative",
@@ -2139,7 +2139,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "You store a fine-tuned replica of yourself in the Akashic Record. You must be at half your maximum hit points or better to cast it. If you are ever brought below half your maximum hit points during the duration, you may end the spell as an immediate action to draw strength from the replica and immediately regain 3d8 hit points plus 1 per caster level, to a maximum of +15."
+     "target": "You store a fine-tuned replica of yourself in the memory of the cosmos. You must be at half your maximum hit points or better to cast it. If you are ever brought below half your maximum hit points during the duration, you may end the spell as an immediate action to draw strength from the replica and immediately regain 3d8 hit points plus 1 per caster level, to a maximum of +15."
     }
    ],
    "duration": {
@@ -2689,7 +2689,7 @@
     },
     {
      "type": "narrative",
-     "target": "Members of the Prophet of Kalistrade prestige class can cast this spell even though it is neither divination nor enchantment."
+     "target": "Members of an ascetic merchant-prophets' prestige class can cast this spell even though it is neither divination nor enchantment."
     }
    ],
    "duration": {
@@ -2829,7 +2829,7 @@
    "converted_by": "read",
    "notes": ""
   },
-  "hanspur-s-flotsam-vessel": {
+  "flotsam-vessel": {
    "effects": [
     {
      "type": "narrative",
@@ -2910,7 +2910,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Using a Harrow deck, you tell a fortune for yourself or a creature you stay adjacent to for the whole 10-minute casting. The harrowing must name one set of events or course of action the subject intends to undertake during the duration. Draw nine cards — or simulate each with a d6 and a d10 — and record the ability score and alignment of each."
+     "target": "Using a fortune-telling deck, you tell a fortune for yourself or a creature you stay adjacent to for the whole 10-minute casting. The harrowing must name one set of events or course of action the subject intends to undertake during the duration. Draw nine cards — or simulate each with a d6 and a d10 — and record the ability score and alignment of each."
     },
     {
      "type": "narrative",

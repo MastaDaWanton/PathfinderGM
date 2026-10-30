@@ -196,7 +196,7 @@ def test_no_hired_smith_stands_in_the_players_own_smithy():
 
 def test_target_subtype_and_a_list_of_types_mean_any_of():
     """Silver and electrum's +2 against shapechangers is `{"target": {"subtype": ...}}`;
-    elysian bronze's `{"target": {"type": ["magical beast", "monstrous humanoid"]}}` is a
+    celestial bronze's `{"target": {"type": ["magical beast", "monstrous humanoid"]}}` is a
     LIST, meaning any of them. Asked of the defender by tag prefix (law 1)."""
     s = Scene(location_id=None)
     were = tagged(instantiate("thug", scene=s, name="were"), "subtype.shapechanger")
@@ -228,14 +228,14 @@ def test_an_adamantine_suits_dr_is_its_weight_classes_not_the_best_of_three():
                                 "shield", "heavy shield") is None
 
 
-def test_elysian_bronze_dr_asks_who_struck():
-    """`{"attacker": {"type": [...]}}`: elysian bronze armour's DR holds against magical
+def test_celestial_bronze_dr_asks_who_struck():
+    """`{"attacker": {"type": [...]}}`: celestial bronze armour's DR holds against magical
     beasts and monstrous humanoids, and against nobody else. The blow carries its maker's
     type as `attacker:` traits from the weapon hit. Measured before lane H: the suit
-    reader asked no `when` at all, so an elysian bronze breastplate held DR 3/— (the best
+    reader asked no `when` at all, so an celestial bronze breastplate held DR 3/— (the best
     of its three weight rows) against every blow from anybody."""
     pc, s, e = kesst()
-    pc.add_stock(forge_items.stock_item(suit("bronze-plate", "elysian-bronze",
+    pc.add_stock(forge_items.stock_item(suit("bronze-plate", "celestial-bronze",
                                              base="breastplate")))
     wear(e, "bronze-plate")
     beast = tagged(instantiate("thug", scene=s, name="beast"), "type.magical-beast")
@@ -246,12 +246,12 @@ def test_elysian_bronze_dr_asks_who_struck():
     assert pc.damage_reduction("slashing", ()) is None
 
 
-def test_noqual_armour_guards_saves_against_spells_only():
-    """`{"against": "spell"}`: noqual armour's +2 resistance on saves against spells. The
+def test_null_skymetal_armour_guards_saves_against_spells_only():
+    """`{"against": "spell"}`: null skymetal armour's +2 resistance on saves against spells. The
     cast's save and a spell-stamped save op pass it; a plain save does not."""
     pc, s, e = kesst()
-    pc.add_stock(forge_items.stock_item(suit("noqual-shirt", "noqual")))
-    wear(e, "noqual-shirt")
+    pc.add_stock(forge_items.stock_item(suit("null-skymetal-shirt", "null-skymetal")))
+    wear(e, "null-skymetal-shirt")
     plain = total(pc.save_modifiers("will"))
     assert total(pc.save_modifiers("will", {"against": "spell"})) == plain + 2
     def save_terms(origin):
@@ -260,8 +260,8 @@ def test_noqual_armour_guards_saves_against_spells_only():
                   origin=origin)[0]
         return [m.source for m in out.rolls[0].modifiers]
 
-    assert "Noqual Shirt" in save_terms("spell:hold-person")
-    assert "Noqual Shirt" not in save_terms("author:test")
+    assert "Null Skymetal Shirt" in save_terms("spell:hold-person")
+    assert "Null Skymetal Shirt" not in save_terms("author:test")
 
 
 def test_alchemical_silvers_minus_one_is_slashing_and_piercing_only():
@@ -281,13 +281,13 @@ def test_alchemical_silvers_minus_one_is_slashing_and_piercing_only():
     assert total(pc.damage_modifiers("silvered-mace")) == plain_mace + iron_dmg
 
 
-def test_inubrix_swings_truer_at_a_metal_armoured_defender():
-    """`{"target": {"armour_metal": true}}`: inubrix's house +3 attack against a defender
+def test_ghost_skymetal_swings_truer_at_a_metal_armoured_defender():
+    """`{"target": {"armour_metal": true}}`: ghost skymetal's house +3 attack against a defender
     in iron or steel (the book's "ignores armour bonuses from iron or steel"). Evaluated
     off what the defender wears (`armour.wears_metal`), never off a name."""
     pc, s, e = kesst()
-    pc.add_stock(forge_items.stock_item(blade("inubrix-rapier", "inubrix", base="rapier")))
-    wear(e, "inubrix-rapier")
+    pc.add_stock(forge_items.stock_item(blade("ghost-skymetal-rapier", "ghost-skymetal", base="rapier")))
+    wear(e, "ghost-skymetal-rapier")
     mailed = instantiate("thug", scene=s, name="mailed")
     mailed.flat_ac = None
     mailed.armour = "chainmail"
@@ -417,12 +417,12 @@ def test_a_forged_shield_is_strapped_on_and_folds_into_the_shield_bonus():
     assert "iron-shield" in pc.stock
 
 
-# --- 9. noqual's recoil (the owner's house rule, contracts §13.2) --------------------------------
+# --- 9. null skymetal's recoil (the owner's house rule, contracts §13.2) --------------------------------
 
-def test_assaying_noqual_suppresses_the_assayers_magic_for_1d4_rounds():
-    """The owner, 2026-10-04: "magic recoils" — a HOUSE RULE. Before it, an assay of noqual
+def test_assaying_null_skymetal_suppresses_the_assayers_magic_for_1d4_rounds():
+    """The owner, 2026-10-04: "magic recoils" — a HOUSE RULE. Before it, an assay of null skymetal
     was safe (`danger_of` found no carrier effect on it). Now the assay's danger is
-    `suppress_magic`, applied through the one applicator with `origin: item:noqual`: a
+    `suppress_magic`, applied through the one applicator with `origin: item:null-skymetal`: a
     cast mage armor's +4 AC goes quiet while it holds and comes back when it ends — the
     spell suppressed, not dispelled (its clock still runs) — and a tea's buff, which is
     chemistry, is untouched."""
@@ -433,12 +433,12 @@ def test_assaying_noqual_suppresses_the_assayers_magic_for_1d4_rounds():
     pc.add_buff("save_mod", "will", 1, source="a calming tea", rounds=100,
                 origin="item:chamomile")
     will = total(pc.save_modifiers("will"))
-    got = knowledge.assay(pc, "noqual", 0, clock=0)
+    got = knowledge.assay(pc, "null-skymetal", 0, clock=0)
     assert got["danger"]["type"] == "suppress_magic" and got["danger"].get("house")
-    outcomes = knowledge.apply_danger(e, pc, "noqual", got["danger"])
+    outcomes = knowledge.apply_danger(e, pc, "null-skymetal", got["danger"])
     assert outcomes and "recoils" in outcomes[0].tell
     held = next(x for x in pc.effects if x.key == "magic-recoils")
-    assert held.origin == "item:noqual" and 1 <= held.rounds_left <= 4
+    assert held.origin == "item:null-skymetal" and 1 <= held.rounds_left <= 4
     assert pc.has_state("suppressed.magic")
     assert pc.ac() == armoured - 4
     assert total(pc.save_modifiers("will")) == will, "the tea is not magic"
@@ -449,12 +449,12 @@ def test_assaying_noqual_suppresses_the_assayers_magic_for_1d4_rounds():
     assert pc.ac() == armoured and mage_armor.rounds_left < left
 
 
-def test_noquals_danger_is_written_as_a_house_rule_in_the_data():
+def test_null_skymetals_danger_is_written_as_a_house_rule_in_the_data():
     """The assay danger is data, validated: a type the assay can apply, a duration, the
-    `reactive` trait, and whose rule it is. Noqual's says house."""
+    `reactive` trait, and whose rule it is. Null skymetal's says house."""
     from rules import materials
 
-    doc = materials.get("noqual")
+    doc = materials.get("null-skymetal")
     assert doc["assay_danger"]["type"] == "suppress_magic"
     assert doc["assay_danger"]["house"] is True
     assert doc["assay_danger"]["duration"] == {"amount": "1d4", "unit": "round"}
@@ -525,14 +525,14 @@ def test_the_campaign_format_documents_every_material_field():
     assert "materials" in handoff.lower() and "quench_mark" in handoff
 
 
-def test_noqual_assay_warns_in_words_not_an_id():
-    """Merged 2026-10-04: noqual's recoil reached the card as the bare id `suppress_magic`
+def test_null_skymetal_assay_warns_in_words_not_an_id():
+    """Merged 2026-10-04: null skymetal's recoil reached the card as the bare id `suppress_magic`
     (`effectspec.render` had no line for it and `knowledge.danger_of` drops the note), so
     the forge's `_danger_words` sent nothing and the confirm fell back on a general warning.
     The owner's ruling is that the warning says what happens: your magic is suppressed."""
     from play import forge_views
     from rules import knowledge, materials
 
-    found = knowledge.danger_of(materials.get("noqual"))
+    found = knowledge.danger_of(materials.get("null-skymetal"))
     words = forge_views._danger_words(found[1])
     assert "magic" in words.lower() and "1d4 rounds" in words, words

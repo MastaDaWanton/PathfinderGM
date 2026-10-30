@@ -1892,7 +1892,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Summon a single barghest from Basalfeyst to serve you, as a summon monster spell. It lacks the feed ability, but at caster level 9th or higher it arrives with 2 growth points and the attack, CMB, save, skill, hit point and caster level bonuses those bring."
+     "target": "Summon a single barghest from its Abyssal realm to serve you, as a summon monster spell. It lacks the feed ability, but at caster level 9th or higher it arrives with 2 growth points and the attack, CMB, save, skill, hit point and caster level bonuses those bring."
     }
    ],
    "duration": {
@@ -2790,7 +2790,7 @@
     },
     {
      "type": "narrative",
-     "target": "You must have been raised Shoanti and belong to a quah to cast this at all, and may summon only your own quah's revered creatures: Lyrune-Quah — small air elemental, 1d3 bats, wolf, 1d3 owls. Shadde-Quah — 1d3 eagles, small earth elemental, small water elemental. Shriikirri-Quah — small air elemental, 1d3+1 hawks, horse. Shundar-Quah — small air elemental, small earth elemental, 1d3 eagles."
+     "target": "You must have been raised by a tribe that honors totem creatures and belong to one of its clans to cast this at all, and may summon only your own quah's revered creatures: Lyrune-Quah — small air elemental, 1d3 bats, wolf, 1d3 owls. Shadde-Quah — 1d3 eagles, small earth elemental, small water elemental. Shriikirri-Quah — small air elemental, 1d3+1 hawks, horse. Shundar-Quah — small air elemental, small earth elemental, 1d3 eagles."
     },
     {
      "type": "narrative",

@@ -12,7 +12,7 @@ What is pinned here:
   -10% spell failure is a benefit and a -5 hardness a drawback;
 * assaying costs a sliver and ten minutes, reveals one benefit and one drawback, is
   easier for every known metal of the same kind (at most -4), and a reactive metal's own
-  carrier effect lands for real through the engine (abysium sickens);
+  carrier effect lands for real through the engine (fever skymetal sickens);
 * one store: `Actor.herb_known`, keyed by material id, a form on its parent, surviving a
   save; and every name `rules/herbknowledge.py` had still works;
 * smiths teach, libraries tell common knowledge, and smithing manuals are a goods table
@@ -73,11 +73,11 @@ MITHRAL = _doc("testmithral", "Testmithral", "metal", "rare",
                working=[_trait("easily_worked")])
 SICKENS = {"type": "apply_condition", "target": "sickened", "trigger": "carried",
            "book": True}
-ABYSIUM = _doc("testabysium", "Testabysium", "metal", "exotic",
+FEVER_SKYMETAL = _doc("testfeverskymetal", "Testfeverskymetal", "metal", "exotic",
                weapon=[_mod("damage", 2), SICKENS, _mod("attack", -2)],
                armour=[_mod("ac", 2), SICKENS, _gear("acp", -2)],
                working=[_trait("reactive")])
-NOQUAL = _doc("testnoqual", "Testnoqual", "metal", "exotic",
+NULL_SKYMETAL = _doc("testnullskymetal", "Testnullskymetal", "metal", "exotic",
               weapon=[_mod("damage", 2), _mod("attack", -2), _gear("hardness", 2)],
               armour=[_gear("asf", 20, book=True), _mod("ac", 2), _gear("acp", -2)],
               working=[_trait("reactive")])
@@ -89,7 +89,7 @@ ORE = _doc("testore", "Testore", "ore", "common", form="ore",
 QUENCH = _doc("testbrine", "Testbrine", "quenchant", "common",
               working=[_trait("quench_sensitive"), _trait("clean_heat")],
               mark=_gear("hardness", 1))
-FIXTURES = {d["id"]: d for d in (IRON, BRONZE, MITHRAL, ABYSIUM, NOQUAL, CARRIED_SAFE, ORE,
+FIXTURES = {d["id"]: d for d in (IRON, BRONZE, MITHRAL, FEVER_SKYMETAL, NULL_SKYMETAL, CARRIED_SAFE, ORE,
                                   QUENCH)}
 FORMS = {"testmithral-fittings": "testmithral"}
 
@@ -288,9 +288,9 @@ def test_assay_dc_falls_with_each_known_metal_of_the_kind(door):
     knowledge.reveal(pc, "testmithral", ["w0"], "t")
     knowledge.reveal(pc, "testbrine", ["t0"], "t")       # a quenchant: another kind
     knowledge.reveal(pc, "testbronze", ["w0"], "t")      # an alloy: another kind
-    knowledge.meet(pc, "testnoqual")                     # met, nothing known
+    knowledge.meet(pc, "testnullskymetal")                     # met, nothing known
     assert knowledge.assay_dc(MITHRAL, pc) == 20
-    for mid in ("testiron", "testabysium", "testnoqual", "testlode"):
+    for mid in ("testiron", "testfeverskymetal", "testnullskymetal", "testlode"):
         knowledge.reveal(pc, mid, ["w0"], "t")
     assert knowledge.assay_dc(MITHRAL, pc) == 16
     assert knowledge.assay_dc(IRON, pc) == 6  # common 10, four other known metals
@@ -316,7 +316,7 @@ def _scene():
     return s, pc
 
 
-def test_assaying_abysium_sickens(door):
+def test_assaying_fever_skymetal_sickens(door):
     """Plan §16.1, lane 6, and the owner's ruling: assay is safe except for reactive
     metals, where the danger is real. The metal's own carrier effect lands through the
     engine (law 2: an ActiveEffect from the condition op, not a flag written here), for
@@ -326,13 +326,13 @@ def test_assaying_abysium_sickens(door):
     from rules.engine import Engine
 
     s, pc = _scene()
-    got = knowledge.assay(pc, "testabysium", 40, clock=0)
+    got = knowledge.assay(pc, "testfeverskymetal", 40, clock=0)
     assert got["danger"]["type"] == "apply_condition"
     assert got["danger"]["target"] == "sickened"
     assert "trigger" not in got["danger"]
     assert got["danger"]["duration"] == {"amount": "1d4", "unit": "hour"}
     assert "w1" in got["revealed"]  # the landed drawback is the one learned
-    outcomes = knowledge.apply_danger(Engine(s, Dice(seed=3)), pc, "testabysium",
+    outcomes = knowledge.apply_danger(Engine(s, Dice(seed=3)), pc, "testfeverskymetal",
                                       got["danger"])
     assert outcomes
     held = [e for e in pc.effects if isinstance(e, ActiveEffect) and e.key == "sickened"]
@@ -340,14 +340,14 @@ def test_assaying_abysium_sickens(door):
     # `_op_condition` stamps the intent's `because` as the source and no `origin` (the
     # herb taste's paralysis is the same, measured 2026-10-03: origin ''), so the
     # provenance asked here is the source line and the condition op's own tell.
-    assert held[0].source == "assaying Testabysium"
+    assert held[0].source == "assaying Testfeverskymetal"
     assert any(o.op == "condition" and "sickened" in o.tell for o in outcomes)
     assert 1 * 600 <= held[0].rounds_left <= 4 * 600
 
 
 def test_the_danger_is_the_handling_not_the_reading(door):
-    """A missed assay of abysium still names the danger: the sliver was handled."""
-    got = knowledge.assay(_pc(), "testabysium", 0, clock=0)
+    """A missed assay of fever skymetal still names the danger: the sliver was handled."""
+    got = knowledge.assay(_pc(), "testfeverskymetal", 0, clock=0)
     assert not got["success"] and got["danger"]["target"] == "sickened"
 
 
@@ -356,8 +356,8 @@ def test_only_reactive_metals_are_dangerous_to_assay(door):
     that is not reactive is felt by carrying it, not by a ten-minute assay; a reactive
     metal with no carrier effect has nothing to do to a handler."""
     assert knowledge.assay(_pc(), "testlode", 40, clock=0)["danger"] is None
-    assert knowledge.assay(_pc(), "testnoqual", 40, clock=0)["danger"] is None
-    assert knowledge.apply_danger(None, _pc(), "testnoqual", None) == []
+    assert knowledge.assay(_pc(), "testnullskymetal", 40, clock=0)["danger"] is None
+    assert knowledge.apply_danger(None, _pc(), "testnullskymetal", None) == []
 
 
 def test_working_a_metal_reveals_its_working_traits(door):

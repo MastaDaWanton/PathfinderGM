@@ -201,7 +201,7 @@ BYSTANDER_KEY = "bystander"
 #                                     which the cold iron surcharge asks
 #
 # Before this, metal was a name list (`armour.METAL_ARMOUR`, `METAL_SHIELDS`): a forged
-# mithral-on-darkwood shield was metal by its name and a forged noqual breastplate only
+# mithral-on-darkwood shield was metal by its name and a forged null skymetal breastplate only
 # because "breastplate" was on the list. The substance is read off the material's own
 # `kind` (metal, alloy, hide...), so a world's own metals answer the same question
 # (World Bible exports `kind`; docs/enchanting-revamp-plan.md §20). Foundry's PF1 system

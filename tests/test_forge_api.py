@@ -324,7 +324,7 @@ def test_the_ledger_and_a_material_card(forge):
     card = forge.get("/api/forge/material/iron").json()
     assert card["carried"] == 1.9 and card["assay_dc"] == 12 and card["reactive"] is False
     assert [p["known"] for p in card["properties"]][:2] == [True, True]
-    assert forge.get("/api/forge/material/noqual").json()["reactive"] is True
+    assert forge.get("/api/forge/material/null-skymetal").json()["reactive"] is True
     assert forge.get("/api/forge/material/no-such-thing").status_code == 404
 
 

@@ -42,6 +42,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "content" / "weapons" / "weapons.json"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import golarion_rewrites  # noqa: E402
+
 PROFICIENCIES = {"simple", "martial", "exotic"}
 
 # Header cell -> the key it becomes. Several spellings of the same column appear across
@@ -300,7 +303,9 @@ def build(src: Path) -> dict:
             "reach": sum(1 for w in out if "reach" in w["traits"]),
             "finessable": sum(1 for w in out if w["finessable"]),
         },
-        "weapons": out,
+        # Golarion's names out (docs/bestiary-licensing.md §7): a re-import must not
+        # put "Aldori dueling sword" back.
+        "weapons": golarion_rewrites.apply_weapons(out),
     }
 
 

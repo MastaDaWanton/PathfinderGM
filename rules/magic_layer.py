@@ -95,8 +95,8 @@ OVERWHELMING = "overwhelming"
 # ability added" (CRB, special materials). A WEAPON's, and its main material's ("the most
 # prevalent"). The catalogue's cold iron carries no `enchant_surcharge_gp`, so the book's
 # number stands here until lane D (or World Bible) puts it on the material; a material's
-# own field wins when it has one. Noqual's 5,000 IS on its document (`enchant_surcharge_gp`,
-# "any magic item incorporating noqual") and is read from there, for any piece.
+# own field wins when it has one. Null skymetal's 5,000 IS on its document (`enchant_surcharge_gp`,
+# "any magic item incorporating null skymetal") and is read from there, for any piece.
 WEAPON_MAIN_SURCHARGE_GP = {"cold-iron": 2000}
 
 # --- the owner's numbers (round 4; "use the proposed numbers, tune in play") ------------------
@@ -651,7 +651,7 @@ def plan(record, adds: dict, *, binder: dict, hurry: bool = False, helps=()) -> 
 
 def _surcharges(record, before: dict, gear: str) -> list[dict]:
     """The material's price for taking magic at all, once: the first time it is enhanced
-    (CRB cold iron; noqual's "any magic item incorporating noqual"). An item that already
+    (CRB cold iron; null skymetal's "any magic item incorporating null skymetal"). An item that already
     carries a layer has paid."""
     if has_layer({"magic": before}):
         return []

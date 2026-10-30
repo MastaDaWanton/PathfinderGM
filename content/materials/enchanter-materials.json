@@ -60,7 +60,7 @@
     "silver",
     "angelskin-binding",
     "unicorn-hide",
-    "elysian-bronze"
+    "celestial-bronze"
    ],
    "working": [
     "pure"
@@ -345,7 +345,7 @@
    "color": "#8b1e2d",
    "affinity": [
     "fiend-bone-core",
-    "abysium"
+    "fever-skymetal"
    ],
    "working": [
     "volatile"
@@ -393,7 +393,7 @@
    "affinity": [
     "fiend-bone-core",
     "hell-hound-hide",
-    "abysium"
+    "fever-skymetal"
    ],
    "working": [
     "volatile"
@@ -1476,7 +1476,7 @@
    "form": "phial",
    "affinity": [
     "fiend-bone-core",
-    "abysium"
+    "fever-skymetal"
    ],
    "house": [
     {
@@ -2111,7 +2111,7 @@
     "silver",
     "angelskin-binding",
     "unicorn-hide",
-    "elysian-bronze"
+    "celestial-bronze"
    ],
    "house": [
     {
@@ -2174,7 +2174,7 @@
    "affinity": [
     "fiend-bone-core",
     "hell-hound-hide",
-    "abysium"
+    "fever-skymetal"
    ],
    "house": [
     {
@@ -4608,7 +4608,7 @@
     "silver",
     "angelskin-binding",
     "unicorn-hide",
-    "elysian-bronze"
+    "celestial-bronze"
    ],
    "house": [
     {
@@ -4669,7 +4669,7 @@
    "affinity": [
     "fiend-bone-core",
     "hell-hound-hide",
-    "abysium"
+    "fever-skymetal"
    ],
    "house": [
     {
@@ -4926,7 +4926,7 @@
     "silver",
     "angelskin-binding",
     "unicorn-hide",
-    "elysian-bronze"
+    "celestial-bronze"
    ],
    "house": [
     {

@@ -214,7 +214,7 @@
    "converted_by": "read",
    "notes": "Summoning; the vocabulary cannot create creatures. Its own numbers (duplicates per level, cap per 3 levels) belong to the summon, not to any effect type."
   },
-  "aroden-s-magic-army": {
+  "magic-army": {
    "effects": [
     {
      "type": "combat_mod",
@@ -240,7 +240,7 @@
    "converted_by": "read",
    "notes": "Bonus progression stated in the notes, not in `scaling` — scaling here is a damage/healing shape only."
   },
-  "aroden-s-spellbane": {
+  "spellbane": {
    "effects": [
     {
      "type": "narrative",
@@ -255,7 +255,7 @@
    },
    "converted_by": "read"
   },
-  "aroden-s-spellsword": {
+  "spellsword": {
    "effects": [
     {
      "type": "narrative",
@@ -1307,7 +1307,7 @@
    },
    "converted_by": "read"
   },
-  "baphomet-s-blessing": {
+  "blessing-of-the-bull": {
    "effects": [
     {
      "type": "save_gate",
@@ -1760,7 +1760,7 @@
    },
    "converted_by": "read"
   },
-  "besmara-s-grasping-depths": {
+  "grasping-depths": {
    "effects": [
     {
      "type": "narrative",
@@ -2011,7 +2011,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "A variant of planar binding that calls a single caulborn into a prepared trap. A bound caulborn can be compelled only to give information, using its Knowledge skills or detect thoughts; any attempt to make it fight, guard a place, or do any other task fails automatically. Otherwise as planar binding. Caulborn value unique books and intelligent creatures whose thoughts they can feed on; their true names are nearly impossible to learn, though some reclusive scholars in Kaer Maga know titles that call specific ones."
+     "target": "A variant of planar binding that calls a single caulborn into a prepared trap. A bound caulborn can be compelled only to give information, using its Knowledge skills or detect thoughts; any attempt to make it fight, guard a place, or do any other task fails automatically. Otherwise as planar binding. Caulborn value unique books and intelligent creatures whose thoughts they can feed on; their true names are nearly impossible to learn, though some reclusive scholars know titles that call specific ones."
     }
    ],
    "duration": {

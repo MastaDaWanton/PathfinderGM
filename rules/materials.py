@@ -101,7 +101,7 @@ HOUSE_FLOOR = 2
 POINT = {"weight_pct": 10, "asf": 5, "speed_penalty": 5}
 
 # What an assay danger may be, beyond a reactive metal's own carrier effect. One kind:
-# `suppress_magic`, the owner's house rule for noqual (2026-10-04, contracts §13.2) —
+# `suppress_magic`, the owner's house rule for null skymetal (2026-10-04, contracts §13.2) —
 # "magic recoils": the assayer's active magical effects (buffs, wards) are suppressed for
 # the duration. Applied by `knowledge.apply_danger` through the one applicator.
 ASSAY_DANGERS = ("suppress_magic",)
@@ -167,7 +167,7 @@ MARK_STEP = {"tannin": "tan", "oil": "curry", "wax": "tool", "thread": "stitch",
 # a condition, a rider) is not a mark's to give: it is an enchantment.
 MARK_LIMIT = {"resistance": 2, "skill_mod": 2, "gear_mod": 1, "save_mod": 1,
               "combat_mod": 1}
-# Combat modifiers a mark may give only to a weapon (a grip): a suit tanned in styx-mordant
+# Combat modifiers a mark may give only to a weapon (a grip): a suit tanned in oblivion-mordant
 # does not make its wearer's sword bite outsiders, and a mark's effect on armour is read on
 # every roll the wearer makes (`Actor._standing_mods`).
 _MARK_WEAPON_ONLY = ("attack", "damage")
@@ -403,7 +403,7 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "not_yet": [str(n) for n in _list(raw.get("not_yet"))],
         "book": bool(raw.get("book", False)),
         "forms": [str(f) for f in _list(raw.get("forms"))],
-        # Which forge methods a material with no piece to fill feeds: djezet, zinc and
+        # Which forge methods a material with no piece to fill feeds: quick skymetal, zinc and
         # bismuth are alloying stock, never a blade (contract §3's relevance rule).
         "feeds": [str(f) for f in _list(raw.get("feeds"))],
         # Which gear a treatment finishes. A treatment fills no piece; it is laid over
@@ -412,12 +412,12 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         # The book's restrictions on a finish: alchemical silver cannot go on
         # adamantine, cold iron or mithral (CRB 155).
         "not_on": [str(f) for f in _list(raw.get("not_on"))],
-        # Noqual's "any magic item incorporating noqual costs +5,000 gp to create" is a
+        # Null skymetal's "any magic item incorporating null skymetal costs +5,000 gp to create" is a
         # price, not an effect, so it is a field the enchanter can read.
         "enchant_surcharge_gp": int(raw.get("enchant_surcharge_gp") or 0),
         # What handling a sliver does to the assayer, for a reactive metal whose harm is
-        # not a carrier effect (abysium's is: its sickness is what carrying it does).
-        # Noqual's is the owner's HOUSE RULE of 2026-10-04, "magic recoils"
+        # not a carrier effect (fever skymetal's is: its sickness is what carrying it does).
+        # Null skymetal's is the owner's HOUSE RULE of 2026-10-04, "magic recoils"
         # (`ASSAY_DANGERS`); read by `knowledge.danger_of`. None when it has none.
         "assay_danger": (dict(raw["assay_danger"])
                          if isinstance(raw.get("assay_danger"), dict) else None),
@@ -603,9 +603,38 @@ def refresh() -> None:
     _cache(refresh=True)
 
 
+# Renamed shipped materials: old id -> id now. The two planar finishes from the river of
+# forgetting were named for the Styx until 2026-10-30, when the owner had the myth names
+# taken out of shipped content (docs/bestiary-licensing.md §7). A save holding the old id
+# is rewritten on load (`sheet._current_materials`); anything else asking by the old id
+# is answered here.
+RENAMED: dict[str, str] = {
+    "styx-water": "oblivion-water",
+    "styx-mordant": "oblivion-mordant",
+    # Golarion's skymetals and its metals named for places and planes, renamed the same
+    # day by what each does (the owner: "using the adjective skymetal is fine").
+    "abysium": "fever-skymetal", "abysium-ore": "fever-skymetal-ore",
+    "djezet": "quick-skymetal", "djezet-ore": "quick-skymetal-ore",
+    "inubrix": "ghost-skymetal", "inubrix-ore": "ghost-skymetal-ore",
+    "noqual": "null-skymetal", "noqual-ore": "null-skymetal-ore",
+    "siccatite": "searing-skymetal", "siccatite-ore": "searing-skymetal-ore",
+    "horacalcum": "time-skymetal", "horacalcum-ore": "time-skymetal-ore",
+    "nexavaran-steel": "frontier-steel", "elysian-bronze": "celestial-bronze",
+}
+
+
+def current_id(material_id: str) -> str:
+    """The id a stored material id reads as today. A homebrew material that still uses an
+    old id is the player's own and keeps it."""
+    key = str(material_id or "").strip().lower()
+    if key in RENAMED and key not in _cache():
+        return RENAMED[key]
+    return key
+
+
 def get(material_id: str) -> dict | None:
     """The normalised document, or None. A copy: the cache is not the caller's to edit."""
-    doc = _cache().get(str(material_id or "").strip().lower())
+    doc = _cache().get(current_id(material_id))
     return copy.deepcopy(doc) if doc is not None else None
 
 
@@ -669,7 +698,7 @@ def is_negative(spec: dict) -> bool:
 
     `effectspec.is_drawback` answers for numbers (gear targets by direction, modifiers by
     sign). The rest is who it lands on: a sickness *carried* is the material's drawback,
-    the same sickness delivered on a *hit* is its sting. Abysium's only drawback is its
+    the same sickness delivered on a *hit* is its sting. Fever skymetal's only drawback is its
     carrier effect, which is why this cannot be sign-only.
     """
     if effectspec.is_drawback(spec):

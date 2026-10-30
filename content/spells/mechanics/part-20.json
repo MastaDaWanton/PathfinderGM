@@ -483,7 +483,7 @@
    "converted_by": "read",
    "notes": "The shaken condition and the -2 both last only while the creature stays inside the area, which the duration shape cannot express, so it is recorded on both specs."
   },
-  "vision-of-lamashtu": {
+  "vision-of-nightmares": {
    "effects": [
     {
      "type": "narrative",
@@ -1403,7 +1403,7 @@
    "converted_by": "read",
    "notes": "Protection from mundane liquid is not damage resistance and has no effect type."
   },
-  "waters-of-lamashtu": {
+  "foul-waters": {
    "effects": [
     {
      "type": "narrative",
@@ -1706,28 +1706,6 @@
    },
    "converted_by": "read",
    "notes": "A created structure; the total cover it gives is a property of the shelter rather than a modifier on a creature."
-  },
-  "what-grows-within": {
-   "effects": [
-    {
-     "type": "save_mod",
-     "amount": 3,
-     "bonus_type": "profane",
-     "target": "will"
-    },
-    {
-     "type": "narrative",
-     "target": "While the spell lasts your mind-affecting spells carry a supernatural taint. Whenever you successfully affect a creature with one of them — the target failing its save, or the spell allowing none — that target must also succeed at a Fortitude save against what grows within or be afflicted by a lesser seeded infestation. Lesser seeded infestation: save Fortitude at this spell's save DC; onset immediate; frequency 1/day; effect 1d4 Constitution drain; cure none, curable by magic alone. A creature whose Constitution is reduced to 0 by it dies and rises 1d4 rounds later as a seeded creature. Each creature so afflicted reduces this spell's remaining duration by 1 round, and if you affect several in a round you choose the order in which they save. The infestation does not expose its victim to Xhamen-Dor's infectious dreams. Preparing this spell for the first time, or first using it from a spell-completion or spell-trigger item, makes you a possible target of Xhamen-Dor's infected dreams ability thereafter."
-    }
-   ],
-   "duration": {
-    "kind": "per_level",
-    "amount": 1,
-    "unit": "round",
-    "dismissible": false
-   },
-   "converted_by": "read",
-   "notes": "The +3 profane on Will saves is the only thing that happens to you at casting and is emitted. The 1d4 Constitution drain lands on a third party — a creature your later mind-affecting spells affect — and recurs daily, so it is not an ability_drain spec."
   },
   "whip-of-spiders": {
    "effects": [
@@ -2405,11 +2383,11 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Functions as symbol of death, except that creatures which succumb become dominated by Hastur, as dominate monster. They seek to aid any obvious minion or worshiper of Hastur in sight, and any true worshiper of Hastur can command them as if that worshiper had dominated them; conflicting commands from different true worshipers are settled by opposed Charisma checks, the winner commanding the targets that round. With no worshiper or agent of Hastur in sight, an affected creature acts normally. The domination lasts 1 round per level, and once triggered the Yellow Sign itself remains active for 10 minutes per caster level. There is a 1% chance when a creature fails its save that Hastur takes note and decides to control the target personally: the dominated creature's actions are then the GM's to determine, the effects persist for 1 day per level, and no other creature can countermand the commands, not even a Hastur worshiper. However long the effects last, and whether or not Hastur controls the victim directly, any creature that failed to resist this spell can be targeted by Hastur's fulvous dreams ability for the rest of its life, should the Great Old One ever choose to. Yellow Sign can be made permanent with permanency by a caster of 18th level or higher for 40,000 gp."
+     "target": "Functions as symbol of death, except that creatures which succumb become dominated by the god of the sign, as dominate monster. They seek to aid any obvious minion or worshiper of the god of the sign in sight, and any true worshiper of the god of the sign can command them as if that worshiper had dominated them; conflicting commands from different true worshipers are settled by opposed Charisma checks, the winner commanding the targets that round. With no worshiper or agent of the god of the sign in sight, an affected creature acts normally. The domination lasts 1 round per level, and once triggered the Yellow Sign itself remains active for 10 minutes per caster level. There is a 1% chance when a creature fails its save that the god of the sign takes note and decides to control the target personally: the dominated creature's actions are then the GM's to determine, the effects persist for 1 day per level, and no other creature can countermand the commands, not even a the god of the sign worshiper. However long the effects last, and whether or not the god of the sign controls the victim directly, any creature that failed to resist this spell can be targeted by the god of the sign's fulvous dreams ability for the rest of its life, should the Great Old One ever choose to. Yellow Sign can be made permanent with permanency by a caster of 18th level or higher for 40,000 gp."
     }
    ],
    "converted_by": "read",
-   "notes": "Domination has no effect type, and the three different durations here (1 round/level for the domination, 10 minutes/caster level for the sign, 1 day/level if Hastur intervenes) are why the corpus duration reads 'see text'; no single duration would be true, so it is omitted."
+   "notes": "Domination has no effect type, and the three different durations here (1 round/level for the domination, 10 minutes/caster level for the sign, 1 day/level if the god of the sign intervenes) are why the corpus duration reads 'see text'; no single duration would be true, so it is omitted."
   },
   "youthful-appearance": {
    "effects": [

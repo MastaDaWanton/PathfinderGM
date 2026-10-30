@@ -67,11 +67,11 @@ player still reads them, and listed here so they are not forgotten):
   No "after exposure" trigger.
 - **Living steel**: repairs 2 hp a day; breaks a weapon that rolls a natural 1 against
   its armour. No item repair, no "struck on a natural 1" trigger.
-- **Inubrix**: ignores iron and steel armour bonuses, cannot damage iron or steel,
+- **Ghost skymetal**: ignores iron and steel armour bonuses, cannot damage iron or steel,
   damage as one size smaller. Approximated by a house +3 attack against a
   metal-armoured target (`when: {"target": {"armour_metal": true}}`, evaluated since
   lane H: the defender's suit or shield is iron or steel, `armour.wears_metal`).
-- **Noqual**: +4 on the *object's* saves against magic. Items have no saves yet. The
+- **Null skymetal**: +4 on the *object's* saves against magic. Items have no saves yet. The
   +5,000 gp enchanting surcharge is the field `enchant_surcharge_gp` for the enchanter.
   Assaying it is a **house rule** (the owner, 2026-10-04): magic recoils, and the
   assayer's buffs and wards are suppressed for 1d4 rounds (`assay_danger`).
@@ -80,21 +80,21 @@ player still reads them, and listed here so they are not forgotten):
   spends a finish yet, as for holy anointing.
 - **Wyroot**: stores a life point for ki or arcane pools. Approximated by 1 temporary hp
   on a critical, once a day.
-- **Abysium**: glows like a candle. No light vocabulary.
+- **Fever skymetal**: glows like a candle. No light vocabulary.
 - **Singing steel**: speeds bardic performance. Approximated by a house Perform bonus.
-- **Horacalcum**: +¼ hit points. Only its hardness is carried.
+- **Time skymetal**: +¼ hit points. Only its hardness is carried.
 
 `when` clauses this data uses, all evaluated since lane H (2026-10-04; a clause nothing
 can evaluate is still dropped, never applied): `{"target": {"type": ...}}` and
 `{"target": {"subtype": ...}}` against the struck creature, where a **list** value means
 "any of"; `{"armour": {"weight": ...}}` against the base armour at build time
-(adamantine's DR 1/2/3, horacalcum's initiative, elysian bronze); `{"attacker": {"type":
-[...]}}` for elysian bronze's DR (the "natural weapons and unarmed strikes only" in its
-note is not yet asked); `{"against": "spell"}` for noqual's saves; `{"weapon":
+(adamantine's DR 1/2/3, time skymetal's initiative, celestial bronze); `{"attacker": {"type":
+[...]}}` for celestial bronze's DR (the "natural weapons and unarmed strikes only" in its
+note is not yet asked); `{"against": "spell"}` for null skymetal's saves; `{"weapon":
 {"slashing_or_piercing": true}}` for silver's −1 damage.
 
 Quench marks are a single effect (contract §3). Dragon blood's plan wanted resistance on
-armour or +1 energy damage on a weapon; it is resistance on both. Styx water's two parts
+armour or +1 energy damage on a weapon; it is resistance on both. Oblivion water's two parts
 are one `bundle`.
 
 """

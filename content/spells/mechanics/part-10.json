@@ -1232,7 +1232,7 @@
    "converted_by": "read",
    "notes": "duration omitted: the corpus reads 'rounds (1d4+1)' and the shared shape carries no random term. Not wrapped in a save_gate because the save is 'Will partial' and the partial result is a shorter duration, not a lesser effect — gating the penalties on a failure would let a successful save escape them entirely, which is wrong."
   },
-  "irriseni-mirror-sight": {
+  "mirror-sight": {
    "effects": [
     {
      "type": "narrative",
@@ -1246,7 +1246,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "Scrying; the vocabulary has no remote-sensor spec. The Urion Petresky passage is a worked example and is not converted."
+   "notes": "Scrying; the vocabulary has no remote-sensor spec. The spy-and-queen passage is a worked example and is not converted."
   },
   "isolate": {
    "effects": [
@@ -1361,7 +1361,7 @@
    "converted_by": "read",
    "notes": "Planar travel; nothing in the vocabulary moves creatures between planes."
   },
-  "jatembe-s-ire": {
+  "wrathful-vines": {
    "effects": [
     {
      "type": "narrative",
@@ -1496,11 +1496,11 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "A 10-minute ritual that undoes Pharasma's judgment, returning a willing petitioner to mortal life. It must be cast on the plane the petitioner was sent to, with the petitioner present throughout, using as focus a specific object the petitioner valued deeply in life. On completion the petitioner returns in the mortal form it had as a young adult, with all memories and class levels intact."
+     "target": "A 10-minute ritual that undoes the judgment of the dead, returning a willing petitioner to mortal life. It must be cast on the plane the petitioner was sent to, with the petitioner present throughout, using as focus a specific object the petitioner valued deeply in life. On completion the petitioner returns in the mortal form it had as a young adult, with all memories and class levels intact."
     },
     {
      "type": "narrative",
-     "target": "The risk: 1d6+5 minutes after the casting begins, an olethros psychopomp appears within 50 feet and demands the caster stop, attacking if ignored. It will not harm the petitioner unless the spell has already succeeded, in which case it tries to eliminate the returned mortal too, and it hunts both afterwards. The casting may be paused for up to 1 minute — during which the caster can act and cast freely — but fails if not resumed inside that window. The wrath can be avoided entirely by first visiting the Boneyard and obtaining permission from a powerful agent of Pharasma; a worshipper of Pharasma who casts it without that permission has grossly violated her code."
+     "target": "The risk: 1d6+5 minutes after the casting begins, an olethros psychopomp appears within 50 feet and demands the caster stop, attacking if ignored. It will not harm the petitioner unless the spell has already succeeded, in which case it tries to eliminate the returned mortal too, and it hunts both afterwards. The casting may be paused for up to 1 minute — during which the caster can act and cast freely — but fails if not resumed inside that window. The wrath can be avoided entirely by first visiting the court of the dead and obtaining permission from a powerful agent of the god of death; a worshipper of the god of death who casts it without that permission has grossly violated her code."
     }
    ],
    "duration": {
@@ -1752,7 +1752,7 @@
    "converted_by": "read",
    "notes": "Teleportation; the vocabulary cannot move creatures."
   },
-  "kiss-of-the-first-world": {
+  "fey-kiss": {
    "effects": [
     {
      "type": "save_gate",
@@ -1928,11 +1928,11 @@
    "converted_by": "read",
    "notes": "situational_mod rather than skill_mod because Knowledge is many skills and the bonus is tied to one reflected-upon creature type, not to a named Knowledge skill."
   },
-  "kreighton-s-perusal": {
+  "rapid-perusal": {
    "effects": [
     {
      "type": "narrative",
-     "target": "You gain a brief, incomplete grasp of one touched book's contents, equal to having skimmed it for an hour. It is not enough to translate an unknown language, break a code or memorise text, but you learn what topics the book covers — the difference between researching it and walking off with it. You also gain at once any bonus or effect the book would normally give a reader who spent an hour with it, such as those from the volumes of the Pathfinder Chronicles."
+     "target": "You gain a brief, incomplete grasp of one touched book's contents, equal to having skimmed it for an hour. It is not enough to translate an unknown language, break a code or memorise text, but you learn what topics the book covers — the difference between researching it and walking off with it. You also gain at once any bonus or effect the book would normally give a reader who spent an hour with it, such as those some rare tomes grant."
     }
    ],
    "duration": {
@@ -2029,7 +2029,7 @@
    "converted_by": "read",
    "notes": "Corpus duration is instantaneous even though the claw lasts up to 24 hours; emitted as written, with the 24 hours in the narrative. Vocabulary gap: negative levels / energy drain cannot be expressed."
   },
-  "last-azlanti-s-defending-sword-mass": {
+  "defending-sword-mass": {
    "effects": [
     {
      "type": "combat_mod",
@@ -2051,7 +2051,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "The corpus contradicts itself on how many swords: the effect line says one per 3 levels, the description says one per 5 caster levels. Neither was picked — the count is left in the prose. Details of the sword come from last-azlanti-s-defending-sword, which this spell functions as (the description still calls it by its older name, Aroden's defending sword)."
+   "notes": "The corpus contradicts itself on how many swords: the effect line says one per 3 levels, the description says one per 5 caster levels. Neither was picked — the count is left in the prose. Details of the sword come from last-azlanti-s-defending-sword, which this spell functions as (defending sword)."
   },
   "lay-of-the-land": {
    "effects": [
@@ -2543,7 +2543,7 @@
    "converted_by": "read",
    "notes": "duration omitted: the corpus reads 'rounds (1) + rounds/level (1)', two terms added together, and the shared shape holds one. Emitting only the per-level term would silently shorten the spell. The lance's +1 and holy damage belong to the created weapon, not to the spell."
   },
-  "light-of-iomedae": {
+  "light-of-the-righteous": {
    "effects": [
     {
      "type": "skill_mod",
@@ -2734,7 +2734,7 @@
    "converted_by": "read",
    "notes": "Affects two willing creatures plus one per 6 caster levels, no two more than 30 feet apart."
   },
-  "lissalan-snake-sigil": {
+  "cursed-snake-sigil": {
    "effects": [
     {
      "type": "save_gate",
@@ -2743,7 +2743,7 @@
      "on_failure": [
       {
        "type": "narrative",
-       "target": "As sepia snake sigil — and it counts as that spell for combining with anything else that hides or garbles text — except that a triggered sigil curses the reader instead of trapping them, in a way set by which of the seven Thassilonian schools this variant belongs to. The effect lasts 1 day per caster level and is a curse, removable with remove curse. Abjuration: every beneficial magical effect on the target lasts half as long as normal. Conjuration: the target is nauseated (a poison effect). Enchantment: the target takes a 1d6 penalty to Intelligence, Wisdom and Charisma (a compulsion effect). Evocation: the target gains vulnerability to acid, cold, electricity or fire, chosen at random (and is an effect of that energy type). Illusion: the target's vision blurs, giving -4 on Perception checks that rely on sight and making it treat every other creature as having displacement (a glamer). Necromancy: the target is exhausted, and rest will not remove it. Transmutation: the target is affected by slow.",
+       "target": "As sepia snake sigil — and it counts as that spell for combining with anything else that hides or garbles text — except that a triggered sigil curses the reader instead of trapping them, in a way set by which of the seven schools of sin magic this variant belongs to. The effect lasts 1 day per caster level and is a curse, removable with remove curse. Abjuration: every beneficial magical effect on the target lasts half as long as normal. Conjuration: the target is nauseated (a poison effect). Enchantment: the target takes a 1d6 penalty to Intelligence, Wisdom and Charisma (a compulsion effect). Evocation: the target gains vulnerability to acid, cold, electricity or fire, chosen at random (and is an effect of that energy type). Illusion: the target's vision blurs, giving -4 on Perception checks that rely on sight and making it treat every other creature as having displacement (a glamer). Necromancy: the target is exhausted, and rest will not remove it. Transmutation: the target is affected by slow.",
        "note": "None of the seven is emitted as its own spec: the caster picks one variant when scribing the sigil, so emitting any of them would apply an effect this casting may not carry."
       }
      ]

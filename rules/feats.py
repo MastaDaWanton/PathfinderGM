@@ -112,6 +112,10 @@ def _build_feats() -> dict[str, Feat]:
         if not folder.is_dir():
             continue
         for path in sorted(folder.glob("*.json")):
+            if path.name == "aliases.json":
+                # Old id or name -> new id, read by `aliases()`. Read here it would land
+                # in `_META` key by key, every old feat name a metadata field.
+                continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
@@ -160,15 +164,62 @@ def _by_name() -> dict[str, Feat]:
     return _BY_NAME
 
 
+_ALIASES: dict[str, str | None] | None = None
+
+
+def aliases() -> dict[str, str | None]:
+    """Old feat id or old lower-cased name -> the id it ships under now, None if dropped.
+
+    `content/feats/aliases.json`, written by tools/strip_golarion.py when the imported
+    feats lost Golarion's names (docs/bestiary-licensing.md §7). Sheets store a feat by
+    its name, so a sheet saved before then holds "aldori dueling mastery" and must still
+    find Dueling Sword Mastery."""
+    global _ALIASES
+    if _ALIASES is None:
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "feats" / "aliases.json"
+        try:
+            _ALIASES = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        except (ValueError, OSError) as exc:
+            files.unreadable(path, exc)
+            _ALIASES = {}
+    return _ALIASES
+
+
 def get(feat_id: str) -> Feat:
     key = (feat_id or "").strip().lower()
     found = all_feats().get(key)
     if found is None:
         # Sheets write feats as names, not ids: "weapon focus (rapier)".
         found = _by_name().get(key)
+    if found is None and aliases().get(key):
+        found = all_feats().get(aliases()[key])
     if found is None:
         raise KeyError(f"no feat {feat_id!r}")
     return found
+
+
+def current_name(raw: str) -> str:
+    """A sheet's feat string as it should read today: a renamed feat under its new name,
+    lower-cased the way sheets store names, its parenthetical target kept. Anything the
+    shipped feats or homebrew still answer to — or a dropped feat, which has no new name
+    to give — comes back as it was."""
+    import re
+
+    from .tables import FEAT_TARGET_RE
+
+    text = str(raw or "").strip()
+    m = re.match(FEAT_TARGET_RE, text, re.IGNORECASE)
+    name = (m.group("feat") if m else text).strip()
+    key = name.lower()
+    if not aliases().get(key) or key in all_feats() or key in _by_name():
+        return text                             # the cheap question first
+    feat = all_feats().get(aliases()[key])
+    if feat is None:
+        return text
+    new = feat.name.strip().lower()
+    return f"{new} ({m.group('target').strip()})" if m else new
 
 
 # --- mechanics as documents (stage 8) ---------------------------------------------------

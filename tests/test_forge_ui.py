@@ -503,19 +503,19 @@ def test_the_quality_perk_names_the_rung_it_reaches_once():
     assert out["perk_info"]["quality"]["next"] == "Your quality ceiling rises one step, to Flawless +1"
 
 
-def test_an_assay_of_abysium_sickens_the_assayer_for_real(forge):
+def test_an_assay_of_fever_skymetal_sickens_the_assayer_for_real(forge):
     """Lane U5's report: the view showed an assay's danger and applied nothing, so
-    assaying abysium never sickened anyone, though lane E's `assay` leaves the applying to
+    assaying fever skymetal never sickened anyone, though lane E's `assay` leaves the applying to
     its caller in so many words. The danger goes through the engine as an effect, and the
     response carries the DC and the verdict the ledger card shows."""
     pc = cm.current().scene.pc()
-    pc.carry("abysium", 1)
+    pc.carry("fever-skymetal", 1)
     cm.current().save()
-    card = forge.get("/api/forge/material/abysium").json()
+    card = forge.get("/api/forge/material/fever-skymetal").json()
     assert card["assay_danger"].startswith("Causes sickened") and card["color"] and "smiths_here" in card
     # Iron harms nobody: no `assay_danger` at all, so lane U5's card asks nothing.
     assert "assay_danger" not in forge.get("/api/forge/material/iron").json()
-    r = _post(forge, "/api/forge/assay", {"material": "abysium", "face": 10}).json()
+    r = _post(forge, "/api/forge/assay", {"material": "fever-skymetal", "face": 10}).json()
     assert r["danger"] and r["danger_applied"] is True, r
     assert "dc" in r and isinstance(r["success"], bool)
     pc = cm.current().scene.pc()

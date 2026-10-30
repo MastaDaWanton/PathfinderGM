@@ -5,9 +5,9 @@ materials, 57 had no effect at all; of the 63 effects that did exist, 40 were `n
 prose nothing could execute; none carried a piece, and no material had three properties to
 discover (0 traits: 58, 1: 47, 2: 7). Eleven entries contradicted the printed PF1e rule
 (docs/blacksmithing-prior-art.md §5.2): mithral claimed a lighter category "for
-proficiency", abysium carried an invented DC 18 save where the book has none, horacalcum
+proficiency", fever skymetal carried an invented DC 18 save where the book has none, time skymetal
 gave +1 initiative regardless of armour weight, singing steel an invented Perform bonus,
-and inubrix and noqual had lost their drawbacks.
+and ghost skymetal and null skymetal had lost their drawbacks.
 
 These tests pin plan §16.1 lane 4: every structural material has 3 + 3 effects with a
 drawback in each, no narrative, the book effects equal the sweep's table, house numbers
@@ -350,7 +350,7 @@ BOOK = {
         _r("armour", "damage_reduction", None, 3, weight="heavy"),
         _r("armour", "gear_mod", "hardness", 10), _r("armour", "gear_mod", "hp_per_inch", 10)},
     "cold-iron": {_r("weapon", "strikes_as", "cold_iron")},
-    "nexavaran-steel": {_r("weapon", "strikes_as", "cold_iron")},
+    "frontier-steel": {_r("weapon", "strikes_as", "cold_iron")},
     "cold-iron-blanching": {_r("weapon", "strikes_as", "cold_iron")},
     # The other weapon blanch (Ultimate Equipment): full damage to incorporeal creatures.
     # A house +2 against undead stood in for it until `strikes_as: ghost_touch` existed
@@ -376,32 +376,32 @@ BOOK = {
         _r("weapon", "save_gate", "fort", 13, "crit"),
         _r("weapon", "save_gate", "fort", 12, "carried", who="self"),
         _r("weapon", "gear_mod", "hardness", -5)},
-    "abysium": {
+    "fever-skymetal": {
         _r("weapon", "apply_condition", "sickened", trigger="carried"),
         _r("armour", "apply_condition", "sickened", trigger="carried")},
-    "horacalcum": {
+    "time-skymetal": {
         _r("weapon", "combat_mod", "attack", 1), _r("weapon", "gear_mod", "hardness", 5),
         _r("armour", "combat_mod", "initiative", 1, weight="light"),
         _r("armour", "combat_mod", "initiative", 2, weight="medium"),
         _r("armour", "combat_mod", "initiative", 3, weight="heavy"),
         _r("armour", "gear_mod", "hardness", 5)},
-    "inubrix": {
+    "ghost-skymetal": {
         _r("weapon", "combat_mod", "attack", -2), _r("weapon", "combat_mod", "damage", -2),
         _r("weapon", "gear_mod", "hardness", -5), _r("weapon", "gear_mod", "hp_per_inch", -20)},
-    "noqual": {
+    "null-skymetal": {
         _r("weapon", "gear_mod", "weight_pct", -50),
         _r("weapon", "combat_mod", "damage", 1), _r("weapon", "combat_mod", "damage", 1),
         _r("armour", "gear_mod", "asf", 20), _r("armour", "save_mod", "fort", 2),
         _r("armour", "save_mod", "ref", 2), _r("armour", "save_mod", "will", 2),
         _r("armour", "gear_mod", "weight_pct", -50), _r("armour", "gear_mod", "category", -1),
         _r("armour", "gear_mod", "max_dex", 2), _r("armour", "gear_mod", "acp", 3)},
-    "siccatite": {
+    "searing-skymetal": {
         _r("weapon", "damage", "fire", 1, "hit"),
         _r("weapon", "damage", "fire", 1, "each_round", who="self"),
         _r("armour", "damage", "fire", 1, "each_round", who="self"),
         _r("armour", "damage", "fire", 1, "when_grappled", who="attacker"),
         _r("armour", "resistance", "cold", 5)},
-    "elysian-bronze": {
+    "celestial-bronze": {
         _r("weapon", "combat_mod", "damage", 1), _r("weapon", "combat_mod", "attack", 1, "hit", who="self"),
         _r("armour", "damage_reduction", None, 1, weight="light"),
         _r("armour", "damage_reduction", None, 2, weight="medium"),
@@ -449,21 +449,21 @@ def test_the_eleven_catalogue_errors_are_gone(forge):
     # Mithral: lighter for movement, never proficiency; spell failure; strikes as silver.
     assert "proficiency" not in json.dumps(d["mithral"]["armour"]).replace(
         "never for proficiency", "")
-    # Abysium: no save at all; the sickness is carried.
-    assert not any(e["type"] == "save_gate" for e in d["abysium"]["weapon"])
+    # fever-skymetal: no save at all; the sickness is carried.
+    assert not any(e["type"] == "save_gate" for e in d["fever-skymetal"]["weapon"])
     # Viridium: leprosy at DC 12, not DC 14 sickened.
     assert not any(e.get("dc") == 14 for e in d["viridium"]["weapon"])
-    # Horacalcum: initiative by armour weight, attack on the weapon.
+    # time-skymetal: initiative by armour weight, attack on the weapon.
     assert not any(e.get("target") == "initiative" and e.get("book")
-                   for e in d["horacalcum"]["weapon"])
+                   for e in d["time-skymetal"]["weapon"])
     # Singing steel: the invented +2 Perform is gone as a book number.
     assert not any(e.get("target") == "perform" and e.get("book")
                    for g in materials.FORGE_GEARS for e in d["singing-steel"][g])
-    # Inubrix and noqual keep their drawbacks.
-    assert any(materials.is_negative(e) and e.get("book") for e in d["inubrix"]["weapon"])
+    # Ghost skymetal and null skymetal keep their drawbacks.
+    assert any(materials.is_negative(e) and e.get("book") for e in d["ghost-skymetal"]["weapon"])
     assert any(e.get("target") == "asf" and e.get("amount") == 20
-               for e in d["noqual"]["armour"])
-    assert d["noqual"]["enchant_surcharge_gp"] == 5000
+               for e in d["null-skymetal"]["armour"])
+    assert d["null-skymetal"]["enchant_surcharge_gp"] == 5000
     # Fire-forged armour resists always, not "once it has drunk a round of flame".
     assert {"type": "resistance", "target": "fire", "amount": 2, "book": True} in \
         d["fire-forged-steel"]["armour"]
@@ -585,7 +585,7 @@ def test_too_few_properties_is_refused():
 
 
 def test_a_carried_sickness_counts_as_the_drawback():
-    """Abysium's only drawback is its carrier effect (plan §5.4). A sign-only check would
+    """Fever Skymetal's only drawback is its carrier effect (plan §5.4). A sign-only check would
     call its weapon list drawback-free and demand an invented penalty on top."""
     carried = {"type": "apply_condition", "target": "sickened", "trigger": "carried"}
     on_hit = {"type": "apply_condition", "target": "sickened", "trigger": "hit"}

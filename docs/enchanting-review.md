@@ -92,7 +92,7 @@ The owner's ruling (round 4 point 10, round 5): phases of the day from `rules/sk
 |---|---|---|---|---|---|
 | cold | dawn | Frost before dawn (the owner's own example): the coldest hour of the day is just before sunrise, when the night's cooling has run longest and the sun has not yet begun to repay it (the diurnal temperature minimum; any meteorology text). | frost-forged-steel, white-dragonhide, winter-wolf-pelt | heavy | 7 |
 | earth | dawn | Stone takes at sunrise: in the Eddic Alvissmal the dwarf All-Wise is kept talking until dawn and the first light turns him to stone (https://en.wikipedia.org/wiki/Alv%C3%ADssm%C3%A1l); trolls share the fate in Norse folklore. | iron, bulette-plate, ironwood-haft | heavy | 2 |
-| holy | dawn | The cockcrow that ends the dead's hour: spirits and devils "disappear with the first cry of the cock" (https://www.almanac.com/folklore-cocks-cockcrows-and-weathercocks). Dawn is the hour the holy wins back. | silver, angelskin-binding, unicorn-hide, elysian-bronze | pure | 3 |
+| holy | dawn | The cockcrow that ends the dead's hour: spirits and devils "disappear with the first cry of the cock" (https://www.almanac.com/folklore-cocks-cockcrows-and-weathercocks). Dawn is the hour the holy wins back. | silver, angelskin-binding, unicorn-hide, celestial-bronze | pure | 3 |
 | invulnerability | dawn | The hardening at first light, as earth: Alvissmal's dwarf made stone by the sunrise (https://en.wikipedia.org/wiki/Alv%C3%ADssm%C3%A1l). A house pairing with earth; no separate source. | adamantine, tarrasque-plate | heavy | 1 |
 | light | dawn | First light, the cockcrow: in the folk belief the crow before dawn sends the night's spirits home (https://www.almanac.com/folklore-cocks-cockcrows-and-weathercocks); Hamlet's ghost fades at it. | silver, gold, glowlizard-hide | pure | 2 |
 | vorpal | dawn | Executions at dawn, the custom of military and civil justice alike. A house reading; not sourced in this pass. | adamantine, high-carbon-steel | volatile | 1 |
@@ -119,11 +119,11 @@ The owner's ruling (round 4 point 10, round 5): phases of the day from `rules/sk
 | mind | night | The night owl and the scholar's lamp, as arcane: wisdom keeps the night hours. A house reading; not sourced. | gold, silver | pure | 3 |
 | shadow | night | Darkness itself: the hours with no sun. | shadow-silk, shadow-mastiff-hide, umbral-dragonhide, shadow-black | skittish | 4 |
 | slick | night | The burglar's hours, slipping through bars and bonds. A house reading; not sourced. | mink-oil, currier-tallow, troll-fat | skittish | 3 |
-| vicious | night | The predator's dark, when the wolf comes to the fold. A house reading; not sourced. | fiend-bone-core, abysium | volatile | 1 |
+| vicious | night | The predator's dark, when the wolf comes to the fold. A house reading; not sourced. | fiend-bone-core, fever-skymetal | volatile | 1 |
 | water | night | Dew settles through the night as the ground cools below the air (and was gathered before sunrise for magic, Folkard's Plant Lore, cited in rules/sky.py). | kraken-hide, sharkskin-grip, crocodile-hide | skittish | 1 |
 | ghost | midnight | The dead at midnight (the owner's own example; https://en.wikipedia.org/wiki/Witching_hour). | ghost-wax, silver | night_only | 3 |
 | negative | midnight | The dead at midnight, as ghost (https://en.wikipedia.org/wiki/Witching_hour). | bone-grip, fiend-bone-core | volatile | 1 |
-| unholy | midnight | The witching hour, "the hour immediately after midnight", when witches, demons and ghosts are at their most powerful (https://en.wikipedia.org/wiki/Witching_hour). | fiend-bone-core, hell-hound-hide, abysium | volatile | 2 |
+| unholy | midnight | The witching hour, "the hour immediately after midnight", when witches, demons and ghosts are at their most powerful (https://en.wikipedia.org/wiki/Witching_hour). | fiend-bone-core, hell-hound-hide, fever-skymetal | volatile | 2 |
 
 ## The essences
 

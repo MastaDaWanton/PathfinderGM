@@ -637,7 +637,7 @@ con("ironbark-tannin", "#4a3a2a", "ceiling_up", "slow_tan", "flawless", tannage=
 con("wyrm-gall", "#6a7a2a", "fast_tan", "ceiling_up", "forgiving", tannage="planar")
 con("salamander-ash-lye", "#8a8a8a", "fast_tan", "salt_proof", "flawless",
     tannage="mineral")
-con("styx-mordant", "#1a2a3a", "slow_tan", "ceiling_up", "salt_proof", tannage="planar")
+con("oblivion-mordant", "#1a2a3a", "slow_tan", "ceiling_up", "salt_proof", tannage="planar")
 con("dragonblood-tannin", "#7a1a1a", "ceiling_up", "flawless", "slow_tan",
     tannage="planar")
 # The field tans, filed as treatments before the pass. Plan §8.1 names them as the brain and
@@ -732,7 +732,7 @@ MARKS: dict[str, dict] = {
     "umbral-oil": sk("stealth", 1, bonus="circumstance"),
     # "+1 damage vs outsiders on a grip" (plan §14.6): keyed to a weapon, so a suit tanned in
     # it does not make its wearer's sword bite (`materials.mark_problems`).
-    "styx-mordant": {"weapon": cm("damage", 1, when={"target": {"type": "outsider"}})},
+    "oblivion-mordant": {"weapon": cm("damage", 1, when={"target": {"type": "outsider"}})},
 }
 
 # --- the forge's four leather pieces (plan §4.4) -----------------------------------------------
@@ -768,10 +768,10 @@ FORGE_FORMS = {
 
 # Iron and its alloys: what rusting grasp eats (contracts §6.2, plan §18.5). Read from the
 # shelf's own texts: iron, wrought and cold iron, meteoric star-iron, and every steel. Not
-# inubrix ("ghost iron" is a skymetal that cannot damage iron), not abysium (it "works as
+# ghost skymetal ("ghost iron" is a skymetal that cannot damage iron), not fever skymetal (it "works as
 # steel" and is not), not wyrmsteel (adamantine folded with dragonfire).
 FERROUS = ("iron", "wrought-iron", "cold-iron", "star-iron", "steel", "high-carbon-steel",
-           "pattern-steel", "nexavaran-steel", "living-steel", "fire-forged-steel",
+           "pattern-steel", "frontier-steel", "living-steel", "fire-forged-steel",
            "frost-forged-steel")
 
 NOTE = ("Tier follows the worldclass ladder (a deer is common work, a dragon legendary). "

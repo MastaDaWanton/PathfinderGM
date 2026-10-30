@@ -26,7 +26,7 @@ How the numbers are found, in order:
    bought thing named for a special material ("adamantine longsword") adds that
    material's BOOK numbers only — its document's `book: true` effects — since no smith
    chose its grip. The documents state hit points per inch as a change from steel's 30
-   (adamantine +10 is the book's 40; inubrix −20 is its "10 hit points per inch"), so a
+   (adamantine +10 is the book's 40; ghost skymetal −20 is its "10 hit points per inch"), so a
    change of N per inch is N/30 of the row's hit points, rounded toward zero like every
    forge number (the owner's ruling of 2026-10-03): adamantine's +10 is the book's "one-
    third more hit points than normal" (CRB p.154), and a house ±2 leaves a 5-hit-point

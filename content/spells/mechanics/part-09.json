@@ -147,7 +147,7 @@
    "converted_by": "read",
    "notes": "The litany escape clause paralyses the target for half the duration and shakes its allies. Not converted: the paralysis is the target's own choice, not the spell's imposition, and the shaken is taken by third parties on a save of their own."
   },
-  "hermean-potential": {
+  "perfected-potential": {
    "effects": [
     {
      "type": "permission",
@@ -2565,7 +2565,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The mirror of hermean potential, and its counter. Forcing a reroll is not a modifier, and the per-5-levels progression adds rolls rather than dice, which the scaling shape cannot hold. No saving throw, but spell resistance applies."
+   "notes": "The mirror of perfected potential, and its counter. Forcing a reroll is not a modifier, and the per-5-levels progression adds rolls rather than dice, which the scaling shape cannot hold. No saving throw, but spell resistance applies."
   },
   "illusion-of-calm": {
    "effects": [
@@ -3232,7 +3232,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "A calling spell — no summoning type exists in the vocabulary. Conjuring a devil is typically an evil act, and cast for any purpose other than administering a Hellknight test this spell gains the evil descriptor."
+   "notes": "A calling spell — no summoning type exists in the vocabulary. Conjuring a devil is typically an evil act, and cast for any purpose other than administering a knightly order's test this spell gains the evil descriptor."
   },
   "infernal-healing": {
    "effects": [

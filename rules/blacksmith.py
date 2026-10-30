@@ -51,7 +51,7 @@ HOT_FUEL_RANK = 3
 
 # Flux is no longer a method (plan §2, "Flux becomes an ingredient of Smelt"): a flux in
 # a charge that is smelted cleans the *metal*, not the smith. The harm it strips is the
-# harm carried by ore-kind materials, and a metal that sickens whoever works it (abysium)
+# harm carried by ore-kind materials, and a metal that sickens whoever works it (fever skymetal)
 # stays risky however much flux goes in the melt.
 CLEANSED_BY = "smelt"
 
@@ -87,8 +87,8 @@ _AFTER_WHY = {
 # entry cannot say "not with anything".
 SOLITARY = frozenset({
     "cold-iron", "cold-iron-ore", "mithral", "mithral-ore",
-    "adamantine", "adamantine-ore", "noqual", "noqual-ore",
-    "inubrix", "inubrix-ore", "horacalcum", "horacalcum-ore",
+    "adamantine", "adamantine-ore", "null-skymetal", "null-skymetal-ore",
+    "ghost-skymetal", "ghost-skymetal-ore", "time-skymetal", "time-skymetal-ore",
 })
 
 # A novel alloy is a discovery: melting two *different* metals of the same tier yields a
@@ -829,7 +829,7 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
 
     # Effects: what every material contributes, plus what the quality adds. A flux in a
     # smelted charge strips the harm carried by dirty ore, the way purify strips a
-    # poison — but only from ore: a metal that sickens the smith (abysium) is not cleaner
+    # poison — but only from ore: a metal that sickens the smith (fever skymetal) is not cleaner
     # for the slag being gone.
     cleansed = CLEANSED_BY in chain.methods and any(i.kind == "flux" for i in items)
     specs: list[dict] = []
@@ -2909,7 +2909,7 @@ def _build_assemble(plan: ForgePlan, row: dict) -> None:
                tier=wc.TIERS[max(p.rank for p, _ in plan.slots.values()) - 1])
     # A leather grip or lacing set carries the tanner's marks onto the item, as a leather
     # base does (`_build_from_base`): the consumables it was worked with, read live by
-    # `forge_items.mark_rows`. Measured by the marks lane (2026-10-08): a styx-mordant-tanned
+    # `forge_items.mark_rows`. Measured by the marks lane (2026-10-08): a oblivion-mordant-tanned
     # grip fitted here kept its tannage in the piece and gave no mark at all, so the
     # tannin's weapon mark (+1 damage against outsiders) could never land on any weapon.
     leather = [p.leather for p, _ in plan.slots.values() if p.leather is not None]

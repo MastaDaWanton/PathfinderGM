@@ -6,7 +6,7 @@ copy of the licence must ship with any build.
 
 ## What in this repo is Open Game Content
 
-`content/spells/spells.json` — 3,040 Pathfinder 1st Edition spells, imported from The
+`content/spells/spells.json` — 3,038 Pathfinder 1st Edition spells, imported from The
 Spell Codex spreadsheet. Names, schools, subschools, descriptors, class lists, components,
 ranges, durations, saving throws and descriptions are Open Game Content and each entry
 records the sourcebook it came from. The `tags` field on each spell is *not* Open Game
@@ -39,11 +39,20 @@ The structural tables in `rules/tables.py`:
 - condition effects, weapon and armour statistics, size modifiers
 - the difficulty class table used by `rules/dc.py`
 
+**Golarion's names out of the spells, feats and weapons (2026-10-29).** These files named
+Paizo's setting in 271 rows: gods, places, peoples, organisations and characters of
+Golarion. Each was rewritten world-agnostic with its mechanics kept, or dropped where the
+setting was the mechanic (docs/bestiary-licensing.md §7; the table is
+`tools/golarion_rewrites.py`, and `tests/test_no_golarion_names.py` holds the count at
+zero). The rewritten wording is a modification of the Open Game Content and is offered
+under the same licence. `content/spells/aliases.json` and `content/feats/aliases.json` keep
+the old ids only so that older saves load.
+
 Nothing under `world/`, `gm/`, `play/`, `fixtures/` or `docs/` is Open Game Content.
 `fixtures/pangrella-campaign.json` is a World Bible export and carries no rules content at
 all — that boundary is deliberate and is documented in `docs/campaign-format.md`.
 
-`content/feats/feats.json` — 1,474 Pathfinder 1st Edition feats imported from an OGL feat
+`content/feats/feats.json` — 1,453 Pathfinder 1st Edition feats imported from an OGL feat
 spreadsheet. Names, types, prerequisites, benefits and the normal/special clauses are Open
 Game Content, and each entry records the sourcebook it came from. The typed
 `prerequisites` array is this app's own machine-readable restatement of the prerequisite

@@ -106,7 +106,7 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "The heal is on the caster and is real (1d8 + 1/level, max +5), but it is conditional: you must be at half hit points or more to cast, and can only draw on it once, after dropping below half. No damage_type is claimed — the prose calls it absorbing strength from an Akashic replica, not positive energy.",
+   "notes": "The heal is on the caster and is real (1d8 + 1/level, max +5), but it is conditional: you must be at half hit points or more to cast, and can only draw on it once, after dropping below half. No damage_type is claimed — the prose calls it absorbing strength from an cosmic replica, not positive energy.",
    "converted_by": "read"
   },
   "minor-reversion-mass": {
@@ -238,7 +238,7 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "The save is not made at casting: it is made the first time the target sees its own reflection, and again on each later viewing. A creature that saves is immune to being shaken by this caster's spell for 24 hours but still sees the Red Mantis. The -2 is written as situational_mod rather than save_mod because the prose says 'saves against fear effects', which is not one of the three saves.",
+   "notes": "The save is not made at casting: it is made the first time the target sees its own reflection, and again on each later viewing. A creature that saves is immune to being shaken by this caster's spell for 24 hours but still sees the assassin. The -2 is written as situational_mod rather than save_mod because the prose says 'saves against fear effects', which is not one of the three saves.",
    "converted_by": "read"
   },
   "mirror-polish": {
@@ -1416,7 +1416,7 @@
    "notes": "No ability_restore spec: the spell restores however much a given poison took, which neither an ability nor a die can be named for without inventing both.",
    "converted_by": "read"
   },
-  "nex-s-secret-workshop": {
+  "secret-workshop": {
    "effects": [
     {
      "type": "narrative",
@@ -1709,7 +1709,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Two creatures clasp hands and swear an oath in Kols's name, sealing it as mark of justice does. Whichever of them later breaks the oath gains a mark on the face that tells any dwarf who sees it that a sacred oath was broken, and takes a -4 penalty to influence dwarves. The mark can be removed as mark of justice describes, or the other party may forgive the oath-breaker, which makes it vanish."
+     "target": "Two creatures clasp hands and swear an oath in the name of a god of oaths, sealing it as mark of justice does. Whichever of them later breaks the oath gains a mark on the face that tells any dwarf who sees it that a sacred oath was broken, and takes a -4 penalty to influence dwarves. The mark can be removed as mark of justice describes, or the other party may forgive the oath-breaker, which makes it vanish."
     }
    ],
    "duration": {
@@ -2185,7 +2185,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Cast in fog or dim light, the mists part and set you and up to one touched creature per caster level, all touching one another, on the Dead Roads — a network of extraplanar roadways. Name a destination known to you or one of your travellers. On the Roads you cover 50 miles an hour whatever the terrain below, because the route is shorter, not because you move faster. You may leave early by wandering off the path, which usually returns you to your starting place, shunted to the nearest empty space if that would be inside something solid. You cannot see the Material Plane from the Roads without other magic. They also reach the Shadow, Ethereal and Astral Planes and the Boneyard in 10 hours, and lead from any plane back to the Material Plane in 10 hours unless that plane bars extraplanar travel. Companions are not bound to follow you: one who wanders off has an 80% chance of surfacing at a random point on the Material Plane within 2d6 × 10 miles of your starting point, and otherwise arrives in the Boneyard."
+     "target": "Cast in fog or dim light, the mists part and set you and up to one touched creature per caster level, all touching one another, on the Dead Roads — a network of extraplanar roadways. Name a destination known to you or one of your travellers. On the Roads you cover 50 miles an hour whatever the terrain below, because the route is shorter, not because you move faster. You may leave early by wandering off the path, which usually returns you to your starting place, shunted to the nearest empty space if that would be inside something solid. You cannot see the Material Plane from the Roads without other magic. They also reach the Shadow, Ethereal and Astral Planes and the court of the dead in 10 hours, and lead from any plane back to the Material Plane in 10 hours unless that plane bars extraplanar travel. Companions are not bound to follow you: one who wanders off has an 80% chance of surfacing at a random point on the Material Plane within 2d6 × 10 miles of your starting point, and otherwise arrives in the court of the dead."
     }
    ],
    "duration": {

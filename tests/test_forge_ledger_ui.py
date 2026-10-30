@@ -6,7 +6,7 @@ The card and the Journal section are play/static/js/table/44-forge-ledger.js
 forge's four perks (potency, hardening, quality, yield) use the herb bench's picker. The
 behaviour checks load the real files into node with a small fake DOM, as
 tests/test_bench_core.py does, and feed them the REAL server's answers: a campaign is
-begun, iron and noqual are carried, one property is learned through rules/knowledge.py,
+begun, iron and null skymetal are carried, one property is learned through rules/knowledge.py,
 and `/api/forge/material/<id>`, `/api/forge/ledger` and `/api/forge/state` are read through
 the Django test client. They skip, saying why, where node is not installed. Each test
 names the defect it prevents.
@@ -55,12 +55,12 @@ def served(tmp_path_factory):
         client = Client()
         out = {"empty_ledger": client.get("/api/forge/ledger").json()}
         pc.carry("iron", 2)
-        pc.carry("noqual", 1)
+        pc.carry("null-skymetal", 1)
         keys = knowledge.property_keys(knowledge.material("iron"))
         knowledge.reveal(pc, "iron", [keys[0]], "assayed, day 14")
         c.save()
         out["iron"] = client.get("/api/forge/material/iron").json()
-        out["noqual"] = client.get("/api/forge/material/noqual").json()
+        out["null-skymetal"] = client.get("/api/forge/material/null-skymetal").json()
         out["ledger"] = client.get("/api/forge/ledger").json()
         out["track"] = client.get("/api/forge/state").json()["track"]
         cm._LIVE.clear()
@@ -147,12 +147,12 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
     out.api = ['card', 'journal', 'peek', 'unpeek', 'close', 'forget'].filter((n) => typeof L[n] !== 'function');
     out.iron = R.card(data.iron, { actions: true, pinned: true });
     out.ironJournal = R.props(data.iron);
-    out.noqual = R.card(data.noqual, { actions: true });
-    out.noqualConfirm = R.needsConfirm(data.noqual);
+    out["null-skymetal"] = R.card(data["null-skymetal"], { actions: true });
+    out.nullSkymetalConfirm = R.needsConfirm(data["null-skymetal"]);
     out.ironConfirm = R.needsConfirm(data.iron);
-    out.confirm = R.confirm(data.noqual);
-    out.confirmWords = R.confirm(Object.assign({}, data.noqual, { assay_danger: { text: data.recoil } }));
-    out.quietOre = R.needsConfirm(Object.assign({}, data.noqual, { assay_danger: null }));
+    out.confirm = R.confirm(data["null-skymetal"]);
+    out.confirmWords = R.confirm(Object.assign({}, data["null-skymetal"], { assay_danger: { text: data.recoil } }));
+    out.quietOre = R.needsConfirm(Object.assign({}, data["null-skymetal"], { assay_danger: null }));
     out.none = R.card(Object.assign({}, data.iron, { carried: 0 }), { actions: true });
     out.smith = R.card(Object.assign({}, data.iron, { smiths_here: [{ ref: 'npc:brannoc', name: 'Brannoc', price: '5 sp' }] }), { actions: true });
     out.found = R.found({ obtain: 'mined', biomes: ['mountain', 'hills'] });
@@ -229,7 +229,7 @@ def test_every_number_on_the_card_is_one_the_server_sent(served, ledger):
     known" on the card by counting rows on the page, a number the material endpoint never
     sent. Every run of digits in the drawn card must appear in the server's own answer."""
     sent = json.dumps(served["iron"])
-    for html in (ledger["iron"], ledger["noqual"], ledger["smith"]):
+    for html in (ledger["iron"], ledger["null-skymetal"], ledger["smith"]):
         for n in re.findall(r"\d+", _text(html)):
             assert n in sent or n == "5", (n, _text(html))     # 5 sp is the smith's own price
 
@@ -257,26 +257,26 @@ def test_ask_a_smith_shows_only_when_the_server_names_one_here(ledger):
 
 
 def test_a_reactive_assay_asks_first_in_alarm_words(ledger):
-    """UI plan §6.7 and contracts §13.2: assaying a reactive metal hurts for real (abysium
-    sickens; noqual's magic recoils and suppresses the assayer's active magic for 1d4
-    rounds), so it asks first, in --alarm words, "Noqual reacts badly to testing. Assay it
+    """UI plan §6.7 and contracts §13.2: assaying a reactive metal hurts for real (fever skymetal
+    sickens; null skymetal's magic recoils and suppresses the assayer's active magic for 1d4
+    rounds), so it asks first, in --alarm words, "Null Skymetal reacts badly to testing. Assay it
     anyway?", with Keep it before Assay it. Iron, which is safe, asks nothing: a confirm on
     every assay trains the player to click through the one that matters."""
-    assert ledger["noqualConfirm"] is True and ledger["ironConfirm"] is False
+    assert ledger["nullSkymetalConfirm"] is True and ledger["ironConfirm"] is False
     c = ledger["confirm"]
-    assert '<p class="fl-alarm">Noqual reacts badly to testing. Assay it anyway?</p>' in c
+    assert '<p class="fl-alarm">Null Skymetal reacts badly to testing. Assay it anyway?</p>' in c
     assert c.index(">Keep it<") < c.index(">Assay it<")
     assert "bench-danger" in c
 
 
 def test_the_confirm_says_what_the_server_says_the_assay_does(ledger):
-    """Contracts §13.2 (owner, 2026-10-04): the noqual confirm must say the magic recoils,
+    """Contracts §13.2 (owner, 2026-10-04): the null skymetal confirm must say the magic recoils,
     from whatever the server's card reports, never from a metal's name written into the
     page (fixes are world-agnostic: a world's own reactive metal must warn in its own
     words). With `assay_danger` sent, its words are the second --alarm line; a card that
     says `assay_danger: null` (a reactive ore that harms nobody) asks nothing."""
     assert f'<p class="fl-alarm">{RECOIL}</p>' in ledger["confirmWords"]
-    # The real server's noqual card now carries the recoil in words (effectspec renders
+    # The real server's null skymetal card now carries the recoil in words (effectspec renders
     # `suppress_magic` since the 2026-10-04 merge); before that it sent nothing and the
     # confirm fell back on the general warning, which this line used to pin.
     assert '<p class="fl-alarm">Suppresses your active magic for 1d4 rounds</p>' \
@@ -284,7 +284,7 @@ def test_the_confirm_says_what_the_server_says_the_assay_does(ledger):
     assert "Testing it can turn on you" not in ledger["confirm"]
     assert ledger["quietOre"] is False
     js = _src(LEDGER)
-    assert "noqual" not in re.sub(r"//.*", "", js).lower(), "the page names a metal"
+    assert "null-skymetal" not in re.sub(r"//.*", "", js).lower(), "the page names a metal"
 
 
 def test_where_it_is_found_or_bought_is_said_in_words(ledger):
@@ -309,20 +309,20 @@ def test_the_swatch_takes_only_a_plain_colour(ledger):
 def test_the_journal_counts_what_is_known_from_the_ledger(served, ledger):
     """UI plan §6.7: every material met, with "3 of 7 known" counts. Those counts are the
     ledger's own `known` and `total` (rules/knowledge.py `ledger_row`), so the row for iron
-    reads "1 of 7 known" and noqual "0 of 14 known", as the server sent them."""
+    reads "1 of 7 known" and null skymetal "0 of 14 known", as the server sent them."""
     rows = {r["id"]: r for r in served["ledger"]["ledger"]}
     assert rows["iron"]["known"] == 1 and rows["iron"]["total"] == 7
     text = _text(ledger["rows"])
-    assert "1 of 7 known" in text and f"0 of {rows['noqual']['total']} known" in text
+    assert "1 of 7 known" in text and f"0 of {rows['null-skymetal']['total']} known" in text
 
 
 def test_unknowns_first_puts_the_least_known_material_on_top(ledger):
-    """The "Unknowns first" toggle: by name, Iron comes before Noqual; unknowns first,
-    Noqual (14 unknown) must lead Iron (6 unknown). A toggle that changes its pressed state
+    """The "Unknowns first" toggle: by name, Iron comes before Null skymetal; unknowns first,
+    Null skymetal (14 unknown) must lead Iron (6 unknown). A toggle that changes its pressed state
     and not the order is the defect."""
     plain, first = ledger["rows"], ledger["rowsFirst"]
-    assert plain.index('data-fl-mat="iron"') < plain.index('data-fl-mat="noqual"')
-    assert first.index('data-fl-mat="noqual"') < first.index('data-fl-mat="iron"')
+    assert plain.index('data-fl-mat="iron"') < plain.index('data-fl-mat="null-skymetal"')
+    assert first.index('data-fl-mat="null-skymetal"') < first.index('data-fl-mat="iron"')
 
 
 def test_the_journal_says_what_to_do_when_empty_reading_or_failed(ledger):

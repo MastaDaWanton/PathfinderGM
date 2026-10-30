@@ -703,7 +703,7 @@
    "converted_by": "read",
    "notes": "The 1d4 is not converted to a damage spec: it happens only on a later successful attack roll that the caster spends a move action to make, not when the spell is cast, and its size depends on a shard count that itself scales. Emitting it would deal 1d4 to something at casting. The lost shield bonus is also unconvertible - its size is whatever shield the caster happens to be carrying."
   },
-  "shield-of-the-dawnflower": {
+  "shield-of-dawn": {
    "effects": [
     {
      "type": "narrative",
@@ -719,11 +719,11 @@
    "converted_by": "read",
    "notes": "RETRIBUTIVE - refused as a damage spec on purpose. The 1d6+1/level is taken by whoever hits the caster in melee, not by any target of the spell, and it fires on each such attack rather than on casting. This is the thorn body defect verbatim; a damage spec plus a per-level scaling block would look perfectly plausible here and would burn the wrong creature. Element already derived as fire."
   },
-  "shield-of-the-dawnflower-greater": {
+  "shield-of-dawn-greater": {
    "effects": [
     {
      "type": "narrative",
-     "target": "As the lesser spell: any creature striking you in melee deals normal damage but takes 1d6 points plus 1 point per caster level, half of it fire and half holy damage as flame strike. An undead creature, or one particularly vulnerable to light, takes 2d6 plus 1 point per caster level instead. Creatures using reach weapons take none of it. The disk sheds light as daylight. Only one instance can be active at a time and it does not stack with fire shield or with shield of the Dawnflower."
+     "target": "As the lesser spell: any creature striking you in melee deals normal damage but takes 1d6 points plus 1 point per caster level, half of it fire and half holy damage as flame strike. An undead creature, or one particularly vulnerable to light, takes 2d6 plus 1 point per caster level instead. Creatures using reach weapons take none of it. The disk sheds light as daylight. Only one instance can be active at a time and it does not stack with fire shield or with shield of dawn."
     }
    ],
    "duration": {
@@ -1065,11 +1065,11 @@
    "converted_by": "read",
    "notes": "The -5 is not a skill_mod: it modifies the one Perception check the spell itself makes, and a skill_mod would instead saddle the caster's own Perception with -5. The spell is instantaneous, so there is no window for a modifier to sit in at all."
   },
-  "sign-of-the-dawnflower": {
+  "sign-of-the-faithful": {
    "effects": [
     {
      "type": "narrative",
-     "target": "As message, except the only thing you can convey is that you are a worshipper of Sarenrae. Once told, the target may reply that it understands your sign. The spell carries meaning rather than sound and crosses any language barrier."
+     "target": "As message, except the only thing you can convey is that you are a worshipper of your god. Once told, the target may reply that it understands your sign. The spell carries meaning rather than sound and crosses any language barrier."
     }
    ],
    "duration": {
@@ -2020,7 +2020,7 @@
    "converted_by": "read",
    "notes": "The save is 'Will partial', and the partial is explicitly a duration cut to 1 round rather than a lesser effect - so the success branch carries the same +4 morale Strength with a 1-round duration rather than nothing. +4 morale to Strength is stated with its bonus type."
   },
-  "song-of-kyonin": {
+  "restorative-song": {
    "effects": [
     {
      "type": "fast_healing",
@@ -2090,7 +2090,7 @@
     },
     {
      "type": "narrative",
-     "target": "Uplifting music from Elysium, Heaven or Nirvana accompanies you. Cast in the same round you activate a bardic performance, that round does not count against your bardic performance rounds for the day. Cast in the same round you cast a spell with the sonic descriptor, that spell's save DC increases by 1."
+     "target": "Uplifting music from the free heavens, Heaven or the serene heavens accompanies you. Cast in the same round you activate a bardic performance, that round does not count against your bardic performance rounds for the day. Cast in the same round you cast a spell with the sonic descriptor, that spell's save DC increases by 1."
     }
    ],
    "duration": {
@@ -2251,7 +2251,7 @@
     },
     {
      "type": "narrative",
-     "target": "An ethereal vault briefly envelops the target. Cast on a living creature that then dies, the spell protects both its body and its spirit for the rest of the duration; cast on a corpse within 1 round of death, it protects body and soul both; cast later, only the body is protected. Any spellcaster who worships Abadar may learn and cast this as a 4th-level spell even if it is not normally on her list. It can be made permanent with permanency at a cost of 7,500 gp and a minimum caster level of 11th."
+     "target": "An ethereal vault briefly envelops the target. Cast on a living creature that then dies, the spell protects both its body and its spirit for the rest of the duration; cast on a corpse within 1 round of death, it protects body and soul both; cast later, only the body is protected. Any spellcaster who worships a god of wealth and law may learn and cast this as a 4th-level spell even if it is not normally on her list. It can be made permanent with permanency at a cost of 7,500 gp and a minimum caster level of 11th."
     }
    ],
    "duration": {
@@ -2267,7 +2267,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "You learn what stage of judgment a given soul has reached, or its fate after judgment. You must either identify the soul unambiguously or use the skull of the body it left as a focus. A soul of a different alignment from yours may attempt a Will save to resist, as though it were still alive. If the subject is still alive, or its soul has been destroyed, the spell fails and tells you nothing. If the soul has not yet been judged, you get an estimate of its location - usually somewhere in the River of Souls or the Boneyard - which may help you travel to it in cases involving soul bind or a devourer's devour soul, though the spell's real purpose is to establish how long the subject has been dead and therefore what life-restoring magic is needed. If it has been judged, you learn instead which plane it was sent to as a petitioner and its general location there, such as 'Elysium, beneath the boughs of the Witchwood'."
+     "target": "You learn what stage of judgment a given soul has reached, or its fate after judgment. You must either identify the soul unambiguously or use the skull of the body it left as a focus. A soul of a different alignment from yours may attempt a Will save to resist, as though it were still alive. If the subject is still alive, or its soul has been destroyed, the spell fails and tells you nothing. If the soul has not yet been judged, you get an estimate of its location - usually somewhere in the river of the dead or the court of the dead - which may help you travel to it in cases involving soul bind or a devourer's devour soul, though the spell's real purpose is to establish how long the subject has been dead and therefore what life-restoring magic is needed. If it has been judged, you learn instead which plane it was sent to as a petitioner and its general location there, such as 'the free heavens, beneath the boughs of its great forest'."
     },
     {
      "type": "permission",
@@ -2373,7 +2373,7 @@
    "effects": [
     {
      "type": "permission",
-     "target": "May speak and understand one regional human language of your choice that you yourself know - Varisian, Taldane, Tien and the like - selected when you cast the spell. It cannot be a dead language such as Ancient Osiriani or Jistka. The target speaks it with a native accent."
+     "target": "May speak and understand one regional human language of your choice that you yourself know - Common, a local trade tongue and the like - selected when you cast the spell. It cannot be a dead language such as the tongue of a fallen empire. The target speaks it with a native accent."
     }
    ],
    "duration": {

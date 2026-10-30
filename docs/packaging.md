@@ -227,7 +227,7 @@ throwaway directory, driven over HTTP by a script that imports nothing from the 
 | craft page | 200, 101,606 bytes |
 | craft shelf: herbalism | 161 materials (Acacia, Aconite, Adder's-Tongue…) |
 | craft shelf: alchemy | 137 materials (Adamantine Crucible, Adder Venom Gland…) |
-| craft shelf: blacksmithing | 112 materials (Abysium, Abysium Ore, Abyssal Salt…) |
+| craft shelf: blacksmithing | 112 materials (Fever skymetal, Fever Skymetal Ore, Abyssal Salt…) |
 | craft shelf: leatherworking | 127 materials (Adamantine Buckles, Ankheg Shell Leather…) |
 | craft shelf: enchanting | 117 materials (Adamantine Dust, Amethyst Focus…) |
 | spell list | **3,040** unpaged (the endpoint defaults to `limit=120`); `/api/spells/fireball` returns evocation, long range, and its scaling |

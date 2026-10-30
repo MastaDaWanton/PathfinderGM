@@ -384,8 +384,16 @@ def shelf() -> dict[str, Ingredient]:
     return {**reagents(), **all_ingredients()}
 
 
+# Renamed shipped ingredients: old id -> id now. The anti-magic grass was "Elysium", a
+# plane's name, until 2026-10-30 (docs/bestiary-licensing.md §7). Saves are rewritten on
+# load (`sheet._current_materials`); anything else asking by the old id is answered here.
+RENAMED: dict[str, str] = {"elysium": "nullgrass"}
+
+
 def get(ingredient_id: str) -> Ingredient:
     key = (ingredient_id or "").strip().lower()
+    if key in RENAMED and key not in all_ingredients():
+        key = RENAMED[key]
     ing = all_ingredients().get(key) or reagents().get(key)
     if ing is None:
         raise KeyError(f"no ingredient {ingredient_id!r}")

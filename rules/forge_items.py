@@ -237,7 +237,7 @@ def at_build(eff: dict, gear: str, base: str) -> dict | None:
     no reader asked it, so `damage_reduction` met all three rows on an adamantine chain
     shirt and took the best — DR 3/— on a light suit. Answered here, once, so the clause
     is gone from the spec every reader sees: a row that holds keeps the rest of its `when`
-    (elysian bronze's attacker clause is the roll's to ask); a row that fails is not on
+    (celestial bronze's attacker clause is the roll's to ask); a row that fails is not on
     the item at all. A shield has no weight class, so an armour-weight row is not on one.
     """
     when = eff.get("when")
@@ -1013,7 +1013,7 @@ def stock_item(record: dict, count: int | None = None) -> ForgedStock:
 
 
 def material_carried_effects(material_id: str) -> list[dict]:
-    """The `carried` effects of a raw material in the pack — abysium sickens whoever carries
+    """The `carried` effects of a raw material in the pack — fever skymetal sickens whoever carries
     it, bar or blade (plan §12.5). Read from both of its lists, once each."""
     doc = material(material_id)
     if not doc:
