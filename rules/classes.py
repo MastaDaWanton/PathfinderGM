@@ -118,9 +118,54 @@ def get(class_id: str) -> dict:
     found = all_classes().get(key)
     if found is not None:
         return found
+    found = npc_classes().get(key)
+    if found is not None:
+        return found
     from . import animal_companion
 
     return animal_companion.progression_classes().get(key, {})
+
+
+_NPC: dict[str, dict] | None = None
+
+
+def npc_classes() -> dict[str, dict]:
+    """The five NPC classes — adept, aristocrat, commoner, expert, warrior (CRB Chapter 14,
+    "Creating NPCs", pp. 448-451) — and any homebrew one, by id.
+
+    A third store beside `all_classes()`, kept out of it for the companion's reason: "most
+    [NPCs] rely upon basic NPC classes", and none is a class a player can be — the forge,
+    the Class tab and the "build every class" tests iterate `all_classes()`. Read by `get`,
+    so a sheet whose `char_class` is "warrior" computes its BAB, saves and hit dice off the
+    document exactly as a fighter's do. Built with the same layering as `_build_classes`."""
+    global _NPC
+    if _NPC is None:
+        from . import pristine
+
+        _NPC = pristine.memo("npc-classes", [_homebrew("npc-classes")], _build_npc_classes)
+    return _NPC
+
+
+def _build_npc_classes() -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for folder in (_dir("npc-classes"), _homebrew("npc-classes")):
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            key = str(data.get("id") or "").strip().lower() if isinstance(data, dict) else ""
+            if not key:
+                continue
+            base = dict(out.get(key, {}))
+            base.update({k: v for k, v in data.items() if v not in (None, "")})
+            for field in ("good_saves", "class_skills", "proficiencies"):
+                base[field] = tuple(base.get(field) or ())
+            out[key] = base
+    return out
 
 
 # --- class choices ------------------------------------------------------------------------
@@ -1019,8 +1064,11 @@ def validate_choices(d: dict) -> list[str]:
                         f"{oat}.from: no catalogue called {pool!r} in "
                         f"content/class-options/. One of: {', '.join(sorted(catalogues()))}.")
                 n = option.get("how_many", 1)
-                if not isinstance(n, int) or not 1 <= n <= 5:
-                    problems.append(f"{oat}.how_many: picks per level, 1 to 5.")
+                # Ten, not five: the expert NPC class "can choose any 10 skills to be class
+                # skills" (CRB p. 450), all at 1st level. Five was a sanity bound, and the
+                # book's own largest pick is ten.
+                if not isinstance(n, int) or not 1 <= n <= 10:
+                    problems.append(f"{oat}.how_many: picks per level, 1 to 10.")
                 spec = option.get("raise")
                 if spec is not None and (
                         src is None or not isinstance(spec, dict)

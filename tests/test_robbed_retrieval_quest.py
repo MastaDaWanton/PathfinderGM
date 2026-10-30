@@ -134,6 +134,10 @@ def test_worn_armour_and_what_cannot_be_run_with_are_never_the_thing_taken():
     pc.goods = {"chain shirt": 2}
     assert defeat.the_take(pc, robber)["name"] == "chain shirt", "the spare, 100 gp"
     robber.abilities["str"] = 3                     # light load 10 lb; the shirt is 25
+    # Empty-handed but for the sheet: since 2026-10-29 a robber carries the gear its stat
+    # block prints (a masterwork suit in its pack), which at Str 3 leaves no spare load
+    # for anything — true, and not what this measures.
+    robber.stock, robber.kit_pending = {}, {}
     took = defeat.the_take(pc, robber)
     assert took is not None and took["name"] == "rapier"
 
@@ -246,7 +250,8 @@ def test_a_shelf_record_handed_over_keeps_its_record():
     blade = Stock(base="Vayr's Blade", tier="rare", weapon="longsword", masterwork=True,
                   enhancement=1, kind="crafted", craft="enchanter")
     robber.add_stock(copy.deepcopy(blade), 1)
-    sid = next(iter(robber.stock))
+    # By its base: the robber's own printed gear is on its shelf too since 2026-10-29.
+    sid = next(k for k, v in robber.stock.items() if v.base == "Vayr's Blade")
     e.run(e.validate([{"op": "give", "actor": robber.ref,
                        "params": {"item": "Vayr's Blade", "to": pc.ref}, "because": "test"}]))
     assert sid in pc.stock and pc.stock[sid].enhancement == 1

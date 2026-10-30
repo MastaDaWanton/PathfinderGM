@@ -34,6 +34,7 @@ import inspect
 import pytest
 
 from gm import judgement
+from rules import npcs
 from rules import scope
 from rules.bestiary import instantiate, split_collective_name
 from rules.dice import Dice
@@ -178,8 +179,11 @@ def test_a_band_of_twelve_raiders_books_twelve_and_puts_raiders_on_the_board(sce
     made = judgement.promote_cast(scene, added, beat=beat, world=WORLD)
     bodies = [a for a in scene.actors.values() if not a.is_pc]
     assert made and bodies
-    assert all(a.from_template == "raider" for a in bodies)
-    assert all(a.hp > 20 for a in bodies), "a Raider, not a 4-hp guildhand"
+    # A raider: the app's own (`raider-level-N`, the rulebook line only, 2026-10-28) or a
+    # block called Raider — by its base id, the rung stripped — and a fighter's body.
+    assert all(npcs._base_id(a.from_template) == "raider" for a in bodies)
+    guildhand = instantiate("guildhand").hp
+    assert all(a.hp > guildhand for a in bodies), "a raider, not a 4-hp guildhand"
     # Group 8 left this as four bodies against twelve in the prose and said the cap was the
     # real tension. Group 9 resolved it the way the record said it would: ONE unit of twelve
     # (item 33, tests/test_the_crowd.py). The ledger's number is what the unit is formed from.
@@ -214,13 +218,16 @@ def test_the_role_word_reaches_the_corpus_but_never_drags_a_species_in():
     veteran *buccaneer* and "merchant" with a Tian merchant *sailor*. A CR 3 gnoll walking
     out of a market crowd is not the fiction anybody wrote, so the corpus's pick stands
     only when the block IS the role word."""
-    assert judgement.template_for("raider") == "raider"
-    assert judgement.template_for("twelve raiders") == "raider"
-    assert judgement.template_for("bandit") == "bandit"
-    assert judgement.template_for("an armed guard") == "guard"
+    # By base id, the level rung stripped: the app's own people are `raider-level-1`.
+    assert npcs._base_id(judgement.template_for("raider")) == "raider"
+    assert npcs._base_id(judgement.template_for("twelve raiders")) == "raider"
+    assert npcs._base_id(judgement.template_for("bandit")) == "bandit"
+    assert npcs._base_id(judgement.template_for("an armed guard")).startswith("guard")
+    # A merchant is a merchant now: the corpus's only one was a Tian merchant *sailor*,
+    # and the app's own (`merchant-level-1`, 2026-10-28) is the role and nothing else.
+    assert npcs._base_id(judgement.template_for("merchant")) == "merchant"
     for phrase, floor in (("bruiser", "thug"), ("veteran", "thug"),
-                          ("merchant", "guildhand"), ("woman", "guildhand"),
-                          ("man in the leather apron", "guildhand")):
+                          ("woman", "guildhand"), ("man in the leather apron", "guildhand")):
         assert judgement.template_for(phrase) == floor, phrase
     # The animal cue still wins outright: the corpus answers "guard dog" with a Guard.
     assert judgement.template_for("the guard dog") == "guard dog"
@@ -244,7 +251,7 @@ def test_a_band_arriving_mid_fight_arrives(scene):
     added = judgement.note_cast(scene, beat, turn=3)
     made = judgement.promote_cast(scene, added, beat=beat, world=WORLD)
     assert made, "a band arriving mid-fight used to put nobody on the board"
-    raiders = [a for a in scene.actors.values() if a.from_template == "raider"]
+    raiders = [a for a in scene.actors.values() if npcs._base_id(a.from_template) == "raider"]
     assert raiders
     assert all(a.has_state("role.bystander") for a in raiders), "in the room, not the order"
     sides = {r for refs in (scene.sides or {}).values() for r in refs}

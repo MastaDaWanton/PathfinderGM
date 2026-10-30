@@ -589,7 +589,9 @@ def _self_check() -> int:
         problems.append(f"content/ missing at {content}")
     else:
         for sub in sorted(p for p in content.iterdir() if p.is_dir()):
-            files = list(sub.glob("*.json"))
+            # Every file, not only JSON: content/style ships intimate.txt, and counted as
+            # JSON alone the check called that folder empty in every build since it came.
+            files = [f for f in sub.iterdir() if f.is_file()]
             print(f"content/{sub.name:<14} {len(files)} file(s)")
             if not files:
                 problems.append(f"content/{sub.name} is empty in the bundle")

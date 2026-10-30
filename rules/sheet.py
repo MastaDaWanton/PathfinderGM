@@ -2076,9 +2076,18 @@ class Actor:
         own = tuple(self.class_data.get("class_skills", ()) or ())
         if not (self.domains or self.class_choices):
             return own
+        from . import classes as classes_mod
         from . import grantedpowers
 
-        return own + tuple(s for s in grantedpowers.class_skills(self) if s not in own)
+        more = list(grantedpowers.class_skills(self))
+        # Any class-option pick's `class_skill`, not only a bloodline's: the expert "can
+        # choose any 10 skills to be class skills" (CRB p. 450), ten picks of a catalogue.
+        for ch in classes_mod.choices_for(self.char_class or "", self.level):
+            for pick in classes_mod.chosen(self, str(ch.get("id") or "")):
+                skill = str((pick.get("entry") or {}).get("class_skill") or "").strip().lower()
+                if skill and skill not in more:
+                    more.append(skill)
+        return own + tuple(s for s in more if s not in own)
 
     def ability_score(self, ab: str) -> int:
         """The score as it stands, after everything that has happened to it.
@@ -2937,8 +2946,15 @@ class Actor:
         doc = self._creature_doc()
         if not doc or not (doc.get("melee") or doc.get("ranged")):
             return {}
-        from . import statblock_attacks
+        from . import compile_block, statblock_attacks
 
+        # The compiled record when the block has a fresh one (every shipped printed block,
+        # docs/compiled-bestiary-plan.md): read once at compile, never interpreted here.
+        # Live for what has none — homebrew, a templated creature, a block edited since.
+        rec = compile_block.record_for(doc)
+        if rec is not None:
+            return {cat: [[dict(a) for a in opt] for opt in rec["attacks"].get(cat) or ()]
+                    for cat in ("melee", "ranged")}
         return statblock_attacks.of_block(doc)
 
     def printed_item(self, key: str) -> str:
@@ -3013,14 +3029,72 @@ class Actor:
 
         made = [self.printed_item(a["key"]) for cat in ("melee", "ranged")
                 for opt in self.stat_block_attacks().get(cat) or () for a in opt]
-        made = [m for m in dict.fromkeys(made) if m]
+        # And what its gear line lists, compiled: the ogre's four javelins, a guard's sap,
+        # weapons the attack line never swings but the body carries all the same.
+        made += self._carried_weapons()
+        # One of each, by the table's key: the print says "shortsword", the gear "short
+        # sword", and they are one blade.
+        made = list({(weapons_mod.key_for(m) or m): m for m in made if m}.values())
+        primary = self.printed_item(self.primary_attack_key()) if made else ""
+        if not made:
+            made, primary = self._arms_of_the_alias()
         if not made:
             return                       # a dog's bite is not a thing it carries
         self.print_armed = True
         have = {weapons_mod.key_for(w) or str(w).lower() for w in self.weapons}
         self.weapons += [m for m in made if (weapons_mod.key_for(m) or m) not in have]
         if not self.equipped:
-            self.equipped = self.printed_item(self.primary_attack_key()) or None
+            self.equipped = primary or None
+
+    def _carried_weapons(self) -> list[str]:
+        """The wieldable weapons in this body's compiled `carries`, by table key."""
+        if self.flat_attack is None or self.class_data:
+            return []
+        from . import compile_block
+        from . import weapons as weapons_mod
+
+        rec = compile_block.record_for(self._creature_doc())
+        out = []
+        for it in (rec or {}).get("carries") or ():
+            key = str(it.get("key") or "")
+            if it.get("table") == "weapon" and key and key != "unarmed" \
+                    and weapons_mod.wieldable(key)[0]:
+                out.append(key)
+        return out
+
+    def _arms_of_the_alias(self) -> tuple[list[str], str]:
+        """What a saved creature carries when its stat block is gone and its id now lands
+        on one of the app's own people (`bestiary.alias_of`): that person's weapons, which
+        are on a sheet, not printed.
+
+        Option D (2026-10-29) removed the adventure rows. The owner's saves held five of
+        them — four keepers and a clerk as `tian-merchant-sailor`, a robber as
+        `commoner-outlaw`, a herbalist as `hedge-witch` — every one with an empty
+        `weapons` list, because its shortspear or club was a line of print. Aliased to a
+        build, which prints nothing, the print-reading above found no weapon and each of
+        them would have fought with its fists from then on."""
+        from . import bestiary as bestiary_mod
+        from . import weapons as weapons_mod
+
+        if self.class_data or not bestiary_mod.alias_of(self.from_template or ""):
+            return [], ""
+        doc = self._creature_doc() or {}
+        if not doc.get("build"):
+            return [], ""
+        # A forged weapon is a record in the build's stock ("1-longsword"), which the saved
+        # body does not own: it takes the plain weapon the record is made on, the number on
+        # its own sheet being the old print's, not the build's +1.
+        stock = doc.get("stock") or {}
+
+        def plain(w: str) -> str:
+            rec = stock.get(w)
+            return str(rec.get("base") or "") if isinstance(rec, dict) else w
+
+        carried = [plain(str(w)) for w in [doc.get("equipped"), *(doc.get("weapons") or [])]
+                   if w]
+        made = [w for w in dict.fromkeys(carried) if w and weapons_mod.wieldable(w)[0]
+                and (weapons_mod.key_for(w) or w) != "unarmed"]
+        return made, (made[0] if made else "")
 
     def primary_attack_key(self) -> str:
         """The first attack of the first melee option, else of the first ranged one, or "".
@@ -4713,6 +4787,16 @@ class Actor:
                 # Written in the weapon table's own key, so "heavy crossbow" and the
                 # row "heavy-crossbow" are one permission (E1).
                 out.append(f"proficient.weapon.{weapons_mod.key_for(p) or p}")
+        # A class-option pick's own `tags`, held like a feat's: the commoner "is proficient
+        # with one simple weapon" (CRB p. 449) — a choice, not a list, so the pick carries
+        # its `proficient.weapon.<key>`. Generic: any catalogue entry may grant a tag.
+        if self.class_choices:
+            from . import classes as classes_mod
+
+            for ch in classes_mod.choices_for(self.char_class or "", self.level):
+                for pick in classes_mod.chosen(self, str(ch.get("id") or "")):
+                    for tag in (pick.get("entry") or {}).get("tags") or ():
+                        out.append(str(tag))
         for raw in self.feats:
             doc = feats_mod.document(raw)
             for tag in (doc or {}).get("tags") or ():

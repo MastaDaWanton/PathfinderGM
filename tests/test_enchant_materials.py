@@ -321,7 +321,8 @@ def test_rows_not_in_the_book_are_retired_never_offered(recipes):
     for rid in UNSOURCED:
         assert rows[rid]["retired"] is True, rid
         assert rid not in recipes, rid
-    assert len(recipes) == 112 - len(UNSOURCED)
+    # And ten of our own since 2026-10-29 (tools/own_items.py, docs/own-items.md).
+    assert len(recipes) == 112 - len(UNSOURCED) + 10
 
 
 def test_no_recipe_is_narrative_and_each_can_be_made_from_the_shelf(recipes, shelf):
@@ -340,7 +341,10 @@ def test_no_recipe_is_narrative_and_each_can_be_made_from_the_shelf(recipes, she
                 assert need["grants"] in granted, (rid, need)
             elif need.get("family"):
                 assert need["family"] in families, (rid, need)
-        assert doc["source"].startswith("https://legacy.aonprd.com/"), rid
+        # The legacy PRD for a rulebook's item, the current AoN for a setting book's
+        # (our own versions of the adventures' items, tools/own_items.py).
+        assert doc["source"].startswith(("https://legacy.aonprd.com/",
+                                         "https://aonprd.com/")), rid
 
 
 def test_scaled_recipes_are_lane_as_documents(recipes):

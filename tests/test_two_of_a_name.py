@@ -82,10 +82,12 @@ def test_ordinals_count_on_and_keep_the_article(table):
 
 
 def test_a_template_name_is_told_apart_as_well(table):
-    """No name given: two wolves off one stat block were two actors called "Wolf"."""
+    """No name given: two wolves off one stat block were two actors called "Wolf". Lower
+    case since the Bestiary's own wolf ships (2026-10-28): a printed kind goes by its kind
+    (`bestiary.kind_word`), where the adventure's "Wolf" row kept its capital."""
     s, _ = table
     s.add(instantiate("wolf", scene=s))
-    assert instantiate("wolf", scene=s).name == "second Wolf"
+    assert instantiate("wolf", scene=s).name == "second wolf"
 
 
 def test_a_resident_of_the_world_keeps_their_own_name(table):
@@ -108,13 +110,19 @@ def test_a_name_nobody_here_wears_is_unchanged(table):
 
 def test_a_troop_member_is_not_numbered(table):
     """`troops.form` instantiates a throwaway member for its name and hit points; told
-    apart from a Raider already here, the unit's members would have been "second Raider"."""
-    from rules import troops
+    apart from a Raider already here, the unit's members would have been "second Raider".
+
+    The Raider moved to a shipped body on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the adventure row named "Raider" is gone, and "raider"
+    lands (content/bestiary/aliases.json) on the app's own raider build, which goes by its
+    kind in lower case, "raider" — so the numbered name to refuse is "second raider"."""
+    from rules import bestiary, troops
 
     s, _ = table
+    assert bestiary.alias_of("raider") == "raider-level-4"
     s.add(instantiate("raider", scene=s))
     unit = troops.form("raider", 6, scene=s)
-    assert unit.troop.member_name == "Raider", unit.troop.member_name
+    assert unit.troop.member_name == "raider", unit.troop.member_name
 
 
 # --- the cut ------------------------------------------------------------------------------

@@ -64,11 +64,16 @@ def test_281_lines_that_produced_no_biome_at_all_now_do(core):
     """The count that started this: run over the 782 printed stat blocks, the biome matcher
     came back empty for 281 of them — every line whose only terrain word was "any", "land",
     "water" or the name of a plane the alias table spelled differently. One is left, the
-    stat block whose Environment line is blank in the book."""
-    empty = [c for c in core if not biomes.parse_environment(c["environment"]).biomes]
-    assert len(empty) == 1
-    assert empty[0]["id"] == "exoskeleton"
-    assert empty[0]["environment"] == ""
+    stat block whose Environment line is blank in the book.
+
+    Since the re-read by header (2026-10-28, tests/test_bestiary_rescan.py) the file has
+    1,417 blocks, and the blank lines are counted apart: 43 blocks whose family prints its ecology
+    outside every block and are tagged by inference instead. Of the lines that ARE read, one
+    yields nothing — the leucrotta's, which its page's two columns interleaved ("temperate or
+    tropical the effects of a suggestion…")."""
+    read = [c for c in core if c["environment"]]
+    empty = [c for c in read if not biomes.parse_environment(c["environment"]).biomes]
+    assert [c["id"] for c in empty] == ["leucrotta"]
 
 
 def test_a_split_word_from_the_pdf_is_repaired():
@@ -130,22 +135,27 @@ def test_wilderness_is_not_a_city():
 
 # --- what the two files ended up carrying ----------------------------------------------
 
-def test_every_creature_but_one_knows_where_it_lives(core, spread):
-    """7,188 creatures, 782 of which stated an environment. The one exception is the stat
-    block whose Environment line is blank in the book — it is left empty rather than given
-    a default, the same way a missing AC is."""
-    untagged = [c for c in core + spread if not c["biomes"]]
-    assert [c["id"] for c in untagged] == ["exoskeleton"]
+def test_every_creature_knows_where_it_lives(core, spread):
+    """7,188 creatures, 782 of which stated an environment, and one exception: the stat
+    block whose Environment line is blank in the book, left empty rather than given a
+    default. Since the re-read (7,823 creatures, 1,417 printed) a printed block with no line
+    of its own goes the spreadsheet's routes and says it guessed (`biomes_inferred`) — the
+    old exception was the cockroach exoskeleton, now one of 44 such."""
+    assert [c["id"] for c in core + spread if not c["biomes"]] == []
 
 
 def test_the_stated_and_the_guessed_are_counted_separately(core, spread):
-    """782 from real prose, 6,406 guessed. The flag is the same one ingredients carry and
-    exists for the same reason: a guess that cannot be told from an observation is a guess
-    that gets quoted back as fact."""
+    """782 from real prose, 6,406 guessed — and since the re-read, 1,373 stated and 6,450
+    guessed (the 6,406 and 44 printed blocks with no line of their own that reads). The flag is the
+    same one ingredients carry and exists for the same reason: a guess that cannot be told
+    from an observation is a guess that gets quoted back as fact.
+
+    Measured 2026-10-29, after option D (docs/bestiary-licensing.md) left creatures.json
+    the 757 rulebook rows: 1,373 stated still, and 801 guessed (the 757 and the 44)."""
     stated = [c for c in core + spread if not c["biomes_inferred"]]
     guessed = [c for c in core + spread if c["biomes_inferred"]]
-    assert len(stated) == 782
-    assert len(guessed) == 6406
+    assert len(stated) == 1373
+    assert len(guessed) == 801
     assert all(c["biomes_from"] in ("environment", "") for c in stated)
 
 
@@ -154,31 +164,47 @@ def test_every_route_records_which_one_it_was(spread):
     the one before, so each is counted on its own rather than under one "inferred" bit.
     Measured on this import: 55 exact name matches, 754 species read out of a longer name,
     1,180 from a subtype, 465 from the creature type, and 3,952 left with nothing to read.
+    Against the re-read Bestiaries (1,417 printed blocks, 2026-10-28) more of them find the
+    creature they are a variant of: 125, 938, 1,103, 359 and 3,881.
+
+    Measured 2026-10-29, after option D left the spreadsheet its 757 rulebook rows: 8,
+    185, 6, 6 and 552 — the Codexes' people are mostly named for their work ("Barkeep",
+    "Mayor"), so most fall to the floor, and the Monster Codex's goblins, giants and
+    boggards read their species out of the name.
     """
     routes = {}
     for c in spread:
         routes[c["biomes_from"]] = routes.get(c["biomes_from"], 0) + 1
-    assert routes == {"name": 55, "name-word": 754, "subtype": 1180,
-                      "type": 465, "floor": 3952}
+    assert routes == {"name": 8, "name-word": 185, "subtype": 6,
+                      "type": 6, "floor": 552}
 
 
 def test_the_species_in_a_name_carries_the_ecology(spread):
     """"Frost Giant Battle Priest" has no Environment line and never will; the Bestiary
     printed the frost giant on cold mountains and the species is right there in the name.
-    754 rows are reached this way that would otherwise have fallen to "any land"."""
+    754 rows are reached this way that would otherwise have fallen to "any land".
+
+    The hobgoblin example moved to a shipped row on 2026-10-29 under option D: the
+    hobgoblin archer was an adventure row; the Monster Codex's hobgoblin commander reads
+    the same species out of its name. 185 rows are reached this way since (measured
+    2026-10-29)."""
     by_id = {c["id"]: c for c in spread}
     assert by_id["frost-giant-battle-priest"]["biomes"] == ["mountain", "tundra"]
     assert by_id["frost-giant-battle-priest"]["climates"] == ["cold"]
-    assert by_id["hobgoblin-archer"]["biomes"] == ["hills"]
+    assert by_id["hobgoblin-commander"]["biomes"] == ["hills"]
+    assert by_id["hobgoblin-commander"]["biomes_from"] == "name-word"
     assert by_id["boggard-brute"]["biomes"] == ["swamp"]
 
 
 def test_a_named_npc_falls_to_any_land_and_admits_it(spread):
     """3,952 rows are adventure-path people — "Nereza Rigalio, human" — with no ecology to
     read. "Any land" is the honest answer for a person and a useless one for a search, so
-    it is recorded as the floor rather than as a habitat."""
+    it is recorded as the floor rather than as a habitat. 3,881 since the re-read, which
+    gave 71 of them a printed creature to inherit from. 552 measured 2026-10-29, after
+    option D removed the adventure-path people: the floor is now the rulebook's own people
+    named for their work ("Barkeep", "Border Guard"), with no species in the name."""
     floor = [c for c in spread if c["biomes_from"] == "floor"]
-    assert len(floor) == 3952
+    assert len(floor) == 552
     assert all(c["biomes_any"] and c["biomes_inferred"] for c in floor)
 
 
@@ -186,10 +212,14 @@ def test_a_native_outsider_is_not_filed_off_the_material_plane(spread):
     """The outsider profile derived from core is `planar`, because 52 of the 63 core
     outsiders that name a habitat name a plane. 211 spreadsheet outsiders carry the
     `native` subtype, which means precisely the opposite, and inheriting the type would
-    have sent every summoned creature and half the villains off-world."""
+    have sent every summoned creature and half the villains off-world.
+
+    Measured 2026-10-29, after option D removed the adventure rows: three spreadsheet
+    native outsiders are left (the boroboroton, the diabolist and the kasa-obake), and the
+    rule holds for each of them."""
     natives = [c for c in spread
                if "native" in c["subtype"] and c["creature_type"] == "outsider"]
-    assert len(natives) > 100
+    assert len(natives) >= 3
     assert all("planar" not in c["biomes"] for c in natives)
 
 
@@ -258,12 +288,18 @@ def test_specialists_are_separable_from_the_anywhere_crowd():
     """4,636 of the 7,133 the app loads are found anywhere — not of the 7,188 the two files
     hold, because 55 names are in both and the printed block wins. Asked without the filter
     a swamp answers with 4,761 of 7,133, which is two thirds of the book and therefore not
-    an answer; with it, 125.
+    an answer; with it, 125. Since the app's own people and templated creatures joined
+    (2026-10-28: 272 and 164, met where their work or their base is, rarely a swamp) it is
+    4,832 of 8,143 — still most of the book, which is the point.
+
+    Measured 2026-10-29, after option D removed the adventure rows (most of them people
+    found "anywhere"): 1,081 of 2,605 answer a swamp, two fifths of the book and still not
+    an answer, and 131 of them are specialists — an eighth.
     """
     everything = bestiary.search(biome="swamp", limit=99999)
     specialists = bestiary.search(biome="swamp", specialists=True, limit=99999)
-    assert len(everything) > len(bestiary.search(limit=99999)) * 0.6
-    assert len(specialists) < len(everything) / 10
+    assert len(everything) > len(bestiary.search(limit=99999)) * 0.4
+    assert len(specialists) < len(everything) / 8
 
 
 def test_an_empty_climate_list_means_any_climate_not_no_climate():

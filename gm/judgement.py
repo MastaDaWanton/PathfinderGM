@@ -1116,7 +1116,13 @@ def template_for(phrase: str, level: int = 1, floor: str = "guildhand") -> str:
         if not word:
             continue
         got = npcs.choose(word, max(1, int(level or 1))) or {}
-        if str(got.get("id") or "").lower() == word:
+        # The role's base id, its level rung stripped (`npcs._base_id`): the app's own
+        # people are `raider-level-1`, `guardsman-level-4`, and the exact-id test sent
+        # every one of them to the floor (2026-10-28). A single-word base that begins
+        # with the word is the same role ("guardsman" for "guard"); a hyphen is another
+        # word, and "gnoll-bruiser" is still never a bruiser.
+        base = npcs._base_id(str(got.get("id") or "").lower())
+        if base == word or (base.startswith(word) and "-" not in base):
             return str(got["id"])
     return floor
 
@@ -9083,9 +9089,14 @@ def name_the_nameless(scene, world) -> list[str]:
             head = str(a.appearance or "").split(":", 1)[0].strip().lower()
             if ":" in str(a.appearance or "") and head in peoples:
                 a.appearance = ""
-            row = bestiary_mod.imported().get(template.strip().lower()) or {}
-            if str(getattr(a, "true_name", "") or "").lower() == \
-                    str(row.get("name") or "").lower():
+            row = bestiary_mod.raw_block(template.strip().lower()) or {}
+            # The template's own name is also its id's words when the id is an alias: since
+            # option D (2026-10-29) "aelzeldra" lands on the annis hag, whose name is not
+            # the one this loop once copied onto the owner's hag.
+            own = {str(row.get("name") or "").lower()}
+            if bestiary_mod.alias_of(template):
+                own.add(template.strip().lower().replace("-", " "))
+            if str(getattr(a, "true_name", "") or "").lower() in own:
                 a.true_name = ""
             continue
         if a.is_pc or getattr(a, "true_name", ""):

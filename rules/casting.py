@@ -137,11 +137,37 @@ FOUR_LEVEL = [
     [0, 4, 3, 3, 2, 0, 0, 0, 0, 0],
     [0, 4, 4, 3, 3, 0, 0, 0, 0, 0],
 ]
+# The adept, an NPC class (CRB Table 14-1: Adept, p. 448): divine, prepared, off Wisdom,
+# spell levels 0-5. "Where Table 14-1 indicates that the adept gets 0 spells per day of a
+# given spell level, she gains only the bonus spells she would be entitled to based on her
+# Wisdom score" — the paladin's convention, so the same `NO`/0 split.
+ADEPT = [
+    [3, 1, NO, NO, NO, NO, NO, NO, NO, NO],
+    [3, 1, NO, NO, NO, NO, NO, NO, NO, NO],
+    [3, 2, NO, NO, NO, NO, NO, NO, NO, NO],
+    [3, 2, 0, NO, NO, NO, NO, NO, NO, NO],
+    [3, 2, 1, NO, NO, NO, NO, NO, NO, NO],
+    [3, 2, 1, NO, NO, NO, NO, NO, NO, NO],
+    [3, 3, 2, NO, NO, NO, NO, NO, NO, NO],
+    [3, 3, 2, 0, NO, NO, NO, NO, NO, NO],
+    [3, 3, 2, 1, NO, NO, NO, NO, NO, NO],
+    [3, 3, 2, 1, NO, NO, NO, NO, NO, NO],
+    [3, 3, 3, 2, NO, NO, NO, NO, NO, NO],
+    [3, 3, 3, 2, 0, NO, NO, NO, NO, NO],
+    [3, 3, 3, 2, 1, NO, NO, NO, NO, NO],
+    [3, 3, 3, 2, 1, NO, NO, NO, NO, NO],
+    [3, 3, 3, 3, 2, NO, NO, NO, NO, NO],
+    [3, 3, 3, 3, 2, 0, NO, NO, NO, NO],
+    [3, 3, 3, 3, 2, 1, NO, NO, NO, NO],
+    [3, 3, 3, 3, 2, 1, NO, NO, NO, NO],
+    [3, 3, 3, 3, 3, 2, NO, NO, NO, NO],
+    [3, 3, 3, 3, 3, 2, NO, NO, NO, NO],
+]
 # The tables whose printed 0 means "bonus spells only". Every other table writes a 0 for
 # a level not reached (the wizard's 9th at 1st), and the paladin's 0-level column and its
 # 5th-9th are not spell levels it has at all — so only spell levels 1-4 of this table read
 # a 0 as access.
-_ZERO_IS_ACCESS = {"four_level": range(1, 5)}
+_ZERO_IS_ACCESS = {"four_level": range(1, 5), "adept": range(1, 6)}
 
 
 def _has_access(progression: str, spell_level: int, base: int) -> bool:
@@ -152,7 +178,7 @@ def _has_access(progression: str, spell_level: int, base: int) -> bool:
     return base == 0 and spell_level in _ZERO_IS_ACCESS.get(progression, ())
 
 PROGRESSIONS = {"full": FULL_CASTER, "spontaneous_full": SPONTANEOUS_FULL,
-                "six_level": SIX_LEVEL, "four_level": FOUR_LEVEL}
+                "six_level": SIX_LEVEL, "four_level": FOUR_LEVEL, "adept": ADEPT}
 
 # --- what a spontaneous caster KNOWS, which is a different table from what they cast ---
 #

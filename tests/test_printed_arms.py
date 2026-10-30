@@ -79,11 +79,16 @@ def _manoeuvre(engine, body, key: str):
 # --- the defect ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("template, weapon", [
-    ("guard", "halberd"), ("ogre", "greatclub"), ("varisian-wagon-driver", "club")])
+    ("guard", "halberd"), ("ogre", "greatclub"), ("beggar", "club")])
 def test_a_disarm_told_the_creature_held_nothing_while_it_swung_a_printed_weapon(template,
                                                                                   weapon):
     """By 15, 12 and 20 on 2026-10-28, each told "holds nothing that can be knocked
-    loose" with the weapon still swung next turn."""
+    loose" with the weapon still swung next turn.
+
+    The wagon driver's club moved to a shipped block on 2026-10-29 under option D: the
+    Varisian wagon driver was an adventure row (its id now lands on the app's own
+    driver build, which carries a quarterstaff on its sheet); the Game Mastery Guide's
+    Beggar prints "club +1 (1d6+1)"."""
     scene, engine, body = _fight(template)
     assert body.wielded_key() == weapon
     out = _manoeuvre(engine, body, "disarm")

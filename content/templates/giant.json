@@ -1,0 +1,25 @@
+{
+ "id": "giant",
+ "name": "giant",
+ "kind": "simple",
+ "source": "Bestiary 1, Appendix 1: Simple Templates, p. 294-295",
+ "text": "Creatures with the giant template are larger and stronger than their normal-sized kin.",
+ "quick_rules": "+2 to all rolls based on Str or Con, +2 hp/HD, -1 penalty on all rolls based on Dex.",
+ "cr": {
+  "add": 1
+ },
+ "size_steps": 1,
+ "natural_armour": 3,
+ "abilities": {
+  "str": 4,
+  "con": 4,
+  "dex": -2
+ },
+ "damage_dice_steps": 1,
+ "refuse": {
+  "sizes": [
+   "colossal"
+  ]
+ },
+ "describe": "{A_base} of unusual size, heavier and stronger than any of its kin."
+}

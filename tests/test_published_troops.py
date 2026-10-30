@@ -45,8 +45,12 @@ BLOCKS = _blocks()
 
 def test_the_corpus_still_ships_troop_blocks():
     """If this ever drops to zero, a re-import has lost the subtype and every troop in the
-    game has quietly become one creature again."""
-    assert len(BLOCKS) >= 20, len(BLOCKS)
+    game has quietly become one creature again.
+
+    The floor was 20 of the corpus's 23; measured 2026-10-29, after option D
+    (docs/bestiary-licensing.md) removed the adventure rows, three ship — Bestiary 6's
+    cultist, goblin and outlaw troops."""
+    assert len(BLOCKS) >= 3, len(BLOCKS)
 
 
 @pytest.mark.parametrize("key", [k for k, _ in BLOCKS])
@@ -85,15 +89,19 @@ def test_the_roster_starts_full_and_agrees_with_the_pool(key, doc):
 
 def test_a_published_troop_loses_members_as_it_is_hurt():
     """The readout the note refused to ship half of: "the troop rules without the attrition
-    would leave a readout saying '1 of 1'"."""
+    would leave a readout saying '1 of 1'".
+
+    The example moved to a shipped block on 2026-10-29 under option D: the hobgoblin
+    phalanx troop (126 hp, 16 of 8) was an adventure row; Bestiary 6's cultist troop
+    prints 144 hp."""
     s = Scene(location_id="t")
-    actor = bestiary.instantiate("hobgoblin-phalanx-troop", scene=s)
+    actor = bestiary.instantiate("troop-cultist", scene=s)
     t = actor.troop
-    assert (t.members, t.member_hp) == (16, 8)        # 126 hp over the 20-foot square
+    assert (t.members, t.member_hp) == (16, 9)        # 144 hp over the 20-foot square
     actor.hp -= 40
     fell = troops.settle(t, actor.hp)
-    assert fell == 5 and t.members == 11
-    assert "11 of" in troops.tell_of(t, actor.name, fell)
+    assert fell == 4 and t.members == 12
+    assert "12 of" in troops.tell_of(t, actor.name, fell)
     actor.hp = 0
     troops.settle(t, actor.hp)
     assert t.members == 0, "reducing a troop to 0 hit points causes it to break up"
@@ -107,9 +115,12 @@ def test_an_ordinary_creature_is_not_a_crowd():
 
 def test_the_unit_is_worth_what_it_was_and_the_members_share_it():
     """`xp_owed` pays for the members who actually fell when the rest run, so a member's
-    share has to exist and has to add up to about the block's own value."""
+    share has to exist and has to add up to about the block's own value.
+
+    The example moved to a shipped block on 2026-10-29 under option D: Bestiary 6's
+    cultist troop (CR 11, 12,800 XP) for the removed hobgoblin phalanx troop."""
     s = Scene(location_id="t")
-    actor = bestiary.instantiate("hobgoblin-phalanx-troop", scene=s)
+    actor = bestiary.instantiate("troop-cultist", scene=s)
     t = actor.troop
     assert t.member_xp > 0
     assert abs(t.member_xp * t.members - actor.xp_value) <= t.members

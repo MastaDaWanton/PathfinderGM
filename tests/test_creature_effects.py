@@ -100,14 +100,19 @@ def giant():
 
 def test_a_frost_giant_no_longer_takes_damage_from_cold(giant):
     """It took the full 20 before this. `Immune cold` was in the file and was dropped on
-    the way to the sheet."""
+    the way to the sheet. And since the re-read by header (2026-10-28) its printed
+    "Weaknesses vulnerability to fire" reaches the sheet too: the anchor file carried no
+    Bestiary weakness at all, so fire took 20 where the book takes 30."""
     assert giant.immunities == ["cold"]
     assert giant.take_damage(20, "cold")["taken"] == 0
-    assert giant.take_damage(20, "fire")["taken"] == 20
+    assert giant.take_damage(20, "fire")["taken"] == 30
 
 
 def test_vulnerability_is_half_again_and_rounds_down():
-    snowman = bestiary.instantiate("abominable-snowman")
+    """The example moved to a shipped creature on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): the abominable snowman was an adventure row; the
+    Bestiary's yeti prints the same "Weaknesses vulnerability to fire"."""
+    snowman = bestiary.instantiate("yeti")
     assert snowman.vulnerabilities == ["fire"]
     assert snowman.take_damage(20, "fire")["taken"] == 30
     assert snowman.take_damage(15, "fire")["taken"] == 22        # 22.5, rounded down

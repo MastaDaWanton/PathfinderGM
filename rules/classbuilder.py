@@ -1538,7 +1538,18 @@ def validate_class(d: dict) -> list[str]:
                 problems.append(
                     "casting.list: which printed spell list this class casts off — wizard, "
                     "cleric, druid, sorcerer, bard, paladin or ranger. A list of your own "
-                    "has no spells on it, so nothing would be castable.")
+                    "has no spells on it unless `casting.spell_list` names them.")
+            # A list printed with the class (the adept's, CRB p. 449), written into each
+            # named spell's `lists` by `rules.spells._class_spell_lists`.
+            own = casting.get("spell_list")
+            if own is not None:
+                if not isinstance(own, dict) or not all(
+                        str(k).isdigit() and 0 <= int(k) <= 9 and isinstance(v, list)
+                        and all(isinstance(n, str) and n.strip() for n in v)
+                        for k, v in own.items()):
+                    problems.append(
+                        "casting.spell_list: spell level to the spells' names, "
+                        "{\"0\": [\"light\", ...], \"1\": [\"bless\", ...]} — levels 0 to 9.")
 
     # --- paths --------------------------------------------------------------------
     limit = d.get("max_paths")

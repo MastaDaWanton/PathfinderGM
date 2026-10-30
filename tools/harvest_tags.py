@@ -174,10 +174,14 @@ def _has_phrase(name: str, phrase: str) -> bool:
 
 
 def merged() -> dict[str, dict]:
-    """The blocks as the game reads them (`bestiary._build_imported`'s merge: core wins)."""
+    """The blocks as the game reads them (`bestiary._build_imported`'s merge: core wins) —
+    the printed ones. The app's own people and templated creatures are built at load and
+    carry their own rule (a template inherits its base's tags or, undead, strips them; a
+    person is never harvested), so this pass, which writes tags into the two content
+    files, leaves them out rather than list 436 entries it cannot write to."""
     from rules import bestiary
 
-    return {k: dict(v) for k, v in bestiary._build_imported().items()}
+    return {k: dict(v) for k, v in bestiary._build_imported(printed_only=True).items()}
 
 
 def _doc_type(doc: dict) -> str:

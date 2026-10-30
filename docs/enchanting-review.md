@@ -227,7 +227,7 @@ The owner's ruling (round 4 point 10, round 5): phases of the day from `rules/sk
 
 ## The magic items re-tiered by price
 
-36 of 112 wondrous rows moved (the pricing lane counted 35 before this pass; the Headband of Ponderous Recollection is the 36th, because its book price is 5,100 gp, not 500). Checked on load: `materials.magic_item_tier_problems`.
+36 of 122 wondrous rows moved (the pricing lane counted 35 before this pass; the Headband of Ponderous Recollection is the 36th, because its book price is 5,100 gp, not 500). Checked on load: `materials.magic_item_tier_problems`.
 
 | Item | Price | Was | Now |
 |---|---|---|---|
@@ -350,4 +350,4 @@ Not on the Core Rulebook's rings, wondrous items or rods pages, Ultimate Equipme
 
 ## What the recipes still cannot run
 
-102 recipes, none narrative. Book documents of a type the engine does not run yet, by type: spell_effect 3. 67 recipes say in `not_yet` what of the book they leave out.
+112 recipes, none narrative. Book documents of a type the engine does not run yet, by type: spell_effect 4. 76 recipes say in `not_yet` what of the book they leave out.

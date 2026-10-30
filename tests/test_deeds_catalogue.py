@@ -73,14 +73,25 @@ def test_good_carcasses_counted_on_the_shipped_bestiary():
     alignment — 58 outsiders (the subtype alone is 32; three fallen ones print CE and keep
     the subtype). Good dragons by their printed alignment: 9, the faerie dragon, the
     pseudodragon and seven named individuals; no metallic true dragon ships. Counted
-    2026-10-08; a change to either count is a change to the bestiary, and says so."""
+    2026-10-08; a change to either count is a change to the bestiary, and says so.
+
+    It did, 2026-10-28: the Bestiaries re-read by header (tests/test_bestiary_rescan.py)
+    ship every block, so 103 good outsiders and 42 good dragons — the brass, bronze,
+    copper, gold and silver true dragons and the later books' good ones at three ages
+    each, where the anchor file had none.
+
+    And again, measured 2026-10-29, after option D (docs/bestiary-licensing.md) removed
+    the adventure rows: 59 good outsiders (every one a Bestiary block, 47 of them by the
+    good subtype) and 35 good dragons — the eleven good true-dragon colours at three ages
+    each, the faerie dragon and the pseudodragon. The seven named individuals were
+    adventure rows and went with them."""
     blocks = bestiary.imported()
     outsiders = [k for k, v in blocks.items()
                  if deeds.of_carcass(v) == "deed.harvest.good-outsider"]
     dragons = sorted(k for k, v in blocks.items()
                      if deeds.of_carcass(v) == "deed.harvest.good-dragon")
-    assert len(outsiders) == 58
-    assert len(dragons) == 9 and {"pseudodragon", "dragon-faerie"} <= set(dragons)
+    assert len(outsiders) == 59
+    assert len(dragons) == 35 and {"pseudodragon", "dragon-faerie"} <= set(dragons)
     assert deeds.of_carcass(_block("wolf")) is None
     assert deeds.of_carcass(_block("tiefling")) is None
 
@@ -102,14 +113,15 @@ def test_the_carcass_deed_never_reads_the_name():
 
 def test_the_native_outsiders_are_never_harvested_like_humanoids():
     """The owner's answer 3b: aasimar, tieflings, sylphs and the other native outsiders
-    (225 blocks) are peoples, "banned from skinning like humanoids". The humanoid rule
+    (225 blocks; 252 since the re-read by header, 2026-10-28; 47 measured 2026-10-29,
+    after option D removed the adventure rows) are peoples, "banned from skinning like humanoids". The humanoid rule
     alone missed every one: they are outsiders. `never_harvested` is the reader lane C
     asks before it offers a single part."""
     blocks = bestiary.imported()
     native = [k for k, v in blocks.items()
               if str(v.get("creature_type") or "").lower() == "outsider"
               and "native" in str(v.get("subtype") or "").lower()]
-    assert len(native) == 225
+    assert len(native) == 47
     assert all(bestiary.never_harvested(blocks[k]) for k in native)
     for key in ("aasimar", "tiefling"):
         assert deeds.never_harvested(_block(key)), key

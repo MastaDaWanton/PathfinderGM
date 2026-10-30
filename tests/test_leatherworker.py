@@ -198,6 +198,13 @@ def test_every_authored_effect_validates():
     assert not offenders, f"{len(offenders)} invalid effect specs"
 
 
+# Hides no shipped creature yields, each with why. May only shrink. Option D (2026-10-29)
+# removed the adventure rows; the cave bear hide moved to the Bestiary's dire bear (the
+# Core rules' cave bear), and this one has no rulebook creature: the glowlizard was an
+# adventure's. Waiting on the owner — a world's own glowlizard can still yield it.
+UNREACHABLE_HIDES = {"glowlizard-hide": "adventure creature, none in the rulebooks"}
+
+
 def test_every_hide_names_a_creature_the_bestiary_has():
     """`from_creatures` is the old skin excursion's joint (lane C replaces it with bestiary
     tags). A fragment no bestiary name contains is a hide no fight can yield."""
@@ -207,6 +214,8 @@ def test_every_hide_names_a_creature_the_bestiary_has():
         if m["kind"] != "hide":
             continue
         if m["id"].startswith("generic-") or m.get("obtain") == "bought":
+            continue
+        if m["id"] in UNREACHABLE_HIDES:
             continue
         frags = [f.lower() for f in m.get("from_creatures") or []]
         assert frags, f"{m['id']} has no from_creatures"

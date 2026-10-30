@@ -284,7 +284,7 @@ def instantiate(
         data["name"] = name_apart(scene, str(data.get("name") or ""))
     data["world_entity_id"] = world_entity_id
     actor = from_dict(data, ref=_next_ref(scene))
-    _assemble_kit(actor, data)
+    _assemble_kit(actor, data, block)
     # `raw`, not `found`: `lookup` drops `subtype` with the rest of `_NOT_ON_THE_SHEET`,
     # so the one field that says "this is a crowd" is gone by the time `found` is built.
     # The same arrangement `Actor._creature_doc` uses, and for the same reason.
@@ -323,7 +323,7 @@ def _form_if_a_troop(actor, doc: dict) -> None:
     actor.size = troops_mod.size_for(members)
 
 
-def _assemble_kit(actor, data: dict) -> None:
+def _assemble_kit(actor, data: dict, block: dict | None = None) -> None:
     """Pockets for the spawned — as a CLAIM, not yet as contents.
 
     The loot op made empty pockets visible — "I take everything" off a thug who owns a
@@ -340,16 +340,60 @@ def _assemble_kit(actor, data: dict) -> None:
     """
     if int((data.get("abilities") or {}).get("int", 10) or 10) <= 2:
         return                                  # animals carry teeth, not coin
+    # What the book prints it carries, compiled (rules/compile_block.py): its coin and
+    # the things in its pack, in place of the purse derived from its XP. The owner's
+    # ruling of 2026-10-28: loot is the printed gear. Weapons are already on the sheet
+    # (`take_up_printed_arms`); a suit or shield goes in the pack, not on the body,
+    # because the printed AC already counts it.
+    from . import compile_block
+
+    rec = compile_block.record_for(block)
+    printed = [it for it in (rec or {}).get("carries") or ()
+               if it.get("key") and it.get("table") not in ("weapon", "magic item")]
+    if printed:
+        coin = [f"{it.get('dice') or it['count']} {it['key']}"
+                for it in printed if it["table"] == "coin"]
+        # A masterwork or magic suit is the forge's record, its +N laid on by the
+        # enchanter's writer — the shape the app's own people's gear takes
+        # (`npc_gear.records`) — so "+1 chainmail" loots as itself, not as chainmail.
+        # Shields stay plain, `npc_gear`'s rule and reason: a shield's +N is an armour-
+        # bonus channel the forged row does not fold.
+        made = [it for it in printed if it["table"] == "armour"
+                and (it.get("masterwork") or it.get("enhancement"))]
+        from . import forge_items, npc_gear
+
+        for it in made:
+            gear = {"armour": {"base": it["key"], "masterwork": bool(it.get("masterwork")),
+                               "enhancement": int(it.get("enhancement") or 0)}}
+            for rec in npc_gear.records(gear):
+                actor.add_stock(forge_items.stock_item(rec), 1)
+        pockets = [str(it["key"]) for it in printed if it["table"] != "coin"
+                   and it not in made for _ in range(_units(it))]
+        actor.kit_pending = {"kit": "printed", "wealth": ", ".join(coin), "pockets": pockets}
+        return
     kit_key = str(data.get("kit") or "").strip().lower()
     kit = KITS.get(kit_key, {})
     wealth = str(data.get("wealth") or kit.get("wealth") or "").strip()
-    if not wealth and data.get("kind") == "npc":
+    # Not for the app's own people who carry Table 14-9's coin, which is in the purse
+    # already; a trade's build (`npc_gear.trade_outfit`) keeps the small derived purse.
+    table_coin = bool(((data.get("build") or {}).get("gear") or {}).get("table"))
+    if not wealth and data.get("kind") == "npc" and not table_coin:
         # Derived, roughly: what defeating them is worth maps to what they carry.
         xp = int(data.get("xp_value", 0) or 0)
         wealth = "2d6 sp" if xp >= 100 else "1d4 sp"
     pockets = [str(p) for p in (data.get("pockets") or kit.get("pockets") or [])]
     if wealth or pockets:
         actor.kit_pending = {"kit": kit_key, "wealth": wealth, "pockets": pockets}
+
+
+def _units(item: dict) -> int:
+    """How many of a carried thing's key go in the pack. Rounds come in the table's
+    bundles ("crossbow-bolts-10"): "with 20 bolts" is two of them, not twenty."""
+    count = max(1, int(item.get("count") or 1))
+    bundle = re.search(r"-(\d+)$", str(item.get("key") or ""))
+    if item.get("table") == "ammunition" and bundle:
+        count = -(-count // int(bundle.group(1)))
+    return min(count, 50)
 
 
 def collapse_kit(actor) -> list[str]:
@@ -371,16 +415,60 @@ def collapse_kit(actor) -> list[str]:
         # Merged, never assigned: play may already have put coin on this body (a
         # bribe taken, a payout pocketed), and the claim collapsing must add the
         # kit's coin to the facts, not overwrite them.
-        rolled = creation_mod.starting_purse({"starting_wealth": wealth}) or {}
-        for coin, n in rolled.items():
-            actor.purse[coin] = int(actor.purse.get(coin, 0)) + int(n)
+        # A printed purse is exact coin and may be several ("46 gp, 5 sp"); a derived
+        # or printed roll ("2d6 sp", "3d6 gp") is rolled.
+        for part in [p.strip() for p in wealth.split(",") if p.strip()]:
+            flat = re.fullmatch(r"(\d+)\s*([a-z]{2})", part.lower())
+            rolled = ({flat.group(2): int(flat.group(1))} if flat else
+                      creation_mod.starting_purse({"starting_wealth": part}) or {})
+            for coin, n in rolled.items():
+                actor.purse[coin] = int(actor.purse.get(coin, 0)) + int(n)
         made.append(f"a purse ({wealth})")
+    from . import goods as goods_mod
+
     for thing in pending.get("pockets") or []:
-        key = str(thing).strip().lower().replace(" ", "-")
+        key = str(thing).strip().lower()
+        # A suit or a round keeps its table key ("chain shirt"; `goods.canonical`), which
+        # a hyphen would turn into a word no table knows.
+        if not goods_mod.known_item(key) and key not in goods_mod.GEAR:
+            key = key.replace(" ", "-")
         if key:
-            actor.carry(key, 1)
+            _pocket(actor, key)
             made.append(key)
     return made
+
+
+def _pocket(actor, key: str) -> None:
+    """One pocketed thing, filed where a purchase of it would be (`goods.deliver`).
+
+    Measured in the running app 2026-10-29: a looted goblin's two potions of cure light
+    wounds, its acid, alchemist's fire and tanglefoot bags all went into `inventory`, the
+    herb satchel, where nothing drinks or throws them and the Equipment tab does not list
+    them — every pocket was `carry`'d since kits began, which was harmless while kits held
+    work gloves and chalk and is not now that a body's pockets are its printed gear.
+    A brewed thing is the alchemy bench's stock row (`goods.alchemy_stock`), a weapon, a
+    suit, a shield or a round goes through `goods.stow`, and the rest to the satchel as
+    before."""
+    from . import formulae
+    from . import goods as goods_mod
+
+    book = formulae.all()
+    slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-")
+    # The classics by the shop's own ids ("acid" is `acid-flask`, `goods.CLASSIC_GEAR`).
+    fid = (key if key in book else slug if slug in book
+           else goods_mod.CLASSIC_GEAR.get(key, "") or goods_mod.CLASSIC_GEAR.get(
+               key.replace("-", " "), ""))
+    if fid:
+        made = goods_mod.alchemy_stock(fid)
+        if made is not None:
+            actor.add_stock(made, 1)
+            return
+    found = goods_mod.known_item(key)
+    if found and found["table"] in ("weapon", "armour", "shield", "ammunition"):
+        stowed, _ = goods_mod.stow(actor, key, 1)
+        if stowed:
+            return
+    actor.carry(key, 1)
 
 
 def next_ref(scene, taken=()) -> str:
@@ -508,6 +596,10 @@ _NOT_ON_THE_SHEET = (
     "senses", "languages", "special_attacks", "special_abilities", "spell_like",
     "environment", "organization", "treasure", "source", "playable", "id", "feats",
     "biomes", "climates", "biomes_any", "biomes_inferred", "biomes_from",
+    # What the book prints a creature carries, as printed (tools/ship_rulebook_line.py):
+    # read by the compile into `carries`, never by the sheet, whose own `gear` is a dict
+    # of worn slots — the first cut wrote the text there and 258 tests failed on load.
+    "printed_gear", "printed_other_gear",
 )
 
 
@@ -573,18 +665,21 @@ def imported() -> dict[str, dict]:
 
         from . import pristine
 
+        home = Path(settings.CAMPAIGN_DIR).parent / "homebrew"
         _IMPORTED = pristine.memo(
-            "bestiary", [Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"],
-            _build_imported)
+            "bestiary", [home / "creatures", home / "npc-builds"], _build_imported)
         _INDEX = sorted(set(list(TEMPLATES) + list(_IMPORTED)))
     return _IMPORTED
 
 
-def _build_imported() -> dict[str, dict]:
-    """The two content files and the homebrew creatures, read and merged."""
+def _build_imported(printed_only: bool = False) -> dict[str, dict]:
+    """The two content files and the homebrew creatures, read and merged — then the
+    templated creatures and the app's own people built on top, unless `printed_only`
+    (the harvest-tag pass, which writes into the printed files and nothing else)."""
     from django.conf import settings
 
     out: dict[str, dict] = {}
+    derived: list = []
     for folder in (Path(settings.BASE_DIR) / "content" / "bestiary",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"):
         if not folder.is_dir():
@@ -594,6 +689,10 @@ def _build_imported() -> dict[str, dict]:
         # an adventure-path variant that happens to share a name must not replace it.
         for path in sorted(folder.glob("*.json"),
                            key=lambda q: (q.stem == "core", q.stem)):
+            # Not stat blocks: the compiled records (rules/compile_block.py) and the alias
+            # map (`_aliases`), each read by its own reader.
+            if path.stem in ("compiled", "aliases") and folder.name == "bestiary":
+                continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
@@ -607,7 +706,100 @@ def _build_imported() -> dict[str, dict]:
                     base = dict(out.get(e["id"], {}))
                     base.update({k: v for k, v in e.items() if v not in (None, "")})
                     out[e["id"]] = base
+            if isinstance(data, dict) and isinstance(data.get("derived"), list):
+                derived.extend(data["derived"])
+    if printed_only:
+        return out
+    _derive(out, derived)
+    _people(out, [Path(settings.BASE_DIR) / "content" / "npc-builds",
+                  Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "npc-builds"])
     return out
+
+
+def _people(out: dict[str, dict], folders) -> None:
+    """People built from the rules (`rules/npc_builds.py`), each one a block in the store.
+
+    The build is made into an actor by the engine — every number derived from its race,
+    class, level, scores, skills, feats and gear — and stored as that sheet plus the
+    block fields every reader of a block asks (`cr`, `creature_type`, `biomes`). Its
+    ground is the build's own and marked as no Bestiary line (`biomes_inferred`): people
+    are found by their work through `npcs.choose`, never drawn out of the land as a kind
+    (`ground_stated`). A build the rules refuse is reported and left out."""
+    from . import npc_builds
+    from .sheet import to_dict
+
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            for doc in (data.get("builds") if isinstance(data, dict) else None) or []:
+                try:
+                    actor = npc_builds.actor(doc)
+                except (ValueError, KeyError) as exc:
+                    files.unreadable(path, exc)
+                    continue
+                sheet, _ = npc_builds.build(doc)
+                block = to_dict(actor)
+                block.pop("ref", None)
+                block.update({
+                    "id": sheet["id"], "name": sheet["name"], "kind": "npc",
+                    "cr": sheet["cr"], "cr_value": sheet["cr_value"],
+                    "creature_type": "humanoid", "subtype": sheet["subtype"],
+                    "alignment": str(doc.get("alignment") or "N"),
+                    "biomes": list(doc.get("biomes") or ()), "climates": [],
+                    "biomes_any": not doc.get("biomes"), "biomes_inferred": True,
+                    "biomes_from": "build", "source": npc_builds.SOURCE,
+                    "description": str(doc.get("description") or ""),
+                    "role": str(doc.get("role") or ""),
+                    "build": doc,
+                    # Step 6's kit as a pocket claim (`_assemble_kit`), opened on first
+                    # look like any creature's; its coin is in the sheet's purse already.
+                    "pockets": list(sheet.get("pockets") or []),
+                })
+                if not block["biomes"]:
+                    from . import biomes as biomes_mod
+
+                    block["biomes"] = list(biomes_mod.LAND)
+                out.setdefault(block["id"], block)
+
+
+def _derive(out: dict[str, dict], declared: list) -> None:
+    """Creatures made from a Bestiary creature and Bestiary templates (`rules/templates.py`),
+    declared `{"base": "shark", "templates": ["zombie"]}` in a bestiary file's `derived`
+    list and built here, after every printed block is read, so the numbers are always the
+    rules' applied to the block as it now stands. A declaration the rules refuse is
+    reported (`files.unreadable`) and skipped, never shipped half-made."""
+    from . import templates as templates_mod
+
+    for decl in declared:
+        if not isinstance(decl, dict):
+            continue
+        base = out.get(str(decl.get("base") or "").strip().lower())
+        if base is None:
+            files.unreadable(Path("derived"), ValueError(f"no base creature {decl.get('base')!r}"))
+            continue
+        block, why = templates_mod.apply_chain(dict(base), list(decl.get("templates") or []))
+        if block is None:
+            files.unreadable(Path("derived"), ValueError(f"{decl}: {why}"))
+            continue
+        if decl.get("id"):
+            block["id"] = str(decl["id"]).strip().lower()
+        # Reached by name — the GM's spawn, a summon, a scheme — never drawn out of the
+        # land as a kind (`ground_stated`): a zombie wolf in every forest's encounter pool
+        # would remake the encounter tables, which nobody asked of a template.
+        block["biomes_inferred"] = True
+        block["biomes_from"] = "template"
+        # Over an adventure's row of the same name (the rules' own build is the better
+        # one, docs/compiled-bestiary-plan.md), never over a printed Bestiary block.
+        held = out.get(block["id"])
+        if held is not None and str(held.get("source") or "").startswith("Bestiary"):
+            continue
+        out[block["id"]] = block
 
 
 def everything() -> dict[str, dict]:
@@ -672,9 +864,72 @@ def raw_block(key: str) -> dict | None:
     """
     key = (key or "").strip().lower()
     store = imported()
+    # An alias first: it is the printed Bestiary's own block, and the Bestiary wins a name
+    # it shares with the spreadsheet (`_build_imported` loads core.json last for that). The
+    # alias was consulted last at first, and `zombie` — the Bestiary's human zombie before
+    # the re-read — answered with an adventure's zombie from the spreadsheet.
+    alias = alias_of(key)
+    if alias and alias in store:
+        return store[alias]
     return (store.get(key)
             or store.get(key.replace(" ", "-"))
             or store.get(_index_order(key)))
+
+
+def _aliases() -> dict[str, str]:
+    """Ids the Bestiary file used to carry, to the block each now is (`aliases` in
+    core.json, written by tools/extract_bestiary_pdfs.py). The file was re-read on
+    2026-10-28 by every printed header instead of one index anchor per page, and 20 old
+    ids name no block any more — `skeleton` is now `human-skeleton`, `elephant-mastodon`
+    the `mastodon` — while saves still hold them as `from_template`.
+
+    And content/bestiary/aliases.json (tools/ship_rulebook_line.py): since 2026-10-29 that
+    file is the rulebook line alone (option D, docs/bestiary-licensing.md), and each of the
+    5,538 adventure, society and module ids it no longer carries lands on a shipped body —
+    one of the app's own people for a person, the nearest printed Bestiary creature of its
+    type for anything else — so a save made on 0.2.22 keeps every creature in it.
+
+    That file's keys are hashes of the old ids (`alias_key`), not the ids: many were the
+    names of Paizo's adventure characters, the very thing option D stopped shipping. A
+    save's "aelzeldra" is hashed at lookup and finds its body; the name is in no file."""
+    global _ALIAS_MAP
+    if _ALIAS_MAP is None:
+        from django.conf import settings
+
+        _ALIAS_MAP = {}
+        # A file of its own, not a key in the 16 MB creatures.json, which this would parse
+        # again every time a test moves CAMPAIGN_DIR and clears the map.
+        for name in ("aliases.json", "core.json"):
+            try:
+                doc = json.loads((Path(settings.BASE_DIR) / "content" / "bestiary" / name)
+                                 .read_text(encoding="utf-8"))
+                mark = "#" if doc.get("hashed") else ""
+                _ALIAS_MAP.update({mark + str(k): str(v)
+                                   for k, v in (doc.get("aliases") or {}).items()})
+            except Exception as exc:  # noqa: BLE001 — a missing file is no aliases
+                files.unreadable(Path(f"content/bestiary/{name}"), exc)
+    return _ALIAS_MAP
+
+
+def alias_key(key: str) -> str:
+    """The hashed form aliases.json files an old id under."""
+    import hashlib
+
+    return hashlib.sha1(str(key or "").strip().lower().encode("utf-8")).hexdigest()[:16]
+
+
+def alias_of(key: str) -> str:
+    """The id a removed or renamed creature id now lands on, or "" when it names itself."""
+    key = (key or "").strip().lower()
+    m = _aliases()
+    for k in (key, key.replace(" ", "-")):
+        hit = m.get(k) or m.get("#" + alias_key(k))
+        if hit:
+            return hit
+    return ""
+
+
+_ALIAS_MAP: dict[str, str] | None = None
 
 
 def lookup(key: str) -> dict | None:
@@ -727,7 +982,8 @@ def details(key: str) -> dict | None:
     key = (key or "").strip().lower()
     if key in TEMPLATES:
         return {"id": key, "hand_written": True, **TEMPLATES[key]}
-    return imported().get(key)
+    # Through the one resolver, aliases included: `skeleton` is `human-skeleton` now.
+    return raw_block(key)
 
 
 def suggestion(key: str) -> str:
@@ -793,7 +1049,7 @@ def kind_names(template: str) -> set[str]:
     out: set[str] = set()
     if key in TEMPLATES:
         out |= {key, str(TEMPLATES[key].get("name") or "").lower()}
-    row = imported().get(key) or imported().get(key.replace(" ", "-"))
+    row = raw_block(key)
     if row:
         if row.get("creature_type"):
             out.add(str(row["creature_type"]).lower())
@@ -915,6 +1171,11 @@ def vocabularies() -> dict:
             if v:
                 counts[field][v] = counts[field].get(v, 0) + 1
         if c.get("biomes_any"):
+            continue
+        # The app's own people and templated creatures carry a ground (a farmer's farmland,
+        # a zombie wolf's forests) that is where they are met, not a habitat: counting it
+        # told a reader farmland had 56 specialists the land itself never printed.
+        if c.get("biomes_from") in ("build", "template"):
             continue
         for field, key in (("biomes", "biomes"), ("climates", "climates")):
             for v in c.get(key) or ():

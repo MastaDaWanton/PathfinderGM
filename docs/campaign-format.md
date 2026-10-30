@@ -789,6 +789,38 @@ tag"; the world owns its own races, but a person is never a hide), a tag naming 
 that does not exist, and a true dragon tagged with another colour's dragonhide (measured
 before the revamp: a red dragon offered all eleven colours, inventory §0.4).
 
+### What a world's creature carries (proposed, 2026-10-29: the compiled bestiary)
+
+The app no longer reads a stat block's attack and gear lines at play: each shipped block is
+compiled once into `attacks` (every printed attack, classed `item`, `natural`, `fist`,
+`body`, `thrown_object`, `worn` or `ability`) and `carries` (each thing it has, as a table
+key with its count, masterwork, special material and magic properties), in
+`content/bestiary/compiled.json` (rules/compile_block.py, docs/compiled-bestiary-plan.md).
+A world's beast or person that comes in `like` a bestiary block takes that block's record:
+its swings and its loot are the book's.
+
+Where a world's own creature carries something else — the marsh raiders' bone spears, a
+keeper's own lantern — the export says so in words and ids only, never a rules number,
+in the same row as its tags:
+
+```json
+{"id": "5bbd0c40345f~creature:marsh-raider", "name": "marsh raider", "like": "bandit-level-3",
+ "carries": [{"key": "spear", "count": 1}, {"key": "leather", "count": 1},
+             {"key": "5bbd0c40345f~material:reed-cord", "count": 2}]}
+```
+
+| Field | Means | Absent |
+|---|---|---|
+| `key` | a Core table key (`weapons`, `armour`, shields, the general store's gear, an alchemy formula id) or one of the world's own `play.materials[]` / `play.magic_items[]` ids | refused: "a carried thing names no table row or world id" |
+| `count` | how many | 1 |
+| `masterwork` | `true` for a masterwork weapon or suit | `false` |
+| `material` | a special material by its bestiary spelling (`cold iron`, `alchemical silver`, `adamantine`, `mithral`, `darkwood`, `dragonhide`) | none |
+
+No `enhancement` and no `properties` on a world's row: a magic weapon is a
+`play.magic_items[]` row and is carried by its id, so the number lives on the one document
+the app validates (stage 8's provenance: no model authors a number). Coin is not carried
+either: a world's purse is the kit the app derives, or the book's for a `like` block.
+
 ### Tanneries and leatherworkers
 
 | Field | Meaning |

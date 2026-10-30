@@ -1,0 +1,254 @@
+{
+ "id": "expert-skills",
+ "name": "Expert class skills",
+ "source": "Core Rulebook, Chapter 14: Creating NPCs, pp. 448-451",
+ "_unconfirmed": [],
+ "rules": {},
+ "options": [
+  {
+   "id": "acrobatics",
+   "name": "Acrobatics",
+   "text": "Acrobatics is a class skill.",
+   "requires": [],
+   "class_skill": "acrobatics"
+  },
+  {
+   "id": "appraise",
+   "name": "Appraise",
+   "text": "Appraise is a class skill.",
+   "requires": [],
+   "class_skill": "appraise"
+  },
+  {
+   "id": "bluff",
+   "name": "Bluff",
+   "text": "Bluff is a class skill.",
+   "requires": [],
+   "class_skill": "bluff"
+  },
+  {
+   "id": "climb",
+   "name": "Climb",
+   "text": "Climb is a class skill.",
+   "requires": [],
+   "class_skill": "climb"
+  },
+  {
+   "id": "craft",
+   "name": "Craft",
+   "text": "Craft is a class skill.",
+   "requires": [],
+   "class_skill": "craft"
+  },
+  {
+   "id": "diplomacy",
+   "name": "Diplomacy",
+   "text": "Diplomacy is a class skill.",
+   "requires": [],
+   "class_skill": "diplomacy"
+  },
+  {
+   "id": "disable-device",
+   "name": "Disable Device",
+   "text": "Disable Device is a class skill.",
+   "requires": [],
+   "class_skill": "disable device"
+  },
+  {
+   "id": "disguise",
+   "name": "Disguise",
+   "text": "Disguise is a class skill.",
+   "requires": [],
+   "class_skill": "disguise"
+  },
+  {
+   "id": "escape-artist",
+   "name": "Escape Artist",
+   "text": "Escape Artist is a class skill.",
+   "requires": [],
+   "class_skill": "escape artist"
+  },
+  {
+   "id": "fly",
+   "name": "Fly",
+   "text": "Fly is a class skill.",
+   "requires": [],
+   "class_skill": "fly"
+  },
+  {
+   "id": "handle-animal",
+   "name": "Handle Animal",
+   "text": "Handle Animal is a class skill.",
+   "requires": [],
+   "class_skill": "handle animal"
+  },
+  {
+   "id": "heal",
+   "name": "Heal",
+   "text": "Heal is a class skill.",
+   "requires": [],
+   "class_skill": "heal"
+  },
+  {
+   "id": "intimidate",
+   "name": "Intimidate",
+   "text": "Intimidate is a class skill.",
+   "requires": [],
+   "class_skill": "intimidate"
+  },
+  {
+   "id": "linguistics",
+   "name": "Linguistics",
+   "text": "Linguistics is a class skill.",
+   "requires": [],
+   "class_skill": "linguistics"
+  },
+  {
+   "id": "perception",
+   "name": "Perception",
+   "text": "Perception is a class skill.",
+   "requires": [],
+   "class_skill": "perception"
+  },
+  {
+   "id": "perform",
+   "name": "Perform",
+   "text": "Perform is a class skill.",
+   "requires": [],
+   "class_skill": "perform"
+  },
+  {
+   "id": "profession",
+   "name": "Profession",
+   "text": "Profession is a class skill.",
+   "requires": [],
+   "class_skill": "profession"
+  },
+  {
+   "id": "ride",
+   "name": "Ride",
+   "text": "Ride is a class skill.",
+   "requires": [],
+   "class_skill": "ride"
+  },
+  {
+   "id": "sense-motive",
+   "name": "Sense Motive",
+   "text": "Sense Motive is a class skill.",
+   "requires": [],
+   "class_skill": "sense motive"
+  },
+  {
+   "id": "sleight-of-hand",
+   "name": "Sleight Of Hand",
+   "text": "Sleight Of Hand is a class skill.",
+   "requires": [],
+   "class_skill": "sleight of hand"
+  },
+  {
+   "id": "spellcraft",
+   "name": "Spellcraft",
+   "text": "Spellcraft is a class skill.",
+   "requires": [],
+   "class_skill": "spellcraft"
+  },
+  {
+   "id": "stealth",
+   "name": "Stealth",
+   "text": "Stealth is a class skill.",
+   "requires": [],
+   "class_skill": "stealth"
+  },
+  {
+   "id": "survival",
+   "name": "Survival",
+   "text": "Survival is a class skill.",
+   "requires": [],
+   "class_skill": "survival"
+  },
+  {
+   "id": "swim",
+   "name": "Swim",
+   "text": "Swim is a class skill.",
+   "requires": [],
+   "class_skill": "swim"
+  },
+  {
+   "id": "use-magic-device",
+   "name": "Use Magic Device",
+   "text": "Use Magic Device is a class skill.",
+   "requires": [],
+   "class_skill": "use magic device"
+  },
+  {
+   "id": "knowledge-arcana",
+   "name": "Knowledge (Arcana)",
+   "text": "Knowledge (Arcana) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (arcana)"
+  },
+  {
+   "id": "knowledge-dungeoneering",
+   "name": "Knowledge (Dungeoneering)",
+   "text": "Knowledge (Dungeoneering) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (dungeoneering)"
+  },
+  {
+   "id": "knowledge-engineering",
+   "name": "Knowledge (Engineering)",
+   "text": "Knowledge (Engineering) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (engineering)"
+  },
+  {
+   "id": "knowledge-geography",
+   "name": "Knowledge (Geography)",
+   "text": "Knowledge (Geography) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (geography)"
+  },
+  {
+   "id": "knowledge-history",
+   "name": "Knowledge (History)",
+   "text": "Knowledge (History) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (history)"
+  },
+  {
+   "id": "knowledge-local",
+   "name": "Knowledge (Local)",
+   "text": "Knowledge (Local) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (local)"
+  },
+  {
+   "id": "knowledge-nature",
+   "name": "Knowledge (Nature)",
+   "text": "Knowledge (Nature) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (nature)"
+  },
+  {
+   "id": "knowledge-nobility",
+   "name": "Knowledge (Nobility)",
+   "text": "Knowledge (Nobility) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (nobility)"
+  },
+  {
+   "id": "knowledge-planes",
+   "name": "Knowledge (Planes)",
+   "text": "Knowledge (Planes) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (planes)"
+  },
+  {
+   "id": "knowledge-religion",
+   "name": "Knowledge (Religion)",
+   "text": "Knowledge (Religion) is a class skill.",
+   "requires": [],
+   "class_skill": "knowledge (religion)"
+  }
+ ]
+}

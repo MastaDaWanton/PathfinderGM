@@ -1,0 +1,56 @@
+{
+ "id": "fiendish",
+ "name": "fiendish",
+ "kind": "simple",
+ "source": "Bestiary 1, Appendix 1: Simple Templates, p. 294-295",
+ "text": "Creatures with the fiendish template live in the Lower Planes.",
+ "cr": {
+  "add": 1,
+  "if_hd_at_least": 5
+ },
+ "senses": "darkvision 60 ft.",
+ "defenses_by_hd": [
+  {
+   "hd": [
+    1,
+    4
+   ],
+   "resist": {
+    "cold": 5,
+    "fire": 5
+   },
+   "dr": null
+  },
+  {
+   "hd": [
+    5,
+    10
+   ],
+   "resist": {
+    "cold": 10,
+    "fire": 10
+   },
+   "dr": {
+    "amount": 5,
+    "bypass": "good"
+   }
+  },
+  {
+   "hd": [
+    11,
+    999
+   ],
+   "resist": {
+    "cold": 15,
+    "fire": 15
+   },
+   "dr": {
+    "amount": 10,
+    "bypass": "good"
+   }
+  }
+ ],
+ "sr_over_cr": 5,
+ "special_attack": "smite good 1/day",
+ "describe": "{A_base} from the lower planes, its eyes lit with a malice no beast was born with."
+}

@@ -269,12 +269,15 @@ def test_the_counters_survive_a_save():
 def test_the_bestiary_lives_in_the_water_rather_than_on_the_beach():
     """468 creatures moved when the aliases were repointed and the tagger re-run. A
     shark's environment line reads "any ocean" and the only word this app had for an
-    ocean was the sand beside it."""
+    ocean was the sand beside it.
+
+    The floor was 300; 237 measured 2026-10-29, after option D
+    (docs/bestiary-licensing.md) removed the adventure rows, many of them sea-going."""
     from rules import bestiary
 
     every = bestiary.everything()
     in_water = [k for k, c in every.items() if "water" in (c.get("biomes") or [])]
-    assert len(in_water) > 300, len(in_water)
+    assert len(in_water) > 230, len(in_water)
 
 
 def test_the_handoff_offers_both_words():

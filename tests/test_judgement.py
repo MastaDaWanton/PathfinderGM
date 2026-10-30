@@ -1529,7 +1529,9 @@ def test_a_noted_person_stands_in_the_scene():
     assert any("stranger" in n for n in names)
     assert any("guard" in n for n in names)
     guard = next(a for a in s.actors.values() if "guard" in a.name)
-    assert guard.from_template == "guard",         "the corpus has a Guard at CR 1; the watchman is the floor, not the answer"
+    from rules import npcs as _npcs
+
+    assert _npcs._base_id(guard.from_template).startswith("guard"),         "the corpus has a guard; the watchman is the floor, not the answer"
 
     # The ledger empties; the people stay. `clear_cast` used to depart the promoted
     # civilians because a room had no way to keep them — it does now, and it is the

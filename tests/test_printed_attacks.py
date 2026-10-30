@@ -133,25 +133,34 @@ def test_a_bite_is_a_bite_and_a_claw_a_claw():
 def test_printed_iteratives_are_the_books_not_minus_five_steps():
     """Two-weapon fighting printed out: "2 +1 short swords +19/+17/+12/+12/+9". Five
     swings, each at its printed bonus — the second is +17, not the +14 a -5 step would
-    make, and the count of two does not double them to ten."""
-    _, _, rogue = _fight("zelfane-vexidyre")
+    make, and the count of two does not double them to ten.
+
+    The example moved to a shipped block on 2026-10-29 under option D: Zelfane Vexidyre
+    was an adventure row. The lamia matriarch prints her two-weapon line the same way,
+    "+1 scimitars +14/+14/+9/+9/+4": five swings, the second at +14 where a -5 step would
+    make +9, and the plural not doubled to ten."""
+    _, _, rogue = _fight("lamia-matriarch")
     plan = rogue.attack_plan(full_attack=True)
     assert [i for _, i in plan] == [0, 1, 2, 3, 4]
     totals = [sum(m.value for m in rogue.attack_modifiers(k, i)) for k, i in plan]
-    assert totals == [19, 17, 12, 12, 9]
+    assert totals == [14, 14, 9, 9, 4]
 
 
 # --- what rides the blow ---------------------------------------------------------------
 
 def test_a_typed_extra_die_lands_as_its_own_type():
     """"+1 frost katana (1d8+10/18-20 plus 2d6 cold)": 551 printed attacks carry an extra
-    typed die. It lands as its own packet, so cold resistance meets only the cold."""
-    engine, pc, samurai = _fight("michiko-subtier-6-7")
+    typed die. It lands as its own packet, so cold resistance meets only the cold.
+
+    The example moved to a shipped block on 2026-10-29 under option D: the Society samurai
+    was an adventure row. The Game Mastery Guide's bandit lord prints "+1 frost keen rapier
+    +20/+15/+10 (1d6+6/15-20 plus 1d6 cold)"."""
+    engine, pc, samurai = _fight("bandit-lord")
     for _ in range(40):
         out = _swing(engine, samurai, pc)
         cold = [e for e in out.effects if e.get("type") == "cold"]
         if cold:
-            assert cold[0]["origin"] == "creature:michiko-subtier-6-7"
+            assert cold[0]["origin"] == "creature:bandit-lord"
             assert "adds" in out.tell
             return
     pytest.fail("forty swings and the frost never landed")

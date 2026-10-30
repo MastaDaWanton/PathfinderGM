@@ -226,7 +226,7 @@ def what_they_are(a) -> str:
             # printed type, and core.json's is truncated: the grioth was "monstrous".
             kind = bestiary.body_words(a)
             if not kind:
-                row = bestiary.imported().get(template.strip().lower()) or {}
+                row = bestiary.raw_block(template.strip().lower()) or {}
                 kind = str(row.get("creature_type") or "").strip().lower()
     # A person of the world's own people is shown as that people (`heritage`, the
     # world's; `race` is the stat block's rules term and "human" by default — memory: the

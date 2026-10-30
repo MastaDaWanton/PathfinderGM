@@ -1,0 +1,30 @@
+{
+ "id": "young",
+ "name": "young",
+ "kind": "simple",
+ "source": "Bestiary 1, Appendix 1: Simple Templates, p. 294-295",
+ "text": "Creatures with the young template are immature specimens of the base creature.",
+ "quick_rules": "+2 to all Dex-based rolls, -2 to all other rolls, -2 hp/HD.",
+ "cr": {
+  "add": -1
+ },
+ "size_steps": -1,
+ "natural_armour": -2,
+ "natural_armour_floor": 0,
+ "abilities": {
+  "str": -4,
+  "con": -4,
+  "dex": 4
+ },
+ "damage_dice_steps": -1,
+ "refuse": {
+  "sizes": [
+   "fine"
+  ],
+  "types": [
+   "dragon"
+  ],
+  "why": "This template cannot be applied to creatures that increase in power through aging or feeding (such as dragons or barghests) or creatures that are Fine-sized."
+ },
+ "describe": "A young {base}, not yet grown into its strength."
+}

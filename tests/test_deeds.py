@@ -227,11 +227,17 @@ def test_killing_a_red_dragon_writes_nothing():
     s, pc, e = _street()
     wyrm = s.add(instantiate(key, scene=s, name="the wyrm"))
     e.settle_attitude(wyrm, "hostile")
-    for _ in range(200):
+    # One blow past its hit points and its Constitution, so it dies of it. In 60s, the
+    # adult red dragon the re-read Bestiary sorts first (212 hp; 2026-10-28) went down to
+    # dying between blows, and the last blow killed a helpless hostile creature outside a
+    # fight — the captive deed, correctly, for a scene this test never meant to stage.
+    # Three times over, because its DR 5/magic takes its share of a blow sized exactly.
+    blow = 3 * (int(wyrm.hp) + int(wyrm.abilities.get("con", 10)))
+    for _ in range(3):
         if wyrm.has_state("state.down.dead"):
             break
         _run(e, [{"op": "damage", "actor": "pc", "target": wyrm.ref, "because": "slay",
-                  "params": {"amount": 60, "type": "slashing"}}], origin="author:test")
+                  "params": {"amount": blow, "type": "slashing"}}], origin="author:test")
     assert wyrm.has_state("state.down.dead")
     assert pc.deeds == []
 

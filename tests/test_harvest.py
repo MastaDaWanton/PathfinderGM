@@ -87,8 +87,13 @@ def test_a_red_dragon_offers_only_red_dragonhide():
     """Inventory §0.4: "a red dragon offered all 11 colours" — the old reader matched the
     fragment "dragon" against every dragonhide. Choral the Conqueror's own block (fire cone
     breath, chaotic evil) says red; nothing in its name is asked, and the validator refuses
-    another colour's tag on it."""
-    block = harvest.block_of("choral-the-conqueror")
+    another colour's tag on it.
+
+    The example moved to a shipped creature on 2026-10-29 under option D
+    (docs/bestiary-licensing.md): Choral was an adventure row, gone with the rest, and the
+    Bestiary's adult red dragon (50-ft. cone of fire, chaotic evil) is the red dragon that
+    ships."""
+    block = harvest.block_of("adult-red-dragon")
     assert harvest.dragon_colour(block) == "red-dragonhide"
     assert [m for b, m in harvest.tagged(block) if b == "hide"] == ["red-dragonhide"]
     wrong = dict(block, tags=["harvest.hide.blue-dragonhide"])
@@ -99,10 +104,13 @@ def test_a_red_dragon_offers_only_red_dragonhide():
 def test_no_humanoid_or_native_outsider_offers_anything():
     """Inventory §0.4: "109 humanoids yielded a hide"; and the owner's 2026-10-08 answer 3b:
     native outsiders (aasimar, tieflings, sylphs) are peoples, banned the same way. Every
-    such block in the shipped bestiary yields nothing, and a hand tag on one is refused."""
+    such block in the shipped bestiary yields nothing, and a hand tag on one is refused.
+
+    More than 3,000 such blocks before option D; 1,106 measured 2026-10-29, after option D
+    removed the adventure rows (most of them people)."""
     store = bestiary.imported()
     peoples = [b for b in store.values() if harvest.banned(b)]
-    assert len(peoples) > 3000
+    assert len(peoples) > 1100
     assert [b["id"] for b in peoples if harvest.tagged(b)] == []
     aasimar = harvest.block_of("aasimar")
     assert "native outsider" in harvest.banned(aasimar)
@@ -270,7 +278,11 @@ def test_a_generic_hide_takes_its_tier_units_and_numbers_from_the_block():
     """Plan §5.4, §5.5: CR sets a generic hide's tier, size its units, and its highest
     energy resistance (÷ 5, at least 1; an immunity the tier's ceiling) and, rare and up,
     its highest DR as DR max(1, N ÷ 5) — owner answer 6 — come from the block on read.
-    Choral (CR 25, Colossal, immune to fire, DR 20/magic) against a CR 4 block with DR 5."""
+    Choral (CR 25, Colossal, immune to fire, DR 20/magic) against a CR 4 block with DR 5.
+
+    Choral's example moved to a shipped creature on 2026-10-29 under option D: the adult
+    red dragon (CR 14, Huge, immune to fire, DR 5/magic) - a rare hide, so its fire
+    immunity is the tier's ceiling of 3 and its DR 5 is DR max(1, 5 / 5) = 1/magic."""
     block = {"id": "x", "creature_type": "magical beast", "size": "large", "cr_value": 4,
              "reductions": [{"amount": 5, "bypass": "silver"}], "resist": ["cold 10"]}
     assert harvest.tier_of_cr(4) == "uncommon"
@@ -278,9 +290,9 @@ def test_a_generic_hide_takes_its_tier_units_and_numbers_from_the_block():
     rare = dict(block, cr_value=7)
     assert {"type": "damage_reduction", "amount": 1, "bypass": "silver"} \
         in harvest.inherited(rare)
-    assert harvest.inherited("choral-the-conqueror") == [
-        {"type": "resistance", "target": "fire", "amount": 4},
-        {"type": "damage_reduction", "amount": 4, "bypass": "magic"}]
+    assert harvest.inherited("adult-red-dragon") == [
+        {"type": "resistance", "target": "fire", "amount": 3},
+        {"type": "damage_reduction", "amount": 1, "bypass": "magic"}]
     assert harvest.units_for(harvest.block_of("lion"), "hide", "x") == 2.0
 
 
@@ -309,12 +321,26 @@ def test_the_extractor_reads_abbreviated_abilities():
 def test_an_unprinted_poison_is_never_invented():
     """Deeds plan §13.4: every core.json block lacks its special abilities, so a core giant
     scorpion prints a "plus poison" rider and no poison. It is a poisonous body (the tag)
-    and runs no poison round: a poison nobody printed is not invented."""
-    block = harvest.block_of("scorpion-giant")
+    and runs no poison round: a poison nobody printed is not invented.
+
+    The printed poison moved to a shipped creature on 2026-10-29 under option D: the
+    advanced giant scorpion was an adventure row (its id now lands on the core giant
+    scorpion, which prints none). The Monster Codex's serpentfolk hunter prints its
+    paragraph - "Poison (Ex) Bite-injury; save Fort DC 16; ... effect 1d2 Str" - and runs
+    its round.
+
+    Later the same day the Bestiaries' SPECIAL ABILITIES were read (they never had been),
+    and the core giant scorpion prints its own: "Poison (Ex) Sting—injury; save Fort DC 17;
+    ... effect 1d2 Strength damage". The unprinted case is now the black scorpion, whose
+    sting says "plus poison" and whose block prints no paragraph: 48 Bestiary blocks are
+    like it, and none runs a round."""
+    block = harvest.block_of("black-scorpion")
     assert "poison" in harvest.dangers(block)
-    assert [r["kind"] for r in harvest.danger_rounds(Body("scorpion-giant"))] == []
-    assert [r["kind"] for r in harvest.danger_rounds(Body("advanced-giant-scorpion"))] \
-        == ["poison"]
+    assert [r["kind"] for r in harvest.danger_rounds(Body("black-scorpion"))] == []
+    assert [(r["kind"], r["dc"]) for r in harvest.danger_rounds(Body("scorpion-giant"))] \
+        == [("poison", 17)]
+    assert [(r["kind"], r["dc"]) for r in harvest.danger_rounds(Body("serpentfolk-hunter"))] \
+        == [("poison", 16)]
 
 
 def test_an_aura_is_not_a_danger_to_the_skinner():
@@ -327,57 +353,74 @@ def test_an_aura_is_not_a_danger_to_the_skinner():
 
 def test_a_fire_bodied_hide_burns_for_its_own_burn_dice():
     """Deeds plan §13.4: the amount is the book's small one — the creature's own burn or
-    heat dice where it prints them, else 1d6, never its breath's."""
-    assert harvest.contact_dice("noble-salamander", "fire") == "1d8"
-    assert harvest.contact_dice("choral-the-conqueror", "fire") == "1d6"
+    heat dice where it prints them, else 1d6, never its breath's.
+
+    The examples moved to shipped creatures on 2026-10-29 under option D (the noble
+    salamander and Choral were adventure rows): the Huge magma elemental prints "burn (1d8,
+    DC 16)", and the adult red dragon prints a 12d10 fire breath and no burn."""
+    assert harvest.contact_dice("huge-magma-elemental", "fire") == "1d8"
+    assert harvest.contact_dice("adult-red-dragon", "fire") == "1d6"
 
 
 def test_a_giant_scorpion_forces_its_poison_round_once_per_carcass(client):
     """Deeds plan §13.5: taking three parts makes one round. Per-part exposure would make
-    a dragon six hazards."""
-    a = _corpse("advanced-giant-scorpion")
+    a dragon six hazards.
+
+    The example moved to a shipped creature on 2026-10-29 under option D: the advanced
+    giant scorpion (a printed poison, a chitin hide and sinew) was an adventure row, and no
+    shipped creature both prints a poison that runs and has a part to take (the five
+    serpentfolk and the vampire warrior offer nothing). The adult red dragon is the dragon
+    the first line means: one fire round from its breath's energy, and six parts."""
+    a = _corpse("adult-red-dragon")
     code, got = _post(client, "/api/harvest/take",
-                      {"creature": a.ref, "key": "hide:generic-chitin", "face": 20,
-                       "danger_faces": {"poison": 20}})
+                      {"creature": a.ref, "key": "hide:red-dragonhide", "face": 20,
+                       "danger_faces": {"fire": 20}})
     assert code == 200, got
-    assert [d["kind"] for d in got["dangers"]] == ["poison"]
+    assert [d["kind"] for d in got["dangers"]] == ["fire"]
     code, got = _post(client, "/api/harvest/take",
-                      {"creature": a.ref, "key": "sinew:sinew-thread", "face": 20})
+                      {"creature": a.ref, "key": "sinew:dragon-sinew", "face": 20})
     assert code == 200 and got["dangers"] == []
 
 
 def test_a_failed_poison_round_goes_through_the_poison_door(client):
     """Deeds plan §13.5 and the owner's answer 6: exposed only on a miss by 5 or more; then
     a Fortitude save at the printed DC, +2 a dose past the first, the effect landing only
-    on a failed save, stamped `creature:<template>`."""
+    on a failed save, stamped `creature:<template>`.
+
+    The example moved to a shipped creature on 2026-10-29 under option D: the advanced
+    giant scorpion (DC 19) was an adventure row; the Monster Codex's serpentfolk hunter
+    prints its poison at DC 16."""
     c = _c()
-    a = _corpse("advanced-giant-scorpion")
+    a = _corpse("serpentfolk-hunter")
     pc = c.scene.pc()
     engine = c.engine()
-    safe = harvest.face_danger(engine, pc, a, "poison", 15, now=0, dice=engine.dice)
+    safe = harvest.face_danger(engine, pc, a, "poison", 12, now=0, dice=engine.dice)
     assert not safe["exposed"] and safe["margin"] == -4
-    b = _corpse("advanced-giant-scorpion")
-    hit = harvest.face_danger(engine, pc, b, "poison", 14, now=0, dice=engine.dice)
+    b = _corpse("serpentfolk-hunter")
+    hit = harvest.face_danger(engine, pc, b, "poison", 11, now=0, dice=engine.dice)
     assert hit["exposed"] and 1 <= hit["doses"] <= 3
-    assert hit["dc"] == 19 and hit["save_dc"] == 19 + 2 * (hit["doses"] - 1)
+    assert hit["dc"] == 16 and hit["save_dc"] == 16 + 2 * (hit["doses"] - 1)
     saves = [o for o in hit["outcomes"] if o.op == "save"]
     assert len(saves) == 1
     landed = [e for o in hit["outcomes"] if o.op != "save" for e in (o.effects or [])]
     if saves[0].verdict == "success":
         assert landed == []
     else:
-        assert landed and all(e.get("origin") == "creature:advanced-giant-scorpion"
+        assert landed and all(e.get("origin") == "creature:serpentfolk-hunter"
                               for e in landed if "origin" in e)
 
 
 def test_an_acid_body_burns_through_the_hazard_door_with_its_own_dice(client):
     """Deeds plan §13.4: acid and energy damage go through the `hazard` op's contact rows,
     stamped `rule:contact-<energy>`, resistance applying in `take_damage`; a fire body
-    rolls its own printed heat dice (the noble salamander's 1d8)."""
+    rolls its own printed heat dice (the noble salamander's 1d8).
+
+    The example moved to a shipped creature on 2026-10-29 under option D: the noble
+    salamander was an adventure row; the Huge magma elemental prints "burn (1d8, DC 16)"."""
     c = _c()
     pc = c.scene.pc()
     engine = c.engine()
-    sal = _corpse("noble-salamander")
+    sal = _corpse("huge-magma-elemental")
     got = harvest.face_danger(engine, pc, sal, "fire", -10, now=0, dice=engine.dice)
     assert got["exposed"]
     hz = [o for o in got["outcomes"] if o.op == "hazard"]

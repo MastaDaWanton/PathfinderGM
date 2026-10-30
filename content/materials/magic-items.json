@@ -6897,6 +6897,557 @@
    ],
    "retired": true,
    "why_retired": "Not in the book: Not found."
+  },
+  {
+   "id": "mi-lodestar-compass",
+   "name": "Lodestar Compass",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 5,
+   "price_gp": 500,
+   "obtain": "bought",
+   "spell": "light",
+   "spells": [
+    [
+     "light"
+    ]
+   ],
+   "text": "A brass case the size of a palm, its needle a sliver of lodestone. A word lights it like a lantern, and an old hollow in its lid takes a small stone of power.",
+   "book": [
+    {
+     "type": "item_power",
+     "spell": "light",
+     "uses": "unlimited",
+     "caster_level": 5,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "family": "light",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Wayfinder",
+   "not_yet": [
+    "A +2 circumstance bonus on Survival checks to avoid becoming lost: no roll reads being lost yet.",
+    "The hollow in the lid holds an ioun stone; the game has none."
+   ],
+   "tier": "common",
+   "effects": []
+  },
+  {
+   "id": "mi-wardstar-medallion",
+   "name": "Wardstar Medallion",
+   "kind": "wondrous",
+   "slot": "neck",
+   "vessel": "neck",
+   "caster_level": 5,
+   "price_gp": 3500,
+   "obtain": "bought",
+   "spell": "false-life",
+   "spells": [
+    [
+     "false-life"
+    ],
+    [
+     "gentle-repose"
+    ],
+    [
+     "resistance"
+    ]
+   ],
+   "text": "A seven-pointed star of dark iron on a chain. It turns aside a little of every harm, and once a day it lends its wearer a borrowed vigour.",
+   "book": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "book": true
+    },
+    {
+     "type": "item_power",
+     "spell": "false-life",
+     "uses": "per_day",
+     "uses_count": 1,
+     "caster_level": 5,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "grants": "resistance",
+     "count": 1
+    },
+    {
+     "family": "vigour",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Sihedron%20Medallion",
+   "not_yet": [
+    "Laid on a body it keeps the body from decay (gentle repose); nothing keeps a corpse yet."
+   ],
+   "tier": "uncommon",
+   "effects": []
+  },
+  {
+   "id": "mi-wardstar-ring",
+   "name": "Wardstar Ring",
+   "kind": "wondrous",
+   "slot": "ring",
+   "vessel": "ring",
+   "caster_level": 9,
+   "price_gp": 35000,
+   "obtain": "bought",
+   "spell": "shield",
+   "spells": [
+    [
+     "endure-elements"
+    ],
+    [
+     "resistance"
+    ],
+    [
+     "shield"
+    ]
+   ],
+   "text": "A heavy ring cut with a seven-pointed star. Its wearer stands easier against blows and spells alike, feels neither frost nor furnace, and may dress in whatever clothes the ring is told to show.",
+   "book": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "deflection",
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 3,
+     "bonus_type": "resistance",
+     "book": true
+    },
+    {
+     "type": "spell_effect",
+     "target": "endure-elements",
+     "caster_level": 9,
+     "trigger": "worn",
+     "book": true
+    },
+    {
+     "type": "item_power",
+     "tell": "The ring dresses its wearer's clothes or armour to look like any others",
+     "uses": "unlimited",
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "grants": "deflection",
+     "count": 1
+    },
+    {
+     "grants": "resistance",
+     "count": 1
+    },
+    {
+     "family": "warding",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicRingsDisplay.aspx?FinalName=Sihedron+Ring",
+   "not_yet": [],
+   "tier": "exotic",
+   "effects": []
+  },
+  {
+   "id": "mi-iron-saints-mask",
+   "name": "Iron Saint's Mask",
+   "kind": "wondrous",
+   "slot": "head",
+   "vessel": "head",
+   "caster_level": 1,
+   "price_gp": 2100,
+   "obtain": "bought",
+   "spell": "cause-fear",
+   "spells": [
+    [
+     "cause-fear"
+    ],
+    [
+     "shadow-conjuration"
+    ]
+   ],
+   "text": "A mask of beaten iron with a calm, unmoving face. Behind it a healer's hands are surer and a threat lands harder; once a day it mends a wound, and once a day it frightens.",
+   "book": [
+    {
+     "type": "skill_mod",
+     "target": "heal",
+     "amount": 2,
+     "bonus_type": "competence",
+     "book": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "competence",
+     "book": true
+    },
+    {
+     "type": "item_power",
+     "spell": "cure-light-wounds",
+     "uses": "per_day",
+     "uses_count": 1,
+     "caster_level": 1,
+     "book": true
+    },
+    {
+     "type": "item_power",
+     "spell": "cause-fear",
+     "uses": "per_day",
+     "uses_count": 1,
+     "caster_level": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "grants": "skill-competence",
+     "count": 1
+    },
+    {
+     "family": "mind",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Holy+Mask+of+the+Living+God",
+   "not_yet": [
+    "The book's maker also needs 5 ranks in Heal and Intimidate; the bench does not ask ranks of an enchanter yet."
+   ],
+   "tier": "uncommon",
+   "effects": []
+  },
+  {
+   "id": "mi-war-paint-black",
+   "name": "War Paint (Black)",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 7,
+   "price_gp": 1800,
+   "obtain": "bought",
+   "spell": "blur",
+   "spells": [
+    [
+     "blur"
+    ]
+   ],
+   "text": "A clay pot of black paint, ground with ash and bitter root. Smeared on the skin it blurs the wearer's outline for a day; a second colour wipes out the first.",
+   "book": [
+    {
+     "type": "item_power",
+     "effect": [
+      {
+       "type": "concealment",
+       "miss_chance": 20,
+       "duration": {
+        "amount": 24,
+        "unit": "hour"
+       }
+      }
+     ],
+     "uses": "once",
+     "uses_count": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "family": "shadow",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20PaintBlack",
+   "not_yet": [
+    "Putting it on is a full-round action that provokes, in the book; here it is put on outside a fight."
+   ],
+   "tier": "uncommon",
+   "effects": []
+  },
+  {
+   "id": "mi-war-paint-blue",
+   "name": "War Paint (Blue)",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 7,
+   "price_gp": 900,
+   "obtain": "bought",
+   "spell": "expeditious-retreat",
+   "spells": [
+    [
+     "expeditious-retreat"
+    ]
+   ],
+   "text": "A clay pot of blue paint, ground with ash and bitter root. Smeared on the skin it quickens the wearer's stride by thirty feet for a day; a second colour wipes out the first.",
+   "book": [
+    {
+     "type": "item_power",
+     "effect": [
+      {
+       "type": "speed",
+       "target": "land",
+       "amount": 30,
+       "bonus_type": "enhancement",
+       "duration": {
+        "amount": 24,
+        "unit": "hour"
+       }
+      }
+     ],
+     "uses": "once",
+     "uses_count": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "family": "speed",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20PaintBlue",
+   "not_yet": [
+    "Putting it on is a full-round action that provokes, in the book; here it is put on outside a fight."
+   ],
+   "tier": "common",
+   "effects": []
+  },
+  {
+   "id": "mi-war-paint-orange",
+   "name": "War Paint (Orange)",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 7,
+   "price_gp": 900,
+   "obtain": "bought",
+   "spell": "stoneskin",
+   "spells": [
+    [
+     "stoneskin"
+    ]
+   ],
+   "text": "A clay pot of orange paint, ground with ash and bitter root. Smeared on the skin it hardens the skin against every blow (DR 1/—) for a day; a second colour wipes out the first.",
+   "book": [
+    {
+     "type": "item_power",
+     "effect": [
+      {
+       "type": "damage_reduction",
+       "amount": 1,
+       "bypass": "",
+       "duration": {
+        "amount": 24,
+        "unit": "hour"
+       }
+      }
+     ],
+     "uses": "once",
+     "uses_count": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "family": "earth",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20PaintOrange",
+   "not_yet": [
+    "Putting it on is a full-round action that provokes, in the book; here it is put on outside a fight."
+   ],
+   "tier": "common",
+   "effects": []
+  },
+  {
+   "id": "mi-war-paint-red",
+   "name": "War Paint (Red)",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 7,
+   "price_gp": 900,
+   "obtain": "bought",
+   "spell": "resist-energy",
+   "spells": [
+    [
+     "resist-energy"
+    ]
+   ],
+   "text": "A clay pot of red paint, ground with ash and bitter root. Smeared on the skin it turns aside fire for a day; a second colour wipes out the first.",
+   "book": [
+    {
+     "type": "item_power",
+     "effect": [
+      {
+       "type": "resistance",
+       "target": "fire",
+       "amount": 10,
+       "duration": {
+        "amount": 24,
+        "unit": "hour"
+       }
+      }
+     ],
+     "uses": "once",
+     "uses_count": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "family": "fire",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20PaintRed",
+   "not_yet": [
+    "Putting it on is a full-round action that provokes, in the book; here it is put on outside a fight."
+   ],
+   "tier": "common",
+   "effects": []
+  },
+  {
+   "id": "mi-war-paint-silver",
+   "name": "War Paint (Silver)",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 7,
+   "price_gp": 900,
+   "obtain": "bought",
+   "spell": "shield-of-faith",
+   "spells": [
+    [
+     "shield-of-faith"
+    ]
+   ],
+   "text": "A clay pot of silver paint, ground with ash and bitter root. Smeared on the skin it turns blows aside for a day; a second colour wipes out the first.",
+   "book": [
+    {
+     "type": "item_power",
+     "effect": [
+      {
+       "type": "combat_mod",
+       "target": "ac",
+       "amount": 3,
+       "bonus_type": "deflection",
+       "duration": {
+        "amount": 24,
+        "unit": "hour"
+       }
+      }
+     ],
+     "uses": "once",
+     "uses_count": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "grants": "deflection",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20PaintSilver",
+   "not_yet": [
+    "Putting it on is a full-round action that provokes, in the book; here it is put on outside a fight."
+   ],
+   "tier": "common",
+   "effects": []
+  },
+  {
+   "id": "mi-war-paint-yellow",
+   "name": "War Paint (Yellow)",
+   "kind": "wondrous",
+   "slot": null,
+   "vessel": "slotless",
+   "caster_level": 7,
+   "price_gp": 900,
+   "obtain": "bought",
+   "spell": "clairaudience-clairvoyance",
+   "spells": [
+    [
+     "clairaudience-clairvoyance"
+    ]
+   ],
+   "text": "A clay pot of yellow paint, ground with ash and bitter root. Smeared on the skin it sharpens the wearer's eyes and ears for a day; a second colour wipes out the first.",
+   "book": [
+    {
+     "type": "item_power",
+     "effect": [
+      {
+       "type": "skill_mod",
+       "target": "perception",
+       "amount": 5,
+       "bonus_type": "competence",
+       "duration": {
+        "amount": 24,
+        "unit": "hour"
+       }
+      }
+     ],
+     "uses": "once",
+     "uses_count": 1,
+     "book": true
+    }
+   ],
+   "essences": [
+    {
+     "grants": "skill-competence",
+     "count": 1
+    }
+   ],
+   "source": "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20PaintYellow",
+   "not_yet": [
+    "Putting it on is a full-round action that provokes, in the book; here it is put on outside a fight."
+   ],
+   "tier": "common",
+   "effects": []
   }
  ]
 }

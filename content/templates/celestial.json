@@ -1,0 +1,59 @@
+{
+ "id": "celestial",
+ "name": "celestial",
+ "kind": "simple",
+ "source": "Bestiary 1, Appendix 1: Simple Templates, p. 294-295",
+ "text": "Celestial creatures dwell in the higher planes.",
+ "cr": {
+  "add": 1,
+  "if_hd_at_least": 5
+ },
+ "senses": "darkvision 60 ft.",
+ "defenses_by_hd": [
+  {
+   "hd": [
+    1,
+    4
+   ],
+   "resist": {
+    "acid": 5,
+    "cold": 5,
+    "electricity": 5
+   },
+   "dr": null
+  },
+  {
+   "hd": [
+    5,
+    10
+   ],
+   "resist": {
+    "acid": 10,
+    "cold": 10,
+    "electricity": 10
+   },
+   "dr": {
+    "amount": 5,
+    "bypass": "evil"
+   }
+  },
+  {
+   "hd": [
+    11,
+    999
+   ],
+   "resist": {
+    "acid": 15,
+    "cold": 15,
+    "electricity": 15
+   },
+   "dr": {
+    "amount": 10,
+    "bypass": "evil"
+   }
+  }
+ ],
+ "sr_over_cr": 5,
+ "special_attack": "smite evil 1/day",
+ "describe": "{A_base} from the higher planes, its eyes bright with a light that is not the sun's."
+}
