@@ -105,8 +105,67 @@ def class_of(actor) -> str:
     return ""
 
 
+_COIN_GP = {"cp": 0.01, "sp": 0.1, "gp": 1.0, "pp": 10.0}
+
+
+def _item_gp(it: dict) -> float:
+    """One printed piece's book price, in gp, by the table it was read from (the compiled
+    record's `table`); 0 for a piece no table prices — never a guess."""
+    from . import goods, materials, pricing
+    from . import magicitem
+
+    table = str(it.get("table") or "")
+    key = str(it.get("key") or "")
+    n = max(1, int(it.get("count") or 1))
+    if table == "coin":
+        return float(it.get("count") or 0) * _COIN_GP.get(key, 0.0)
+    if table == "magic item":
+        rid = magicitem.recipe_named(str(it.get("printed") or ""))
+        row = materials.recipe(rid) if rid else None
+        return n * float((row or {}).get("price_gp") or 0)
+    if table in ("potion", "alchemy"):
+        return n * float(pricing.book_price(key) or 0)
+    if table == "gear":
+        g = goods.good(key)
+        return n * float(g.price_gp) if g else 0.0
+    found = goods.known_item(key) if key else None
+    if not found:
+        return 0.0
+    base = float(found.get("cost_gp") or 0)
+    plus = int(it.get("enhancement") or 0)
+    if table == "weapon":
+        extra = (300 if it.get("masterwork") or plus else 0) + 2000 * plus ** 2
+    elif table in ("armour", "shield"):
+        extra = (150 if it.get("masterwork") or plus else 0) + 1000 * plus ** 2
+    else:
+        extra = 0
+    return n * (base + extra)
+
+
+def carried_gp(actor) -> int:
+    """What the book prints this body carrying is worth, in gp: its compiled Gear and
+    Other Gear lines (`compile_block`), which the loot hands over piece by piece
+    (`bestiary._assemble_kit`). 0 for a body with no printed gear."""
+    from . import bestiary, compile_block
+
+    tpl = str(getattr(actor, "from_template", "") or "").strip().lower()
+    if not tpl:
+        return 0
+    rec = compile_block.record_for(bestiary.raw_block(tpl) or {})
+    return int(round(sum(_item_gp(it) for it in (rec or {}).get("carries") or ())))
+
+
 def worth(actor, rng=None) -> int:
-    """What this one body is carrying, in gp. 0 when it says nothing or says none."""
+    """What this one body is carrying beyond its printed gear, in gp. 0 when it says
+    nothing or says none.
+
+    **Less what it is printed carrying.** The book's treasure value is the TOTAL a creature
+    has — "'NPC gear' indicates the monster has treasure as normal for an NPC", and an NPC's
+    gear is its treasure ("Encounters against NPCs typically award three times the treasure
+    a monster-based encounter awards, due to NPC gear", CRB Placing Treasure) — and the loot
+    hands that gear over as real things since 2026-10-28, its magic items since 2026-10-30.
+    Paying this purse on top paid the printed gear twice. What the purse adds is only what
+    the printed gear leaves of the value, and nothing when the gear already exceeds it."""
     kind = class_of(actor)
     if not kind or kind == "none":
         return 0
@@ -115,7 +174,11 @@ def worth(actor, rng=None) -> int:
         return 0
     # Rolled around the centre: 50%–150%, so the same wolf is not the same purse twice.
     roll = (rng or dice_mod.Dice()).roll("2d6").total          # 2..12, centred on 7
-    return max(1, int(round(centre * (0.5 + (roll - 2) / 10.0))))
+    rolled = max(1, int(round(centre * (0.5 + (roll - 2) / 10.0))))
+    carried = carried_gp(actor)
+    if not carried:
+        return rolled
+    return max(0, rolled - carried)
 
 
 def take_from_fallen(scene, pc, rng=None) -> tuple[int, list[str]]:

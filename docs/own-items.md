@@ -59,10 +59,24 @@ its own first readings), and written where the catalogue's grammar can carry eve
 ## Where they appear
 
 Like the Core wondrous items: as recipes on the enchanting bench, and worn by name
-(`magicitem.worn_specs`). No market sells catalogue wondrous items, Core or ours; that is
-the catalogue's existing design, not something this adds. The app's own people (Table
-14-9) spend their magic column on weapon and armour enhancement only (`rules/npc_gear.py`);
-buying wondrous items with it is a separate change.
+(`magicitem.worn_specs`).
+
+Since 2026-10-30 (the owner's ruling, after the review of 0.2.23), also:
+
+- **On a magic counter.** The curio stall draws finished wondrous items, Core and ours
+  (`market.MAGIC_ITEM_DRAW`, `goods.magic_item_goods`), at the book's price, under the
+  rarity quota and the settlement's base value. Over 60 days a city's stall shelved nine of
+  the ten; the Wardstar Ring (35,000 gp) is above every base value (a metropolis's is
+  16,000) and is never on a shelf. Bought, an item is the record the bench writes
+  (`magicitem.finished`); a slotless one (the paints, the compass) is used from the pack.
+- **On a body.** A creature's printed magic items loot as found, unidentified items
+  (`bestiary._assemble_kit`); the app's own people wear what Table 14-9's Protection and
+  Magic columns buy (`rules/npc_gear.py`).
+- **Used once.** A paint is one dose: the pot leaves the pack when it is put on, a colour
+  replaces the one before, and orange's DR adds to a class's DR (the AoN text, by
+  `stacks_with`). A once-power bound on a vessel stays spent (`Actor.reset_item_uses`).
+- **The ring's endure elements works**: its wearer rolls no cold or heat saves
+  (`Engine._exposure`).
 
 ## Sources
 

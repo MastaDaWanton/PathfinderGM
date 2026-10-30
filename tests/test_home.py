@@ -474,12 +474,13 @@ def test_the_spawned_arrive_with_pockets_worth_looting():
 
     s = Scene()
     thug = instantiate("thug", scene=s, name="the tough")
-    assert thug.purse == {} and thug.inventory == {}     # unobserved
+    assert thug.purse == {} and thug.stock == {}         # unobserved
     assert thug.kit_pending.get("kit") == "kit.cutpurse"
     assert thug.armour == "leather"                # worn, hence lootable
     made = collapse_kit(thug)
     assert thug.purse.get("sp", 0) >= 2            # 2d4 sp, rolled at first look
-    assert thug.inventory and made
+    # Filed as a purchase of them is, on the shelf, not in the herb satchel (2026-10-30).
+    assert thug.stock and not thug.inventory and made
     assert collapse_kit(thug) == []                # looked twice, nothing doubles
     dog = instantiate("guard dog", scene=s, name="the dog")
     assert dog.kit_pending == {} and dog.purse == {} and dog.inventory == {}

@@ -212,8 +212,9 @@ def _selections(cls: dict, scores: dict, race_id: str) -> int:
     return n + (1 if race_id == "human" else 0)
 
 
-def skill_selections(doc: dict) -> int:
-    """How many skills this build may select, by the same arithmetic `build` checks."""
+def final_scores(doc: dict) -> dict:
+    """The build's ability scores after race and level increases — the arithmetic `build`
+    checks, for the gear's stat item (`npc_gear`) and the skill count alike."""
     from . import classes as classes_mod
     from . import creation
     from . import races as races_mod
@@ -226,7 +227,16 @@ def skill_selections(doc: dict) -> int:
     for ab in doc.get("increases") or ():
         if ab in scores:
             scores[ab] += 1
-    return _selections(classes_mod.get(cid), scores, race_id)
+    return scores
+
+
+def skill_selections(doc: dict) -> int:
+    """How many skills this build may select, by the same arithmetic `build` checks."""
+    from . import classes as classes_mod
+
+    cid = str(doc.get("class") or "").strip().lower()
+    race_id = str(doc.get("race") or "human").strip().lower()
+    return _selections(classes_mod.get(cid), final_scores(doc), race_id)
 
 
 def _real_target(target: str) -> bool:
@@ -283,6 +293,15 @@ def actor(doc: dict, ref: str | None = None):
         if rec.get("gear") == "weapon":
             a.weapons = [w for w in a.weapons if w != rec.get("base")]
             a.equipped = rec["id"]
+    # The wondrous items Step 6 bought (`npc_gear.outfit`'s `worn`): the catalogue's own
+    # records, on the shelf and worn as a player's are, so the cloak counts on the saves
+    # and goes to whoever loots the body — found, so not yet identified.
+    from . import magicitem
+
+    for rid in (doc.get("gear") or {}).get("worn") or ():
+        item = magicitem.finished(str(rid), how="found")
+        a.add_stock(item, 1)
+        a.wear(item.as_dict())
     if coin:
         a.purse["gp"] = int(a.purse.get("gp", 0)) + coin
     a.hp = a.hp_max

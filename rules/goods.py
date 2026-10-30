@@ -670,7 +670,8 @@ GOOD_PREFIX = "gear:"
 # What each kind of good is filed under on a shelf. The id carries the kind, so a row
 # picked on the screen names its own shelf with nothing looked up twice.
 PREFIXES = {"gear": "gear:", "weapon": "weapon:", "armour": "armour:", "shield": "shield:",
-            "mount": "mount:", "tack": "tack:", "manual": "manual:", "alchemy": "alchemy:"}
+            "mount": "mount:", "tack": "tack:", "manual": "manual:", "alchemy": "alchemy:",
+            "magic": "magic:"}
 # The smallest coin, for the four weapons the Core Rulebook prints a dash for (club,
 # quarterstaff, sling, wooden stake). The outfit page gives them away; a counter cannot,
 # because `pricing.worth` reads an authored price of 0 as "no price written" and prices
@@ -887,6 +888,25 @@ def potion_goods() -> list[Good]:
             and not r.get("harmful")]
 
 
+def magic_item_goods() -> list[Good]:
+    """Every wondrous item a binder can make (`materials.recipes`: the Core rows and our own,
+    retired rows left out), as goods at the book's price and tier, for the daily draw of a
+    counter that sells magic (`market.MAGIC_ITEM_DRAW`). NOT staples: which of them a
+    counter has today is the market's existing rule — the rarity quota and the settlement's
+    base value (`market.on_sale`), the GameMastery Guide's "base value for available magic
+    items". Bought, one is the record the enchanter's bench writes (`magicitem.finished`).
+
+    The owner's ruling of 2026-10-30: sell the new items in magic shops. Before it no
+    counter sold any catalogue wondrous item, Core or ours (docs/own-items.md)."""
+    from . import materials
+
+    return [Good(id=PREFIXES["magic"] + rid, name=str(row["name"]),
+                 price_gp=float(row.get("price_gp") or 0),
+                 tier=str(row.get("tier") or "common"), staple=False, kind="magic", key=rid)
+            for rid, row in sorted(materials.recipes().items())
+            if float(row.get("price_gp") or 0) > 0]
+
+
 def catalogue_ids() -> set[str]:
     """The id of every good the outfit page sells — what "every item is buyable in play"
     is measured against."""
@@ -971,6 +991,14 @@ def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
                          if len(names) == 1 else
                          f" {', '.join(names)} are {actor.name}'s now, and go where "
                          f"they go.")
+    if kind == "magic":
+        # A wondrous item off a magic counter: the finished record the enchanter's bench
+        # would have written (`magicitem.finished`), worn from the Equipment tab or used
+        # from the pack like any bound item — never a pack jar named "Cloak of Resistance".
+        from . import magicitem
+
+        actor.add_stock(magicitem.finished(key, how="bought"), count)
+        return [], ""
     per = int(getattr(found, "per", 1) or 1)
     # An alchemist's product — a classic off the shelf or a potion from today's draw — is
     # the bench's own stock row (`alchemy_stock`), so a bought antitoxin gives its +5 and a

@@ -680,6 +680,9 @@ def draw_of(kind: str) -> tuple[str, ...]:
 
 
 POTION_DRAW = "potions"
+# The finished wondrous items (rings, cloaks, war paint): named in a counter's `draw` by the
+# counters that sell the enchanter's magic (the curio stall).
+MAGIC_ITEM_DRAW = "magic-items"
 
 # The bench whose catalogue is magic: its essences, blanks and phials are what an
 # enchanter makes magic items from, and a counter sells them only when its row names the
@@ -758,6 +761,16 @@ def priced_from(tracks) -> list:
                 from . import goods as goods_mod
 
                 for g in goods_mod.potion_goods():
+                    seen.setdefault(g.id, g)
+                continue
+            # Finished wondrous items the same way (`goods.magic_item_goods`): drawn under
+            # the quota and the settlement's base value, which is the book's own rule for
+            # magic items ("the community's base value for available magic items",
+            # GameMastery Guide p.204), never always on the shelf.
+            if track == MAGIC_ITEM_DRAW:
+                from . import goods as goods_mod
+
+                for g in goods_mod.magic_item_goods():
                     seen.setdefault(g.id, g)
                 continue
             try:

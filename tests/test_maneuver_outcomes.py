@@ -216,14 +216,15 @@ def test_a_fist_that_fails_a_disarm_drops_nothing_and_says_nothing_dropped():
 
 def test_a_steal_tell_said_an_object_was_taken_and_nothing_moved():
     """The kit a thug was generated with collapses on the first hand in his pockets;
-    the loose thing goes, from his inventory into the thief's, owner recorded."""
+    the loose thing goes, from his pockets into the thief's, owner recorded. The pockets
+    are the shelf since 2026-10-30 (`bestiary._pocket`), where a bought thing is."""
     scene, engine, pc, thug = _fight()
     out = _do(engine, "steal")
     assert re.search(r"Kesst Vayr takes the (dice of bone|strip of dried meat) "
                      r"from the thug", out.tell), out.tell
     took = next(e for e in out.effects if e["kind"] == "stolen")
-    key = took["item"].replace(" ", "-")
-    assert pc.inventory.get(key) == 1 and key not in thug.inventory
+    assert sum(s.count for s in pc.stock.values() if s.base == took["item"]) == 1
+    assert not any(s.base == took["item"] for s in thug.stock.values())
     assert scene.prop_named(took["prop"])["owner"] == "c1"
 
 

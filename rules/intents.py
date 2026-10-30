@@ -365,7 +365,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # types, 123 spells and 13 magic items authored one, and `consumables` had no branch
     # — so the dose was spent and nothing happened, with no error anywhere.
     "defence": (("kind",),
-                ("against", "amount", "bypass", "to", "duration", "source"), "hidden"),
+                ("against", "amount", "bypass", "to", "duration", "source", "stacks_with"),
+                "hidden"),
     "buff": (("type", "target", "amount"),
              ("to", "source", "duration", "note", "bonus_type", "when"),
              "hidden"),

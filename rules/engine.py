@@ -8549,6 +8549,15 @@ class Engine:
         for iid, n in defender.inventory.items():
             if n > 0:
                 offer(iid.replace("-", " "), "inventory", iid, False)
+        # The shelf's loose things — a kit's dice, a potion, a pot of paint — since the
+        # pockets are filed as purchases are (`bestiary._pocket`, 2026-10-30): before it a
+        # kit's things sat in the satchel this loop reads above, and a steal of the shelf
+        # was never offered. What is worn or in hand is not loose (`worn`, `held`).
+        worn = {str(k).strip().lower() for k in (defender.worn or {})}
+        for sid, st in defender.stock.items():
+            name = str(getattr(st, "name", "") or "")
+            if int(getattr(st, "count", 0) or 0) > 0 and name.lower() not in worn:
+                offer(name, "stock", sid, False)
         for slot, fastened in self._STEAL_SLOTS.items():
             for it in defender.slots.get(slot) or []:
                 if it:
@@ -8599,6 +8608,12 @@ class Engine:
             if defender.inventory[key] <= 0:
                 del defender.inventory[key]
             actor.carry(key, 1, at_minute=self.scene.clock_minutes)
+        elif where == "stock":
+            import copy as _copy
+
+            one = _copy.deepcopy(defender.stock[key])
+            defender.take_stock(key, 1)
+            actor.add_stock(one, 1)
         elif where.startswith("slot:"):
             items = defender.slots.get(where[5:]) or []
             items.remove(key)
@@ -9253,7 +9268,8 @@ class Engine:
         source = str(intent.params.get("source") or "a preparation")
         rounds = self._duration_rounds(intent.params.get("duration"), default_unit="hour")
         target.grant_defence(kind, against, amount=amount, bypass=bypass,
-                             source=source, rounds=rounds, origin=intent.origin)
+                             source=source, rounds=rounds, origin=intent.origin,
+                             stacks_with=str(intent.params.get("stacks_with") or ""))
         said = {
             "damage_reduction": f"damage reduction {amount}/{bypass or '—'}",
             "immunity": f"immunity to {against}",
@@ -15795,6 +15811,15 @@ class Engine:
                 break
             carried = rec
         if found is None:
+            # A slotless item is used from the pack: "Some items can be worn or carried
+            # without taking up a slot on a character's body" (CRB, Magic Items on the
+            # Body). A pot of war paint, an elixir, a compass bought or looted
+            # (`magicitem.finished`) has no slot to be on, and was refused "must be worn
+            # or in hand" — so a bought one could never be used at all.
+            found = next((h for h in actor.item_records(item_said)
+                          if not h.get("slot") and h.get("_stock_id")
+                          and magic_layer.has_layer(h)), None)
+        if found is None:
             if carried is not None or actor.item_records(item_said):
                 return None, None, None, (f"The {item_said} must be worn or in hand to use "
                                           f"its power. Nothing happens.")
@@ -15815,6 +15840,10 @@ class Engine:
                 f"{', '.join(str(r.get('key')) for r in rows)}.")
         count = _uses_per_day(row)
         if count is not None and int(row.get("used", 0) or 0) >= count:
+            if _used_once(row):
+                return found, lay, row, (
+                    f"The {name}'s {_property_word(row.get('spec') or {})} is spent: it "
+                    f"was good for one use, and it does not come back.")
             return found, lay, row, (
                 f"The {name}'s {_property_word(row.get('spec') or {})} is spent for today "
                 f"({count} of {count} used); it returns with the new day.")
@@ -16031,16 +16060,33 @@ class Engine:
         what = _property_word(spec)
         count = _uses_per_day(row)
         left = None
+        spent = ""
+        used_up = False
         if not resuming and count is not None:
-            used = int(row.get("used", 0) or 0) + 1
-            for holder in actor.item_records(rec_id):
-                holder["magic"].setdefault("uses", {})[str(row["key"])] = used
-            left = count - used
+            # A single-use thing with no slot — a pot of war paint, an elixir — is the
+            # dose itself: using it takes one off the stack (`take_stock`) and leaves the
+            # rest of the stack fresh. Counting it on the layer instead would mark every
+            # pot in a stack of three spent by the first, since a stack shares one layer.
+            sid = str(rec.get("_stock_id") or "")
+            if _used_once(row) and sid and not rec.get("slot") and \
+                    all(_used_once(p) for p in (lay or {}).get("powers") or ()):
+                actor.take_stock(sid, 1)
+                used_up = True
+                spent = f" The {name} is used up."
+            else:
+                used = int(row.get("used", 0) or 0) + 1
+                for holder in actor.item_records(rec_id):
+                    holder["magic"].setdefault("uses", {})[str(row["key"])] = used
+                left = count - used
+                # A power good once on a thing that stays (paint bound on a ring) is
+                # spent for good: `Actor.reset_item_uses` keeps a `once` count.
+                spent = (f" The {name}'s {what} is spent for good." if _used_once(row)
+                         else f" The {name} has {left} use{'s' if left != 1 else ''} of "
+                              f"its {what} left today.")
         record = {"ref": actor.ref, "kind": "item_power", "item": rec_id,
                   "power": str(row.get("key")), "origin": origin,
-                  **({"left": left} if left is not None else {})}
-        spent = (f" The {name} has {left} use{'s' if left != 1 else ''} of its {what} "
-                 f"left today." if left is not None else "")
+                  **({"left": left} if left is not None else {}),
+                  **({"used_up": True} if used_up else {})}
         cl = int(spec.get("caster_level") or (lay or {}).get("caster_level") or 1)
 
         if spec.get("spell"):
@@ -16095,6 +16141,19 @@ class Engine:
                 ref = ref[0] if isinstance(ref, list) else ref
                 targets = [self.scene.actors[ref]] if ref in self.scene.actors else []
                 tells.append(f"{actor.name} calls on the {name}'s {what}.")
+            # A power whose documents name a `source` replaces what an earlier power of
+            # that source laid, rather than adding to it: war paint's "you can benefit from
+            # only one color ... at a time and applying a dose of a different color
+            # replaces the effects of the previous application" (AoN, read 2026-10-30).
+            # Measured on 0.2.23: all six colours held at once.
+            replaces = {str(d.get("source")) for d in docs
+                        if isinstance(d, dict) and d.get("source")}
+            if replaces:
+                for who in ({actor.ref: actor} | {t.ref: t for t in targets}).values():
+                    gone = who.remove_effects(match=lambda e: str(e.source or "") in replaces)
+                    if gone:
+                        tells.append(f"The {', '.join(sorted(replaces))} {who.name} wore "
+                                     f"before is gone.")
             for doc in docs:
                 # `recipient: "self"` is the bearer whatever the power was aimed at — a
                 # cursed power's opposite effect (lane F) lands on whoever used it.
@@ -20594,6 +20653,14 @@ class Engine:
                         tgt[thing] = tgt.get(thing, 0) + n
                     taken.append(f"{n} × {thing}" if n != 1 else str(thing))
                 store.clear()
+            # The shelf too, as the loot moves it: a kit's things are filed there since
+            # 2026-10-30 (`bestiary._pocket`), and its potions always were — "everything
+            # he has" left them all behind.
+            for sid, st in list(giver.stock.items()):
+                if taker is not None:
+                    taker.add_stock(st, st.count)
+                taken.append(f"{st.count} × {st.name}" if st.count != 1 else st.name)
+            giver.stock = {}
             for coin, n in list(giver.purse.items()):
                 if taker is not None:
                     taker.purse[coin] = taker.purse.get(coin, 0) + n
@@ -23445,6 +23512,17 @@ class Engine:
         rolls, effects = [], []
         if not save:
             return rolls, effects, ""
+        # Endure elements: "A creature protected by endure elements suffers no harm from
+        # being in a hot or cold environment ... without having to make Fortitude saves"
+        # (CRB). The rows the temperature asks (`against` cold or heat) are not rolled for
+        # anybody holding the permission's tag — a worn Wardstar Ring's or winterlands
+        # boots' (`Actor._worn_tags`), or one drunk (`consumables`, a `permission` grant).
+        from .effectspec import permission_tag
+
+        if str(row.get("against") or rule) in ("cold", "heat") \
+                and target.has_state(permission_tag("endure_elements")):
+            return rolls, effects, (f"{target.name} feels none of the "
+                                    f"{row.get('against') or rule}: endure elements.")
         failed = taken = 0
         made = 0
         for i in range(max(0, int(hours))):
@@ -25023,8 +25101,17 @@ def _ac_grant(spec: dict):
     return amount
 
 
+def _used_once(row: dict) -> bool:
+    """Whether a power is good for one use ever (effectspec `uses: "once"`, "Once ever"),
+    rather than a count that comes back with the day."""
+    return str((row or {}).get("uses") or "").strip().lower() == "once"
+
+
 def _uses_per_day(row: dict) -> int | None:
-    """A power's uses a day, or None for one at will (effectspec `uses: "unlimited"`)."""
+    """A power's limited uses, or None for one at will (effectspec `uses: "unlimited"`).
+    A `once` power's count never comes back (`_used_once`, `Actor.reset_item_uses`); every
+    other limit is read per day — no item in the catalogue says `per_combat` or `per_hour`
+    (counted 2026-10-30: 60 once, 30 per_day, 24 unlimited across content)."""
     uses = str(row.get("uses") or "").strip().lower()
     if uses in ("unlimited", "at_will", "at will", "continuous"):
         return None

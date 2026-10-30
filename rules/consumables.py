@@ -571,7 +571,12 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                             "amount": int(spec.get("amount", 0) or 0),
                             "bypass": str(spec.get("bypass", "") or ""),
                             "to": target,
-                            "source": spec.get("from") or "the preparation",
+                            # Who it comes from, as the buffs read it
+                            # (`effectspec.bonus_source`): a document's own `source` (war
+                            # paint's, which one colour replaces), then `from`.
+                            "source": effectspec.bonus_source(spec, "the preparation"),
+                            **({"stacks_with": str(spec["stacks_with"])}
+                               if spec.get("stacks_with") else {}),
                             **({"duration": spec["duration"]}
                                if isinstance(spec.get("duration"), dict) else
                                {"duration": {"amount": 1, "unit": "hour"}})}}]
