@@ -6392,7 +6392,11 @@ class Engine:
 
         cond = branch.get("condition")
         if cond:
-            actor.add_condition(cond, branch.get("rounds"), source=intent.because)
+            # With the document that called the save stamped on it (`Intent.origin`): a
+            # swarm's nausea says `creature:rat-swarm`, as a quench's sickness says its
+            # blade. The branch dropped it, so a failed save's condition had no origin.
+            actor.add_condition(cond, branch.get("rounds"), source=intent.because,
+                                origin=str(intent.origin or ""))
             effects.append({"ref": actor.ref, "kind": "condition", "condition": cond})
             tell_bits.append(f"{actor.name} is {cond}.")
 
@@ -7519,6 +7523,11 @@ class Engine:
                 # where a hit is known to have landed.
                 for extra in ([] if dancing
                               else self._natural_riders(actor, defender, weapon_key)):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
+                # A swarm's automatic damage nauseates what it damaged unless a
+                # Fortitude save shakes it off (`_distraction`).
+                for extra in self._distraction(actor, defender, printed):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # Thorns, wasps, holy fire: whatever the defender is wearing that
@@ -14745,6 +14754,58 @@ class Engine:
         a monster's special-attack DCs, so a rider scales with the body that has it."""
         level = max(1, int(getattr(actor, "level", 1) or 1))
         return 10 + level // 2 + actor.ability_mod("str")
+
+    def _distraction(self, actor: Actor, defender: Actor, printed: dict) -> list[dict]:
+        """A swarm's distraction, on the automatic damage that just landed.
+
+        Bestiary 1, Appendix 2, Swarm subtype (p. 313): "Swarms possess the distraction
+        universal monster rule", and Appendix 3, Distraction (Ex) (p. 299): "Any living
+        creature that takes damage from a creature with the distraction ability is
+        nauseated for 1 round; a Fortitude save (DC 10 + 1/2 creature's HD + creature's
+        Con modifier) negates the effect." The block prints the DC ("distraction (DC
+        12)", the rat swarm's Special Attacks); the formula answers only when it does not.
+
+        Until 2026-10-30 the swarm did not reach this point at all — it had no attack —
+        and its line's "plus distraction" was a rider nothing fired. Run as a `save` intent
+        through `validate`/`run`, the door `_natural_riders` uses, so the nausea is an
+        `ActiveEffect` with its source, and its tell is the save's own.
+        """
+        if not printed.get("automatic") or defender.hp <= 0 or defender.is_dead:
+            return []
+        doc = actor._creature_doc() or {}
+        said = " ".join(str(doc.get(f) or "") for f in ("special_attacks", "melee"))
+        swarm = "swarm" in str(doc.get("subtype") or "").lower()
+        if not (swarm or "distraction" in printed.get("riders", ())
+                or re.search(r"\bdistraction\b", said, re.I)):
+            return []
+        # "Any living creature": the undead and constructs are not, and their trait
+        # bundles say so (nauseated is in both); a printed immunity to nausea likewise.
+        if defender.has_state("type.undead") or defender.has_state("type.construct") \
+                or states.immunity_blocks(defender.immunities, "nauseated"):
+            return []
+        m = re.search(r"\bdistraction\s*\(\s*DC\s*(\d+)", said, re.I)
+        if m:
+            dc = int(m.group(1))
+        else:
+            from . import templates as templates_mod
+
+            hd = templates_mod.total_hd(doc) or actor.hit_dice
+            dc = 10 + hd // 2 + actor.ability_mod("con")
+        res = self.run(self.validate([{
+            "op": "save", "actor": defender.ref, "visibility": "hidden",
+            "because": f"{actor.name} is all over them",
+            "params": {"save": "fort", "dc": dc,
+                       "on_failure": {"condition": "nauseated", "rounds": 1}},
+        }], origin=f"creature:{actor.from_template}", origin_name="distraction"))
+        out: list[dict] = []
+        for o in res.outcomes:
+            got = [e for e in (o.effects or []) if e.get("kind") == "condition"]
+            out.extend({"effect": e, "tell": o.tell} for e in got)
+            if not got:
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                       "rider": "distraction"},
+                            "tell": o.tell})
+        return out
 
     def _natural_riders(self, actor: Actor, defender: Actor,
                         weapon_key: str) -> list[dict]:

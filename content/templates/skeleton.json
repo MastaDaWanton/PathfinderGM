@@ -88,15 +88,15 @@
   "per_hand": true
  },
  "fly": "none",
+ "fly_rule": "Bestiary 1 p. 250, Speed: 'A winged skeleton can't use its wings to fly. If the base creature flew magically, so can the skeleton. All other movement types are retained.'",
  "drops_attacks": [
   "tongue",
   "tentacle",
   "tentacles",
-  "slam",
   "touch",
-  "engulf",
-  "sting"
+  "engulf"
  ],
+ "drops_attacks_rule": "AoN, Skeleton (Bestiary 1 p. 250): 'A skeleton retains all the natural weapons, manufactured weapon attacks, and weapon proficiencies of the base creature, except for attacks that can't work without flesh.' The 3.5 SRD's same sentence names its example, 'a mind flayer's tentacle attacks'. Dropped: tentacle and tongue (muscle with no bone in it), touch (it delivers a special attack, and 'a skeleton retains none of the base creature's special attacks'), engulf (a body wrapped round its victim). Kept, each struck with bone, horn or keratin: bite, claw, talon, rake, foreclaw, gore, horn, tusk, hoof, head butt, stamp, tail and tail slap (vertebrae), wing (its bones; the template takes away the flying, not the buffet), pincer, sting (the spike stays; the poison that rode it is a special attack and goes), and slam (a blow of limb or bulk). Until 2026-10-30 slam and sting were dropped too, on no clause of the template.",
  "refuse": {
   "types": [
    "undead",

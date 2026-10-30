@@ -44,11 +44,36 @@ _TYPOGRAPHY = str.maketrans({"–": "-", "−": "-", "×": "x", "´": "x"})
 # The lookahead after the bonuses is what stops "Large +1 giant-bane greatsword +21/+16"
 # reading as an attack called "Large" at +1: a bonus is only the bonus when the damage
 # parenthesis (or the end of the entry) follows it.
+#
+# "gore +4 melee (1d8+4)": six shipped lines name the category after the bonus, as 3.5
+# printed it — the boar's, the dire boar's, the bone and bearded devils', the monkey's and
+# the wyvern's. Until 2026-10-30 the lookahead refused the word: five of the six read no
+# attack at all and fought with 1d3 nonlethal fists, and the wyvern kept only its wings.
 _ATTACK = re.compile(
     r"^\s*(?:(?P<count>\d+)\s+)?(?P<name>.+?)\s+"
     r"(?P<bonuses>[+-]\s*\d+(?:\s*/\s*[+-]\s*\d+)*)"
+    r"(?:\s+(?:melee|ranged)(?!\s+touch))?"
     r"(?P<touch>\s+(?:ranged\s+|melee\s+)?touch)?"
     r"(?=\s*(?:\(|$))\s*(?:\((?P<damage>[^()]*)\))?", re.I)
+# Where another heading of the block ran into the attack column at import: "urn +6
+# (1d4+3) Spell-Like Abilities (CL 2nd; ...)". Measured 2026-10-30, 92 attack pieces in 89
+# blocks carried one after a good attack, and the reader dropped it unseen. It is not an
+# attack and not unread: it is the next field, and the line ends where it starts. The
+# PDFs kern these headings apart ("Spell-Like Ab ilities", "a bilities", "Special
+# a ttacks") and case them every way ("Spell-like abilities"), hence the optional spaces
+# and the scoped case-folding. A people's or a class's name may stand in front ("Ifrit
+# Spell-Like Abilities", "Bard Spells Known"), capitalised.
+_K = r"\s?"
+_HEADINGS = re.compile(
+    r"\s*\b(?:[A-Z][a-z]+\s+)?(?i:"
+    r"spell-?\s?like\s+" + _K.join("abilities")
+    + r"|spells\s+(?:known|prepared)"
+    r"|special\s+" + _K.join("attack") + r"s?\b"
+    + r"|psychic\s+magic|kineticist\s+wild\s+talents|tactics\b|statistics\b)")
+# "bite +5 (1d8+4 plus grab) and tail slap +0 (1d12+2)": the "and" that joins two attacks
+# follows a closed damage parenthesis. One anywhere else is prose that leaked into the
+# column ("can only perform a single move action and ..."), and is left whole.
+_AND = re.compile(r"(?<=\))\s+and\s+(?=\S)")
 # A swarm or a troop prints no bonus at all — "swarm (2d6 plus distraction)", "troop
 # (4d6+12)" — because it makes no attack roll: its damage is automatic.
 _AUTOMATIC = re.compile(r"^\s*(?P<name>swarm|troop)\s*\((?P<damage>[^()]*)\)", re.I)
@@ -61,6 +86,7 @@ _BASE_ALIASES = {"flail": "light-flail", "unarmed strike": "unarmed",
                  "armor spikes": "spiked-armor", "armour spikes": "spiked-armor",
                  "shield bash": "heavy-shield", "heavy shield bash": "heavy-shield",
                  "light shield bash": "light-shield"}
+_FLURRY = re.compile(r"\s*\b(?:unarmed\s+strike\s+)?flurry(?:\s+of\s+blows?)?\s*$", re.I)
 _DICE = re.compile(r"^\s*(?P<dice>\d+d\d+|\d+)\s*(?P<bonus>[+-]\s*\d+)?", re.I)
 _EXTRA = re.compile(r"^(?P<dice>\d+d\d+(?:\s*[+-]\s*\d+)?)\s+(?P<type>[a-z]+)", re.I)
 _ENHANCEMENT = re.compile(r"^(?:[+-]\d+\s+|mwk\s+|masterwork\s+)+", re.I)
@@ -135,6 +161,14 @@ def base_weapon(name: str) -> str:
     weapon. Tried longest-first so "light crossbow" is not read as "crossbow".
     """
     plain = _ENHANCEMENT.sub("", _SIZE_WORD.sub("", name)).rstrip("*").strip().lower()
+    # "shuriken flurry of blows", "+2 longbow flurry of blows": a flurry is a way of
+    # attacking (`compile_block._class` keeps it as the attack's `mode`), and the weapon
+    # is the word in front of it. The tail search below found "flurry of blows" first and
+    # stood 23 of them on the fist — a longbow flurry rolled 1d8 bludgeoning, at no range,
+    # and could be neither disarmed nor looted. Only a bare flurry is the unarmed strike.
+    flurry = _FLURRY.search(plain)
+    if flurry and plain[:flurry.start()].strip():
+        plain = plain[:flurry.start()].strip()
     # The name as printed first, then its singular: "aklys" and "flurry of blows" are
     # not plurals, and singularising them first found "akly" and "flurry of blow".
     for bare in dict.fromkeys((plain, singular(plain))):
@@ -234,8 +268,11 @@ def _damage(text: str) -> dict | None:
                 out["extra"].append({"dice": e.group("dice").replace(" ", ""),
                                      "type": e.group("type").lower()})
             elif not re.match(r"^\d", piece):
-                # "gra b": the PDF broke the word across a column, sixteen times.
-                out["riders"].append(_RIDER_REPAIRS.get(piece.lower(), piece.lower()))
+                # "gra b": the PDF broke the word across a column, sixteen times; and its
+                # last letter off the line the same way, "poiso n" five times and
+                # "energy drai n" twice (2026-10-30). No rider ends in a lone letter.
+                low = _RIDER_REPAIRS.get(piece.lower(), piece.lower())
+                out["riders"].append(re.sub(r"([a-z]{2,}) ([a-z])$", r"\1\2", low))
     return out
 
 
@@ -253,7 +290,13 @@ def _attack(text: str, category: str) -> dict | None:
         return None
     name = _SIZE_WORD.sub("", m.group("name").strip()).rstrip("*").strip()
     # A leading enhancement that is not the count: "2 +1 short swords" is two of them.
-    if re.search(r"[()]", name) or len(name) > 48:
+    # The length cap keeps prose out ("attack roll of +3 when using telekinesis to hurl
+    # objects"), but a name the weapons table resolves is a weapon however many
+    # properties ride in front of it: Baalzebul's "+5 adamantine good-outsider-bane icy
+    # burst unholy longsword" is 58 characters, and was refused, so the lord of flies
+    # fought with his slams alone.
+    if re.search(r"[()]", name) or len(name) > 96 or (len(name) > 48
+                                                      and not base_weapon(name)):
         return None
     dmg = _damage(m.group("damage"))
     if dmg is None:
@@ -275,21 +318,79 @@ def _attack(text: str, category: str) -> dict | None:
     }
 
 
+def _split_and(text: str) -> list[str]:
+    """`text` cut at each `_AND` outside parentheses."""
+    out, start = [], 0
+    for m in _AND.finditer(text):
+        if text[:m.start()].count("(") == text[:m.start()].count(")"):
+            out.append(text[start:m.start()])
+            start = m.end()
+    out.append(text[start:])
+    return [p.strip() for p in out if p.strip()]
+
+
+def _pieces(text: str, category: str, attacks: list, unread: list) -> None:
+    """Read one comma piece into `attacks`, and whatever is not an attack into `unread`.
+
+    A piece can hold more than one attack when the print lost a comma ("bite +5 (1d6)
+    2 claws +3 (1d4)"): what follows a read attack is read again, and anything left that
+    is no attack is unread — never dropped. Until 2026-10-30 the reader matched the first
+    attack and silently threw the rest away.
+    """
+    rest = text.strip()
+    while rest:
+        a = _attack(rest, category)
+        if a is None:
+            unread.append(rest)
+            return
+        attacks.append(a)
+        m = _AUTOMATIC.match(rest) if a.get("automatic") else _ATTACK.match(rest)
+        rest = rest[m.end():].strip(" ,;") if m else ""
+
+
+def read(line: str, category: str = "melee") -> tuple[list[list[dict]], list[str]]:
+    """(options of attacks, the printed pieces no attack was read from).
+
+    The book's "or" separates options; inside one, its commas and its "and" join the
+    attacks of one full attack — "bite +3 (1d6+1 plus disease and paralysis) and 2 claws
+    +3 (1d6+1 plus paralysis)" is the ghoul's whole line, and until 2026-10-30 everything
+    after the "and" was lost (the ghoul's claws, the crocodile's tail slap, the minotaur's
+    gore; with the other fixes here, 34 attacks in 28 blocks were found that day). An
+    "and" inside the damage parenthesis is a rider's
+    and stays there. Every printed piece is either an attack or in the second list: the
+    compile's `unread` is this list, so "accounted for" is true by construction.
+    """
+    text = _clean(line)
+    head = _HEADINGS.search(text)
+    if head:
+        text = text[:head.start()]
+    options: list[list[dict]] = []
+    unread: list[str] = []
+    for opt in _split_top(text, " or "):
+        attacks: list[dict] = []
+        for piece in _split_top(opt, ","):
+            for part in _split_and(piece):
+                _pieces(part, category, attacks, unread)
+        if attacks:
+            options.append(attacks)
+    return options, unread
+
+
 @lru_cache(maxsize=4096)
 def _parse_cached(line: str, category: str, _table: int) -> tuple:
     # `_table` is the identity of the weapons table the `base` of each attack was looked
     # up in. It carries homebrew, so a parse made against one campaign's table must not
     # answer for another's; the identity changes exactly when that cache is rebuilt.
-    options = []
-    for opt in _split_top(_clean(line), " or "):
-        attacks = []
-        for piece in _split_top(opt, ","):
-            a = _attack(piece, category)
-            if a is not None:
-                attacks.append(a)
-        if attacks:
-            options.append(tuple(attacks))
-    return tuple(options)
+    options, unread = read(line, category)
+    return tuple(tuple(opt) for opt in options), tuple(unread)
+
+
+def unread_of(line: str, category: str = "melee") -> list[str]:
+    """The printed pieces of a line no attack was read from (`read`)."""
+    from . import weapons as weapons_mod
+
+    return list(_parse_cached(str(line or ""), category,
+                              id(weapons_mod.all_weapons()))[1])
 
 
 def parse(line: str, category: str = "melee") -> list[list[dict]]:
@@ -299,7 +400,7 @@ def parse(line: str, category: str = "melee") -> list[list[dict]]:
 
     table = id(weapons_mod.all_weapons())
     return [[dict(a) for a in opt]
-            for opt in _parse_cached(str(line or ""), category, table)]
+            for opt in _parse_cached(str(line or ""), category, table)[0]]
 
 
 def swings(attack: dict) -> list[int]:

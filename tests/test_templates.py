@@ -153,3 +153,80 @@ def test_a_declared_templated_creature_is_built_with_the_store():
     bestiary._derive(store, [{"base": "shark", "templates": ["zombie"]},
                              {"base": "nobody", "templates": ["zombie"]}])
     assert store["shark-zombie"]["hp"] == 33 and "nobody-zombie" not in store
+
+
+# --- the book's clauses, read again (review of 0.2.23, 2026-10-30) -------------------------------
+
+def test_a_skeleton_keeps_what_bone_can_strike_with():
+    """"A skeleton retains all the natural weapons ... except for attacks that can't work
+    without flesh" (Bestiary 1 p. 250; the 3.5 SRD's example is a mind flayer's
+    tentacles). The first cut dropped slam and sting on no clause: a wyvern skeleton lost
+    its sting, a hill giant skeleton its fists. The giant frog's tongue is muscle, and goes;
+    the poison that rode the wyvern's sting is a special attack, and goes."""
+    w = _t("wyvern", "skeleton")
+    assert w["melee"] == "sting +8 (1d6+4), bite +8 (2d6+4), 2 wings +3 (1d6+2)"
+    assert _t("frog-giant", "skeleton")["melee"] == "bite +3 (1d6+3)"
+
+
+def test_a_hand_strikes_once():
+    """"A creature with hands gains one claw attack per hand" — and a hill giant's hands
+    already strike, as its "2 slams". The first cut gave it two claws besides: four blows
+    from two hands. The lizardfolk prints one claw beside its morningstar; its skeleton,
+    with no weapon in either hand, has two."""
+    assert _t("hill-giant", "skeleton")["melee"] == "2 slams +13 (1d8+7)"
+    assert _t("lizardfolk", "skeleton")["melee"] == "2 claws +2 (1d4+1), bite +2 (1d4+1)"
+
+
+def test_a_zombie_has_one_slam():
+    """"It also gains a slam attack" (p. 288): one. The hill giant zombie swung its two
+    slams and a third; Paizo's own (Rise of the Runelords Anniversary Edition, via
+    d20pfsrd's "Zombie, Giant (Hill)") prints one slam, at +12 damage once its editor's
+    note corrects the 1.5 x Str — the +12 this gives."""
+    z = _t("hill-giant", "zombie")
+    assert z["melee"] == "slam +16 (1d8+12)"
+
+
+def test_winged_undead_fly_as_the_template_says():
+    """Skeleton: "A winged skeleton can't use its wings to fly." Zombie: "Winged zombies
+    can still fly, but maneuverability drops to clumsy." Either: "If the base creature
+    flew magically, so can" it. Both documents carried `fly` and nothing read it."""
+    assert _t("wyvern", "skeleton")["speed_note"] == "20 ft."
+    assert _t("wyvern", "zombie")["speed_note"] == "20 ft., fly 60 ft. (clumsy)"
+    assert "fly 30 ft. (perfect)" in _t("sagari", "skeleton")["speed_note"]
+
+
+def test_a_template_moves_the_dcs_its_abilities_are_built_on():
+    """A DC is 10 + 1/2 HD + an ability modifier; poison is Con-based and trample
+    Str-based (Bestiary 1, Universal Monster Rules). Only the advanced template's quick
+    +2 was ever applied, and only in Special Attacks — not to a wyvern's poison, which is
+    described in Special Abilities."""
+    assert "save DC 19" in _t("wyvern", "giant")["special_abilities"]
+    assert "save DC 15" in _t("wyvern", "young")["special_abilities"]
+    assert "save DC 19" in _t("wyvern", "advanced")["special_abilities"]
+    assert "DC 27" in _t("triceratops", "giant")["special_attacks"]
+    assert "DC 23" in _t("triceratops", "young")["special_attacks"]
+
+
+def test_a_giant_finesse_fighter_swings_with_its_better_score():
+    """The ghoul finesses its claws with Dex 15. A giant ghoul's Str 17 is the better now,
+    and its claws move with that: +3, not the +1 that moving with its lost Dex gave."""
+    assert _t("ghoul", "giant")["melee"].startswith("bite +3 ")
+
+
+@pytest.mark.parametrize("base, refused", [
+    ("wyvern", False), ("pseudodragon", False),
+    ("red-dragon-young", True), ("barghest", True), ("nabasu", True),
+])
+def test_young_refuses_what_grows_by_age_or_feeding_and_not_the_dragon_type(base, refused):
+    """"Creatures that increase in power through aging or feeding (such as dragons or
+    barghests)" (p. 295). The type alone refused all 126 dragon-type blocks, the 36 with
+    no age category among them; the barghest and the nabasu say they gain growth points."""
+    block, why = templates.apply_all(base, ["young"])
+    assert (block is None) == refused, why
+
+
+def test_a_templated_swarm_still_rolls_nothing():
+    """Written back as "swarm +0 (...)", an advanced rat swarm read as a +0 attack roll."""
+    s = _t("rat-swarm", "advanced")
+    assert s["melee"] == "swarm (1d6 plus disease)"
+    assert statblock_attacks.parse(s["melee"])[0][0]["automatic"]
