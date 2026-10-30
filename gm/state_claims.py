@@ -34,7 +34,7 @@ the player reads:
   * hedged and denied claims ("nearly tears the blade from his hand", "does not fall")
     are not claims;
   * the player's weapon is judged only in the second person, after the name swap, and a
-    creature's only when no creature here holds anything.
+    creature's only when no creature here has a made weapon, held or printed.
 """
 from __future__ import annotations
 
@@ -343,16 +343,17 @@ def state_claims(text: str, scene, changes=None, *,
                     flag(said, f"puts your {named} in your hand, and you are holding the "
                             f"{holding}" + _where_it_lies(scene, pc.ref, named))
                     break
-        # A creature's weapon only when nobody here, standing or fallen, holds one: the
-        # dead keep theirs `equipped`, and a corpse's sap may clatter.
-        armed = [a for a in cast.others if _holding(a)]
+        # A creature's weapon only when nobody here, standing or fallen, has one: the
+        # dead keep theirs `equipped`, and a corpse's sap may clatter. "Nobody here",
+        # not "nobody facing you": the caravan's hired hands fight beside the player.
+        armed = [a for a in cast.others if _armed(a, scene)]
         standing = [a for a in cast.others if not _down(a)]
         if standing and not armed:
             m = re.search(rf"\b(?:his|her|their|its)\s+(?:\w+\s+)?({_alt(_WEAPON_WORDS)})\b",
                           s, re.I)
             if m and _WIELDED.search(s[m.end():m.end() + 60]) and not _NOT_IN_HAND.search(s):
                 flag(said, f"puts a {m.group(1).lower()} in a hand that holds nothing — "
-                        f"nobody facing you here is armed")
+                        f"nobody here is armed")
     return found
 
 
@@ -369,6 +370,28 @@ def _holding(actor) -> str | None:
     if key in ("unarmed", "unarmed strike", "") or actor.natural_weapon(key) is not None:
         return None
     return key
+
+
+def _armed(actor, scene) -> bool:
+    """Has this creature a made weapon to swing? `equipped`, when the sheet names the
+    hand (an explicit "unarmed" is a disarmed or empty one); otherwise what it carries and
+    what its stat block prints, through the one reader the beat check names arms by
+    (`beat_verify.arms_of`), less anything of its own lying on the props ledger.
+
+    Measured 2026-10-28 on two road fights (escort jobs, kesst-vayr): every caravan hand
+    and the Toll-Keeper had `equipped` None and no `weapons` — their club, halberd and
+    heavy flail are lines of print (`Actor.stat_block_attacks`, docs/printed-attacks.md)
+    — so this read "nobody is armed" and cut 8 sentences across 7 of 18 creature turns,
+    7 of them true: "the second teamster swings their club" on a turn whose tell was
+    "hits the riding dog with the club for 4 bludgeoning" among them. (The eighth gave
+    the Toll-Keeper the heavy flail its block prints on a halberd turn — a wrong weapon,
+    not a missing one, and not this question's to answer.)"""
+    if (actor.equipped or "").strip():
+        return _holding(actor) is not None
+    from .beat_verify import arms_of
+
+    out = getattr(scene, "out_of_hand", None)
+    return any(not (out and out(actor.ref, w)) for w in arms_of(actor, made_only=True))
 
 
 def _ledger_names(scene, ref: str) -> set[str]:

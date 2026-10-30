@@ -470,18 +470,24 @@ def _blows_of(ctx, outcomes, pc) -> dict:
             "joined": joined}
 
 
-def arms_of(a) -> list[str]:
+def arms_of(a, *, made_only: bool = False) -> list[str]:
     """The weapons a creature may be named striking with: what it carries (`weapons`,
     `equipped`) and what its stat block prints (`stat_block_attacks` — the barkeep's sap,
-    dagger and heavy crossbow), by name. Read off the actor, never off prose."""
+    dagger and heavy crossbow), by name. Read off the actor, never off prose.
+
+    `made_only` keeps the made weapons — a club, a halberd — and drops the body's own: a
+    fist, a bite, a printed "tendrils" that stands on no weapon in the table (`base`
+    empty). `state_claims` asks it whether anybody here has a weapon to swing at all."""
     out: list[str] = []
     raw = getattr(a, "weapons", None) or ()
     for key in (list(raw) if not isinstance(raw, dict) else list(raw.keys())):
         try:
-            name = (a.weapon(key) or {}).get("name") or key
+            row = a.weapon(key) or {}
         except Exception:  # noqa: BLE001 — a weapon the sheet cannot read is named by key
-            name = key
-        out.append(_weapon_name(name))
+            row = {}
+        if made_only and row.get("natural"):
+            continue
+        out.append(_weapon_name(row.get("name") or key))
     if getattr(a, "equipped", None):
         out.append(_weapon_name(a.equipped))
     try:
@@ -491,7 +497,12 @@ def arms_of(a) -> list[str]:
     for options in (blocks or {}).values():
         for option in options or ():
             for att in option or ():
+                if made_only and (att.get("natural") or not att.get("base")):
+                    continue
                 out.append(_weapon_name(att.get("name") or att.get("key")))
+    if made_only:
+        out = [w for w in out if w not in ("unarmed", UNARMED)
+               and not (hasattr(a, "natural_weapon") and a.natural_weapon(w))]
     return [w for w in dict.fromkeys(out) if w and w != "improvised weapon"]
 
 
