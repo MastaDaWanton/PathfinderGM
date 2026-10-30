@@ -55,7 +55,8 @@ from .bestiary import printed_alignment
 from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
-from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _when_holds,
+from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _said_rounds,
+                    _when_holds,
                     attacker_traits, current_moment, situated)
 from .tables import (
     CONDITIONS,
@@ -8474,6 +8475,13 @@ class Engine:
                 for extra in self._distraction(actor, defender, printed):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # And what else the stat block prints on this hit: "plus grab", "plus
+                # poison", "plus disease and paralysis" (`_printed_riders`).
+                for extra in ([] if dancing else self._printed_riders(
+                        intent, actor, defender, printed, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
                 # Thorns, wasps, holy fire: whatever the defender is wearing that
                 # punishes the creature who just hit them. Fired here rather than in
                 # `_apply_damage`, because retribution is owed to a *melee attack* and
@@ -9107,6 +9115,14 @@ class Engine:
             if taken > 0:
                 mods.append(Modifier(-taken, "struck while trying it"))
 
+        # A printed rider's free manoeuvre (`_rider_maneuver`): Grab's "+4 bonus on combat
+        # maneuver checks to start and maintain a grapple" (Bestiary UMR), or the larger
+        # racial bonus a block prints instead (the sargassum fiend's +8). Read only off an
+        # intent the engine built and stamped `creature:` — never a param a plan writes.
+        rider = intent.params.get("rider") if str(intent.origin or "").startswith(
+            "creature:") else None
+        if rider and int(intent.params.get("rider_bonus") or 0):
+            mods.append(Modifier(int(intent.params["rider_bonus"]), str(rider)))
         # Attempting to disarm while unarmed is -4; so is grappling without two hands.
         if m.get("unarmed_penalty") and weapon_key == "unarmed":
             mods.append(Modifier(m["unarmed_penalty"], "unarmed"))
@@ -9314,7 +9330,8 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "dropped",
                                     "item": weapon_key, "prop": rec["name"],
                                     "from": f"failed {m['name']}"})
-            elif m.get("backfire") and margin <= -10:
+            # Trip UMR: "If the attempt fails, the creature is not tripped in return."
+            elif m.get("backfire") and margin <= -10 and not rider:
                 bits.append(maneuver_text(m["backfire"], actor.name, defender.name) + ".")
                 back = m.get("backfire_condition")
                 if back:
@@ -15802,6 +15819,508 @@ class Engine:
                                        "rider": "distraction"},
                             "tell": o.tell})
         return out
+
+    # --- a stat block's printed riders (docs/attack-riders.md) -------------------------
+    #
+    # "bite +3 (1d6+1 plus disease and paralysis)": until 2026-10-30 the reader carried the
+    # words and nothing fired them — a ghoul paralysed nobody, a rat swarm's filth fever
+    # infected nobody, a giant spider's venom was a bite. Each word is read into a document
+    # once, at compile (`attack_riders.rules_for`, stored on the attack as `rules`), with
+    # the save, the DC and the effect from the block's own Special Attacks and Special
+    # Abilities; here each document is applied on the hit, through doors the engine
+    # already has: the manoeuvre (`_resolve_maneuver`), the condition applicator, the
+    # bleed and burn effects, the ability damage op, and the affliction's own effect run
+    # by the one periodic executor (`Actor.run_periodic` -> `Actor._afflicted`).
+    #
+    # A rider no rule here applies is not dropped: it comes back as a `rider_unsupported`
+    # effect with the reason (the compile's reason, "no Poison entry defines it"), no
+    # tell — nothing happened, so the narrator is told nothing — and the counts are in
+    # docs/attack-riders.md.
+
+    _RIDER_TYPE_WORD = {"paralyzed": "paralysis", "stunned": "stun", "dazed": "daze"}
+
+    def _printed_riders(self, intent: Intent, actor: Actor, defender: Actor,
+                        printed: dict, state: dict) -> list[dict]:
+        """Apply what rides the hit that just landed, per the stat block's own words."""
+        riders = printed.get("riders") or ()
+        if not riders or defender.hp <= 0 or defender.is_dead:
+            # A rider on a corpse: the damage landed; venom in the dead is noise.
+            return []
+        rules = printed.get("rules")
+        if rules is None:
+            # A block read live (homebrew, a templated creature, one edited since its
+            # compile) has no stored documents: read now, from the same reader.
+            from . import attack_riders
+
+            full = {"riders": list(riders), "amounts": printed.get("amounts") or {},
+                    "key": printed.get("key"), "name": printed.get("key"),
+                    "kind": printed.get("key")}
+            rules = attack_riders.rules_for(actor._creature_doc() or {}, full)
+        origin = str(printed.get("origin") or f"creature:{actor.from_template}")
+        out: list[dict] = []
+        for rule in rules:
+            if defender.hp <= 0 or defender.is_dead:
+                break
+            kind = str(rule.get("kind") or "")
+            if kind == "distraction":
+                continue                        # `_distraction`, just above
+            apply = self._RIDERS.get(kind)
+            if apply is None:
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_unsupported",
+                                       "rider": rule.get("rider"), "origin": origin,
+                                       "why": str(rule.get("why") or "")},
+                            "tell": ""})
+                continue
+            out.extend(apply(self, intent, actor, defender, rule, origin, state))
+        return out
+
+    def _printed_dc(self, actor: Actor, rule: dict) -> int:
+        """The rider's DC: the block's own when it prints one, else the universal monster
+        rules' formula, "10 + 1/2 [the creature's] racial HD + [its] Constitution modifier"
+        (Poison, Disease, Paralysis, Burn) — Charisma for energy drain, and for a body with
+        no Constitution score (the undead), whose save DCs the Bestiary bases on Charisma.
+        """
+        if rule.get("dc"):
+            return int(rule["dc"])
+        from . import templates as templates_mod
+
+        doc = actor._creature_doc() or {}
+        ab = str(rule.get("dc_ability") or "con")
+        if ab == "con" and doc and "con" not in (doc.get("abilities") or {}):
+            ab = "cha"
+        hd = templates_mod.total_hd(doc) or actor.hit_dice
+        return 10 + int(hd) // 2 + actor.ability_mod(ab)
+
+    def _rider_save(self, defender: Actor, save: str, dc: int, label: str,
+                    state: dict, against: str = "") -> tuple[bool, str]:
+        """The defender's save against a rider, the engine's roll (an NPC's intent: hidden,
+        as `_distraction` and `_magic_gate` roll theirs), kept in the attack's rolls, and
+        the words the tell quotes: "Fortitude 9 against DC 13"."""
+        roll = self.dice.d20(defender.save_modifiers(save, {"against": against}
+                                                     if against else None),
+                             label=label, visibility="hidden")
+        state.setdefault("rolls", []).append(roll.as_dict())
+        nat = natural_said(roll, dc)
+        return d20_succeeds(roll, dc), (f"{SAVES[save]} {nat + ', ' if nat else ''}"
+                                        f"{roll.total} against DC {dc}")
+
+    def _rider_maneuver(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
+                        origin: str, state: dict) -> list[dict]:
+        """Grab, trip, push, pull and bull rush: a free combat manoeuvre on the hit.
+
+        Grab (Bestiary UMR): "it deals the normal amount of damage and tries to start a
+        grapple as a free action without provoking an attack of opportunity", "a +4 bonus
+        on combat maneuver checks to start and maintain a grapple", and "works only
+        against opponents of the same size category or smaller" unless the block widens
+        it. Trip: "a free action without provoking ... If the attempt fails, the creature
+        is not tripped in return." Pull and push: "a free combat maneuver check", the
+        distance the block's, "only on creatures of a size equal to or smaller than" the
+        creature, and the one moved "do[es] not provoke".
+
+        Grab and trip go through `_resolve_maneuver` itself — CMB against CMD, the d20's
+        face, the grappled condition on both and its holder written — with the rider's
+        bonus as one more named term and no backfire. Push and pull move the body with
+        `_shove`, the step the races' natural push and pull already take. Never through
+        `validate`: a free manoeuvre owes no attack of opportunity, and the validator's
+        own provocation would add one.
+        """
+        from .tables import SIZE_ORDER
+
+        word, key = str(rule["rider"]), str(rule.get("maneuver") or "")
+        if key not in MANEUVERS:
+            return []
+        try:
+            gap = SIZE_ORDER.index(defender.size) - SIZE_ORDER.index(actor.size)
+        except ValueError:
+            gap = 0
+        if rule.get("any_size"):
+            room = 99
+        elif rule.get("max_size") in SIZE_ORDER:
+            room = SIZE_ORDER.index(rule["max_size"]) - SIZE_ORDER.index(
+                actor.size if actor.size in SIZE_ORDER else "medium")
+        elif rule.get("larger_by") is not None:
+            room = int(rule["larger_by"])
+        else:
+            room = int(MANEUVERS[key].get("size_limit") or 0) if word == "trip" else 0
+        if gap > room:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": word, "why": "too large", "origin": origin},
+                     "tell": f"{defender.name} is too big for {actor.name}'s {word} to "
+                             f"take hold of."}]
+        if key == "grapple" and defender.has_state("state.held.grappled") and any(
+                (e.payload or {}).get("by") == actor.ref for e in defender.effects):
+            return []                           # already held by this one
+        if key == "trip" and defender.has_state("state.position.prone"):
+            return []
+        if word in ("pull", "push"):
+            return self._rider_shove(actor, defender, rule, origin, state)
+        sub = Intent(op="attack", actor=actor.ref, target=defender.ref,
+                     because=f"{actor.name}'s {word}", visibility="hidden",
+                     id=f"{intent.id}.{word.replace(' ', '-')}",
+                     params={"manoeuvre": key, "rider": word,
+                             "rider_bonus": int(rule.get("bonus") or 0)},
+                     origin=origin, origin_name=word)
+        got = self._resolve_maneuver(sub, actor, defender, actor.wielded_key(), {})
+        state.setdefault("rolls", []).extend(r.as_dict() for r in got.rolls)
+        out = [{"effect": e, "tell": ""} for e in got.effects]
+        out.append({"effect": {"ref": defender.ref, "kind": "rider", "rider": word,
+                               "verdict": got.verdict, "origin": origin},
+                    "tell": got.tell})
+        if got.verdict == "success" and key == "grapple":
+            out.extend(self._on_hold(actor, defender, rule.get("then") or (), origin,
+                                     state))
+        return out
+
+    def _rider_shove(self, actor: Actor, defender: Actor, rule: dict, origin: str,
+                     state: dict) -> list[dict]:
+        """Pull or push: the free CMB check, then the block's distance in five-foot steps
+        through `_shove` (which stops at the first square that is blocked)."""
+        word = str(rule["rider"])
+        key = "drag" if word == "pull" else "bull rush"
+        roll = self.dice.d20(actor.cmb_modifiers(key), label=f"{word.title()} (CMB)",
+                             visibility="hidden")
+        state.setdefault("rolls", []).append(roll.as_dict())
+        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver=key))
+        if not d20_succeeds(roll, cmd):
+            return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                "rider": word, "origin": origin},
+                     "tell": f"{actor.name} tries to {word} {defender.name} and cannot "
+                             f"({roll.total} against CMD {cmd})."}]
+        steps = 0
+        for _ in range(max(1, int(rule.get("feet") or 5) // 5)):
+            if not self._shove(actor, defender, toward=(word == "pull")):
+                break
+            steps += 1
+        verb = "drags" if word == "pull" else "drives"
+        where = "in" if word == "pull" else "back"
+        return [{"effect": {"ref": defender.ref, "kind": "rider", "rider": word,
+                            "moved_ft": steps * 5, "origin": origin},
+                 "tell": (f"{actor.name} {verb} {defender.name} {where} {steps * 5} feet."
+                          if steps else
+                          f"{actor.name} has {defender.name} but cannot move them: the "
+                          f"way is blocked, or there is no board to move them on.")}]
+
+    def _on_hold(self, actor: Actor, defender: Actor, then, origin: str,
+                 state: dict) -> list[dict]:
+        """What a hold this creature has just established does at once: constrict ("deals
+        bludgeoning damage in addition to any other effects caused by a successful
+        check", Constrict UMR) and blood drain (Constitution damage "if it grapples a foe",
+        Blood Drain UMR). Fired on the check that won the hold; the grapple maintained on
+        later turns has no executor yet (docs/attack-riders.md)."""
+        out: list[dict] = []
+        for t in then:
+            if defender.is_dead:
+                break
+            if t.get("kind") == "constrict":
+                roll = self.dice.roll(str(t["dice"]), label=f"Constrict ({t['dice']})",
+                                      visibility="hidden")
+                state.setdefault("rolls", []).append(roll.as_dict())
+                hit = self._apply_damage(defender, max(0, roll.total), "bludgeoning")
+                hit["origin"] = origin
+                out.append({"effect": hit,
+                            "tell": f"{actor.name} constricts {defender.name} for "
+                                    f"{hit['amount']} bludgeoning"
+                                    + (f" ({hit['note']})." if hit.get("note") else ".")})
+            elif t.get("kind") == "blood_drain":
+                out.extend(self._rider_ability(None, actor, defender, {
+                    "rider": "blood drain", "ability": t["ability"], "dice": t["dice"],
+                    "drain": False}, origin, state))
+            elif t.get("kind") == "unsupported":
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_unsupported",
+                                       "rider": t.get("rider"), "why": t.get("why"),
+                                       "origin": origin}, "tell": ""})
+        return out
+
+    def _rider_attach(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
+                      origin: str, state: dict) -> list[dict]:
+        """"The creature latches on when it hits with the listed attack. The creature is
+        grappled, but the target is not" (Attach UMR): the grappled condition on the
+        attacker, its holder written as the one it clings to, then what a hold does."""
+        if actor.has_state("state.held.grappled") and any(
+                (e.payload or {}).get("by") == defender.ref for e in actor.effects):
+            return []
+        # The grapple's own condition, from the manoeuvre table (`MANEUVERS`), not a
+        # second spelling of it: attach is "effectively grappling" (the stirge's words).
+        held = MANEUVERS["grapple"]["condition"]
+        actor.add_condition(held, source=f"latched onto {defender.name}", origin=origin)
+        _held_by(actor, held, defender.ref)
+        out = [{"effect": {"ref": actor.ref, "kind": "condition", "condition": held,
+                           "from": "attach", "attached_to": defender.ref,
+                           "origin": origin},
+                "tell": f"{actor.name} latches onto {defender.name} and holds on."}]
+        return out + self._on_hold(actor, defender, rule.get("then") or (), origin, state)
+
+    def _rider_save_condition(self, intent: Intent, actor: Actor, defender: Actor,
+                              rule: dict, origin: str, state: dict) -> list[dict]:
+        """Paralysis, and a stun the block defines: a save, or the condition for the
+        block's length ("paralysis (1d4+1 rounds, DC 13, elves are immune to this
+        effect)"). Paralysis UMR: "unlike hold person ... does not permit saving throws
+        each round" — one save, here."""
+        word, cond = str(rule["rider"]), str(rule["condition"])
+        for race in rule.get("immune_races") or ():
+            if defender.has_state(f"race.{race}"):
+                return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                    "rider": word, "why": f"race.{race}",
+                                    "origin": origin},
+                         "tell": f"{actor.name}'s {word} has no hold on {defender.name}: "
+                                 f"the {race}s are immune to it."}]
+        blocked = states.immune_to(defender, self._RIDER_TYPE_WORD.get(cond, word), cond)
+        if blocked:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": word, "why": blocked, "origin": origin},
+                     "tell": f"{defender.name} is immune to {blocked}; {actor.name}'s "
+                             f"{word} does nothing."}]
+        save = str(rule.get("save") or "fort")
+        dc = self._printed_dc(actor, rule)
+        made, said = self._rider_save(defender, save, dc,
+                                      f"{SAVES[save]} save against {word}", state)
+        if made:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                "rider": word, "origin": origin},
+                     "tell": f"{defender.name} resists {actor.name}'s {word} ({said})."}]
+        span = rule.get("for") or {}
+        unit = Actor.AFFLICTION_ROUNDS.get(str(span.get("unit") or "round"), 1)
+        roll = self.dice.roll(str(span.get("dice") or "1"), label=f"{word} duration",
+                              visibility="hidden")
+        state.setdefault("rolls", []).append(roll.as_dict())
+        rounds = max(1, roll.total) * unit
+        made_cond = defender.add_condition(cond, rounds, source=f"{actor.name}'s {word}",
+                                           origin=origin)
+        name = CONDITIONS.get(cond, {}).get("name", cond).lower()
+        return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": cond,
+                            "rounds_left": made_cond.rounds_left, "from": word,
+                            "origin": origin},
+                 "tell": f"{defender.name} fails ({said}) against {actor.name}'s {word} "
+                         f"and is {name} for {made_cond.rounds_left} rounds."}]
+
+    def _rider_bleed(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
+                     origin: str, state: dict) -> list[dict]:
+        """"Wounds that continue to bleed, dealing additional damage each round at the
+        start of the affected creature's turn ... stopped with a successful DC 15 Heal
+        skill check or through the application of any magical healing" (Bleed UMR): the
+        `bleed` condition with its per-round damage, run by the one periodic executor,
+        the shape wounding's bleed and the demon-ichor flask already take. "Bleed damage
+        does not stack": a second bleed replaces the first only when it is worse."""
+        if states.immune_to(defender, "bleed", "bleed") or defender.has_state("immune.bleed"):
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": "bleed", "origin": origin},
+                     "tell": f"{defender.name} does not bleed; the wound stays shut."}]
+        amount = str(rule.get("amount") or "1")
+
+        def mean(dice: str) -> float:
+            m = re.fullmatch(r"(\d+)d(\d+)([+-]\d+)?", dice.replace(" ", ""))
+            if m:
+                return int(m.group(1)) * (int(m.group(2)) + 1) / 2 + int(m.group(3) or 0)
+            return float(dice) if dice.isdigit() else 1.0
+
+        worse = [e for e in defender.effects if e.key == "bleed"
+                 and any(mean(str(p.get("damage") or "1")) >= mean(amount)
+                         for p in e.periodic)]
+        if worse:
+            return [{"effect": {"ref": defender.ref, "kind": "rider", "rider": "bleed",
+                                "stacked": False, "origin": origin},
+                     "tell": f"{actor.name} opens another wound on {defender.name}; it "
+                             f"bleeds no worse than it already does."}]
+        defender.remove_effects(kind="condition", match=lambda e: e.key == "bleed")
+        defender.apply_effect(ActiveEffect(
+            name="Bleed", kind="condition", key="bleed", source=f"{actor.name}'s bleed",
+            origin=origin, tags=states.tags_for("bleed"),
+            payload={"stopped_by": "a DC 15 Heal check or any magical healing"},
+            periodic=[{"per": "round", "damage": amount, "damage_type": "untyped"}]))
+        return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": "bleed",
+                            "per_round": amount, "origin": origin},
+                 "tell": f"{actor.name} leaves {defender.name} bleeding: {amount} damage "
+                         f"a round until a DC 15 Heal check or magical healing stops it."}]
+
+    def _rider_burn(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
+                    origin: str, state: dict) -> list[dict]:
+        """"Fire damage ... in addition to damage dealt normally", then "a Reflex save
+        ... or catch fire", burning for "the listed damage" each round "for an additional
+        1d4 rounds at the start of its turn"; a full-round action and a new save puts it
+        out, "+4 bonus ... for dropping and rolling" (Burn UMR). The catching is the
+        `burn` op's clinging fire, put out by `extinguish`."""
+        dice = str(rule.get("dice") or "1d6")
+        roll = self.dice.roll(dice, label=f"Burn ({dice})", visibility="hidden")
+        state.setdefault("rolls", []).append(roll.as_dict())
+        hit = self._apply_damage(defender, max(0, roll.total), "fire")
+        hit["origin"] = origin
+        out = [{"effect": hit,
+                "tell": f"{actor.name}'s fire burns {defender.name} for {hit['amount']} "
+                        f"fire" + (f" ({hit['note']})." if hit.get("note") else ".")}]
+        if defender.hp <= 0 or defender.is_dead or hit.get("immune"):
+            return out
+        dc = self._printed_dc(actor, rule)
+        made, said = self._rider_save(defender, "ref", dc, "Reflex save against catching "
+                                      "fire", state)
+        if made:
+            out.append({"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                   "rider": "burn", "origin": origin},
+                        "tell": f"{defender.name} does not catch fire ({said})."})
+            return out
+        rounds = self.dice.roll("1d4", label="burning rounds", visibility="hidden")
+        state.setdefault("rolls", []).append(rounds.as_dict())
+        res = self.run(self.validate([{
+            "op": "burn", "actor": defender.ref, "visibility": "hidden",
+            "because": f"{actor.name}'s burn",
+            "params": {"to": defender.ref, "dice": dice, "damage_type": "fire",
+                       "rounds": max(1, rounds.total), "put_out_with": "ref",
+                       "put_out_dc": dc, "smother_bonus": 4},
+        }], origin=origin, origin_name="burn"))
+        for o in res.outcomes:
+            out.extend({"effect": e, "tell": ""} for e in o.effects or [])
+            out.append({"effect": {"ref": defender.ref, "kind": "rider", "rider": "burn",
+                                   "origin": origin},
+                        "tell": f"{defender.name} catches fire ({said})."
+                                + (f" {o.tell}" if o.tell else "")})
+        return out
+
+    def _rider_ability(self, intent: Intent | None, actor: Actor, defender: Actor,
+                       rule: dict, origin: str, state: dict) -> list[dict]:
+        """"plus 1d4 Con drain", "plus 1d2 Str", a blood drain's Constitution: through the
+        `ability_damage` op, the one door a score is damaged by. The undead take no
+        damage to a physical score and no drain, constructs none at all (Bestiary
+        pp.307, 309) — asked first, because the op itself does not ask."""
+        ab, drain = str(rule["ability"]), bool(rule.get("drain"))
+        word = str(rule.get("rider") or "")
+        refused = states.ability_harm_refused(defender, ab, drain)
+        if refused:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": word, "why": refused, "origin": origin},
+                     "tell": f"{defender.name} has {refused}; {actor.name}'s {word} "
+                             f"takes nothing from it."}]
+        res = self.run(self.validate([{
+            "op": "ability_damage", "actor": actor.ref, "visibility": "hidden",
+            "because": f"{actor.name}'s {word}",
+            "params": {"to": defender.ref, "ability": ab, "amount": str(rule["dice"]),
+                       "drain": drain},
+        }], origin=origin, origin_name=word))
+        out: list[dict] = []
+        for o in res.outcomes:
+            for r in o.rolls or ():
+                state.setdefault("rolls", []).append(r.as_dict())
+            out.extend({"effect": e, "tell": ""} for e in o.effects or [])
+            if o.tell:
+                out.append({"effect": {"ref": defender.ref, "kind": "rider", "rider": word,
+                                       "origin": origin}, "tell": o.tell})
+        return out
+
+    def _rider_affliction(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
+                          origin: str, state: dict) -> list[dict]:
+        """A poison or a disease, contracted on the hit (Core Rulebook, Afflictions,
+        pp. 555-557): "All afflictions grant a saving throw when they are contracted. If
+        successful, the creature does not suffer from the affliction." Failed, it takes
+        hold — an `ActiveEffect` of kind `affliction` (`Actor.take_affliction`) whose
+        periodic saves the one executor rolls on the printed frequency until the printed
+        cure, or until a counted frequency runs out (`Actor._afflicted`).
+
+        With no onset — a spider's venom — the failed save is the first failure, and its
+        effect lands now ("the effect that the character suffers each time if he fails
+        his saving throw"); it counts as the first of "1/round for 4 rounds". Whether the
+        contraction save counts toward that limit could not be confirmed from a primary
+        source; this reading gives the venom its printed number of effects at most. With
+        an onset — ghoul fever's day — nothing lands until it has passed, "and then only
+        if further saving throws are failed".
+        """
+        aff = dict(rule["affliction"])
+        kind = "disease" if str(aff.get("kind") or "").startswith(("disease", "curse")) \
+            else "poison"
+        doc = actor._creature_doc() or {}
+        name = (str(aff.get("name") or "").strip().lower()
+                or f"{str(doc.get('name') or actor.name).lower()} {kind}")
+        blocked = states.immune_to(defender, kind)
+        if blocked:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": rule["rider"], "why": blocked, "origin": origin},
+                     "tell": f"{defender.name} is immune to {blocked}; the {name} takes "
+                             f"no hold."}]
+        save, dc = str(aff.get("save") or "fort"), int(aff.get("dc") or 10)
+        made, said = self._rider_save(defender, save, dc, f"{SAVES[save]} save against "
+                                      f"{name}", state, against=kind)
+        if made:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                "rider": rule["rider"], "affliction": name,
+                                "origin": origin},
+                     "tell": f"{defender.name} resists the {name} ({said})."}]
+        rounds_of = Actor.AFFLICTION_ROUNDS
+        freq = aff.get("frequency") or {}
+        every = max(1, rounds_of.get(str(freq.get("unit") or "round"), 1)
+                    // max(1, int(freq.get("count") or 1)))
+        limit = None
+        if freq.get("limit"):
+            lim = self.dice.roll(str(freq["limit"]), label=f"{name} duration",
+                                 visibility="hidden")
+            limit = max(1, lim.total)
+        onset = aff.get("onset") or {}
+        onset_rounds = 0
+        if onset and str(onset.get("dice") or "0") != "0":
+            o = self.dice.roll(str(onset["dice"]), label=f"{name} onset",
+                               visibility="hidden")
+            onset_rounds = max(1, o.total) * rounds_of.get(str(onset.get("unit")), 1)
+        immediate = onset_rounds == 0
+        eff, again = defender.take_affliction(
+            aff, name=name, source=f"{actor.name}'s {rule['rider']}", origin=origin,
+            onset_rounds=onset_rounds or every, every_rounds=every,
+            limit=(limit - 1 if immediate and limit else limit),
+            dose_extends=-(-limit // 2) if limit else 0)
+        if again:
+            if kind == "poison":
+                held = eff.payload.get("affliction") or {}
+                return [{"effect": {"ref": defender.ref, "kind": "affliction_dose",
+                                    "affliction": name, "dc": held.get("dc"),
+                                    "origin": origin},
+                         "tell": f"Another dose of {name} goes into {defender.name} "
+                                 f"({said}): it runs longer and is harder to shake "
+                                 f"(DC {held.get('dc')})."}]
+            return [{"effect": {"ref": defender.ref, "kind": "rider", "rider": "disease",
+                                "affliction": name, "origin": origin, "again": True},
+                     "tell": f"{defender.name} already carries {name}."}]
+        when = ("" if immediate else
+                f"; it will take hold in {_said_rounds(onset_rounds)}")
+        out = [{"effect": {"ref": defender.ref, "kind": "affliction", "affliction": name,
+                           "type": kind, "dc": dc, "onset_rounds": onset_rounds,
+                           "every_rounds": every, "limit": limit,
+                           "cure": aff.get("cure"), "origin": origin},
+                "tell": f"{defender.name} fails ({said}) and is "
+                        f"{'poisoned' if kind == 'poison' else 'infected'} with "
+                        f"{name}{when}."}]
+        if immediate:
+            for rec in defender.affliction_strikes(eff, self.dice):
+                out.append({"effect": rec, "tell": _ward_tell(self.scene, rec)})
+            if limit == 1 and eff in defender.effects:
+                for rec in defender.end_affliction(eff, "ran its course"):
+                    out.append({"effect": rec, "tell": _ward_tell(self.scene, rec)})
+        return out
+
+    def _rider_energy_drain(self, intent: Intent, actor: Actor, defender: Actor,
+                            rule: dict, origin: str, state: dict) -> list[dict]:
+        """Energy drain is NOT applied, and says so (as a record, not a tell: nothing
+        happened to the body). A negative level moves eight numbers at once — every
+        attack, save, skill and ability check, CMB and CMD, five hit points, a caster
+        level — and `effectspec`'s `negative_level` type records the owner-level decision
+        that applying seven of them is worse than applying none. Its immunity is still
+        asked, so the record is right about who it could never have touched."""
+        blocked = states.immune_to(defender, "energy drain")
+        return [{"effect": {"ref": defender.ref, "kind": "rider_unsupported",
+                            "rider": "energy drain", "levels": rule.get("levels"),
+                            "dc": rule.get("dc"), "origin": origin,
+                            "why": (f"immune ({blocked})" if blocked else
+                                    "negative levels are not applied by the engine "
+                                    "(effectspec negative_level, engine=False)")},
+                 "tell": ""}]
+
+    _RIDERS = {
+        "maneuver": _rider_maneuver,
+        "attach": _rider_attach,
+        "save_condition": _rider_save_condition,
+        "bleed": _rider_bleed,
+        "burn": _rider_burn,
+        "ability": _rider_ability,
+        "blood_drain": lambda self, i, a, d, r, o, s: self._rider_ability(
+            i, a, d, {"rider": "blood drain", "ability": r.get("ability") or "con",
+                      "dice": r.get("dice") or "1", "drain": False}, o, s),
+        "affliction": _rider_affliction,
+        "energy_drain": _rider_energy_drain,
+    }
 
     def _natural_riders(self, actor: Actor, defender: Actor,
                         weapon_key: str) -> list[dict]:
@@ -26135,8 +26654,25 @@ def _ward_tell(scene: Scene, e: dict) -> str:
         return f"{said.format(name=name)} ({e.get('from', source)})."
     if kind == "ability_damage":
         return (f"{name} takes {e.get('amount')} "
-                f"{ABILITY_FULL.get(str(e.get('ability', '')), 'ability')} damage "
-                f"from {source}.")
+                f"{ABILITY_FULL.get(str(e.get('ability', '')), 'ability')} "
+                f"{'drain' if e.get('drain') else 'damage'} from {source}.")
+    # An affliction's periodic save and its end (`Actor._afflicted`): what the save was,
+    # how it went, and how near the cure is — "2 of 2 consecutive saves" is the cure.
+    if kind == "affliction_save":
+        nat = f"{e['natural']}, " if e.get("natural") else ""
+        roll = f"{nat}{e.get('roll')} against DC {e.get('dc')}"
+        if e.get("made"):
+            cure = e.get("cure")
+            toward = (f"; {e.get('streak')} of {cure} saves toward the cure"
+                      if cure and int(cure) > 1 else "")
+            return f"{name} holds off the {e.get('what')} ({roll}){toward}."
+        return f"{name} fails against the {e.get('what')} ({roll})."
+    if kind == "affliction_ended":
+        how = ("is cured of" if e.get("why") == "cured" else "is through")
+        return f"{name} {how} the {e.get('what')}."
+    if kind == "affliction_resisted":
+        return (f"{name} has {e.get('why')}; the {e.get('what')} does no "
+                f"{e.get('harm')}.")
     if kind == "manifest_ended":
         return f"{e.get('what', 'It')} thins out and is gone."
     if kind == "effect_ended":

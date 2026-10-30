@@ -1558,9 +1558,17 @@ class Actor:
             for p in list(e.periodic or ()):
                 if str(p.get("per") or "round").lower() != per or "spend_pool" in p:
                     continue
-                if elapsed and "heal" not in p:
+                # An affliction runs over a stretch of time as well as in played rounds:
+                # a disease's "1/day" is a day of the clock, and a poison's "1/minute for
+                # 6 minutes" six minutes of it. Its own count bounds the saves, so a
+                # night's 4,800 rounds are a handful of saves, not 4,800 (`_afflicted`).
+                if elapsed and "heal" not in p and "affliction" not in p:
                     continue
                 source = e.name or e.source or "an effect"
+                if isinstance(p.get("affliction"), dict):
+                    if e in self.effects:
+                        out.extend(self._afflicted(e, p["affliction"], times, dice))
+                    continue
                 if "heal" in p:
                     runs = times
                     if elapsed and e.duration == "rounds" and e.rounds_left is not None:
@@ -1688,6 +1696,186 @@ class Actor:
                 else:
                     out.extend(self._periodic_effect(branch, source, origin, dice))
         return out
+
+    # --- afflictions: a poison or a disease in the body --------------------------------
+    #
+    # Core Rulebook, Afflictions (pp. 555-557, aonprd.com/Rules.aspx?ID=417): "All
+    # afflictions grant a saving throw when they are contracted. If successful, the
+    # creature does not suffer from the affliction"; then a periodic save on its frequency
+    # ("after the onset time, if the affliction has any") until "a number of saving throws
+    # ... made consecutively" cures it, or a poison's "1/round for 6 rounds" runs out. The
+    # contraction is the engine's (`Engine._rider_affliction`, on the hit); everything
+    # after it is this executor's, on the one periodic clock, so a fever keeps its course
+    # across a night's rest and a save and load.
+
+    # The executor's clock is rounds: a disease's "1/day" waits 14,400 of them, which a
+    # stretch of time spends in one subtraction (`Scene.advance` passes the stretch's
+    # rounds), never 14,400 iterations.
+    AFFLICTION_ROUNDS = {"round": 1, "minute": 10, "hour": 600, "day": 14400,
+                         "week": 100800}
+
+    def take_affliction(self, aff: dict, *, name: str, source: str, origin: str,
+                        onset_rounds: int, every_rounds: int, limit: int | None,
+                        dose_extends: int = 0) -> tuple["ActiveEffect", bool]:
+        """Put a contracted affliction on this body, or add a dose to the one it has.
+
+        Returns (the effect, whether it was a second dose). A second dose of the same
+        poison "extends the total duration of the poison (as noted under frequency) by half
+        its total duration" and "increases the DC to resist the poison by +2" (CRB,
+        Poison, p.557) — `dose_extends` is that half, worked out by the caller from the
+        printed limit. A disease already carried is not caught twice.
+        """
+        from . import states
+
+        kind = str(aff.get("kind") or "poison")
+        key = "diseased" if kind.startswith(("disease", "curse")) else "poisoned"
+        ident = f"{origin}|{name}"
+        have = next((e for e in self.effects if e.kind == "affliction"
+                     and (e.payload or {}).get("id") == ident), None)
+        if have is not None:
+            if key == "poisoned":
+                held = have.payload.setdefault("affliction", {})
+                held["dc"] = int(held.get("dc") or 0) + 2
+                for p in have.periodic:
+                    step = p.get("affliction")
+                    if isinstance(step, dict) and step.get("left") is not None:
+                        step["left"] = int(step["left"]) + max(0, int(dose_extends))
+            return have, True
+        eff = ActiveEffect(
+            name=name, kind="affliction", key=key, source=source, origin=origin,
+            tags=states.tags_for(key),
+            payload={"id": ident, "affliction": dict(aff)},
+            periodic=[{"per": "round", "affliction": {
+                "wait": max(1, int(onset_rounds or every_rounds)),
+                "every": max(1, int(every_rounds)),
+                "left": None if limit is None else max(0, int(limit)),
+                "streak": 0}}])
+        self.apply_effect(eff)
+        return eff, False
+
+    def _afflicted(self, e: "ActiveEffect", step: dict, times: int, dice) -> list[dict]:
+        """The affliction's saves that fall due in `times` rounds, each one rolled.
+
+        A made save counts toward the cure ("2 consecutive saves") and a failed one resets
+        the count and does the effect again. A counted frequency ("for 6 rounds") ends it
+        when it runs out. While the body is immune — delay poison's "does not affect it
+        until the spell ends", a periapt of health — the saves are not made and nothing is
+        counted: the affliction is held, not spent."""
+        from . import states
+        from .dice import d20_succeeds, natural_said
+
+        out: list[dict] = []
+        if dice is None:
+            return out
+        aff = (e.payload or {}).get("affliction") or {}
+        kind = "disease" if e.key == "diseased" else "poison"
+        save = str(aff.get("save") or "fort")
+        remaining = max(0, int(times or 0))
+        while remaining > 0 and e in self.effects and not self.is_dead:
+            wait = max(1, int(step.get("wait") or step.get("every") or 1))
+            if wait > remaining:
+                step["wait"] = wait - remaining
+                break
+            remaining -= wait
+            step["wait"] = max(1, int(step.get("every") or 1))
+            if states.immune_to(self, kind):
+                continue
+            dc = int(aff.get("dc") or 10)
+            roll = dice.d20(self.save_modifiers(save, {"against": kind}),
+                            label=f"{SAVES.get(save, save)} save against {e.name}",
+                            visibility="hidden")
+            made = d20_succeeds(roll, dc)
+            step["streak"] = int(step.get("streak") or 0) + 1 if made else 0
+            cure = aff.get("cure")
+            out.append({"kind": "affliction_save", "ref": self.ref, "what": e.name,
+                        "made": made, "roll": roll.total, "dc": dc,
+                        "natural": natural_said(roll, dc), "streak": step["streak"],
+                        "cure": cure, "origin": e.origin, "affliction": kind})
+            if made and cure and step["streak"] >= int(cure):
+                out.extend(self.end_affliction(e, "cured"))
+                break
+            if not made:
+                out.extend(self.affliction_strikes(e, dice))
+            if step.get("left") is not None:
+                step["left"] = int(step["left"]) - 1
+                if step["left"] <= 0 and e in self.effects:
+                    out.extend(self.end_affliction(e, "ran its course"))
+                    break
+        return out
+
+    def affliction_strikes(self, e: "ActiveEffect", dice) -> list[dict]:
+        """What one failed save against this affliction does: each printed effect, through
+        the doors that already exist — `damage_ability` (Constitution takes its hit points
+        with it), `take_damage`, `add_condition`. A condition the print gives a length is
+        held that long; one it gives none ("target is fatigued") is held while the
+        affliction runs and goes with it (`end_affliction`). Immunities are asked per
+        effect: an undead body takes no Constitution damage from a ghoul's fever."""
+        from . import states
+
+        aff = (e.payload or {}).get("affliction") or {}
+        out: list[dict] = []
+        for eff in aff.get("effects") or ():
+            if self.is_dead:
+                break
+            if eff.get("ability"):
+                ab, drain = str(eff["ability"]), bool(eff.get("drain"))
+                refused = states.ability_harm_refused(self, ab, drain)
+                if refused:
+                    out.append({"kind": "affliction_resisted", "ref": self.ref,
+                                "what": e.name, "why": refused,
+                                "harm": f"{ABILITY_FULL.get(ab, ab)} "
+                                        f"{'drain' if drain else 'damage'}"})
+                    continue
+                n = _amount_of(eff.get("dice"), dice)
+                if n <= 0:
+                    continue
+                res = self.damage_ability(ab, n, drain=drain)
+                out.append({"kind": "ability_damage", "ref": self.ref, "amount": n,
+                            "ability": ab, "drain": drain, "source": e.name,
+                            "origin": e.origin, "score": res["score"]})
+                for c in self.ability_zero_effects():
+                    out.append({"kind": "condition", "ref": self.ref, "condition": c,
+                                "from": f"{ABILITY_FULL.get(ab, ab)} 0"})
+            elif eff.get("damage"):
+                n = _amount_of(eff["damage"], dice)
+                if n > 0:
+                    dtype = str(eff.get("type") or "untyped")
+                    d = self.take_damage(n, dtype)
+                    out.append({"kind": "damage", "ref": self.ref,
+                                "amount": int(d.get("taken", n) or 0),
+                                "type": normalise_damage_type(dtype), "source": e.name,
+                                "origin": e.origin, "hp_after": self.hp,
+                                "hp_max": self.hp_max})
+            elif eff.get("condition"):
+                cond = str(eff["condition"])
+                blocked = states.immune_to(self, "", cond)
+                if blocked:
+                    out.append({"kind": "affliction_resisted", "ref": self.ref,
+                                "what": e.name, "why": blocked, "harm": cond})
+                    continue
+                span = eff.get("for") or {}
+                rounds = None
+                if span:
+                    rounds = max(1, _amount_of(span.get("dice"), dice)) * \
+                        self.AFFLICTION_ROUNDS.get(str(span.get("unit") or "round"), 1)
+                self.add_condition(cond, rounds, source=e.name, origin=e.origin,
+                                   payload=None if rounds else {"with": e.payload.get("id")})
+                out.append({"kind": "condition", "ref": self.ref, "condition": cond,
+                            "from": e.name, "rounds": rounds})
+        return out
+
+    def end_affliction(self, e: "ActiveEffect", why: str) -> list[dict]:
+        """The affliction leaves the body — cured by its saves, run its course, or ended by
+        whatever cures it — and the conditions it held with no length of their own go with
+        it. What it already did stays: "It does not undo instantaneous effects already
+        suffered" (neutralize poison), and ability damage heals on its own clock."""
+        if not self.remove_effects(match=lambda x: x is e):
+            return []
+        ident = (e.payload or {}).get("id")
+        self.remove_effects(kind="condition",
+                            match=lambda x: (x.payload or {}).get("with") == ident)
+        return [{"kind": "affliction_ended", "ref": self.ref, "what": e.name, "why": why,
+                 "origin": e.origin}]
 
     def _standing_mods(self, kind: str, target: str,
                        ctx: dict | None = None) -> list["Modifier"]:
@@ -3283,6 +3471,12 @@ class Actor:
                 "damage_bonus": int(a["bonus"]),
                 "extra": [dict(x) for x in a["extra"]],
                 "riders": list(a["riders"]),
+                "amounts": dict(a.get("amounts") or {}),
+                # The compiled rider documents (`attack_riders.rules_for`, stored by the
+                # compile); None for a block read live, whose riders the engine reads on
+                # the hit that needs them (`Engine._printed_riders`).
+                "rules": ([dict(r) for r in a["rules"]] if isinstance(a.get("rules"), list)
+                          else None),
                 "touch": bool(a["touch"]),
                 "automatic": bool(a.get("automatic")),
                 "ability": str(a.get("ability") or ""),

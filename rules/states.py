@@ -393,6 +393,15 @@ TAGS: dict[str, tuple[str, ...]] = {
     "prone":       ("state.position.prone", "recovery.rest"),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),
+    # A poison or a disease running in the body (Core Rulebook, Afflictions, pp. 555-557):
+    # saved against on its frequency until it is cured or runs out. Not a condition of
+    # Appendix 2 — what it DOES each failed save is (ability damage, nausea, paralysis),
+    # and those land as their own effects; this tag is the affliction itself, the thing
+    # neutralize poison and remove disease end. Its record is an `ActiveEffect` of kind
+    # `affliction` whose `periodic` work the one executor runs (`Actor._afflicted`);
+    # applied by `Engine._printed_riders` from a stat block's printed rider.
+    "poisoned":    ("state.afflicted.poison",),
+    "diseased":    ("state.afflicted.disease",),
     "entangled":   ("state.held.entangled", "recovery.rest", "state.slowed"),
     # The tanglefoot bag's second half (CRB, Goods and Services): "the target is glued to
     # the floor and unable to move" on a failed DC 15 Reflex save, until it breaks free
@@ -818,17 +827,81 @@ IMMUNITY_COVERS: dict[str, tuple[str, ...]] = {
     # "nonlethal" joined both 2026-09-27, the day punches first dealt it: until then
     # every blow was lethal and a skeleton punched was a skeleton hurt, which was the
     # right answer for the wrong reason.
+    #
+    # "energy drain" joined both 2026-10-30, with the printed riders that first apply it:
+    # undead are "not subject to ... ability drain, or energy drain" (Bestiary p.309);
+    # constructs likewise ("not subject to ability damage, ability drain, fatigue,
+    # exhaustion, energy drain, or nonlethal damage", Bestiary p.307 — that sentence is
+    # from the book and was not on the page aonprd served when it was checked).
     "undead traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                       "disease", "poison", "fatigued", "exhausted",
                       *_MIND_AFFECTING, "bleed", "death", "nauseated", "sickened",
-                      "nonlethal"),
+                      "nonlethal", "energy drain"),
     "construct traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                          "disease", "poison", "fatigued", "exhausted",
                          *_MIND_AFFECTING, "bleed", "death", "nauseated",
-                         "sickened", "nonlethal"),
+                         "sickened", "nonlethal", "energy drain"),
     "elemental traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                          "poison", "bleed"),
+    # 36 and 47 shipped blocks print these, and until 2026-10-30 neither had a row, so
+    # each protected only against its own name: a gray ooze could be poisoned. "Immunity
+    # to poison, sleep effects, paralysis, polymorph, and stunning" (ooze, Bestiary p.308);
+    # plants the same and "all mind-affecting effects" (Bestiary p.309).
+    "ooze traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun", "poison",
+                    "polymorph"),
+    "plant traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun", "poison",
+                     "polymorph", *_MIND_AFFECTING),
 }
+
+# The bundle each type carries whether or not its block printed it: four shipped undead
+# and two constructs print no "traits" line and are undead and constructs all the same.
+TYPE_BUNDLES: dict[str, str] = {
+    UNDEAD: "undead traits", CONSTRUCT: "construct traits",
+    "type.ooze": "ooze traits", "type.plant": "plant traits",
+    "subtype.elemental": "elemental traits",
+}
+
+
+def immune_to(actor, what: str = "", condition_key: str = "") -> str:
+    """Which immunity stops `what` (an effect word: "poison", "disease", "paralysis",
+    "bleed", "energy drain") or the condition it would leave, on this body — "" if none.
+
+    `immunity_blocks` over the printed list, then the bundle the creature's TYPE carries
+    (`TYPE_BUNDLES`), asked by tag (law 1): a ghoul printed without "undead traits" is no
+    less immune to poison. The printed words win, so a refusal quotes the block.
+    """
+    printed = list(getattr(actor, "immunities", None) or ())
+    said = (what,) if what else ()
+    got = immunity_blocks(printed, condition_key, said)
+    if got:
+        return got
+    for tag, bundle in TYPE_BUNDLES.items():
+        if actor is not None and actor.has_state(tag):
+            got = immunity_blocks([bundle], condition_key, said)
+            if got:
+                return got
+    return ""
+
+
+# Which ability scores a type's bundle protects from damage and drain. Undead are "immune
+# to damage to [their] physical ability scores (Constitution, Dexterity, and Strength)" and
+# "not subject to ... ability drain" (Bestiary p.309); constructs to all of it (p.307).
+_PHYSICAL = ("str", "dex", "con")
+
+
+def ability_harm_refused(actor, ability: str, drain: bool = False) -> str:
+    """Which immunity stops this ability damage or drain on this body, or ""."""
+    ab = str(ability or "").lower()[:3]
+    printed = [" ".join(str(x).split()).lower() for x in
+               (getattr(actor, "immunities", None) or ())]
+    word = "ability drain" if drain else "ability damage"
+    if word in printed:
+        return word
+    if actor is not None and actor.has_state(CONSTRUCT):
+        return "construct traits"
+    if actor is not None and actor.has_state(UNDEAD) and (drain or ab in _PHYSICAL):
+        return "undead traits"
+    return ""
 
 
 # The families that change a MIND rather than a body, named the way 1e names them.
