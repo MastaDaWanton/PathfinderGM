@@ -151197,6 +151197,11 @@
            "kind": "blood_drain",
            "dice": "1",
            "ability": "str"
+          },
+          {
+           "kind": "blood_drain",
+           "dice": "1",
+           "ability": "con"
           }
          ]
         }
