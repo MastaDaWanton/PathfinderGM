@@ -133,6 +133,25 @@ def test_the_equipment_tab_offers_a_pots_power_and_a_worn_rings_not_a_pocketed_o
         == ["mi-wardstar-medallion"]
 
 
+def test_a_finished_item_is_never_drunk_and_reads_as_magic_on_the_counter():
+    """Seen live on the scratch campaign, 2026-10-30: the looted cloak of resistance and a
+    bought pot of war paint each offered "Drink" on the Equipment tab, and the counter's
+    deal line called the paint "for show, no effect in play"."""
+    from play.views import _carried, _row
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.stock = {}
+    pc.add_stock(magicitem.finished("mi-cloak-resistance-1", how="found"), 1)
+    pc.add_stock(magicitem.finished("mi-war-paint-silver"), 1)
+    rows = {r["name"]: [a["label"] for a in r.get("acts") or ()] for r in _carried(pc)}
+    assert "Drink" not in rows["Cloak of Resistance +1"]
+    assert "Wear" in rows["Cloak of Resistance +1"]
+    assert rows["War Paint (Silver)"] == ["Use"]
+    good = next(g for g in goods.magic_item_goods() if g.key == "mi-war-paint-silver")
+    row = _row(good, good.price_gp)
+    assert row["does_something"] and row["shelf"] == "magic"
+
+
 # --- 2. creatures drop their magic ---------------------------------------------------------
 
 def _loot(template: str):

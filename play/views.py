@@ -1864,6 +1864,11 @@ def _carried(pc) -> list[dict]:
             else:
                 acts += by_name(d["name"], slot)
         acts += _power_acts(s, d, slot, bool(on), held_weapon)
+        # A finished wondrous item is used by its power, never drunk: on the magic shelf it
+        # passed `usable`, and live (2026-10-30) a looted cloak of resistance and a bought
+        # pot of war paint each offered "Drink".
+        if isinstance(getattr(s, "magic", None), dict) and s.magic.get("powers"):
+            acts = [a for a in acts if a["label"] not in ("Drink", "Throw", "Coat")]
         effects = [str(x) for x in (d.get("effects") or []) if x]
         # A magic layer is something the engine runs (lane U5's report, 2026-10-06: an
         # enchanted sword read "for show, no effect in play"). Its line is the item card's,
@@ -6191,7 +6196,11 @@ def _row(item, price: float, count: int = 1) -> dict:
             # when the answer is nothing — worth showing beside the number. A weapon, a
             # suit of armour and a horse are all things the engine runs (I2).
             "does_something": bool(getattr(item, "specs", None))
-            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")
+            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount",
+                                                  "magic")
+            # A finished wondrous item runs its layer (`magicitem.finished`); the deal line
+            # said "for show, no effect in play" of a pot of war paint (live, 2026-10-30).
+            or bool((getattr(item, "magic", None) or {}).get("powers"))
             # A craft's material is worked at a bench — charcoal feeds the forge — and
             # the panel had labelled it "for show, no effect in play" (live, 2026-10-05).
             or _craft_material(item)
@@ -6228,6 +6237,10 @@ def _shelf_of(item) -> str:
     name = str(getattr(item, "name", "") or "")
     if kind in ("mount", "tack"):
         return "animals"
+    if kind == "magic":
+        # A counter's finished wondrous item (`goods.magic_item_goods`): on the magic
+        # shelf, where it is filed once bought, not among the rope.
+        return "magic"
     if kind == "material":
         # A craft's staple consumable (`market.consumable_goods`): charcoal is what a
         # workshop works with, filed beside the drawn materials, not among the rope.
