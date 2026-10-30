@@ -13133,91 +13133,6 @@
    "source_hash": "dad0658ceae8bcdc",
    "compiler": 2
   },
-  "apollyon": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "6d6",
-       "bonus": 8,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "energy drain",
-        "disease"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "gore",
-       "key": "gore",
-       "count": 1,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "gore",
-       "dice": "4d6",
-       "bonus": 8,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "Usher of the Black Rain",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "melee: Usher of the Black Rain (scythe) +56/+51/+46/+41 (2d4+29/19-20/x4)",
-    "ranged: Usher of the Black Rain (longbow) +48/+43/+38/+33 (1d8+21/x3)",
-    "gear: Usher of the Black Rain"
-   ],
-   "source_hash": "7bfe27728a0d1a77",
-   "compiler": 2
-  },
   "apostate-devil": {
    "attacks": {
     "melee": [
@@ -14578,6 +14493,930 @@
    "source_hash": "8567a4bd25f0ecc6",
    "compiler": 2
   },
+  "archdevil-of-contracts": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+5 axiomatic flaming unholy trident",
+       "key": "axiomatic flaming unholy trident",
+       "count": 1,
+       "bonuses": [
+        55,
+        50,
+        45,
+        40
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "trident",
+       "natural": false,
+       "kind": "",
+       "dice": "2d6",
+       "bonus": 29,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "1d6",
+         "type": "fire"
+        }
+       ],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": 0
+      },
+      {
+       "name": "gore",
+       "key": "gore",
+       "count": 1,
+       "bonuses": [
+        50
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "gore",
+       "dice": "2d8",
+       "bonus": 8,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "wings",
+       "key": "wings",
+       "count": 6,
+       "bonuses": [
+        48
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "wing",
+       "dice": "1d8",
+       "bonus": 8,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+5 axiomatic flaming unholy trident",
+     "key": "trident",
+     "table": "weapon",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [
+      "axiomatic",
+      "flaming",
+      "unholy"
+     ],
+     "charges": 0,
+     "slot": "pack"
+    },
+    {
+     "printed": "soul quill",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "ranged: attack",
+    "ranged: as an immediate action the archdevil can cause his body and all of his gear to collapse into ashes while he teleports to any point within 30 feet of his prior position and re-forms",
+    "ranged: taking no",
+    "gear: soul quill"
+   ],
+   "source_hash": "76afd39c5c24e3f7",
+   "compiler": 2
+  },
+  "archdevil-of-desire": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+4 speed unholy ranseur",
+       "key": "speed unholy ranseur",
+       "count": 1,
+       "bonuses": [
+        51,
+        46,
+        41,
+        36
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "ranseur",
+       "natural": false,
+       "kind": "",
+       "dice": "2d4",
+       "bonus": 26,
+       "crit_range": 19,
+       "crit_mult": 3,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": 0
+      },
+      {
+       "name": "wings",
+       "key": "wings",
+       "count": 2,
+       "bonuses": [
+        40
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "wing",
+       "dice": "2d8",
+       "bonus": 6,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "gore",
+       "key": "gore",
+       "count": 1,
+       "bonuses": [
+        40
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "gore",
+       "dice": "1d6",
+       "bonus": 6,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+4 speed unholy ranseur",
+     "key": "ranseur",
+     "table": "weapon",
+     "count": 1,
+     "enhancement": 4,
+     "masterwork": true,
+     "material": "",
+     "properties": [
+      "unholy",
+      "speed"
+     ],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "melee: caress +40 touch (special)"
+   ],
+   "source_hash": "4b07eadc47ec71f5",
+   "compiler": 2
+  },
+  "archdevil-of-flies": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+5 adamantine good-outsider-bane icy burst unholy longsword",
+       "key": "adamantine good-outsider-bane icy burst unholy longsword",
+       "count": 1,
+       "bonuses": [
+        53,
+        48,
+        43,
+        38
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "longsword",
+       "natural": false,
+       "kind": "",
+       "dice": "2d6",
+       "bonus": 24,
+       "crit_range": 17,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "1d6",
+         "type": "cold"
+        }
+       ],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      }
+     ],
+     [
+      {
+       "name": "slams",
+       "key": "slams",
+       "count": 2,
+       "bonuses": [
+        47
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "slam",
+       "dice": "8d6",
+       "bonus": 13,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+5 adamantine good-outsider-bane icy burst unholy longsword",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: +5 adamantine good-outsider-bane icy burst unholy longsword"
+   ],
+   "source_hash": "a0519e4af91fdee9",
+   "compiler": 2
+  },
+  "archdevil-of-gates": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "staff of eyes",
+       "key": "staff of eyes",
+       "count": 1,
+       "bonuses": [
+        41,
+        41,
+        41,
+        36,
+        36,
+        31,
+        31,
+        26
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "1d6",
+       "bonus": 19,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      },
+      {
+       "name": "beard",
+       "key": "beard",
+       "count": 1,
+       "bonuses": [
+        36
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "1d8",
+       "bonus": 5,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "bleed",
+        "disease"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "staff of eyes",
+     "key": "",
+     "table": "magic item",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [],
+   "source_hash": "58c0caa709a93b4f",
+   "compiler": 2
+  },
+  "archdevil-of-greed": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 4,
+       "bonuses": [
+        47
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "1d6",
+       "bonus": 14,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "gore",
+       "key": "gore",
+       "count": 1,
+       "bonuses": [
+        47
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "gore",
+       "dice": "2d8",
+       "bonus": 14,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "talons",
+       "key": "talons",
+       "count": 6,
+       "bonuses": [
+        47
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "2d6",
+       "bonus": 14,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [
+    "ranged: touch attacks have a 20% miss chance against the silver effigy",
+    "ranged: and such missed attacks have a 20% chance of being redirected toward a random target within 60 feet; otherwise",
+    "ranged: they are deflected harml"
+   ],
+   "source_hash": "5219f07058d4432c",
+   "compiler": 2
+  },
+  "archdevil-of-heresy": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+5 cruelUE dispelling burst UE unholy flail",
+       "key": "cruelue dispelling burst ue unholy flail",
+       "count": 1,
+       "bonuses": [
+        47,
+        42,
+        37,
+        32
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "light-flail",
+       "natural": false,
+       "kind": "",
+       "dice": "3d6",
+       "bonus": 19,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "+1 heavy shield",
+       "key": "heavy shield",
+       "count": 1,
+       "bonuses": [
+        43,
+        38
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "heavy-shield",
+       "natural": false,
+       "kind": "",
+       "dice": "2d6",
+       "bonus": 15,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      },
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 3,
+       "bonuses": [
+        41
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "1d6",
+       "bonus": 7,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "tail slaps",
+       "key": "tail slaps",
+       "count": 3,
+       "bonuses": [
+        41
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "tail slap",
+       "dice": "2d6",
+       "bonus": 7,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "poison"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+5 arrow deflection bashing heavy steel shield",
+     "key": "heavy shield",
+     "table": "shield",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [
+      "arrow deflection",
+      "bashing"
+     ],
+     "charges": 0,
+     "slot": "shield"
+    },
+    {
+     "printed": "+5 cruel dispelling burst unholy flail",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    },
+    {
+     "printed": "lying horn",
+     "key": "",
+     "table": "magic item",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: +5 cruel dispelling burst unholy flail"
+   ],
+   "source_hash": "32b7387e4b8059bc",
+   "compiler": 2
+  },
+  "archdevil-of-iron": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "eclipse mace",
+       "key": "eclipse mace",
+       "count": 1,
+       "bonuses": [
+        49,
+        44,
+        39,
+        34
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "2d6",
+       "bonus": 22,
+       "crit_range": 19,
+       "crit_mult": 3,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      },
+      {
+       "name": "gore",
+       "key": "gore",
+       "count": 1,
+       "bonuses": [
+        39
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "gore",
+       "dice": "2d6",
+       "bonus": 6,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "eclipse mace",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: eclipse mace"
+   ],
+   "source_hash": "8f44c507d4c152a8",
+   "compiler": 2
+  },
+  "archdevil-of-sacrifice": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "gore axe",
+       "key": "gore axe",
+       "count": 1,
+       "bonuses": [
+        46,
+        41,
+        36,
+        31
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "3d6",
+       "bonus": 18,
+       "crit_range": 19,
+       "crit_mult": 4,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      },
+      {
+       "name": "wounding sword",
+       "key": "wounding sword",
+       "count": 1,
+       "bonuses": [
+        46,
+        41
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "3d6",
+       "bonus": 18,
+       "crit_range": 17,
+       "crit_mult": 3,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      },
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        42
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "2d6",
+       "bonus": 7,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab",
+        "burn"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "gore",
+       "key": "gore",
+       "count": 1,
+       "bonuses": [
+        42
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "gore",
+       "dice": "2d6",
+       "bonus": 7,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "burn"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "gore axe",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    },
+    {
+     "printed": "wounding sword",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: gore axe",
+    "gear: wounding sword"
+   ],
+   "source_hash": "5da074ff0ab89c63",
+   "compiler": 2
+  },
   "archelon": {
    "attacks": {
     "melee": [
@@ -15311,120 +16150,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "e9e53ac718826810",
-   "compiler": 2
-  },
-  "arshea": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+5 disrupting holy merciful flail",
-       "key": "disrupting holy merciful flail",
-       "count": 1,
-       "bonuses": [
-        54,
-        49,
-        44,
-        39
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "light-flail",
-       "natural": false,
-       "kind": "",
-       "dice": "1d8",
-       "bonus": 33,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      },
-      {
-       "name": "wings",
-       "key": "wings",
-       "count": 2,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "wing",
-       "dice": "2d6",
-       "bonus": 20,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "slam",
-       "key": "slam",
-       "count": 1,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "slam",
-       "dice": "1d4",
-       "bonus": 20,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+5 disrupting holy merciful flail",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "ranged: attack",
-    "ranged: a spell)",
-    "ranged: that creature must succeed at a DC 40 Will save",
-    "ranged: hesitate and waste the action (losing the spell or daily use, if applicable). If Arshea attacked that creature in the last round",
-    "gear: +5 disrupting holy merciful flail"
-   ],
-   "source_hash": "92a90f340177c72a",
    "compiler": 2
   },
   "arsinoitherium": {
@@ -16853,6 +17578,75 @@
    "carries": [],
    "unread": [],
    "source_hash": "c7d6770a5e765376",
+   "compiler": 2
+  },
+  "avatar-of-the-outer-god": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "slams",
+       "key": "slams",
+       "count": 2,
+       "bonuses": [
+        51
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "slam",
+       "dice": "2d8",
+       "bonus": 17,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "temporal displacement"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "tentacles",
+       "key": "tentacles",
+       "count": 4,
+       "bonuses": [
+        49
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "tentacle",
+       "dice": "6d6",
+       "bonus": 8,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "3d43985e6aa54261",
    "compiler": 2
   },
   "avoral": {
@@ -18401,97 +19195,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "64066dc825a58db1",
-   "compiler": 2
-  },
-  "baalzebul": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+5 adamantine good-outsider-bane icy burst unholy longsword",
-       "key": "adamantine good-outsider-bane icy burst unholy longsword",
-       "count": 1,
-       "bonuses": [
-        53,
-        48,
-        43,
-        38
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "longsword",
-       "natural": false,
-       "kind": "",
-       "dice": "2d6",
-       "bonus": 24,
-       "crit_range": 17,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "1d6",
-         "type": "cold"
-        }
-       ],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      }
-     ],
-     [
-      {
-       "name": "slams",
-       "key": "slams",
-       "count": 2,
-       "bonuses": [
-        47
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "slam",
-       "dice": "8d6",
-       "bonus": 13,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+5 adamantine good-outsider-bane icy burst unholy longsword",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: +5 adamantine good-outsider-bane icy burst unholy longsword"
-   ],
-   "source_hash": "a0519e4af91fdee9",
    "compiler": 2
   },
   "babau": {
@@ -20090,96 +20793,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "f327ae2a6ee6f3ae",
-   "compiler": 2
-  },
-  "barbatos": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "Eyjatas",
-       "key": "eyjatas",
-       "count": 1,
-       "bonuses": [
-        41,
-        41,
-        41,
-        36,
-        36,
-        31,
-        31,
-        26
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "1d6",
-       "bonus": 19,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "beard",
-       "key": "beard",
-       "count": 1,
-       "bonuses": [
-        36
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "1d8",
-       "bonus": 5,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "bleed",
-        "disease"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "Eyjatas",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: Eyjatas"
-   ],
-   "source_hash": "da3c62096398a195",
    "compiler": 2
   },
   "barbed-devil": {
@@ -23823,119 +24436,6 @@
    "source_hash": "753f5bad73e1597e",
    "compiler": 2
   },
-  "belial": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+4 speed unholy ranseur",
-       "key": "speed unholy ranseur",
-       "count": 1,
-       "bonuses": [
-        51,
-        46,
-        41,
-        36
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "ranseur",
-       "natural": false,
-       "kind": "",
-       "dice": "2d4",
-       "bonus": 26,
-       "crit_range": 19,
-       "crit_mult": 3,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": 0
-      },
-      {
-       "name": "wings",
-       "key": "wings",
-       "count": 2,
-       "bonuses": [
-        40
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "wing",
-       "dice": "2d8",
-       "bonus": 6,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "gore",
-       "key": "gore",
-       "count": 1,
-       "bonuses": [
-        40
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "gore",
-       "dice": "1d6",
-       "bonus": 6,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+4 speed unholy ranseur",
-     "key": "ranseur",
-     "table": "weapon",
-     "count": 1,
-     "enhancement": 4,
-     "masterwork": true,
-     "material": "",
-     "properties": [
-      "unholy",
-      "speed"
-     ],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "melee: caress +40 touch (special)"
-   ],
-   "source_hash": "4b07eadc47ec71f5",
-   "compiler": 2
-  },
   "belker": {
    "attacks": {
     "melee": [
@@ -24246,141 +24746,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "ba34354f7543a0c3",
-   "compiler": 2
-  },
-  "black-butterfly": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "Voidsedge",
-       "key": "voidsedge",
-       "count": 1,
-       "bonuses": [
-        52,
-        47,
-        42,
-        37
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "1d6",
-       "bonus": 20,
-       "crit_range": 19,
-       "crit_mult": 3,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "2d6",
-         "type": "fire"
-        },
-        {
-         "dice": "2d6",
-         "type": "cold"
-        }
-       ],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "touch",
-       "key": "touch",
-       "count": 1,
-       "bonuses": [
-        42
-       ],
-       "automatic": false,
-       "touch": true,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "10d6",
-       "bonus": 0,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "cold",
-       "extra": [],
-       "riders": [
-        "steal breath"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": [
-     [
-      {
-       "name": "Voidsedge",
-       "key": "voidsedge",
-       "count": 1,
-       "bonuses": [
-        52,
-        47,
-        42,
-        37
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "ranged",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "1d6",
-       "bonus": 20,
-       "crit_range": 19,
-       "crit_mult": 3,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "2d6",
-         "type": "fire"
-        },
-        {
-         "dice": "2d6",
-         "type": "cold"
-        }
-       ],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      }
-     ]
-    ]
-   },
-   "carries": [
-    {
-     "printed": "Voidsedge",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: Voidsedge"
-   ],
-   "source_hash": "8d9ddf4d2bd3b3b3",
    "compiler": 2
   },
   "black-ice": {
@@ -41286,6 +41651,103 @@
    "source_hash": "7ceef3396f747c30",
    "compiler": 2
   },
+  "celestial-titan": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "maul of the titans",
+       "key": "maul of the titans",
+       "count": 1,
+       "bonuses": [
+        33,
+        28,
+        23,
+        18
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "6d8",
+       "bonus": 28,
+       "crit_range": 17,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      }
+     ],
+     [
+      {
+       "name": "slams",
+       "key": "slams",
+       "count": 2,
+       "bonuses": [
+        30
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "slam",
+       "dice": "2d8",
+       "bonus": 17,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+3 breastplate",
+     "key": "breastplate",
+     "table": "armour",
+     "count": 1,
+     "enhancement": 3,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "armour"
+    },
+    {
+     "printed": "maul of the titans",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: maul of the titans"
+   ],
+   "source_hash": "d1b1fb3b3d835b8d",
+   "compiler": 2
+  },
   "cell-leader": {
    "attacks": {
     "melee": [
@@ -44278,129 +44740,6 @@
    "source_hash": "2723dfed7b3743ec",
    "compiler": 2
   },
-  "charon": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+5 spellstealing UE unholy quarterstaff",
-       "key": "spellstealing ue unholy quarterstaff",
-       "count": 1,
-       "bonuses": [
-        52,
-        47,
-        42,
-        37
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "quarterstaff",
-       "natural": false,
-       "kind": "",
-       "dice": "1d6",
-       "bonus": 20,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "curse of ages"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      },
-      {
-       "name": "+5 spellstealing UE unholy quarterstaff",
-       "key": "spellstealing ue unholy quarterstaff",
-       "count": 1,
-       "bonuses": [
-        52,
-        47,
-        42
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "quarterstaff",
-       "natural": false,
-       "kind": "",
-       "dice": "1d6",
-       "bonus": 20,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "curse of ages"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      }
-     ]
-    ],
-    "ranged": [
-     [
-      {
-       "name": "Stygian bolts",
-       "key": "stygian bolts",
-       "count": 4,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "ranged",
-       "base": "bolts",
-       "natural": false,
-       "kind": "",
-       "dice": "10d6",
-       "bonus": 0,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "memory loss"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      }
-     ]
-    ]
-   },
-   "carries": [
-    {
-     "printed": "+5 spellstealing unholy quarterstaff",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "melee: touch +51 (curse of",
-    "gear: +5 spellstealing unholy quarterstaff"
-   ],
-   "source_hash": "265e6d3633e0f69c",
-   "compiler": 2
-  },
   "charybdis": {
    "attacks": {
     "melee": [
@@ -44466,83 +44805,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "1fb89efccecbe8d3",
-   "compiler": 2
-  },
-  "chavazvug": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bites",
-       "key": "bites",
-       "count": 4,
-       "bonuses": [
-        30
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "2d6",
-       "bonus": 13,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "2d6",
-         "type": "fire"
-        }
-       ],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "talons",
-       "key": "talons",
-       "count": 2,
-       "bonuses": [
-        30
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "2d8",
-       "bonus": 13,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "2d6",
-         "type": "fire"
-        }
-       ],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "8ac662498918855c",
    "compiler": 2
   },
   "cheetah": {
@@ -45642,7 +45904,7 @@
    "source_hash": "8c933c79c7252f1d",
    "compiler": 2
   },
-  "chosen-of-lamashtu": {
+  "chosen-of-the-demon-mother": {
    "attacks": {
     "melee": [
      [
@@ -65199,89 +65461,6 @@
    "source_hash": "aef7d81e75bae4f3",
    "compiler": 2
   },
-  "dispater": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "The Eclipsing Eye",
-       "key": "the eclipsing eye",
-       "count": 1,
-       "bonuses": [
-        49,
-        44,
-        39,
-        34
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "2d6",
-       "bonus": 22,
-       "crit_range": 19,
-       "crit_mult": 3,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "gore",
-       "key": "gore",
-       "count": 1,
-       "bonuses": [
-        39
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "gore",
-       "dice": "2d6",
-       "bonus": 6,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "The Eclipsing Eye",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: The Eclipsing Eye"
-   ],
-   "source_hash": "93b190369f94f1cf",
-   "compiler": 2
-  },
   "divine-loremaster": {
    "attacks": {
     "melee": [
@@ -68372,6 +68551,171 @@
    ],
    "unread": [],
    "source_hash": "ebaa562dd83c1224",
+   "compiler": 2
+  },
+  "dreamland-hound": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        18
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "2d6",
+       "bonus": 9,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 2,
+       "bonuses": [
+        18
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "1d6",
+       "bonus": 9,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "f29958b53ea58765",
+   "compiler": 2
+  },
+  "dreamland-spider": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "mwk flail",
+       "key": "flail",
+       "count": 1,
+       "bonuses": [
+        22,
+        17,
+        12
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "light-flail",
+       "natural": false,
+       "kind": "",
+       "dice": "3d6",
+       "bonus": 8,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        16
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "2d6",
+       "bonus": 4,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "poison"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": [
+     [
+      {
+       "name": "mwk bolas",
+       "key": "bolas",
+       "count": 1,
+       "bonuses": [
+        23
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "ranged",
+       "base": "bolas",
+       "natural": false,
+       "kind": "",
+       "dice": "1d8",
+       "bonus": 8,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      }
+     ]
+    ]
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "21fbc963349787f4",
    "compiler": 2
   },
   "dretch": {
@@ -77033,103 +77377,6 @@
    "source_hash": "e9d2d5304e0df920",
    "compiler": 2
   },
-  "elysian": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "maul of the titans",
-       "key": "maul of the titans",
-       "count": 1,
-       "bonuses": [
-        33,
-        28,
-        23,
-        18
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "6d8",
-       "bonus": 28,
-       "crit_range": 17,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      }
-     ],
-     [
-      {
-       "name": "slams",
-       "key": "slams",
-       "count": 2,
-       "bonuses": [
-        30
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "slam",
-       "dice": "2d8",
-       "bonus": 17,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+3 breastplate",
-     "key": "breastplate",
-     "table": "armour",
-     "count": 1,
-     "enhancement": 3,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "armour"
-    },
-    {
-     "printed": "maul of the titans",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: maul of the titans"
-   ],
-   "source_hash": "d1b1fb3b3d835b8d",
-   "compiler": 2
-  },
   "emotion-ooze": {
    "attacks": {
     "melee": [
@@ -77210,6 +77457,358 @@
    "carries": [],
    "unread": [],
    "source_hash": "20cf95b66e01d521",
+   "compiler": 2
+  },
+  "empyreal-lord-of-abandon": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+5 disrupting holy merciful flail",
+       "key": "disrupting holy merciful flail",
+       "count": 1,
+       "bonuses": [
+        54,
+        49,
+        44,
+        39
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "light-flail",
+       "natural": false,
+       "kind": "",
+       "dice": "1d8",
+       "bonus": 33,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "wings",
+       "key": "wings",
+       "count": 2,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "wing",
+       "dice": "2d6",
+       "bonus": 20,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "slam",
+       "key": "slam",
+       "count": 1,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "slam",
+       "dice": "1d4",
+       "bonus": 20,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+5 disrupting holy merciful flail",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "ranged: attack",
+    "ranged: a spell)",
+    "ranged: that creature must succeed at a DC 40 Will save",
+    "ranged: hesitate and waste the action (losing the spell or daily use, if applicable). If the empyreal lord attacked that creature in the last round",
+    "gear: +5 disrupting holy merciful flail"
+   ],
+   "source_hash": "1bd92e25bf317b7b",
+   "compiler": 2
+  },
+  "empyreal-lord-of-silence": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "void starknife",
+       "key": "void starknife",
+       "count": 1,
+       "bonuses": [
+        52,
+        47,
+        42,
+        37
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "starknife",
+       "natural": false,
+       "kind": "",
+       "dice": "1d6",
+       "bonus": 20,
+       "crit_range": 19,
+       "crit_mult": 3,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "2d6",
+         "type": "fire"
+        },
+        {
+         "dice": "2d6",
+         "type": "cold"
+        }
+       ],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "touch",
+       "key": "touch",
+       "count": 1,
+       "bonuses": [
+        42
+       ],
+       "automatic": false,
+       "touch": true,
+       "category": "melee",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "10d6",
+       "bonus": 0,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "cold",
+       "extra": [],
+       "riders": [
+        "steal breath"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": [
+     [
+      {
+       "name": "void starknife",
+       "key": "void starknife",
+       "count": 1,
+       "bonuses": [
+        52,
+        47,
+        42,
+        37
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "ranged",
+       "base": "starknife",
+       "natural": false,
+       "kind": "",
+       "dice": "1d6",
+       "bonus": 20,
+       "crit_range": 19,
+       "crit_mult": 3,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "2d6",
+         "type": "fire"
+        },
+        {
+         "dice": "2d6",
+         "type": "cold"
+        }
+       ],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      }
+     ]
+    ]
+   },
+   "carries": [
+    {
+     "printed": "void starknife",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: void starknife"
+   ],
+   "source_hash": "e437fb20f5bd1029",
+   "compiler": 2
+  },
+  "empyreal-lord-of-vengeance": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+5 evil-outsider-bane flaming burst holy bastard sword",
+       "key": "evil-outsider-bane flaming burst holy bastard sword",
+       "count": 1,
+       "bonuses": [
+        46,
+        41,
+        36,
+        31
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "bastard-sword",
+       "natural": false,
+       "kind": "",
+       "dice": "3d8",
+       "bonus": 21,
+       "crit_range": 17,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "wings",
+       "key": "wings",
+       "count": 5,
+       "bonuses": [
+        35
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "wing",
+       "dice": "1d8",
+       "bonus": 5,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "1d6",
+         "type": "fire"
+        }
+       ],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+5 evil-outsider-bane flaming burst holy bastard sword",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    },
+    {
+     "printed": "+5 full plate",
+     "key": "full plate",
+     "table": "armour",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "armour"
+    }
+   ],
+   "unread": [
+    "gear: +5 evil-outsider-bane flaming burst holy bastard sword"
+   ],
+   "source_hash": "2cccdc6d1b14425e",
    "compiler": 2
   },
   "empyrean": {
@@ -79912,7 +80511,7 @@
    "source_hash": "cb2d779e30244699",
    "compiler": 2
   },
-  "eye-of-lamashtu": {
+  "eye-of-the-demon-mother": {
    "attacks": {
     "melee": [
      [
@@ -80711,7 +81310,7 @@
      "slot": "pack"
     },
     {
-     "printed": "trained hawk (Pathfinder RPG Bestiary 131, worth 40 gp)",
+     "printed": "trained hawk (Bestiary 131, worth 40 gp)",
      "key": "",
      "table": "",
      "count": 1,
@@ -80785,13 +81384,13 @@
    ],
    "unread": [
     "gear: silver holy symbol",
-    "gear: trained hawk (Pathfinder RPG Bestiary 131, worth 40 gp)",
+    "gear: trained hawk (Bestiary 131, worth 40 gp)",
     "gear: bit and bridle",
     "gear: light horse (combat trained)",
     "gear: riding saddle",
     "gear: saddlebags"
    ],
-   "source_hash": "7ba19949208d9f9c",
+   "source_hash": "ec301bb832aa5c30",
    "compiler": 2
   },
   "fallen": {
@@ -94648,172 +95247,6 @@
    "source_hash": "d545cc792ee80759",
    "compiler": 2
   },
-  "geryon": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+5 cruelUE dispelling burst UE unholy flail",
-       "key": "cruelue dispelling burst ue unholy flail",
-       "count": 1,
-       "bonuses": [
-        47,
-        42,
-        37,
-        32
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "light-flail",
-       "natural": false,
-       "kind": "",
-       "dice": "3d6",
-       "bonus": 19,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      },
-      {
-       "name": "+1 heavy shield",
-       "key": "heavy shield",
-       "count": 1,
-       "bonuses": [
-        43,
-        38
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "heavy-shield",
-       "natural": false,
-       "kind": "",
-       "dice": "2d6",
-       "bonus": 15,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 3,
-       "bonuses": [
-        41
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "1d6",
-       "bonus": 7,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "tail slaps",
-       "key": "tail slaps",
-       "count": 3,
-       "bonuses": [
-        41
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "tail slap",
-       "dice": "2d6",
-       "bonus": 7,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "poison"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+5 arrow deflection bashing heavy steel shield",
-     "key": "heavy shield",
-     "table": "shield",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [
-      "arrow deflection",
-      "bashing"
-     ],
-     "charges": 0,
-     "slot": "shield"
-    },
-    {
-     "printed": "+5 cruel dispelling burst unholy flail",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    },
-    {
-     "printed": "Horn of Lies",
-     "key": "",
-     "table": "magic item",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: +5 cruel dispelling burst unholy flail"
-   ],
-   "source_hash": "a4e40a447cb72bad",
-   "compiler": 2
-  },
   "ghaele": {
    "attacks": {
     "melee": [
@@ -95815,6 +96248,76 @@
    "source_hash": "904ce5b253a9e4f6",
    "compiler": 2
   },
+  "ghoul-dreamland": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        16
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "1d8",
+       "bonus": 7,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "disease",
+        "paralysis"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 2,
+       "bonuses": [
+        17
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "1d6",
+       "bonus": 7,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "paralysis"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "386fc11ae55da4fb",
+   "compiler": 2
+  },
   "ghoul-huntsmaster": {
    "attacks": {
     "melee": [
@@ -96015,76 +96518,6 @@
     "gear: +1 human-bane arrows (3)"
    ],
    "source_hash": "3d6ffa0e3f220944",
-   "compiler": 2
-  },
-  "ghoul-leng": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        16
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "1d8",
-       "bonus": 7,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "disease",
-        "paralysis"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 2,
-       "bonuses": [
-        17
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "1d6",
-       "bonus": 7,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "paralysis"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "386fc11ae55da4fb",
    "compiler": 2
   },
   "ghoul-monarch": {
@@ -104709,7 +105142,7 @@
      "slot": "pack"
     },
     {
-     "printed": "giant gecko mount (Pathfinder RPG Bestiary 3 186)",
+     "printed": "giant gecko mount (Bestiary 3 186)",
      "key": "",
      "table": "",
      "count": 1,
@@ -104734,9 +105167,9 @@
     }
    ],
    "unread": [
-    "gear: giant gecko mount (Pathfinder RPG Bestiary 3 186)"
+    "gear: giant gecko mount (Bestiary 3 186)"
    ],
-   "source_hash": "4d70630bc2cb30e1",
+   "source_hash": "35f1df581fabd41d",
    "compiler": 2
   },
   "goblin-snake": {
@@ -107828,7 +108261,7 @@
      "slot": "pack"
     },
     {
-     "printed": "Book of the Black Sphynx (see below)",
+     "printed": "black sphinx tome (see below)",
      "key": "",
      "table": "",
      "count": 1,
@@ -107841,9 +108274,9 @@
     }
    ],
    "unread": [
-    "gear: Book of the Black Sphynx (see below)"
+    "gear: black sphinx tome (see below)"
    ],
-   "source_hash": "e1ee826b83fee61f",
+   "source_hash": "ccbdb2e2b6cb9aae",
    "compiler": 2
   },
   "grand-inquisitor": {
@@ -108709,7 +109142,7 @@
      "slot": "pack"
     },
     {
-     "printed": "wooden unholy symbol of Norgorber",
+     "printed": "wooden unholy symbol of a god of secrets",
      "key": "",
      "table": "",
      "count": 1,
@@ -108728,9 +109161,9 @@
     "gear: +1 human-bane gladius",
     "gear: cestus of security*",
     "gear: disguise kit",
-    "gear: wooden unholy symbol of Norgorber"
+    "gear: wooden unholy symbol of a god of secrets"
    ],
-   "source_hash": "f8791bef956346a6",
+   "source_hash": "c2c8f56582e6a2f0",
    "compiler": 2
   },
   "gravebound": {
@@ -109295,6 +109728,170 @@
    "carries": [],
    "unread": [],
    "source_hash": "c52d388a0c67d0d7",
+   "compiler": 2
+  },
+  "great-old-one-of-serpents": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "6d10",
+       "bonus": 21,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "poison"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 2,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "4d8",
+       "bonus": 21,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "tail slap",
+       "key": "tail slap",
+       "count": 1,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "tail slap",
+       "dice": "4d10",
+       "bonus": 21,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "5107b2f56f581e28",
+   "compiler": 2
+  },
+  "great-old-one-of-the-statue": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        41
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "4d6",
+       "bonus": 18,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 6,
+       "bonuses": [
+        41
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "2d8",
+       "bonus": 18,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "e350a5eaf73a5724",
    "compiler": 2
   },
   "great-white-whale": {
@@ -111179,7 +111776,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Gorum",
+     "printed": "silver holy symbol of a god of battle",
      "key": "",
      "table": "",
      "count": 1,
@@ -111192,9 +111789,9 @@
     }
    ],
    "unread": [
-    "gear: silver holy symbol of Gorum"
+    "gear: silver holy symbol of a god of battle"
    ],
-   "source_hash": "1068f08e3a8926cb",
+   "source_hash": "364a73f786678d99",
    "compiler": 2
   },
   "grizzled-mercenary": {
@@ -111761,7 +112358,7 @@
      "slot": "pack"
     },
     {
-     "printed": "giant gecko mount (Pathfinder RPG Bestiary 3 186)",
+     "printed": "giant gecko mount (Bestiary 3 186)",
      "key": "",
      "table": "",
      "count": 1,
@@ -111786,9 +112383,9 @@
     }
    ],
    "unread": [
-    "gear: giant gecko mount (Pathfinder RPG Bestiary 3 186)"
+    "gear: giant gecko mount (Bestiary 3 186)"
    ],
-   "source_hash": "f13166a7b5513882",
+   "source_hash": "783c8c27213a8eb6",
    "compiler": 2
   },
   "grodair": {
@@ -112964,7 +113561,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Abadar",
+     "printed": "silver holy symbol of a god of commerce",
      "key": "",
      "table": "",
      "count": 1,
@@ -112990,9 +113587,9 @@
    ],
    "unread": [
     "gear: guard's kit*",
-    "gear: silver holy symbol of Abadar"
+    "gear: silver holy symbol of a god of commerce"
    ],
-   "source_hash": "1106efa21a878e51",
+   "source_hash": "ea471e3dca51e169",
    "compiler": 2
   },
   "guard-mage": {
@@ -119456,7 +120053,7 @@
    "source_hash": "d9de757075eec5bc",
    "compiler": 2
   },
-  "herecite-of-asmodeus": {
+  "herecite-of-tyranny": {
    "attacks": {
     "melee": [
      [
@@ -123942,7 +124539,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Torag",
+     "printed": "silver holy symbol of a god of the forge",
      "key": "",
      "table": "",
      "count": 1,
@@ -123956,9 +124553,9 @@
    ],
    "unread": [
     "gear: mwk musket with 14 alchemical cartridges (paper)",
-    "gear: silver holy symbol of Torag"
+    "gear: silver holy symbol of a god of the forge"
    ],
-   "source_hash": "43ed86aa892311c7",
+   "source_hash": "d381c07d58021da4",
    "compiler": 2
   },
   "holy-warrior": {
@@ -125194,7 +125791,371 @@
    "source_hash": "1c99a37e8cdec139",
    "compiler": 2
   },
-  "hound-of-tindalos": {
+  "horseman-of-death": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+5 spellstealing UE unholy quarterstaff",
+       "key": "spellstealing ue unholy quarterstaff",
+       "count": 1,
+       "bonuses": [
+        52,
+        47,
+        42,
+        37
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "quarterstaff",
+       "natural": false,
+       "kind": "",
+       "dice": "1d6",
+       "bonus": 20,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "curse of ages"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "+5 spellstealing UE unholy quarterstaff",
+       "key": "spellstealing ue unholy quarterstaff",
+       "count": 1,
+       "bonuses": [
+        52,
+        47,
+        42
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "quarterstaff",
+       "natural": false,
+       "kind": "",
+       "dice": "1d6",
+       "bonus": 20,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "curse of ages"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      }
+     ]
+    ],
+    "ranged": [
+     [
+      {
+       "name": "Stygian bolts",
+       "key": "stygian bolts",
+       "count": 4,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "ranged",
+       "base": "bolts",
+       "natural": false,
+       "kind": "",
+       "dice": "10d6",
+       "bonus": 0,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "memory loss"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": ""
+      }
+     ]
+    ]
+   },
+   "carries": [
+    {
+     "printed": "+5 spellstealing unholy quarterstaff",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 5,
+     "masterwork": true,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "melee: touch +51 (curse of",
+    "gear: +5 spellstealing unholy quarterstaff"
+   ],
+   "source_hash": "265e6d3633e0f69c",
+   "compiler": 2
+  },
+  "horseman-of-famine": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bites",
+       "key": "bites",
+       "count": 3,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "4d6",
+       "bonus": 21,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "energy drain"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "claws",
+       "key": "claws",
+       "count": 2,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "3d8",
+       "bonus": 14,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "ee45ba3ac412682d",
+   "compiler": 2
+  },
+  "horseman-of-pestilence": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "6d6",
+       "bonus": 8,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "energy drain",
+        "disease"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "gore",
+       "key": "gore",
+       "count": 1,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "gore",
+       "dice": "4d6",
+       "bonus": 8,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "plague weapon",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "melee: plague weapon (scythe) +56/+51/+46/+41 (2d4+29/19-20/x4)",
+    "ranged: plague weapon (longbow) +48/+43/+38/+33 (1d8+21/x3)",
+    "gear: plague weapon"
+   ],
+   "source_hash": "2342e2855e53ecea",
+   "compiler": 2
+  },
+  "horseman-of-war": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "black greatsword",
+       "key": "black greatsword",
+       "count": 1,
+       "bonuses": [
+        58,
+        58,
+        53,
+        48,
+        43
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "greatsword",
+       "natural": false,
+       "kind": "",
+       "dice": "2d6",
+       "bonus": 36,
+       "crit_range": 17,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": null
+      },
+      {
+       "name": "wings",
+       "key": "wings",
+       "count": 2,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "wing",
+       "dice": "1d6",
+       "bonus": 9,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "energy drain"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "black greatsword",
+     "key": "",
+     "table": "",
+     "count": 1,
+     "enhancement": 0,
+     "masterwork": false,
+     "material": "",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [
+    "gear: black greatsword"
+   ],
+   "source_hash": "cb5539fe6c028fc4",
+   "compiler": 2
+  },
+  "hound-of-the-angles": {
    "attacks": {
     "melee": [
      [
@@ -131202,19 +132163,6 @@
    "source_hash": "b18307aa5d114780",
    "compiler": 2
   },
-  "isph-aun-vuln": {
-   "attacks": {
-    "melee": [],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [
-    "melee: bite +40 touch (destruction)",
-    "ranged: touch attacks. All ranged touch attacks against this qlippoth lord have a 50% miss chance. The soul shell does not impede Isph-Aun-Vuln's ability to move through solid objects as an incorporeal creatu"
-   ],
-   "source_hash": "fe0ae3d37f4ceac6",
-   "compiler": 2
-  },
   "izfiitar": {
    "attacks": {
     "melee": [
@@ -133236,6 +134184,232 @@
    ],
    "unread": [],
    "source_hash": "550d6b6867d244be",
+   "compiler": 2
+  },
+  "kaiju-of-flame": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bites",
+       "key": "bites",
+       "count": 3,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "6d6",
+       "bonus": 26,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "burn"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "wings",
+       "key": "wings",
+       "count": 2,
+       "bonuses": [
+        44
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "wing",
+       "dice": "3d8",
+       "bonus": 16,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "burn"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "tail slap",
+       "key": "tail slap",
+       "count": 1,
+       "bonuses": [
+        46
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "tail slap",
+       "dice": "4d8",
+       "bonus": 35,
+       "crit_range": 19,
+       "crit_mult": 3,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "burn"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "aa3a39267e1203cb",
+   "compiler": 2
+  },
+  "kaiju-of-frost": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bites",
+       "key": "bites",
+       "count": 2,
+       "bonuses": [
+        39
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "4d6",
+       "bonus": 27,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "4d6",
+         "type": "cold"
+        }
+       ],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "slam",
+       "key": "slam",
+       "count": 1,
+       "bonuses": [
+        39
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "slam",
+       "dice": "4d8",
+       "bonus": 27,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "4d6",
+         "type": "cold"
+        }
+       ],
+       "riders": [
+        "staggering strike"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [
+    "ranged: touch attacks with a range of 1",
+    "ranged: 200 feet. If she chooses to fire them in a line",
+    "ranged: all creatures within the area of effect take 20d6 points of cold damage (Reflex DC 38 half). If she fires the beams as"
+   ],
+   "source_hash": "29f28fd8f2b95892",
+   "compiler": 2
+  },
+  "kaiju-of-the-fouled-sea": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "tentacles",
+       "key": "tentacles",
+       "count": 6,
+       "bonuses": [
+        40
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "tentacle",
+       "dice": "4d6",
+       "bonus": 21,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "2d6",
+         "type": "acid"
+        }
+       ],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "fe7793c5063994a2",
    "compiler": 2
   },
   "kalavakus": {
@@ -138570,171 +139744,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "59e6b438c787e4d8",
-   "compiler": 2
-  },
-  "leng-hound": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        18
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "2d6",
-       "bonus": 9,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 2,
-       "bonuses": [
-        18
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "1d6",
-       "bonus": 9,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "f29958b53ea58765",
-   "compiler": 2
-  },
-  "leng-spider": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "mwk flail",
-       "key": "flail",
-       "count": 1,
-       "bonuses": [
-        22,
-        17,
-        12
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "light-flail",
-       "natural": false,
-       "kind": "",
-       "dice": "3d6",
-       "bonus": 8,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      },
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        16
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "2d6",
-       "bonus": 4,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "poison"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": [
-     [
-      {
-       "name": "mwk bolas",
-       "key": "bolas",
-       "count": 1,
-       "bonuses": [
-        23
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "ranged",
-       "base": "bolas",
-       "natural": false,
-       "kind": "",
-       "dice": "1d8",
-       "bonus": 8,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      }
-     ]
-    ]
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "21fbc963349787f4",
    "compiler": 2
   },
   "leonal": {
@@ -147107,101 +148116,6 @@
    "source_hash": "c0fc18c19b892a4b",
    "compiler": 2
   },
-  "mammon": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 4,
-       "bonuses": [
-        47
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "1d6",
-       "bonus": 14,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "gore",
-       "key": "gore",
-       "count": 1,
-       "bonuses": [
-        47
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "gore",
-       "dice": "2d8",
-       "bonus": 14,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "talons",
-       "key": "talons",
-       "count": 6,
-       "bonuses": [
-        47
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "2d6",
-       "bonus": 14,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [
-    "ranged: touch attacks have a 20% miss chance against the Argent Prince",
-    "ranged: and such missed attacks have a 20% chance of being redirected toward a random target within 60 feet; otherwise",
-    "ranged: they are deflected harml"
-   ],
-   "source_hash": "3e9fbdd37650d9a3",
-   "compiler": 2
-  },
   "manananggal": {
    "attacks": {
     "melee": [
@@ -152234,140 +153148,6 @@
    "source_hash": "9f06396f64afc988",
    "compiler": 2
   },
-  "mephistopheles": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+5 axiomatic flaming unholy trident",
-       "key": "axiomatic flaming unholy trident",
-       "count": 1,
-       "bonuses": [
-        55,
-        50,
-        45,
-        40
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "trident",
-       "natural": false,
-       "kind": "",
-       "dice": "2d6",
-       "bonus": 29,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "1d6",
-         "type": "fire"
-        }
-       ],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": 0
-      },
-      {
-       "name": "gore",
-       "key": "gore",
-       "count": 1,
-       "bonuses": [
-        50
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "gore",
-       "dice": "2d8",
-       "bonus": 8,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "wings",
-       "key": "wings",
-       "count": 6,
-       "bonuses": [
-        48
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "wing",
-       "dice": "1d8",
-       "bonus": 8,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+5 axiomatic flaming unholy trident",
-     "key": "trident",
-     "table": "weapon",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [
-      "axiomatic",
-      "flaming",
-      "unholy"
-     ],
-     "charges": 0,
-     "slot": "pack"
-    },
-    {
-     "printed": "Visineir",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "ranged: attack",
-    "ranged: as an immediate action Mephistopheles can cause his body and all of his gear to collapse into ashes while he teleports to any point within 30 feet of his prior position and re-forms",
-    "ranged: taking no",
-    "gear: Visineir"
-   ],
-   "source_hash": "8034a10ec44c2173",
-   "compiler": 2
-  },
   "mephit": {
    "attacks": {
     "melee": [
@@ -154795,7 +155575,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Abadar",
+     "printed": "silver holy symbol of a god of commerce",
      "key": "",
      "table": "",
      "count": 1,
@@ -154822,9 +155602,9 @@
    "unread": [
     "gear: oil of bless weapon",
     "gear: guard's kit*",
-    "gear: silver holy symbol of Abadar"
+    "gear: silver holy symbol of a god of commerce"
    ],
-   "source_hash": "6a5d912d13da64ec",
+   "source_hash": "7e97cd91c6549214",
    "compiler": 2
   },
   "mistress-of-high-places": {
@@ -156195,160 +156975,6 @@
    ],
    "unread": [],
    "source_hash": "2a406998b50ce235",
-   "compiler": 2
-  },
-  "moloch": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "Goreletch",
-       "key": "goreletch",
-       "count": 1,
-       "bonuses": [
-        46,
-        41,
-        36,
-        31
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "3d6",
-       "bonus": 18,
-       "crit_range": 19,
-       "crit_mult": 4,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "Ramithaine",
-       "key": "ramithaine",
-       "count": 1,
-       "bonuses": [
-        46,
-        41
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "3d6",
-       "bonus": 18,
-       "crit_range": 17,
-       "crit_mult": 3,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        42
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "2d6",
-       "bonus": 7,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab",
-        "burn"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "gore",
-       "key": "gore",
-       "count": 1,
-       "bonuses": [
-        42
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "gore",
-       "dice": "2d6",
-       "bonus": 7,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "burn"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "Goreletch",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    },
-    {
-     "printed": "Ramithaine",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: Goreletch",
-    "gear: Ramithaine"
-   ],
-   "source_hash": "f41bb71c243b3864",
    "compiler": 2
   },
   "monadic-deva": {
@@ -164725,76 +165351,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "8bd6e4fa1729cd22",
-   "compiler": 2
-  },
-  "oaur-ooung": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "slam",
-       "key": "slam",
-       "count": 1,
-       "bonuses": [
-        35
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "slam",
-       "dice": "6d6",
-       "bonus": 17,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "poison"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "tentacles",
-       "key": "tentacles",
-       "count": 6,
-       "bonuses": [
-        30
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "tentacle",
-       "dice": "2d8",
-       "bonus": 8,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab",
-        "poison"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "bc0008cd34786b42",
    "compiler": 2
   },
   "obcisidaemon": {
@@ -173450,7 +174006,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Iomedae",
+     "printed": "silver holy symbol of a god of valor",
      "key": "",
      "table": "",
      "count": 1,
@@ -173464,9 +174020,9 @@
    ],
    "unread": [
     "gear: oil of bless weapon (2)",
-    "gear: silver holy symbol of Iomedae"
+    "gear: silver holy symbol of a god of valor"
    ],
-   "source_hash": "afd3312a9079dcca",
+   "source_hash": "5de117b5e6403edc",
    "compiler": 2
   },
   "petty-fence": {
@@ -176403,7 +176959,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver unholy symbol of Urgathoa",
+     "printed": "silver unholy symbol of a god of undeath",
      "key": "",
      "table": "",
      "count": 1,
@@ -176429,9 +176985,9 @@
    ],
    "unread": [
     "gear: pallid suspension*",
-    "gear: silver unholy symbol of Urgathoa"
+    "gear: silver unholy symbol of a god of undeath"
    ],
-   "source_hash": "7ac8aafe212aa6af",
+   "source_hash": "4a377bcc87e84be6",
    "compiler": 2
   },
   "plaguebrewer": {
@@ -180370,6 +180926,214 @@
    "source_hash": "4f6366014c64e5d0",
    "compiler": 2
   },
+  "qlippoth-lord-of-acid": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bite",
+       "key": "bite",
+       "count": 1,
+       "bonuses": [
+        33
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "6d8",
+       "bonus": 13,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "2d6",
+         "type": "acid"
+        }
+       ],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [
+    "melee: 4 talons 33 (2d6+13)"
+   ],
+   "source_hash": "97936f7d329bff8a",
+   "compiler": 2
+  },
+  "qlippoth-lord-of-fever": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "bites",
+       "key": "bites",
+       "count": 4,
+       "bonuses": [
+        30
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "bite",
+       "dice": "2d6",
+       "bonus": 13,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "2d6",
+         "type": "fire"
+        }
+       ],
+       "riders": [
+        "grab"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "talons",
+       "key": "talons",
+       "count": 2,
+       "bonuses": [
+        30
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "claw",
+       "dice": "2d8",
+       "bonus": 13,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [
+        {
+         "dice": "2d6",
+         "type": "fire"
+        }
+       ],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "8ac662498918855c",
+   "compiler": 2
+  },
+  "qlippoth-lord-of-ruin": {
+   "attacks": {
+    "melee": [],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [
+    "melee: bite +40 touch (destruction)",
+    "ranged: touch attacks. All ranged touch attacks against this qlippoth lord have a 50% miss chance. The soul shell does not impede the qlippoth lord's ability to move through solid objects as an incorporeal creatu"
+   ],
+   "source_hash": "fc6cd11055a5f1b5",
+   "compiler": 2
+  },
+  "qlippoth-lord-of-spawn": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "slam",
+       "key": "slam",
+       "count": 1,
+       "bonuses": [
+        35
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "slam",
+       "dice": "6d6",
+       "bonus": 17,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "poison"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      },
+      {
+       "name": "tentacles",
+       "key": "tentacles",
+       "count": 6,
+       "bonuses": [
+        30
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "",
+       "natural": true,
+       "kind": "tentacle",
+       "dice": "2d8",
+       "bonus": 8,
+       "crit_range": 19,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [
+        "grab",
+        "poison"
+       ],
+       "ability": "",
+       "drain": false,
+       "class": "natural",
+       "mode": ""
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [],
+   "unread": [],
+   "source_hash": "bc0008cd34786b42",
+   "compiler": 2
+  },
   "qolok": {
    "attacks": {
     "melee": [
@@ -181313,107 +182077,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "5e783f3443b99843",
-   "compiler": 2
-  },
-  "ragathiel": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+5 evil-outsider-bane flaming burst holy bastard sword",
-       "key": "evil-outsider-bane flaming burst holy bastard sword",
-       "count": 1,
-       "bonuses": [
-        46,
-        41,
-        36,
-        31
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "bastard-sword",
-       "natural": false,
-       "kind": "",
-       "dice": "3d8",
-       "bonus": 21,
-       "crit_range": 17,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": null
-      },
-      {
-       "name": "wings",
-       "key": "wings",
-       "count": 5,
-       "bonuses": [
-        35
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "wing",
-       "dice": "1d8",
-       "bonus": 5,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "1d6",
-         "type": "fire"
-        }
-       ],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+5 evil-outsider-bane flaming burst holy bastard sword",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    },
-    {
-     "printed": "+5 full plate",
-     "key": "full plate",
-     "table": "armour",
-     "count": 1,
-     "enhancement": 5,
-     "masterwork": true,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "armour"
-    }
-   ],
-   "unread": [
-    "gear: +5 evil-outsider-bane flaming burst holy bastard sword"
-   ],
-   "source_hash": "2cccdc6d1b14425e",
    "compiler": 2
   },
   "rage-flame": {
@@ -185683,7 +186346,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver unholy symbol of Norgorber",
+     "printed": "silver unholy symbol of a god of secrets",
      "key": "",
      "table": "",
      "count": 1,
@@ -185746,10 +186409,10 @@
    "unread": [
     "gear: hemp rope (50 ft.)",
     "gear: holy text",
-    "gear: silver unholy symbol of Norgorber",
+    "gear: silver unholy symbol of a god of secrets",
     "gear: trail rations (5)"
    ],
-   "source_hash": "76b117acae678988",
+   "source_hash": "8f1271805ea1ddc4",
    "compiler": 2
   },
   "recruit": {
@@ -187123,75 +187786,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "7de32a5ef1499dc5",
-   "compiler": 2
-  },
-  "rhan-tegoth": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        41
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "4d6",
-       "bonus": 18,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 6,
-       "bonuses": [
-        41
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "2d8",
-       "bonus": 18,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "e350a5eaf73a5724",
    "compiler": 2
   },
   "rhinoceros": {
@@ -203942,7 +204536,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Torag",
+     "printed": "silver holy symbol of a god of the forge",
      "key": "",
      "table": "",
      "count": 1,
@@ -203969,9 +204563,9 @@
    "unread": [
     "gear: soothe syrup (2)",
     "gear: guard's kit*",
-    "gear: silver holy symbol of Torag"
+    "gear: silver holy symbol of a god of the forge"
    ],
-   "source_hash": "ab014adf297faa7c",
+   "source_hash": "8d957e09f246d146",
    "compiler": 2
   },
   "shieldbreaker": {
@@ -205118,60 +205712,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "9917e5132b24e15a",
-   "compiler": 2
-  },
-  "shoki": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "+2 cold iron quarterstaff",
-       "key": "cold iron quarterstaff",
-       "count": 1,
-       "bonuses": [
-        19,
-        14
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "quarterstaff",
-       "natural": false,
-       "kind": "",
-       "dice": "1d6",
-       "bonus": 12,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "item",
-       "mode": "",
-       "item": 0
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "+2 cold iron quarterstaff",
-     "key": "quarterstaff",
-     "table": "weapon",
-     "count": 1,
-     "enhancement": 2,
-     "masterwork": true,
-     "material": "cold iron",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [],
-   "source_hash": "db54e61a0f975084",
    "compiler": 2
   },
   "shopkeep": {
@@ -210240,7 +210780,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver holy symbol of Calistria",
+     "printed": "silver holy symbol of a god of revenge",
      "key": "",
      "table": "",
      "count": 1,
@@ -210265,9 +210805,9 @@
     }
    ],
    "unread": [
-    "gear: silver holy symbol of Calistria"
+    "gear: silver holy symbol of a god of revenge"
    ],
-   "source_hash": "644313512799faba",
+   "source_hash": "a4455aa6e68129d9",
    "compiler": 2
   },
   "snake-swarm": {
@@ -210959,6 +211499,60 @@
    "carries": [],
    "unread": [],
    "source_hash": "783eb00e49d78425",
+   "compiler": 2
+  },
+  "soulkeeper-psychopomp": {
+   "attacks": {
+    "melee": [
+     [
+      {
+       "name": "+2 cold iron quarterstaff",
+       "key": "cold iron quarterstaff",
+       "count": 1,
+       "bonuses": [
+        19,
+        14
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "melee",
+       "base": "quarterstaff",
+       "natural": false,
+       "kind": "",
+       "dice": "1d6",
+       "bonus": 12,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "",
+       "extra": [],
+       "riders": [],
+       "ability": "",
+       "drain": false,
+       "class": "item",
+       "mode": "",
+       "item": 0
+      }
+     ]
+    ],
+    "ranged": []
+   },
+   "carries": [
+    {
+     "printed": "+2 cold iron quarterstaff",
+     "key": "quarterstaff",
+     "table": "weapon",
+     "count": 1,
+     "enhancement": 2,
+     "masterwork": true,
+     "material": "cold iron",
+     "properties": [],
+     "charges": 0,
+     "slot": "pack"
+    }
+   ],
+   "unread": [],
+   "source_hash": "db54e61a0f975084",
    "compiler": 2
   },
   "sound-warrior": {
@@ -220084,92 +220678,6 @@
    "source_hash": "c4b5fbc11d4c580a",
    "compiler": 2
   },
-  "szuriel": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "Lamentation of the Faithless",
-       "key": "lamentation of the faithless",
-       "count": 1,
-       "bonuses": [
-        58,
-        58,
-        53,
-        48,
-        43
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": false,
-       "kind": "",
-       "dice": "2d6",
-       "bonus": 36,
-       "crit_range": 17,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "body",
-       "mode": ""
-      },
-      {
-       "name": "wings",
-       "key": "wings",
-       "count": 2,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "wing",
-       "dice": "1d6",
-       "bonus": 9,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "energy drain"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [
-    {
-     "printed": "Lamentation of the Faithless",
-     "key": "",
-     "table": "",
-     "count": 1,
-     "enhancement": 0,
-     "masterwork": false,
-     "material": "",
-     "properties": [],
-     "charges": 0,
-     "slot": "pack"
-    }
-   ],
-   "unread": [
-    "gear: Lamentation of the Faithless"
-   ],
-   "source_hash": "946d0727e0d97949",
-   "compiler": 2
-  },
   "tactician": {
    "attacks": {
     "melee": [
@@ -222141,75 +222649,6 @@
     "gear: masterwork flute"
    ],
    "source_hash": "612467fd9562dbdb",
-   "compiler": 2
-  },
-  "tawil-at-umr": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "slams",
-       "key": "slams",
-       "count": 2,
-       "bonuses": [
-        51
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "slam",
-       "dice": "2d8",
-       "bonus": 17,
-       "crit_range": null,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "temporal displacement"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "tentacles",
-       "key": "tentacles",
-       "count": 4,
-       "bonuses": [
-        49
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "tentacle",
-       "dice": "6d6",
-       "bonus": 8,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "3d43985e6aa54261",
    "compiler": 2
   },
   "taxidermic-grizzly-bear": {
@@ -224247,7 +224686,7 @@
      "slot": "pack"
     },
     {
-     "printed": "silver unholy symbol of Urgathoa",
+     "printed": "silver unholy symbol of a god of undeath",
      "key": "",
      "table": "",
      "count": 1,
@@ -224260,9 +224699,9 @@
     }
    ],
    "unread": [
-    "gear: silver unholy symbol of Urgathoa"
+    "gear: silver unholy symbol of a god of undeath"
    ],
-   "source_hash": "d6613d1de2830956",
+   "source_hash": "5567d7b73c849eb1",
    "compiler": 2
   },
   "theletos": {
@@ -225670,54 +226109,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "6d27312cd999b392",
-   "compiler": 2
-  },
-  "thuskchoon": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        33
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "6d8",
-       "bonus": 13,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "2d6",
-         "type": "acid"
-        }
-       ],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [
-    "melee: 4 talons 33 (2d6+13)"
-   ],
-   "source_hash": "97936f7d329bff8a",
    "compiler": 2
   },
   "thylacine": {
@@ -229066,75 +229457,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "5f845a4dbfaebb6c",
-   "compiler": 2
-  },
-  "trelmarixian": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bites",
-       "key": "bites",
-       "count": 3,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "4d6",
-       "bonus": 21,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "energy drain"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 2,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "3d8",
-       "bonus": 14,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "ee45ba3ac412682d",
    "compiler": 2
   },
   "trench-mist": {
@@ -240061,103 +240383,6 @@
    "source_hash": "b828f66a4c5678f2",
    "compiler": 2
   },
-  "varklops": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bites",
-       "key": "bites",
-       "count": 3,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "6d6",
-       "bonus": 26,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "burn"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "wings",
-       "key": "wings",
-       "count": 2,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "wing",
-       "dice": "3d8",
-       "bonus": 16,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "burn"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "tail slap",
-       "key": "tail slap",
-       "count": 1,
-       "bonuses": [
-        46
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "tail slap",
-       "dice": "4d8",
-       "bonus": 35,
-       "crit_range": 19,
-       "crit_mult": 3,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "burn"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "aa3a39267e1203cb",
-   "compiler": 2
-  },
   "vaultbreaker": {
    "attacks": {
     "melee": [
@@ -243506,52 +243731,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "3275942778b973b6",
-   "compiler": 2
-  },
-  "vorgozen": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "tentacles",
-       "key": "tentacles",
-       "count": 6,
-       "bonuses": [
-        40
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "tentacle",
-       "dice": "4d6",
-       "bonus": 21,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "2d6",
-         "type": "acid"
-        }
-       ],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "fe7793c5063994a2",
    "compiler": 2
   },
   "vrock": {
@@ -252994,89 +253173,6 @@
    "source_hash": "eea850b33845e033",
    "compiler": 2
   },
-  "yarthoon": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bites",
-       "key": "bites",
-       "count": 2,
-       "bonuses": [
-        39
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "4d6",
-       "bonus": 27,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "4d6",
-         "type": "cold"
-        }
-       ],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "slam",
-       "key": "slam",
-       "count": 1,
-       "bonuses": [
-        39
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "slam",
-       "dice": "4d8",
-       "bonus": 27,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [
-        {
-         "dice": "4d6",
-         "type": "cold"
-        }
-       ],
-       "riders": [
-        "staggering strike"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [
-    "ranged: touch attacks with a range of 1",
-    "ranged: 200 feet. If she chooses to fire them in a line",
-    "ranged: all creatures within the area of effect take 20d6 points of cold damage (Reflex DC 38 half). If she fires the beams as"
-   ],
-   "source_hash": "29f28fd8f2b95892",
-   "compiler": 2
-  },
   "yellow-musk-creeper": {
    "attacks": {
     "melee": [
@@ -253204,101 +253300,6 @@
    "carries": [],
    "unread": [],
    "source_hash": "b3846259aef4cafd",
-   "compiler": 2
-  },
-  "yig": {
-   "attacks": {
-    "melee": [
-     [
-      {
-       "name": "bite",
-       "key": "bite",
-       "count": 1,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "bite",
-       "dice": "6d10",
-       "bonus": 21,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "poison"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "claws",
-       "key": "claws",
-       "count": 2,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "claw",
-       "dice": "4d8",
-       "bonus": 21,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      },
-      {
-       "name": "tail slap",
-       "key": "tail slap",
-       "count": 1,
-       "bonuses": [
-        44
-       ],
-       "automatic": false,
-       "touch": false,
-       "category": "melee",
-       "base": "",
-       "natural": true,
-       "kind": "tail slap",
-       "dice": "4d10",
-       "bonus": 21,
-       "crit_range": 19,
-       "crit_mult": null,
-       "nonlethal": false,
-       "type": "",
-       "extra": [],
-       "riders": [
-        "grab"
-       ],
-       "ability": "",
-       "drain": false,
-       "class": "natural",
-       "mode": ""
-      }
-     ]
-    ],
-    "ranged": []
-   },
-   "carries": [],
-   "unread": [],
-   "source_hash": "5107b2f56f581e28",
    "compiler": 2
   },
   "yithian": {

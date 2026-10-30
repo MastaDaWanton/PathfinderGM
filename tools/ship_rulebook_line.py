@@ -369,8 +369,11 @@ def write_aliases(gone: list[dict], shipped: dict[str, dict]) -> tuple[dict, lis
 
     moved = golarion_rewrites.bestiary_aliases()
     aliases = {k: moved.get(v, v) for k, v in aliases.items()}
+    # A renamed creature's old id is that creature, never a stand-in: 0.2.22 shipped
+    # "chosen-of-lamashtu" itself, so landing it by CR sent it to an athach.
     for old_id, new_id in moved.items():
-        aliases.setdefault(old_id, new_id)
+        aliases[old_id] = new_id
+        was_cr.pop(old_id, None)
     ALIASES.write_text(json.dumps({
         "note": ("Ids the bestiary carried before option D (2026-10-29), each to the shipped "
                  "body it now is: written by tools/ship_rulebook_line.py, read by "
