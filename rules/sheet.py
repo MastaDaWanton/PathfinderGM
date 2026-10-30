@@ -7843,6 +7843,31 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         a.weapons = kept
         if a.equipped and weapons_mod.is_ammunition(a.equipped):
             a.equipped = "unarmed"
+    # A natural attack in hand that this body no longer grants goes back to fists, after
+    # the effects (a wild shape's jaws are an effect's) and before `validate`, which would
+    # otherwise refuse the whole sheet. The jaws are the race document's, read live
+    # (`_race_doc`), so when that document cannot be read the bite goes with it — law 2's
+    # rule for a removed source. Measured 2026-10-29: the owner's Sammy (asura wizard 2,
+    # 410 turns) equipped "bite" from a bench race in homebrew/races/asura.json; loaded
+    # anywhere that file was not — a reported save, a deleted or edited bench race — the
+    # roster said "the sheet cannot be read" and the game could not be played. The names
+    # stay on `weapons`, as `creation.build` wrote them, so the race coming back restores
+    # them. Only natural-attack names: an unknown table weapon is still refused, because
+    # nothing else could have put it there and silently unarming it would hide that.
+    if a.equipped:
+        held = " ".join(str(a.equipped).split()).lower()
+        from . import races as races_mod
+
+        if held in races_mod.natural_weapon_aliases() and held not in WEAPONS \
+                and not weapons_mod.has(held) and a.natural_weapon(held) is None \
+                and a._crafted_weapon(held) is None:
+            import logging
+
+            logging.getLogger("pathfindergm").warning(
+                "%s: %r is a natural attack race %r does not grant (its document "
+                "could not be read or no longer lists it); fighting unarmed",
+                a.name, a.equipped, a.race)
+            a.equipped = "unarmed"
     # After the effects, never before: a save written while a Constitution buff was
     # standing carries a maximum that already includes it, so the rolled base is the
     # saved total minus whatever Constitution contributes with everything loaded. Do it
