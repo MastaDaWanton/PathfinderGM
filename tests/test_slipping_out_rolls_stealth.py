@@ -10,9 +10,10 @@ When 1e calls for it (CRB p.106, Archives of Nethys, Skills > Stealth): the chec
 opposed by the Perception check of anyone who might notice you", made "as part of
 movement, so it doesn't take a separate action"; up to half speed at no penalty, which is
 what slipping out is. So: rolled against the sharpest eye here, and with nobody here to
-notice, not rolled at all. Not modelled: "if people are observing you … you can't use
-Stealth" — nothing records who is watching the player — and the Bluff that can buy the
-diversion.
+notice, not rolled at all. Since 2026-10-30, "if people are observing you … you can't use
+Stealth. Against most creatures, finding cover or concealment allows you to use Stealth"
+is modelled (`Engine._watched_in_the_open`, rules/awareness.py), so the walk past the
+watchman below is made in shadow. Not modelled: the Bluff that can buy the diversion.
 """
 from __future__ import annotations
 
@@ -72,6 +73,9 @@ def test_slipping_out_past_a_watchman_on_the_exits_row_asks_for_the_die(worlds, 
     c = desk["c"]
     way = _way(c)
     c.scene.add(instantiate("guildhand", scene=c.scene, name="the watchman"))
+    # In shadow (20% concealment): watched in the open, Stealth is refused before the
+    # die (CRB p.106), which is tests/test_hidden_state.py's case, not this one's.
+    c.scene.pc().add_buff("concealment", "miss_chance", 20, source="test: the long shadows")
     c.save()
     r = _say("I slip out quietly", way)
     assert r.status_code == 200, r.content[:300]
