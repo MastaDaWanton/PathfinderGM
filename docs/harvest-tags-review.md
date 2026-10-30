@@ -527,6 +527,7 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 |---|---|---|
 | anarchic-essence | `abrikandilu` | Abrikandilu |
 | anarchic-essence | `augnagar` | Augnagar |
+| anarchic-essence | `avatar-of-the-outer-god` | Avatar of the Outer God |
 | anarchic-essence | `azuretzi` | Azuretzi |
 | anarchic-essence | `babau` | Babau |
 | anarchic-essence | `balor` | Balor |
@@ -587,7 +588,6 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | anarchic-essence | `shemhazian` | Shemhazian |
 | anarchic-essence | `shoggti` | Shoggti |
 | anarchic-essence | `succubus` | Succubus |
-| anarchic-essence | `tawil-at-umr` | Tawil At'umr |
 | anarchic-essence | `thanatotic` | Thanatotic |
 | anarchic-essence | `thulgant` | Thulgant |
 | anarchic-essence | `uinuja` | Uinuja |
@@ -996,7 +996,7 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `horseman-of-famine` | Horseman of Famine |
 | unholy-essence | `horseman-of-pestilence` | Horseman of Pestilence |
 | unholy-essence | `horseman-of-war` | Horseman of War |
-| unholy-essence | `hound-of-tindalos` | Hound of Tindalos |
+| unholy-essence | `hound-of-the-angles` | Hound of the Angles |
 | unholy-essence | `howler` | Howler |
 | unholy-essence | `hydraggon` | Hydraggon |
 | unholy-essence | `hydrodaemon` | Hydrodaemon |

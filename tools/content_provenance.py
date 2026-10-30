@@ -144,6 +144,20 @@ GOLARION = {
         Abadius Calistril Pharast Gozran Desnus Sarenith Erastus Arodus Rova Lamashan
         Neth Kuthona Toilday Wealday Oathday Fireday Starday
     """,
+    # The second sweep, 2026-10-30: the named things in the Bestiary 6 demigods' blocks
+    # (their weapons and artifacts, Mammon's silver body, Black Butterfly's titled
+    # ability), the three unique kaiju, and a Villain Codex artifact. Found by a discovery
+    # pass over the bestiary's capitalised words, read by hand against d20pfsrd's blocks.
+    "item": """
+        Goreletch Ramithaine Eyjatas Voidsedge Visineir
+    """,
+    "item phrase": [
+        "Eclipsing Eye", "Lamentation of the Faithless", "Usher of the Black Rain",
+        "Horn of Lies", "Argent Prince", "Book of the Black Sphynx", "Silence Between",
+    ],
+    "character kaiju": """
+        Varklops Vorgozen Yarthoon
+    """,
     # Golarion's coined metals: the skymetals of Numeria and the steel named for Nex. Both
     # cases, because a material's id and its prose are lower-case (renamed 2026-10-30).
     "material": """
@@ -160,8 +174,12 @@ MYTH = {
         Moloch Belial Baalzebul Dispater Geryon Barbatos Abraxas Haagenti Shax Hastur
         Azathoth Cthulhu Nyarlathotep Yog-Sothoth Shub-Niggurath Erebus Abaddon Abaddonian
         Apollyon Charon Ahriman Cernunnos Apsu Dahak Leng Carcosa Styx
+        Yig Rhan-Tegoth Tindalos
+        Avernus Phlegethon Stygia Malebolge Cocytus Caina Nessus
     """,
-    "myth phrase": ["Baba Yaga", "Sun Wukong"],
+    # Tawil at'Umr is Lovecraft and Price's; Hell's layers are Virgil's, Dante's and
+    # Milton's (Dis, the second, is left off: a bare "Dis" is a prefix in running text).
+    "myth phrase": ["Baba Yaga", "Sun Wukong", "Tawil at'Umr"],
 }
 
 # Paizo product titles quoted in rules text — a citation of a trademark, not lore.

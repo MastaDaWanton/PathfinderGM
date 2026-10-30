@@ -809,15 +809,28 @@ COSMOS: list[tuple[str, str, bool]] = [
     ("Axis", "city of law", True),
     # The myth places, as the spells' own edits already wrote them (the daemon wastes,
     # the river of forgetting), here as one map so the bestiary's 41 "any (Abaddon)"
-    # environments read the same as Malediction's prose. Erebus is Mammon's layer of Hell;
-    # Leng is the Mythos' dream plateau, which this game's rules call the Dimension of
-    # Dreams.
+    # environments read the same as Malediction's prose. Leng is the Mythos' dream
+    # plateau, which this game's rules call the Dimension of Dreams; Tindalos the Mythos'
+    # city of angles, whose hounds enter by a corner ("angled entry").
     ("River Styx", "river of forgetting", True),
     ("Styx", "river of forgetting", True),
     ("Abaddonian", "daemonic", False),
     ("Abaddon", "daemon wastes", True),
-    ("Erebus", "treasure vaults of Hell", True),
     ("Leng", "dreamlands", True),
+    ("Tindalos", "angles", True),
+    # Hell's nine layers by Golarion's names, which are Virgil's, Dante's and Milton's
+    # (Avernus, Dis, Erebus, Phlegethon, Stygia, Malebolge, Cocytus, Caina, Nessus): myth,
+    # renamed with the rest of the myth names, by number, which is how the Bestiary's own
+    # text already counts them ("Nessus, the ninth and deepest layer of Hell"). Dis is
+    # left to the rows' own edits: as a bare word it is a prefix in running English.
+    ("Avernus", "first layer of Hell", True),
+    ("Erebus", "third layer of Hell", True),
+    ("Phlegethon", "fourth layer of Hell", True),
+    ("Stygia", "fifth layer of Hell", True),
+    ("Malebolge", "sixth layer of Hell", True),
+    ("Cocytus", "seventh layer of Hell", True),
+    ("Caina", "eighth layer of Hell", True),
+    ("Nessus", "ninth layer of Hell", True),
 ]
 
 
@@ -946,6 +959,24 @@ CREATURE_RENAMES: list[tuple[str, str, str, str, str | None]] = [
      "Chosen of the Demon Mother", None),
     ("eye-of-lamashtu", "Eye of Lamashtu", "eye-of-the-demon-mother",
      "Eye of the Demon Mother", None),
+    # The second sweep (2026-10-30, the owner: "Golarion's names gone everywhere"). The
+    # three unique kaiju are Paizo's own named characters ("Kaiju, Vorgozen" in the book),
+    # named here by their element as the others by their portfolio.
+    ("varklops", "Varklops", "kaiju-of-flame", "Kaiju of Flame", "the kaiju"),
+    ("vorgozen", "Vorgozen", "kaiju-of-the-fouled-sea", "Kaiju of the Fouled Sea",
+     "the kaiju"),
+    ("yarthoon", "Yarthoon", "kaiju-of-frost", "Kaiju of Frost", "the kaiju"),
+    # The Mythos gods the Bestiaries stat — Lovecraft's and his circle's, so myth by this
+    # table's rule, as Hastur, Azathoth and Yog-Sothoth already were. Their blocks call
+    # each "the Great Old One"; Tawil at'Umr is the outer god's avatar.
+    ("yig", "Yig", "great-old-one-of-serpents", "Great Old One of Serpents",
+     "the Great Old One"),
+    ("rhan-tegoth", "Rhan-Tegoth", "great-old-one-of-the-statue",
+     "Great Old One of the Statue", "the Great Old One"),
+    ("tawil-at-umr", "Tawil at'Umr", "avatar-of-the-outer-god", "Avatar of the Outer God",
+     "the avatar"),
+    ("hound-of-tindalos", "Hound of Tindalos", "hound-of-the-angles", "Hound of the Angles",
+     None),
 ]
 
 # Sentences the renames alone would leave wrong, keyed by the creature's original id and
@@ -958,13 +989,63 @@ CREATURE_EDITS: dict[str, list[tuple[str, str]]] = {
     "mammon": [("Mammon's Mark (Su)", "Miser's Mark (Su)"),      # Genius Avaricious's word
                # Written out in full: an edit's new words must survive the later passes,
                # or the second run cannot find them and calls the table stale.
-               ("domain on Erebus", "domain in the treasure vaults of Hell")],
+               ("domain on Erebus", "domain in the third layer of Hell"),
+               ("Argent Prince (Su)", "Silver Effigy (Su)")],
     "ghoran": [("Ghorus Seed", "Ghoran Seed")],
     "tawil-at-umr": [("Yog-Sothoth can create a new avatar",
                       "the outer god it serves can create a new avatar")],
     # An ability with no (Ex) after its title, so nothing marks the sentence start.
     "charon": [("Craft Item Charon is treated", "Craft Item The Horseman is treated")],
+    # Hell's layers listed by name; Dis, the second, is only ever named here.
+    "pit-fiend": [("the depths of Nessus, the ninth and deepest layer of Hell",
+                   "the depths of the ninth and deepest layer of Hell"),
+                  ("to Avernus, Dis, Malebolge, Nessus, and Phlegethon the layers",
+                   "to the first, second, fourth, sixth and ninth layers, the layers")],
+    "mephistopheles": [("Within his realm of Caina,", "Within his realm, the eighth layer of "
+                                                      "Hell,")],
+    "black-butterfly": [("Voidsedge Bond (Ex)", "Starknife Bond (Ex)"),
+                        # Her ability titled for her epithet, "the Silence Between".
+                        ("Silence Between (Ex)", "Between Breaths (Ex)")],
 }
+
+# The named weapons and artifacts of the Bestiary 6 demigods, Paizo's coinages (proper
+# names of things, which every Paizo declaration makes Product Identity): each becomes
+# what it is, from its own description (d20pfsrd prints them; it keeps the names). In a
+# list — a melee line, a treasure line — the bare noun; in prose, "the" noun.
+ITEM_NAMES: list[tuple[str, str]] = [
+    ("Goreletch", "gore axe"),                        # +3 unholy vorpal battleaxe
+    ("Ramithaine", "wounding sword"),                 # +3 unholy wounding longsword
+    ("Eyjatas", "staff of eyes"),                     # quarterstaff set with eyeballs
+    ("Eclipsing Eye", "eclipse mace"),                # +4 adamantine heavy mace
+    ("Lamentation of the Faithless", "black greatsword"),
+    ("Usher of the Black Rain", "plague weapon"),     # a longbow that becomes a scythe
+    ("Voidsedge", "void starknife"),                  # +5 aberration-bane starknife
+    ("Visineir", "soul quill"),                       # adamantine quill and dagger
+    ("Horn of Lies", "lying horn"),
+    ("Argent Prince", "silver effigy"),               # the silver body Mammon possesses
+    ("Book of the Black Sphynx", "black sphinx tome"),  # Villain Codex, Grand Dam's gear
+]
+
+
+def _items(s: str) -> str:
+    pattern = _ITEMS_RE
+
+    def swap(m: re.Match) -> str:
+        core = _ITEMS[m.group("name")]
+        before = m.string[:m.start()].rstrip()
+        if not before or before[-1] in "(,;":
+            return core                                 # a list entry, or the line's start
+        new = "the " + core
+        if before[-1] in ".!?:\n\"" or _OPENS_AFTER.search(before):
+            new = new[0].upper() + new[1:]
+        return new
+
+    return pattern.sub(swap, s)
+
+
+_ITEMS = dict(ITEM_NAMES)
+_ITEMS_RE = re.compile(r"(?<![\w'-])(?P<the>[Tt]he\s+)?(?P<name>" + "|".join(
+    re.escape(n) for n, _c in sorted(ITEM_NAMES, key=lambda e: -len(e[0]))) + r")(?![\w-])")
 
 GODS.update({"Torag": "a god of the forge", "Iomedae": "a god of valor"})
 WORSHIPER_RE = re.compile(r"\b([Ww]orshiper of) (" + "|".join(map(re.escape, GODS)) + r")\b")
@@ -1048,7 +1129,7 @@ def apply_bestiary(entries: list[dict]) -> list[dict]:
         def prose(s: str, rename=rename) -> str:
             s = SYMBOL_RE.sub(lambda m: f"{m.group(1)} {GODS[m.group(2)]}", rename(s))
             s = WORSHIPER_RE.sub(lambda m: f"{m.group(1)} {GODS[m.group(2)]}", s)
-            return _god_names(_common(s))
+            return _god_names(_common(_items(s)))
 
         e = _rewrite_prose(e, prose)
         if own in renamed:
