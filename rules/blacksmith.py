@@ -1413,6 +1413,11 @@ class Work:
     # salamander oil its leather was curried in. Ids only; `forge_items.build` reads the
     # marks live.
     marks: list = field(default_factory=list)
+    # A finished item's limited-use finishes (`rules/finish_uses.py`): uses gone by key
+    # ("cold-iron-blanching~0": 1), and the battle-long ones in their battle now. Kept as
+    # tags so a blade kept as a plain Stock remembers a spent blanch across a save.
+    spent: dict = field(default_factory=dict)
+    engaged: list = field(default_factory=list)
 
     def copy(self) -> "Work":
         return _copy.deepcopy(self)
@@ -1444,6 +1449,8 @@ class Work:
                 t.append(f"forge.base.{k}.{_enc(self.from_base[k])}")
         t += [f"forge.finish.{f}" for f in self.finish]
         t += [f"forge.mark.{m}" for m in self.marks]
+        t += [f"forge.spent.{k}.{int(n)}" for k, n in sorted(self.spent.items()) if int(n or 0)]
+        t += [f"forge.engaged.{k}" for k in sorted(set(self.engaged))]
         if self.smith:
             t.append(f"forge.smith.level.{int(self.smith.get('level', 1))}")
             for k, n in sorted((self.smith.get("perks") or {}).items()):
@@ -1509,6 +1516,10 @@ class Work:
                 w.finish.append(val)
             elif head == "mark":
                 w.marks.append(val)
+            elif head == "spent" and len(rest) >= 2 and rest[-1].isdigit():
+                w.spent[".".join(rest[:-1])] = int(rest[-1])
+            elif head == "engaged" and val:
+                w.engaged.append(val)
             elif head == "smith" and rest:
                 if rest[0] == "level":
                     w.smith["level"] = int(rest[1])
@@ -1744,6 +1755,10 @@ def record(item, count: int | None = None) -> dict | None:
         rec["from_base"] = dict(w.from_base)
     if w.marks:
         rec["marks"] = list(w.marks)
+    if w.spent:
+        rec["spent"] = dict(w.spent)
+    if w.engaged:
+        rec["engaged"] = sorted(set(w.engaged))
     return rec
 
 
@@ -1862,6 +1877,14 @@ class Piece:
                 out.append("honed")
             if w.passes:
                 out.append(f"strengthened ×{w.passes}")
+            if w.form == "item" and w.finish:
+                # A limited finish's state where the smith sees the item (finish_uses):
+                # "cold iron blanching 1/1", or "... spent" once its dose is used.
+                built_ = build_of(record(w)) or {}
+                for row in built_.get("uses") or ():
+                    name = str(row.get("name") or row.get("source") or "").lower()
+                    out.append(f"{name} spent" if int(row.get("left") or 0) <= 0 else
+                               f"{name} {int(row['left'])}/{int(row.get('count') or 1)}")
         if self.base is not None:
             out.append("leather base")
         if self.leather is not None:
@@ -3088,7 +3111,15 @@ def _build_finish(plan: ForgePlan, row: dict) -> None:
     if tm.id in sacred and plan.level < int(rules.get("sacred_level", 3)):
         plan.problems.append(f"{tm.name} is a sacred finish, learned at Blacksmith "
                              f"{int(rules.get('sacred_level', 3))}.")
-    if tm.id in w.finish:
+    # A finish with limited uses whose dose is spent (or in its battle) is applied again:
+    # the book's blanch is a dose, "each dose of blanching can coat one weapon" (APG
+    # p.184), so a spent blanch takes a fresh one. A finish still whole is refused as
+    # before, and so is a standing one (gilding twice is nothing).
+    from . import finish_uses
+
+    head = f"{tm.id}~"
+    renewed = any(str(k).startswith(head) for k in list(w.spent) + list(w.engaged))
+    if tm.id in w.finish and not renewed:
         plan.problems.append(f"It already carries {tm.name.lower()}.")
     law = (rules.get("finish_rules") or {}).get(tm.id) or {}
     main = (w.pieces.get(PIECES.get(w.gear, PIECES["weapon"])[0]) or {}).get("material", "")
@@ -3102,7 +3133,9 @@ def _build_finish(plan: ForgePlan, row: dict) -> None:
                              f"{' or '.join(g for g in law['gear'])}, not this.")
     if plan.problems:
         return
-    w.finish.append(tm.id)
+    w.spent, w.engaged = finish_uses.restore(w.spent, w.engaged, tm.id)
+    if tm.id not in w.finish:
+        w.finish.append(tm.id)
     plan.consumes = [(item, 1), (tr, 1)]
     plan.outputs = [(w, 1)]
     plan.units = 1

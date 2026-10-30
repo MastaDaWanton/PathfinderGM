@@ -420,6 +420,30 @@ def build(record: dict) -> dict:
     strikes: list[str] = []
     gear_out = {t: 0 for t in GEAR_TARGETS}
     problems: list[str] = []
+    # Limited-use effects (`rules/finish_uses.py`): one row each for the card and the
+    # consumers, and an effect whose uses are gone is left out of everything below — so a
+    # spent blanch no longer reaches `strikes_as`, the readers' one list. Before this the
+    # `uses` on a forge spec was read by nothing: a blanched blade struck as cold iron for
+    # every hit it ever landed.
+    uses_rows: list[dict] = []
+
+    def _limited(eff: dict, source: str, key: str) -> dict | None:
+        from . import finish_uses
+
+        most = finish_uses.limit(eff)
+        if most is None:
+            return eff
+        have = max(0, most - finish_uses.used(rec, key))
+        doc_ = material(source) or {}
+        uses_rows.append({
+            "key": key, "source": source,
+            "name": str(doc_.get("name") or source.replace("-", " ")),
+            "type": str(eff.get("type") or ""), "target": str(eff.get("target") or ""),
+            "uses": str(eff.get("uses") or "").strip().lower(), "count": most,
+            "left": have, "spent_on": finish_uses.spent_on(eff),
+            "engaged": finish_uses.engaged(rec, key),
+            "effect": {k: v for k, v in eff.items() if k not in ("origin", "source")}})
+        return dict(eff, uses_key=key) if have > 0 else None
 
     pieces = rec.get("pieces") if isinstance(rec.get("pieces"), dict) else {}
     order = list(PIECES[gear]) + [p for p in pieces if p not in PIECES[gear]]
@@ -468,8 +492,10 @@ def build(record: dict) -> dict:
             inherited += [(e, slot) for e in _inherited(str(spec["creature"]))]
         passes = max(0, int(spec.get("passes", 0) or 0))
         mult = (MAIN_WEIGHT if slot == main else OTHER_WEIGHT) * STRENGTHEN_PER_PASS ** passes
-        for eff in _effects_for(doc, gear):
+        for n_eff, eff in enumerate(_effects_for(doc, gear)):
             eff = at_build(eff, gear, base_key)
+            if eff is not None:
+                eff = _limited(eff, mid, f"{mid}~{n_eff}")
             if eff is None:
                 continue
             kind = str(eff.get("type") or "")
@@ -587,8 +613,10 @@ def build(record: dict) -> dict:
         elif gear in ("armour", "shield"):
             gear_out["acp"] += 1
 
-    def _unscaled(eff: dict, source: str) -> None:
+    def _unscaled(eff: dict, source: str, key: str = "") -> None:
         eff = at_build(eff, gear, base_key)
+        if eff is not None and key:
+            eff = _limited(eff, source, key)
         if eff is None:
             return
         kind = str(eff.get("type") or "")
@@ -611,9 +639,9 @@ def build(record: dict) -> dict:
         if isinstance(mark, dict) and (gear in mark or "weapon" in mark or "armour" in mark) \
                 and "type" not in mark:
             mark = mark.get(gear) or (mark.get("armour") if gear == "shield" else None)
-        for eff in ([mark] if isinstance(mark, dict) else list(mark or [])):
+        for n_eff, eff in enumerate([mark] if isinstance(mark, dict) else list(mark or [])):
             if isinstance(eff, dict):
-                _unscaled(eff, quench)
+                _unscaled(eff, quench, f"{quench}~{n_eff}")
 
     marks = mark_rows(rec, gear, base_key, problems)
     for row in marks:
@@ -627,8 +655,8 @@ def build(record: dict) -> dict:
             if fid:
                 problems.append(f"finish: no treatment called {fid!r}.")
             continue
-        for eff in _effects_for(doc, gear):
-            _unscaled(eff, fid)
+        for n_eff, eff in enumerate(_effects_for(doc, gear)):
+            _unscaled(eff, fid, f"{fid}~{n_eff}")
 
     for flaw in rec.get("flaws") or []:
         for eff in FLAWS.get(str(flaw).strip().lower(), ()):
@@ -679,6 +707,7 @@ def build(record: dict) -> dict:
         "quality_index": quality_index,
         "multipliers": {"quality": round(q_mult, 4), "negative_cut": round(cut, 4)},
         "problems": problems,
+        "uses": uses_rows,
     }
     # The enchanter's layer (enchanting contracts §3.2), merged into the lists every
     # reader already reads — specs into the funnel, the DR traits into `strikes_as` — so

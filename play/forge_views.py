@@ -489,8 +489,16 @@ def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "",
     from . import leather_views as lv
 
     beasts = lv._creature_unknown(pieces, pc)
+    try:
+        from rules import finish_uses
+
+        uses = [finish_uses.card_line(r) for r in build.get("uses") or ()]
+    except Exception:      # noqa: BLE001 - a line in words is never worth failing for
+        uses = []
     return {
         "columns": cols, "rows": rows, "summary": summary, "powers": powers,
+        # Limited finishes and their uses left (rules/finish_uses.py): a blanch's one hit.
+        "uses": uses,
         "marks": lv._marks_card(build, pc),
         "from_creature": [_render(e) for e in build.get("specs") or []
                           if str(e.get("source") or "").startswith("creature:")

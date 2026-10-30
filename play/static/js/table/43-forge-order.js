@@ -298,6 +298,8 @@
       (as ? '<p class="fo-as">' + esc(as) + ':</p>' : "") +
       '<p class="fo-sum">' + esc(lines) + '</p>' +
       (card.powers && card.powers.length ? '<p class="fo-powers">' + esc(card.powers.join(", ")) + '</p>' : "") +
+      // A limited finish's uses left (rules/finish_uses.py): a blanch lasts one hit.
+      (card.uses && card.uses.length ? '<p class="fo-powers">' + esc(card.uses.join("; ")) + '</p>' : "") +
       '<button type="button" class="v2-btn is-small is-quiet" id="forge-sum" aria-haspopup="dialog">Show the sum</button>';
   }
   buildEl.addEventListener("click", function (e) {
@@ -366,6 +368,8 @@
       '<p class="fc-round">Final numbers are rounded toward zero.</p>' +
       (card.powers && card.powers.length ? '<p class="fc-book"><span class="fx-k">By the book, from the main piece:</span> ' +
         esc(card.powers.join(", ")) + '</p>' : "") +
+      (card.uses && card.uses.length ? '<p class="fc-book"><span class="fx-k">Uses:</span> ' +
+        esc(card.uses.join("; ")) + '</p>' : "") +
       // The leather card (it carries `by_nature`) is armour and worn goods, where the book's
       // masterwork is not +1 to attack: it says only that the book's masterwork applies.
       (markLines(card).length ? '<p class="fc-book"><span class="fx-k">Marks, once each and never scaled:</span> ' +

@@ -1320,6 +1320,11 @@ class Actor:
                                                  or ())
                     if str(p.get("uses") or "").strip().lower() == "once"}
             m["uses"] = {k: v for k, v in m["uses"].items() if k in once}
+        # The forge's limited finishes by the same rule (`finish_uses.new_day`): a wyroot
+        # haft's daily spark back, a spent blanch still spent.
+        from . import finish_uses
+
+        finish_uses.new_day(self)
 
     def worn_effects(self) -> dict[str, tuple[dict, str, str]]:
         """What worn things grant as standing effects, by a stable key — today fast
