@@ -343,3 +343,268 @@ load-bearing claim. The critic corrected three overclaims, all reflected above:
 block is PI. Also not found: the Frog God Games declarations for Rappan Athuk, Sword of
 Air, The Lost City of Barakus and Tome of Horrors. Their 748 rows need the same check
 before any option that keeps them.
+
+---
+
+## 7. Follow-up, 2026-10-29: Golarion names outside the bestiary
+
+**Status: measured, waiting on the owner. No content has been changed.** The owner chose
+option D for the bestiary on 2026-10-28: ship Paizo's rulebook line and no Product
+Identity. The spells and feats came in through the same kind of spreadsheet import, from
+the whole Pathfinder line. This section measures how much Golarion they carry and sets out
+the options. The letters run F1–F4 so they cannot be confused with A–E above.
+
+### 7.1 How it was measured
+
+Reproduce with `python tools/content_provenance.py`. It is read-only, like
+`tools/bestiary_provenance.py`. Add `--rows` for every hit row (a worklist) and
+`--sample N` for random hits with context.
+
+- **A deny-list, not a guess.** 519 Golarion proper nouns in six classes: deity,
+  place, people (and their languages), organisation, character (iconics included) and
+  calendar. They were taken from four places:
+  - §2 of this doc.
+  - The spreadsheets' own source titles.
+  - The spells' `deity` column.
+  - A discovery pass: every capitalised word in shipped content that is never written in
+    lower case anywhere, read by hand.
+
+  Matching is case-sensitive and on word boundaries. Ids are checked too, because an id is
+  the slugged name (`aroden-s-spellbane`). Names that are also ordinary English words were
+  left off the list, so **the counts are a floor**.
+- **Counted apart, not in the Golarion total:**
+  - `myth`: names older than Paizo that Golarion adopted (Asmodeus, Lamashtu, Hastur,
+    Abaddon).
+  - `product`: Paizo titles cited in rules text ("see Pathfinder RPG Bestiary").
+  - `cosmology`: Paizo planes that read as ordinary words (Boneyard, First World,
+    Elysium).
+- **Where in a row the name sits** matters, because it decides what a fix costs:
+  - its **name** or id;
+  - its **prose** (description, benefit, special);
+  - only a **list column**: the spells' `deity` and `bloodline` columns, or the feats'
+    prerequisites.
+- **Family** comes from each row's `source`, using an explicit table:
+  - rulebook: the Roleplaying Game line;
+  - setting: Campaign Setting and Player Companion together;
+  - adventure: Adventure Path, module and Society;
+  - other: blog, comic and card deck.
+
+  All 208 source strings are placed, and none is unclassified. After folding the
+  spreadsheets' case and title variants ("Qadira" and "Qadira, Jewel of the East"), that
+  is 17 rulebooks, about 117 setting books, 53 adventures and 3 others.
+- **Hand check:**
+  - 40 random hits: all 40 were real Golarion, myth or title mentions. Two class labels
+    are loose: Kalistrade is a prophet filed as a deity, and Nex is both a wizard and his
+    nation.
+  - 40 random setting or adventure rows with no hit: none carried a Golarion name in the
+    text read.
+  - A third pass listed the capitalised words left in the rows with no hit. It found six
+    more names (Ninth Battalion, Risen Guard, Bloodstone Swords, Old Cults, Shaine, and
+    "Pathf inder Society" split by the PDF). They are now on the list.
+- **A correction to the first count.** The 2026-10-29 grep (52 lines in spells.json, 77
+  in feats.json) mostly matched the `source` column, for example `"source": "Kobolds Of
+  Golarion"`. That is the book title, not the row's text. The real figures are below.
+
+### 7.2 What ships (measured)
+
+| file | family | rows | name | prose only | column only | **Golarion total** | myth only | product title only |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| spells.json | rulebook | 1,997 | 3 | 16 | 7 | **26** | 2 | 49 |
+| spells.json | setting | 931 | 30 | 64 | 55 | **149** | 12 | 35 |
+| spells.json | adventure | 101 | 2 | 11 | 13 | **26** | 7 | 6 |
+| spells.json | other | 11 | 0 | 1 | 0 | **1** | 1 | 0 |
+| feats.json | rulebook | 1,091 | 0 | 0 | 0 | **0** | 0 | 6 |
+| feats.json | setting | 378 | 19 | 26 | 24 | **69** | 5 | 13 |
+| feats.json | adventure | 5 | 0 | 0 | 0 | **0** | 0 | 1 |
+| **total** | | **4,514** | **54** | **118** | **99** | **271** | **27** | **110** |
+
+- **271 of 4,514 rows (6%) name Golarion.** Most of the rest are plain mechanics.
+- **Setting books are mostly mechanics.** 1,426 rows come from setting, adventure and
+  other books. 1,181 of them (83%) carry no Golarion name. Examples are Hollow Blades,
+  Rain of Arrows and Diminished Detection.
+- **Where the named rows come from:**
+
+  | source | named rows |
+  |---|---:|
+  | Inner Sea Gods | 54 |
+  | Inner Sea World Guide | 22 |
+  | Inner Sea Magic | 21 |
+  | Faction Guide | 17 |
+  | Adventurer's Guide | 16 |
+  | Dwarves of Golarion | 9 |
+  | 61 other sources | 132 |
+
+- **The rulebook line is not clean either. 26 spells name Golarion; no rulebook feat
+  does.**
+  - 16 are from the *Adventurer's Guide*. It is a Roleplaying Game hardcover, but it was
+    built around Golarion's organisations (Red Mantis, Lantern Bearers, Cyphermages,
+    Aldori, Sarzari).
+  - 7 are Core or APG spells whose only hit is "Harrow" in the `bloodline` column. That
+    is the Harrowed bloodline, a setting bloodline, listed against augury, weird and
+    others.
+  - 2 are from *Planar Adventures*: Pharasma in judgment undone, and the Witchwood in
+    soulseeker.
+  - 1 is from *Occult Adventures*: Shelyn in foster hatred.
+- **Which kinds of name appear** (rows mentioning each class):
+
+  | class | rows | most common names |
+  |---|---:|---|
+  | deity | 176 | Aroden, Abadar, Zon-Kuthon, Calistria, Pharasma |
+  | place | 101 | Golarion, Inner Sea, Nex, Irrisen, the Worldwound |
+  | people | 65 | Shoanti, Aldori, Varisian, Azlanti, Taldan |
+  | organisation | 60 | the Harrow, Cyphermages, Whispering Way, Pathfinders, Hellknight |
+  | character | 49 | Aram Zey, Kreighton Shaine, Jatembe, Hao Jin, Alaznist |
+
+- **The `deity` column is not read by any code.**
+  - 96 spells fill it, and 70 of those name Golarion only there. Only the importer
+    (`tools/build_spells.py`) writes it.
+  - The ruling of 2026-09-19, "grab whatever the belief system of the world is", keeps
+    deity out of the engine, and `tests/test_spellcasting.py` enforces that.
+  - Deleting those column entries therefore changes no behaviour.
+- **The 54 name rows:**
+  - 7 are feats whose *name* is clean but whose id carries the book title as a reprint
+    tie-breaker, for example `gore-fiend-orcs-of-golarion`.
+  - That leaves 47 that really need renaming.
+- **Feats nobody here can take.**
+  - 17 *Faction Guide* feats require Pathfinder Society faction prestige, for example
+    "Kitharodian Academy 15 TPA".
+  - That is an organised-play currency this app does not have, so these rows are dead
+    whatever is decided.
+- **Copies elsewhere that would have to follow any change:**
+  - 55 entries in the spell mechanics files (`content/spells/mechanics/part-*.json`,
+    `spells-mechanics.json`) are keyed by a named id or repeat the name in their own
+    `target` or `notes` prose. Any rename or drop has to follow them there.
+  - Saves store spellbooks and feats as strings (`rules/sheet.py`), so a rename or a drop
+    needs aliases, as `content/bestiary/aliases.json` does for creatures.
+- **Other shipped content:**
+  - `weapons.json` has "Aldori dueling sword" and "Shoanti bolas". `rules/base-pieces.json`
+    repeats the bolas.
+  - Two `_source` notes cite "Archives of Nethys" and the "Pathfinder Society FAQ". These
+    are citations, not lore.
+  - Everything else in `content/` outside the bestiary is clean.
+  - Code mentions are comments only. The two "Harrow" hits in `gm/prompts.py` are an
+    invented example place name, not the deck.
+- **Out of scope here, but on record:** `reference/books/` is not packaged but is in the
+  public repository. It holds 23 Golarion mentions in its extracted Bestiary 4–6, Mythic
+  and Ultimate Equipment text.
+
+### 7.3 Prior art for this exact case
+
+- **d20pfsrd** publishes setting-book spells **renamed, with the names taken out of the
+  prose**, and keeps a per-page Section 15 for the setting book:
+  - Inner Sea Magic's "Aroden's spellbane" is published as **"Spellbane"**. Its text names
+    no one, and the page credits "Pathfinder Campaign Setting: Inner Sea Magic. © 2011,
+    Paizo Publishing, LLC".
+  - Inner Sea Gods' "Abadar's truthtelling" is published as **"Touch of Truthtelling"**.
+    The deity is replaced by a generic line that the spell "is associated with a
+    particular deity", and the page credits Inner Sea Gods © 2014.
+
+  This is option C's pattern, applied to spells, by the site that applies it to NPCs (§4).
+- **The PRD and PSRD-Data** carry the rulebook line only (§4).
+- **Foundry**, under the CUP, keeps the names (§4).
+
+Sources: https://www.d20pfsrd.com/magic/all-spells/s/aroden-s-spellbane/ and
+https://www.d20pfsrd.com/magic/all-spells/t/touch-of-truthtelling/ (both read 2026-10-29,
+**P**). Not confirmed: whether d20pfsrd does this for every setting spell. Two pages were
+read, not a sweep.
+
+### 7.4 The options
+
+All four options share these steps:
+
+- Product-title citations become plain book names ("see Pathfinder RPG Bestiary" becomes
+  "see the Bestiary"). They appear in 131 rows, and in 110 of those they are the only
+  hit. This is a mechanical rewrite.
+- The 2 weapons are renamed, and the 55 mechanics entries and the saves' aliases follow
+  every rename or drop.
+- `tools/content_provenance.py` becomes a test that holds the Golarion count at zero,
+  so a later import cannot bring the names back. The rule is the one used for models:
+  detect the defect in code.
+- The 27 myth-only rows (Waters of Lamashtu, the yellow sign of Hastur, Asmodeus's
+  spellcasting contracts) are a separate call. Each name is public myth, but the Golarion
+  god built on it is Paizo's.
+
+#### F1. Rulebook line only: option D, applied to spells and feats
+
+- **What it does:**
+  - Drops all 1,426 setting, adventure and other rows: 1,043 spells and 383 feats.
+  - Drops or rewrites the 26 rulebook spells that still name Golarion. Dropping all 16
+    *Adventurer's Guide* rows and removing "Harrow" from the bloodline column covers 23 of
+    them.
+- **Why it is safe:** it is the PRD's shape and the same rule the bestiary now follows.
+  Section 15 shrinks to the rulebook line, 17 books, and most of them can be transcribed
+  from the PRD (§5 D's caveat about the later books applies).
+- **Cost:**
+  - 1,181 rows of plain mechanics that name nothing.
+  - Some of them are features players use, for example Ultimate Wilderness is kept but
+    Arcane Anthology, Magic Tactics Toolbox and Dirty Tactics Toolbox go.
+  - Characters holding a dropped spell or feat need an alias to a rulebook equivalent, or
+    a refund.
+
+#### F2. Keep the mechanics, drop the named rows
+
+- **What it does:**
+  - Keeps the 1,181 setting rows that carry no name.
+  - Drops the 245 named setting and adventure rows.
+  - Fixes the 26 rulebook spells as in F1.
+- **Keeps:** almost all the variety, with no prose rewritten.
+- **Cost:**
+  - Section 15 for every source still shipped: up to 173 setting, adventure and other
+    sources, most of them lines whose declarations §6 marks **U** (could not be read).
+  - "Mechanics are open" is the reading for every Paizo declaration that *was* read. It
+    is not confirmed for the Campaign Setting and Player Companion lines.
+
+#### F3. Keep every row, rewrite the names: the d20pfsrd pattern, and the one used for creatures and adventure items
+
+What it does, in order of cost:
+
+1. **Column-only rows (99).**
+   - Delete the deity and bloodline entries. No code reads them.
+   - Replace the 24 feats' deity prerequisites with something world-agnostic. One choice
+     is no gate. Another is "a worshipper of a god of war", read from the world's own
+     belief system.
+2. **Prose-only rows (118).**
+   - Rewrite only the sentences that carry the name; the mechanics stay.
+   - Done the project's way: the deny-list finds the defect, a targeted call rewrites that
+     sentence, and the deny-list re-checks the result.
+3. **Name rows (47 real, plus 7 ids to re-slug).**
+   - Retitle from the mechanics, as d20pfsrd did: Spellbane, Touch of Truthtelling.
+   - Then alias the old ids.
+
+- **Rows that do not survive a rewrite** are dropped, because the setting *is* their
+  mechanics:
+  - the 17 prestige-award feats;
+  - Totem Spirit, keyed to Shoanti tribes;
+  - Varisian Tattoo;
+  - the Hellknight-rank feats.
+- **Cost:**
+  - Section 15 for every source, as in F2.
+  - Hand review of every rewritten row, because these are rules text.
+- **World Bible.** Following the standing rule that fixes are world-agnostic: if
+  deity-gated rows are to mean anything in a World Bible world, the export has to name the
+  world's gods **with their portfolios or domains**. A spell "associated with a god of
+  trade" can then attach to the world's own god of trade. This is a new item for the next
+  export, and it is needed only if F3 keeps the gates.
+
+#### F4. F1, plus a user-side import
+
+This is option E's pattern. The public build ships F1. A user who owns the books points
+`tools/build_spells.py` and `tools/build_feats.py` at their own spreadsheets, and the
+result lands in their data directory. As in E, this needs an import step in the packaged
+app that does not use a terminal.
+
+### Recommendation, for what it is worth
+
+**F3 for the rows worth keeping, falling back to F2 where a rewrite would gut the row.**
+
+- The PI problem is narrow: 6% of rows, and 99 of the 271 are fixed by deleting a column
+  entry nobody reads.
+- d20pfsrd has shown that this exact rewrite works on these exact spells.
+- F1 would throw away 1,181 rows that name nothing to remove 245 that do.
+
+**The real price of F2 and F3 is Section 15 for up to 173 non-rulebook sources whose
+declarations nobody here has read.** If that transcription is not wanted, F1 is the
+consistent choice with the bestiary's D: the same line, the same reasons, and an
+attribution burden that can be finished from primary sources.
+
+The owner's call.
