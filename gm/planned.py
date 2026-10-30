@@ -490,6 +490,31 @@ def aimed_line(engine, outcomes) -> str:
     return line
 
 
+def unseen_line(engine, acting: str) -> str:
+    """On a creature's turn, that it cannot see the player — said plainly, as one fact for
+    the NPC-turn call, when the player is hidden from it and it has not pinpointed them
+    (rules/awareness.py). "" otherwise. `acting` is the creature's ref or its name.
+
+    Measured 2026-10-30 (scratchpad invis/live_npc.out): told only "Conditions: invisible"
+    in the brief, three gemma turns in a row wound up "aimed at your head" and "to crack
+    the intruder's skull"; the read-back's `unseen` question checks what this says."""
+    from rules import awareness
+
+    scene = engine.scene
+    pc = scene.pc()
+    if pc is None or not pc.has_state(awareness.HIDDEN) or not acting:
+        return ""
+    who = scene.actors.get(acting) or next(
+        (a for a in scene.actors.values()
+         if not a.is_pc and str(a.name).lower() == str(acting).lower()), None)
+    if who is None or who.is_pc or awareness.sees(scene, who, pc) \
+            or awareness.knows_where(scene, who, pc):
+        return ""
+    name = narration_mod.definite(str(who.name))
+    return (f"{name[:1].upper() + name[1:]} cannot see you (the player) and does not know "
+            f"where you are: nothing it does this turn looks at you or is aimed at you.")
+
+
 # Where a blow's telling begins, one a blow, least recently used. Measured on the 2026-10-16
 # fight rerun: with the wind-up gone, 17 of 21 creature beats opened "The figure behind the
 # bar lunges forward, swinging a heavy sap" — the ask ("how it is struck, how it lands, how

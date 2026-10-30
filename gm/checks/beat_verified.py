@@ -97,6 +97,10 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          # the swing" (the 0.2.22 road fight, 4 of 5 allied misses; docs/ally-swings.md).
          # The player reads a blow at them that no die threw — as heavy as the early one.
          "aimed": ("beat-aimed-wrong", 3),
+         # Somebody who cannot see the player shown looking, aiming or striking at them
+         # (rules/awareness.py): the three live gemma turns of 2026-10-30, each "aimed at
+         # your head" at an invisible player. A blow the engine says has nowhere to go.
+         "unseen": ("beat-sees-the-unseen", 3),
          # A thing the page says the player made that no typed craft made: the "duller
          # blade of common steel" a refused mithral longsword left on the page (live,
          # 2026-10-28; docs/typed-crafting.md). Wrong for as long as the pack is read.
@@ -221,7 +225,7 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
             continue
         if d.category == "move" or d.sentence not in text:
             continue
-        if d.category in ("foe_weapon", "aimed") and d.line:
+        if d.category in ("foe_weapon", "aimed", "unseen") and d.line:
             # The engine's own line in the cut sentence's place, its numbers off (the
             # creature's roll is hidden): "the one behind the bar's attack with the sap
             # misses Kesst Vayr." The name becomes "you" later in the groom.
