@@ -139,7 +139,10 @@ def test_props_survive_the_save():
     from play import campaign as cm
 
     assert '"props": [dict(e) for e in self.scene.props]' in inspect.getsource(cm.Campaign.save)
-    assert 'props=[dict(e) for e in (s.get("props") or [])]' in inspect.getsource(cm.Campaign.load)
+    # Read through `_current_prop` since 2026-10-30, which renames a grant's old herb ids;
+    # every record still comes back, as a copy.
+    assert ('props=[_current_prop(dict(e)) for e in (s.get("props") or [])]'
+            in inspect.getsource(cm.Campaign.load))
 
 
 # --- A thing swung or thrown is an improvised-weapon attack ---------------------------------

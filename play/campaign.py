@@ -56,6 +56,27 @@ class UnreadableSave(RuntimeError):
     """
 
 
+def _current_prop(rec: dict) -> dict:
+    """A scene record as it reads today. A grant (`Engine._mark_granted`) keeps the
+    ingredient ids it put in the satchel, and `granted_line` reads those ids back off the
+    satchel — which `sheet._current_materials` migrates. A grant still holding "elysium"
+    beside a satchel holding "nullgrass" said the herbs were all spent (review,
+    2026-10-30). A renamed id loses the name stored with it, which was the old name; the
+    line looks the ingredient's own name up instead."""
+    from rules.sheet import current_material_ids, material_renames
+
+    g = rec.get("granted")
+    renamed = material_renames()
+    if not isinstance(g, dict) or not renamed:
+        return rec
+    ids = g.get("ids")
+    if isinstance(ids, dict):
+        names = {k: v for k, v in (g.get("names") or {}).items() if k not in renamed}
+        rec["granted"] = {**g, "ids": current_material_ids(ids, renamed),
+                          "names": current_material_ids(names, renamed)}
+    return rec
+
+
 def _grid(raw: dict | None):
     """Rebuild a map from a save, or None for the scenes that never had one.
 
@@ -427,7 +448,7 @@ class Campaign:
             thread=dict(s.get("thread") or {}),
             cast=[dict(e) for e in (s.get("cast") or [])],
             # Absent in saves written before things had records: nothing lies anywhere.
-            props=[dict(e) for e in (s.get("props") or [])],
+            props=[_current_prop(dict(e)) for e in (s.get("props") or [])],
             fallen={str(k): int(v) for k, v in (s.get("fallen") or {}).items()},
             heat=dict(s.get("heat") or {}),
             # Absent in saves written before shops had shelves: an empty ledger means

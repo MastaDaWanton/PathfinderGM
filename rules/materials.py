@@ -661,13 +661,17 @@ def _root(mid: str, docs: dict[str, dict]) -> str:
 def material_of(material_id: str) -> str:
     """A form's parent material: "mithral-fittings" -> "mithral". Followed to the root
     and cycle-safe; an unknown id is its own material, because a homebrew entry nobody
-    linked is still the one thing it is."""
+    linked is still the one thing it is.
+
+    An old id reads as its new one first (`current_id`): without it "noqual-ore" answered
+    "noqual-ore" — not in the catalogue, so its own material — and `knowledge._store_id`
+    filed what was learned under the old id (review, 2026-10-30)."""
     mid = str(material_id or "").strip().lower()
     try:
         docs = _cache()
     except Exception:
         return mid
-    return _root(mid, docs)
+    return _root(current_id(mid), docs)
 
 
 def is_forge(doc: dict) -> bool:
