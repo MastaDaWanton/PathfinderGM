@@ -234,7 +234,7 @@ common: water, quenching brine, quenching oil · uncommon: whale oil, glacier me
 (*risky*: fume save) · rare: blessed water (edge counts blessed; undead flinch), troll
 blood (*risky*; metal knits its cracks), wyvern blood (*risky*: first wound carries the
 venom, Fort 17 or 1d4 Con) · exotic: dragon blood (*risky*; fire resist 2 on armour),
-styx water (*risky*: Will 16 or lose the last minute).
+oblivion water (*risky*: Will 16 or lose the last minute).
 
 ### Fittings (16)
 

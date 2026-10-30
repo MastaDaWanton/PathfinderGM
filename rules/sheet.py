@@ -7723,7 +7723,36 @@ def _current_feats(feats: list) -> list[str]:
     return [feats_mod.current_name(f) if isinstance(f, str) else f for f in feats]
 
 
+def _current_materials(data: dict) -> dict:
+    """A renamed material's old id, wherever a save keeps material ids — the pack's goods,
+    the crafted stock's records (a tannage, a quench, a mark) and what the character knows
+    about each material — read as its id now (`materials.RENAMED`). Only an exact old id
+    is swapped, so nothing else in those records can change."""
+    fields = ("goods", "stock", "herb_known")
+    if not any(data.get(f) for f in fields):
+        return data
+    from . import materials as materials_mod
+
+    # Asked politely: a test may stand a materials door of its own in for the module.
+    RENAMED = getattr(materials_mod, "RENAMED", None) or {}
+    if not RENAMED:
+        return data
+
+    def swap(v):
+        if isinstance(v, str):
+            return RENAMED.get(v, v)
+        if isinstance(v, list):
+            return [swap(x) for x in v]
+        if isinstance(v, dict):
+            return {(RENAMED.get(k, k) if isinstance(k, str) else k): swap(x)
+                    for k, x in v.items()}
+        return v
+
+    return {**data, **{f: swap(data[f]) for f in fields if data.get(f)}}
+
+
 def from_dict(data: dict, ref: str | None = None) -> Actor:
+    data = _current_materials(data)
     immunities, resistances, vulnerabilities = _defences(data)
     a = Actor(
         ref=ref or data.get("ref") or data["name"].lower().replace(" ", "-"),

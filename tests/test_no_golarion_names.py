@@ -110,3 +110,31 @@ def test_a_save_from_before_the_rename_loads_as_it_is_now():
     assert a.spellbook == ["spellbane", "magic-missile"]
     assert a.prepared == {"spellbane": 1, "magic-missile": 2}
     assert a.feats == ["dueling sword mastery", "weapon focus (rapier)", "ominous mien"]
+
+
+def test_the_river_materials_answer_to_their_old_ids():
+    """The app's own planar finishes, Styx Water (a quenchant) and Styx Mordant (a
+    tannin), were renamed Oblivion Water and Oblivion Mordant on 2026-10-30 with the other
+    myth names. A forge record, a recipe or a shop asking by the old id still gets the
+    material; the shipped catalogue no longer has a row under it."""
+    from rules import materials
+
+    assert materials.get("styx-water")["id"] == "oblivion-water"
+    assert materials.get("styx-mordant")["name"] == "Oblivion Mordant"
+    assert "styx-water" not in materials.all()
+
+
+def test_a_pack_and_a_tanned_grip_from_before_keep_their_river_materials():
+    """A save keeps material ids in three places: the goods in the pack, the crafted
+    stock's records (here a grip's tannage and its mark) and what the character has
+    learned about a material. Each old id reads as the new one on load; nothing else in
+    the record moves."""
+    from rules.sheet import from_dict
+
+    a = from_dict({"name": "x", "kind": "npc", "hp": 5, "hp_max": 5,
+                   "abilities": {k: 10 for k in ("str", "dex", "con", "int", "wis", "cha")},
+                   "goods": {"styx-water": 2, "oak-bark": 1},
+                   "herb_known": {"styx-mordant": {"keys": ["k0"], "how": {"k0": "test"}}}},
+                  ref="c1")
+    assert a.goods == {"oblivion-water": 2, "oak-bark": 1}
+    assert set(a.herb_known) == {"oblivion-mordant"}

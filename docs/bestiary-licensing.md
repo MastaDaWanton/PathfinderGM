@@ -381,8 +381,11 @@ falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the
     Draconic Release, Vision of Nightmares and Foul Waters. Nothing was dropped.
 - **Left as they were, on purpose:**
   - Cosmology words (Boneyard, Elysium, First World), which were never ruled on.
-  - The app's own crafting materials Styx Water and Styx Mordant. They are house-authored,
-    not imported, and are the owner's to rename.
+- **The app's own river materials were renamed on 2026-10-30** (the owner: "rename the Styx
+  materials too"). Styx Water is now Oblivion Water, quenching "Oblivion-quenched"; Styx
+  Mordant is now Oblivion Mordant. Their text already called it "the river of forgetting".
+  Old ids resolve through `materials.RENAMED`, and saves are rewritten on load
+  (`sheet._current_materials`). "Styx" is on the deny-list now.
 - **Still outstanding:** Section 15 for the setting books.
 
 The section below is the measurement and the options as they were put.

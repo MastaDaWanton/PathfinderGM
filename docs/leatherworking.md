@@ -242,7 +242,7 @@ reason a sack of oak bark does not tan the whole bestiary.
 | Ironbark Tannin | rare | Bites monster-grade hide that common bark cannot bind |
 | Wyrm Gall | rare | Opens and binds scaled hide; the stink takes a month to fade |
 | Salamander Ash Lye | exotic | Binds fire-natured and planar hide; the vat must be stone |
-| Styx Mordant | exotic | Fixes shadow-natured hide; a bare-skin splash costs the working day's memory |
+| Oblivion Mordant | exotic | Fixes shadow-natured hide; a bare-skin splash costs the working day's memory |
 | Dragonblood Tannin | legendary | The only tannin that binds legendary hide |
 
 ## Threads

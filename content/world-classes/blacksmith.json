@@ -68,7 +68,7 @@
    "methods": [],
    "max_tier": "legendary / mythic",
    "ceiling": 4,
-   "note": "Legendary metal, and the sacred and planar finishes: holy anointing, ghost-salt blanching, styx water."
+   "note": "Legendary metal, and the sacred and planar finishes: holy anointing, ghost-salt blanching, oblivion water."
   }
  ],
  "method_descriptions": {
@@ -128,7 +128,7 @@
   },
   "finish": {
    "does": "Adds a treatment's own effect to a finished item, unscaled. Alchemical silver will not take on adamantine, cold iron or mithral.",
-   "needs": "Blacksmith 2 (3 for holy anointing, ghost-salt blanching and styx water), a finished item and a treatment.",
+   "needs": "Blacksmith 2 (3 for holy anointing, ghost-salt blanching and oblivion water), a finished item and a treatment.",
    "for": "Silvering against lycanthropes, blessing against undead, bluing against rust."
   },
   "strengthen": {
@@ -236,8 +236,8 @@
    "weld_aid": {"weld_band": 1.2},
    "easily_worked": {"time": 0.5}
   },
-  "_finish_note": "Treatments that need Blacksmith 3 (`sacred`), and the book's restrictions by treatment (`rules`): `not_on` names main-piece materials the treatment will not take on (alchemical silver: not adamantine, cold iron or mithral, Ultimate Equipment), `gear` the kinds of item it goes on. Styx water is a quenchant that can also be used as a finish.",
-  "sacred_finishes": ["holy-anointing", "ghost-salt-blanching", "styx-water"],
+  "_finish_note": "Treatments that need Blacksmith 3 (`sacred`), and the book's restrictions by treatment (`rules`): `not_on` names main-piece materials the treatment will not take on (alchemical silver: not adamantine, cold iron or mithral, Ultimate Equipment), `gear` the kinds of item it goes on. Oblivion water is a quenchant that can also be used as a finish.",
+  "sacred_finishes": ["holy-anointing", "ghost-salt-blanching", "oblivion-water"],
   "sacred_level": 3,
   "finish_rules": {
    "alchemical-silver-plating": {"not_on": ["adamantine", "cold-iron", "mithral"], "book": true},

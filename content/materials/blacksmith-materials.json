@@ -4669,8 +4669,8 @@
    "book": false
   },
   {
-   "id": "styx-water",
-   "name": "Styx Water",
+   "id": "oblivion-water",
+   "name": "Oblivion Water",
    "kind": "quenchant",
    "tier": "exotic",
    "craft_dc": 25,
@@ -4703,7 +4703,7 @@
    ],
    "quench_mark": {
     "type": "bundle",
-    "label": "Styx-quenched",
+    "label": "Oblivion-quenched",
     "effects": [
      {
       "type": "combat_mod",

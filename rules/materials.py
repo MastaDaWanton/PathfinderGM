@@ -167,7 +167,7 @@ MARK_STEP = {"tannin": "tan", "oil": "curry", "wax": "tool", "thread": "stitch",
 # a condition, a rider) is not a mark's to give: it is an enchantment.
 MARK_LIMIT = {"resistance": 2, "skill_mod": 2, "gear_mod": 1, "save_mod": 1,
               "combat_mod": 1}
-# Combat modifiers a mark may give only to a weapon (a grip): a suit tanned in styx-mordant
+# Combat modifiers a mark may give only to a weapon (a grip): a suit tanned in oblivion-mordant
 # does not make its wearer's sword bite outsiders, and a mark's effect on armour is read on
 # every roll the wearer makes (`Actor._standing_mods`).
 _MARK_WEAPON_ONLY = ("attack", "damage")
@@ -603,9 +603,29 @@ def refresh() -> None:
     _cache(refresh=True)
 
 
+# Renamed shipped materials: old id -> id now. The two planar finishes from the river of
+# forgetting were named for the Styx until 2026-10-30, when the owner had the myth names
+# taken out of shipped content (docs/bestiary-licensing.md §7). A save holding the old id
+# is rewritten on load (`sheet._current_materials`); anything else asking by the old id
+# is answered here.
+RENAMED: dict[str, str] = {
+    "styx-water": "oblivion-water",
+    "styx-mordant": "oblivion-mordant",
+}
+
+
+def current_id(material_id: str) -> str:
+    """The id a stored material id reads as today. A homebrew material that still uses an
+    old id is the player's own and keeps it."""
+    key = str(material_id or "").strip().lower()
+    if key in RENAMED and key not in _cache():
+        return RENAMED[key]
+    return key
+
+
 def get(material_id: str) -> dict | None:
     """The normalised document, or None. A copy: the cache is not the caller's to edit."""
-    doc = _cache().get(str(material_id or "").strip().lower())
+    doc = _cache().get(current_id(material_id))
     return copy.deepcopy(doc) if doc is not None else None
 
 

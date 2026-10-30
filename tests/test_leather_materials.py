@@ -380,7 +380,7 @@ def test_the_marks_are_on_their_consumables_and_the_held_block_is_gone(leather):
     assert marked["fireproof-wax"] == {"type": "resistance", "target": "fire", "amount": 1}
     # The nine the hold kept, and the two the consumables' own texts give.
     assert {"salamander-oil", "fireproof-wax", "troll-fat", "spider-silk-cord",
-            "shadow-silk", "shadow-black", "void-dye", "umbral-oil", "styx-mordant",
+            "shadow-silk", "shadow-black", "void-dye", "umbral-oil", "oblivion-mordant",
             "wire-silk", "ghost-wax"} == set(marked)
     assert all(leather[k]["kind"] in materials.MARK_KINDS for k in marked)
 

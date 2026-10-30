@@ -2909,7 +2909,7 @@ def _build_assemble(plan: ForgePlan, row: dict) -> None:
                tier=wc.TIERS[max(p.rank for p, _ in plan.slots.values()) - 1])
     # A leather grip or lacing set carries the tanner's marks onto the item, as a leather
     # base does (`_build_from_base`): the consumables it was worked with, read live by
-    # `forge_items.mark_rows`. Measured by the marks lane (2026-10-08): a styx-mordant-tanned
+    # `forge_items.mark_rows`. Measured by the marks lane (2026-10-08): a oblivion-mordant-tanned
     # grip fitted here kept its tannage in the piece and gave no mark at all, so the
     # tannin's weapon mark (+1 damage against outsiders) could never land on any weapon.
     leather = [p.leather for p, _ in plan.slots.values() if p.leather is not None]

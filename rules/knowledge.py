@@ -449,7 +449,7 @@ def _material_specs(doc: dict) -> list[tuple[str, dict, str]]:
     for group, prefix in MATERIAL_LISTS:
         raw = doc.get(group)
         if group == "mark" and isinstance(raw, dict) and "type" not in raw:
-            # A mark keyed by gear (styx-mordant's is a grip's alone): one property, said
+            # A mark keyed by gear (oblivion-mordant's is a grip's alone): one property, said
             # with where it acts (`line`).
             gear, eff = next(((g, e) for g, e in raw.items() if isinstance(e, dict)),
                              ("", None))

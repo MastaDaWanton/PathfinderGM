@@ -188,21 +188,21 @@ def test_a_thick_generic_hide_can_make_hide_armour():
     assert "too thin" in lw.fit_reason("cut", "hide", thin, product="hide armour")
 
 
-def test_a_styx_tanned_grip_carries_its_mark_through_the_forge():
+def test_an_oblivion_tanned_grip_carries_its_mark_through_the_forge():
     """The marks lane: a grip fitted at the forge kept its tannage in the piece and gave no
-    mark, so styx mordant's weapon mark (+1 damage against outsiders) never landed. The
+    mark, so oblivion mordant's weapon mark (+1 damage against outsiders) never landed. The
     forge's Assemble now carries a leather piece's marks, as a leather base's are."""
     from tests.test_leather_forge_handoff import assemble, carry_work, kesst, tempered_blank
 
     pc = kesst()
     h = lw.Hide(form="grip", material="sharkskin", quarters=1, grade=2,
-                tannage="styx-mordant")
+                tannage="oblivion-mordant")
     grip = f"stock:{lw.put_hide(pc, h)}"
     blade = carry_work(pc, tempered_blank())
     plan = assemble(pc, {"head": blade, "haft": grip})
     assert plan.problems == []
     rec = bs.record(bs.make(plan, 1)[0][0])
-    assert rec.get("marks") == ["styx-mordant"]
+    assert rec.get("marks") == ["oblivion-mordant"]
     rows = forge_items.build(rec)["marks"]
     assert any(r["applied"] and r["effect"]["target"] == "damage" for r in rows), rows
 
@@ -218,11 +218,11 @@ def test_the_forge_card_names_known_marks_and_held_back_creature_lines():
     build = {"specs": [{"type": "resistance", "target": "fire", "amount": 3,
                         "source": "creature:salamander"}],
              "sum": [], "book": [], "strikes_as": [], "multipliers": {},
-             "marks": [{"material": "styx-mordant", "step": "tan", "applied": True,
+             "marks": [{"material": "oblivion-mordant", "step": "tan", "applied": True,
                         "effect": {"type": "combat_mod", "target": "damage", "amount": 1}}]}
     card = forge_views._card(build, _pieces(), "armour", "Sound", pc)
     assert card["marks"] == [] and card["from_creature"] == []
-    knowledge.reveal(pc, "styx-mordant", ["k0"], "test")
+    knowledge.reveal(pc, "oblivion-mordant", ["k0"], "test")
     assert forge_views._card(build, _pieces(), "armour", "Sound", pc)["marks"]
 
 

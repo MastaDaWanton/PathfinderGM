@@ -736,7 +736,7 @@
 
   // Quench baths. The id is the quenchant's (content/materials: water, quenching-brine,
   // quenching-oil, whale-oil, glacier-melt, mercury-bath, blessed-water, troll-blood,
-  // wyvern-blood, dragon-blood, styx-water), read by the word in it, so a homebrew
+  // wyvern-blood, dragon-blood, oblivion-water), read by the word in it, so a homebrew
   // "sea-brine" or "linseed-oil" is heard as its family. Unknown or none is water.
   //   hiss   the steam's band, falling as the film collapses
   //   crack  grains of vapour discharge (brine's "explosive" breakup)

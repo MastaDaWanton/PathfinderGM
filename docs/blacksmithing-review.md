@@ -58,7 +58,7 @@ note is not yet asked); `{"against": "spell"}` for noqual's saves; `{"weapon":
 {"slashing_or_piercing": true}}` for silver's −1 damage.
 
 Quench marks are a single effect (contract §3). Dragon blood's plan wanted resistance on
-armour or +1 energy damage on a weapon; it is resistance on both. Styx water's two parts
+armour or +1 energy damage on a weapon; it is resistance on both. Oblivion water's two parts
 are one `bundle`.
 
 
@@ -158,7 +158,7 @@ are one `bundle`.
 | Troll Blood | rare | Fast healing 1, on the first wound it deals each day, on whoever has it, for 1 minute (1× per day) | malleable, narrow_window |
 | Wyvern Blood | rare | Fortitude DC 17 · fail: 1d4 Constitution damage, on the first wound it deals each day | narrow_window, reactive |
 | Dragon Blood | exotic | Resist fire 2 | narrow_window, pure |
-| Styx Water | exotic | +1 Damage rolls (when target type outsider); **-1 Will, on whoever has it** | narrow_window, reactive |
+| Oblivion Water | exotic | +1 Damage rolls (when target type outsider); **-1 Will, on whoever has it** | narrow_window, reactive |
 
 ## Ores (assayed for their metal)
 

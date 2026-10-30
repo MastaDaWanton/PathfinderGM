@@ -637,7 +637,7 @@ con("ironbark-tannin", "#4a3a2a", "ceiling_up", "slow_tan", "flawless", tannage=
 con("wyrm-gall", "#6a7a2a", "fast_tan", "ceiling_up", "forgiving", tannage="planar")
 con("salamander-ash-lye", "#8a8a8a", "fast_tan", "salt_proof", "flawless",
     tannage="mineral")
-con("styx-mordant", "#1a2a3a", "slow_tan", "ceiling_up", "salt_proof", tannage="planar")
+con("oblivion-mordant", "#1a2a3a", "slow_tan", "ceiling_up", "salt_proof", tannage="planar")
 con("dragonblood-tannin", "#7a1a1a", "ceiling_up", "flawless", "slow_tan",
     tannage="planar")
 # The field tans, filed as treatments before the pass. Plan §8.1 names them as the brain and
@@ -732,7 +732,7 @@ MARKS: dict[str, dict] = {
     "umbral-oil": sk("stealth", 1, bonus="circumstance"),
     # "+1 damage vs outsiders on a grip" (plan §14.6): keyed to a weapon, so a suit tanned in
     # it does not make its wearer's sword bite (`materials.mark_problems`).
-    "styx-mordant": {"weapon": cm("damage", 1, when={"target": {"type": "outsider"}})},
+    "oblivion-mordant": {"weapon": cm("damage", 1, when={"target": {"type": "outsider"}})},
 }
 
 # --- the forge's four leather pieces (plan §4.4) -----------------------------------------------

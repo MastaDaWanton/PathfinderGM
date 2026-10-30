@@ -94,7 +94,7 @@ note is not yet asked); `{"against": "spell"}` for noqual's saves; `{"weapon":
 {"slashing_or_piercing": true}}` for silver's −1 damage.
 
 Quench marks are a single effect (contract §3). Dragon blood's plan wanted resistance on
-armour or +1 energy damage on a weapon; it is resistance on both. Styx water's two parts
+armour or +1 energy damage on a weapon; it is resistance on both. Oblivion water's two parts
 are one `bundle`.
 
 """

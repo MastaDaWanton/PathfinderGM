@@ -791,8 +791,8 @@ entry("dragon-blood", working=wk("narrow_window", "pure"),
       text="Blood of a true dragon, which quenches steel without ever quite going cold. "
            "The piece takes a shadow of the donor's element: its bearer resists 2 fire "
            "from a red dragon's blood.")
-entry("styx-water", working=wk("narrow_window", "reactive"),
-      quench_mark={"type": "bundle", "label": "Styx-quenched",
+entry("oblivion-water", working=wk("narrow_window", "reactive"),
+      quench_mark={"type": "bundle", "label": "Oblivion-quenched",
                    "effects": [cm("damage", 1, bonus="untyped", when=vs("outsider")),
                                sv("will", -1, bonus="untyped", recipient="self")]},
       text="Water from the river of forgetting, carried in horn. A blade quenched in it "

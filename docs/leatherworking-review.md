@@ -233,8 +233,8 @@ Each tannin on a hide with no time trait of its own (a wolf pelt); a deer hide's
 | Tara Pod | bark (vegetable) | fast_tan | 3 days | none in the pack; 6 sp at a tannery |
 | Ironbark Tannin | bark (vegetable) | slow_tan | 7 days | none in the pack; 1 gp 4 sp at a tannery |
 | Wyrm Gall | planar | fast_tan | 4 days | 8 sp |
+| Oblivion Mordant | planar | slow_tan | 11 days | 2 gp 2 sp |
 | Salamander Ash Lye | mineral | fast_tan | 6 hours | 2 sp |
-| Styx Mordant | planar | slow_tan | 11 days | 2 gp 2 sp |
 | Dragonblood Tannin | planar | slow_tan | 11 days | 2 gp 2 sp |
 
 ## Consumables (working traits only)
@@ -256,8 +256,8 @@ No consumable carries an item list, so no tannin, wax or thread prose reaches a 
 | Tara Pod | uncommon | bark | ceiling_up, tans_white, fast_tan | 3 | 8 gp |
 | Ironbark Tannin | rare | bark | ceiling_up, slow_tan, flawless | 3 | 60 gp |
 | Wyrm Gall | rare | planar | fast_tan, ceiling_up, forgiving | 3 | not sold |
+| Oblivion Mordant | exotic | planar | slow_tan, ceiling_up, salt_proof | 4 | 700 gp |
 | Salamander Ash Lye | exotic | mineral | fast_tan, salt_proof, flawless | 3 | not sold |
-| Styx Mordant | exotic | planar | slow_tan, ceiling_up, salt_proof | 4 | 700 gp |
 | Dragonblood Tannin | legendary | planar | ceiling_up, flawless, slow_tan | 3 | not sold |
 
 ### Oils
@@ -331,7 +331,7 @@ Each is the one small effect the consumable leaves on a finished item (plan §14
 
 | Consumable | Kind | Step | Mark |
 |---|---|---|---|
-| Styx Mordant | tannin | Tan | +1 Damage rolls (when target type outsider) (on a grip) |
+| Oblivion Mordant | tannin | Tan | +1 Damage rolls (when target type outsider) (on a grip) |
 | Salamander Oil | oil | Curry | Resist fire 1 |
 | Troll Fat | oil | Curry | +1 hardness |
 | Umbral Oil | oil | Curry | +1 Stealth |
@@ -348,7 +348,7 @@ Each is the one small effect the consumable leaves on a finished item (plan §14
 Every settlement's leatherworker sells the craft's supplies (your answer to open point 9). Each id below has a `price_gp` the price rule accepts (`pricing.material_price_problems`: 1 gp floor common, 5 gp uncommon). Ids are unchanged by this pass; brain paste and tawing alum are now kind `tannin` (plan §8.1 files them as the brain and alum tannins).
 
 - **Curing salt**: `curing-salt` 1 gp.
-- **Tannins**: `brain-paste` 1 gp, `hemlock-bark` 1 gp, `oak-bark` 1 gp, `sumac-leaf` 1 gp, `tawing-alum` 2 gp, `willow-bark` 1 gp, `bog-liquor` 5 gp, `mangrove-bark` 5 gp, `tara-pod` 8 gp, `ironbark-tannin` 60 gp, `styx-mordant` 700 gp.
+- **Tannins**: `brain-paste` 1 gp, `hemlock-bark` 1 gp, `oak-bark` 1 gp, `sumac-leaf` 1 gp, `tawing-alum` 2 gp, `willow-bark` 1 gp, `bog-liquor` 5 gp, `mangrove-bark` 5 gp, `tara-pod` 8 gp, `ironbark-tannin` 60 gp, `oblivion-mordant` 700 gp.
 - **Oils**: `currier-tallow` 1 gp, `fish-oil` 1 gp, `neatsfoot-oil` 1 gp, `mink-oil` 5 gp, `umbral-oil` 4000 gp.
 - **Waxes**: `seam-pitch` 1 gp, `thread-wax` 1 gp, `hardening-wax` 6 gp, `ghost-wax` 450 gp.
 - **Threads and sinew**: `gut-cord` 1 gp, `horsehair-cord` 1 gp, `linen-thread` 1 gp, `sinew-thread` 1 gp, `waxed-flax` 2 gp, `silk-thread` 10 gp, `spider-silk-cord` 25 gp, `shadow-silk` 200 gp, `wire-silk` 150 gp.

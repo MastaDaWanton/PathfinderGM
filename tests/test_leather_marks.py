@@ -205,11 +205,11 @@ def test_a_mark_is_applied_once_and_never_scaled():
 
 
 def test_a_grip_only_mark_never_reaches_a_suit():
-    """Styx-mordant's mark is "+1 damage vs outsiders on a grip" (plan §14.6). A suit's
+    """Oblivion-mordant's mark is "+1 damage vs outsiders on a grip" (plan §14.6). A suit's
     standing specs are read on every roll its wearer makes (`Actor._standing_mods`), so an
     unkeyed damage mark on armour would put +1 on every blow the wearer struck at an
-    outsider. Keyed to a weapon, a styx-tanned coat carries nothing from it."""
-    b = forge_items.build(_record(["styx-mordant"]))
+    outsider. Keyed to a weapon, an oblivion-tanned coat carries nothing from it."""
+    b = forge_items.build(_record(["oblivion-mordant"]))
     assert not [s for s in b["specs"] if s.get("target") == "damage"]
     assert [r["effect"] for r in b["marks"]] == [None]
 

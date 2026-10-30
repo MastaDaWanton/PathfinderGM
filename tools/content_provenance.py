@@ -150,7 +150,7 @@ MYTH = {
         Asmodeus Asmodean Lamashtu Lamashtan Baphomet Mammon Mephistopheles Dagon Pazuzu
         Moloch Belial Baalzebul Dispater Geryon Barbatos Abraxas Haagenti Shax Hastur
         Azathoth Cthulhu Nyarlathotep Yog-Sothoth Shub-Niggurath Erebus Abaddon Abaddonian
-        Apollyon Charon Ahriman Cernunnos Apsu Dahak Leng Carcosa
+        Apollyon Charon Ahriman Cernunnos Apsu Dahak Leng Carcosa Styx
     """,
     "myth phrase": ["Baba Yaga", "Sun Wukong"],
 }
