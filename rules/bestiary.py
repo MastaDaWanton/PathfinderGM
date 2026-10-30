@@ -730,47 +730,109 @@ def _people(out: dict[str, dict], folders) -> None:
     ground is the build's own and marked as no Bestiary line (`biomes_inferred`): people
     are found by their work through `npcs.choose`, never drawn out of the land as a kind
     (`ground_stated`). A build the rules refuse is reported and left out."""
-    from . import npc_builds
-    from .sheet import to_dict
+    from django.conf import settings
 
+    shipped = Path(settings.BASE_DIR) / "content" / "npc-builds"
     for folder in folders:
         if not folder.is_dir():
             continue
+        # The shipped builds' sheets, made at tool time (`built_sheets`): building 272
+        # people through the engine took 1.90 s of every start (measured 2026-10-30, the
+        # first `imported()` 0.34-0.43 s before the builds and 2.07-2.12 s after). A
+        # homebrew build is always built here, live.
+        made = built_sheets() if folder.resolve() == shipped.resolve() else {}
         for path in sorted(folder.glob("*.json")):
+            if path.name == SHEETS_FILE:
+                continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
                 files.unreadable(path, exc)
                 continue
             for doc in (data.get("builds") if isinstance(data, dict) else None) or []:
+                pre = made.get(str(doc.get("id") or "").strip().lower())
+                # Only a sheet made from exactly this build: one edited since (the roster
+                # re-run without the sheets) is built live, so a stale file is slow, never
+                # wrong. tests/test_people_sheets.py fails while it is stale.
+                if pre is not None and pre.get("stamp") == build_stamp(doc):
+                    out.setdefault(pre["block"]["id"], pre["block"])
+                    continue
                 try:
-                    actor = npc_builds.actor(doc)
+                    block = people_block(doc)
                 except (ValueError, KeyError) as exc:
                     files.unreadable(path, exc)
                     continue
-                sheet, _ = npc_builds.build(doc)
-                block = to_dict(actor)
-                block.pop("ref", None)
-                block.update({
-                    "id": sheet["id"], "name": sheet["name"], "kind": "npc",
-                    "cr": sheet["cr"], "cr_value": sheet["cr_value"],
-                    "creature_type": "humanoid", "subtype": sheet["subtype"],
-                    "alignment": str(doc.get("alignment") or "N"),
-                    "biomes": list(doc.get("biomes") or ()), "climates": [],
-                    "biomes_any": not doc.get("biomes"), "biomes_inferred": True,
-                    "biomes_from": "build", "source": npc_builds.SOURCE,
-                    "description": str(doc.get("description") or ""),
-                    "role": str(doc.get("role") or ""),
-                    "build": doc,
-                    # Step 6's kit as a pocket claim (`_assemble_kit`), opened on first
-                    # look like any creature's; its coin is in the sheet's purse already.
-                    "pockets": list(sheet.get("pockets") or []),
-                })
-                if not block["biomes"]:
-                    from . import biomes as biomes_mod
-
-                    block["biomes"] = list(biomes_mod.LAND)
                 out.setdefault(block["id"], block)
+
+
+# Where `tools/build_people_sheets.py` writes the shipped builds' sheets, beside the builds.
+SHEETS_FILE = "people-sheets.json"
+
+
+def build_stamp(doc: dict) -> str:
+    """What a precomputed sheet was made from: the build document, every field of it."""
+    import hashlib
+
+    return hashlib.sha1(json.dumps(doc, sort_keys=True, ensure_ascii=False)
+                        .encode("utf-8")).hexdigest()[:16]
+
+
+def built_sheets() -> dict[str, dict]:
+    """{build id: {"stamp", "block"}} out of content/npc-builds/people-sheets.json, or {}
+    when there is no such file (then every build is made live, as before it existed)."""
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR) / "content" / "npc-builds" / SHEETS_FILE
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 — an unreadable file is no sheets
+        files.unreadable(path, exc)
+        return {}
+    return {str(k): v for k, v in (data.get("sheets") or {}).items()
+            if isinstance(v, dict) and isinstance(v.get("block"), dict)}
+
+
+def people_block(doc: dict) -> dict:
+    """One build as the block the store holds: the actor the engine makes of it (every
+    number derived from its race, class, level, scores, skills, feats and gear), as a
+    sheet, plus the block fields every reader of a block asks. Raises ValueError for a
+    build the rules refuse. The one maker, for the live build and the precomputed file."""
+    from . import npc_builds
+    from .sheet import to_dict
+
+    actor = npc_builds.actor(doc)
+    sheet, _ = npc_builds.build(doc)
+    block = to_dict(actor)
+    block.pop("ref", None)
+    block.update({
+        "id": sheet["id"], "name": sheet["name"], "kind": "npc",
+        "cr": sheet["cr"], "cr_value": sheet["cr_value"],
+        "creature_type": "humanoid", "subtype": sheet["subtype"],
+        "alignment": str(doc.get("alignment") or "N"),
+        "biomes": list(doc.get("biomes") or ()), "climates": [],
+        "biomes_any": not doc.get("biomes"), "biomes_inferred": True,
+        "biomes_from": "build", "source": npc_builds.SOURCE,
+        "description": str(doc.get("description") or ""),
+        "role": str(doc.get("role") or ""),
+        "build": doc,
+        # Step 6's kit as a pocket claim (`_assemble_kit`), opened on first look like any
+        # creature's; its coin is in the sheet's purse already.
+        "pockets": list(sheet.get("pockets") or []),
+    })
+    if not block["biomes"]:
+        from . import biomes as biomes_mod
+
+        block["biomes"] = list(biomes_mod.LAND)
+    # The build's own tags as the block's, where a stat block's are read (`Actor.
+    # standing_tags`, the watchman's `role.guard`): the sheet has no field for them, and
+    # passed only to the sheet they were lost — a built guardsman was no guard.
+    if doc.get("tags"):
+        block["tags"] = [str(t) for t in doc["tags"]]
+    # Through JSON, as the precomputed file holds it, so the live and the precomputed block
+    # are the same shape to every reader (a tuple is a list in both).
+    return json.loads(json.dumps(block, ensure_ascii=False))
 
 
 def _derive(out: dict[str, dict], declared: list) -> None:
