@@ -69,6 +69,23 @@ social states (`attitude.hostile.to-pc`, `knows.pc-name`) may be granted by the
 watcher through the same applicator and queried by mechanics (a hostile merchant
 refuses the trade panel) without the watcher ever touching a number.
 
+**The first `knows.*` built, 2026-10-30** (`rules/awareness.py`, branch
+`feat/hidden-state`): who knows where a hidden creature is, held on the OBSERVER as an
+`ActiveEffect` (kind `situation`, origin `rule:perception`) — `knows.where.<ref>`
+(pinpointed: the payload holds the square, and the answer is "no" once the square is not
+that one) and `knows.near.<ref>` (a hunch). Granted by the engine's own Perception rolls,
+never by a model: a creature's reactive check at the top of its turn
+(`Engine.turn_begins`), a newcomer's out of a fight (`_awareness_settle`), a search
+(`check perception search=true`, `Engine._search`), a blow taken from an invisible
+attacker. The hiding is on the hidden one: `state.hidden.invisible` (the condition, with
+`ends_when` on the potion's and the spells' documents) and `state.hidden.stealth` (a won
+Stealth check, source `rule:stealth`). Read by the targeting gate (`unseen_target`), the
+attacks of opportunity (`reactions._cannot_see`), the conversation door, the turn
+prompt, and the read-back's `unseen` question. The PF2e shape (detection states "relative
+to the viewer") and Ultimate Intrigue's (four steps of awareness per pair) are the prior
+art. Ends on a deed: `Engine._ends_on_act` reads `ends_when.acts` at the attack,
+manoeuvre and harmful-cast doors, and tells the end.
+
 ## The mind had no gate (2026-09-09)
 
 *Widened 2026-10-05 (docs/means-gate.md): the declaration door below leaked by its gaps

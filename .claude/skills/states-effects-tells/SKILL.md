@@ -138,7 +138,10 @@ lethal; `Scene.advance` heals nonlethal 1/hour/level by hour boundaries crossed.
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
-  the bridge in the doc's last section. No code grants them today.
+  the bridge in the doc's last section. The WATCHER grants none today. (The engine's
+  own Perception grants `knows.where.<ref>` / `knows.near.<ref>` on an observer since
+  2026-10-30 — hiding held across turns, `rules/awareness.py`; the doc's bridge
+  section says what reads them. Ask `awareness.sees`/`locates`, never the tag.)
 - `grants` documents for blood spike, coagulator and blood commander paths.
 - Blood Burst's computed save DC; Rupture Self's blood-pool targeting (see the
   path's `needs` map).
