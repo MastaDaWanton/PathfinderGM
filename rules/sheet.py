@@ -2640,6 +2640,15 @@ class Actor:
             size_mod = SIZES.get(self.size, SIZES["medium"])["stealth"]
             if size_mod:
                 mods.append(Modifier(size_mod, f"{self.size} size"))
+            # The invisible condition's own: "+40 bonus on Stealth checks if you are
+            # immobile, or a +20 bonus on Stealth checks if you're moving" (Stealth, CRB
+            # p.106). The condition's, so a spell's invisibility and a potion's give it
+            # alike; the potion's document carried a flat +20 of its own until 2026-10-30
+            # and never the +40 (`awareness.invisible_stealth` asks how they moved).
+            if self.has_state("state.hidden.invisible"):
+                from . import awareness
+
+                mods.append(awareness.invisible_stealth(self))
 
         mods.extend(self._condition_mods("skills"))
         mods.extend(self._buff_mods("skill_mod", skill))
@@ -4657,12 +4666,15 @@ class Actor:
         return took
 
     def add_condition(self, key: str, rounds: int | None = None, source: str = "",
-                      origin: str = "") -> Condition:
+                      origin: str = "", payload: dict | None = None) -> Condition:
         """A condition is an effect whose granted tags are its `rules/states.py` entry.
 
         `origin` is the document that put it here (`item:<id>`, `spell:<id>`), stamped
         by the `condition` op from its intent. The op dropped it until 2026-10-03, so a
-        wyvern-blood quench's sickness landed with no record of the blade behind it."""
+        wyvern-blood quench's sickness landed with no record of the blade behind it.
+
+        `payload` rides on the effect: an `ends_when` ("acts": what ending deeds) is the
+        one writer today (`Engine._ends_on_act` reads it)."""
         from . import states
 
         key = key.strip().lower()
@@ -4672,13 +4684,20 @@ class Actor:
             # Same condition twice does not stack in 1e; the longer duration wins.
             if rounds is not None and (existing.rounds_left is None or rounds > existing.rounds_left):
                 existing.rounds_left = rounds
+            # An end the old copy did not have is not taken on by the new one: a greater
+            # invisibility (no end on attack) under a drunk invisibility keeps the
+            # greater's terms. A copy that had an end and meets one without keeps none.
+            if payload is not None and (existing.payload or {}).get("ends_when") \
+                    and not payload.get("ends_when"):
+                existing.payload = {k: v for k, v in (existing.payload or {}).items()
+                                    if k != "ends_when"}
             return Condition(key=key, rounds_left=existing.rounds_left,
                              source=existing.source)
         self.apply_effect(ActiveEffect(
             name=CONDITIONS.get(key, {}).get("name", key.title()), kind="condition",
             key=key, source=source, origin=origin,
             duration="until-dismissed" if rounds is None else "rounds",
-            rounds_left=rounds, tags=states.tags_for(key)))
+            rounds_left=rounds, tags=states.tags_for(key), payload=dict(payload or {})))
         return Condition(key=key, rounds_left=rounds, source=source)
 
     def add_buff(self, kind: str, target: str, amount: int, source: str = "",

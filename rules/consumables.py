@@ -520,6 +520,13 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
         if isinstance(duration, dict) and duration.get("amount"):
             params["duration"] = {"amount": duration.get("amount"),
                                   "unit": duration.get("unit", "round")}
+        # What ends it besides its clock: the potion of invisibility's "acts": ["attack",
+        # "cast_offensive"] (Invisibility, CRB p.301: "The spell ends if the subject
+        # attacks any creature"). Dropped here until 2026-10-30, so a drunk invisibility
+        # outlived every blow struck from inside it (`Engine._ends_on_act` reads it).
+        ends = spec.get("ends_when")
+        if isinstance(ends, dict) and ends.get("acts"):
+            params["ends_when"] = {"acts": [str(a) for a in ends["acts"]]}
         return [{"op": "condition", "because": because, "params": params}]
 
     if kind in SCALED_BONUSES:

@@ -366,6 +366,19 @@ TAGS: dict[str, tuple[str, ...]] = {
     "deafened":    ("state.senses.deafened",),
     "dazzled":     ("state.senses.dazzled", "recovery.rest"),
     "invisible":   ("state.hidden.invisible",),
+    # A won Stealth check, held (rules/awareness.py, 2026-10-30): "Creatures that fail to
+    # beat your Stealth check are not aware of you and treat you as if you had total
+    # concealment" (CRB p.106). Not a condition the book prints, so it has no row in
+    # `tables.CONDITIONS`; granted by `Engine._op_check` (source `rule:stealth`, the
+    # result in the payload) and ended by an attack (`_ends_on_act`), by being found, or
+    # by leaving the place. `state.slowed` is the book's no-penalty speed: "You can move
+    # up to half your normal speed and use Stealth at no penalty" — the -5 band between
+    # half and full speed is not offered.
+    #
+    # Its readers, and the `knows.*` it is checked into, are in rules/awareness.py:
+    # `knows.where.<ref>` (pinpointed) and `knows.near.<ref>` (a hunch) on the OBSERVER,
+    # a family with the ref in the leaf like `state.wanted.<town>`, so not rows here.
+    "sneaking":    ("state.hidden.stealth", "state.slowed"),
     "prone":       ("state.position.prone", "recovery.rest"),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),

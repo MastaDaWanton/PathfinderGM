@@ -990,17 +990,6 @@
    "text": "Gum arabic holding the suspension together — the spell's own binder, doing the same job in a bottle that it does in a gesture. The classic, and the one every party buys two of.",
    "effects": [
     {
-     "type": "skill_mod",
-     "amount": 20,
-     "bonus_type": "untyped",
-     "target": "stealth",
-     "duration": {
-      "amount": 3,
-      "unit": "minute"
-     },
-     "note": "while invisible and moving; +40 while invisible and holding still"
-    },
-    {
      "type": "apply_condition",
      "target": "invisible",
      "duration": {
