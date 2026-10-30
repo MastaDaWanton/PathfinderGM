@@ -124,7 +124,7 @@ def test_the_forge_moves_the_book_when_its_documents_say_so():
 
 def test_the_documents_are_written_as_steps_from_steel():
     """`DOCUMENT_BASE_HP_PER_INCH` is steel's 30 because every document that states an
-    absolute figure in its note gets there from steel: inubrix −20 is '10 hit points per
+    absolute figure in its note gets there from steel: ghost skymetal −20 is '10 hit points per
     inch', singing steel −10 '20', gold −5 'hardness 5', bronze armour −1 'hardness 9'."""
     import json
     from pathlib import Path

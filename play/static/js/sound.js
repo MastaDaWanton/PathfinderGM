@@ -709,10 +709,11 @@
   var HARDNESS = {
     iron: 12, "wrought-iron": 8, copper: 9, tin: 8, lead: 10, zinc: 10, bismuth: 10,
     silver: 8, gold: 5, platinum: 10, "cold-iron": 8, "star-iron": 12, viridium: 5,
-    mithral: 15, adamantine: 20, abysium: 12, djezet: 10, inubrix: 5, noqual: 10,
-    siccatite: 10, horacalcum: 15, steel: 12, bronze: 8, brass: 8, pewter: 8, electrum: 8,
-    "bell-bronze": 12, "high-carbon-steel": 12, "pattern-steel": 8, "nexavaran-steel": 8,
-    "elysian-bronze": 8, "living-steel": 15, "fire-forged-steel": 8,
+    mithral: 15, adamantine: 20, "fever-skymetal": 12, "quick-skymetal": 10, "ghost-skymetal": 5,
+    "null-skymetal": 10,
+    "searing-skymetal": 10, "time-skymetal": 15, steel: 12, bronze: 8, brass: 8, pewter: 8, electrum: 8,
+    "bell-bronze": 12, "high-carbon-steel": 12, "pattern-steel": 8, "frontier-steel": 8,
+    "celestial-bronze": 8, "living-steel": 15, "fire-forged-steel": 8,
     "frost-forged-steel": 8, "singing-steel": 10, wyrmsteel: 10,
   };
   function hardnessOf(c) {

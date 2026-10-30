@@ -111,7 +111,7 @@ def vs_sub(subtype) -> dict:
 
 def by_weight(weight) -> dict:
     """`when` the base armour is of this weight class: adamantine's DR 1/2/3 and
-    horacalcum's initiative +1/+2/+3 are printed per class, and the build knows the base."""
+    time skymetal's initiative +1/+2/+3 are printed per class, and the build knows the base."""
     return {"armour": {"weight": weight}}
 
 
@@ -205,28 +205,28 @@ entry("adamantine-ore", material="adamantine", working=wk("narrow_window"),
       text="Night-black metal found only in the hearts of fallen stars and the deepest "
            "delvings. It smelts to adamantine in a narrow band of white heat that only a "
            "rare fuel reaches.")
-entry("abysium-ore", material="abysium", working=wk("reactive"),
+entry("fever-skymetal-ore", material="fever-skymetal", working=wk("reactive"),
       text="A skymetal ore that glows blue-green in the dark and warms the hand that holds "
-           "it. It smelts to abysium, and it sickens whoever carries it: assaying it is "
+           "it. It smelts to fever skymetal, and it sickens whoever carries it: assaying it is "
            "genuinely dangerous.")
-entry("djezet-ore", material="djezet", working=wk("malleable"),
+entry("quick-skymetal-ore", material="quick-skymetal", working=wk("malleable"),
       text="Rust-red skymetal that is liquid at every temperature, collected drop by drop "
            "where it seeps from volcanic rock. Carried in wax-stoppered vials; nothing a "
            "smith does to it can ruin it.")
-entry("inubrix-ore", material="inubrix", working=wk("malleable"),
+entry("ghost-skymetal-ore", material="ghost-skymetal", working=wk("malleable"),
       text="The ghost iron. Seams of it are found threaded through iron deposits they have "
-           "visibly sunk through. It smelts to inubrix, only slightly less malleable than "
+           "visibly sunk through. It smelts to ghost skymetal, only slightly less malleable than "
            "lead.")
-entry("noqual-ore", material="noqual", working=wk("forgiving"),
+entry("null-skymetal-ore", material="null-skymetal", working=wk("forgiving"),
       text="Pale green skymetal crystal, found in crater rims. Detect magic slides off a "
-           "nugget of it as though there were nothing there. It smelts to noqual, which "
+           "nugget of it as though there were nothing there. It smelts to null skymetal, which "
            "the book says is worked as iron.")
-entry("siccatite-ore", material="siccatite", working=wk("reactive"),
+entry("searing-skymetal-ore", material="searing-skymetal", working=wk("reactive"),
       text="A skymetal that comes out of the ground either searing hot or freezing cold "
-           "and never changes its mind. It smelts to siccatite, and assaying it burns.")
-entry("horacalcum-ore", material="horacalcum", working=wk("narrow_window"),
+           "and never changes its mind. It smelts to searing skymetal, and assaying it burns.")
+entry("time-skymetal-ore", material="time-skymetal", working=wk("narrow_window"),
       text="The rarest skymetal: a dull coppery ore around which time runs a half-step "
-           "slow. It smelts to horacalcum in the narrowest band of any ore.")
+           "slow. It smelts to time skymetal in the narrowest band of any ore.")
 
 # ---- metals ---------------------------------------------------------------------------------
 
@@ -380,7 +380,7 @@ entry("adamantine", pieces={"weapon": W_HS, "armour": A_BF},
            "head strikes as adamantine, through hardness below 20, and hits harder, though "
            "it is heavier than steel. Adamantine armour gives the book's damage reduction "
            "of 1, 2 or 3 by weight and turns blows, but it does not flex.")
-entry("abysium", pieces={"weapon": W_HS, "armour": A_BF}, risky=True,
+entry("fever-skymetal", pieces={"weapon": W_HS, "armour": A_BF}, risky=True,
       weapon=[B({"type": "apply_condition", "target": "sickened", "trigger": "carried",
                  "note": "while carried and for 1d4 hours after; a poison effect, no save"}),
               cm("damage", 3), cm("attack", 2)],
@@ -397,12 +397,12 @@ entry("abysium", pieces={"weapon": W_HS, "armour": A_BF}, risky=True,
               {"type": "narrative",
                "target": "Glows: sheds light as a candle, and cannot be hidden from "
                          "creatures that see it"}])
-entry("djezet", feeds=["alloy"], working=wk("malleable", "pure", "weld_aid"),
+entry("quick-skymetal", feeds=["alloy"], working=wk("malleable", "pure", "weld_aid"),
       text="The quickmetal: rust-red and liquid at every temperature. It fills no piece; "
            "the book makes it useless for metal objects except alloys, and at the "
            "crucible it is the kindest of the skymetals. Its spell-quickening use is a "
            "spellcaster's, not a smith's.")
-entry("inubrix", pieces={"weapon": ["head"]},
+entry("ghost-skymetal", pieces={"weapon": ["head"]},
       weapon=[B(cm("attack", -2, bonus="untyped", note="always broken")),
               B(cm("damage", -2, bonus="untyped", note="always broken; and damage as one "
                                                        "size smaller")),
@@ -412,7 +412,7 @@ entry("inubrix", pieces={"weapon": ["head"]},
                  note="house approximation of the book's 'ignores armour and shield "
                       "bonuses from iron or steel'")],
       working=wk("malleable", "narrow_window"),
-      text="Ghost iron, the softest of the skymetals. An inubrix head is always broken in "
+      text="Ghost iron, the softest of the skymetals. An ghost skymetal head is always broken in "
            "the book, deals damage as a size smaller and cannot harm iron or steel, but "
            "passes through iron and steel armour as if it were not there; here it swings "
            "truer against a metal-armoured foe. Poor for armour, so it fills no armour "
@@ -421,7 +421,7 @@ entry("inubrix", pieces={"weapon": ["head"]},
                "target": "Ignores armour and shield bonuses from iron or steel, but is "
                          "always broken, deals damage as one size smaller and cannot "
                          "damage iron or steel"}])
-entry("noqual", pieces={"weapon": W_HS, "armour": A_BF}, enchant_surcharge_gp=5000,
+entry("null-skymetal", pieces={"weapon": W_HS, "armour": A_BF}, enchant_surcharge_gp=5000,
       weapon=[B(gm("weight_pct", -50)),
               B(cm("damage", 1, bonus="enhancement", when=vs("construct"),
                    note="constructs made by feats or spells")),
@@ -435,7 +435,7 @@ entry("noqual", pieces={"weapon": W_HS, "armour": A_BF}, enchant_surcharge_gp=50
               B(gm("weight_pct", -50)), B(gm("category", -1)), B(gm("max_dex", 2)),
               B(gm("acp", 3))],
       working=wk("forgiving", "reactive"),
-      text="Pale green and crystalline, and magic slides off it. Noqual is half weight; "
+      text="Pale green and crystalline, and magic slides off it. Null skymetal is half weight; "
            "its weapons bite constructs and made undead harder, and its armour moves a "
            "class lighter and wards its wearer against spells, at a fifth more spell "
            "failure for any caster. Any magic item made with it costs 5,000 gp more to "
@@ -444,10 +444,10 @@ entry("noqual", pieces={"weapon": W_HS, "armour": A_BF}, enchant_surcharge_gp=50
                "target": "Half weight; armour: +2 resistance on saves against spells, "
                          "+20% spell failure for all casting, one category lighter; any "
                          "magic item made with it costs 5,000 gp more"}])
-entry("siccatite", pieces={"weapon": ["head"], "armour": ["body"]}, risky=True,
+entry("searing-skymetal", pieces={"weapon": ["head"], "armour": ["body"]}, risky=True,
       weapon=[B({"type": "damage", "dice": "1", "damage_type": "fire",
                  "lethality": "lethal", "trigger": "hit",
-                 "note": "hot siccatite; cold siccatite deals cold"}),
+                 "note": "hot searing skymetal; cold searing skymetal deals cold"}),
               B({"type": "damage", "dice": "1", "damage_type": "fire",
                  "lethality": "lethal", "recipient": "self", "trigger": "each_round",
                  "duration": ALWAYS, "note": "to the wielder, each round of combat"}),
@@ -459,15 +459,15 @@ entry("siccatite", pieces={"weapon": ["head"], "armour": ["body"]}, risky=True,
                  "lethality": "lethal", "recipient": "attacker",
                  "trigger": "when_grappled", "duration": ALWAYS,
                  "note": "to whoever grapples the wearer, each round"}),
-              B(res("cold", 5, note="hot siccatite armour; cold siccatite gives fire "
+              B(res("cold", 5, note="hot searing skymetal armour; cold searing skymetal gives fire "
                                     "resistance 5 instead")),
               cm("ac", 2)],
       working=wk("reactive", "narrow_window"),
-      text="The skymetal of extremes; this is the hot kind. A siccatite head brands what "
+      text="The skymetal of extremes; this is the hot kind. A searing skymetal head brands what "
            "it hits for a point of fire and burns its wielder a point each round of "
-           "combat. Siccatite armour burns its wearer and anyone who grapples them, and "
+           "combat. Searing skymetal armour burns its wearer and anyone who grapples them, and "
            "keeps the cold off. Assaying it burns.")
-entry("horacalcum", pieces={"weapon": W_HS, "armour": A_BF},
+entry("time-skymetal", pieces={"weapon": W_HS, "armour": A_BF},
       weapon=[B(cm("attack", 1, bonus="circumstance", note="not ammunition")),
               B(gm("hardness", 5)), cm("initiative", 4), cm("damage", -2)],
       armour=[B(cm("initiative", 1, bonus="untyped", when=by_weight("light"))),
@@ -476,11 +476,11 @@ entry("horacalcum", pieces={"weapon": W_HS, "armour": A_BF},
               B(gm("hardness", 5)), gm("acp", -2)],
       working=wk("narrow_window", "pure"),
       text="The rarest skymetal, a dull coppery gold around which time runs slow. A "
-           "horacalcum blade gives the book's +1 on the attack and puts its bearer ahead "
-           "in the fight, though it lands lightly. Horacalcum armour quickens the wearer "
+           "time skymetal blade gives the book's +1 on the attack and puts its bearer ahead "
+           "in the fight, though it lands lightly. Time skymetal armour quickens the wearer "
            "by its weight, +1 to +3 initiative, and sits stiffly.",
       legacy=[{"type": "combat_mod", "amount": 1, "bonus_type": "circumstance",
-               "target": "attack", "note": "a horacalcum weapon; armour instead gives "
+               "target": "attack", "note": "a time skymetal weapon; armour instead gives "
                                            "+1/+2/+3 initiative by weight"}])
 
 # ---- alloys ---------------------------------------------------------------------------------
@@ -547,7 +547,7 @@ entry("pattern-steel", pieces={"weapon": ["head"], "armour": ["body"]},
            "water-marks. Spring and edge in one bar: it cuts deep and survives what "
            "snaps a plain blade, and is a little softer for the spring. Masterwork costs "
            "it no extra difficulty, in a narrow heat window.")
-entry("nexavaran-steel", pieces={"weapon": W_HS, "armour": A_BF},
+entry("frontier-steel", pieces={"weapon": W_HS, "armour": A_BF},
       weapon=[B(sa("cold_iron")), cm("damage", 2), gm("hardness", -2)],
       armour=[sv("will", 2), gm("hardness", 2), gm("acp", -2)],
       working=wk("narrow_window", "forgiving"),
@@ -558,7 +558,7 @@ entry("nexavaran-steel", pieces={"weapon": W_HS, "armour": A_BF},
                "target": "Counts as cold iron against damage reduction, at 1.5 times "
                          "common cost rather than double"}])
 _EB_TYPES = ["magical beast", "monstrous humanoid"]
-entry("elysian-bronze", pieces={"weapon": W_HS, "armour": A_BF},
+entry("celestial-bronze", pieces={"weapon": W_HS, "armour": A_BF},
       weapon=[B(cm("damage", 1, bonus="untyped", when={"target": {"type": _EB_TYPES}},
                    note="multiplied on a critical hit")),
               B(cm("attack", 1, bonus="untyped", trigger="hit", recipient="self",

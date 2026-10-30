@@ -43,7 +43,7 @@ from .tables import (
 # `gear_mod` changes the item's *own* numbers, which are on no character sheet. The amount is
 # **added to the number as `tables.ARMOUR` stores it**, and that one convention decides every
 # sign: the table keeps armour check penalty negative (a chain shirt is -2) and spell failure
-# as a positive percentage, so mithral's lighter penalty is acp **+3** and noqual's heavier
+# as a positive percentage, so mithral's lighter penalty is acp **+3** and null skymetal's heavier
 # spell failure is asf +20. The alternative — "the size of the change, sign meaning better or
 # worse" — reads naturally for one target and backwards for the next, and plan §5.4 already
 # wrote mithral's acp as -3 and adamantine's as -2 meaning opposite things. `better` records
@@ -455,7 +455,7 @@ def splash_for(specs: list[dict]) -> list[dict]:
 
 # Triggers that belong to an *item* rather than to a spell's lifetime: a blade's venom on
 # the hit, viridium's leprosy on the crit, wyvern blood on the first wound each day,
-# abysium sickening whoever carries it. The item is their window, which is why they are
+# fever skymetal sickening whoever carries it. The item is their window, which is why they are
 # excused the duration a spell's `each_round` needs — and why the engine's ward path
 # (`Engine._executes`, which treats any non-`on_cast` trigger as a ward) must not be the
 # thing that runs them. Lane B's riders do (contract §5).
@@ -2635,7 +2635,7 @@ def render(spec: dict, *, against: bool = False) -> str:
     """
     found = find(str(spec.get("type", "")))
     if found is None:
-        # Noqual's assay recoil (`materials.ASSAY_DANGERS`, the owner's house rule of
+        # Null skymetal's assay recoil (`materials.ASSAY_DANGERS`, the owner's house rule of
         # 2026-10-04) is not an authorable effect, but it reaches a card: without words
         # here the assay confirm printed nothing of its own and fell back on a general
         # warning, because `knowledge.danger_of` hands over the effect without its note.

@@ -3,9 +3,9 @@
 Enchanting plan §16 and contracts §3.3; the cross-craft ruling it serves is the owner's
 "there are spells that affect metal" (leatherworking Q7.3): heat metal, chill metal,
 shocking grasp's +3 against metal armour, the druid's no-metal rule, and the enchanter's
-cold iron and noqual surcharges all ask one question — *is it metal, and which metal* —
+cold iron and null skymetal surcharges all ask one question — *is it metal, and which metal* —
 and before this the only answer was a list of suit names in `rules/armour.py`, which called
-a forged mithral-on-darkwood shield metal by its name and a forged noqual breastplate metal
+a forged mithral-on-darkwood shield metal by its name and a forged null skymetal breastplate metal
 only because "breastplate" was on the list.
 
 **Where the answer comes from, in order:**
@@ -252,7 +252,7 @@ def material_tags(thing) -> tuple[str, ...]:
 
 def has_material(thing, prefix: str) -> bool:
     """Whether any of the item's material tags answers `prefix` — `material.metal`,
-    `material.metal.cold-iron`, `material.main.noqual` — by `states.matches`, never `==`."""
+    `material.metal.cold-iron`, `material.main.null-skymetal` — by `states.matches`, never `==`."""
     q = str(prefix or "").strip().lower()
     return any(states.matches(t, q) for t in material_tags(thing))
 
@@ -268,7 +268,7 @@ def main_material(thing) -> str | None:
 
 def materials_in(thing) -> list[str]:
     """Every root material id in the item, main first — for a reader that asks about one
-    material's own data (noqual's `enchant_surcharge_gp`)."""
+    material's own data (null skymetal's `enchant_surcharge_gp`)."""
     pieces, main, loose = _resolve(thing)
     ids = ([pieces[main]] if main in pieces else []) + [m for s, m in pieces.items()
                                                        if s != main] + loose

@@ -581,7 +581,7 @@ def test_a_novel_alloy_is_one_band_rarer_and_gated_by_what_it_makes():
     reach the level-5 deed; the deed is gone, so a legendary melt now needs the level that
     works legendary metal, as the Herbalist's revamped bench gates by its output."""
     chain = Chain("blacksmith", ["smelt", "alloy", "forge", "quench"],
-                  ["siccatite", "abysium", "dragonfire-coal"], base="longsword")
+                  ["searing-skymetal", "fever-skymetal", "dragonfire-coal"], base="longsword")
     r = blacksmith.preview(3, chain)
     assert r.problems == []
     assert r.tier == "legendary"

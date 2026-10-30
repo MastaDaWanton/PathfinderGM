@@ -1196,7 +1196,7 @@ def _assay_doc(material_id: str):
 
 
 def is_reactive(doc) -> bool:
-    """Whether a material has the `reactive` working trait (noqual, abysium): the one
+    """Whether a material has the `reactive` working trait (null skymetal, fever skymetal): the one
     thing that makes an assay dangerous."""
     return any(str(s.get("trait") or s.get("target") or "") == "reactive"
                for s in (_field(doc, "working", None) or ()) if isinstance(s, dict))
@@ -1206,13 +1206,13 @@ def danger_of(doc) -> tuple[str, dict] | None:
     """(key, effect) of the carrier effect an assay of a reactive metal applies, or None.
 
     The material's OWN carrier effect (`trigger: carried`, contract §2), so the assay is
-    the metal doing to the assayer what it does to anyone who holds it: abysium's
+    the metal doing to the assayer what it does to anyone who holds it: fever skymetal's
     sickness, never a hazard invented for the bench. A reactive metal with no carrier
     effect has nothing to do to a handler, and an assay of it is safe; a carrier effect
     on a metal that is not reactive is felt by carrying it, not by a ten-minute assay.
     The trigger and the book flag are the item's bookkeeping and do not travel; a
     carrier effect states no length (it lasts while carried), so the assay's comes from
-    the rule row (the book's abysium: 1d4 hours after it is put down).
+    the rule row (the book's fever-skymetal: 1d4 hours after it is put down).
     """
     if not is_reactive(doc) or is_leather(doc):
         # No hide bites back when it is graded (the owner, 2026-10-08, open point 10:
@@ -1220,7 +1220,7 @@ def danger_of(doc) -> tuple[str, dict] | None:
         # while skinning"): a dangerous body is the harvest's second check, never Grade's.
         return None
     # A danger the material states for the assay itself, when its harm is not a carrier
-    # effect: noqual's "magic recoils" (the owner's house rule, 2026-10-04). Its key is
+    # effect: null skymetal's "magic recoils" (the owner's house rule, 2026-10-04). Its key is
     # the `reactive` working trait's, so what the assayer learns from it is that the
     # metal is reactive — learned by having their wards go quiet.
     stated = _field(doc, "assay_danger", None)
@@ -1246,7 +1246,7 @@ def assay(actor, material_id: str, total: int, *, clock: int, creature=None) -> 
     The sliver is cut and spent either way, and the ten minutes pass either way: the bench
     takes the cost (`cost`, `minutes`) and this records the knowledge. A success reveals
     one benefit and one drawback, the owner's ruling mirroring tasting, with the danger's
-    own key preferred as the drawback (you learned abysium sickens by being sickened). A
+    own key preferred as the drawback (you learned fever skymetal sickens by being sickened). A
     miss reveals nothing and does not wait for a rest as study does: each try costs a
     sliver, which is its own limit.
 
@@ -1398,7 +1398,7 @@ def apply_danger(engine, actor, material_id: str, effect: dict | None,
 
 
 def _suppress_magic(engine, actor, mid: str, name: str, spec: dict, because: str):
-    """Noqual's recoil (the owner's HOUSE RULE, 2026-10-04, contracts §13.2): the
+    """Null Skymetal's recoil (the owner's HOUSE RULE, 2026-10-04, contracts §13.2): the
     assayer's active magical effects — buffs and wards — are suppressed for 1d4 rounds.
 
     One `ActiveEffect` through the one applicator, `origin: item:<material>`, granting

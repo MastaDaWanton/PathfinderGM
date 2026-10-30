@@ -108,8 +108,8 @@
         {"material": "mithral", "keys": "all"},
         {"material": "adamantine", "keys": "all"},
         {"material": "star-iron", "keys": "benefits"},
-        {"material": "abysium", "keys": "drawbacks"},
-        {"material": "noqual", "keys": "drawbacks"}
+        {"material": "fever-skymetal", "keys": "drawbacks"},
+        {"material": "null-skymetal", "keys": "drawbacks"}
       ]
     }
   ]

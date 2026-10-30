@@ -10,8 +10,9 @@ re-import or a hand edit that brings a name back fails here, not in a licence re
 
 The myth names Golarion adopted went the same way on 2026-10-30, at the owner's word: 27
 rows named Asmodeus, Lamashtu, Hastur, Apsu, Abaddon and their kin as Golarion's gods and
-planes. Deliberately not held to zero: cosmology words (Boneyard, Elysium), never ruled on.
-The alias files are exempt by design: they are where old saves find the old ids.
+planes. Paizo's names for its planes (the Boneyard, Elysium, the First World, the Akashic
+Record) and its coined metals (the skymetals, nexavaran steel, elysian bronze) followed the
+same day. The alias files are exempt by design: they are where old saves find the old ids.
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ def test_no_shipped_content_names_golarion():
     rows, _ = cp.measure()
     named = sorted({f"{rel} {rid}: {h.term} ({h.field})"
                     for rel, rid, _src, _fam, hits in rows for h in hits
-                    if h.cls in cp.LORE or h.cls == "myth"})
+                    if h.cls in cp.LORE or h.cls in ("myth", "cosmology")})
     assert not named, "Golarion names in shipped content:\n" + "\n".join(named[:40])
 
 
@@ -138,3 +139,28 @@ def test_a_pack_and_a_tanned_grip_from_before_keep_their_river_materials():
                   ref="c1")
     assert a.goods == {"oblivion-water": 2, "oak-bark": 1}
     assert set(a.herb_known) == {"oblivion-mordant"}
+
+
+def test_the_renamed_metals_planes_and_grass_answer_to_their_old_ids():
+    """Renamed 2026-10-30 by what each does: abysium is fever skymetal, noqual null
+    skymetal, nexavaran steel frontier steel, elysian bronze celestial bronze; the
+    anti-magic grass "Elysium" is nullgrass; Akashic Form is Remembered Form. A save, a
+    recipe or a World Bible export naming the old id still finds the thing."""
+    from rules import ingredients, materials, spells
+
+    assert materials.get("noqual")["name"] == "Null Skymetal"
+    assert materials.get("abysium-ore")["id"] == "fever-skymetal-ore"
+    assert materials.get("nexavaran-steel")["id"] == "frontier-steel"
+    assert materials.get("elysian-bronze")["id"] == "celestial-bronze"
+    assert ingredients.get("elysium").id == "nullgrass"
+    assert spells.get("akashic-form").id == "remembered-form"
+
+
+def test_a_skymetal_bar_and_a_grass_in_an_old_pack_load_renamed():
+    """The same load-time rewrite as the Styx finishes, for the metals and the grass."""
+    from rules.sheet import from_dict
+
+    a = from_dict({"name": "x", "kind": "npc", "hp": 5, "hp_max": 5,
+                   "abilities": {k: 10 for k in ("str", "dex", "con", "int", "wis", "cha")},
+                   "goods": {"noqual": 1, "elysium": 3}}, ref="c1")
+    assert a.goods == {"null-skymetal": 1, "nullgrass": 3}

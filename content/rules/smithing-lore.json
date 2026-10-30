@@ -18,7 +18,7 @@
     "_comparison": "Plan §9.2 (proposed, accepted with the plan): -1 DC for each other known material of the same kind, at most -4. Assaying is comparison against known references: touchstone needles of known fineness, spark charts (docs/blacksmithing-prior-art.md §3.8).",
     "comparison_per_known": 1,
     "comparison_max": 4,
-    "_danger_duration": "A carrier effect lasts while carried and states no length of its own. Pathfinder #61 (via the sweep's §1.4 table): abysium's carrier is sickened while carrying it 'and for 1d4 hours after'. A sliver is put down when the assay ends, so the assay's danger is the after.",
+    "_danger_duration": "A carrier effect lasts while carried and states no length of its own. Pathfinder #61 (via the sweep's §1.4 table): fever skymetal's carrier is sickened while carrying it 'and for 1d4 hours after'. A sliver is put down when the assay ends, so the assay's danger is the after.",
     "danger_duration": {"amount": "1d4", "unit": "hour"}
   },
   "study": {

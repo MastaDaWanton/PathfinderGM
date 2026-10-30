@@ -768,10 +768,10 @@ FORGE_FORMS = {
 
 # Iron and its alloys: what rusting grasp eats (contracts §6.2, plan §18.5). Read from the
 # shelf's own texts: iron, wrought and cold iron, meteoric star-iron, and every steel. Not
-# inubrix ("ghost iron" is a skymetal that cannot damage iron), not abysium (it "works as
+# ghost skymetal ("ghost iron" is a skymetal that cannot damage iron), not fever skymetal (it "works as
 # steel" and is not), not wyrmsteel (adamantine folded with dragonfire).
 FERROUS = ("iron", "wrought-iron", "cold-iron", "star-iron", "steel", "high-carbon-steel",
-           "pattern-steel", "nexavaran-steel", "living-steel", "fire-forged-steel",
+           "pattern-steel", "frontier-steel", "living-steel", "fire-forged-steel",
            "frost-forged-steel")
 
 NOTE = ("Tier follows the worldclass ladder (a deer is common work, a dragon legendary). "

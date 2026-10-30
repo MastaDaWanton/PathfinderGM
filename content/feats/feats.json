@@ -15394,8 +15394,8 @@
    "types": [
     "general"
    ],
-   "description": "You were found in the wilds as a child, bearing a mark of the First World.",
-   "benefit": "Your strange connection to the First World and the fey infuses you with life, and whenever you receive magical healing, you heal an additional 2 points per die rolled. You gain a +2 bonus on all saving throws against death effects. Unfortunately, you also suffer +1 point of damage from cold iron weapons (although you can wield cold iron weapons without significant discomfort).",
+   "description": "You were found in the wilds as a child, bearing a mark of the fey realm.",
+   "benefit": "Your strange connection to the fey realm and the fey infuses you with life, and whenever you receive magical healing, you heal an additional 2 points per die rolled. You gain a +2 bonus on all saving throws against death effects. Unfortunately, you also suffer +1 point of damage from cold iron weapons (although you can wield cold iron weapons without significant discomfort).",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -29367,7 +29367,7 @@
     "general"
    ],
    "description": "You have seen the outer reaches of the multiverse, and have gleaned knowledge from these alien realms. You have a special affinity for one of these realms in particular, and carry some of that plane's power within you.",
-   "benefit": "Choose one of the planes below. The alignment of the plane must be within one step of your alignment. You gain a +2 bonus on saves against spells and spell-like abilities with the associated descriptor, and you cast spells with that descriptor at +1 caster level. Plane Alignment Descriptor Heaven LG Light Nirvana NG Good Elysium CG EmotionUM Axis LN Lawful The Boneyard N Death The Maelstrom CN Chaotic Hell LE PainUM the daemon wastes NE Evil The Abyss CE Fear",
+   "benefit": "Choose one of the planes below. The alignment of the plane must be within one step of your alignment. You gain a +2 bonus on saves against spells and spell-like abilities with the associated descriptor, and you cast spells with that descriptor at +1 caster level. Plane Alignment Descriptor Heaven LG Light the serene heavens NG Good the free heavens CG EmotionUM the city of law LN Lawful The court of the dead N Death The churning chaos CN Chaotic Hell LE PainUM the daemon wastes NE Evil The Abyss CE Fear",
    "normal": "",
    "special": "",
    "source": "Demon Hunter's Handbook",

@@ -2,7 +2,7 @@
 
 The owner's answer to Q7.3: "armor and weapons both need a metal tag because there are
 spells that affect metal". The tag existed (`rules/item_tags.py`, enchanting plan §16) and
-was read by one thing, inubrix's house clause. Read off the code and the documents on
+was read by one thing, ghost skymetal's house clause. Read off the code and the documents on
 build/leatherworking before this lane, 2026-10-08:
 
 - the druid's "no metal armour" was a proficiency token read by the armour-proficiency

@@ -1558,7 +1558,7 @@
    "converted_by": "read",
    "notes": "Duration is 'until landing or minutes/level'; the per_level part is emitted and the landing cut-off is in the narrative."
   },
-  "glimpse-of-the-akashic": {
+  "glimpse-of-all-memory": {
    "effects": [
     {
      "type": "narrative",
@@ -1566,7 +1566,7 @@
     },
     {
      "type": "narrative",
-     "target": "When that minute ends the Akashic Record assaults your psyche: you are stunned for 2 rounds and then sickened for 1 minute."
+     "target": "When that minute ends the memory of the cosmos assaults your psyche: you are stunned for 2 rounds and then sickened for 1 minute."
     }
    ],
    "duration": {
@@ -2139,7 +2139,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "You store a fine-tuned replica of yourself in the Akashic Record. You must be at half your maximum hit points or better to cast it. If you are ever brought below half your maximum hit points during the duration, you may end the spell as an immediate action to draw strength from the replica and immediately regain 3d8 hit points plus 1 per caster level, to a maximum of +15."
+     "target": "You store a fine-tuned replica of yourself in the memory of the cosmos. You must be at half your maximum hit points or better to cast it. If you are ever brought below half your maximum hit points during the duration, you may end the spell as an immediate action to draw strength from the replica and immediately regain 3d8 hit points plus 1 per caster level, to a maximum of +15."
     }
    ],
    "duration": {

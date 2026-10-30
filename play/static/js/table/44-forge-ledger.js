@@ -49,8 +49,8 @@
 // bought), `assay_minutes`/`grade_minutes` and `grade_cost`, `smiths_here`/`tanners_here`,
 // `assay_danger` (what testing it does, in words).
 //
-// THE REACTIVE ASSAY (blacksmithing UI plan §6.7, contracts §13.2). Assaying abysium
-// sickens (the book) and assaying noqual makes magic recoil, suppressing the assayer's
+// THE REACTIVE ASSAY (blacksmithing UI plan §6.7, contracts §13.2). Assaying fever skymetal
+// sickens (the book) and assaying null skymetal makes magic recoil, suppressing the assayer's
 // active magic for 1d4 rounds (the owner's house rule), so it always asks first, in
 // --alarm words, with the safe button focused. Whether to ask is the server's
 // `assay_danger`, else its `reactive`. A hide never bites when graded (the owner's answer
@@ -195,8 +195,8 @@
     return bits.join(", ");
   }
   function reactiveLine(name) { return name + " reacts badly to testing. Assay it anyway?"; }
-  // What testing it does to the tester, in the server's words. Abysium sickens (the book);
-  // noqual's magic recoils and suppresses the assayer's active magic for 1d4 rounds (the
+  // What testing it does to the tester, in the server's words. Fever skymetal sickens (the book);
+  // null skymetal's magic recoils and suppresses the assayer's active magic for 1d4 rounds (the
   // owner's house rule, contracts §13.2). Both are the material's own data, so the page
   // names no metal: it prints `assay_danger` (a sentence, or {text}) when the card carries
   // it, and a plain warning when it does not.

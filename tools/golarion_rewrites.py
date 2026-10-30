@@ -411,8 +411,8 @@ SPELL_EDITS: dict[str, list[tuple[str, str]]] = {
          "why his academy credits him with the creation of this spell.")],
     "planar-orientation": [("such as the Eldest of the First World or Heaven's various "
                             "Empyreal Lords and deities",
-                            "such as the fey lords of the First World or Heaven's various "
-                            "lords and deities")],
+                            "such as the lords of the fey realm or Heaven's various lords "
+                            "and deities")],
     "preserve-grace": [("The Lantern Bearers must often make difficult decisions",
                         "Elven light-bearers on crusade must often make difficult decisions")],
     "protection-from-spores": [("created by the seeded, by the spell what grows within, or by "
@@ -735,6 +735,45 @@ for _sid, _pairs in {
 FEAT_EDITS["outer-planes-traveler"] = [("Abaddon NE Evil", "the daemon wastes NE Evil")]
 
 
+# --- the cosmology words (the owner, 2026-10-30: "rename the cosmology words too") ----------
+#
+# Paizo's names for its planes: the Boneyard, the Maelstrom, Axis, Elysium, Nirvana, the
+# First World, the Great Beyond, the River of Souls and the Akashic Record. Each becomes
+# what it is. The open, generic planes (Heaven, Hell, the Abyss, the Shadow, Ethereal,
+# Astral and Material Planes) are the SRD's and stay; so do book titles in `source`.
+
+SPELL_RENAMES.update({
+    "akashic-communion": ("memory-communion", "Memory Communion"),
+    "akashic-form": ("remembered-form", "Remembered Form"),
+    "glimpse-of-the-akashic": ("glimpse-of-all-memory", "Glimpse of All Memory"),
+    "first-world-revisions": ("fey-revisions", "Fey Revisions"),
+    "kiss-of-the-first-world": ("fey-kiss", "Fey Kiss"),
+})
+
+# Whole phrases first, so "the Boneyard" never becomes "the the court of the dead".
+COSMOS: list[tuple[re.Pattern, str]] = [
+    (re.compile(p), r) for p, r in [
+        (r"\bthe Akashic Record\b", "the memory of the cosmos"),
+        (r"\bThe Akashic Record\b", "The memory of the cosmos"),
+        (r"\bAkashic Record\b", "memory of the cosmos"),
+        (r"\bAkashic replica\b", "cosmic replica"),
+        (r"\bthe First World\b", "the fey realm"), (r"\bThe First World\b", "The fey realm"),
+        (r"\bFirst World\b", "the fey realm"),
+        (r"\bthe Great Beyond\b", "the planes beyond"),
+        (r"\bthe Boneyard\b", "the court of the dead"),
+        (r"\bThe Boneyard\b", "The court of the dead"),
+        (r"\bBoneyard\b", "the court of the dead"),
+        (r"\bthe Maelstrom\b", "the churning chaos"),
+        (r"\bThe Maelstrom\b", "The churning chaos"),
+        (r"\bMaelstrom\b", "the churning chaos"),
+        (r"\bthe River of Souls\b", "the river of the dead"),
+        (r"\bElysium\b", "the free heavens"),
+        (r"\bNirvana\b", "the serene heavens"),
+        (r"\bAxis\b", "the city of law"),
+    ]
+]
+
+
 # --- applying ----------------------------------------------------------------------------------
 
 class StaleEdit(ValueError):
@@ -819,6 +858,8 @@ def _common(s: str) -> str:
         s = s.replace(old, new)
     for pattern, new in PRODUCT:
         s = pattern.sub(new, s)
+    for pattern, new in COSMOS:
+        s = pattern.sub(new, s)
     return s
 
 
@@ -865,7 +906,7 @@ def apply_spells(entries: list[dict]) -> tuple[list[dict], dict[str, str | None]
             continue
         e = _clear_columns(dict(e))
         e = _edit_row(e, _edits_for(SPELL_EDITS, sid, SPELL_RENAMES))
-        e = _rewrite_prose(e, lambda s: rename(_common(s)))
+        e = _rewrite_prose(e, lambda s: _common(rename(s)))
         if sid in SPELL_RENAMES:
             e["id"], e["name"] = SPELL_RENAMES[sid]
         out.append(e)
@@ -901,7 +942,7 @@ def apply_feats(entries: list[dict]) -> tuple[list[dict], dict[str, str | None]]
         if fid in FEAT_DROPS:
             continue
         e = _edit_row(dict(e), _edits_for(FEAT_EDITS, fid, FEAT_RENAMES))
-        e = _rewrite_prose(e, lambda s: gods(rename(_common(s))))
+        e = _rewrite_prose(e, lambda s: gods(_common(rename(s))))
         for cond in e.get("prerequisites") or []:
             if cond.get("kind") == "feat" and cond.get("feat") in FEAT_RENAMES:
                 cond["feat"] = FEAT_RENAMES[cond["feat"]][0]
@@ -937,4 +978,4 @@ def spell_renamer(entries: list[dict]):
     names = {e["name"]: SPELL_RENAMES[e["id"]][1] for e in entries
              if e.get("id") in SPELL_RENAMES}
     rename = _renamer(names, lowercase=True)
-    return lambda s: rename(_common(s))
+    return lambda s: _common(rename(s))

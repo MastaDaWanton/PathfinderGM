@@ -1875,7 +1875,7 @@ class Scene:
                 "source": holder.source, "what": holder.source}
 
     def _held_off(self, ward: "Ward") -> bool:
-        """Whether the creature this ward sits on has its magic suppressed (noqual's
+        """Whether the creature this ward sits on has its magic suppressed (null skymetal's
         recoil): the ward waits, its clock still running. An area's ward has no owner."""
         owner = (self.people.get(ward.owner) if ward.owner else None)
         return owner is not None and owner.has_state(MAGIC_SUPPRESSED)
@@ -3853,7 +3853,7 @@ class Engine:
         # or gone — and a find it was sitting on is paid once it has gone.
         resolution.outcomes.extend(self._holding_ground_settles())
         # What the pack grants after this batch moved things in and out of it — the
-        # abysium bar just bought, the cursed blade just sold (`_carried_settles`).
+        # fever skymetal bar just bought, the cursed blade just sold (`_carried_settles`).
         resolution.outcomes.extend(self._carried_settles())
         # A loosed dancing blade or animated shield (lane C2): its round's attacks, or
         # its four rounds over and the drop (`_loosed_settles`).
@@ -6251,7 +6251,7 @@ class Engine:
         actor = self.scene.actors[intent.actor]
         save = intent.params["save"]
         # A save a spell document called for is a save against a spell (the provenance
-        # stamp, stage 8), which noqual's `when: {"against": "spell"}` asks.
+        # stamp, stage 8), which null skymetal's `when: {"against": "spell"}` asks.
         ctx = {"against": "spell"} if str(intent.origin or "").startswith("spell:") else None
         # And a poison's own gate (`consumables._gate_intent`, label `poison-N`) is a save
         # against poison — which antitoxin's +5 asks (`when: {"against": "poison"}`,
@@ -16837,7 +16837,7 @@ class Engine:
                 # PC roll their own save against a spell and keeps every NPC's save with
                 # the engine, through the one rule `_force_visibility` states.
                 save_roll = self._roll_or_suspend_stage(
-                    # Against a spell: noqual armour's +2 resistance "on saves against
+                    # Against a spell: null skymetal armour's +2 resistance "on saves against
                     # spells" is a `when: {"against": "spell"}` term, asked of this.
                     intent, target, save_mods,
                     f"{SAVES[plan['save']]} save against {spell.name}", dc,
@@ -17283,7 +17283,7 @@ class Engine:
         reason `Scene.guards` gives: this is a relationship, and it belongs to the scene.
         """
         out: list[dict] = []
-        # A ward on a body whose magic is held off (noqual's recoil, `MAGIC_SUPPRESSED`)
+        # A ward on a body whose magic is held off (null skymetal's recoil, `MAGIC_SUPPRESSED`)
         # does not answer: suppressed, not ended, so it answers again when that lifts.
         if struck.has_state(MAGIC_SUPPRESSED):
             return out

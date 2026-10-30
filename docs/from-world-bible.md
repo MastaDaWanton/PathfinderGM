@@ -239,7 +239,7 @@ surcharges, and it is answered from data, never a name.
 |---|---|---|
 | `play.materials[].kind` | Absent (the whole of `play.materials[]` is proposed) | The substance for anything a piece can be made of: `metal` or `alloy` (both metal), `hide` or `leather`, `thread` (cord), `wood`, `bone`, `horn`, `cloth`, `stone`, `glass`. A world's "blue iron of the eastern hills" with `kind: "metal"` is metal to every spell that asks. The forge's other kinds (`fuel`, `flux`, `quenchant`, `fitting`, `treatment`) say what it does at the bench, not what it is |
 | `play.materials[].material` on a fitting | Absent | **Required on a fitting** (and any form): the root material it is made of, `"material": "brass"`. A fitting's kind is only "fitting", so this link is the one way the tag learns that "the guild's riveted grips" are brass and metal. Without it the fitting is made of nothing the tag can name, and nothing is guessed |
-| `play.materials[].enchant_surcharge_gp` | Absent | Only for a metal that should resist magic, as the book's cold iron (+2,000 gp the first time a weapon of it is enchanted) and noqual (+5,000) do: the extra gold, which the app turns into motes. Absent is no surcharge |
+| `play.materials[].enchant_surcharge_gp` | Absent | Only for a metal that should resist magic, as the book's cold iron (+2,000 gp the first time a weapon of it is enchanted) and null skymetal (+5,000) do: the extra gold, which the app turns into motes. Absent is no surcharge |
 
 **Essences** (lane D: `materials.essences()`, checked by `materials.essence_problems`). The
 enchanter binds essences, and a world's own creatures and places are where the found ones

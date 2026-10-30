@@ -230,7 +230,7 @@ def worn_things(actor) -> list:
 
 
 def wears_metal(actor) -> bool:
-    """Whether this creature has metal armour or a metal shield on — what inubrix's house
+    """Whether this creature has metal armour or a metal shield on — what ghost skymetal's house
     clause (`when: {"target": {"armour_metal": true}}`) asks of a defender, and what the
     druid's rule and shocking grasp will ask. A stat block with a printed AC wears what its
     note says, which this cannot read, so it answers no: a clause nothing can evaluate is
@@ -238,13 +238,13 @@ def wears_metal(actor) -> bool:
 
     Asked of the material tag (`item_tags`, enchanting plan §16), never of a name. It was
     two name lists here, `METAL_ARMOUR` and `METAL_SHIELDS`, which made a forged shield
-    metal by its base's name whatever it was made of, and a forged noqual breastplate
+    metal by its base's name whatever it was made of, and a forged null skymetal breastplate
     metal only because "breastplate" was on the list.
 
     The creature's standing tags (`wears.armour.metal`, `wears.shield.metal`,
     `item_tags.bearer_tags`) are read off the same `worn_by_kind` and the same material
     tag, so this and `has_state` cannot disagree; this stays a direct read because the
-    inubrix clause asks it on every blow and the standing tags walk the whole pack."""
+    ghost skymetal clause asks it on every blow and the standing tags walk the whole pack."""
     if getattr(actor, "flat_ac", None) is not None:
         return False
     from . import item_tags

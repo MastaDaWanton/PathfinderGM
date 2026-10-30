@@ -2,7 +2,7 @@
 material documents.
 
 Before it, metal was two name lists in rules/armour.py (`METAL_ARMOUR`, `METAL_SHIELDS`):
-a forged shield was metal by its base's name whatever it was made of, a forged noqual
+a forged shield was metal by its base's name whatever it was made of, a forged null skymetal
 breastplate was metal only because "breastplate" was listed, and no weapon could say what it
 was made of at all.
 """
@@ -39,20 +39,20 @@ def test_the_name_lists_are_gone_and_the_question_is_the_tag():
     assert not hasattr(armour_mod, "METAL_ARMOUR") and not hasattr(armour_mod, "METAL_SHIELDS")
 
 
-def test_a_darkwood_shield_is_not_metal_and_a_forged_noqual_breastplate_is():
-    """Plan §21.1's pin. A wooden shield's body is wood whoever made it; a forged noqual
-    breastplate is metal because noqual's `kind` is metal, not because "breastplate" was on
+def test_a_darkwood_shield_is_not_metal_and_a_forged_null_skymetal_breastplate_is():
+    """Plan §21.1's pin. A wooden shield's body is wood whoever made it; a forged null skymetal
+    breastplate is metal because null skymetal's `kind` is metal, not because "breastplate" was on
     a list."""
     darkwood = forge_items.record_for_base("heavy wooden shield", gear="shield",
                                            pieces={"body": "darkwood"}, item_id="dw")
-    noqual = {"id": "nq", "name": "Noqual breastplate", "gear": "armour",
+    null_skymetal = {"id": "nq", "name": "Null skymetal breastplate", "gear": "armour",
               "base": "breastplate", "slot": "armor", "quality_index": 3,
-              "pieces": {"body": {"material": "noqual", "passes": 0}}}
+              "pieces": {"body": {"material": "null-skymetal", "passes": 0}}}
     assert not item_tags.has_material(darkwood, METAL)
-    assert item_tags.has_material(noqual, METAL)
-    assert item_tags.main_material(noqual) == "noqual"
+    assert item_tags.has_material(null_skymetal, METAL)
+    assert item_tags.main_material(null_skymetal) == "null-skymetal"
     assert not armour_mod.wears_metal(worn_by(shield="heavy wooden shield", arm=darkwood))
-    assert armour_mod.wears_metal(worn_by(armour="breastplate", suit=noqual))
+    assert armour_mod.wears_metal(worn_by(armour="breastplate", suit=null_skymetal))
 
 
 def test_a_forged_shield_is_what_it_was_made_of_not_what_its_base_is_called():

@@ -519,8 +519,8 @@ def render() -> str:
         "is not modelled; `bulette-plate` is the bulette leather. Names wait on the "
         "licensing decision (plan §22), as do the umbral dragon's and the shadow mastiff's.",
         "**Ferrous** is set on iron, wrought iron, cold iron, star-iron, steel, high-carbon, "
-        "pattern, nexavaran, living, fire-forged and frost-forged steel. Not on inubrix "
-        "(\"ghost iron\" is a skymetal that cannot harm iron), abysium or wyrmsteel.",
+        "pattern, frontier, living, fire-forged and frost-forged steel. Not on ghost skymetal "
+        "(\"ghost iron\" is a skymetal that cannot harm iron), fever skymetal or wyrmsteel.",
     ]
     for a in asks:
         out.append(f"- {a}")

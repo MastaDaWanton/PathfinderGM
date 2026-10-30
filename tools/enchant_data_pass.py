@@ -100,7 +100,7 @@ FAMILIES: dict[str, dict] = {
                       f"sends the night's spirits home ({COCKCROW}); Hamlet's ghost fades "
                       "at it."),
     "holy": dict(phase="dawn", color="#ffe08a",
-                 affinity=["silver", "angelskin-binding", "unicorn-hide", "elysian-bronze"],
+                 affinity=["silver", "angelskin-binding", "unicorn-hide", "celestial-bronze"],
                  working=["pure"],
                  why="The cockcrow that ends the dead's hour: spirits and devils "
                      f"\"disappear with the first cry of the cock\" ({COCKCROW}). Dawn is "
@@ -220,7 +220,7 @@ FAMILIES: dict[str, dict] = {
                   working=["skittish"],
                   why="The burglar's hours, slipping through bars and bonds. A house "
                       "reading; not sourced."),
-    "vicious": dict(phase="night", color="#8b1e2d", affinity=["fiend-bone-core", "abysium"],
+    "vicious": dict(phase="night", color="#8b1e2d", affinity=["fiend-bone-core", "fever-skymetal"],
                     working=["volatile"],
                     why="The predator's dark, when the wolf comes to the fold. A house "
                         "reading; not sourced."),
@@ -239,7 +239,7 @@ FAMILIES: dict[str, dict] = {
                      "night hours. A house reading; not sourced."),
     # --- midnight
     "unholy": dict(phase="midnight", color="#6b1030",
-                   affinity=["fiend-bone-core", "hell-hound-hide", "abysium"],
+                   affinity=["fiend-bone-core", "hell-hound-hide", "fever-skymetal"],
                    working=["volatile"],
                    why="The witching hour, \"the hour immediately after midnight\", when "
                        f"witches, demons and ghosts are at their most powerful ({WITCHING})."),

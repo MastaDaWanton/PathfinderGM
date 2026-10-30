@@ -186,8 +186,8 @@ prose in the entry's `text` with **no fake spec** — the creature import's rule
 | common | iron ore, bog iron (slag-brittle −1 damage until fluxed), copper ore, tin ore, lead ore, calamine |
 | uncommon | cinnabar ore (*risky*: fume save or sickened), silver ore, gold ore, nickel ore, cold iron ore |
 | rare | platinum ore, mithral ore |
-| exotic | adamantine ore, abysium ore (*risky*: daily save or sickened), djezet seep, inubrix ore, noqual ore, siccatite ore (*risky*: 1 fire/round bare-handed) |
-| legendary | horacalcum ore |
+| exotic | adamantine ore, fever skymetal ore (*risky*: daily save or sickened), quick skymetal seep, ghost skymetal ore, null skymetal ore, searing skymetal ore (*risky*: 1 fire/round bare-handed) |
+| legendary | time skymetal ore |
 
 ### Metals (21)
 
@@ -196,8 +196,8 @@ prose in the entry's `text` with **no fake spec** — the creature import's rule
 | common | iron, wrought iron, bismuth, copper, tin, lead (lining blocks scrying), zinc |
 | uncommon | silver (plated: bites lycanthropes), gold, cold iron (bypasses DR of demons and fey; **costs double** — the metal forgives no reworking), viridium (*risky*: wounds fester, Fort 14 or sickened a day) |
 | rare | platinum, star iron (counts as cold iron; sky-fallen), mithral (**weight ×0.5**; armour a category lighter, max Dex +2, ACP −3) |
-| exotic | adamantine (ignores hardness < 20; keeps its masterwork edge; armour DR 3/2/1 —), abysium (*risky*: Fort 18 or sickened per unshielded day; glows), djezet (liquid always; quickens spellwork), inubrix (ghost iron: passes through iron and steel), noqual (magic slides off; +2 saves vs spells as armour), siccatite (*risky*: 1 fire **or** 1 cold per round of bare contact — including the wielder's grip) |
-| legendary | horacalcum (+1 initiative; time runs slow around it) |
+| exotic | adamantine (ignores hardness < 20; keeps its masterwork edge; armour DR 3/2/1 —), fever skymetal (*risky*: Fort 18 or sickened per unshielded day; glows), quick skymetal (liquid always; quickens spellwork), ghost skymetal (ghost iron: passes through iron and steel), null skymetal (magic slides off; +2 saves vs spells as armour), searing skymetal (*risky*: 1 fire **or** 1 cold per round of bare contact — including the wielder's grip) |
+| legendary | time skymetal (+1 initiative; time runs slow around it) |
 
 No two same-tier metals are reskins, and the test suite pins the three famous ones:
 cold iron's identity is *whom it hurts*, mithral's is *what it weighs*, adamantine's is
@@ -206,8 +206,8 @@ cold iron's identity is *whom it hurts*, mithral's is *what it weighs*, adamanti
 ### Alloys (15)
 
 common: steel, bronze, brass, pewter · uncommon: electrum, bell bronze (signal ring),
-high-carbon steel (holds its edge), pattern steel (watered spring), nexavaran steel
-(cold iron at 1.5× instead of 2×) · rare: elysian bronze (+1 damage vs magical beasts
+high-carbon steel (holds its edge), pattern steel (watered spring), frontier steel
+(cold iron at 1.5× instead of 2×) · rare: celestial bronze (+1 damage vs magical beasts
 and monstrous humanoids), living steel (self-repairing; harvested), fire-forged steel
 (fire resist 2), frost-forged steel (cold resist 2) · exotic: singing steel (+2 Perform
 with the metal in the act) · legendary: wyrmsteel (fire resist 5; adamantine's contempt
@@ -296,11 +296,11 @@ DR if ever worn as armour — and six stages of chain pay 10 MP on top of first-
 
 A smith standing in the mountains calls `obtainable("mined", biome="mountain")` through
 the craft-action button and gets 22 entries — iron, copper, lead, silver, gold, nickel,
-platinum, mithral and horacalcum ore, the mountain skymetals (djezet, noqual, siccatite),
+platinum, mithral and time skymetal ore, the mountain skymetals (quick skymetal, null skymetal, searing skymetal),
 star iron, viridium, cinnabar, coal, dragonfire coal and crushed quartz. In a swamp the
 same button offers exactly one thing: **bog iron**. (Peat is in that swamp too, but it is
 `gathered`, not mined — a different excursion and a different button.) Adamantine,
-abysium and inubrix are `underground`: they want a delve, not a hillside.
+fever skymetal and ghost skymetal are `underground`: they want a delve, not a hillside.
 
 ## INTEGRATION NOTES
 

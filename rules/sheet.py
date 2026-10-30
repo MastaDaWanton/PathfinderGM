@@ -284,7 +284,7 @@ def dr_ignored(traits) -> int:
 # Magic held off: the tag an effect grants while the bearer's active magic is suppressed
 # (`Actor._buff_mods` skips a magical effect's modifiers, `Engine` skips the bearer's
 # wards). Granted today by one thing, the owner's HOUSE RULE of 2026-10-04 — assaying
-# noqual, "magic recoils": the assayer's buffs and wards are suppressed for 1d4 rounds
+# null skymetal, "magic recoils": the assayer's buffs and wards are suppressed for 1d4 rounds
 # (contracts §13.2, `knowledge.apply_danger`). Suppressed, not dispelled: the book's
 # antimagic field "suppresses" and the spell resumes when the field is gone, which is the
 # shape this keeps — the clocks keep running underneath.
@@ -1239,7 +1239,7 @@ class Actor:
         """Every `carried` effect the pack holds, by a stable key.
 
         A forged item's carried riders (`forge_items.build`), and a raw material's own —
-        abysium sickens whoever carries it, whether it is a blade or a bar. Keyed
+        fever skymetal sickens whoever carries it, whether it is a blade or a bar. Keyed
         `item:<id>#<n>` so the same stack held twice is one effect and two different
         items are two."""
         from . import forge_items
@@ -1346,7 +1346,7 @@ class Actor:
     def sync_carried(self, dice=None, only_heals: bool = False) -> list[dict]:
         """Grant what the pack grants, take back what left it — through the one applicator.
 
-        Abysium in the pack is a sickened condition with `origin: item:<id>`; the bar sold
+        Fever skymetal in the pack is a sickened condition with `origin: item:<id>`; the bar sold
         or dropped is the condition removed, and a carried effect with a `duration` then
         LINGERS that long ("sickened while carried and for 1d4 hours after", plan §5.4) as
         a timed copy the ticker expires. Returns one record per change, in the shapes
@@ -3959,7 +3959,7 @@ class Actor:
         # What is worn (`worn_specs_of`): adamantine armour's book DR, invulnerability's
         # 5/magic, a catalogue item's — read live while worn (contract §5), so taking it
         # off takes the DR with it.
-        # A suit's DR may be conditional on who struck (elysian bronze: "against magical
+        # A suit's DR may be conditional on who struck (celestial bronze: "against magical
         # beasts and monstrous humanoids"). The blow names its maker in its traits as
         # `attacker:<tag>` (`Engine` adds them on a weapon hit), and the clause is asked
         # through `_when_holds` like every other; a blow that names nobody — a fall, a
@@ -4287,7 +4287,7 @@ class Actor:
         """The DR what is worn gives (`worn_specs_of`), for the sheet's lists: the damage
         path reads the same documents (`damage_reduction`), and before 2026-10-08 the
         sheet listed only the innate and the class's, so a suit's DR was real in a fight
-        and absent from the page. A conditional one (elysian bronze's "against magical
+        and absent from the page. A conditional one (celestial bronze's "against magical
         beasts") says so in its source."""
         out = []
         for s, name, _ in self.worn_specs_of("damage_reduction", ask_when=False):
@@ -5321,7 +5321,7 @@ class Actor:
         """
         want = str(target).lower()
         out: list[Modifier] = []
-        # Magic held off (noqual's recoil, `MAGIC_SUPPRESSED`): a spell's buff contributes
+        # Magic held off (null skymetal's recoil, `MAGIC_SUPPRESSED`): a spell's buff contributes
         # nothing while the suppressing effect holds and everything again when it ends —
         # the effect is not removed, its contribution is (law 2, read live).
         held_off = self.has_state(MAGIC_SUPPRESSED)
@@ -6832,7 +6832,7 @@ def _kind_leaf(word) -> str:
 
 
 def _is_of_kind(actor, field_name: str, value) -> bool:
-    """Whether this creature is of the type (or subtype) named — any of a list (elysian
+    """Whether this creature is of the type (or subtype) named — any of a list (celestial
     bronze's "magical beast" or "monstrous humanoid") — by tag prefix (law 1)."""
     wanted = value if isinstance(value, (list, tuple)) else [value]
     return any(actor.has_state(f"{field_name}.{_kind_leaf(v)}") for v in wanted)
@@ -7092,7 +7092,7 @@ def _when_holds(when, ctx: dict | None) -> bool:
                 return False
             for field_name, value in want.items():
                 if field_name == "armour_metal":
-                    # Inubrix's house approximation of "ignores armour and shield bonuses
+                    # Ghost skymetal's house approximation of "ignores armour and shield bonuses
                     # from iron or steel": the defender has metal on (`armour.wears_metal`,
                     # the suit or the shield). Asked of what is worn, never of a name.
                     from . import armour as armour_mod
@@ -7115,7 +7115,7 @@ def _when_holds(when, ctx: dict | None) -> bool:
                 if not _is_of_kind(defender, field_name, value):
                     return False
         elif key == "attacker":
-            # Elysian bronze's DR "against magical beasts and monstrous humanoids": asked
+            # Celestial bronze's DR "against magical beasts and monstrous humanoids": asked
             # of whoever made the blow. The damage path knows them only by the blow's
             # traits, so `Actor.damage_reduction` hands their type tags in as
             # `attacker_tags`; a roll that knows the actor passes `attacker_actor`.
@@ -7731,10 +7731,12 @@ def _current_materials(data: dict) -> dict:
     fields = ("goods", "stock", "herb_known")
     if not any(data.get(f) for f in fields):
         return data
+    from . import ingredients as ingredients_mod
     from . import materials as materials_mod
 
     # Asked politely: a test may stand a materials door of its own in for the module.
-    RENAMED = getattr(materials_mod, "RENAMED", None) or {}
+    RENAMED = {**(getattr(ingredients_mod, "RENAMED", None) or {}),
+               **(getattr(materials_mod, "RENAMED", None) or {})}
     if not RENAMED:
         return data
 

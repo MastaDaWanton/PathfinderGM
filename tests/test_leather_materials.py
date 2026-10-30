@@ -448,14 +448,14 @@ def test_leather_fittings_carry_their_metals_numbers(leather):
 
 
 FERROUS = {"iron", "wrought-iron", "cold-iron", "star-iron", "steel", "high-carbon-steel",
-           "pattern-steel", "nexavaran-steel", "living-steel", "fire-forged-steel",
+           "pattern-steel", "frontier-steel", "living-steel", "fire-forged-steel",
            "frost-forged-steel"}
 
 
 def test_ferrous_marks_iron_and_its_alloys_only():
     """Rusting grasp eats "one nonmagical ferrous object" (plan §18.5) and the metal tag
     needs to know which metals are iron (contracts §6.2). Measured before: no material said.
-    Not mithral, adamantine, inubrix ("ghost iron" is a skymetal) or wyrmsteel."""
+    Not mithral, adamantine, ghost skymetal ("ghost iron" is a skymetal) or wyrmsteel."""
     shelf = materials.all()
     assert {k for k, d in shelf.items() if d["ferrous"]} == FERROUS
     bad = copy.deepcopy(shelf["deer-hide"])

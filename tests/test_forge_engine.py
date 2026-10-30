@@ -64,7 +64,7 @@ DOCS = {
     "viridium": {"id": "viridium", "name": "Viridium", "kind": "metal",
                  "weapon": [{"type": "apply_condition", "target": "nauseated",
                              "trigger": "crit"}]},
-    "abysium": {"id": "abysium", "name": "Abysium", "kind": "metal",
+    "fever-skymetal": {"id": "fever-skymetal", "name": "Fever Skymetal", "kind": "metal",
                 "weapon": [{"type": "apply_condition", "target": "sickened",
                             "trigger": "carried",
                             "duration": {"amount": "1d4", "unit": "hour"}}],
@@ -359,25 +359,25 @@ def test_a_crit_rider_waits_for_the_crit():
     assert got and thug.has_condition("nauseated")
 
 
-def test_abysium_in_the_pack_sickens_and_lingers_after_it_leaves():
-    """Plan §12.5: abysium sickens whoever carries it, and for 1d4 hours after. Granted by
+def test_fever_skymetal_in_the_pack_sickens_and_lingers_after_it_leaves():
+    """Plan §12.5: fever skymetal sickens whoever carries it, and for 1d4 hours after. Granted by
     carrying (source `item:<id>`), removed with the item, then a timed copy the ticker
     expires — every step through the applicator and every step told."""
     scene, engine = table(seed=4)
     pc = scene.pc()
     pc.add_stock(forge_items.stock_item(weapon_record(
-        rid="abysium-dagger", name="Abysium Dagger", head="abysium", base="dagger")))
+        rid="fever-skymetal-dagger", name="Fever Skymetal Dagger", head="fever-skymetal", base="dagger")))
     res = engine.run(engine.validate([{"op": "narrate_only", "because": "t",
                                        "params": {}}]))
     carried = [o for o in res.outcomes if o.op == "carried"]
-    assert carried and "sickened (the Abysium Dagger carried)" in carried[0].tell
+    assert carried and "sickened (the Fever Skymetal Dagger carried)" in carried[0].tell
     held = [e for e in pc.effects if e.key == "sickened"]
-    assert held and held[0].origin == "item:abysium-dagger" and held[0].rounds_left is None
+    assert held and held[0].origin == "item:fever-skymetal-dagger" and held[0].rounds_left is None
     # Sold: the carried condition goes, and a 1d4-hour copy lingers.
-    pc.take_stock("abysium-dagger", 1)
+    pc.take_stock("fever-skymetal-dagger", 1)
     said = pc.sync_carried(engine.dice)
     linger = [e for e in pc.effects if e.key == "sickened"]
-    assert len(linger) == 1 and linger[0].source == "item:abysium-dagger:linger"
+    assert len(linger) == 1 and linger[0].source == "item:fever-skymetal-dagger:linger"
     assert linger[0].rounds_left in (600, 1200, 1800, 2400)
     assert any(r["kind"] == "effect_ended" for r in said)
     assert any("lingering for" in _ward_tell(scene, r) for r in said)
@@ -385,18 +385,18 @@ def test_abysium_in_the_pack_sickens_and_lingers_after_it_leaves():
     assert not pc.has_condition("sickened")
 
 
-def test_a_raw_abysium_bar_in_the_pack_sickens_too():
+def test_a_raw_fever_skymetal_bar_in_the_pack_sickens_too():
     """The carried effect belongs to the metal, not only to a finished blade: a bar of it
     in the pack (a Stock naming its material in `from_materials`) sickens the same way."""
     from rules import crafting
 
     scene, engine = table()
     pc = scene.pc()
-    pc.add_stock(crafting.Stock(base="Abysium Bar", kind="metal", craft="blacksmith",
-                                from_materials=["abysium"]))
+    pc.add_stock(crafting.Stock(base="Fever Skymetal Bar", kind="metal", craft="blacksmith",
+                                from_materials=["fever-skymetal"]))
     pc.sync_carried(engine.dice)
     assert pc.has_condition("sickened")
-    assert next(e for e in pc.effects if e.key == "sickened").origin == "item:abysium"
+    assert next(e for e in pc.effects if e.key == "sickened").origin == "item:fever-skymetal"
 
 
 # --- prospecting reaches the forge ------------------------------------------------------

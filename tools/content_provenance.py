@@ -141,6 +141,12 @@ GOLARION = {
         Abadius Calistril Pharast Gozran Desnus Sarenith Erastus Arodus Rova Lamashan
         Neth Kuthona Toilday Wealday Oathday Fireday Starday
     """,
+    # Golarion's coined metals: the skymetals of Numeria and the steel named for Nex. Both
+    # cases, because a material's id and its prose are lower-case (renamed 2026-10-30).
+    "material": """
+        abysium Abysium djezet Djezet inubrix Inubrix noqual Noqual siccatite Siccatite
+        horacalcum Horacalcum nexavaran Nexavaran
+    """,
 }
 
 # Older than Paizo: real-world myth, demonology and the Mythos, taken into Golarion as its
@@ -164,11 +170,11 @@ PRODUCT = [
     r"Archives of Nethys", r"Pathfinder Society (?:FAQ|Roleplaying Guild)",
 ]
 
-# Paizo-coined cosmology that reads as ordinary words, or real words Golarion made places.
-# Reported on its own line and in no total: whether "the Boneyard" is a name is the
-# reader's call, not this tool's.
-COSMOLOGY = ["Boneyard", "Maelstrom", "Great Beyond", "First World", "Akashic Record",
-             "Elysium", "Nirvana"]
+# Paizo's names for its planes, some of them ordinary words Golarion made places. Reported
+# on their own line. The owner had them rewritten on 2026-10-30, and
+# tests/test_no_golarion_names.py holds them at zero with the rest.
+COSMOLOGY = ["Boneyard", "Maelstrom", "Great Beyond", "First World", "Akashic", "Elysium",
+             "Elysian", "Nirvana", "Axis", "River of Souls"]
 
 
 def _terms(table: dict) -> dict[str, str]:
@@ -409,7 +415,7 @@ def measure():
 
 # --- report ------------------------------------------------------------------------------------
 
-LORE = {"deity", "place", "people", "organisation", "character", "calendar"}
+LORE = {"deity", "place", "people", "organisation", "character", "calendar", "material"}
 
 # Columns that are lists and gates rather than prose: the spells' "which god grants this"
 # and "which bloodline gets it" columns, and the feats' prerequisites. A name only here

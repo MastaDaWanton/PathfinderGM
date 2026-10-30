@@ -386,6 +386,43 @@ falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the
   Mordant is now Oblivion Mordant. Their text already called it "the river of forgetting".
   Old ids resolve through `materials.RENAMED`, and saves are rewritten on load
   (`sheet._current_materials`). "Styx" is on the deny-list now.
+- **The cosmology words, 2026-10-30** (the owner: "rename the cosmology words too").
+  Paizo's own plane names became what each place is:
+  - the Boneyard → the court of the dead;
+  - the Maelstrom → the churning chaos;
+  - Axis → the city of law;
+  - Elysium → the free heavens;
+  - Nirvana → the serene heavens;
+  - the First World → the fey realm;
+  - the Great Beyond → the planes beyond;
+  - the River of Souls → the river of the dead;
+  - the Akashic Record → the memory of the cosmos.
+
+  Five spells were renamed: Memory Communion, Remembered Form, Glimpse of All Memory, Fey
+  Revisions and Fey Kiss. The SRD's generic planes (Heaven, Hell, the Abyss, the Shadow,
+  Ethereal, Astral and Material Planes) and book titles in `source` stay.
+- **Golarion's coined metals, the same day** (the owner: "rename the skymetals and
+  nexavaran steel too, using the adjective skymetal is fine"). Each is named for what its
+  own entry says it does:
+
+  | was | now |
+  |---|---|
+  | abysium | fever skymetal |
+  | djezet | quick skymetal |
+  | inubrix | ghost skymetal |
+  | noqual | null skymetal |
+  | siccatite | searing skymetal |
+  | horacalcum | time skymetal |
+  | nexavaran steel | frontier steel |
+  | elysian bronze | celestial bronze |
+  | the herb Elysium | nullgrass |
+
+  Their ores follow. Old ids resolve through `materials.RENAMED` and
+  `ingredients.RENAMED`, and saves are rewritten on load.
+  - Updated: code, tests, data passes, the generated review pages, and the contract docs
+    (`campaign-format.md`, `from-world-bible.md`).
+  - Not updated: the dated design records (plans, prior art, contracts, questions). They
+    still quote the book's names, as a record of what was read.
 - **Still outstanding:** Section 15 for the setting books.
 
 The section below is the measurement and the options as they were put.

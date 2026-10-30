@@ -274,11 +274,11 @@ def test_cold_iron_charges_twenty_motes_on_its_first_enhancement_only():
     assert again["price"]["surcharges"] == [] and again["price"]["motes"] == 30
 
 
-def test_noqual_adds_fifty_motes_from_its_own_document():
-    """`enchant_surcharge_gp: 5000` on noqual (blacksmith-materials.json) had no reader
-    (plan §1). "Any magic item incorporating noqual": fittings count, not only the head."""
-    rec = forged(rid="noqual-guarded", head="steel")
-    rec["pieces"]["fittings"] = {"material": "noqual", "passes": 0}
+def test_null_skymetal_adds_fifty_motes_from_its_own_document():
+    """`enchant_surcharge_gp: 5000` on null skymetal (blacksmith-materials.json) had no reader
+    (plan §1). "Any magic item incorporating null skymetal": fittings count, not only the head."""
+    rec = forged(rid="null-skymetal-guarded", head="steel")
+    rec["pieces"]["fittings"] = {"material": "null-skymetal", "passes": 0}
     p = magic_layer.plan(rec, {"enhancement": 1}, binder=binder())
     assert any(s["motes"] == 50 for s in p["price"]["surcharges"])
     assert p["price"]["motes"] == 10 + 50

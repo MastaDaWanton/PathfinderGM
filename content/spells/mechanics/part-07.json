@@ -1337,7 +1337,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Open a circular portal 5 to 20 feet across, oriented as you choose, between the Material Plane and the First World. Grey fog inside it blocks line of sight. Anything entering the First World through it is shunted to a single random point on that plane, the same point for everything from one casting; anything leaving the First World arrives where the spell was cast."
+     "target": "Open a circular portal 5 to 20 feet across, oriented as you choose, between the Material Plane and the fey realm. Grey fog inside it blocks line of sight. Anything entering the fey realm through it is shunted to a single random point on that plane, the same point for everything from one casting; anything leaving the fey realm arrives where the spell was cast."
     },
     {
      "type": "permission",
@@ -1921,7 +1921,7 @@
    },
    "notes": "The +4 is untyped because the prose states no bonus type, and it is a situational_mod rather than a save_mod because it applies only against pain effects. The upgraded DR 10 / resist 30 values are not emitted as their own specs — they replace the base ones only if the caster spends the immediate action, and emitting both pairs would stack them."
   },
-  "first-world-revisions": {
+  "fey-revisions": {
    "effects": [
     {
      "type": "narrative",

@@ -113,7 +113,7 @@ def test_a_gear_number_adds_to_the_table_and_the_drawback_follows_the_target():
     the same sign meaning opposite things. The amount is added to the number as
     `tables.ARMOUR` keeps it — acp negative, spell failure positive — so a lighter penalty
     is +3, and whether an effect is the list's drawback is a lookup by target, not the
-    sign alone. Every mithral number is a benefit; adamantine's acp -2 and noqual's asf
+    sign alone. Every mithral number is a benefit; adamantine's acp -2 and null skymetal's asf
     +20 are drawbacks."""
     from rules.tables import ARMOUR
 
@@ -261,7 +261,7 @@ def test_item_triggers_need_no_duration_where_a_spell_trigger_does():
 
 
 def test_carried_works_only_on_the_three_types_a_burden_can_have():
-    """Abysium sickens whoever carries it; viridium makes a daily save. Carrying a thing
+    """Fever skymetal sickens whoever carries it; viridium makes a daily save. Carrying a thing
     cannot swing a sword or grant a sense, so 'while carried' is accepted on
     apply_condition, save_gate and ability_damage and refused, named, on everything
     else."""

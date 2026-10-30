@@ -62,7 +62,7 @@ SHELF = {d["id"]: d for d in [
     _doc("mithral", "Mithral", "metal", "rare", craft_dc=20),
     _doc("star-iron", "Star Iron", "metal", "rare", working=["flawless"], craft_dc=20),
     _doc("adamantine", "Adamantine", "metal", "exotic", craft_dc=25),
-    _doc("noqual", "Noqual", "metal", "exotic", working=["reactive"], craft_dc=25),
+    _doc("null-skymetal", "Null Skymetal", "metal", "exotic", working=["reactive"], craft_dc=25),
     _doc("steel", "Steel", "alloy", craft_dc=10),
     _doc("high-carbon-steel", "High-Carbon Steel", "alloy", "uncommon",
          working=["narrow_window"], craft_dc=15),
@@ -70,7 +70,7 @@ SHELF = {d["id"]: d for d in [
     _doc("bronze", "Bronze", "alloy"),
     _doc("bell-bronze", "Bell Bronze", "alloy", "uncommon"),
     _doc("pewter", "Pewter", "alloy"),
-    _doc("nexavaran-steel", "Nexavaran Steel", "alloy", "uncommon", craft_dc=15),
+    _doc("frontier-steel", "Frontier Steel", "alloy", "uncommon", craft_dc=15),
     _doc("charcoal", "Charcoal", "fuel", working=["clean_heat"], craft_dc=10),
     _doc("coal", "Coal", "fuel", working=["sulfurous"]),
     _doc("dragonfire-coal", "Dragonfire Coal", "fuel", "rare", craft_dc=20),
@@ -365,7 +365,7 @@ def test_an_unlisted_pair_is_a_novel_alloy_under_a_real_name(pc):
 
 def test_solitary_metals_enter_only_the_recipe_that_names_them(pc):
     """What makes cold iron cold iron does not survive the mixing, except in the one alloy
-    the book names for it (nexavaran steel)."""
+    the book names for it (frontier steel)."""
     pc.carry("cold-iron", 3)
     pc.carry("iron", 1)
     pc.carry("steel", 1)
@@ -374,7 +374,7 @@ def test_solitary_metals_enter_only_the_recipe_that_names_them(pc):
     assert any("Cold Iron works alone" in p for p in alone.problems)
     named = step(pc, 2, "alloy", {"a": ("inv:cold-iron", 3), "b": ("inv:steel", 1)},
                  where=SMITHY)
-    assert named.problems == [] and named.outputs[0][0].material == "nexavaran-steel"
+    assert named.problems == [] and named.outputs[0][0].material == "frontier-steel"
 
 
 def test_pattern_steel_is_folded_not_melted(pc):

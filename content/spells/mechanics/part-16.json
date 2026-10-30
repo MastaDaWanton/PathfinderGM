@@ -2090,7 +2090,7 @@
     },
     {
      "type": "narrative",
-     "target": "Uplifting music from Elysium, Heaven or Nirvana accompanies you. Cast in the same round you activate a bardic performance, that round does not count against your bardic performance rounds for the day. Cast in the same round you cast a spell with the sonic descriptor, that spell's save DC increases by 1."
+     "target": "Uplifting music from the free heavens, Heaven or the serene heavens accompanies you. Cast in the same round you activate a bardic performance, that round does not count against your bardic performance rounds for the day. Cast in the same round you cast a spell with the sonic descriptor, that spell's save DC increases by 1."
     }
    ],
    "duration": {
@@ -2267,7 +2267,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "You learn what stage of judgment a given soul has reached, or its fate after judgment. You must either identify the soul unambiguously or use the skull of the body it left as a focus. A soul of a different alignment from yours may attempt a Will save to resist, as though it were still alive. If the subject is still alive, or its soul has been destroyed, the spell fails and tells you nothing. If the soul has not yet been judged, you get an estimate of its location - usually somewhere in the River of Souls or the Boneyard - which may help you travel to it in cases involving soul bind or a devourer's devour soul, though the spell's real purpose is to establish how long the subject has been dead and therefore what life-restoring magic is needed. If it has been judged, you learn instead which plane it was sent to as a petitioner and its general location there, such as 'Elysium, beneath the boughs of its great forest'."
+     "target": "You learn what stage of judgment a given soul has reached, or its fate after judgment. You must either identify the soul unambiguously or use the skull of the body it left as a focus. A soul of a different alignment from yours may attempt a Will save to resist, as though it were still alive. If the subject is still alive, or its soul has been destroyed, the spell fails and tells you nothing. If the soul has not yet been judged, you get an estimate of its location - usually somewhere in the river of the dead or the court of the dead - which may help you travel to it in cases involving soul bind or a devourer's devour soul, though the spell's real purpose is to establish how long the subject has been dead and therefore what life-restoring magic is needed. If it has been judged, you learn instead which plane it was sent to as a petitioner and its general location there, such as 'the free heavens, beneath the boughs of its great forest'."
     },
     {
      "type": "permission",

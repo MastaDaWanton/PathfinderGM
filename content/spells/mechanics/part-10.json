@@ -1500,7 +1500,7 @@
     },
     {
      "type": "narrative",
-     "target": "The risk: 1d6+5 minutes after the casting begins, an olethros psychopomp appears within 50 feet and demands the caster stop, attacking if ignored. It will not harm the petitioner unless the spell has already succeeded, in which case it tries to eliminate the returned mortal too, and it hunts both afterwards. The casting may be paused for up to 1 minute — during which the caster can act and cast freely — but fails if not resumed inside that window. The wrath can be avoided entirely by first visiting the Boneyard and obtaining permission from a powerful agent of the god of death; a worshipper of the god of death who casts it without that permission has grossly violated her code."
+     "target": "The risk: 1d6+5 minutes after the casting begins, an olethros psychopomp appears within 50 feet and demands the caster stop, attacking if ignored. It will not harm the petitioner unless the spell has already succeeded, in which case it tries to eliminate the returned mortal too, and it hunts both afterwards. The casting may be paused for up to 1 minute — during which the caster can act and cast freely — but fails if not resumed inside that window. The wrath can be avoided entirely by first visiting the court of the dead and obtaining permission from a powerful agent of the god of death; a worshipper of the god of death who casts it without that permission has grossly violated her code."
     }
    ],
    "duration": {
@@ -1752,7 +1752,7 @@
    "converted_by": "read",
    "notes": "Teleportation; the vocabulary cannot move creatures."
   },
-  "kiss-of-the-first-world": {
+  "fey-kiss": {
    "effects": [
     {
      "type": "save_gate",
