@@ -46,7 +46,7 @@ import re
 
 # Bump when the compile's output changes for the same input: every shipped record is then
 # stale and the content test names the command that rewrites them.
-COMPILER = 1
+COMPILER = 2
 
 # The lines a record is compiled from. Change one and the record is stale.
 SOURCE_FIELDS = ("melee", "ranged", "printed_gear", "printed_other_gear")
@@ -89,7 +89,10 @@ def _properties() -> list[str]:
                      .read_text(encoding="utf-8"))
     names = {str(p.get("name") or "").lower() for p in doc.get("properties") or []}
     # Longest first, so "flaming burst" is one property and not "flaming" and a stray word.
-    return sorted((n for n in names if n), key=len, reverse=True)
+    # Then by name: the names come out of a set, and length alone left equal-length names
+    # in hash order, so two compiles of the same block could list its properties in a
+    # different order and the shipped records churned on every regeneration.
+    return sorted((n for n in names if n), key=lambda n: (-len(n), n))
 
 
 _PROPS: list[str] | None = None
@@ -278,27 +281,35 @@ def _class(a: dict) -> tuple[str, str]:
         return "fist", mode
     if a.get("natural"):
         return "natural", mode
+    # A weapon a hand holds before anything worn: "spiked chain" and "spiked gauntlet"
+    # carry the word the armour spikes do, and the worn test below took all 14 of them
+    # (2026-10-30) — a +4 spiked chain that could not be disarmed, sundered or looted.
+    # What is left for `worn` is what `weapons.wieldable` refuses: armour spikes and a
+    # shield's bash.
+    if base and weapons_mod.wieldable(base)[0]:
+        return "item", mode
     if re.search(r"\bspike[sd]?\b|\bshield bash\b", name):
         return "worn", mode
     if re.search(r"\bbombs?\b", name):
         return "ability", mode
     if re.search(r"\brocks?\b|\bboulders?\b", name) and not base:
         return "thrown_object", mode
-    if base and weapons_mod.wieldable(base)[0]:
-        return "item", mode
     return "body", mode
 
 
 def attacks(block: dict) -> tuple[dict, list[str]]:
-    from .statblock_attacks import _attack, _clean, _split_top, of_block
+    from .statblock_attacks import of_block, unread_of
 
     parsed = of_block(block)
     unread: list[str] = []
     for cat in ("melee", "ranged"):
-        for opt in _split_top(_clean(block.get(cat) or ""), " or "):
-            for piece in _split_top(opt, ","):
-                if _attack(piece, cat) is None:
-                    unread.append(f"{cat}: {piece}")
+        # The reader's own account of what it could not read (`statblock_attacks.read`).
+        # This used to re-split the line here and ask only whether each comma piece
+        # STARTED with an attack, so a piece whose second attack was dropped counted as
+        # read: the ghoul's claws, the crocodile's tail slap and the minotaur's gore were
+        # lost, and the ratchet called them accounted for. Measured 2026-10-30, the reader's
+        # fixes found 34 attacks in 28 blocks and took unread from 342 pieces to 186.
+        unread += [f"{cat}: {piece}" for piece in unread_of(block.get(cat) or "", cat)]
         for option in parsed[cat]:
             for a in option:
                 a["class"], a["mode"] = _class(a)
