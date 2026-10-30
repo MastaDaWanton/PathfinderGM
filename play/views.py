@@ -94,6 +94,10 @@ def _shown_conditions(a) -> list[str]:
 
     shown = [x.name for x in a.conditions
              if not any(states.matches(t, "attitude") for t in states.tags_for(x.key))]
+    # A poison or a disease running in them (`Actor._afflicted`) is not a condition row,
+    # and without this the panel showed nothing for a fever that rolls a save every day:
+    # "filth fever", by the affliction's own name.
+    shown += [e.name for e in a.effects if e.kind == "affliction" and e.name]
     word = attitude_mod.word_for_panel(a)
     return shown + ([word] if word else [])
 

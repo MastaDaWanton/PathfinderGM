@@ -304,3 +304,15 @@ def test_every_compiled_rider_is_applied_or_reported():
                         else:
                             assert r["kind"] in Engine._RIDERS or r["kind"] == "distraction"
     assert unsupported <= 358
+
+
+def test_the_panel_names_a_running_affliction():
+    """An affliction is not a condition row, and the panel's words after a person's hit
+    points showed nothing for a fever saving every day until it said so by name."""
+    from play.views import _shown_conditions
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.take_affliction({"kind": "disease", "dc": 12, "effects": []}, name="filth fever",
+                       source="t", origin="author:test", onset_rounds=14400,
+                       every_rounds=14400, limit=None)
+    assert "filth fever" in _shown_conditions(pc)
