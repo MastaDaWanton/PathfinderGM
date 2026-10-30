@@ -403,6 +403,13 @@ def closing_move(scene, actor, defender,
     improvised weapon read as a melee swing out of reach, and the player's declared throw
     was never rolled — the prose landed it anyway.
     """
+    # A creature that does not know where `defender` is has no square to close on
+    # (rules/awareness.py): before 2026-10-30 every fallback turn walked straight up to an
+    # invisible player and swung (probe p2: 4 of 4 rounds).
+    from . import awareness
+
+    if not awareness.locates(scene, actor, defender):
+        return None
     miss = out_of_reach(scene, actor, defender, weapon_key, thrown=thrown)
     if miss is None:
         return None

@@ -221,6 +221,12 @@ class Facts:
     # caravan's hired hands swung at the toll-keeper, and 4 of 5 allied misses reached the
     # page aimed at the player.
     aimed: tuple[tuple[str, str], ...] = ()
+    # The people here who cannot see the player and do not know where they are
+    # (rules/awareness.py: invisible, or hidden by Stealth and not found). Non-empty asks
+    # who the page shows looking at, aiming at or striking at the player (`unseen`),
+    # judged by `_unseen_wrong`. Measured 2026-10-30, live: three gemma turns against the
+    # invisible player each wound up "aimed at your head".
+    unseen: tuple[str, ...] = ()
 
     @property
     def bodies(self) -> bool:
@@ -273,7 +279,7 @@ class Facts:
                            [(a.code, a.who, a.verdict) for a in attempts_of(self)],
                            self.settings, self.blows, self.arms, self.joined,
                            self.foe, self.foe_blows, self.foe_arms, self.foe_natural,
-                           self.at_you, self.struck_by, self.aimed],
+                           self.at_you, self.struck_by, self.aimed, self.unseen],
                           default=str, sort_keys=True)
 
 
@@ -409,7 +415,25 @@ def facts_from(ctx) -> Facts:
                  **_blows_of(ctx, outcomes, pc),
                  **_foe_blows_of(ctx, outcomes, scene),
                  **_struck_by_of(ctx, outcomes, pc, scene),
-                 **_aimed_of(ctx, outcomes, scene))
+                 **_aimed_of(ctx, outcomes, scene),
+                 **_unseen_of(ctx, scene, pc))
+
+
+def _unseen_of(ctx, scene, pc) -> dict:
+    """{"unseen"} for `Facts`: who here cannot see the player and has not pinpointed them
+    (`awareness.sees` / `knows_where`), on any beat while the player is hidden. Not in an
+    intimate scene (its own words are the scene's)."""
+    if pc is None or getattr(ctx, "intimate", False):
+        return {}
+    from rules import awareness
+
+    if not pc.has_state(awareness.HIDDEN):
+        return {}
+    refs = tuple(str(r) for r, a in (getattr(scene, "actors", {}) or {}).items()
+                 if a is not pc and not a.is_pc and awareness.can_perceive(a)
+                 and not awareness.sees(scene, a, pc)
+                 and not awareness.knows_where(scene, a, pc))
+    return {"unseen": refs} if refs else {}
 
 
 UNARMED = "unarmed strike"
@@ -1256,6 +1280,68 @@ def aimed_messages(text: str, facts: Facts) -> list[dict]:
             {"role": "user", "content": f"People: {_aimed_people(facts)}\n\nPassage:\n{text}"}]
 
 
+# --- who looks at, aims at or strikes at a player they cannot see ---------------------------
+#
+# The player is hidden (rules/awareness.py) and these people have not found them: a sentence
+# showing one of them looking at the player, aiming at them or striking at them is a thing
+# the engine says cannot happen. Asked as one code per sentence, compared in code with
+# `Facts.unseen`. Measured 2026-10-30 on gemma (scratchpad invis/live_npc.out): 3 of 3 turns
+# against an invisible player wound up "aimed at your head" / "to crack the intruder's skull".
+# The demonstrations are the ferry's, nowhere near the shipped world, and show a search, a
+# blind swing at empty air, a look at somebody else, and the two things that are wrong.
+_UNSEEN_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\"). The player cannot be seen by "
+    "the people listed. Report every sentence that shows one of them looking at you, "
+    "watching you, meeting your eyes, turning to face you, speaking to you, reaching for "
+    "you, or aiming, swinging, striking or shooting at you — in the codes given. Not a "
+    "sentence that shows them looking around, searching, listening, sniffing the air, "
+    "swinging at empty air or at where they guess someone is, or looking at somebody else. "
+    "One entry per such sentence, copying its own words into \"quote\". Leave the list "
+    "empty when no sentence shows that; most passages show none.")
+_UNSEEN_DEMO_USER = (
+    "People who cannot see you: c4: Dunmar Oake — ferryman; c5: the drover — commoner; "
+    "someone not listed\n\n"
+    "Passage:\n"
+    "Dunmar Oake turns a slow circle on the deck, sniffing the air like a hound. The drover "
+    "stares straight at you and raises his cudgel. He swings it hard at your ribs. Dunmar "
+    "jabs his boathook into the empty air beside the mast and finds nothing.")
+_UNSEEN_DEMO_ANSWER = {"unseen_at_you": [
+    {"who": "c5", "quote": "The drover stares straight at you and raises his cudgel"},
+    {"who": "c5", "quote": "He swings it hard at your ribs"}]}
+_UNSEEN_DEMO2_USER = (
+    "People who cannot see you: c4: Dunmar Oake — ferryman; someone not listed\n\n"
+    "Passage:\n"
+    "Dunmar Oake's eyes slide over the place where you stand and move on. He calls into "
+    "the dark, 'Who's there?', and waits, listening.")
+_UNSEEN_DEMO2_ANSWER = {"unseen_at_you": []}
+
+
+def unseen_codes(facts: Facts) -> list[str]:
+    return [*facts.unseen, NEW_PERSON]
+
+
+def unseen_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"unseen_at_you": {
+        "type": "array", "maxItems": 6,
+        "items": {"type": "object", "properties": {
+            "who": {"type": "string", "enum": unseen_codes(facts)}, "quote": s},
+            "required": ["who", "quote"]}}},
+        "required": ["unseen_at_you"]}
+
+
+def unseen_messages(text: str, facts: Facts) -> list[dict]:
+    people = "; ".join([*(f"{p.ref}: {p.name}" + (f" — {p.what}" if p.what else "")
+                          for p in facts.people if p.ref in facts.unseen), NEW_PERSON])
+    return [{"role": "system", "content": _UNSEEN_SYSTEM},
+            {"role": "user", "content": _UNSEEN_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_UNSEEN_DEMO_ANSWER)},
+            {"role": "user", "content": _UNSEEN_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_UNSEEN_DEMO2_ANSWER)},
+            {"role": "user",
+             "content": f"People who cannot see you: {people}\n\nPassage:\n{text}"}]
+
+
 def setting_schema() -> dict:
     from rules.places import SETTINGS
 
@@ -1809,6 +1895,7 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("foe_struck_with", "foe_weapon", ("weapon",)),
                             ("at_you", "at_you", ("who",)),
                             ("aimed_at", "aimed", ("striker", "target")),
+                            ("unseen_at_you", "unseen", ("who",)),
                             ("made", "made", ("item",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
@@ -1995,6 +2082,18 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                         schema=aimed_schema(facts))
             result.raw += "\n" + whom.text
             answer = dict(answer or {}, aimed_at=(whom.json() or {}).get("aimed_at") or [])
+        if facts.unseen:
+            # Who the page shows looking or aiming at a player they cannot see, in a call
+            # of its own (`_UNSEEN_SYSTEM`).
+            msgs = unseen_messages(text, facts)
+            if bare_template(model):
+                msgs = _raw_prompt(msgs)
+            eyes = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                        num_predict=300, provider=provider, api_key=api_key,
+                        schema=unseen_schema(facts))
+            result.raw += "\n" + eyes.text
+            answer = dict(answer or {}, unseen_at_you=(eyes.json() or {}).get(
+                "unseen_at_you") or [])
         if crafted(facts):
             # What the page says the player made, on a typed craft's beat (`_MADE_SYSTEM`).
             msgs = made_messages(text, facts)
@@ -2382,6 +2481,22 @@ def _aimed_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
     return Discrepancy("contradiction", "aimed", fact, c.sentence, line, c, ref=target)
 
 
+def _unseen_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
+    """Somebody who cannot see the player shown looking, aiming or striking at them, or
+    None. The fact says why, and the creature's own line this beat (its search, its blind
+    swing) is the backstop's stand-in."""
+    who = str(c.slots.get("who") or "")
+    if who not in facts.unseen:
+        return None
+    name = _name(facts, who)
+    fact = (f"{name} cannot see you and does not know where you are: nothing {name} does "
+            f"is aimed at you or looks at you. They may look about, search or swing at "
+            f"empty air.")
+    own = [o for o in _resolved(facts) if str(o.get("actor") or "") == who and o.get("tell")]
+    line = str(own[0]["tell"]) if own else ""
+    return Discrepancy("contradiction", "unseen", fact, c.sentence, line, c, ref=who)
+
+
 def _taken_though_refused(c: Claim, facts: Facts) -> Discrepancy | None:
     """The player shown picking up a thing on a turn the engine refused a pick-up of
     something that is not there (`Engine._picked_from_nowhere`, code `not_here`), or None.
@@ -2667,6 +2782,10 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             found = _aimed_wrong(c, facts)
             if found is not None:
                 out.append(found)
+        elif c.category == "unseen":
+            found = _unseen_wrong(c, facts)
+            if found is not None:
+                out.append(found)
         elif c.category == "setting":
             found = _setting_wrong(c, facts)
             if found is not None:
@@ -2854,6 +2973,10 @@ def question(d: Discrepancy, facts: Facts) -> str:
         # key and the record of what was asked.
         return (f"Which of these people does this sentence show striking or swinging at you "
                 f"(the player)? ({_name(facts, s['who'])} was named.)")
+    if c.category == "unseen":
+        return (f"Does this sentence show {_name(facts, s['who'])} looking at you (the "
+                f"player), turning to you, or aiming or striking at you — not looking "
+                f"around, searching, or swinging at empty air?")
     if c.category == "aimed":
         # Asked in `_aimed_whom`'s shape (who at whom, from the codes); this line is the
         # cache key and the record of what was asked.

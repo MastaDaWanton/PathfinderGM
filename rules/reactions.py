@@ -305,7 +305,7 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
         # creatures began closing to reach before they swing: the merchant beside the
         # man in the apron took an attack of opportunity as he stepped in, knocked him
         # unconscious, and was drawn into a fight the scene had kept him out of.
-        if watcher.has_state(states.BYSTANDER):
+        if watcher.has_state(states.BYSTANDER) or _cannot_see(scene, ref, mover_ref):
             continue
         # Squares this watcher threatened that the mover has now vacated. Comparing
         # against the squares it *left* rather than the ones it crossed is deliberate: the
@@ -351,7 +351,8 @@ def provoked_by_entering(scene, mover_ref: str, start, end) -> list[tuple[str, R
     out: list[tuple[str, Reaction]] = []
     for ref, watcher in scene.actors.items():
         if ref == mover_ref or _allied(scene, ref, mover_ref) \
-                or watcher.has_state(states.BYSTANDER) or ref not in scene.positions:
+                or watcher.has_state(states.BYSTANDER) or ref not in scene.positions \
+                or _cannot_see(scene, ref, mover_ref):
             continue
         theirs = set(gridmod.footprint(tuple(scene.positions[ref][:2]), watcher.size))
         if not (arrived & theirs) or (left & theirs) or not threatened_by(scene, ref):
@@ -380,7 +381,8 @@ def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
     filled = set(gridmod.footprint(tuple(anchor), actor.size))
     out: list[tuple[str, Reaction]] = []
     for ref, watcher in scene.actors.items():
-        if ref == actor_ref or _allied(scene, ref, actor_ref):
+        if ref == actor_ref or _allied(scene, ref, actor_ref) \
+                or _cannot_see(scene, ref, actor_ref):
             continue
         if not any(threatens(scene, ref, sq) for sq in filled):
             continue
@@ -425,7 +427,7 @@ def provoked_by_maneuver(scene, actor_ref: str, target_ref: str,
         return []
     if actor.has_state(unprovoking_tag(row.get("name") or maneuver)):
         return []
-    if _allied(scene, target_ref, actor_ref):
+    if _allied(scene, target_ref, actor_ref) or _cannot_see(scene, target_ref, actor_ref):
         return []
     zone = threatened_by(scene, target_ref)
     if not any(sq in zone for sq in gridmod.footprint((anchor[0], anchor[1]), actor.size)):
@@ -495,9 +497,9 @@ def provoked_by_withdraw(scene, mover_ref: str,
     for ref, watcher in scene.actors.items():
         if ref in party or _allied(scene, ref, mover_ref):
             continue
-        if watcher.has_state(states.BYSTANDER):
+        if watcher.has_state(states.BYSTANDER) or _cannot_see(scene, ref, mover_ref):
             continue
-        owed = [r for r in reactions_for(watcher) if r.fires_on("leaves_threatened_square")]
+        owed =[r for r in reactions_for(watcher) if r.fires_on("leaves_threatened_square")]
         zone = threatened_by(scene, ref) if owed else set()
         if zone:
             watchers[ref] = (owed, zone)
@@ -624,6 +626,24 @@ def _allied(scene, a: str, b: str) -> bool:
         if a in members and b in members:
             return True
     return False
+
+
+def _cannot_see(scene, watcher_ref: str, mover_ref: str) -> bool:
+    """Whether the watcher cannot see the one who would provoke it — and so takes no
+    swing. "You can't execute an attack of opportunity against an opponent with total
+    concealment, even if you know what square or squares the opponent occupies" (CRB
+    p.196, aonprd.com/Rules.aspx?Name=Concealment&Category=Combat%20Modifiers). Asked of
+    `awareness.sees`, so an invisible mover draws nothing from anyone without see
+    invisibility, pinpointed or not, and one hidden by Stealth draws nothing from a
+    watcher who has not found them. Measured 2026-10-30 (probe p2 B): the invisible
+    player walked out of a Large thug's reach and took his swing."""
+    from . import awareness
+
+    watcher = scene.actors.get(watcher_ref)
+    mover = scene.actors.get(mover_ref)
+    if watcher is None or mover is None:
+        return False
+    return not awareness.sees(scene, watcher, mover)
 
 
 __all__ = ["Reaction", "TRIGGERS", "UNPROVOKING", "budget_for",

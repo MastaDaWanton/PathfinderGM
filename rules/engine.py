@@ -2952,13 +2952,19 @@ class Engine:
         # refuse the strike for the fifteen feet the move is about to close. Those
         # swings are left to the floor in `_op_attack`, which asks after the move.
         moved: set[str] = set()
+        # Who searches earlier in this list (a creature's Perception with no DC): its blow
+        # after the search is the search's to decide, at resolution (`_op_attack`'s floor).
+        searched: set[str] = set()
         for i, intent in enumerate(intents):
             self._standing_means(intent)
             self._check_refs(intent, i, extra=pending | introduced)
             self._check_legality(intent, i, moved=moved)
+            self._check_unseen_target(intent, i, searched)
             self._force_visibility(intent)
             if intent.op == "move":
                 moved.add(str(intent.params.get("who") or intent.actor or ""))
+            if intent.op == "check" and intent.params.get("search"):
+                searched.add(str(intent.actor or ""))
             if intent.op == "introduce":
                 # One introduce per plan, with `count` for a group. An op that is always
                 # on offer gets over-used: Labyrinth's state-only planner "calls state
@@ -2984,6 +2990,82 @@ class Engine:
                 self._planned_places.add(_place_key(intent.params["name"]))
         self._planned_places = set()
         return intents
+
+    def _unseen_refusal(self, actor, subject) -> str:
+        """Why `actor` cannot aim a blow at `subject`, or "" when it can."""
+        from . import awareness
+
+        if actor is None or subject is None or actor.is_pc:
+            return ""
+        if not subject.has_state(awareness.HIDDEN) \
+                or awareness.locates(self.scene, actor, subject):
+            return ""
+        how = ("invisible" if subject.has_state(awareness.INVISIBLE)
+               and not awareness.sees_invisible(actor) else "hidden")
+        return (f"attack: {actor.name} cannot see {subject.name} ({how}) and does not know "
+                f"where they are, so it cannot attack them by name. Search for them "
+                f"({awareness.search_fix(actor.ref)}), swing blind at where it guesses "
+                f"they are ({awareness.guess_fix(actor.ref)}), or act against somebody it "
+                f"can see.")
+
+    def _check_unseen_target(self, intent: Intent, index: int, searched: set) -> None:
+        """A creature's blow at somebody hidden from it that it has not found is refused,
+        with the two things it can do instead named (Concealment, CRB p.196: "You can't
+        attack an opponent that has total concealment, though you can attack into a square
+        that you think he occupies"). Measured 2026-10-30 before this: gemma's turn wrote
+        `attack target=pc` at the invisible player 3 of 3 times and the engine walked the
+        thug up to her square and swung. The player's own blows are not asked here."""
+        if intent.op != "attack" or intent.params.get("guess") \
+                or intent.params.get("reaction") or str(intent.actor or "") in searched:
+            return
+        actor = self.scene.actors.get(str(intent.actor or ""))
+        for ref in intent.targets():
+            why = self._unseen_refusal(actor, self.scene.actors.get(ref))
+            if why:
+                raise IntentError(why, "legality", index, code="unseen_target")
+
+    def _guess_square(self, intent: Intent, actor) -> str | Outcome:
+        """A blow into a square the creature guesses at: one of the squares it reaches,
+        not filled by anybody it can see, picked by the engine's die. The ref of whoever
+        hidden stands there, or the Outcome of a swing at empty air — told as a miss and
+        nothing more ("tell him that the character has missed, regardless of the
+        result", CRB p.564), so the page never learns where the player was not."""
+        from . import awareness, reactions as reactions_mod
+
+        if not self.scene.has_grid or actor.ref not in self.scene.positions:
+            return self._refuse(intent, f"{actor.name} has nothing to aim at: there is no "
+                                        f"ground mapped to guess a square on.")
+        seen = set()
+        for r, a in self.scene.actors.items():
+            if r != actor.ref and r in self.scene.positions \
+                    and awareness.sees(self.scene, actor, a):
+                seen |= set(gridmod.footprint(tuple(self.scene.positions[r][:2]), a.size))
+        squares = sorted(sq for sq in reactions_mod.threatened_by(self.scene, actor.ref)
+                         if tuple(sq[:2]) not in seen
+                         and self.scene.grid.passable(tuple(sq[:2])))
+        if not squares:
+            return self._refuse(intent, f"{actor.name} has no open square within reach to "
+                                        f"swing into.")
+        rolls = []
+        if len(squares) == 1:
+            pick = tuple(squares[0][:2])
+        else:
+            roll = self.dice.roll(f"1d{len(squares)}", label=f"{actor.name}'s guess",
+                                  visibility="hidden")
+            rolls.append(roll)
+            pick = tuple(squares[max(0, min(len(squares), roll.total) - 1)][:2])
+        for r, a in self.scene.actors.items():
+            if r == actor.ref or r not in self.scene.positions or not a.has_state(
+                    awareness.HIDDEN) or awareness.locates(self.scene, actor, a):
+                continue
+            if pick in set(gridmod.footprint(tuple(self.scene.positions[r][:2]), a.size)):
+                return r
+        return Outcome(intent_id=intent.id, op="attack", rolls=rolls, verdict="miss",
+                       effects=[{"ref": actor.ref, "kind": "guessed", "square": list(pick),
+                                 "found": False}],
+                       tell=f"{actor.name} swings blind at where it guesses somebody is, "
+                            f"and misses.",
+                       because=intent.because)
 
     def _standing_means(self, intent: Intent) -> None:
         """A blow by the player's character that names no weapon, in the fight it already
@@ -3884,6 +3966,9 @@ class Engine:
         # An ability's effect that a state ends: a rage when its barbarian falls, a smite
         # when its mark dies (`_ability_ends_settle`).
         resolution.outcomes.extend(self._ability_ends_settle())
+        # Hiding held across the batch: a newcomer's Perception, a hiding left behind,
+        # knowledge of somebody no longer hidden (`_awareness_settle`, rules/awareness.py).
+        resolution.outcomes.extend(self._awareness_settle())
         # A creature holding its ground answers what this batch did: struck, closed on,
         # or gone — and a find it was sitting on is paid once it has gone.
         resolution.outcomes.extend(self._holding_ground_settles())
@@ -4061,6 +4146,298 @@ class Engine:
                     intent_id="", op="effect_ended", effects=records,
                     tell=" ".join([f"{why}, and {actor.name}'s {e.name} ends."] + said),
                     because="")))
+        return out
+
+    # --- what a deed ends (invisibility, Stealth) ----------------------------------------
+    #
+    # GAS's removal on an event, beside `_ability_ends_settle`'s removal on a tag: an effect
+    # whose payload carries `ends_when: {"acts": [...]}` ends the moment its holder does
+    # one of those deeds. Two writers: a potion's or a spell's invisible condition
+    # ("The spell ends if the subject attacks any creature. For purposes of this spell, an
+    # attack includes any spell targeting a foe or whose area or effect includes a foe",
+    # CRB p.301), and a won Stealth check ("Your Stealth immediately ends after you make an
+    # attack roll, whether or not the attack is successful", CRB p.106). Greater
+    # invisibility carries no end, which is the whole of the difference ("it doesn't end
+    # if the subject attacks", CRB p.302). Measured 2026-10-30 (probe p3): the potion's
+    # `ends_when` was dropped by `consumables` and nothing read one — Kesst stabbed the thug
+    # for 9 and stayed invisible for the potion's whole 30 rounds.
+    #
+    # Called by the doors where the deed is done, at their end, never by a settle: an
+    # attack's tell is where "the blow gives you away" belongs, and the next blow in the
+    # same list must already find the attacker seen.
+    _ACT_SAID = {"attack": "attacking", "cast_offensive": "a spell aimed at a foe"}
+
+    def _ends_on_act(self, actor, act: str, *, keep=()) -> tuple[list[dict], list[str]]:
+        """End every effect on `actor` its own deed `act` ends. (records, tells)."""
+        from . import awareness
+
+        recs, said = [], []
+        for e in list(actor.effects):
+            if any(e is k for k in keep):
+                continue
+            acts = ((e.payload or {}).get("ends_when") or {}).get("acts") or ()
+            if act not in acts:
+                continue
+            actor.remove_effects(match=lambda x, e=e: x is e)
+            recs.append({"ref": actor.ref, "kind": "effect_ended", "what": e.name,
+                         "why": act, "origin": e.origin})
+            why = self._ACT_SAID.get(act, "what was done")
+            if any(states.matches(str(t), awareness.INVISIBLE) for t in e.tags or ()):
+                said.append(f"{actor.name} is visible again: {why} ends invisibility.")
+            elif any(states.matches(str(t), awareness.SNEAKING) for t in e.tags or ()):
+                said.append(f"{actor.name} is no longer hidden: {why} gives the hiding "
+                            f"away.")
+            else:
+                said.append(f"{actor.name}'s {e.name.lower()} ends: {why} ends it.")
+        if actor.has_state(awareness.HIDDEN):
+            # Still hidden after a fight's deed (greater invisibility): "in combat" is
+            # -20 to notice them from here on, this turn and the next one's checks.
+            awareness.note_loud(self.scene, actor)
+        return recs, said
+
+    def _hiding_after_attack(self, actor, defender, weapon: dict, weapon_key: str,
+                             state: dict, hit: bool) -> tuple[list[dict], list[str]]:
+        """What an attack roll does to the attacker's hiding, and to the struck one's
+        knowledge of where it came from. (records, tells).
+
+        Sniping first (Stealth, CRB p.106): hidden by Stealth, ten feet or more from the
+        target, a ranged attack — "make one ranged attack and then immediately use Stealth
+        again ... a -20 penalty". The -20 roll is `attitude.perceived`'s, already made for
+        the victim's sake when there was one; it becomes the new result everybody else
+        checks against, and a victim who beat it pinpoints the sniper. Then the ends
+        (`_ends_on_act`). Then the struck: "If an invisible creature strikes a character,
+        the character struck knows the location of the creature that struck him (until,
+        of course, the invisible creature moves)", only the general location past 5 ft of
+        reach (CRB p.564)."""
+        from . import awareness
+
+        if not actor.has_state(awareness.HIDDEN):
+            return [], []
+        recs: list[dict] = []
+        said: list[str] = []
+        keep = []
+        sneak = awareness.sneaking(actor)
+        gap = self._gap_ft(actor, defender)
+        ranged = str(weapon.get("category") or "") == "ranged"
+        if sneak is not None and ranged and gap is not None \
+                and gap >= awareness.SNIPE_FROM_FT:
+            rolled = [r for r in state.get("rolls") or ()
+                      if str(r.get("label", "")).endswith("Stealth, sniping")]
+            if rolled:
+                result = int(rolled[-1].get("total", 0))
+            else:
+                again = self.dice.d20(list(actor.skill_modifiers("stealth"))
+                                      + [Modifier(awareness.SNIPING_PENALTY,
+                                                  "sniping, to stay hidden")],
+                                      label=f"{actor.name} Stealth, sniping",
+                                      visibility="hidden")
+                state.setdefault("rolls", []).append(again.as_dict())
+                result = again.total
+            sneak.payload = dict(sneak.payload or {}, result=int(result), checked=[])
+            keep.append(sneak)
+            recs.append({"ref": actor.ref, "kind": "sniping", "result": int(result),
+                         "origin": awareness.STEALTH_ORIGIN})
+            line = f"{actor.name} shoots from hiding and slips back out of sight."
+            if state.get("seen", True) and awareness.can_perceive(defender):
+                awareness.pinpoint(self.scene, defender, actor, "saw the shot")
+                recs.append({"kind": "knows_where", "ref": defender.ref, "of": actor.ref,
+                             "origin": awareness.PERCEPTION_ORIGIN})
+                line += f" {defender.name} saw where the shot came from."
+            said.append(line)
+        gone, gone_said = self._ends_on_act(actor, "attack", keep=keep)
+        recs.extend(gone)
+        said.extend(gone_said)
+        if hit and not ranged and actor.has_state(awareness.HIDDEN) \
+                and awareness.can_perceive(defender) \
+                and not awareness.sees(self.scene, defender, actor) \
+                and not awareness.knows_where(self.scene, defender, actor):
+            from . import reactions as reactions_mod
+
+            reach, _gap = reactions_mod.reach_with(actor, weapon_key)
+            if reach > 5:
+                awareness.hunch(self.scene, defender, actor)
+                recs.append({"kind": "knows_near", "ref": defender.ref, "of": actor.ref,
+                             "origin": awareness.PERCEPTION_ORIGIN})
+                said.append(f"{defender.name} knows roughly where the blow came from, "
+                            f"and not the square.")
+            else:
+                awareness.pinpoint(self.scene, defender, actor, "struck")
+                recs.append({"kind": "knows_where", "ref": defender.ref, "of": actor.ref,
+                             "origin": awareness.PERCEPTION_ORIGIN})
+                said.append(f"{defender.name} knows where the blow came from.")
+        return recs, said
+
+    # --- hiding, held across turns (rules/awareness.py) ----------------------------------
+
+    def _hidden_from(self, observer) -> list:
+        """The creatures here hidden from `observer` that it has not pinpointed."""
+        from . import awareness
+
+        return [a for r, a in self.scene.actors.items()
+                if a is not observer and a.has_state(awareness.HIDDEN)
+                and not awareness.locates(self.scene, observer, a)]
+
+    def _watched_in_the_open(self, actor):
+        """Somebody watching `actor` with nothing between them to hide behind, or None.
+
+        Asked of every conscious creature not of the actor's party that can see it now
+        (`awareness.sees` — an invisible actor is watched by nobody), on the map: a clear
+        line, no cover (`position.cover_of`) and no concealment (`_concealment_of`, which
+        reads dim light, darkness and smoke). Off the map nothing can be measured, and the
+        dice decide as they always did."""
+        from . import awareness, position as position_mod
+
+        if not self.scene.has_grid or actor.ref not in self.scene.positions:
+            return None
+        for ref, o in self.scene.actors.items():
+            if o is actor or (actor.is_pc and (o.is_pc
+                                                or o.has_state(states.TRAVELS_WITH_YOU))):
+                continue
+            if ref not in self.scene.positions or not awareness.can_perceive(o):
+                continue
+            if not awareness.sees(self.scene, o, actor):
+                continue
+            here, there = self.scene.positions[ref], self.scene.positions[actor.ref]
+            try:
+                if not self.scene.grid.line_of_sight(tuple(here), tuple(there)):
+                    continue
+            except Exception:  # noqa: BLE001 — a grid that cannot answer measures nothing
+                continue
+            # Hard cover, not soft: "nor does soft cover allow you to make a Stealth
+            # check" (CRB, Combat, Cover) — a crowd between is not a hiding place.
+            if position_mod.cover_of(self.scene, o, actor) in ("cover", "total"):
+                continue
+            if self._concealment_of(o, actor)[0] > 0:
+                continue
+            return o
+        return None
+
+    def _stealth_lands(self, actor, roll, opposed, won: bool) -> tuple[list[dict], list[str]]:
+        """A Stealth check's result, held: won, the actor is hidden (`state.hidden.
+        stealth`, source `rule:stealth`) with the result in the payload for every other
+        observer to check against, and an attack ends it. Lost while already hidden, the
+        one who beat it has found them. (records, tells)."""
+        from . import awareness
+
+        other = (self.scene.actors.get(str(opposed.get("ref") or ""))
+                 if isinstance(opposed, dict) else None)
+        if not won:
+            if other is not None and awareness.sneaking(actor) is not None:
+                awareness.pinpoint(self.scene, other, actor, "beat the Stealth check")
+                return ([{"kind": "knows_where", "ref": other.ref, "of": actor.ref,
+                          "origin": awareness.PERCEPTION_ORIGIN}],
+                        [f"{other.name} has spotted {actor.name}."])
+            return [], []
+        had = awareness.sneaking(actor)
+        payload = {"result": int(roll.total), "at": self.scene.at,
+                   "ends_when": dict(awareness.ENDS_ON_ATTACK),
+                   # Who has already rolled against this hiding: the one it was opposed
+                   # by. Everybody else here checks against the result at the end of the
+                   # batch (`_awareness_settle`) — "opposed by the Perception check of
+                   # anyone who might notice you", each of them, not only the sharpest.
+                   "checked": [other.ref] if other is not None else []}
+        actor.apply_effect(ActiveEffect(
+            name="Hidden", kind="condition", key=awareness.SNEAKING_KEY,
+            source=awareness.STEALTH_ORIGIN, origin=awareness.STEALTH_ORIGIN,
+            duration="until-dismissed", tags=states.tags_for(awareness.SNEAKING_KEY),
+            payload=payload))
+        # A creature that had found them loses them again: a new check is a new hiding.
+        for a in self.scene.actors.values():
+            if a is not actor:
+                awareness.forget_one(a, actor)
+        return ([{"kind": "condition", "ref": actor.ref, "condition": "hidden",
+                  "origin": awareness.STEALTH_ORIGIN}],
+                [f"{actor.name} is hidden{' still' if had else ''}, moving at half speed, "
+                 f"until they attack or somebody finds them."])
+
+    def _search(self, intent: Intent, actor) -> Outcome:
+        """A creature searches for what is hidden from it: one Perception check, the
+        engine's die, against each hidden creature's own DC (`awareness.check`)."""
+        from . import awareness
+
+        rolls, effects, said = [], [], []
+        for subject in self._hidden_from(actor):
+            got = awareness.check(self, actor, subject, searching=True)
+            if got is None:
+                continue
+            rolls.extend(_roll_from_dict(r) for r in got["rolls"])
+            effects.extend(got["effects"])
+            if got["tell"] and got["tell"] not in said:
+                said.append(got["tell"])
+        if not rolls:
+            said = [f"{actor.name} searches, and there is nothing here it could find."]
+        found = any(e.get("kind") == "knows_where" for e in effects)
+        return Outcome(intent_id=intent.id, op="check", rolls=rolls,
+                       verdict="success" if found else "failure", effects=effects,
+                       tell=" ".join(said), because=intent.because)
+
+    def turn_begins(self, ref: str) -> list:
+        """The top of a creature's turn in a fight: its reactive Perception against
+        everybody hidden from it ("Most Perception checks are reactive", CRB p.102).
+        Outcomes for what it found; nothing for what it did not — the brief tells the
+        turn's prompt that (`awareness.brief_line`)."""
+        from . import awareness
+
+        observer = self.scene.actors.get(ref)
+        if observer is None or observer.is_pc or not awareness.can_perceive(observer):
+            return []
+        out = []
+        for subject in self._hidden_from(observer):
+            if not subject.is_pc:
+                continue
+            got = awareness.check(self, observer, subject)
+            if got and got["tell"]:
+                out.append(self._articled(Outcome(
+                    intent_id="", op="notice", effects=got["effects"],
+                    rolls=[_roll_from_dict(r) for r in got["rolls"]],
+                    tell=got["tell"], because="")))
+        return out
+
+    def _awareness_settle(self) -> list:
+        """Hiding kept honest at the end of every batch.
+
+        * A Stealth hiding left behind: the place changed under it. Ended, said.
+        * Out of a fight, everybody here who has not yet rolled against the player's
+          hiding does — a newcomer the moment they arrive, and the onlookers the opposed
+          check did not name. Once per hiding: the payload's `checked` list.
+        * `knows.*` about a creature no longer hidden, or no longer here, goes (silent:
+          the door that ended the hiding told it)."""
+        from . import awareness
+
+        out = []
+        for subject in [a for a in self.scene.actors.values() if a.is_pc]:
+            sneak = awareness.sneaking(subject)
+            if sneak is not None and (sneak.payload or {}).get("at", self.scene.at) \
+                    != self.scene.at:
+                subject.remove_effects(match=lambda x, s=sneak: x is s)
+                out.append(self._articled(Outcome(
+                    intent_id="", op="effect_ended",
+                    effects=[{"ref": subject.ref, "kind": "effect_ended", "what": "Hidden",
+                              "why": "left", "origin": awareness.STEALTH_ORIGIN}],
+                    tell=f"{subject.name} is no longer hidden: the cover was left behind.",
+                    because="")))
+            if self.scene.in_encounter or not subject.has_state(awareness.HIDDEN):
+                continue
+            hidings = [e for e in subject.effects
+                       if any(states.matches(str(t), awareness.HIDDEN) for t in e.tags or ())]
+            for observer in list(self.scene.actors.values()):
+                if observer.is_pc or observer.has_state(states.TRAVELS_WITH_YOU) \
+                        or not awareness.can_perceive(observer):
+                    continue
+                if all(observer.ref in ((e.payload or {}).get("checked") or ())
+                       for e in hidings):
+                    continue
+                for e in hidings:
+                    e.payload = dict(e.payload or {}, checked=list(
+                        dict.fromkeys([*((e.payload or {}).get("checked") or ()),
+                                       observer.ref])))
+                got = awareness.check(self, observer, subject)
+                if got and got["tell"]:
+                    out.append(self._articled(Outcome(
+                        intent_id="", op="notice", effects=got["effects"],
+                        rolls=[_roll_from_dict(r) for r in got["rolls"]],
+                        tell=got["tell"], because="")))
+        awareness.sweep(self.scene)
         return out
 
     def _works_settles(self) -> list:
@@ -5622,9 +5999,17 @@ class Engine:
         # exchange counts towards regard (`attitude.talked_today`), capped per day,
         # and the tell says so only when a step is crossed — the third law: the
         # narrator hears the change in words, never a number.
-        from . import attitude as attitude_mod
+        from . import attitude as attitude_mod, awareness
 
         bits = [said]
+        # Speaking from hiding: "in combat or speaking" is -20 on the Perception DC to
+        # notice an invisible creature (CRB p.564), and everybody who hears it gets a
+        # fresh check against the hiding at the end of the batch (`_awareness_settle`).
+        if speaker is not None and speaker.has_state(awareness.HIDDEN):
+            awareness.note_loud(self.scene, speaker)
+            for e in speaker.effects:
+                if (e.payload or {}).get("checked"):
+                    e.payload = dict(e.payload, checked=[])
         if heard is not None and speaker is not None and speaker.is_pc \
                 and not heard.is_pc:
             opened = self.join_talk(heard, how="you spoke to them")
@@ -5682,6 +6067,30 @@ class Engine:
             mods, refused = self._skill_mods_or_refusal(intent, actor, skill)
             if refused is not None:
                 return refused
+        opposed = intent.params.get("opposed_by")
+        # A creature's Perception with no DC and nobody named, while somebody here is
+        # hidden from it: that is searching ("Intentionally searching for stimulus is a
+        # move action", CRB p.102), against the hiding's own DC (`_search`). The fix the
+        # unseen-target refusal names.
+        if intent.params.get("search"):
+            if not actor.is_pc:
+                return self._search(intent, actor)
+            # The player's own search is the ordinary Perception check it always was:
+            # what is hidden from the player is the scene's to reveal, not this door's.
+            intent.params.pop("search", None)
+            intent.params["dc"] = {"band": "average"}
+        # Stealth while watched (CRB p.106): "If people are observing you using any of
+        # their senses (but typically sight), you can't use Stealth. Against most
+        # creatures, finding cover or concealment allows you to use Stealth." Refused
+        # before the dice with the watcher named and the ways round it.
+        if str(skill).lower() == "stealth" and helped is None:
+            watcher = self._watched_in_the_open(actor)
+            if watcher is not None:
+                return self._refuse(
+                    intent, f"{watcher.name} is watching {actor.name}, and there is no "
+                            f"cover or shadow between them to hide in: Stealth needs cover "
+                            f"or concealment from anyone looking, or a diversion first. "
+                            f"Nothing is rolled.", code="observed")
         opposed = intent.params.get("opposed_by")
         # A lie told to somebody (owner ruling B1, 2026-09-30): Bluff against their Sense
         # Motive, with the book's believability on the liar's roll (`rules/bluff.py`, CRB
@@ -5826,12 +6235,25 @@ class Engine:
                 f"{actor.name} misses the {skill} check by {-margin}."
             )
         if verdict == "success":
-            # A check beaten is a challenge overcome, and it pays — the number to beat
-            # being the DC, or on an opposed check the other side's own roll.
-            beaten = (opposing_roll.total if opposing_roll else resolved_dc.final)
-            tell += self.reward_check(actor, skill, beaten)
+            # A check beaten is a challenge overcome, and it pays (the owner's rule,
+            # `rules/xp.py`: the CRB gives no line for a skill check — "Awarding
+            # Experience", CRB p.399, pays for monsters, traps, obstacles and roleplaying
+            # encounters overcome — so the app's own reading of a DC as a CR stands). On
+            # an opposed check the difficulty is the other side's 10 + modifier, their
+            # take-10, never the die they happened to throw: measured 2026-10-30 (live), an
+            # invisible level-2 Kesst's Stealth beat a thug's Perception roll of 19 by 27
+            # and was paid 300 XP — a fifth of a level for a check she could not fail.
+            beaten = (10 + opposing_roll.modifier_total if opposing_roll
+                      else resolved_dc.final)
+            tell += self.reward_check(actor, skill, beaten,
+                                      modifier=roll.modifier_total)
 
         effects: list[dict] = []
+        if str(skill).lower() == "stealth" and helped is None:
+            hid_fx, hid_said = self._stealth_lands(actor, roll, opposed,
+                                                   verdict == "success")
+            tell = " ".join(x for x in [tell, *hid_said] if x)
+            effects.extend(hid_fx)
         if opposed and lie:
             felt, effects = self._lie_lands(actor, self.scene.actors[opposed["ref"]],
                                             str(opposed.get("claim") or ""),
@@ -6432,6 +6854,18 @@ class Engine:
         if intent.params.get("mode") == "splash":
             return self._splash_attack(intent, partial)
         actor = self.scene.actors[intent.actor]
+        # A blow into a guessed square (`_guess_square`): the engine's die picks the
+        # square, and whoever hidden stands there is the target — or nobody is, and it is
+        # a swing at air. Decided once, before anything else reads the target.
+        # Kept in `partial`, never in params: a param a plan could write would let it
+        # skip the floor below.
+        if intent.params.get("guess") and not partial.get("guessed"):
+            picked = self._guess_square(intent, actor)
+            if isinstance(picked, Outcome):
+                return picked
+            partial["guessed"] = picked
+        if partial.get("guessed"):
+            intent.target = partial["guessed"]
         targets = intent.targets()
         if not targets:
             return self._refuse(intent, "The attack names nobody to hit, so nothing is rolled.")
@@ -6448,6 +6882,15 @@ class Engine:
         # nothing of the loosener's but their base attack bonus rides it (no Strength, no
         # feats, no sneak attack, no charged blow), and nothing stops it but the reach.
         dancing = bool(partial.get("dancing"))
+        # The floor under validate's unseen-target check, for the lists it let through: a
+        # search earlier in the list that found nothing (rules/awareness.py).
+        if partial.get("attack_state") is None and not partial.get("guessed") \
+                and not intent.params.get("reaction") and not dancing:
+            unseen = self._unseen_refusal(actor, defender)
+            if unseen:
+                return self._refuse(intent, f"{actor.name} cannot find {defender.name}, "
+                                            f"so the blow has nowhere to go.",
+                                    code="unseen_target")
         # The move's rule, for a swing. `validate` asked whether they could attack
         # before the list began; an attack of opportunity spliced in front of an
         # earlier intent in the same list can drop them since. Measured 2026-09-27:
@@ -6723,7 +7166,21 @@ class Engine:
             # riding it — a trip is not a way to finish somebody.
             full = False
         elif intent.params.get("manoeuvre"):
-            return self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
+            done = self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
+            # A manoeuvre is an attack roll (CMB against CMD) at a creature: it ends a
+            # hiding as a blow does. Only one that was rolled — a refusal did nothing.
+            if done.status != "refused" and done.rolls:
+                hid_fx, hid_said = self._hiding_after_attack(
+                    actor, defender, dict(weapon, category="melee"), weapon_key,
+                    {"seen": True, "rolls": []}, False)
+                if hid_fx or hid_said:
+                    # A new Outcome rather than an edit of the record's list: the
+                    # three-laws ratchet reads any `.effects` mutation as the store's.
+                    from dataclasses import replace as _replace
+
+                    done = _replace(done, effects=[*(done.effects or []), *hid_fx],
+                                    tell=" ".join(x for x in [done.tell, *hid_said] if x))
+            return done
 
         # Defending (CRB): "allows the wielder to transfer some or all of the weapon's
         # enhancement bonus to his AC as a bonus that stacks with all others ... at the
@@ -6764,7 +7221,7 @@ class Engine:
         if def_gutter and current_moment() is not None:
             current_moment().guttered.update(def_gutter)
 
-        flat_footed = self._flat_footed(defender)
+        flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
         # A creature floundering in water is easier to hit and keeps no guard: the book
         # gives its opponents +2 and takes its Dexterity off its own AC. Both are facts
         # about the DEFENDER's footing, so they are read here where the defender is known
@@ -7666,6 +8123,13 @@ class Engine:
         self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
         if self.scene.in_encounter:
             self._remember_means(actor, intent, weapon_key)
+        # The attack roll is made: whatever hiding it ends ends now, told with the blow,
+        # and the one struck learns where it came from (`_hiding_after_attack`).
+        if not dancing:
+            hid_fx, hid_said = self._hiding_after_attack(actor, defender, weapon,
+                                                         weapon_key, state, any_hit)
+            effects.extend(hid_fx)
+            state["tells"].extend(hid_said)
         if coup:
             # No AC was rolled against; the only number set against anybody was the save.
             dc = ({"value": coup_dc, "explain": "Fortitude, 10 + damage dealt"}
@@ -8049,6 +8513,13 @@ class Engine:
         defender = self.scene.actors.get(targets[0]) if targets else None
         if actor is None or defender is None:
             return None
+        # Nobody walks up to a square they do not know is occupied (rules/awareness.py):
+        # the blow at somebody unfound is refused at its own door, and a step toward
+        # where they really stand would hand the creature the square it never found.
+        from . import awareness
+
+        if not awareness.locates(self.scene, actor, defender):
+            return None
         weapon_key = (intent.params.get("weapon") or actor.wielded_key()).lower()
         found = self._closing_step(intent, actor, defender, weapon_key)
         if found is None:
@@ -8111,8 +8582,12 @@ class Engine:
         if actor is None or actor.is_pc or foe is None or foe.ref == ref \
                 or ref not in self.scene.positions or foe.ref not in self.scene.positions:
             return
-        from . import position as position_mod
+        from . import awareness, position as position_mod
 
+        # Toward somebody it cannot find, it walks nowhere in particular: the square the
+        # walk would end beside is the one it does not know (rules/awareness.py).
+        if not awareness.locates(self.scene, actor, foe):
+            return
         params = dict(params, toward=foe.ref)
         closing = position_mod.closing_move(self.scene, actor, foe, actor.wielded_key())
         if closing is not None:
@@ -8163,7 +8638,7 @@ class Engine:
             if isinstance(loot, str):
                 return self._refuse(intent, loot)
 
-        flat_footed = self._flat_footed(defender)
+        flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
         cmd_mods = defender.cmd_modifiers(
             flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None)
         if loot and loot["fastened"]:
@@ -14301,6 +14776,16 @@ class Engine:
 
         if _attitude.of(who) == _attitude.HOSTILE:
             return ""
+        # Nobody opens a conversation with somebody they cannot see (rules/awareness.py):
+        # an invisible player, or one hidden by Stealth the speaker has not found, is not
+        # spoken to — whatever the prose had them say. The player speaking first is the
+        # player giving themselves away, and stays their call.
+        from . import awareness
+
+        pc = self.scene.pc()
+        if "they" in str(how) and pc is not None \
+                and not awareness.sees(self.scene, who, pc):
+            return ""
         # Spoken with: the record's `last_met`, which the finder's `met` ring and the
         # coming "since last we met" catch-up read (rules/population.py, `met`).
         from . import population as _population
@@ -14699,8 +15184,15 @@ class Engine:
         if key in states.ATTITUDES:
             cond = self._set_attitude(target, key, rounds, intent.because)
         else:
+            # What ends it besides its clock (`_ends_on_act`): only from a stamped door —
+            # a potion's or a spell's own document. A model's plan cannot write an end
+            # onto a condition it lays (the param is refused unstamped).
+            ends = intent.params.get("ends_when") if intent.origin else None
+            payload = (None if not intent.origin else
+                       {"ends_when": {"acts": [str(a) for a in ends.get("acts") or ()]}}
+                       if isinstance(ends, dict) and ends.get("acts") else {})
             cond = target.add_condition(key, rounds, source=intent.because,
-                                         origin=intent.origin)
+                                         origin=intent.origin, payload=payload)
         return Outcome(
             intent_id=intent.id, op="condition",
             effects=[{"ref": target.ref, "kind": "condition", "condition": key,
@@ -17261,6 +17753,18 @@ class Engine:
             if not self._executes(spec):
                 tells.append(effectspec.render(spec) + ".")
 
+        # A spell that harms a foe it reached is an attack for invisibility's purposes —
+        # "any spell targeting a foe or whose area or effect includes a foe" (CRB p.301),
+        # narrowed to harm by the owner's line `attitude.harm_of` already draws. A bless
+        # with a foe in its area, a summons, a door opened: none of them end it.
+        if state.get("harms") and any(
+                r != actor.ref and r in self.scene.actors
+                and self._against(actor, self.scene.actors[r])
+                for r in state.get("caught") or ()):
+            gone, gone_said = self._ends_on_act(actor, "cast_offensive")
+            effects.extend(gone)
+            tells.extend(gone_said)
+
         return Outcome(
             intent_id=intent.id, op="cast",
             rolls=[_roll_from_dict(r) for r in state["rolls"]],
@@ -17644,7 +18148,12 @@ class Engine:
                  # The spells that affect metal (leatherworking plan §18.5). `touch_attack`
                  # is rolled before the dice (`_touches`) and does nothing as a rider; it is
                  # listed so the cast does not also print it for the GM as unexecuted.
-                 "metal_temperature", "rust", "touch_attack")
+                 "metal_temperature", "rust", "touch_attack",
+                 # A condition the spell itself lays, with no save between — the four
+                 # invisibility spells (2026-10-30), the only top-level `apply_condition`
+                 # specs in the corpus; every other condition sits in a save gate, which
+                 # keeps the path it had. `_lay_condition`.
+                 "apply_condition")
 
     def _executes(self, spec: dict) -> bool:
         # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
@@ -17674,6 +18183,41 @@ class Engine:
             tells.extend(said)
         return effects, tells
 
+    def _lay_condition(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A condition the spell lays on everyone it reached, for its own duration, through
+        the `condition` op stamped `spell:<id>` — and with its document's `ends_when`.
+
+        Invisibility's mechanics were narrative only until 2026-10-30, under a note that
+        "the vocabulary has no 'invisible' condition" (it has had one since stage 3,
+        `states.TAGS["invisible"]`): measured with probe p4, a wizard cast invisibility on
+        herself and nothing about her changed."""
+        key = str(spec.get("target") or "").strip().lower()
+        if not key:
+            return [], []
+        who = list(ctx.get("targets") or [])
+        if not who and ctx.get("self_ok"):
+            who = [ctx["caster"]]
+        fx: list[dict] = []
+        said: list[str] = []
+        for ref in who:
+            if ref not in self.scene.actors:
+                continue
+            params: dict = {"condition": key, "to": ref}
+            if ctx.get("rounds"):
+                params["duration"] = {"amount": int(ctx["rounds"]), "unit": "round"}
+            ends = spec.get("ends_when")
+            if isinstance(ends, dict) and ends.get("acts"):
+                params["ends_when"] = {"acts": [str(a) for a in ends["acts"]]}
+            res = self.run(self.validate([{
+                "op": "condition", "actor": ctx.get("caster"), "visibility": "hidden",
+                "because": str(ctx.get("source") or "the spell"), "params": params}],
+                origin=str(ctx.get("origin") or ""), origin_name=str(ctx.get("source") or "")))
+            for o in res.outcomes:
+                fx.extend(o.effects or [])
+                if o.tell:
+                    said.append(o.tell)
+        return fx, said
+
     def _run_one(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         kind = str(spec.get("type", ""))
         if kind == "bundle":
@@ -17696,6 +18240,8 @@ class Engine:
             return self._grant_sr(spec, ctx)
         if kind == "metal_temperature":
             return self._metal_temperature(spec, ctx)
+        if kind == "apply_condition":
+            return self._lay_condition(spec, ctx)
         if kind == "rust":
             return self._rust(spec, ctx)
         if kind == "touch_attack":
@@ -18650,6 +19196,20 @@ class Engine:
                         f"{actor.name} closes on {foe.name} to strike.")
             elif toward is not None:
                 tell = self._toward_tell(actor, toward, cost, effect)
+            # A hidden mover: how far it went is the DC table's row ("moving at half
+            # speed -5 ... not moving +20", CRB p.564), and a pinpoint on the square it
+            # left is spent — "until, of course, the invisible creature moves".
+            from . import awareness
+
+            if actor.has_state(awareness.HIDDEN) and from_square is not None \
+                    and tuple(from_square)[:2] != tuple(square)[:2]:
+                awareness.note_motion(self.scene, actor, cost or 0)
+                lost = awareness.moved_away(self.scene, actor)
+                if lost:
+                    effect["lost_track"] = list(lost)
+                    tell += (f" {' and '.join(lost)} no longer "
+                             f"{'knows' if len(lost) == 1 else 'know'} where "
+                             f"{actor.name} is.")
             return Outcome(
                 intent_id=intent.id, op="move",
                 effects=[effect],
@@ -18999,11 +19559,19 @@ class Engine:
             line += " Enough to advance — it will settle with a night's sleep."
         return line
 
-    def reward_check(self, actor, skill: str, dc: int | None) -> str:
-        """Pay for a check beaten, once per DC per place per day, or ""."""
+    def reward_check(self, actor, skill: str, dc: int | None,
+                     modifier: int | None = None) -> str:
+        """Pay for a check beaten, once per DC per place per day, or "".
+
+        `modifier` is what the check was rolled with: a DC that the lowest face (1 + it —
+        a skill check has no automatic failure, CRB p.86) already reaches was no challenge
+        to this character, and pays nothing. `xp.challenge_award` says the same of a DC
+        "the character could not fail" and could only ask their level."""
         from . import xp as xp_mod
 
         if actor is None or not actor.is_pc or dc is None:
+            return ""
+        if modifier is not None and int(modifier) + 1 >= int(dc):
             return ""
         award = xp_mod.challenge_award(actor.level, dc)
         if not award:
@@ -19135,18 +19703,46 @@ class Engine:
             or not self._has_acted(defender.ref)
         )
 
+    def _unseen_attacker(self, defender, attacker) -> bool:
+        """Whether `defender` is struck by somebody it cannot see, and so keeps no Dex.
+
+        The invisible condition: it "ignores its opponent's Dexterity bonus to AC (if
+        any)" (CRB p.565), and a creature that has not beaten the attacker's Stealth is
+        "not aware of you" (CRB p.106). Uncanny dodge keeps it — "nor does he lose his
+        Dex bonus to AC if the attacker is invisible" — so it asks `caught_flat_footed`
+        like the flat-footed rule. Measured 2026-10-30 (probe p2 D): the invisible
+        player's blows were judged against the thug's full AC once he had acted, and
+        sneak attack, which the brief claimed worked, worked only in round one."""
+        from . import awareness, classfeatures
+
+        if attacker is None or defender is None or attacker is defender:
+            return False
+        if not attacker.has_state(awareness.HIDDEN):
+            return False
+        return classfeatures.caught_flat_footed(defender) \
+            and not awareness.sees(self.scene, defender, attacker)
+
     # --- what a blow can see (alchemy lane C) --------------------------------------------
 
     def _concealment_of(self, attacker, defender) -> tuple[int, str]:
         """The miss chance this attacker must beat against this defender: the defender's
         own (blur, invisibility), the light at the defender's square as the attacker sees
         it (`Scene.light_at`), and smoke or fog between them (`_fog_chance`). One reader,
-        `Actor.concealment`, best source wins — the plan's "no second miss-chance path"."""
+        `Actor.concealment`, best source wins — the plan's "no second miss-chance path".
+
+        And hidden by Stealth from this attacker: "treat you as if you had total
+        concealment" (CRB p.106) — the 50% a blow at a guessed square must also beat."""
+        from . import awareness
+
         square = self.scene.positions.get(getattr(defender, "ref", ""))
         light = self.scene.light_at(square, viewer=attacker)
-        return defender.concealment(attacker, light=light,
-                                    fog=self._fog_chance(attacker, defender),
-                                    light_ft=self._gap_ft(attacker, defender))
+        got = defender.concealment(attacker, light=light,
+                                   fog=self._fog_chance(attacker, defender),
+                                   light_ft=self._gap_ft(attacker, defender))
+        if got[0] < 50 and attacker is not None and awareness.sneaking(defender) is not None \
+                and not awareness.sees(self.scene, attacker, defender):
+            return 50, "unnoticed"
+        return got
 
     def _fog_chance(self, attacker, defender) -> int:
         """An obscuring cloud's miss chance on this blow: 20 within 5 ft, 50 beyond.
@@ -19525,7 +20121,7 @@ class Engine:
             ac, note = 5, "AC 5, a grid intersection"
             mods = actor.splash_attack_modifiers()
         else:
-            flat_footed = self._flat_footed(defender)
+            flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
             ac = defender.touch_ac(flat_footed, attacker=actor)
             cover = position_mod.ac_mods(self.scene, actor, defender)
             # From the final number, as the attack's note is (`_ac_said`): this printed

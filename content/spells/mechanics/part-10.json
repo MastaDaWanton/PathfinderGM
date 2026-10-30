@@ -759,21 +759,18 @@
   "invisibility": {
    "effects": [
     {
+     "type": "apply_condition",
+     "target": "invisible",
+     "ends_when": {
+      "acts": [
+       "attack",
+       "cast_offensive"
+      ]
+     }
+    },
+    {
      "type": "narrative",
-     "target": "The touched creature or object (up to 100 pounds per level) becomes invisible, along with any gear a creature carries. Items put down become visible; items picked up and stowed vanish. Light itself never becomes invisible, though a light source can, giving a light with no visible source. Any carried item extending more than 10 feet from the subject is visible. The subject is not silenced, and things like swimming or stepping in a puddle can still betray it. The spell ends the moment the subject attacks a creature, which includes any spell targeting a foe or whose area includes one; actions against unattended objects and indirect harm are not attacks, so the subject may open doors, talk, summon monsters and set them attacking, cut a bridge's ropes or trigger a trap and stay hidden. Ally-only spells such as bless are not attacks even when foes stand in the area. On an object it can be made permanent with permanency.",
-     "note": "The vocabulary has no 'invisible' condition, so the state itself can only be narrated; the two Stealth figures below are the part the engine can act on."
-    },
-    {
-     "type": "situational_mod",
-     "amount": 40,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and stationary"
-    },
-    {
-     "type": "situational_mod",
-     "amount": 20,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and moving"
+     "target": "The touched creature or object (up to 100 pounds per level) becomes invisible, along with any gear a creature carries. Items put down become visible; items picked up and stowed vanish. Light itself never becomes invisible, though a light source can, giving a light with no visible source. Any carried item extending more than 10 feet from the subject is visible. The subject is not silenced, and things like swimming or stepping in a puddle can still betray it. The spell ends the moment the subject attacks a creature, which includes any spell targeting a foe or whose area includes one; actions against unattended objects and indirect harm are not attacks, so the subject may open doors, talk, summon monsters and set them attacking, cut a bridge's ropes or trigger a trap and stay hidden. Ally-only spells such as bless are not attacks even when foes stand in the area. On an object it can be made permanent with permanency."
     }
    ],
    "duration": {
@@ -783,7 +780,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "Bonus type is untyped because the prose names none. Vocabulary gap worth reporting: 'invisible' is not in the condition list, so the single most common buff in the game cannot be applied mechanically."
+   "notes": "The invisible condition is applied to the touched creature for the spell's duration and ends when the subject attacks or casts a harmful spell at a foe (ends_when, read by Engine._ends_on_act). The condition carries the +40/+20 Stealth itself (awareness.invisible_stealth), so the spell states none. Objects are not handled: an object made invisible is narrated."
   },
   "invisibility-alarm": {
    "effects": [
@@ -852,21 +849,12 @@
   "invisibility-greater": {
    "effects": [
     {
+     "type": "apply_condition",
+     "target": "invisible"
+    },
+    {
      "type": "narrative",
-     "target": "As invisibility on you or one touched creature, except that attacking does not end it. Carried gear vanishes too, dropped items become visible, light is never itself invisible, and anything carried more than 10 feet from the subject shows.",
-     "note": "The vocabulary has no 'invisible' condition."
-    },
-    {
-     "type": "situational_mod",
-     "amount": 40,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and stationary"
-    },
-    {
-     "type": "situational_mod",
-     "amount": 20,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and moving"
+     "target": "As invisibility on you or one touched creature, except that attacking does not end it. Carried gear vanishes too, dropped items become visible, light is never itself invisible, and anything carried more than 10 feet from the subject shows."
     }
    ],
    "duration": {
@@ -876,36 +864,34 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "Stealth figures carried from invisibility, which this spell functions as."
+   "notes": "As invisibility, with no ends_when: it \"doesn't end if the subject attacks\" (CRB p.302)."
   },
   "invisibility-mass": {
    "effects": [
     {
+     "type": "apply_condition",
+     "target": "invisible",
+     "ends_when": {
+      "acts": [
+       "attack",
+       "cast_offensive"
+      ]
+     }
+    },
+    {
      "type": "narrative",
      "target": "As invisibility, but on any number of creatures no two of which are more than 180 feet apart. The effect moves with the group and breaks when anyone in it attacks. Members cannot see one another. It breaks for anyone moving more than 180 feet from the nearest member; with only two subjects the one moving away loses invisibility, and if both move apart both become visible once the gap passes 180 feet.",
-     "note": "The vocabulary has no 'invisible' condition."
-    },
-    {
-     "type": "situational_mod",
-     "amount": 40,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and stationary"
-    },
-    {
-     "type": "situational_mod",
-     "amount": 20,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and moving"
+     "note": "Not modelled: the 180-ft spread-apart rule, members not seeing each other, and one member's attack breaking it for the whole group — each member's ends on their own attack."
     }
    ],
    "duration": {
     "kind": "per_level",
     "amount": 1,
-    "unit": "round",
+    "unit": "minute",
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "Stealth figures carried from invisibility, which this spell functions as."
+   "notes": "Every creature caught gets the invisible condition, ending on its own attack. Duration corrected to 1 min./level (CRB p.302; it read 1 round/level)."
   },
   "invisibility-purge": {
    "effects": [
@@ -926,21 +912,19 @@
   "invisibility-sphere": {
    "effects": [
     {
+     "type": "apply_condition",
+     "target": "invisible",
+     "ends_when": {
+      "acts": [
+       "attack",
+       "cast_offensive"
+      ]
+     }
+    },
+    {
      "type": "narrative",
      "target": "As invisibility, but every creature within 10 feet of the recipient at the moment of casting turns invisible, in a 10-foot emanation that travels with the recipient. Those affected see each other and themselves normally. Anyone leaving the area becomes visible, and anyone entering afterwards is not hidden. An affected creature other than the recipient who attacks loses only its own invisibility; if the recipient attacks, the whole sphere ends.",
-     "note": "The vocabulary has no 'invisible' condition."
-    },
-    {
-     "type": "situational_mod",
-     "amount": 40,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and stationary"
-    },
-    {
-     "type": "situational_mod",
-     "amount": 20,
-     "bonus_type": "untyped",
-     "target": "Stealth checks while invisible and moving"
+     "note": "Not modelled: the emanation travelling with the recipient, leaving it making a creature visible, and the recipient's attack ending it for everyone — each creature's ends on its own attack."
     }
    ],
    "duration": {
@@ -950,7 +934,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "Stealth figures carried from invisibility, which this spell functions as."
+   "notes": "Every creature caught in the 10-ft emanation at casting gets the invisible condition, ending on its own attack."
   },
   "invoke-deity": {
    "effects": [

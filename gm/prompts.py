@@ -3108,13 +3108,18 @@ def stuck_note(actor) -> str:
 
 def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
                       actor, round_no: int, first: str = "",
-                      companion: str = "", foe: tuple[str, str] | None = None
-                      ) -> list[dict]:
+                      companion: str = "", foe: tuple[str, str] | None = None,
+                      unseen: str = "") -> list[dict]:
     """The messages for one creature's own turn.
 
     `companion`: the facts a companion's turn is told (`gm/companions.turn_facts`) — who
     they are and what the player said to them. With it, the companion examples replace
-    the creature examples, filled with `foe` (ref, name) — the first standing foe."""
+    the creature examples, filled with `foe` (ref, name) — the first standing foe.
+
+    `unseen`: who this creature cannot see, said plainly with what it can do instead
+    (`awareness.brief_line`). Told as a fact of its turn, beside its hit points: the
+    scene brief says only "Conditions: invisible" of the player, and on 2026-10-30 that
+    was all three live turns had — each wound up "aimed at your head"."""
     hp_note = "unhurt"
     if actor.hp < actor.hp_max:
         share = actor.hp / max(1, actor.hp_max)
@@ -3174,6 +3179,7 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
         + (f"{first}\n" if first else holding)
         + stuck_note(actor)
         + (f"{companion}\n" if companion else "")
+        + (f"{unseen}\n" if unseen else "")
         + f"What does {ref} do?"})
     return messages
 

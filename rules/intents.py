@@ -284,7 +284,11 @@ def _bounded(value, low: int, high: int, index: int, what: str) -> int:
 OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `request`: a Diplomacy request (CRB p.93, `rules/requests.py`), written only by the
     # act→op table from the reader's `request` act (CODE_ONLY_PARAMS).
-    "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request"), "player"),
+    # `search`: Perception against what is hidden here, at the hiding's own DC (a move
+    # action, CRB p.102; `Engine._search`, rules/awareness.py) — a creature's answer to an
+    # enemy it cannot find.
+    "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search"),
+              "player"),
     "save": (("save", "dc"), ("on_success", "on_failure"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
     # this to `hidden` meant the engine silently rolled the player's attacks for them,
@@ -307,6 +311,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # A dirty trick's one condition, and where a reposition puts its
                     # target: the attacker's choices, which the rules leave to them.
                     "trick", "square",
+                    # A blow into a square guessed at, by a creature that cannot find
+                    # somebody hidden (Concealment, CRB p.196): no target, the engine's
+                    # die picks the square (`Engine._guess_square`).
+                    "guess",
                     # A defending weapon's per-turn choice (CRB, defending): how much of
                     # its enhancement goes to AC this round. Written by the combat bar,
                     # bounded by the engine against the weapon's own enhancement
@@ -522,7 +530,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # poison, a mind-affecting compulsion — which is what 1e attaches immunity to.
     # Without it the only question that can be asked is "are you immune to being
     # shaken", and the answer to that is not the rule.
-    "condition": (("condition",), ("duration", "to", "descriptors", "ends", "when"),
+    # `ends_when`: what ends it besides its clock — `{"acts": ["attack", ...]}`, read by
+    # `Engine._ends_on_act`. Honoured only from a stamped door (a potion, a spell's own
+    # document); kept out of the list a model is shown (CODE_ONLY_PARAMS).
+    "condition": (("condition",), ("duration", "to", "descriptors", "ends", "when",
+                                   "ends_when"),
                   "hidden"),
     # The engine owns the slot, the caster level and the save DC. It does *not* own what
     # the spell does — that lives in three thousand paragraphs of English, and a parser
@@ -736,7 +748,8 @@ PARAM_ALIASES = {
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
-CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job"})
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
+                              "ends_when"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
@@ -1265,7 +1278,17 @@ def _check_params(intent: Intent, index: int) -> None:
                 f"check: the DC for {p['skill']} on a named person is the engine's — "
                 f"the book sets it from their attitude and their own scores. Drop the "
                 f"dc and keep the target.", "legality", index)
-        if not p.get("dc") and not p.get("opposed_by") and not social:
+        # A search: Perception against whatever is hidden here, at the hiding's own DC —
+        # the engine's (`Engine._search`, rules/awareness.py), so a band is refused.
+        search = bool(p.get("search"))
+        if search and p.get("skill") != "perception":
+            raise IntentError("check: only perception searches. Drop search, or make the "
+                              "skill perception.", "schema", index)
+        if search and (p.get("dc") or p.get("opposed_by")):
+            raise IntentError("check: a search is rolled against what is hidden, at its "
+                              "own DC. Drop the dc and opposed_by and keep search.",
+                              "schema", index)
+        if not p.get("dc") and not p.get("opposed_by") and not social and not search:
             raise IntentError(
                 "check: a check needs something to beat. Add either "
                 '"dc": {"band": "tough"} (one of ' + ", ".join(DC_BANDS) + "), or "
@@ -1963,6 +1986,14 @@ _BACKED_BY = {
     "xp": ("states advancement; levels and experience are the engine's",),
     "moved": ("states the player went somewhere; where they are is the engine's",),
 }
+
+
+def claims_held_by_hiding() -> frozenset[str]:
+    """What prose may say while the player holds `state.hidden` (rules/awareness.py): that
+    they are unnoticed, unseen — a state the engine holds across turns, not a roll this
+    beat made. Only the stealth row: "slips past the guard" as an escape from a hold is
+    still the dice's to back."""
+    return frozenset({"states a stealth result"})
 
 
 def claims_the_engine_backs(outcomes) -> frozenset[str]:

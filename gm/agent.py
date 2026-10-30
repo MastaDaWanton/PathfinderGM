@@ -14,8 +14,9 @@ from dataclasses import dataclass, field
 
 from django.conf import settings
 
-from rules.intents import (Intent, IntentError, claims_the_engine_backs,
-                          cut_outcome_claims, find_outcome_claims)
+from rules.intents import (Intent, IntentError, claims_held_by_hiding,
+                          claims_the_engine_backs, cut_outcome_claims,
+                          find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
 from . import intimate as intimate_mod
@@ -1368,9 +1369,25 @@ class GMAgent:
         # A disarmed creature re-arms first, by the engine's hand (`judgement.rearm`);
         # the prompt is told so as a fact, or the wind-up raises the fists the tells
         # are about to put a sap in.
+        # Who it cannot see (rules/awareness.py), said plainly, and kept out of the refs
+        # its reply may aim at: an unfound player is not a ref this creature can name.
+        # A pinpointed one stays — it may strike the square, at the 50% invisibility keeps.
+        from rules import awareness
+
+        scene = self.engine.scene
+        unseen = "\n".join(
+            line for line in (awareness.brief_line(scene, actor, a)
+                              for a in scene.actors.values()
+                              if a.is_pc and a is not actor
+                              and a.has_state(awareness.HIDDEN))
+            if line)
+        aimable = tuple(r for r, a in scene.actors.items()
+                        if not a.is_pc or a is actor or not a.has_state(awareness.HIDDEN)
+                        or awareness.locates(scene, actor, a))
         base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round,
                                          first=judgement.rearm_note(self.engine.scene, ref),
-                                         companion=facts, foe=foes[0] if foes else None)
+                                         companion=facts, foe=foes[0] if foes else None,
+                                         unseen=unseen)
         # Stage 8's one named exception. A bestiary creature has no path, spellbook
         # or satchel, and its bite's poison lives in a stat block no locator reads
         # yet, so on its turn `damage` and `ability_damage` stay and the origin is
@@ -1404,7 +1421,7 @@ class GMAgent:
                                 # retry loop the schema exists to eliminate.
                                 schema=prompts.turn_schema(
                                     fighting=self.engine.scene.in_encounter,
-                                    refs=tuple(self.engine.scene.actors), ops=ops))
+                                    refs=aimable, ops=ops))
             attempts.append(Attempt("npc", reply.seconds, reply.model, reply.text))
             try:
                 data = reply.json()
@@ -2113,6 +2130,13 @@ class GMAgent:
         cast = " ".join(a.name for a in self.engine.scene.actors.values())
         text = narration_mod.strip_example_cast(text, f"{player_input} {cast}")
         if claims:
+            # The player hidden (rules/awareness.py) is a fact the engine holds, not a
+            # roll this beat made: "you stay unnoticed" reports it on every turn it is
+            # true, not only the turn the Stealth check was rolled. Before 2026-10-30 it
+            # was cut on all the turns after the check (intents.py's stealth row).
+            pc = self.engine.scene.pc()
+            if pc is not None and pc.has_state("state.hidden"):
+                backed = frozenset(backed or ()) | claims_held_by_hiding()
             text, claim_repairs, claim_attempts = self._repair_outcome_claims(
                 text, backed, restrained=self._anyone_held())
             repairs += claim_repairs
@@ -4561,6 +4585,14 @@ class GMAgent:
             if pairs:
                 aimed = planned.aimed_line(self.engine, outcomes)
                 at_you = bool(pc is not None and any(t == pc.ref for _a, t in pairs))
+            # And the player hidden from this creature (rules/awareness.py), said plainly
+            # as a fact of its turn: 3 of 3 live wind-ups at an invisible player were
+            # "aimed at your head" (2026-10-30). The read-back's `unseen` question is the
+            # check behind it.
+            unseen = planned.unseen_line(self.engine, acting)
+            if unseen:
+                aimed = f"{aimed} {unseen}".strip()
+                at_you = False if at_you is None else at_you
         reply = client.chat(
             prompts.call_two_messages(narration, tells, because, player_input,
                                       acting=acting, pc_name=pc.name if pc else "",

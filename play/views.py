@@ -5241,6 +5241,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
 
         engine = c.engine()
         agent.engine = engine
+        # The top of its turn: its reactive Perception against anybody hidden from it
+        # (rules/awareness.py) — rolled by the engine before the creature decides, so the
+        # turn's prompt, the fallback and the validator all read what it now knows. Only
+        # what it found is said.
+        for o in engine.turn_begins(ref):
+            if o.tell:
+                c.transcript.append({"who": "gm", "kind": "consequence",
+                                     "text": _plain_tells(c, [o])})
         # A companion hears what the player said to them (owner's ruling, 2026-10-01):
         # read off the transcript and the conversation log, never guessed (gm/companions).
         from gm import companions as companions_mod

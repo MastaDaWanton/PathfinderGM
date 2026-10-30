@@ -2083,6 +2083,26 @@ def default_npc_action(scene, ref: str) -> list[dict] | None:
     ]
     if not enemies:
         return None
+    # Only an enemy it can find (rules/awareness.py): an invisible player, or one hidden
+    # by Stealth it has not spotted, is not "someone in front of it". Measured
+    # 2026-10-30 (probe p2): this fallback picked the invisible player 4 of 4 rounds and
+    # walked straight to her square. With nobody to find it searches — "Intentionally
+    # searching for stimulus is a move action" (Perception, CRB p.102) — which is what a
+    # guard who has lost his quarry does, and the engine rolls it (`Engine._search`).
+    from rules import awareness
+
+    found = [r for r in enemies if awareness.locates(scene, actor, scene.actors[r])]
+    if not found and any(awareness.has_hunch(actor, scene.actors[r]) for r in enemies):
+        # It senses something close and not where: it swings into a square it guesses
+        # at, as the book lets it ("you can attack into a square that you think he
+        # occupies", CRB p.196). The engine's die picks the square.
+        return [{"op": "attack", "actor": ref, "params": {"guess": True},
+                 "because": "it senses something close by and swings at where it might be"}]
+    if not found:
+        return [{"op": "check", "actor": ref,
+                 "params": {"skill": "perception", "search": True},
+                 "because": "it has lost sight of its foe and looks for them"}]
+    enemies = found
 
     # The most hurt enemy still standing: a creature that has been fighting knows who is
     # nearly down.
