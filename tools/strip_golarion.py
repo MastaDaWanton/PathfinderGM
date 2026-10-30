@@ -16,15 +16,25 @@ feat, old lower-cased name) -> the id a save holding it reads now, null when the
 dropped. Those two files are the one place the old names are kept, for the same reason
 content/bestiary/aliases.json keeps the bestiary's: a save written before this must still
 load (docs/bestiary-licensing.md §7).
+
+Since 2026-10-30 it rewrites the bestiary too (`golarion_rewrites.apply_bestiary`):
+content/bestiary/core.json, creatures.json and mounts.json, in place. A renamed
+creature's old id goes into content/bestiary/aliases.json hashed (`bestiary.alias_key`),
+as that file keeps every id option D removed, so the old name sits in no shipped file;
+and every existing alias that landed on a renamed id is pointed at the new one, because
+`bestiary.alias_of` takes one hop. compiled.json is generated from the printed blocks:
+run tools/compile_bestiary.py after this.
 """
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(ROOT))
 
 import golarion_rewrites as gr  # noqa: E402
 
@@ -34,6 +44,10 @@ WEAPONS = ROOT / "content" / "weapons" / "weapons.json"
 PIECES = ROOT / "content" / "rules" / "base-pieces.json"
 MECHANICS = sorted((ROOT / "content" / "spells" / "mechanics").glob("part-*.json"))
 MACHINE = ROOT / "content" / "spells" / "spells-mechanics.json"
+BESTIARY = ROOT / "content" / "bestiary"
+# mounts.json is hand-written and laid out by hand, and names nothing to rewrite;
+# tests/test_no_golarion_names.py holds it there rather than this tool reflowing it.
+CREATURE_FILES = [BESTIARY / n for n in ("core.json", "creatures.json")]
 
 # This project's own sentences about a renamed spell that name what the spell's text no
 # longer does; matched exactly, like the table's edits.
@@ -135,6 +149,48 @@ def _mechanics_doc(sid: str, doc, rename):
     return gr._edit_row(gr._map_strings(doc, rename), MECHANICS_EDITS.get(sid, []))
 
 
+def _id_renamer(moved: dict):
+    """This project's notes cite spells by id ("Details of the sword come from
+    last-azlanti-s-defending-sword"). The name renamer reads names, so an old id in a
+    note outlived the rename until the 2026-10-30 review found it."""
+    olds = sorted((o for o, n in moved.items() if n), key=len, reverse=True)
+    if not olds:
+        return lambda s: s
+    pattern = re.compile(r"(?<![a-z0-9-])(" + "|".join(map(re.escape, olds))
+                         + r")(?![a-z0-9-])")
+    return lambda s: pattern.sub(lambda m: moved[m.group(1)], s)
+
+
+def _bestiary(check: bool, changed: list[str]) -> None:
+    """The creature files in place, and the bestiary's alias file."""
+    import os
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pathfindergm.settings")
+    from rules import bestiary
+
+    renames = gr.bestiary_aliases()
+    seen: set[str] = set()
+    for path in CREATURE_FILES:
+        data = _load(path)
+        seen |= {c.get("id") for c in data["creatures"]}
+        data["creatures"] = gr.apply_bestiary(data["creatures"])
+        if isinstance(data.get("aliases"), dict):       # core.json's own re-read aliases
+            data["aliases"] = {k: renames.get(v, v) for k, v in data["aliases"].items()}
+        _dump(path, data, check, changed)
+    stale = [old for old, _on, new, _n, _no in gr.CREATURE_RENAMES
+             if old not in seen and new not in seen]
+    if stale:
+        raise gr.StaleEdit(f"creatures neither shipped nor already renamed: {stale}")
+
+    path = BESTIARY / "aliases.json"
+    doc = _load(path)
+    table = {k: renames.get(v, v) for k, v in doc["aliases"].items()}
+    for old, new in renames.items():
+        table[bestiary.alias_key(old)] = new
+    doc["aliases"] = dict(sorted(table.items()))
+    _dump(path, doc, check, changed)
+
+
 def main() -> int:
     check = "--check" in sys.argv
     changed: list[str] = []
@@ -161,6 +217,9 @@ def main() -> int:
     _dump(PIECES, pieces, check, changed)
 
     moved = dict(spell_aliases)
+    rename_ids = _id_renamer(moved)
+    by_name = rename
+    rename = lambda s: rename_ids(by_name(s))      # noqa: E731
     for path in MECHANICS:
         data = _load(path)
         docs = {}
@@ -188,6 +247,8 @@ def main() -> int:
           _merge_aliases(SPELLS.parent / "aliases.json", spell_aliases), check, changed)
     _dump(FEATS.parent / "aliases.json",
           _merge_aliases(FEATS.parent / "aliases.json", feat_aliases), check, changed)
+
+    _bestiary(check, changed)
 
     print(("would change" if check else "changed") + f": {len(changed)} file(s)")
     for rel in changed:

@@ -7970,7 +7970,7 @@
    ],
    "description": "Your skill with handling cards and arcane talents allow you to turn mundane cards into deadly weapons.",
    "benefit": "You can throw a card as though it were a dart, with the same damage, range, and other features. You must use the Arcane Strike feat when throwing a card in this way, or else the card lacks the magical force and precision to deal lethal damage. A card is destroyed when thrown in this way. Fortune-telling cards are treated as masterwork weapons when thrown using this feat, but are still destroyed after they are thrown. A fortune-telling deck can no longer be used as a fortune-telling device after even a single card is thrown. A spellcaster with this feat can enhance a deck of cards as though it were a ranged weapon with 54 pieces of ammunition. This enhancement functions only when used in tandem with this feat, and has no affect on any other way the cards might be used. Only a character who possesses this feat can make use of an enhanced deck of cards, and must still use the Arcane Strike feat to activate the cards' enhancement.",
-   "normal": "An earth breaker is a two-handed weapon, preventing the use of a klar in one hand without imposing penalties for using the earth breaker one-handed. A klar can be used either as a one-handed weapon or a shield; it does not grant a bonus to AC during rounds in which it is used as a weapon.",
+   "normal": "An earth breaker is a two-handed weapon, preventing the use of a skull shield in one hand without imposing penalties for using the earth breaker one-handed. A skull shield can be used either as a one-handed weapon or a shield; it does not grant a bonus to AC during rounds in which it is used as a weapon.",
    "special": "This is a combat feat, and may be selected with class features that grant bonus combat feats.",
    "source": "Varisia",
    "race": "",
@@ -27662,7 +27662,7 @@
    "special": "",
    "source": "Qadira",
    "race": "",
-   "prerequisites_text": "Ride 3 ranks, Mounted Combat, Ride-By Attack, base attack bonus +1, affinity with a desert nation of horsemen",
+   "prerequisites_text": "Ride 3 ranks, Mounted Combat, Ride-By Attack, base attack bonus +1",
    "prerequisites": [
     {
      "kind": "skill_ranks",
@@ -27684,9 +27684,7 @@
      "value": 1
     }
    ],
-   "unparsed_prerequisites": [
-    "affinity with a desert nation of horsemen"
-   ],
+   "unparsed_prerequisites": [],
    "tags": [],
    "multiples": false,
    "goal": "",
@@ -29367,7 +29365,7 @@
     "general"
    ],
    "description": "You have seen the outer reaches of the multiverse, and have gleaned knowledge from these alien realms. You have a special affinity for one of these realms in particular, and carry some of that plane's power within you.",
-   "benefit": "Choose one of the planes below. The alignment of the plane must be within one step of your alignment. You gain a +2 bonus on saves against spells and spell-like abilities with the associated descriptor, and you cast spells with that descriptor at +1 caster level. Plane Alignment Descriptor Heaven LG Light the serene heavens NG Good the free heavens CG EmotionUM the city of law LN Lawful The court of the dead N Death The churning chaos CN Chaotic Hell LE PainUM the daemon wastes NE Evil The Abyss CE Fear",
+   "benefit": "Choose one of the planes below. The alignment of the plane must be within one step of your alignment. You gain a +2 bonus on saves against spells and spell-like abilities with the associated descriptor, and you cast spells with that descriptor at +1 caster level. Plane Alignment Descriptor Heaven LG Light the serene heavens NG Good the free heavens CG EmotionUM the city of law LN Lawful the court of the dead N Death the churning chaos CN Chaotic Hell LE PainUM the daemon wastes NE Evil The Abyss CE Fear",
    "normal": "",
    "special": "",
    "source": "Demon Hunter's Handbook",
@@ -39873,7 +39871,7 @@
     "general"
    ],
    "description": "Your many visits to a vast tapestry demiplane have made you an expert in long-distance travel.",
-   "benefit": "You cast spells of the teleportation subschool as though your caster level were 2 higher, and you treat yourself as one step more familiar when teleporting to an established Pathfinder lodge with the teleport spell. If you can teleport as a supernatural ability, you treat your class level as if it were 2 higher when calculating the total distance that you can travel with this ability.",
+   "benefit": "You cast spells of the teleportation subschool as though your caster level were 2 higher, and you treat yourself as one step more familiar when teleporting to an established adventurers' lodge with the teleport spell. If you can teleport as a supernatural ability, you treat your class level as if it were 2 higher when calculating the total distance that you can travel with this ability.",
    "normal": "",
    "special": "",
    "source": "Pathfinder Society Primer",
@@ -40612,13 +40610,13 @@
    "types": [
     "general"
    ],
-   "description": "You have mastered the ancient Thunder and Fang fighting style, allowing you to fight with increased effectiveness when wielding an earth breaker and klar.",
-   "benefit": "You can use an earth breaker as though it were a one-handed weapon. When using an earth breaker in one hand and a klar in your off hand, you retain the shield bonus your klar grants to your Armor Class even when you use it to attack. Treat your klar as a light weapon for the purposes of determining your two-weapon fighting penalty.",
-   "normal": "An earth breaker is a two-handed weapon, preventing the use of a klar in one hand without imposing penalties for using the earth breaker one-handed. A klar can be used either as a one-handed weapon or a shield; it does not grant a bonus to AC during rounds in which it is used as a weapon.",
+   "description": "You have mastered the ancient Thunder and Fang fighting style, allowing you to fight with increased effectiveness when wielding an earth breaker and skull shield.",
+   "benefit": "You can use an earth breaker as though it were a one-handed weapon. When using an earth breaker in one hand and a skull shield in your off hand, you retain the shield bonus your skull shield grants to your Armor Class even when you use it to attack. Treat your skull shield as a light weapon for the purposes of determining your two-weapon fighting penalty.",
+   "normal": "An earth breaker is a two-handed weapon, preventing the use of a skull shield in one hand without imposing penalties for using the earth breaker one-handed. A skull shield can be used either as a one-handed weapon or a shield; it does not grant a bonus to AC during rounds in which it is used as a weapon.",
    "special": "This is a combat feat, and may be selected with class features that grant bonus combat feats.",
    "source": "Varisia",
    "race": "",
-   "prerequisites_text": "Str 15, Two-Weapon Fighting, Weapon Focus (earth breaker), Weapon Focus (klar)",
+   "prerequisites_text": "Str 15, Two-Weapon Fighting, Weapon Focus (earth breaker), Weapon Focus (skull shield)",
    "prerequisites": [
     {
      "kind": "ability",
@@ -40638,7 +40636,7 @@
     {
      "kind": "feat",
      "feat": "weapon-focus",
-     "name": "Weapon Focus (klar)"
+     "name": "Weapon Focus (skull shield)"
     }
    ],
    "unparsed_prerequisites": [],

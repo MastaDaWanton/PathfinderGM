@@ -1926,7 +1926,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Ghost iron, the softest of the skymetals. An ghost skymetal head is always broken in the book, deals damage as a size smaller and cannot harm iron or steel, but passes through iron and steel armour as if it were not there; here it swings truer against a metal-armoured foe. Poor for armour, so it fills no armour piece.",
+   "text": "Ghost iron, the softest of the skymetals. A ghost skymetal head is always broken in the book, deals damage as a size smaller and cannot harm iron or steel, but passes through iron and steel armour as if it were not there; here it swings truer against a metal-armoured foe. Poor for armour, so it fills no armour piece.",
    "risky": false,
    "source": "mined",
    "biomes": [

@@ -8227,8 +8227,8 @@
    }
   },
   {
-   "id": "kasatha-spinal-sword",
-   "name": "Kasatha spinal sword",
+   "id": "spinal-sword",
+   "name": "Spinal sword",
    "prof": "exotic",
    "section": "Light Weapons",
    "category": "melee",
@@ -8512,8 +8512,8 @@
    }
   },
   {
-   "id": "klar",
-   "name": "Klar",
+   "id": "skull-shield",
+   "name": "Skull shield",
    "prof": "martial",
    "section": "One-Handed Weapons",
    "category": "melee",

@@ -127,19 +127,36 @@ GOLARION = {
     ],
     "character": """
         Tar-Baphon Karzoug Runelord Runelords Sorshen Alaznist Krune Belimarius Zutha
-        Kazavon Mengkare Ileosa Abrogail Thrune Choral Elvanna Jatembe Khemet Janhelia
+        Kazavon Mengkare Ileosa Abrogail Thrune Elvanna Jatembe Khemet Janhelia
         Echean Deivon Kreighton Petresky Kortash Khain Artokus Kirran Ithuna Vardsdottir
         Petulengro Shaine Stigur Anelda Sonnorae Vyushbaro Zykomso Seelah Sajan Merisiel Valeros
         Kyra Harsk Lini Ezren Seoni Amiri Alahazra Damiel Feiya Imrijka Lirianne Seltyiel
         Jirelle Hayato Meligaster Reiko Rivani Zadim Oloch Balazar Shardra Enora Mavaro
     """,
+    # "Choral the Conqueror", the dragon, and not the bare word: Bestiary 6's choral is a
+    # kind of angel that sings in choirs, and was the one hit left when the bestiary was
+    # first scanned (2026-10-30).
     "character phrase": [
         "Aram Zey", "Hao Jin", "Whispering Tyrant", "Old-Mage", "Urion", "Xin",
-        "Lem", "Quinn", "Crowe", "Yoon",
+        "Lem", "Quinn", "Crowe", "Yoon", "Choral the Conqueror",
     ],
     "calendar": """
         Abadius Calistril Pharast Gozran Desnus Sarenith Erastus Arodus Rova Lamashan
         Neth Kuthona Toilday Wealday Oathday Fireday Starday
+    """,
+    # The second sweep, 2026-10-30: the named things in the Bestiary 6 demigods' blocks
+    # (their weapons and artifacts, Mammon's silver body, Black Butterfly's titled
+    # ability), the three unique kaiju, and a Villain Codex artifact. Found by a discovery
+    # pass over the bestiary's capitalised words, read by hand against d20pfsrd's blocks.
+    "item": """
+        Goreletch Ramithaine Eyjatas Voidsedge Visineir
+    """,
+    "item phrase": [
+        "Eclipsing Eye", "Lamentation of the Faithless", "Usher of the Black Rain",
+        "Horn of Lies", "Argent Prince", "Book of the Black Sphynx", "Silence Between",
+    ],
+    "character kaiju": """
+        Varklops Vorgozen Yarthoon
     """,
     # Golarion's coined metals: the skymetals of Numeria and the steel named for Nex. Both
     # cases, because a material's id and its prose are lower-case (renamed 2026-10-30).
@@ -157,8 +174,12 @@ MYTH = {
         Moloch Belial Baalzebul Dispater Geryon Barbatos Abraxas Haagenti Shax Hastur
         Azathoth Cthulhu Nyarlathotep Yog-Sothoth Shub-Niggurath Erebus Abaddon Abaddonian
         Apollyon Charon Ahriman Cernunnos Apsu Dahak Leng Carcosa Styx
+        Yig Rhan-Tegoth Tindalos
+        Avernus Phlegethon Stygia Malebolge Cocytus Caina Nessus
     """,
-    "myth phrase": ["Baba Yaga", "Sun Wukong"],
+    # Tawil at'Umr is Lovecraft and Price's; Hell's layers are Virgil's, Dante's and
+    # Milton's (Dis, the second, is left off: a bare "Dis" is a prefix in running text).
+    "myth phrase": ["Baba Yaga", "Sun Wukong", "Tawil at'Umr"],
 }
 
 # Paizo product titles quoted in rules text — a citation of a trademark, not lore.
@@ -170,8 +191,12 @@ PRODUCT = [
     r"Archives of Nethys", r"Pathfinder Society (?:FAQ|Roleplaying Guild)",
 ]
 
-# Paizo's names for its planes, some of them ordinary words Golarion made places. Reported
-# on their own line. The owner had them rewritten on 2026-10-30, and
+# The names Golarion gives its planes. Not Paizo's coinages: Elysium is Greek myth,
+# Nirvana Buddhist, the Akashic Record Theosophy's, and the Boneyard, the Maelstrom, Axis,
+# the First World and the Great Beyond are English words Golarion uses as plane names.
+# Reported on their own line. The owner had them rewritten on 2026-10-30 for consistency,
+# so the game names its planes one way, not because each is protected; do not extend
+# this list on the premise that a plane's name is Paizo's.
 # tests/test_no_golarion_names.py holds them at zero with the rest.
 COSMOLOGY = ["Boneyard", "Maelstrom", "Great Beyond", "First World", "Akashic", "Elysium",
              "Elysian", "Nirvana", "Axis", "River of Souls"]
@@ -190,6 +215,33 @@ def _terms(table: dict) -> dict[str, str]:
 TERMS = _terms(GOLARION)
 TERMS.update({n: "myth" for n in _terms(MYTH)})
 CLASS_OF = TERMS
+
+# Names matched in any case. The list above is case-sensitive so an ordinary word
+# capitalised at a sentence start is never a hit, and that let four kinds of name through
+# (review, 2026-10-30): the Society as a bare "Pathfinder" ("invaluable to a Pathfinder
+# who must make a snap decision", "an established Pathfinder lodge"); Thassilon's
+# "runelords" written lower-case; a weapon named lower-case in the feats ("an earth breaker
+# and klar") and the kasatha's spinal sword; and an old id quoted in this project's own
+# notes ("come from last-azlanti-s-defending-sword"), which a hyphen hid from the word
+# boundaries. So these match on letter boundaries alone, and a product title
+# ("Pathfinder Roleplaying Game", "Pathfinder Society Scenario") still wins its words —
+# that is a citation of the line, not the Society.
+CASELESS = {
+    "runelord": "character", "runelords": "character",
+    "klar": "item", "kasatha": "people", "azlanti": "people", "shoanti": "people",
+    "thassilonian": "people",
+}
+# The Society, by the shapes the Society takes: a person ("a Pathfinder who must", "fellow
+# Pathfinders") or one of its things ("a Pathfinder lodge"). Not the bare word, which is
+# the game itself in this project's own notes ("a 3.5 skill Pathfinder folded into
+# Perception", "Pathfinder Unchained", "Original writing for Pathfinder GM") — a caseless
+# bare "pathfinder" was tried first and flagged eighteen of those.
+SOCIETY_RE = re.compile(
+    r"(?<![A-Za-z])(?:(?:an?|the|fellow|every|each|any|young|veteran|seasoned)\s+"
+    r"pathfinders?(?![A-Za-z:])|pathfinders(?![A-Za-z])|pathfinder(?:'s)?\s+(?:lodges?|society"
+    r"|chronicles?|agents?|wayfinders?)(?![A-Za-z]))", re.IGNORECASE)
+CASELESS_RE = re.compile(r"(?<![A-Za-z])(" + "|".join(sorted(CASELESS, key=len, reverse=True))
+                         + r")(?![A-Za-z])", re.IGNORECASE)
 
 
 def _pattern(names) -> re.Pattern:
@@ -214,6 +266,8 @@ _ID_UNSAFE = {"lem", "kho", "xin", "nex", "geb", "orv", "eox", "tien", "tian", "
               "kyra", "lini", "brigh", "kols", "trudd", "leng", "shax", "charon", "arcadia",
               "the-eldest", "the-shackles", "urion", "starday", "fireday"}
 ID_SLUGS = {s: n for n in TERMS for s in [_slug(n)] if len(s) > 2 and s not in _ID_UNSAFE}
+# The caseless names in ids too ("kasatha-spinal-sword", "klar"), by their own spelling.
+ID_SLUGS.update({s: s for s in CASELESS})
 ID_RE = re.compile(r"(?:^|-)(" + "|".join(sorted(map(re.escape, ID_SLUGS), key=len,
                                                  reverse=True)) + r")(?:-s)?(?=-|$)")
 
@@ -303,14 +357,23 @@ def family(source: str) -> str:
 BOOK_FILES = {
     "content/spells/spells.json": "spells",
     "content/feats/feats.json": "feats",
+    # The bestiary, scanned since 2026-10-30. It was skipped here ("measured on its own in
+    # tools/bestiary_provenance.py"), which measured sources, not names — and so the
+    # rebuild that grew core.json to 1,417 printed blocks brought back 100 rows naming
+    # Golarion's gods and planes, 444 mentions, with this scan reporting zero.
+    "content/bestiary/core.json": "creatures",
+    "content/bestiary/creatures.json": "creatures",
+    "content/bestiary/mounts.json": "creatures",
 }
-SKIP_DIRS = {"bestiary"}  # measured on its own in tools/bestiary_provenance.py
-# `aliases.json` files are skipped too: old id -> new id, kept so a save written before a
+SKIP_DIRS: set[str] = set()
+# `aliases.json` files are skipped: old id -> new id, kept so a save written before a
 # rename still loads (tools/strip_golarion.py). They are the one sanctioned home of the
-# old names, as content/bestiary/aliases.json is for the bestiary's.
+# old names; content/bestiary/aliases.json keeps its keys hashed, so not even there.
 # This project's typed mechanics for the imported rows, keyed by the rows' ids and quoting
-# their prose: not separate content, but a copy any rename or drop has to follow.
-DERIVED = re.compile(r"^content/(spells/mechanics/|spells/spells-mechanics|feats/mechanics/)")
+# their prose: not separate content, but a copy any rename or drop has to follow. The
+# compiled bestiary is the printed blocks' attacks and gear, generated from them.
+DERIVED = re.compile(r"^content/(spells/mechanics/|spells/spells-mechanics|feats/mechanics/"
+                     r"|bestiary/compiled)")
 
 # --- scanning ----------------------------------------------------------------------------------
 
@@ -331,9 +394,18 @@ def scan_text(text: str):
     titles = [(m.start(), m.end()) for m in PRODUCT_RE.finditer(text)]
     for a, b in titles:
         yield text[a:b], "product", a, b
+    named = []
     for m in NAME_RE.finditer(text):
         if not any(a <= m.start() < b for a, b in titles):
+            named.append((m.start(), m.end()))
             yield m.group(1), CLASS_OF[m.group(1)], m.start(), m.end()
+    for m in CASELESS_RE.finditer(text):
+        if not any(a <= m.start() < b for a, b in titles + named):
+            yield m.group(1), CASELESS[m.group(1).lower()], m.start(), m.end()
+    for m in SOCIETY_RE.finditer(text):
+        # Overlap, not containment: "the Pathfinder Society FAQ" starts before its title.
+        if not any(a < m.end() and m.start() < b for a, b in titles + named):
+            yield "Pathfinder", "organisation", m.start(), m.end()
     for m in COSMOLOGY_RE.finditer(text):
         yield m.group(1), "cosmology", m.start(), m.end()
 
@@ -415,7 +487,8 @@ def measure():
 
 # --- report ------------------------------------------------------------------------------------
 
-LORE = {"deity", "place", "people", "organisation", "character", "calendar", "material"}
+LORE = {"deity", "place", "people", "organisation", "character", "calendar", "material",
+        "item"}
 
 # Columns that are lists and gates rather than prose: the spells' "which god grants this"
 # and "which bloodline gets it" columns, and the feats' prerequisites. A name only here
@@ -472,7 +545,7 @@ def main() -> int:
         for cls, term in {(h.cls, h.term.removesuffix("'s")) for h in hits}:
             by_class[cls][term] += 1
     for cls in ["deity", "place", "people", "organisation", "character", "calendar",
-                "myth", "product", "cosmology"]:
+                "material", "item", "myth", "product", "cosmology"]:
         c = by_class.get(cls)
         if c:
             top = ", ".join(f"{t} {n}" for t, n in c.most_common(10))

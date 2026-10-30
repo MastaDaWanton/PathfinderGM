@@ -218,6 +218,7 @@ worse than none — somebody builds a thing that shipped a month ago.** Last rea
 | 8 | **Where the water is** | **new, and now the sharpest.** See below |
 | 9 | A vocabulary for versatile and lucky | **this side's**, listed so it is not lost |
 | 13 | Each nation's coin | **new, 2026-10-17.** Names only, no numbers. See below |
+| 14 | No Pathfinder setting terms in world prose | **new, 2026-10-30.** Aurvantis says "the First World" twice. See below |
 
 ## 7. `play.names[]` — naming material (built; needs back-filling)
 
@@ -922,6 +923,43 @@ above is needed either way.
 
 **Done when** both shipped worlds carry `coinage[]` for every nation that has a town.
 
+---
+
+## 14. No Pathfinder setting terms in world prose
+
+**Why.** This app took Paizo's setting names out of everything it ships (2026-10-29 and
+2026-10-30, `docs/bestiary-licensing.md` §7): Golarion's gods, places, peoples and
+organisations, the myth names it adopted, and the names it uses for its planes. The plane
+of the fey is "the fey realm" in every spell, feat and stat block here now. The export
+still says the old word: `fixtures/aurvantis-campaign.json` has "the First World" twice,
+in the world's `Reality` fact ("Material world and the First World sit close together")
+and in a cosmology paragraph ("The First World, home of the fey, sits close enough to
+Aurvantis…"). The narrator reads both, so the game says one name for the plane in its
+rules and another in its world.
+
+"First World" is not Paizo's property as words — the owner chose to rename the plane names
+for consistency, not because each is protected — so this is a request for the world to
+name its own planes, not a licence rule.
+
+**Shape.** No new field. In any prose the export carries (facts, cosmology, places,
+cards), name the world's planes in the world's own words or plainly ("the fey realm",
+"the realm of the dead"), and avoid the names the Pathfinder setting gives its planes:
+the First World, the Boneyard, the Maelstrom, Axis, Elysium, Nirvana, Abaddon, the Great
+Beyond, the River of Souls, the Akashic Record — and every Golarion god, nation or people.
+A model given freedom writes them because its training saw Pathfinder; detect them
+mechanically (the deny-list in this repo's `tools/content_provenance.py` is a usable
+starting list) and repair the sentence with a targeted call, rather than instructing the
+model not to.
+
+Not affected: a person's given name that happens to be an English word. Aurvantis's
+name pools hold "Maelstrom" nine times as a given name, which is the world's own choice.
+
+**What Pathfinder GM does without it.** Reads the prose as it is. Nothing here rewrites a
+world's text, and nothing should: the world is the author.
+
+**Done when** a scan of both shipped exports with the deny-list finds no Pathfinder plane,
+god or place name outside a person's given name.
+
 # Known gaps — not asks yet, but on the list
 
 These are documented in `docs/from-world-bible.md` and Pathfinder GM codes defensively
@@ -966,6 +1004,8 @@ A short list, because each of these would cost a rework rather than a fix.
 6. **Do not design places as discovery-only or authored-only.** Both routes are permanent
    and that is a settled decision.
 7. **Do not have a model author a scheme, ever.**
+8. **Do not let Pathfinder's setting names into world prose** (ask 14): no "First World",
+   no Golarion god, place or people.
 
 ---
 

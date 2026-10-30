@@ -19,16 +19,16 @@ Of 103 tagged poisonous bodies, 77 print a poison paragraph and 74 parse to a sa
 
 | Hide | Block | Name |
 |---|---|---|
-| angelskin | `arshea` | Arshea |
 | angelskin | `astral-deva` | Astral Deva |
 | angelskin | `balisse` | Balisse |
 | angelskin | `cassisian` | Cassisian |
 | angelskin | `choral` | Choral |
+| angelskin | `empyreal-lord-of-abandon` | Empyreal Lord of Abandon |
+| angelskin | `empyreal-lord-of-vengeance` | Empyreal Lord of Vengeance |
 | angelskin | `empyrean` | Empyrean |
 | angelskin | `monadic-deva` | Monadic Deva |
 | angelskin | `movanic-deva` | Movanic Deva |
 | angelskin | `planetar` | Planetar |
-| angelskin | `ragathiel` | Ragathiel |
 | angelskin | `solar` | Solar |
 | ankheg-shell-leather | `ankheg` | Ankheg |
 | basilisk-hide | `basilisk` | Basilisk |
@@ -383,7 +383,7 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | cat-fur | `leopard` | Leopard |
 | cat-fur | `lion` | Lion |
 | cat-fur | `mountain-lion` | Mountain Lion |
-| cellar-spider | `leng-spider` | Leng Spider |
+| cellar-spider | `dreamland-spider` | Dreamland Spider |
 | cellar-spider | `phase-spider` | Phase Spider |
 | cellar-spider | `spider-eater` | Spider Eater |
 | cellar-spider | `spider-giant` | Giant Spider |
@@ -527,19 +527,19 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 |---|---|---|
 | anarchic-essence | `abrikandilu` | Abrikandilu |
 | anarchic-essence | `augnagar` | Augnagar |
+| anarchic-essence | `avatar-of-the-outer-god` | Avatar of the Outer God |
 | anarchic-essence | `azuretzi` | Azuretzi |
 | anarchic-essence | `babau` | Babau |
 | anarchic-essence | `balor` | Balor |
 | anarchic-essence | `baregara` | Baregara |
 | anarchic-essence | `bebilith` | Bebilith |
 | anarchic-essence | `behimiron` | Behimiron |
-| anarchic-essence | `black-butterfly` | Black Butterfly |
 | anarchic-essence | `bralani` | Bralani |
 | anarchic-essence | `brimorak` | Brimorak |
 | anarchic-essence | `cambion` | Cambion |
 | anarchic-essence | `cataboligne` | Cataboligne |
+| anarchic-essence | `celestial-titan` | Celestial Titan |
 | anarchic-essence | `chaos-beast` | Chaos Beast |
-| anarchic-essence | `chavazvug` | Chavazvug |
 | anarchic-essence | `chernobue` | Chernobue |
 | anarchic-essence | `coloxus` | Coloxus |
 | anarchic-essence | `cythnigot` | Cythnigot |
@@ -549,7 +549,7 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | anarchic-essence | `demodand-stringy` | Stringy Demodand |
 | anarchic-essence | `demodand-tarry` | Tarry Demodand |
 | anarchic-essence | `dretch` | Dretch |
-| anarchic-essence | `elysian` | Elysian |
+| anarchic-essence | `empyreal-lord-of-silence` | Empyreal Lord of Silence |
 | anarchic-essence | `gancanagh` | Gancanagh |
 | anarchic-essence | `ghaele` | Ghaele |
 | anarchic-essence | `glabrezu` | Glabrezu |
@@ -574,11 +574,13 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | anarchic-essence | `nalfeshnee` | Nalfeshnee |
 | anarchic-essence | `naunet` | Naunet |
 | anarchic-essence | `nyogoth` | Nyogoth |
-| anarchic-essence | `oaur-ooung` | Oaur-ooung |
 | anarchic-essence | `omox` | Omox |
 | anarchic-essence | `oolioddroo` | Oolioddroo |
 | anarchic-essence | `oshageros` | Oshageros |
 | anarchic-essence | `ourdivar` | Ourdivar |
+| anarchic-essence | `qlippoth-lord-of-acid` | Qlippoth Lord of Acid |
+| anarchic-essence | `qlippoth-lord-of-fever` | Qlippoth Lord of Fever |
+| anarchic-essence | `qlippoth-lord-of-spawn` | Qlippoth Lord of Spawn |
 | anarchic-essence | `quasit` | Quasit |
 | anarchic-essence | `raelis` | Raelis |
 | anarchic-essence | `schir` | Schir |
@@ -586,10 +588,8 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | anarchic-essence | `shemhazian` | Shemhazian |
 | anarchic-essence | `shoggti` | Shoggti |
 | anarchic-essence | `succubus` | Succubus |
-| anarchic-essence | `tawil-at-umr` | Tawil At'umr |
 | anarchic-essence | `thanatotic` | Thanatotic |
 | anarchic-essence | `thulgant` | Thulgant |
-| anarchic-essence | `thuskchoon` | Thuskchoon |
 | anarchic-essence | `uinuja` | Uinuja |
 | anarchic-essence | `utukku` | Utukku |
 | anarchic-essence | `vavakia` | Vavakia |
@@ -603,16 +603,16 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | anarchic-essence | `xacarba` | Xacarba |
 | anarchic-essence | `yaenit` | Yaenit |
 | anarchic-essence | `yamah` | Yamah |
-| angel-feather | `arshea` | Arshea |
 | angel-feather | `astral-deva` | Astral Deva |
 | angel-feather | `balisse` | Balisse |
 | angel-feather | `cassisian` | Cassisian |
 | angel-feather | `choral` | Choral |
+| angel-feather | `empyreal-lord-of-abandon` | Empyreal Lord of Abandon |
+| angel-feather | `empyreal-lord-of-vengeance` | Empyreal Lord of Vengeance |
 | angel-feather | `empyrean` | Empyrean |
 | angel-feather | `monadic-deva` | Monadic Deva |
 | angel-feather | `movanic-deva` | Movanic Deva |
 | angel-feather | `planetar` | Planetar |
-| angel-feather | `ragathiel` | Ragathiel |
 | angel-feather | `solar` | Solar |
 | axiomatic-essence | `achaierai` | Achaierai |
 | axiomatic-essence | `adhukait` | Adhukait |
@@ -620,6 +620,14 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | axiomatic-essence | `apkallu` | Apkallu |
 | axiomatic-essence | `apostate-devil` | Apostate Devil |
 | axiomatic-essence | `arbiter` | Arbiter |
+| axiomatic-essence | `archdevil-of-contracts` | Archdevil of Contracts |
+| axiomatic-essence | `archdevil-of-desire` | Archdevil of Desire |
+| axiomatic-essence | `archdevil-of-flies` | Archdevil of Flies |
+| axiomatic-essence | `archdevil-of-gates` | Archdevil of Gates |
+| axiomatic-essence | `archdevil-of-greed` | Archdevil of Greed |
+| axiomatic-essence | `archdevil-of-heresy` | Archdevil of Heresy |
+| axiomatic-essence | `archdevil-of-iron` | Archdevil of Iron |
+| axiomatic-essence | `archdevil-of-sacrifice` | Archdevil of Sacrifice |
 | axiomatic-essence | `archon-gate` | Gate Archon |
 | axiomatic-essence | `archon-harbinger` | Harbinger Archon |
 | axiomatic-essence | `archon-hound` | Hound Archon |
@@ -629,22 +637,18 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | axiomatic-essence | `asurendra` | Asurendra |
 | axiomatic-essence | `augur` | Augur |
 | axiomatic-essence | `axiomite` | Axiomite |
-| axiomatic-essence | `baalzebul` | Baalzebul |
-| axiomatic-essence | `barbatos` | Barbatos |
 | axiomatic-essence | `barbed-devil` | Barbed Devil |
 | axiomatic-essence | `barghest` | Barghest |
 | axiomatic-essence | `barghest-greater` | Greater Barghest |
 | axiomatic-essence | `bearded-devil` | Bearded Devil |
-| axiomatic-essence | `belial` | Belial |
 | axiomatic-essence | `bone-devil` | Bone Devil |
 | axiomatic-essence | `cerberi` | Cerberi |
 | axiomatic-essence | `danava` | Danava |
 | axiomatic-essence | `devil-contract` | Contract Devil |
-| axiomatic-essence | `dispater` | Dispater |
+| axiomatic-essence | `empyreal-lord-of-vengeance` | Empyreal Lord of Vengeance |
 | axiomatic-essence | `eremite` | Eremite |
 | axiomatic-essence | `erinyes` | Erinyes |
 | axiomatic-essence | `exscinder` | Exscinder |
-| axiomatic-essence | `geryon` | Geryon |
 | axiomatic-essence | `hell-hound` | Hell Hound |
 | axiomatic-essence | `hellcat` | Hellcat |
 | axiomatic-essence | `heresy-devil` | Heresy Devil |
@@ -657,14 +661,10 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | axiomatic-essence | `lemure` | Lemure |
 | axiomatic-essence | `lhaksharut` | Lhaksharut |
 | axiomatic-essence | `maharishi-manu` | Maharishi Manu |
-| axiomatic-essence | `mammon` | Mammon |
 | axiomatic-essence | `manu` | Manu |
 | axiomatic-essence | `marut` | Marut |
-| axiomatic-essence | `mephistopheles` | Mephistopheles |
-| axiomatic-essence | `moloch` | Moloch |
 | axiomatic-essence | `nessian-warhound` | Nessian Warhound |
 | axiomatic-essence | `pit-fiend` | Pit Fiend |
-| axiomatic-essence | `ragathiel` | Ragathiel |
 | axiomatic-essence | `rishi-manu` | Rishi Manu |
 | axiomatic-essence | `shield-archon` | Shield Archon |
 | axiomatic-essence | `shinigami` | Shinigami |
@@ -682,11 +682,9 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | celestial-tears | `archon-lantern` | Lantern Archon |
 | celestial-tears | `archon-legion` | Legion Archon |
 | celestial-tears | `archon-trumpet` | Trumpet Archon |
-| celestial-tears | `arshea` | Arshea |
 | celestial-tears | `astral-deva` | Astral Deva |
 | celestial-tears | `avoral` | Avoral |
 | celestial-tears | `balisse` | Balisse |
-| celestial-tears | `black-butterfly` | Black Butterfly |
 | celestial-tears | `bralani` | Bralani |
 | celestial-tears | `brijidine` | Brijidine |
 | celestial-tears | `cassisian` | Cassisian |
@@ -694,6 +692,9 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | celestial-tears | `cetaceal` | Cetaceal |
 | celestial-tears | `choral` | Choral |
 | celestial-tears | `draconal` | Draconal |
+| celestial-tears | `empyreal-lord-of-abandon` | Empyreal Lord of Abandon |
+| celestial-tears | `empyreal-lord-of-silence` | Empyreal Lord of Silence |
+| celestial-tears | `empyreal-lord-of-vengeance` | Empyreal Lord of Vengeance |
 | celestial-tears | `empyrean` | Empyrean |
 | celestial-tears | `exscinder` | Exscinder |
 | celestial-tears | `gancanagh` | Gancanagh |
@@ -705,7 +706,6 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | celestial-tears | `movanic-deva` | Movanic Deva |
 | celestial-tears | `planetar` | Planetar |
 | celestial-tears | `raelis` | Raelis |
-| celestial-tears | `ragathiel` | Ragathiel |
 | celestial-tears | `reptial` | Reptial |
 | celestial-tears | `shield-archon` | Shield Archon |
 | celestial-tears | `silvanshee` | Silvanshee |
@@ -801,34 +801,39 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | dragon-scale-catalyst | `young-underworld-dragon` | Young Underworld Dragon |
 | dragon-scale-catalyst | `young-white-dragon` | Young White Dragon |
 | fiend-ash | `abrikandilu` | Abrikandilu |
-| fiend-ash | `apollyon` | Apollyon |
 | fiend-ash | `apostate-devil` | Apostate Devil |
+| fiend-ash | `archdevil-of-contracts` | Archdevil of Contracts |
+| fiend-ash | `archdevil-of-desire` | Archdevil of Desire |
+| fiend-ash | `archdevil-of-flies` | Archdevil of Flies |
+| fiend-ash | `archdevil-of-greed` | Archdevil of Greed |
+| fiend-ash | `archdevil-of-heresy` | Archdevil of Heresy |
+| fiend-ash | `archdevil-of-iron` | Archdevil of Iron |
+| fiend-ash | `archdevil-of-sacrifice` | Archdevil of Sacrifice |
 | fiend-ash | `astradaemon` | Astradaemon |
-| fiend-ash | `baalzebul` | Baalzebul |
 | fiend-ash | `babau` | Babau |
 | fiend-ash | `balor` | Balor |
 | fiend-ash | `barbed-devil` | Barbed Devil |
 | fiend-ash | `bearded-devil` | Bearded Devil |
-| fiend-ash | `belial` | Belial |
 | fiend-ash | `bone-devil` | Bone Devil |
 | fiend-ash | `brimorak` | Brimorak |
 | fiend-ash | `cacodaemon` | Cacodaemon |
 | fiend-ash | `cambion` | Cambion |
 | fiend-ash | `ceustodaemon` | Ceustodaemon |
-| fiend-ash | `charon` | Charon |
 | fiend-ash | `coloxus` | Coloxus |
 | fiend-ash | `crucidaemon` | Crucidaemon |
 | fiend-ash | `derghodaemon` | Derghodaemon |
 | fiend-ash | `devil-contract` | Contract Devil |
-| fiend-ash | `dispater` | Dispater |
 | fiend-ash | `dretch` | Dretch |
 | fiend-ash | `erinyes` | Erinyes |
 | fiend-ash | `erodaemon` | Erodaemon |
-| fiend-ash | `geryon` | Geryon |
 | fiend-ash | `glabrezu` | Glabrezu |
 | fiend-ash | `heresy-devil` | Heresy Devil |
 | fiend-ash | `hezrou` | Hezrou |
 | fiend-ash | `horned-devil` | Horned Devil |
+| fiend-ash | `horseman-of-death` | Horseman of Death |
+| fiend-ash | `horseman-of-famine` | Horseman of Famine |
+| fiend-ash | `horseman-of-pestilence` | Horseman of Pestilence |
+| fiend-ash | `horseman-of-war` | Horseman of War |
 | fiend-ash | `hydrodaemon` | Hydrodaemon |
 | fiend-ash | `ice-devil` | Ice Devil |
 | fiend-ash | `immolation-devil` | Immolation Devil |
@@ -839,11 +844,8 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | fiend-ash | `lemure` | Lemure |
 | fiend-ash | `leukodaemon` | Leukodaemon |
 | fiend-ash | `lilitu` | Lilitu |
-| fiend-ash | `mammon` | Mammon |
 | fiend-ash | `marilith` | Marilith |
 | fiend-ash | `meladaemon` | Meladaemon |
-| fiend-ash | `mephistopheles` | Mephistopheles |
-| fiend-ash | `moloch` | Moloch |
 | fiend-ash | `nalfeshnee` | Nalfeshnee |
 | fiend-ash | `obcisidaemon` | Obcisidaemon |
 | fiend-ash | `olethrodaemon` | Olethrodaemon |
@@ -859,9 +861,7 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | fiend-ash | `shemhazian` | Shemhazian |
 | fiend-ash | `succubus` | Succubus |
 | fiend-ash | `suspiridaemon` | Suspiridaemon |
-| fiend-ash | `szuriel` | Szuriel |
 | fiend-ash | `temerdaemon` | Temerdaemon |
-| fiend-ash | `trelmarixian` | Trelmarixian |
 | fiend-ash | `vavakia` | Vavakia |
 | fiend-ash | `venedaemon` | Venedaemon |
 | fiend-ash | `vermlek` | Vermlek |
@@ -882,18 +882,19 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | holy-essence | `archon-lantern` | Lantern Archon |
 | holy-essence | `archon-legion` | Legion Archon |
 | holy-essence | `archon-trumpet` | Trumpet Archon |
-| holy-essence | `arshea` | Arshea |
 | holy-essence | `astral-deva` | Astral Deva |
 | holy-essence | `avoral` | Avoral |
 | holy-essence | `balisse` | Balisse |
-| holy-essence | `black-butterfly` | Black Butterfly |
 | holy-essence | `bralani` | Bralani |
 | holy-essence | `cassisian` | Cassisian |
+| holy-essence | `celestial-titan` | Celestial Titan |
 | holy-essence | `cervinal` | Cervinal |
 | holy-essence | `cetaceal` | Cetaceal |
 | holy-essence | `choral` | Choral |
 | holy-essence | `draconal` | Draconal |
-| holy-essence | `elysian` | Elysian |
+| holy-essence | `empyreal-lord-of-abandon` | Empyreal Lord of Abandon |
+| holy-essence | `empyreal-lord-of-silence` | Empyreal Lord of Silence |
+| holy-essence | `empyreal-lord-of-vengeance` | Empyreal Lord of Vengeance |
 | holy-essence | `empyrean` | Empyrean |
 | holy-essence | `exscinder` | Exscinder |
 | holy-essence | `foo-dog` | Foo Dog |
@@ -910,7 +911,6 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | holy-essence | `movanic-deva` | Movanic Deva |
 | holy-essence | `planetar` | Planetar |
 | holy-essence | `raelis` | Raelis |
-| holy-essence | `ragathiel` | Ragathiel |
 | holy-essence | `reptial` | Reptial |
 | holy-essence | `rishi-manu` | Rishi Manu |
 | holy-essence | `shield-archon` | Shield Archon |
@@ -934,16 +934,21 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `aghasura` | Aghasura |
 | unholy-essence | `akvan` | Akvan |
 | unholy-essence | `apocalypse-horse` | Apocalypse Horse |
-| unholy-essence | `apollyon` | Apollyon |
 | unholy-essence | `apostate-devil` | Apostate Devil |
+| unholy-essence | `archdevil-of-contracts` | Archdevil of Contracts |
+| unholy-essence | `archdevil-of-desire` | Archdevil of Desire |
+| unholy-essence | `archdevil-of-flies` | Archdevil of Flies |
+| unholy-essence | `archdevil-of-gates` | Archdevil of Gates |
+| unholy-essence | `archdevil-of-greed` | Archdevil of Greed |
+| unholy-essence | `archdevil-of-heresy` | Archdevil of Heresy |
+| unholy-essence | `archdevil-of-iron` | Archdevil of Iron |
+| unholy-essence | `archdevil-of-sacrifice` | Archdevil of Sacrifice |
 | unholy-essence | `astradaemon` | Astradaemon |
 | unholy-essence | `asurendra` | Asurendra |
 | unholy-essence | `augnagar` | Augnagar |
 | unholy-essence | `augur` | Augur |
-| unholy-essence | `baalzebul` | Baalzebul |
 | unholy-essence | `babau` | Babau |
 | unholy-essence | `balor` | Balor |
-| unholy-essence | `barbatos` | Barbatos |
 | unholy-essence | `barbed-devil` | Barbed Devil |
 | unholy-essence | `baregara` | Baregara |
 | unholy-essence | `barghest` | Barghest |
@@ -951,7 +956,6 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `bearded-devil` | Bearded Devil |
 | unholy-essence | `bebilith` | Bebilith |
 | unholy-essence | `behimiron` | Behimiron |
-| unholy-essence | `belial` | Belial |
 | unholy-essence | `belker` | Belker |
 | unholy-essence | `bone-devil` | Bone Devil |
 | unholy-essence | `brimorak` | Brimorak |
@@ -961,8 +965,6 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `cauchemar` | Cauchemar |
 | unholy-essence | `cerberi` | Cerberi |
 | unholy-essence | `ceustodaemon` | Ceustodaemon |
-| unholy-essence | `charon` | Charon |
-| unholy-essence | `chavazvug` | Chavazvug |
 | unholy-essence | `chernobue` | Chernobue |
 | unholy-essence | `coloxus` | Coloxus |
 | unholy-essence | `crucidaemon` | Crucidaemon |
@@ -974,14 +976,12 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `demodand-tarry` | Tarry Demodand |
 | unholy-essence | `derghodaemon` | Derghodaemon |
 | unholy-essence | `devil-contract` | Contract Devil |
-| unholy-essence | `dispater` | Dispater |
 | unholy-essence | `doru` | Doru |
 | unholy-essence | `dretch` | Dretch |
 | unholy-essence | `eremite` | Eremite |
 | unholy-essence | `erinyes` | Erinyes |
 | unholy-essence | `erodaemon` | Erodaemon |
 | unholy-essence | `esipil` | Esipil |
-| unholy-essence | `geryon` | Geryon |
 | unholy-essence | `ghawwas` | Ghawwas |
 | unholy-essence | `glabrezu` | Glabrezu |
 | unholy-essence | `gongorinan` | Gongorinan |
@@ -992,7 +992,11 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `heresy-devil` | Heresy Devil |
 | unholy-essence | `hezrou` | Hezrou |
 | unholy-essence | `horned-devil` | Horned Devil |
-| unholy-essence | `hound-of-tindalos` | Hound of Tindalos |
+| unholy-essence | `horseman-of-death` | Horseman of Death |
+| unholy-essence | `horseman-of-famine` | Horseman of Famine |
+| unholy-essence | `horseman-of-pestilence` | Horseman of Pestilence |
+| unholy-essence | `horseman-of-war` | Horseman of War |
+| unholy-essence | `hound-of-the-angles` | Hound of the Angles |
 | unholy-essence | `howler` | Howler |
 | unholy-essence | `hydraggon` | Hydraggon |
 | unholy-essence | `hydrodaemon` | Hydrodaemon |
@@ -1011,17 +1015,13 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `lemure` | Lemure |
 | unholy-essence | `leukodaemon` | Leukodaemon |
 | unholy-essence | `lilitu` | Lilitu |
-| unholy-essence | `mammon` | Mammon |
 | unholy-essence | `marilith` | Marilith |
 | unholy-essence | `meladaemon` | Meladaemon |
-| unholy-essence | `mephistopheles` | Mephistopheles |
-| unholy-essence | `moloch` | Moloch |
 | unholy-essence | `nalfeshnee` | Nalfeshnee |
 | unholy-essence | `nessian-warhound` | Nessian Warhound |
 | unholy-essence | `night-hag` | Night Hag |
 | unholy-essence | `nightmare` | Nightmare |
 | unholy-essence | `nyogoth` | Nyogoth |
-| unholy-essence | `oaur-ooung` | Oaur-ooung |
 | unholy-essence | `obcisidaemon` | Obcisidaemon |
 | unholy-essence | `olethrodaemon` | Olethrodaemon |
 | unholy-essence | `omox` | Omox |
@@ -1031,6 +1031,9 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `phasmadaemon` | Phasmadaemon |
 | unholy-essence | `piscodaemon` | Piscodaemon |
 | unholy-essence | `pit-fiend` | Pit Fiend |
+| unholy-essence | `qlippoth-lord-of-acid` | Qlippoth Lord of Acid |
+| unholy-essence | `qlippoth-lord-of-fever` | Qlippoth Lord of Fever |
+| unholy-essence | `qlippoth-lord-of-spawn` | Qlippoth Lord of Spawn |
 | unholy-essence | `qolok` | Qolok |
 | unholy-essence | `quasit` | Quasit |
 | unholy-essence | `sangudaemon` | Sangudaemon |
@@ -1045,12 +1048,9 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 | unholy-essence | `soul-eater` | Soul Eater |
 | unholy-essence | `succubus` | Succubus |
 | unholy-essence | `suspiridaemon` | Suspiridaemon |
-| unholy-essence | `szuriel` | Szuriel |
 | unholy-essence | `temerdaemon` | Temerdaemon |
 | unholy-essence | `thanatotic` | Thanatotic |
 | unholy-essence | `thulgant` | Thulgant |
-| unholy-essence | `thuskchoon` | Thuskchoon |
-| unholy-essence | `trelmarixian` | Trelmarixian |
 | unholy-essence | `tripurasura` | Tripurasura |
 | unholy-essence | `upasunda` | Upasunda |
 | unholy-essence | `utukku` | Utukku |

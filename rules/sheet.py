@@ -7959,34 +7959,61 @@ def _current_feats(feats: list) -> list[str]:
     return [feats_mod.current_name(f) if isinstance(f, str) else f for f in feats]
 
 
-def _current_materials(data: dict) -> dict:
-    """A renamed material's old id, wherever a save keeps material ids — the pack's goods,
-    the crafted stock's records (a tannage, a quench, a mark) and what the character knows
-    about each material — read as its id now (`materials.RENAMED`). Only an exact old id
-    is swapped, so nothing else in those records can change."""
-    fields = ("goods", "stock", "herb_known")
-    if not any(data.get(f) for f in fields):
-        return data
+def material_renames() -> dict[str, str]:
+    """Old material and ingredient id -> the id now (`materials.RENAMED`,
+    `ingredients.RENAMED`), the one map every save migration reads."""
     from . import ingredients as ingredients_mod
     from . import materials as materials_mod
 
     # Asked politely: a test may stand a materials door of its own in for the module.
-    RENAMED = {**(getattr(ingredients_mod, "RENAMED", None) or {}),
-               **(getattr(materials_mod, "RENAMED", None) or {})}
-    if not RENAMED:
-        return data
+    return {**(getattr(ingredients_mod, "RENAMED", None) or {}),
+            **(getattr(materials_mod, "RENAMED", None) or {})}
 
-    def swap(v):
-        if isinstance(v, str):
-            return RENAMED.get(v, v)
-        if isinstance(v, list):
-            return [swap(x) for x in v]
-        if isinstance(v, dict):
-            return {(RENAMED.get(k, k) if isinstance(k, str) else k): swap(x)
-                    for k, x in v.items()}
+
+def current_material_ids(v, renamed: dict[str, str] | None = None):
+    """`v` with every exact old material id — a string, a list entry, a dict key — read
+    as its id now. Two keys that land on one id ("elysium": 3 beside "nullgrass": 2, a
+    pack filled across the rename) add their counts rather than one dropping the other."""
+    renamed = material_renames() if renamed is None else renamed
+    if not renamed:
         return v
+    if isinstance(v, str):
+        return renamed.get(v, v)
+    if isinstance(v, list):
+        return [current_material_ids(x, renamed) for x in v]
+    if isinstance(v, dict):
+        out: dict = {}
+        for k, x in v.items():
+            key = renamed.get(k, k) if isinstance(k, str) else k
+            x = current_material_ids(x, renamed)
+            if key in out and isinstance(out[key], int) and isinstance(x, int):
+                out[key] += x
+            else:
+                out[key] = x
+        return out
+    return v
 
-    return {**data, **{f: swap(data[f]) for f in fields if data.get(f)}}
+
+def _current_materials(data: dict) -> dict:
+    """A renamed material's old id, wherever a save keeps material ids — the pack's goods,
+    the satchel (`inventory`: herbs and reagents by id), the crafted stock's records (a
+    tannage, a quench, a mark), what is worn (each slot's record names its material) and
+    what the character knows about each material — read as its id now
+    (`materials.RENAMED`). Only an exact old id is swapped, so nothing else in those
+    records can change.
+
+    The satchel and the worn slots were missed when the metals and the grass were renamed
+    (review, 2026-10-30): an old save holding {"elysium": 3} kept it, so
+    `herbknowledge.carried(a, "nullgrass")` answered 0 and tasting was refused while
+    `herb_known` — migrated — already said "nullgrass"."""
+    fields = ("goods", "inventory", "stock", "worn", "herb_known")
+    if not any(data.get(f) for f in fields):
+        return data
+    renamed = material_renames()
+    if not renamed:
+        return data
+    return {**data, **{f: current_material_ids(data[f], renamed)
+                       for f in fields if data.get(f)}}
 
 
 def from_dict(data: dict, ref: str | None = None) -> Actor:

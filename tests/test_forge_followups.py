@@ -232,7 +232,7 @@ def test_celestial_bronze_dr_asks_who_struck():
     """`{"attacker": {"type": [...]}}`: celestial bronze armour's DR holds against magical
     beasts and monstrous humanoids, and against nobody else. The blow carries its maker's
     type as `attacker:` traits from the weapon hit. Measured before lane H: the suit
-    reader asked no `when` at all, so an celestial bronze breastplate held DR 3/— (the best
+    reader asked no `when` at all, so a celestial bronze breastplate held DR 3/— (the best
     of its three weight rows) against every blow from anybody."""
     pc, s, e = kesst()
     pc.add_stock(forge_items.stock_item(suit("bronze-plate", "celestial-bronze",

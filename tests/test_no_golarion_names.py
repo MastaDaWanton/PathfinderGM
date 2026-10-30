@@ -10,9 +10,17 @@ re-import or a hand edit that brings a name back fails here, not in a licence re
 
 The myth names Golarion adopted went the same way on 2026-10-30, at the owner's word: 27
 rows named Asmodeus, Lamashtu, Hastur, Apsu, Abaddon and their kin as Golarion's gods and
-planes. Paizo's names for its planes (the Boneyard, Elysium, the First World, the Akashic
-Record) and its coined metals (the skymetals, nexavaran steel, elysian bronze) followed the
-same day. The alias files are exempt by design: they are where old saves find the old ids.
+planes. The names Golarion uses for its planes (the Boneyard, Elysium, the First World, the
+Akashic Record) followed the same day — renamed by the owner's choice so the game names its
+planes one way, NOT because they are Paizo's: Elysium is Greek myth, Nirvana Buddhist,
+Abaddon biblical, the Akashic Record Theosophy's, and the Boneyard or the Maelstrom are
+English words. Do not extend the list on that premise. Golarion's coined metals (the
+skymetals, nexavaran steel, elysian bronze) went too. The alias files are exempt by design:
+they are where old saves find the old ids.
+
+The bestiary was never scanned until the review of 2026-10-30 (`SKIP_DIRS = {"bestiary"}`)
+and held 100 core.json rows with 444 mentions, 13 creatures.json rows and 33 compiled
+records; the owner ruled it renamed to match the spells, through the same table.
 """
 from __future__ import annotations
 
@@ -34,8 +42,11 @@ def _shipped(rel: str, key: str) -> list[dict]:
 
 def test_no_shipped_content_names_golarion():
     """271 spell and feat rows, 55 mechanics entries and 2 weapons named Golarion on
-    2026-10-29, and 27 more rows named its myth-born gods. Every one of them now reads
-    world-agnostic or is gone."""
+    2026-10-29, and 27 more rows named its myth-born gods. On 2026-10-30 the bestiary
+    joined the scan carrying 100 + 13 + 33 rows (core, creatures, compiled), and the
+    caseless names 5 more (a bare "Pathfinder", "runelords", "klar", the kasatha's
+    sword, an old spell id in a note). Every one of them now reads world-agnostic or is
+    gone."""
     rows, _ = cp.measure()
     named = sorted({f"{rel} {rid}: {h.term} ({h.field})"
                     for rel, rid, _src, _fam, hits in rows for h in hits
@@ -69,6 +80,12 @@ def test_the_rewrite_changes_nothing_in_what_ships():
         assert fn(rows)[0] == rows, rel
     weapons = _shipped("content/weapons/weapons.json", "weapons")
     assert gr.apply_weapons(weapons) == weapons
+    # The bestiary's files, which extract_bestiary_pdfs.py and ship_rulebook_line.py
+    # rewrite on the way in.
+    for rel in ("content/bestiary/core.json", "content/bestiary/creatures.json",
+                "content/bestiary/mounts.json"):
+        rows = _shipped(rel, "creatures")
+        assert gr.apply_bestiary(rows) == rows, rel
 
 
 def test_old_ids_and_names_still_resolve():
@@ -164,3 +181,233 @@ def test_a_skymetal_bar_and_a_grass_in_an_old_pack_load_renamed():
                    "abilities": {k: 10 for k in ("str", "dex", "con", "int", "wis", "cha")},
                    "goods": {"noqual": 1, "elysium": 3}}, ref="c1")
     assert a.goods == {"null-skymetal": 1, "nullgrass": 3}
+
+
+# --- 2026-10-30: the review of the rename -------------------------------------------------
+
+
+def test_the_bestiary_is_scanned_like_every_other_file():
+    """`SKIP_DIRS = {"bestiary"}` kept the bestiary out of the scan, so the rebuild that grew
+    core.json to 1,417 printed blocks shipped 100 rows naming Golarion's gods and planes
+    (444 mentions) while this file's count read zero. A ratchet: the bestiary stays in."""
+    assert "bestiary" not in cp.SKIP_DIRS
+    _rows, totals = cp.measure()
+    assert sum(totals["content/bestiary/core.json"].values()) > 1000
+    assert sum(totals["content/bestiary/creatures.json"].values()) > 500
+    assert sum(totals["content/bestiary/compiled.json"].values()) > 1000
+
+
+def _bare(**over) -> dict:
+    return {"name": "x", "kind": "npc", "hp": 5, "hp_max": 5,
+            "abilities": {k: 10 for k in ("str", "dex", "con", "int", "wis", "cha")}, **over}
+
+
+def test_a_save_naming_a_renamed_creature_still_finds_its_body():
+    """A save keeps a creature's `from_template` id, and a spawn asks by name. 27 creature
+    ids named Golarion's demigods and kin ("mammon", "isph-aun-vuln", "chosen-of-lamashtu")
+    until 2026-10-30; each now answers with its renamed block, through content/bestiary/
+    aliases.json, whose keys are hashed so the old names ship in no file."""
+    from rules import bestiary
+
+    for old, new in (("mammon", "archdevil-of-greed"), ("charon", "horseman-of-death"),
+                     ("black-butterfly", "empyreal-lord-of-silence"),
+                     ("isph-aun-vuln", "qlippoth-lord-of-ruin"),
+                     ("ghoul-leng", "ghoul-dreamland"), ("leng ghoul", "ghoul-dreamland"),
+                     ("chosen-of-lamashtu", "chosen-of-the-demon-mother"),
+                     ("herecite-of-asmodeus", "herecite-of-tyranny"),
+                     ("shoki", "soulkeeper-psychopomp"), ("varklops", "kaiju-of-flame"),
+                     ("yig", "great-old-one-of-serpents"),
+                     ("tawil-at-umr", "avatar-of-the-outer-god"),
+                     ("hound of tindalos", "hound-of-the-angles")):
+        block = bestiary.raw_block(old)
+        assert block is not None and block["id"] == new, old
+    aliases = (cp.ROOT / "content" / "bestiary" / "aliases.json").read_text(encoding="utf-8")
+    assert '"mammon"' not in aliases and "lamashtu" not in aliases
+
+
+def test_a_demigods_named_weapon_reads_as_what_it_is():
+    """The second sweep (2026-10-30): the deny-list's names were gods and places, and the
+    Bestiary 6 demigods' own things walked past it — 11 named weapons and artifacts
+    (Moloch's Goreletch and Ramithaine, Mephistopheles' Visineir, Mammon's Argent Prince),
+    3 unique kaiju, 4 Mythos gods and Hell's layers by Dante's names. Each now reads as
+    what its description says it is: a bare noun in an attack or treasure line, "the"
+    noun in prose."""
+    from rules import bestiary
+
+    moloch = bestiary.raw_block("moloch")
+    assert moloch["melee"].startswith("gore axe +46")
+    assert moloch["treasure"] == "triple (gore axe, wounding sword, other treasure)"
+    assert "his weapons the gore axe (a +3" in moloch["special_abilities"]
+    assert gr._items("When she throws Voidsedge, it returns") == (
+        "When she throws the void starknife, it returns")
+    pit = bestiary.raw_block("pit-fiend")["special_abilities"]
+    assert "the first, second, fourth, sixth and ninth layers" in pit
+    assert "Nessus" not in pit and "Avernus" not in pit
+
+
+def test_every_bestiary_alias_lands_on_a_shipped_body():
+    """`alias_of` takes one hop. 17 option-D aliases landed on ids this rename moved
+    ("ragathiel", "ghoul-leng", "charon"); pointed at nothing, a save's creature would have
+    lost its body. Every alias, in aliases.json and core.json, names a block that ships."""
+    from rules import bestiary
+
+    store = bestiary.imported()
+    for rel in ("aliases.json", "core.json"):
+        doc = json.loads((cp.ROOT / "content" / "bestiary" / rel).read_text(encoding="utf-8"))
+        missing = sorted({v for v in (doc.get("aliases") or {}).values() if v not in store})
+        assert not missing, (rel, missing[:20])
+
+
+def test_the_deny_list_reads_names_in_any_case():
+    """The list was case-sensitive, and five names the 2026-10-30 review found walked past
+    it. Each is caught now; a product citation and the game's own name are not."""
+    def hits(text):
+        return [(t, c) for t, c, _a, _b in cp.scan_text(text) if c != "product"]
+
+    assert hits("invaluable to a Pathfinder who must make a snap decision")
+    assert hits("teleporting to an established Pathfinder lodge")
+    assert hits("a burning glaive similar to the ones wielded by the runelords of old")
+    assert hits("an earth breaker and klar")
+    assert hits("Details of the sword come from last-azlanti-s-defending-sword")
+    assert hits("a Kasatha spinal sword")
+    assert not hits("see the Pathfinder Roleplaying Game Core Rulebook")
+    assert not hits("Original writing for Pathfinder GM; a 3.5 skill Pathfinder folded "
+                    "into Perception; Pathfinder Unchained's flawless material")
+    assert not hits("a choral sings in the choir")         # the angel, not the dragon
+
+
+def test_a_plane_takes_its_capital_from_where_it_stands():
+    """Outer Planes Traveler's flattened table read "LN Lawful The court of the dead N Death
+    The churning chaos CN": the capital came along with the source's "The Boneyard". The
+    capital is decided by position now, a bracket is not a sentence start, and a plural
+    possessive takes an apostrophe alone."""
+    assert gr._common("Axis LN Lawful The Boneyard N Death The Maelstrom CN") == (
+        "The city of law LN Lawful the court of the dead N Death the churning chaos CN")
+    assert gr._common("any (Abaddon)") == "any (the daemon wastes)"
+    assert gr._common("at Elysium's edges. Nirvana's knights") == (
+        "at the free heavens' edges. The serene heavens' knights")
+    from rules import feats
+
+    assert "The court" not in feats.get("outer-planes-traveler").benefit
+
+
+def test_a_renamed_word_takes_its_own_article():
+    """A rename that swapped the word alone left the old word's article: "An ghost
+    skymetal head" shipped in blacksmith-materials.json, "an celestial bronze breastplate"
+    and "a oblivion-mordant-tanned grip" sat in the code (review, 2026-10-30). The
+    renamers carry the article with the word, and nothing shipped or written here puts a
+    renamed word behind the wrong one."""
+    assert gr._common("A klar can be used") == "A skull shield can be used"
+    row = gr.apply_bestiary([{"id": "t", "name": "T", "special_abilities":
+                              "It summons an Elysian. A Leng hound follows."}])[0]
+    assert row["special_abilities"] == ("It summons a celestial titan. A dreamland hound "
+                                        "follows.")
+
+    from rules import materials
+
+    words = set()
+    for name in ([n for _o, _on, _i, n, _no in gr.CREATURE_RENAMES]
+                 + [n for _i, n in gr.WEAPON_RENAMES.values()]
+                 + [n for _i, n in gr.SPELL_RENAMES.values()]
+                 + [n for _i, n in gr.FEAT_RENAMES.values()]
+                 + [c for _n, c, _t in gr.COSMOS]
+                 + [v.replace("-", " ") for v in materials.RENAMED.values()]
+                 + ["nullgrass"]):
+        # The name's first two words, so "an free action" (the book's own typo, nothing to
+        # do with "the free heavens") is not read as a rename slip.
+        words.add(tuple(name.lower().split()[:2]))
+
+    def alt(ws):
+        return "|".join(r"[\s-]".join(map(re.escape, w)) for w in sorted(ws))
+
+    vowel = [w for w in words if w[0][0] in "aeiou"]
+    consonant = [w for w in words if w[0][0] not in "aeiou"]
+    wrong = re.compile(r"(?<![\w-])(?:[Aa] (?:" + alt(vowel) + r")|[Aa]n (?:"
+                       + alt(consonant) + r"))(?!\w)", re.IGNORECASE)
+    found = []
+    for folder, glob in (("content", "*.json"), ("rules", "*.py"), ("gm", "*.py"),
+                         ("play", "*.py"), ("tools", "*.py"), ("tests", "*.py")):
+        for path in sorted((cp.ROOT / folder).rglob(glob)):
+            # This file and the rewrite table quote the slips they were written against.
+            if path.name in ("aliases.json", "test_no_golarion_names.py",
+                             "golarion_rewrites.py"):
+                continue
+            for m in wrong.finditer(path.read_text(encoding="utf-8", errors="replace")):
+                found.append(f"{path.relative_to(cp.ROOT)}: {m.group(0)}")
+    assert not found, found[:20]
+
+
+def test_a_renamed_weapon_answers_to_its_old_name():
+    """The klar and the kasatha spinal sword, renamed 2026-10-30. A pack, a feat target or
+    a GM naming the old weapon still finds the row."""
+    from rules import weapons
+
+    assert weapons.key_for("klar") == "skull-shield"
+    assert weapons.key_for("Kasatha spinal sword") == "spinal-sword"
+
+
+def test_a_nation_gate_no_one_can_meet_is_gone():
+    """Mounted Blade asked for "Qadira affinity", rewritten "affinity with a desert nation
+    of horsemen": a requirement no sheet shows and `meets` can never read. The gate goes
+    and the four mechanical prerequisites stay."""
+    from rules import feats
+
+    f = feats.get("mounted-blade")
+    assert f.unparsed_prerequisites == []
+    assert "nation" not in f.prerequisites_text and "Ride-By Attack" in f.prerequisites_text
+
+
+def test_no_note_cites_a_spell_by_its_old_id():
+    """The mechanics files' notes cite spells by id, and one still said "come from
+    last-azlanti-s-defending-sword" after the rename (the name renamer reads names). No
+    renamed spell's old id is left in any of them."""
+    olds = [o for o, n in json.loads((cp.ROOT / "content" / "spells" / "aliases.json")
+                                      .read_text(encoding="utf-8")).items() if n and o != n]
+    pattern = re.compile(r"(?<![a-z0-9-])(" + "|".join(map(re.escape, olds))
+                         + r")(?![a-z0-9-])")
+    found = []
+    for path in sorted((cp.ROOT / "content" / "spells" / "mechanics").glob("*.json")):
+        for text in gr._strings(json.loads(path.read_text(encoding="utf-8"))):
+            found += [f"{path.name}: {m.group(1)}" for m in pattern.finditer(text)]
+    assert not found, found[:10]
+
+
+def test_an_old_satchel_and_an_old_worn_suit_load_renamed():
+    """`_current_materials` rewrote goods, stock and herb_known and missed the satchel and
+    the worn slots (review, 2026-10-30): an old save holding {"elysium": 3} kept it, so
+    `herbknowledge.carried(a, "nullgrass")` answered 0 while `herb_known` already said
+    nullgrass. A satchel filled across the rename keeps both counts."""
+    from rules import herbknowledge
+    from rules.sheet import from_dict
+
+    a = from_dict(_bare(inventory={"elysium": 3, "nullgrass": 2, "monkshood": 1},
+                        herb_known={"elysium": {"keys": ["k0"], "how": {"k0": "x"}}},
+                        worn={"shirt": {"name": "Shirt", "material": "noqual",
+                                        "pieces": {"body": {"material": "noqual"}}}}),
+                  ref="c1")
+    assert a.inventory == {"nullgrass": 5, "monkshood": 1}
+    assert herbknowledge.carried(a, "nullgrass") == 5
+    assert a.worn["shirt"]["material"] == "null-skymetal"
+    assert a.worn["shirt"]["pieces"]["body"]["material"] == "null-skymetal"
+
+
+def test_an_old_ore_is_filed_under_its_new_metal():
+    """`material_of("noqual-ore")` answered "noqual-ore" — not in the catalogue, so its own
+    material — and what a character learned about it was filed under the old id."""
+    from rules import materials
+
+    assert materials.material_of("noqual-ore") == "null-skymetal"
+    assert materials.material_of("abysium") == "fever-skymetal"
+
+
+def test_a_grant_from_before_the_rename_still_reads_off_the_satchel():
+    """A scene's grant record keeps the ingredient ids it put in the satchel
+    (`props[].granted.ids`); the satchel is migrated on load, and a grant still saying
+    "elysium" told the player the herbs were all spent."""
+    from play.campaign import _current_prop
+
+    rec = _current_prop({"kind": "granted", "granted": {
+        "ids": {"elysium": 3, "monkshood": 1}, "names": {"elysium": "Elysium",
+                                                         "monkshood": "Monkshood"}}})
+    assert rec["granted"]["ids"] == {"nullgrass": 3, "monkshood": 1}
+    assert rec["granted"]["names"] == {"monkshood": "Monkshood"}

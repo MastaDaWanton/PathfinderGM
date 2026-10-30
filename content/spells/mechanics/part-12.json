@@ -106,7 +106,7 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "The heal is on the caster and is real (1d8 + 1/level, max +5), but it is conditional: you must be at half hit points or more to cast, and can only draw on it once, after dropping below half. No damage_type is claimed — the prose calls it absorbing strength from an cosmic replica, not positive energy.",
+   "notes": "The heal is on the caster and is real (1d8 + 1/level, max +5), but it is conditional: you must be at half hit points or more to cast, and can only draw on it once, after dropping below half. No damage_type is claimed — the prose calls it absorbing strength from a cosmic replica, not positive energy.",
    "converted_by": "read"
   },
   "minor-reversion-mass": {

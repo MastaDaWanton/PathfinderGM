@@ -403,15 +403,23 @@ falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the
   - Abaddon became the daemon wastes, and Charon's River Styx the river of forgetting.
   - 6 spells were renamed: Shining Scales, Blessing of the Bull, Ferryman's Dispensation,
     Draconic Release, Vision of Nightmares and Foul Waters. Nothing was dropped.
-- **Left as they were, on purpose:**
-  - Cosmology words (Boneyard, Elysium, First World), which were never ruled on.
+- **Left as they were at that point:** the cosmology words (Boneyard, Elysium, First
+  World), not yet ruled on. The owner ruled on them later the same day (below).
 - **The app's own river materials were renamed on 2026-10-30** (the owner: "rename the Styx
   materials too"). Styx Water is now Oblivion Water, quenching "Oblivion-quenched"; Styx
   Mordant is now Oblivion Mordant. Their text already called it "the river of forgetting".
   Old ids resolve through `materials.RENAMED`, and saves are rewritten on load
   (`sheet._current_materials`). "Styx" is on the deny-list now.
 - **The cosmology words, 2026-10-30** (the owner: "rename the cosmology words too").
-  Paizo's own plane names became what each place is:
+  The names Golarion uses for its planes became what each place is. **These are renamed by
+  the owner's choice, for consistency, not because they are Paizo's IP.** Most are not
+  Paizo's coinages at all: Elysium is Greek myth, Nirvana Buddhist, Abaddon biblical, the
+  Akashic Record Theosophy's, and the Boneyard, the Maelstrom, Axis, the First World and
+  the Great Beyond are ordinary English words Golarion uses as plane names. No claim is
+  made here that any of them is Product Identity, and the rule must not be extended to
+  other words on that premise. (An earlier draft of this section and of
+  `tests/test_no_golarion_names.py` called them "Paizo's names for its planes"; corrected
+  2026-10-30 after review.)
   - the Boneyard → the court of the dead;
   - the Maelstrom → the churning chaos;
   - Axis → the city of law;
@@ -447,6 +455,87 @@ falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the
     (`campaign-format.md`, `from-world-bible.md`).
   - Not updated: the dated design records (plans, prior art, contracts, questions). They
     still quote the book's names, as a record of what was read.
+- **The bestiary, 2026-10-30** (the owner: "rename the bestiary to match the spells").
+  The scan had skipped it (`SKIP_DIRS = {"bestiary"}` in `tools/content_provenance.py`),
+  and the PDF rebuild had grown it: 100 core.json rows with 444 mentions, 13
+  creatures.json rows and 33 compiled records. The same table now rewrites it
+  (`golarion_rewrites.apply_bestiary`, run by `tools/strip_golarion.py` and by both
+  bestiary importers):
+  - 27 creatures renamed, role kept and name dropped, the way Bestiary 6 heads its own
+    blocks ("Archdevil, Mammon"): the eight archdevils by portfolio (Archdevil of Greed,
+    of Desire, of Gates, of Iron, of Heresy, of Sacrifice, of Flies, of Contracts); the
+    four Horsemen (of Death, Pestilence, War, Famine); three empyreal lords (of Abandon,
+    Vengeance, Silence); four qlippoth lords (of Fever, Ruin, Acid, Spawn); and the kinds
+    Soulkeeper Psychopomp (shoki), Celestial Titan (elysian), Herecite of Tyranny, the
+    Dreamland Ghoul, Hound and Spider (Leng's), and the gnolls Chosen and Eye of the Demon
+    Mother. In its own block a demigod is "the archdevil", "the Horseman"; elsewhere its
+    title. d20pfsrd keeps these names (§7.3), so this goes further than that prior art.
+  - Planes as the spells have them (Abaddon the daemon wastes, the River Styx the river
+    of forgetting, Leng the dreamlands, Hell's layers by number), priests'
+    holy symbols by their god's portfolio ("silver holy symbol of a god of battle"), and
+    "Azlanti" dropped from the omnipath's languages.
+  - Old ids resolve through `content/bestiary/aliases.json`, hashed like option D's, and
+    17 existing aliases that landed on a renamed id were pointed at the new one.
+  - The bestiary is now in the scan, as a ratchet. The deny-list also reads a handful of
+    names in any case, which it had missed: the Society as a bare "Pathfinder", lower-case
+    "runelords", the klar (now the skull shield) and the kasatha spinal sword (now the
+    spinal sword), and an old spell id quoted in a mechanics note.
+  - Choral, the Bestiary 6 angel, keeps its name: the deny-list's "Choral" meant Choral the
+    Conqueror, and now says so.
+- **The second sweep, 2026-10-30** (the owner: Golarion's names gone everywhere). The
+  deny-list held gods, places and peoples; the demigods' own things walked past it. A
+  discovery pass over the bestiary's capitalised words (mid-sentence, never written
+  lower-case anywhere in shipped content, not already listed), read by hand against
+  d20pfsrd's printed blocks, found these. The test for each was the declarations in §6:
+  "proper names (characters, deities, etc.) … locations" are Product Identity, so a
+  named thing or individual Paizo coined is renamed, and a name older than Paizo goes by
+  the myth rule above. d20pfsrd, the prior art, keeps every one of these names (checked
+  for Barbatos, Dispater, Geryon, Mephistopheles and Mammon), so here too this goes
+  further than it.
+  - **Paizo's named things → what each is:** Goreletch → gore axe, Ramithaine → wounding
+    sword (Moloch's battleaxe and longsword); Eyjatas → staff of eyes (Barbatos's
+    quarterstaff); the Eclipsing Eye → eclipse mace (Dispater's heavy mace);
+    Lamentation of the Faithless → black greatsword (Szuriel); Usher of the Black Rain →
+    plague weapon (Apollyon's bow that becomes a scythe); Voidsedge → void starknife
+    (Black Butterfly); Visineir → soul quill (Mephistopheles' quill-dagger); Horn of Lies
+    → lying horn (Geryon); the Argent Prince → silver effigy (Mammon's possessed body);
+    Book of the Black Sphynx → black sphinx tome (Villain Codex's Grand Dam); and Black
+    Butterfly's ability titled for her epithet, Silence Between → Between Breaths.
+  - **Paizo's named characters:** the unique kaiju Varklops, Vorgozen and Yarthoon →
+    Kaiju of Flame, of the Fouled Sea, of Frost.
+  - **Myth, by the myth rule:** the Mythos gods Yig, Rhan-Tegoth and Tawil at'Umr →
+    Great Old One of Serpents, Great Old One of the Statue, Avatar of the Outer God; the
+    Hound of Tindalos → Hound of the Angles; Hell's layers by Virgil's, Dante's and
+    Milton's names (Avernus, Dis, Erebus, Phlegethon, Stygia, Malebolge, Cocytus, Caina,
+    Nessus) → by number, as the Bestiary's own text counts them ("the ninth and deepest
+    layer of Hell"). Erebus, renamed earlier the same day as "the treasure vaults of
+    Hell", reads "the third layer of Hell" with the others.
+  - **Judged not Paizo's, and kept:**
+    - Krampus (Alpine folklore); the Pale, White, Red and Black Horses (the Book of
+      Revelation); the Prince of Darkness and the Lord of Flies (Christian epithets);
+      Limbo (theology, and the 3.5 SRD's plane); the jabberwock, bandersnatch and jubjub
+      bird (Carroll); the conqueror worm (Poe); Aklo (Machen, and an OGC language);
+      linnorm, cyclops, skald, protean (Norse and Greek words).
+    - Kinds of monster, Paizo-coined or not — schir, abrikandilu, ostovite, choral, gug,
+      deep one: a Bestiary's monster names are the game's open content, the way "ghoul"
+      is, not a proper name of a character or a place.
+    - "Great Old One" and "Outer God" as subtypes: mechanical vocabulary the rules test
+      for, and English words.
+    - "Stygian" (an English adjective since the 16th century), "Oblivion" (the
+      creature, an ordinary word).
+    - Illustrator credits the PDF reading bled into ability text ("Illustration by Ben
+      Wootten", 70 core.json rows): real people, not setting; junk text to strip some day,
+      not a licence question.
+    - "Schir Inductee", "Fang Monastery …", "The Eminent Spellqueen" and the other Villain
+      and NPC Codex titles: descriptive English, no proper noun.
+- **Attribution URLs.** Six war paint rows in `content/materials/magic-items.json` cite
+  their page as `https://aonprd.com/MagicWondrousDisplay.aspx?FinalName=Shoanti%20War%20Paint…`.
+  Kept: `source` is attribution, which the licence asks for and the scan already exempts
+  (book titles in `source` stay, above); the URL is where the row was read, and changing
+  it would break the citation it exists to be. Not traced end to end: whether any screen
+  shows these rows' `source`. The forge's material card shows a material's, and these are
+  wondrous items, not forge materials; if one turns up on screen, show the book's title
+  there rather than editing the citation.
 - **Still outstanding:** Section 15 for the setting books.
 
 The section below is the measurement and the options as they were put.
