@@ -196,13 +196,15 @@ def test_a_living_creature_does_not_wear_its_printed_items_twice():
 
 def test_most_printed_magic_items_are_read_by_the_catalogues_own_name():
     """1,267 of the 2,039 printed magic items name a catalogue item exactly; the rest —
-    wands, scrolls, ioun stones — have no row and are not invented."""
+    wands, scrolls, ioun stones — have no row and are not invented. 2,040 since the second
+    names sweep (fix/bestiary-names): the Grand Dam's "Book of the Black Sphynx" became
+    "black sphinx tome", which the compile now files as a magic item."""
     comp = json.loads((ROOT / "content" / "bestiary" / "compiled.json").read_text(
         encoding="utf-8"))["creatures"]
     printed = [it["printed"] for r in comp.values() for it in r.get("carries") or ()
                if it.get("table") == "magic item"]
     read = [p for p in printed if magicitem.recipe_named(p)]
-    assert len(printed) == 2039
+    assert len(printed) == 2040
     assert len(read) >= 1267
     assert magicitem.recipe_named("wand of cure light wounds (20 charges)") is None
 
