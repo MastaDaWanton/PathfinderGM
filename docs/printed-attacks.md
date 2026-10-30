@@ -157,7 +157,26 @@ leaves them alone.
 - **Riders are carried, not fired.** Grab 650, poison 415, disease 213, paralysis 173,
   energy drain 147, trip 82, bleed 74. The engine's `_natural_riders` resolves trip and
   grab as a Reflex save for races, which is not 1e's free combat manoeuvre, and poison
-  and disease need their documents. Each is its own piece of work.
+  and disease need their documents. Each is its own piece of work. The one exception,
+  since 2026-10-30: a swarm's distraction (`Engine._distraction`, Bestiary 1 pp. 299 and
+  313) — on its automatic damage, Fortitude against the printed DC or nauseated 1 round.
+
+## 2026-10-30: what the reader still dropped
+
+A review of 0.2.23 found the reader losing whole attacks without a word, and the compile's
+`unread` calling the lines accounted for. `statblock_attacks.read` now returns what it read
+and every printed piece it did not, and the compile's `unread` is that list:
+
+- "gore +4 melee (1d8+4)" (six lines; five read nothing and fought with fists);
+- an "and" after a damage parenthesis joins two attacks of one full attack (the ghoul's
+  claws, the crocodile's tail slap, the minotaur's gore), and text after a lost comma is
+  read again; a leaked "Spell-Like Abilities ..." heading ends the line;
+- `Actor.stat_block_attacks` asks the block's lines, not `flat_attack` (43 blocks, 29 of
+  them swarms and troops, had none);
+- a flurry stands on its weapon; a spiked chain or gauntlet is held, not worn;
+- 34 attacks in 28 blocks found, unread 342 -> 186, and
+  `tests/test_monster_attacks_read_whole.py` counts every printed attack shape in every
+  shipped line against what was read or listed unread.
 - **A Strength change does not move a printed number.** Ability damage, enlarge person or
   rage on a monster leaves its printed attack where it was, the same as `flat_attack`
   before. Combat Manager's delta (Δmod to hit, Δmod × the attack's Strength multiple to
@@ -169,7 +188,8 @@ leaves them alone.
 - **"nonlethal" is parsed and not honoured**, because no weapon's `nonlethal` flag is read
   by the attack op. That is a pre-existing gap: saps and fists deal lethal damage for
   characters too.
-- **The 37 unread blocks** keep swinging their fists at `flat_attack`.
+- **The unread blocks** keep swinging their fists at `flat_attack`: 9 on 2026-10-30, each
+  an effect-only touch with no damage dice ("touch +7 (attach)", the stirge) or prose.
 - **Printed options are picked by name.** A full attack with no weapon named uses the
   first option. "claws" finds the option whose entry is printed "claws" before one
   holding a lone "claw".
