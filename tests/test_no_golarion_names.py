@@ -215,11 +215,34 @@ def test_a_save_naming_a_renamed_creature_still_finds_its_body():
                      ("ghoul-leng", "ghoul-dreamland"), ("leng ghoul", "ghoul-dreamland"),
                      ("chosen-of-lamashtu", "chosen-of-the-demon-mother"),
                      ("herecite-of-asmodeus", "herecite-of-tyranny"),
-                     ("shoki", "soulkeeper-psychopomp")):
+                     ("shoki", "soulkeeper-psychopomp"), ("varklops", "kaiju-of-flame"),
+                     ("yig", "great-old-one-of-serpents"),
+                     ("tawil-at-umr", "avatar-of-the-outer-god"),
+                     ("hound of tindalos", "hound-of-the-angles")):
         block = bestiary.raw_block(old)
         assert block is not None and block["id"] == new, old
     aliases = (cp.ROOT / "content" / "bestiary" / "aliases.json").read_text(encoding="utf-8")
     assert '"mammon"' not in aliases and "lamashtu" not in aliases
+
+
+def test_a_demigods_named_weapon_reads_as_what_it_is():
+    """The second sweep (2026-10-30): the deny-list's names were gods and places, and the
+    Bestiary 6 demigods' own things walked past it — 11 named weapons and artifacts
+    (Moloch's Goreletch and Ramithaine, Mephistopheles' Visineir, Mammon's Argent Prince),
+    3 unique kaiju, 4 Mythos gods and Hell's layers by Dante's names. Each now reads as
+    what its description says it is: a bare noun in an attack or treasure line, "the"
+    noun in prose."""
+    from rules import bestiary
+
+    moloch = bestiary.raw_block("moloch")
+    assert moloch["melee"].startswith("gore axe +46")
+    assert moloch["treasure"] == "triple (gore axe, wounding sword, other treasure)"
+    assert "his weapons the gore axe (a +3" in moloch["special_abilities"]
+    assert gr._items("When she throws Voidsedge, it returns") == (
+        "When she throws the void starknife, it returns")
+    pit = bestiary.raw_block("pit-fiend")["special_abilities"]
+    assert "the first, second, fourth, sixth and ninth layers" in pit
+    assert "Nessus" not in pit and "Avernus" not in pit
 
 
 def test_every_bestiary_alias_lands_on_a_shipped_body():
