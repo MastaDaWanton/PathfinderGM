@@ -15,8 +15,11 @@ name in. The same functions run from the importers (`build_spells.py`, `build_fe
 `tests/test_no_golarion_names.py` holds the shipped count at zero either way.
 
 Names older than Paizo that Golarion adopted (Asmodeus, Lamashtu, Hastur) went the same
-way on 2026-10-30, at the owner's word. Deliberately untouched: cosmology words (Boneyard,
-Elysium), which read as ordinary nouns and were never ruled on.
+way on 2026-10-30, at the owner's word, and so did the plane names later that day (the
+Boneyard, Elysium) — renamed by the owner's choice so the game reads one way, not because
+each is Paizo's: Elysium is Greek myth, Nirvana Buddhist, Abaddon biblical, and the
+Boneyard or the Maelstrom are English words Golarion happens to use as plane names. The
+bestiary followed on 2026-10-30 (`apply_bestiary`), through these same maps.
 
     python tools/strip_golarion.py      # applies this table to the shipped files
 """
@@ -98,7 +101,21 @@ FEAT_RENAMES: dict[str, tuple[str, str]] = {
 WEAPON_RENAMES: dict[str, tuple[str, str]] = {
     "aldori-dueling-sword": ("dueling-sword", "Dueling sword"),
     "shoanti-bolas": ("heavy-bolas", "Heavy bolas"),
+    # Missed on 2026-10-29 because the deny-list was case-sensitive and neither word was
+    # on it: the klar is the Shoanti's horned-skull shield with a blade, and the kasatha
+    # are Paizo's four-armed people (review 2026-10-30). Named for what each is.
+    "klar": ("skull-shield", "Skull shield"),
+    "kasatha-spinal-sword": ("spinal-sword", "Spinal sword"),
 }
+
+# The two weapons by name in running text (Thunder and Fang wields "an earth breaker and
+# klar"); whole words, any case, since the feats write "klar" lower-case.
+WEAPON_WORDS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"(?P<art>(?<![\w'-])[Aa]n?\s+)?(?<![\w-])kasatha spinal sword(?![\w-])",
+                re.IGNORECASE), "spinal sword"),
+    (re.compile(r"(?P<art>(?<![\w'-])[Aa]n?\s+)?(?<![\w-])klar(?![\w-])", re.IGNORECASE),
+     "skull shield"),
+]
 
 # --- drops (the F2 fallback) -------------------------------------------------------------------
 # old id -> the id a save holding it should now read, or None when there is no equivalent.
@@ -159,6 +176,8 @@ PRODUCT: list[tuple[re.Pattern, str]] = [
     (re.compile(r"Pathfinder RPG "), ""),
     (re.compile(r"Pathfinder Campaign Setting: "), ""),
     (re.compile(r"Pathfinder Adventure Path volume"), "Adventure Path volume"),
+    # "see page 302 of the Pathfinder Bestiary": the same citation without the "RPG".
+    (re.compile(r"Pathfinder Bestiary"), "Bestiary"),
 ]
 
 SPELL_EDITS: dict[str, list[tuple[str, str]]] = {
@@ -359,7 +378,17 @@ SPELL_EDITS: dict[str, list[tuple[str, str]]] = {
          "their enemies, ghoul army has become a favorite of many necromancers.")],
     "kreighton-s-perusal": [("(such as the bonuses gained from reading volumes of the "
                              "Pathfinder Chronicles; see pages 26-27)",
-                             "(such as the bonuses some rare tomes grant their readers)")],
+                             "(such as the bonuses some rare tomes grant their readers)"),
+                            # The Society, lower in the same row; the case-sensitive
+                            # deny-list read "Pathfinder" alone as nothing (2026-10-30).
+                            ("invaluable to a Pathfinder who must", "invaluable to an "
+                                                                    "explorer who must")],
+    # Thassilon's wizard-kings, lower-cased in the prose so the deny-list's capitalised
+    # "Runelord" never matched them.
+    "emblem-of-greed": [("wielded by the runelords of old", "wielded by the sin-wizards of "
+                                                            "old")],
+    "tears-to-wine": [("Legend claims runelords used", "Legend claims ancient wizard-kings "
+                                                       "used")],
     "last-azlanti-s-defending-sword-mass": [("This spell functions as Aroden's defending sword,",
                                              "This spell functions as defending sword,")],
     "lissalan-snake-sigil": [("one for each of the Thassilonian schools of magic",
@@ -400,8 +429,10 @@ SPELL_EDITS: dict[str, list[tuple[str, str]]] = {
                        "clans of a distant land, and both groups use it")],
     "petulengro-s-validation": [("Venture-Captain Eliza Petulengro devised",
                                  "an adventuring captain devised")],
+    # First written "Created by the god who made the ghorans, while making them," — a
+    # literal unpicking of the original's clause that read as a slip (review 2026-10-30).
     "pinecone-bomb": [("Created by Ghorus when he was working to create the ghorans,",
-                       "Created by the god who made the ghorans, while making them,")],
+                       "Created by the god who shaped the ghorans,")],
     "planar-inquiry": [
         ("Although he was hardly the first to turn to the Outer Planes for answers, Jatembe's "
          "dealings with outsiders in his pursuit of enlightenment are legendary, and the "
@@ -612,7 +643,12 @@ FEAT_EDITS: dict[str, list[tuple[str, str]]] = {
                        "with an outsider.")],
     "lastwall-phalanx": [("When battling the terrifying hordes of Belkzen,",
                           "When battling the terrifying orc hordes,")],
-    "mounted-blade": [("Qadira affinity", "affinity with a desert nation of horsemen")],
+    # A setting gate, not a rule: "Qadira affinity" is defined nowhere, and its first
+    # rewrite ("affinity with a desert nation of horsemen") was a requirement no sheet can
+    # show and `meets` can never read. Unlike a deity gate, which keeps its gate by
+    # portfolio because a world has gods to read it against, this one goes; the feat's
+    # four mechanical prerequisites stay (review 2026-10-30).
+    "mounted-blade": [(", Qadira affinity", ""), ("Qadira affinity", "")],
     "scholar": [("scattered throughout the Inner Sea region", "scattered throughout the world")],
     "serpent-lash": [(" This feat originally appeared in Pathfinder Campaign Setting: Osirion, "
                       "Land of the Pharaohs.", "")],
@@ -636,7 +672,9 @@ FEAT_EDITS: dict[str, list[tuple[str, str]]] = {
                              "You felt powerful angelic wings surround you when you risked "
                              "death from a fall, and somehow a tiny spark of their essence")],
     "tapestry-traveler": [("Your many visits to the Hao Jin Tapestry demiplane",
-                           "Your many visits to a vast tapestry demiplane")],
+                           "Your many visits to a vast tapestry demiplane"),
+                          ("to an established Pathfinder lodge", "to an established "
+                                                                 "adventurers' lodge")],
     "thunder-and-fang": [("the ancient Shoanti Thunder and Fang fighting style",
                           "the ancient Thunder and Fang fighting style")],
     "totem-spirit": [
@@ -737,9 +775,10 @@ FEAT_EDITS["outer-planes-traveler"] = [("Abaddon NE Evil", "the daemon wastes NE
 
 # --- the cosmology words (the owner, 2026-10-30: "rename the cosmology words too") ----------
 #
-# Paizo's names for its planes: the Boneyard, the Maelstrom, Axis, Elysium, Nirvana, the
-# First World, the Great Beyond, the River of Souls and the Akashic Record. Each becomes
-# what it is. The open, generic planes (Heaven, Hell, the Abyss, the Shadow, Ethereal,
+# The names Golarion uses for its planes: the Boneyard, the Maelstrom, Axis, Elysium,
+# Nirvana, the First World, the Great Beyond, the River of Souls and the Akashic Record.
+# Each becomes what it is — by the owner's choice, for consistency, and not because they
+# are Paizo's: most are myth (Elysium, Nirvana) or plain English (the Boneyard). The open, generic planes (Heaven, Hell, the Abyss, the Shadow, Ethereal,
 # Astral and Material Planes) are the SRD's and stay; so do book titles in `source`.
 
 SPELL_RENAMES.update({
@@ -750,28 +789,272 @@ SPELL_RENAMES.update({
     "kiss-of-the-first-world": ("fey-kiss", "Fey Kiss"),
 })
 
-# Whole phrases first, so "the Boneyard" never becomes "the the court of the dead".
-COSMOS: list[tuple[re.Pattern, str]] = [
-    (re.compile(p), r) for p, r in [
-        (r"\bthe Akashic Record\b", "the memory of the cosmos"),
-        (r"\bThe Akashic Record\b", "The memory of the cosmos"),
-        (r"\bAkashic Record\b", "memory of the cosmos"),
-        (r"\bAkashic replica\b", "cosmic replica"),
-        (r"\bthe First World\b", "the fey realm"), (r"\bThe First World\b", "The fey realm"),
-        (r"\bFirst World\b", "the fey realm"),
-        (r"\bthe Great Beyond\b", "the planes beyond"),
-        (r"\bthe Boneyard\b", "the court of the dead"),
-        (r"\bThe Boneyard\b", "The court of the dead"),
-        (r"\bBoneyard\b", "the court of the dead"),
-        (r"\bthe Maelstrom\b", "the churning chaos"),
-        (r"\bThe Maelstrom\b", "The churning chaos"),
-        (r"\bMaelstrom\b", "the churning chaos"),
-        (r"\bthe River of Souls\b", "the river of the dead"),
-        (r"\bElysium\b", "the free heavens"),
-        (r"\bNirvana\b", "the serene heavens"),
-        (r"\bAxis\b", "the city of law"),
-    ]
+# name as printed -> (what it is, whether a bare mention gains "the"). A "the" the source
+# already wrote is absorbed into the match, so "the Boneyard" never becomes "the the court
+# of the dead"; and the capital is decided by where the words stand, not carried over
+# from the source. It was carried at first, and a flattened table row ("LN Lawful The
+# Boneyard N Death The Maelstrom CN") shipped "The court of the dead" mid-row (review,
+# 2026-10-30). A possessive follows the new noun: "Elysium's edges" is "the free heavens'
+# edges", never "heavens's".
+COSMOS: list[tuple[str, str, bool]] = [
+    ("Akashic Record", "memory of the cosmos", False),
+    ("Akashic replica", "cosmic replica", False),
+    ("First World", "fey realm", True),
+    ("Great Beyond", "planes beyond", True),
+    ("Boneyard", "court of the dead", True),
+    ("Maelstrom", "churning chaos", True),
+    ("River of Souls", "river of the dead", True),
+    ("Elysium", "free heavens", True),
+    ("Nirvana", "serene heavens", True),
+    ("Axis", "city of law", True),
+    # The myth places, as the spells' own edits already wrote them (the daemon wastes,
+    # the river of forgetting), here as one map so the bestiary's 41 "any (Abaddon)"
+    # environments read the same as Malediction's prose. Erebus is Mammon's layer of Hell;
+    # Leng is the Mythos' dream plateau, which this game's rules call the Dimension of
+    # Dreams.
+    ("River Styx", "river of forgetting", True),
+    ("Styx", "river of forgetting", True),
+    ("Abaddonian", "daemonic", False),
+    ("Abaddon", "daemon wastes", True),
+    ("Erebus", "treasure vaults of Hell", True),
+    ("Leng", "dreamlands", True),
 ]
+
+
+# A stat block's ability opens on its title and kind, "Devils' End (Ex) Ragathiel gains",
+# and a spell-like line's superscript source letters run into the next sentence ("time
+# stopM M Mammon can use"). Both are sentence starts the punctuation does not mark; the
+# first bestiary pass printed "(Ex) the empyreal lord gains" 30-odd times.
+# "A" and "I" are words, not source letters: "A klar can be used" read "A Skull shield".
+_OPENS_AFTER = re.compile(r"(?:\((?:Ex|Su|Sp)\)|(?<![A-Za-z])(?!(?:A|I)$)[A-Z]{1,4})$")
+
+
+def _starts_sentence(text: str, at: int) -> bool:
+    """Whether the words at `at` open a sentence, a line or a quotation — not a bracket:
+    "any (Abaddon)" is an environment line, and "(The daemon wastes)" read wrong."""
+    before = text[:at].rstrip()
+    return not before or before[-1] in ".!?:\n\"" or bool(_OPENS_AFTER.search(before))
+
+
+def _capital(text: str, at: int, new: str) -> str:
+    return new[0].upper() + new[1:] if new and _starts_sentence(text, at) else new
+
+
+# The article a renamed word stands behind is part of the rename. A rename that swapped
+# the word alone shipped "An ghost skymetal head" (blacksmith-materials.json), "an
+# celestial bronze breastplate" and "a oblivion-mordant-tanned grip" (review, 2026-10-30):
+# the old word took the other article. So every renamer here matches "a"/"an" with the
+# name and writes the one the new word takes.
+_ART = r"(?P<art>(?<![\w'-])[Aa]n?\s+)?"
+
+
+def _articled(m: re.Match, new: str) -> str:
+    """`new` written where `m` matched, with the article it stands behind (if any) chosen
+    for it, and capitalised by where the whole stands."""
+    art = m.group("art")
+    if art:
+        if new.lower().startswith("the "):
+            new = new[4:]           # the source's article wins over the table's "the"
+        new = ("an " if new[:1].lower() in "aeiou" else "a ") + new
+    return _capital(m.string, m.start(), new)
+
+
+def _namer(table: list[tuple[str, str, bool]]):
+    """Running text with each name in `table` written as what it is (see COSMOS)."""
+    pattern = re.compile(
+        _ART + r"(?<![\w'-])(?P<the>[Tt]he\s+)?(?P<name>" + "|".join(
+            re.escape(n) for n, _c, _t in sorted(table, key=lambda e: -len(e[0])))
+        + r")(?P<pos>['’]s)?(?![\w-])")
+    by_name = {n: (core, gains) for n, core, gains in table}
+
+    def swap(m: re.Match) -> str:
+        core, gains = by_name[m.group("name")]
+        new = ("the " if m.group("the") or gains else "") + core
+        if m.group("pos"):
+            new += "'" if new.endswith("s") else "'s"
+        return _articled(m, new)
+
+    return lambda s: pattern.sub(swap, s)
+
+
+_places = _namer(COSMOS)
+
+
+# --- the bestiary (the owner, 2026-10-30: "rename the bestiary to match the spells") --------
+#
+# Option D (2026-10-28) shipped the rulebook line and took the adventures' named people
+# out, but the Bestiaries themselves print Golarion's demigods as creatures — Bestiary 6's
+# archdevils, Horsemen, empyreal lords and qlippoth lords — and fill the rest with its
+# planes: 100 core.json rows carried 444 mentions on 2026-10-30, and creatures.json 13
+# rows (two gnolls named for Lamashtu, eleven priests carrying "a silver holy symbol of
+# Gorum"). Prior art: Paizo's own Bestiary 6 heads each block "Archdevil, Mammon", and
+# d20pfsrd keeps the names (docs/bestiary-licensing.md §7.3 records that it renames
+# adventure NPCs to role titles but not unique monsters). So the role half of the
+# printed heading is kept and the name half goes: "Archdevil of Greed", which is also what
+# Genius Avaricious already says.
+#
+# (old id, old printed name, new id, new name, what the creature's own block calls it).
+# The last is set for a unique: in its own block "Mammon can sense wealth" reads "The
+# archdevil can sense wealth", as the block already says "the archdevil" in between; in
+# anyone else's block the title stands ("his father, the Archdevil of Iron"). A kind of
+# creature (None) is renamed in running text lower-case, as a spell is.
+CREATURE_RENAMES: list[tuple[str, str, str, str, str | None]] = [
+    ("mammon", "Mammon", "archdevil-of-greed", "Archdevil of Greed", "the archdevil"),
+    ("belial", "Belial", "archdevil-of-desire", "Archdevil of Desire", "the archdevil"),
+    ("barbatos", "Barbatos", "archdevil-of-gates", "Archdevil of Gates", "the archdevil"),
+    ("dispater", "Dispater", "archdevil-of-iron", "Archdevil of Iron", "the archdevil"),
+    ("geryon", "Geryon", "archdevil-of-heresy", "Archdevil of Heresy", "the archdevil"),
+    ("moloch", "Moloch", "archdevil-of-sacrifice", "Archdevil of Sacrifice", "the archdevil"),
+    ("baalzebul", "Baalzebul", "archdevil-of-flies", "Archdevil of Flies", "the archdevil"),
+    ("mephistopheles", "Mephistopheles", "archdevil-of-contracts", "Archdevil of Contracts",
+     "the archdevil"),
+    # The daemon harbingers: their own text already calls Charon "the Horseman of Death".
+    ("charon", "Charon", "horseman-of-death", "Horseman of Death", "the Horseman"),
+    ("apollyon", "Apollyon", "horseman-of-pestilence", "Horseman of Pestilence",
+     "the Horseman"),
+    ("szuriel", "Szuriel", "horseman-of-war", "Horseman of War", "the Horseman"),
+    ("trelmarixian", "Trelmarixian", "horseman-of-famine", "Horseman of Famine",
+     "the Horseman"),
+    # By what each block's abilities do: Unlimited Abandon, Devils' End, an aura of silence.
+    ("arshea", "Arshea", "empyreal-lord-of-abandon", "Empyreal Lord of Abandon",
+     "the empyreal lord"),
+    ("ragathiel", "Ragathiel", "empyreal-lord-of-vengeance", "Empyreal Lord of Vengeance",
+     "the empyreal lord"),
+    ("black-butterfly", "Black Butterfly", "empyreal-lord-of-silence",
+     "Empyreal Lord of Silence", "the empyreal lord"),
+    # Boiling spray and a fever curse; Destruction and Destructive Commands; entangling
+    # acid; the Blisterwomb that births qlippoth.
+    ("chavazvug", "Chavazvug", "qlippoth-lord-of-fever", "Qlippoth Lord of Fever",
+     "the qlippoth lord"),
+    ("isph-aun-vuln", "Isph-Aun-Vuln", "qlippoth-lord-of-ruin", "Qlippoth Lord of Ruin",
+     "the qlippoth lord"),
+    ("thuskchoon", "Thuskchoon", "qlippoth-lord-of-acid", "Qlippoth Lord of Acid",
+     "the qlippoth lord"),
+    ("oaur-ooung", "Oaur-Ooung", "qlippoth-lord-of-spawn", "Qlippoth Lord of Spawn",
+     "the qlippoth lord"),
+    # Kinds of creature. The shoki's Soul Lock staff; the elysian titan as elysian bronze
+    # went (celestial bronze); Leng's three as the Dimension of Dreams' own; the herecite
+    # and the gnolls by the role GODS already gives their god.
+    ("shoki", "Shoki", "soulkeeper-psychopomp", "Soulkeeper Psychopomp", None),
+    ("elysian", "Elysian", "celestial-titan", "Celestial Titan", None),
+    ("herecite-of-asmodeus", "Herecite of Asmodeus", "herecite-of-tyranny",
+     "Herecite of Tyranny", None),
+    ("ghoul-leng", "Leng Ghoul", "ghoul-dreamland", "Dreamland Ghoul", None),
+    ("leng-hound", "Leng Hound", "dreamland-hound", "Dreamland Hound", None),
+    ("leng-spider", "Leng Spider", "dreamland-spider", "Dreamland Spider", None),
+    ("chosen-of-lamashtu", "Chosen of Lamashtu", "chosen-of-the-demon-mother",
+     "Chosen of the Demon Mother", None),
+    ("eye-of-lamashtu", "Eye of Lamashtu", "eye-of-the-demon-mother",
+     "Eye of the Demon Mother", None),
+]
+
+# Sentences the renames alone would leave wrong, keyed by the creature's original id and
+# matched exactly, like the spells' edits.
+CREATURE_EDITS: dict[str, list[tuple[str, str]]] = {
+    "horla": [("only Charon, the Horseman of Death, has held",
+               "only the Horseman of Death has held")],
+    # The overview of Hell bled into this block from the facing page.
+    "giant-hellgrammite": [("their lord Asmodeus claimed Hell", "their lord claimed Hell")],
+    "mammon": [("Mammon's Mark (Su)", "Miser's Mark (Su)"),      # Genius Avaricious's word
+               # Written out in full: an edit's new words must survive the later passes,
+               # or the second run cannot find them and calls the table stale.
+               ("domain on Erebus", "domain in the treasure vaults of Hell")],
+    "ghoran": [("Ghorus Seed", "Ghoran Seed")],
+    "tawil-at-umr": [("Yog-Sothoth can create a new avatar",
+                      "the outer god it serves can create a new avatar")],
+    # An ability with no (Ex) after its title, so nothing marks the sentence start.
+    "charon": [("Craft Item Charon is treated", "Craft Item The Horseman is treated")],
+}
+
+GODS.update({"Torag": "a god of the forge", "Iomedae": "a god of valor"})
+WORSHIPER_RE = re.compile(r"\b([Ww]orshiper of) (" + "|".join(map(re.escape, GODS)) + r")\b")
+# A priest's gear: "silver holy symbol of Gorum" is a holy symbol of a god of battle.
+SYMBOL_RE = re.compile(r"\b((?:un)?holy symbol of) (" + "|".join(map(re.escape, GODS))
+                       + r")\b")
+# A god named in a monster's prose, after the symbols and gates have taken their portfolio
+# ("a god of tyranny"): as the spells wrote him, "the lord of Hell". Not in COSMOS, which
+# the feats run before their deity gates — there it turned "Worshiper of Asmodeus" into
+# "worshiper of the lord of Hell" instead of the gate's "a god of tyranny".
+_god_names = _namer([("Asmodeus", "lord of Hell", True)])
+
+
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(name).lower()).strip("-")
+
+
+def _creature_key(name: str) -> str:
+    return re.sub(r"\s*-\s*", "-", " ".join(str(name).lower().split()))
+
+
+def _creature_renamer(own_id: str):
+    """Old creature names to new in running text, for the row whose original id is
+    `own_id`. Hyphens may carry a space ("Oaur- Ooung", a PDF line break); a plural
+    keeps its s; a leading "the" is absorbed so a title never reads "the the"."""
+    by_key = {_creature_key(old_name): (old, new_name, noun)
+              for old, old_name, _nid, new_name, noun in CREATURE_RENAMES}
+    alts = sorted((r"-\s?".join(map(re.escape, re.split(r"\s*-\s*", n)))
+                   for _o, n, _i, _nn, _no in CREATURE_RENAMES), key=len, reverse=True)
+    pattern = re.compile(_ART + r"(?<![\w'-])(?P<the>[Tt]he\s+)?(?P<name>" + "|".join(alts)
+                         + r")(?P<s>s)?(?![\w-])", re.IGNORECASE)
+
+    def swap(m: re.Match) -> str:
+        old, new_name, noun = by_key[_creature_key(m.group("name"))]
+        if noun:
+            new = noun if old == own_id else "the " + new_name
+        else:
+            new = ("the " if m.group("the") else "") + new_name.lower()
+        return _articled(m, new) + (m.group("s") or "")
+
+    return lambda s: pattern.sub(swap, s)
+
+
+def _clear_lore_entries(row: dict, col: str) -> dict:
+    """A list column (a creature's languages) loses an entry that is only a lore name:
+    the omnipath spoke "Azlanti", a tongue no World Bible world has."""
+    name_re, class_of, lore = _lore_names()
+    value = row.get(col)
+    if isinstance(value, list):
+        row[col] = [v for v in value if not (isinstance(v, str) and (m := name_re.fullmatch(
+            v.strip())) and class_of.get(m.group(1)) in lore | {"myth"})]
+    return row
+
+
+def bestiary_aliases() -> dict[str, str]:
+    """Old creature id, and old name slugged where it differs (a spawn asks for "leng
+    ghoul"), -> the id it is now. Hashed into content/bestiary/aliases.json by
+    tools/strip_golarion.py, so the old names sit in no shipped file."""
+    out = {}
+    for old, old_name, new_id, _n, _no in CREATURE_RENAMES:
+        out[old] = new_id
+        out.setdefault(_slug(old_name), new_id)
+    return out
+
+
+def apply_bestiary(entries: list[dict]) -> list[dict]:
+    """A bestiary file's creature rows rewritten (core.json, creatures.json, mounts.json):
+    ids and names from CREATURE_RENAMES, prose through the same maps as the spells. Rows
+    of the table a file does not carry are skipped — the table spans every file, and
+    tools/strip_golarion.py checks each old id is found in one of them."""
+    renamed = {old: (new_id, new_name) for old, _on, new_id, new_name, _no in CREATURE_RENAMES}
+    original = {new_id: old for old, (new_id, _n) in renamed.items()}
+    out = []
+    for e in entries:
+        cid = e.get("id")
+        own = original.get(cid, cid)
+        e = _clear_lore_entries(dict(e), "languages")
+        e = _edit_row(e, CREATURE_EDITS.get(own, []))
+        rename = _creature_renamer(own)
+
+        def prose(s: str, rename=rename) -> str:
+            s = SYMBOL_RE.sub(lambda m: f"{m.group(1)} {GODS[m.group(2)]}", rename(s))
+            s = WORSHIPER_RE.sub(lambda m: f"{m.group(1)} {GODS[m.group(2)]}", s)
+            return _god_names(_common(s))
+
+        e = _rewrite_prose(e, prose)
+        if own in renamed:
+            e["id"], e["name"] = renamed[own]
+        out.append(e)
+    return out
 
 
 # --- applying ----------------------------------------------------------------------------------
@@ -837,18 +1120,23 @@ def _renamer(renames: dict[str, str], lowercase: bool):
     if not renames:
         return lambda s: s
     olds = sorted(renames, key=len, reverse=True)
-    pattern = re.compile(r"(?<![\w'])(" + "|".join(map(re.escape, olds)) + r")(?!\w)",
-                         re.IGNORECASE)
+    pattern = re.compile(_ART + r"(?<![\w'])(?P<name>" + "|".join(map(re.escape, olds))
+                         + r")(?!\w)", re.IGNORECASE)
     by_lower = {o.lower(): n for o, n in renames.items()}
 
     def swap(m: re.Match) -> str:
-        new = by_lower[m.group(1).lower()]
+        new = by_lower[m.group("name").lower()]
         if lowercase:
             new = new.lower()
-        before = m.string[:m.start()].rstrip()
+        art = m.group("art")
+        if art:
+            art = ("an " if new[:1].lower() in "aeiou" else "a ")
+        at = m.start()
+        before = m.string[:at].rstrip()
+        out = (art or "") + new
         if not before or before[-1] in ".!?:\n\"(":
-            new = new[0].upper() + new[1:]
-        return new
+            out = out[0].upper() + out[1:]
+        return out
 
     return lambda s: pattern.sub(swap, s)
 
@@ -858,8 +1146,9 @@ def _common(s: str) -> str:
         s = s.replace(old, new)
     for pattern, new in PRODUCT:
         s = pattern.sub(new, s)
-    for pattern, new in COSMOS:
-        s = pattern.sub(new, s)
+    for pattern, new in WEAPON_WORDS:
+        s = pattern.sub(lambda m, n=new: _articled(m, n), s)
+    s = _places(s)
     return s
 
 
@@ -946,6 +1235,10 @@ def apply_feats(entries: list[dict]) -> tuple[list[dict], dict[str, str | None]]
         for cond in e.get("prerequisites") or []:
             if cond.get("kind") == "feat" and cond.get("feat") in FEAT_RENAMES:
                 cond["feat"] = FEAT_RENAMES[cond["feat"]][0]
+        if isinstance(e.get("unparsed_prerequisites"), list):
+            # A gate an edit deleted leaves "" behind; an empty gate is no gate.
+            e["unparsed_prerequisites"] = [u for u in e["unparsed_prerequisites"]
+                                           if not isinstance(u, str) or u.strip()]
         if fid in FEAT_RENAMES:
             e["id"], e["name"] = FEAT_RENAMES[fid]
         out.append(e)

@@ -61,6 +61,9 @@ ALIASES: dict[str, str] = {
     # docs/bestiary-licensing.md §7). A pack saved before then still holds the old key.
     "aldori dueling sword": "dueling-sword", "aldori-dueling-sword": "dueling-sword",
     "shoanti bolas": "heavy-bolas", "shoanti-bolas": "heavy-bolas",
+    # The same, 2026-10-30: two the case-sensitive deny-list missed.
+    "klar": "skull-shield", "kasatha spinal sword": "spinal-sword",
+    "kasatha-spinal-sword": "spinal-sword",
 }
 
 # Sections the weaponsmith does not stock (owner's ruling E5, 2026-09-30): engines of war
@@ -438,7 +441,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "heavy blades": ("aldori dueling sword", "ankus", "bastard sword", "chakram", "cutlass",
                      "double chicken saber", "double walking stick katana",
                      "elven curve blade", "estoc", "falcata", "falchion", "flambard",
-                     "great terbutje", "greatsword", "katana", "khopesh", "klar",
+                     "great terbutje", "greatsword", "katana", "khopesh", "skull shield",
                      "longsword", "nine-ring broadsword", "nodachi", "rhoka sword",
                      "sawtooth sabre", "scimitar", "scythe", "seven-branched sword",
                      "shotel", "sickle-sword", "split-blade sword", "switchscythe",
@@ -455,7 +458,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "close": ("bayonet", "brass knuckles", "cestus", "dan bong", "emei piercer",
               "fighting fan", "gauntlet", "heavy shield", "iron brush", "katar",
               "katar (tri-bladed)",
-              "klar", "light shield", "mere club", "punching dagger", "rope gauntlet",
+              "skull shield", "light shield", "mere club", "punching dagger", "rope gauntlet",
               "sap", "scizore", "spiked armor", "spiked gauntlet", "spiked heavy shield",
               "spiked light shield", "tekko-kagi", "tonfa", "unarmed strike",
               "waveblade", "wooden stake", "wushu dart"),

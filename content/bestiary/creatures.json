@@ -11219,8 +11219,8 @@
    "printed_other_gear": "hide armor, +1 human bane greatsword, handaxe, longbow with 20 arrows, belt of giant strength +2, 18 gp"
   },
   {
-   "id": "chosen-of-lamashtu",
-   "name": "Chosen Of Lamashtu",
+   "id": "chosen-of-the-demon-mother",
+   "name": "Chosen of the Demon Mother",
    "kind": "npc",
    "cr": "12",
    "cr_value": 12.0,
@@ -21900,8 +21900,8 @@
    "printed_other_gear": "masterwork banded mail, masterwork light steel shield, +1 longsword, kukri, masterwork light crossbow with 20 bolts, masterwork manacles, 114 gp"
   },
   {
-   "id": "eye-of-lamashtu",
-   "name": "Eye Of Lamashtu",
+   "id": "eye-of-the-demon-mother",
+   "name": "Eye of the Demon Mother",
    "kind": "npc",
    "cr": "5",
    "cr_value": 5.0,
@@ -22278,7 +22278,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "potion of cure light wounds, tanglefoot bag",
-   "printed_other_gear": "mithral chain shirt, masterwork light crossbow with 20 bolts, masterwork short sword, signal whistle, silver holy symbol, trained hawk (Pathfinder RPG Bestiary 131, worth 40 gp), bit and bridle, light horse (combat trained), riding saddle, saddlebags, 360 gp"
+   "printed_other_gear": "mithral chain shirt, masterwork light crossbow with 20 bolts, masterwork short sword, signal whistle, silver holy symbol, trained hawk (Bestiary 131, worth 40 gp), bit and bridle, light horse (combat trained), riding saddle, saddlebags, 360 gp"
   },
   {
    "id": "fang-monastery-ascendant",
@@ -29983,7 +29983,7 @@
    "biomes_inferred": true,
    "biomes_from": "name-word",
    "printed_gear": "potion of bull's strength, potions of cure light wounds (2), alchemist's fire (4), tanglefoot bags (2)",
-   "printed_other_gear": "studded leather, heavy wooden shield, mwk dogslicerUE, shortbow with 20 mwk arrows, tindertwigs (7), giant gecko mount (Pathfinder RPG Bestiary 3 186), 2 gp"
+   "printed_other_gear": "studded leather, heavy wooden shield, mwk dogslicerUE, shortbow with 20 mwk arrows, tindertwigs (7), giant gecko mount (Bestiary 3 186), 2 gp"
   },
   {
    "id": "goblin-sneak",
@@ -31356,7 +31356,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "potion of barkskin +3, potion of cat's grace, potion of darkvision, wand of cure light wounds (20 charges), deathblade, purple worm poison",
-   "printed_other_gear": "mithral breastplate, +1 human-bane gladiusUE, cestus of security*, mwk gladius, mwk shortbow with 20 arrows, circlet of persuasion, cloak of resistance +1, disguise kit, wooden unholy symbol of Norgorber"
+   "printed_other_gear": "mithral breastplate, +1 human-bane gladiusUE, cestus of security*, mwk gladius, mwk shortbow with 20 arrows, circlet of persuasion, cloak of resistance +1, disguise kit, wooden unholy symbol of a god of secrets"
   },
   {
    "id": "great-black-sphynx",
@@ -31832,7 +31832,7 @@
    "biomes_any": true,
    "biomes_inferred": true,
    "biomes_from": "floor",
-   "printed_gear": "+1 splint mail, +1 greatsword, silver holy symbol of Gorum"
+   "printed_gear": "+1 splint mail, +1 greatsword, silver holy symbol of a god of battle"
   },
   {
    "id": "grizzled-mercenary",
@@ -32013,7 +32013,7 @@
    "biomes_inferred": true,
    "biomes_from": "subtype",
    "printed_gear": "potion of bull's strength, potion of cure moderate wounds, +1 flaming arrows (5), alchemist's fire (2), tanglefoot bags (2)",
-   "printed_other_gear": "+1 chain shirt, +1 buckler, mwk composite shortbow with 20 arrows, mwk horsechopperUE, giant gecko mount (Pathfinder RPG Bestiary 3 186), 81 gp"
+   "printed_other_gear": "+1 chain shirt, +1 buckler, mwk composite shortbow with 20 arrows, mwk horsechopperUE, giant gecko mount (Bestiary 3 186), 81 gp"
   },
   {
    "id": "grove-guardian",
@@ -32405,7 +32405,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "wand of cure light wounds (20 charges), wand of shield of faith (5 charges)",
-   "printed_other_gear": "mwk chain shirt, dagger, light crossbow with 10 bolts, guard's kit*, healer's kit, silver holy symbol of Abadar, 42 gp"
+   "printed_other_gear": "mwk chain shirt, dagger, light crossbow with 10 bolts, guard's kit*, healer's kit, silver holy symbol of a god of commerce, 42 gp"
   },
   {
    "id": "guard-mage",
@@ -35888,7 +35888,7 @@
     "Sylvan"
    ],
    "special_attacks": "alchemical weapon (swift action), bomb 14/day (4d6+2 fire, DC 16), directed blast",
-   "special_abilities": "Alternate Racial Features (Ex) The bombardier has the engineer racial trait in place of sneaky, granting him a +2 bonus on Craft (alchemy) and Knowledge (engineering) checks. He also employs the hobgoblin alternate favored class option for his alchemy levels, granting him four additional uses of his bomb ability each day. Both of these racial options can be found on page 121 of the Pathfinder RPG Advanced Race Guide.",
+   "special_abilities": "Alternate Racial Features (Ex) The bombardier has the engineer racial trait in place of sneaky, granting him a +2 bonus on Craft (alchemy) and Knowledge (engineering) checks. He also employs the hobgoblin alternate favored class option for his alchemy levels, granting him four additional uses of his bomb ability each day. Both of these racial options can be found on page 121 of the Advanced Race Guide.",
    "spell_like": "",
    "environment": "",
    "organization": "",
@@ -36574,7 +36574,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "potions of cure light wounds (3)",
-   "printed_other_gear": "+1 breastplate, mwk musketUC with 14 alchemical cartridges (paper)UC, warhammer, silver holy symbol of Torag"
+   "printed_other_gear": "+1 breastplate, mwk musketUC with 14 alchemical cartridges (paper)UC, warhammer, silver holy symbol of a god of the forge"
   },
   {
    "id": "holy-warrior",
@@ -44534,7 +44534,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "oil of bless weapon, oil of magic weapon (2), potion of cure moderate wounds",
-   "printed_other_gear": "mwk breastplate, mwk light wooden shield, mwk light crossbow with 40 bolts, mwk longsword, sap, guard's kit*, silver holy symbol of Abadar, 26 gp"
+   "printed_other_gear": "mwk breastplate, mwk light wooden shield, mwk light crossbow with 40 bolts, mwk longsword, sap, guard's kit*, silver holy symbol of a god of commerce, 26 gp"
   },
   {
    "id": "mistress-of-high-places",
@@ -49749,7 +49749,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "oil of bless weapon (2), potion of cure serious wounds",
-   "printed_other_gear": "+1 full plate, +1 greatsword, amulet of natural armor +1, headband of alluring charisma +2, cloak of resistance +1, mwk composite longbow (Str +3), silver holy symbol of Iomedae"
+   "printed_other_gear": "+1 full plate, +1 greatsword, amulet of natural armor +1, headband of alluring charisma +2, cloak of resistance +1, mwk composite longbow (Str +3), silver holy symbol of a god of valor"
   },
   {
    "id": "petty-fence",
@@ -50833,7 +50833,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "potions of barkskin (2), pallid suspension*",
-   "printed_other_gear": "mwk full plate, mwk composite longbow (+4 Str) with 20 arrows, mwk scythe, headband of alluring charisma +2, silver unholy symbol of Urgathoa, 207 gp"
+   "printed_other_gear": "mwk full plate, mwk composite longbow (+4 Str) with 20 arrows, mwk scythe, headband of alluring charisma +2, silver unholy symbol of a god of undeath, 207 gp"
   },
   {
    "id": "plaguebrewer",
@@ -53845,7 +53845,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "potion of cure light wounds, scroll of invisibility, scroll of magic weapon, scroll of summon monster II, wand of cure light wounds (10 charges)",
-   "printed_other_gear": "+1 chain shirt, +1 light wooden shield, javelin, mwk dagger, mwk morningstar, spiked gauntlet, cloak of resistance +1, backpack, belt pouch, hemp rope (50 ft.), holy textUE, silver unholy symbol of Norgorber, spell component pouch, torches (10), trail rations (5), waterskin"
+   "printed_other_gear": "+1 chain shirt, +1 light wooden shield, javelin, mwk dagger, mwk morningstar, spiked gauntlet, cloak of resistance +1, backpack, belt pouch, hemp rope (50 ft.), holy textUE, silver unholy symbol of a god of secrets, spell component pouch, torches (10), trail rations (5), waterskin"
   },
   {
    "id": "recruit",
@@ -59655,7 +59655,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "potion of cure light wounds (8), antiplagueAPG (2), antitoxin (2), soothe syrupAPG (2)",
-   "printed_other_gear": "mwk breastplate, mwk heavy steel shield, mwk dwarven waraxe, throwing axe (5), crowbar, guard's kit*, silver holy symbol of Torag, 18 gp"
+   "printed_other_gear": "mwk breastplate, mwk heavy steel shield, mwk dwarven waraxe, throwing axe (5), crowbar, guard's kit*, silver holy symbol of a god of the forge, 18 gp"
   },
   {
    "id": "shieldbreaker",
@@ -60503,7 +60503,7 @@
     "Elven"
    ],
    "special_attacks": "bold stares (disorientationOA, sapped magicOA, timidityOA), hypnotic stare (-3), manifold tricks (4 tricks), mental potency (+3), mesmerist tricks 12/ day ([DC 22], avenge me, die for me, double, extol, false flanker, misdirection, shadow splinter, spectral smoke)",
-   "special_abilities": "Leadership The mastermind's cohort is a brutal warlord (Pathfinder RPG NPC Codex 88). For his cult followers, use the following NPCs from Pathfinder RPG GameMastery Guide: one pilgrim, two noble scions, three doomsayers, five farmers, and 50 foot soldiers.",
+   "special_abilities": "Leadership The mastermind's cohort is a brutal warlord (NPC Codex 88). For his cult followers, use the following NPCs from GameMastery Guide: one pilgrim, two noble scions, three doomsayers, five farmers, and 50 foot soldiers.",
    "spell_like": "",
    "environment": "",
    "organization": "",
@@ -61492,7 +61492,7 @@
    "biomes_inferred": true,
    "biomes_from": "floor",
    "printed_gear": "oils of magic weapon (2), potions of cure light wounds (3)",
-   "printed_other_gear": "mithral chain shirt, mwk light mace, whip, silver holy symbol of Calistria, 234 gp"
+   "printed_other_gear": "mithral chain shirt, mwk light mace, whip, silver holy symbol of a god of revenge, 234 gp"
   },
   {
    "id": "sneak-shot",
@@ -66004,7 +66004,7 @@
    "biomes_any": true,
    "biomes_inferred": true,
    "biomes_from": "floor",
-   "printed_gear": "+1 ghost touch full plate, headband of inspired wisdom +2, silver unholy symbol of Urgathoa"
+   "printed_gear": "+1 ghost touch full plate, headband of inspired wisdom +2, silver unholy symbol of a god of undeath"
   },
   {
    "id": "thunder-wizard",
@@ -70975,7 +70975,7 @@
     "Vishkanya"
    ],
    "special_attacks": "drain chi (DC 17), poison, weapon training (heavy blades +1)",
-   "special_abilities": "Drain Chi (Su) Instead of draining blood, a jiang-shi vampire drains \"chi,\" or life energy, from a victim's breath. When a jiang-shi makes a successful grapple check (in addition to any other effects caused by a successful check, including additional damage), the jiang-shi can attempt to drain chi by drinking the victim's breath. The victim can resist this attack by succeeding at a DC 17 Fortitude save. On a failed save, the victim gains 1 negative level and is staggered for 1d4 rounds.  Poison (Ex) Vishkanya Venom: Weapon&#8211; injury; save Fort DC 17; frequency 1/round for 6 rounds; effect 1d2 Dex; cure 1 save.  Prayer Scroll (Su) The scroll attached to the brow of a jiang-shi grants immunity to any effects generated by spell-completion or spell-trigger magic items, such as scrolls and wands. Such magical effects treat the jiang-shi as if she had unbeatable spell resistance. A jiang-shi's prayer scroll can be removed with a successful steal combat maneuver (Pathfinder RPG Advanced Player's Guide 322), which immediately ends the jiang-shi's immunity to these effects. If a jiang-shi's prayer scroll is destroyed (a standard action), the vampire also loses her fast healing ability. A jiang-shi can create a replacement prayer scroll by using any strip of parchment and a writing instrument, but doing so requires 10 minutes of uninterrupted work.  Toxic (Ex) Four times per day as a swift action, a vishkanya can envenom a weapon that she wields with her toxic saliva or blood.",
+   "special_abilities": "Drain Chi (Su) Instead of draining blood, a jiang-shi vampire drains \"chi,\" or life energy, from a victim's breath. When a jiang-shi makes a successful grapple check (in addition to any other effects caused by a successful check, including additional damage), the jiang-shi can attempt to drain chi by drinking the victim's breath. The victim can resist this attack by succeeding at a DC 17 Fortitude save. On a failed save, the victim gains 1 negative level and is staggered for 1d4 rounds.  Poison (Ex) Vishkanya Venom: Weapon&#8211; injury; save Fort DC 17; frequency 1/round for 6 rounds; effect 1d2 Dex; cure 1 save.  Prayer Scroll (Su) The scroll attached to the brow of a jiang-shi grants immunity to any effects generated by spell-completion or spell-trigger magic items, such as scrolls and wands. Such magical effects treat the jiang-shi as if she had unbeatable spell resistance. A jiang-shi's prayer scroll can be removed with a successful steal combat maneuver (Advanced Player's Guide 322), which immediately ends the jiang-shi's immunity to these effects. If a jiang-shi's prayer scroll is destroyed (a standard action), the vampire also loses her fast healing ability. A jiang-shi can create a replacement prayer scroll by using any strip of parchment and a writing instrument, but doing so requires 10 minutes of uninterrupted work.  Toxic (Ex) Four times per day as a swift action, a vishkanya can envenom a weapon that she wields with her toxic saliva or blood.",
    "spell_like": "",
    "environment": "",
    "organization": "",

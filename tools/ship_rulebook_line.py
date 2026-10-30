@@ -200,6 +200,11 @@ def main(xlsx: Path) -> None:
             c["printed_gear"] = g["gear"]
         if g.get("other_gear"):
             c["printed_other_gear"] = g["other_gear"]
+    # The gear comes back from the workbook with its gods ("silver holy symbol of Gorum");
+    # the same table as the spells takes them out (tools/golarion_rewrites.py).
+    import golarion_rewrites
+
+    keep = golarion_rewrites.apply_bestiary(keep)
 
     # The store as it will stand: what the aliases may land on. Built from the kept rows,
     # the printed Bestiaries and the app's own people and templated creatures.
@@ -226,6 +231,12 @@ def main(xlsx: Path) -> None:
             aliases[c["id"]] = target
         else:
             lost.append(c["id"])
+    # And the creatures renamed out of Golarion (2026-10-30), so this rewrite of the file
+    # does not drop the aliases tools/strip_golarion.py put there.
+    moved = golarion_rewrites.bestiary_aliases()
+    aliases = {k: moved.get(v, v) for k, v in aliases.items()}
+    for old_id, new_id in moved.items():
+        aliases.setdefault(old_id, new_id)
     ALIASES.write_text(json.dumps({
         "note": ("Ids creatures.json carried before option D (2026-10-29), each to the shipped "
                  "body it now is: written by tools/ship_rulebook_line.py, read by "

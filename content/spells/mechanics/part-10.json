@@ -2051,7 +2051,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "The corpus contradicts itself on how many swords: the effect line says one per 3 levels, the description says one per 5 caster levels. Neither was picked — the count is left in the prose. Details of the sword come from last-azlanti-s-defending-sword, which this spell functions as (defending sword)."
+   "notes": "The corpus contradicts itself on how many swords: the effect line says one per 3 levels, the description says one per 5 caster levels. Neither was picked — the count is left in the prose. Details of the sword come from defending-sword, which this spell functions as (defending sword)."
   },
   "lay-of-the-land": {
    "effects": [

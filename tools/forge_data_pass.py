@@ -412,7 +412,7 @@ entry("ghost-skymetal", pieces={"weapon": ["head"]},
                  note="house approximation of the book's 'ignores armour and shield "
                       "bonuses from iron or steel'")],
       working=wk("malleable", "narrow_window"),
-      text="Ghost iron, the softest of the skymetals. An ghost skymetal head is always broken in "
+      text="Ghost iron, the softest of the skymetals. A ghost skymetal head is always broken in "
            "the book, deals damage as a size smaller and cannot harm iron or steel, but "
            "passes through iron and steel armour as if it were not there; here it swings "
            "truer against a metal-armoured foe. Poor for armour, so it fills no armour "

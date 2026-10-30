@@ -805,6 +805,15 @@ def run_scan(pdf_dir: Path, out: Path, keep_ids: dict[tuple[str, ...], str],
     kerned = join_kerned(list(creatures.values()))
     if kerned:
         report.append(("kerned words rejoined", kerned, 0, ""))
+    # The Bestiaries print Golarion's demigods and planes; the same table that rewrote the
+    # spells rewrites these (tools/golarion_rewrites.py, apply_bestiary), so a re-read of
+    # the PDFs cannot bring "Mammon" or "any (Abaddon)" back. Before the aliases, which
+    # compare against the shipped file's ids, already the new ones. The old ids live
+    # hashed in content/bestiary/aliases.json, written by tools/strip_golarion.py.
+    sys.path.insert(0, str(ROOT / "tools"))
+    import golarion_rewrites
+
+    creatures = {c["id"]: c for c in golarion_rewrites.apply_bestiary(list(creatures.values()))}
     aliases, lost = aliases_for(old or [], creatures)
     if lost:
         report.append(("old ids lost", len(lost), 0, ", ".join(lost)))
