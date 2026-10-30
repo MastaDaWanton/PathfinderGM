@@ -104,6 +104,31 @@ def test_what_no_table_knows_keeps_its_words_and_no_key():
     assert got["key"] == "" and got["printed"] == "silver holy symbol"
 
 
+def test_looted_potions_and_flasks_can_be_used():
+    """Measured in the running app 2026-10-29: a looted goblin's potions of cure light
+    wounds, acid, alchemist's fire and tanglefoot bags went into the herb satchel
+    (`inventory`), where nothing drinks or throws them and the Equipment tab does not list
+    them. They are filed now where buying them files them (`goods.deliver`)."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    s = Scene(location_id="5bbd0c40345f")
+    pc = load_pc("fixtures/pc-kesst.json")
+    s.add(pc)
+    body = bestiary.instantiate("viking", scene=s)
+    s.add(body)
+    body.hp = -20
+    body.die("test")
+    e = Engine(s, Dice(seed=1))
+    e.run(e.validate([{"op": "loot", "actor": "pc", "params": {"from_": body.ref}}]))
+    held = {v.base: (v.count, list(v.how)) for v in pc.stock.values()}
+    assert held["Potion of Cure Light Wounds"] == (3, ["drink"])
+    assert held["+1 chainmail"][0] == 1
+    assert pc.inventory == {}
+    assert "heavy wooden shield" in pc.goods and "battleaxe" in pc.weapons
+
+
 def test_a_block_changed_after_its_compile_is_read_live(shipped):
     block = dict(shipped["ogre"], melee="greatclub +9 (2d8+9)")
     assert compile_block.record_for(block) is None

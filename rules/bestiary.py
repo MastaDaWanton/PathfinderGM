@@ -433,9 +433,42 @@ def collapse_kit(actor) -> list[str]:
         if not goods_mod.known_item(key) and key not in goods_mod.GEAR:
             key = key.replace(" ", "-")
         if key:
-            actor.carry(key, 1)
+            _pocket(actor, key)
             made.append(key)
     return made
+
+
+def _pocket(actor, key: str) -> None:
+    """One pocketed thing, filed where a purchase of it would be (`goods.deliver`).
+
+    Measured in the running app 2026-10-29: a looted goblin's two potions of cure light
+    wounds, its acid, alchemist's fire and tanglefoot bags all went into `inventory`, the
+    herb satchel, where nothing drinks or throws them and the Equipment tab does not list
+    them — every pocket was `carry`'d since kits began, which was harmless while kits held
+    work gloves and chalk and is not now that a body's pockets are its printed gear.
+    A brewed thing is the alchemy bench's stock row (`goods.alchemy_stock`), a weapon, a
+    suit, a shield or a round goes through `goods.stow`, and the rest to the satchel as
+    before."""
+    from . import formulae
+    from . import goods as goods_mod
+
+    book = formulae.all()
+    slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-")
+    # The classics by the shop's own ids ("acid" is `acid-flask`, `goods.CLASSIC_GEAR`).
+    fid = (key if key in book else slug if slug in book
+           else goods_mod.CLASSIC_GEAR.get(key, "") or goods_mod.CLASSIC_GEAR.get(
+               key.replace("-", " "), ""))
+    if fid:
+        made = goods_mod.alchemy_stock(fid)
+        if made is not None:
+            actor.add_stock(made, 1)
+            return
+    found = goods_mod.known_item(key)
+    if found and found["table"] in ("weapon", "armour", "shield", "ammunition"):
+        stowed, _ = goods_mod.stow(actor, key, 1)
+        if stowed:
+            return
+    actor.carry(key, 1)
 
 
 def next_ref(scene, taken=()) -> str:
