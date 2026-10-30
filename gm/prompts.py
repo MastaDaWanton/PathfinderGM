@@ -3127,10 +3127,10 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
     # else: no bonus and no dice, because the model never authors a number. Without it
     # the model guessed — a "club" for an ogre whose line says greatclub — and the
     # engine now refuses a weapon the block does not print (2026-09-27), so an unnamed
-    # attack list cost a retry. Ground every name.
-    printed = [a["key"] for cat in ("melee", "ranged")
-               for opt in (actor.stat_block_attacks().get(cat) or ())
-               for a in opt] if hasattr(actor, "stat_block_attacks") else []
+    # attack list cost a retry. Ground every name. Only what it still has
+    # (`Actor.printed_arms`): a disarmed guard's halberd lies on the ground, and naming
+    # it here would hand the model a swing the engine refuses.
+    printed = actor.printed_arms() if hasattr(actor, "printed_arms") else []
     # "Their", matching the "They are" above it. It first read "Its attacks", and the
     # audit that followed had NPC turns calling a barkeep "it" in 12 of 23 where the
     # run before had 1 of 12 — not proven to be this line, not worth the risk either.

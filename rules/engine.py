@@ -3570,10 +3570,30 @@ class Engine:
                     raise IntentError(
                         f"attack: the {granted['key']} is not formed. Use "
                         f"{granted['ability']} to form it first.", "legality", index, code="not_formed")
-            elif actor.stat_block_weapon(key) is not None:
-                # A printed attack: the ogre's greatclub, the owlbear's claws, a
-                # dragon's tail slap. The stat block is the creature's inventory.
+            elif actor.stat_block_weapon(key) is not None and not actor.printed_item(key):
+                # A printed attack that is the body: the owlbear's claws, a dragon's
+                # tail slap, "tendrils". Nothing to drop, lose or carry.
                 pass
+            elif actor.stat_block_weapon(key) is not None:
+                # A printed made weapon: the print gives its numbers, the sheet says
+                # whether it is still had (`Actor.take_up_printed_arms`). This branch
+                # used to pass every printed name — "the stat block is the creature's
+                # inventory" — so a guard's halberd lying on the ground was swingable
+                # by name the moment a disarm could put it there.
+                if not actor.has_printed(key):
+                    rec = self.scene.out_of_hand(actor.ref, actor.printed_item(key))
+                    if rec is not None:
+                        holder = self.scene.actors.get(str(rec.get("held_by") or ""))
+                        where = (f"is in {holder.name}'s hands" if holder is not None
+                                 else "lies on the ground")
+                        raise IntentError(
+                            f"attack: {actor.name}'s {key} {where}. Picking it up is a "
+                            f"give to {actor.ref} of '{rec['name']}'.", "legality", index,
+                            code="weapon_out_of_hand")
+                    raise IntentError(
+                        f"attack: {actor.name} is not carrying a {key} (has "
+                        f"{', '.join(actor.weapons) or 'nothing'})", "legality", index,
+                        code="no_such_weapon")
             elif (actor.stat_block_attacks()
                   and str(key).strip().lower() not in ("unarmed", "improvised")
                   and str(key).strip().lower() not in (actor.weapons or ())):
