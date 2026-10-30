@@ -133,13 +133,17 @@ def _road(*templates: str):
 
 
 @pytest.mark.parametrize("templates, text", [
-    (("varisian-wagon-driver", "riding-dog"),
+    # The road's own bodies (2026-10-28) were the Varisian wagon driver and the guard; the
+    # bestiary rebuild (build/bestiary-rebuild, 2026-10-30) ships the wagon driver as a
+    # rules-built person with a quarterstaff on its sheet, so the printed-weapon case is
+    # held here by bodies that are still print: the ogre's greatclub, the caravan guard.
+    (("ogre", "riding-dog"),
      "The second teamster swings their club in a heavy, practiced arc, the wood "
      "whistling through the air before it connects with the riding dog."),
     (("guard",),
      "A desperate roar echoes as the Toll-Keeper swings his halberd in a wide, desperate "
      "arc to drive you back."),
-    (("guard", "varisian-wagon-driver"),
+    (("guard", "caravan-guard"),
      "The hired sword steps forward and swings their halberd in a wide, punishing arc at "
      "the Toll-Keeper."),
 ])
