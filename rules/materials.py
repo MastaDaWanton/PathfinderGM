@@ -1819,7 +1819,10 @@ def recipe_problems(doc: dict, *, essences: dict[str, dict] | None = None,
     if doc.get("vessel") not in SLOTS and doc.get("vessel") not in RECIPE_VESSELS:
         say(f"vessel {doc.get('vessel')!r} is no slot. One of the sheet's slots "
             f"(rules/tables.SLOTS) or {', '.join(RECIPE_VESSELS)}.")
-    if not str(doc.get("source") or "").startswith("https://legacy.aonprd.com/"):
+    # The legacy PRD carries the rulebooks only; an item read from a setting book (our own
+    # versions of the adventures' items, tools/own_items.py) is on the current AoN.
+    if not str(doc.get("source") or "").startswith(("https://legacy.aonprd.com/",
+                                                     "https://aonprd.com/")):
         say("cites no source. Name the AoN page its numbers were read from.")
 
     book = doc.get("book") or []
