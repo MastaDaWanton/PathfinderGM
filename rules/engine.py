@@ -16233,6 +16233,17 @@ class Engine:
                                 "rider": rule["rider"], "why": blocked, "origin": origin},
                      "tell": f"{defender.name} is immune to {blocked}; the {name} takes "
                              f"no hold."}]
+        # A disease already carried is not caught again, and nothing is rolled for it.
+        # Measured live 2026-10-30: a second rat-swarm hit rolled a fresh contraction save
+        # against a filth fever Kesst already had, and the tell "resists the filth fever"
+        # told the narrator the fever had been thrown off. A poison's further dose does
+        # roll: it is a new exposure that can stack (`Actor.take_affliction`).
+        if kind == "disease" and any(
+                e.kind == "affliction" and (e.payload or {}).get("id") == f"{origin}|{name}"
+                for e in defender.effects):
+            return [{"effect": {"ref": defender.ref, "kind": "rider", "rider": rule["rider"],
+                                "affliction": name, "origin": origin, "again": True},
+                     "tell": ""}]
         save, dc = str(aff.get("save") or "fort"), int(aff.get("dc") or 10)
         made, said = self._rider_save(defender, save, dc, f"{SAVES[save]} save against "
                                       f"{name}", state, against=kind)

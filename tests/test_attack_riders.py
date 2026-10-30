@@ -211,6 +211,24 @@ def test_a_rat_swarms_filth_fever_infected_nobody():
     pytest.fail("the swarm never infected Kesst in 59 seeds")
 
 
+def test_a_fever_already_carried_is_not_rolled_against_again():
+    """Measured live 2026-10-30: the swarm's second hit rolled a new contraction save
+    against the filth fever Kesst already carried, and told "Kesst Vayr resists the filth
+    fever" — as if it had been thrown off. A disease is caught once; nothing is rolled."""
+    engine, pc, swarm = _fight("rat-swarm", 1)
+    printed = swarm.weapon("swarm")["stat_block"]
+    intent = engine.validate([{"op": "attack", "actor": swarm.ref, "target": "pc",
+                               "because": "t"}])[0]
+    (rule,) = [r for r in printed["rules"] if r["kind"] == "affliction"]
+    pc.take_affliction(rule["affliction"], name="filth fever", source="t",
+                       origin="creature:rat-swarm", onset_rounds=14400,
+                       every_rounds=14400, limit=None)
+    state = {"rolls": []}
+    got = engine._rider_affliction(intent, swarm, pc, rule, "creature:rat-swarm", state)
+    assert state["rolls"] == [] and got[0]["effect"].get("again")
+    assert not any("resists" in g["tell"] for g in got)
+
+
 def test_a_wolf_tripped_nobody():
     """Trip (Bestiary UMR): a free trip on the bite, no attack of opportunity, and "if the
     attempt fails, the creature is not tripped in return"."""
