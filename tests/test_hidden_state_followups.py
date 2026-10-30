@@ -516,3 +516,59 @@ def test_the_unseen_confirmation_asks_what_the_first_read_asked():
     for word in ("speaking to you", "reaching for you", "looking at you", "striking"):
         assert word in q or word.replace("looking at you", "looking at you (the") in q
     assert "speaking to you" in bv._UNSEEN_SYSTEM and "reaching for you" in bv._UNSEEN_SYSTEM
+
+
+# --- found driving the live app, 2026-10-30 ----------------------------------------------
+
+def test_a_built_diversion_or_search_is_not_given_a_band():
+    """Live, the diversion scenario: the reading's built `check bluff diversion=true` was
+    given `dc: average` by `fill_bare_checks` and refused seven plans running ("a diversion
+    is rolled against every watcher's sense motive ... Drop the dc"), until the turn fell
+    to the fallback. A search is the same shape."""
+    from gm import judgement
+
+    out = judgement.fill_bare_checks([
+        {"op": "check", "actor": "pc", "params": {"skill": "bluff", "diversion": True}},
+        {"op": "check", "actor": "pc", "params": {"skill": "perception", "search": True}},
+        {"op": "check", "actor": "pc", "params": {"skill": "climb"}}])
+    assert [("dc" in r["params"]) for r in out] == [False, False, True]
+
+
+def test_the_books_inverted_spell_names_are_found_as_said():
+    """Live, a wizard 13: "I cast mass invisibility on Bran and Wenna" matched only the
+    one-word Invisibility, and the means gate refused "mass invisibility" as no spell of
+    hers while printing "Invisibility, Mass" in the same refusal's list."""
+    from gm import judgement
+
+    for said, want in (("I cast mass invisibility on Bran", "invisibility-mass"),
+                       ("greater invisibility on me", "invisibility-greater"),
+                       ("I cast mass cure light wounds", "cure-light-wounds-mass"),
+                       ("I cast invisibility", "invisibility")):
+        assert judgement.spell_in_words(said).id == want, said
+
+
+def test_the_players_cast_is_the_spell_their_words_name_at_everyone_aimed_at():
+    """Live, the same turn after the name fix: the plan's third attempt was `magic-missile`
+    at Bran and `magic-missile` at Wenna — the allies the player meant to hide — and it
+    validated, because `inject_cast` stands down once the plan casts anything. The named
+    spell is put back, an `at` list is the `target` list, and two casts of a spell with
+    plural targets ("creatures") are one casting."""
+    from gm import judgement
+
+    s = Scene(location_id="5bbd0c40345f")
+    d = to_dict(load_pc("fixtures/pc-caster.json"))
+    d["level"] = 13
+    d["spellbook"] = list(d["spellbook"]) + ["invisibility-mass"]
+    d["prepared"] = {"invisibility-mass": 1, "magic-missile": 2}
+    s.add(from_dict(d, ref="pc"))
+    s.add(instantiate("thug", scene=s, name="Bran"))
+    s.add(instantiate("thug", scene=s, name="Wenna"))
+    said = "I cast mass invisibility on Bran and Wenna."
+    planned = [{"op": "cast", "actor": "pc", "params": {"spell": "magic-missile", "at": "c1"}},
+               {"op": "cast", "actor": "pc", "params": {"spell": "magic-missile", "at": "c2"}}]
+    assert judgement.the_named_spell(planned, said, s) == [
+        {"op": "cast", "actor": "pc", "params": {"spell": "invisibility-mass"},
+         "target": ["c1", "c2"]}]
+    listed = [{"op": "cast", "actor": "pc",
+               "params": {"spell": "mass invisibility", "at": ["c1", "c2"]}}]
+    assert judgement.the_named_spell(listed, said, s)[0]["target"] == ["c1", "c2"]

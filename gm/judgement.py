@@ -3037,7 +3037,14 @@ def fill_bare_checks(raw_intents) -> list:
             # the turn degraded to narration — which handed over a pouch of coin.
             social = (str(params.get("skill", "")).strip().lower()
                       in ("diplomacy", "intimidate") and raw.get("target"))
-            if not params.get("dc") and not params.get("opposed_by") and not social:
+            # And a search or a diversion: each is rolled against what the engine holds
+            # (a hiding's own DC, every watcher's Sense Motive), and `_check_params`
+            # refuses either with a band. Measured live 2026-10-30: the reading's built
+            # `check bluff diversion=true` was given `dc: average` here and refused seven
+            # plans running, until the turn fell to the fallback.
+            engine_set = bool(params.get("search") or params.get("diversion"))
+            if not params.get("dc") and not params.get("opposed_by") and not social \
+                    and not engine_set:
                 raw = dict(raw)
                 params["dc"] = {"band": "average"}
                 raw["params"] = params
@@ -4214,8 +4221,10 @@ def inject_false_claim(raw_intents, player_text: str, scene, reading=None) -> li
     }
     out, placed = [], False
     for r in raw_intents:
+        # A diversion's Bluff (`acts_to_ops._sneak`) is not the claim's: kept beside it.
         if isinstance(r, dict) and str(r.get("op", "")).lower() == "check" \
-                and str((r.get("params") or {}).get("skill", "")).lower() == "bluff":
+                and str((r.get("params") or {}).get("skill", "")).lower() == "bluff" \
+                and not (r.get("params") or {}).get("diversion"):
             if not placed:
                 out.append(check)
                 placed = True
@@ -6927,6 +6936,19 @@ def spell_in_words(text: str):
             words = _spell_words(catalogue[sid].name)
             if words:
                 index.setdefault(words, catalogue[sid])
+        # And the book's inverted names the way they are said: "Invisibility, Mass" is
+        # "mass invisibility" aloud, "Cure Light Wounds, Mass" "mass cure light wounds".
+        # Measured live 2026-10-30: "I cast mass invisibility on Bran and Wenna" matched
+        # only the one-word Invisibility, which a wizard 13 without it could not reach,
+        # and the means gate refused "mass invisibility" as no spell of hers — with
+        # "Invisibility, Mass" printed in the same refusal's list. After the book's own
+        # names, so a name the book prints is never shadowed by a reordered one.
+        for sid in sorted(catalogue):
+            head, sep, tail = str(catalogue[sid].name).rpartition(",")
+            if sep and head.strip() and tail.strip():
+                spoken = _spell_words(f"{tail} {head}")
+                if spoken:
+                    index.setdefault(spoken, catalogue[sid])
         _SPELL_INDEX.update(size=len(catalogue), index=index,
                             longest=max((len(k) for k in index), default=0))
     index, longest = _SPELL_INDEX["index"], _SPELL_INDEX["longest"]
@@ -7030,6 +7052,82 @@ def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
         "op": "cast", "actor": pc.ref, "params": params,
         "because": "the player said they cast it",
     }]
+
+
+def the_named_spell(raw_intents, player_text: str, scene) -> list:
+    """The player's cast is the spell their words name, at everyone it was aimed at.
+
+    Measured live 2026-10-30 (a wizard 13, "I cast mass invisibility on Bran and Wenna"):
+    the plan's first cast aimed `at: ["c4", "c5"]` and was refused (`at` is one ref); its
+    second named "mass invisibility", not an id, and was refused with eight ids listed —
+    none of them the spell; its third was `magic-missile` at Bran and `magic-missile` at
+    Wenna, which validated. `inject_cast` stands down when the plan has a cast at all, so
+    nothing put the named spell back. Read here only by structure: the spell the words
+    name against the whole book (`spell_in_words`, which since 2026-10-30 also knows the
+    book's inverted names as said — "mass invisibility"), reachable by this caster, put
+    in place of whatever spell the plan's player cast names; an `at` written as a list is
+    the intent's `target` list; and several player casts of one spell whose printed
+    targets are plural ("creatures", the book's line) are one casting at all of them —
+    one slot, as the book spends it."""
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    from rules import casting, spells as spells_mod
+
+    if not casting.is_caster(pc):
+        return raw_intents
+    reachable = [sp.id for level in casting.known_spells(
+        pc, up_to=casting.highest_spell_level(pc)).values() for sp in level]
+    reachable += [s for s in (getattr(pc, "prepared", {}) or {}) if s not in reachable]
+    chosen = _reachable_by_name(spell_in_words(player_text), reachable)
+
+    def mine(r) -> bool:
+        return isinstance(r, dict) and str(r.get("op", "")).lower() == "cast" \
+            and str(r.get("actor") or pc.ref) in (pc.ref, "pc", "None", "")
+
+    out: list = []
+    for r in raw_intents:
+        if not mine(r):
+            out.append(r)
+            continue
+        r = dict(r, params=dict(r.get("params") or {}))
+        if chosen and str(r["params"].get("spell") or "") != chosen:
+            r["params"]["spell"] = chosen
+        at = r["params"].get("at")
+        if isinstance(at, list):
+            r["params"].pop("at")
+            r["target"] = [str(x) for x in at]
+        out.append(r)
+    if not chosen:
+        return out
+    try:
+        plural = bool(re.search(r"\bcreatures\b", str(spells_mod.get(chosen).targets or ""),
+                                re.I))
+    except KeyError:
+        plural = False
+    casts = [r for r in out if mine(r) and r["params"].get("spell") == chosen]
+    if not plural or len(casts) < 2:
+        return out
+    whom: list[str] = []
+    for r in casts:
+        for ref in ([r["params"].get("at")] if r["params"].get("at") else []) + (
+                r.get("target") if isinstance(r.get("target"), list)
+                else [r.get("target")] if r.get("target") else []):
+            if ref and str(ref) not in whom:
+                whom.append(str(ref))
+    one = dict(casts[0], params={k: v for k, v in casts[0]["params"].items() if k != "at"},
+               target=whom)
+    merged, placed = [], False
+    for r in out:
+        if any(r is c for c in casts):
+            if not placed:
+                merged.append(one)
+                placed = True
+            continue
+        merged.append(r)
+    return merged
 
 
 def the_players_spell_dice(raw_intents, player_text: str, scene) -> list:

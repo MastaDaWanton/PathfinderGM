@@ -827,6 +827,11 @@ class GMAgent:
                 # to claim it.
                 raw = judgement.inject_cast(raw, player_input, self.engine.scene,
                                             attached=getattr(self, "attachments", ()))
+                # And when the plan already cast something: the spell the words name, at
+                # everyone it was aimed at (live 2026-10-30, mass invisibility planned as
+                # two magic missiles at the allies). A spell chip is its own declaration.
+                if not judgement._attached_spell(getattr(self, "attachments", ())):
+                    raw = judgement.the_named_spell(raw, player_input, self.engine.scene)
                 # The plan's own cast with no aim written takes one from the player's
                 # words where they ground it (G2): a name or a thing here, never a guess.
                 raw = judgement.aim_the_cast(

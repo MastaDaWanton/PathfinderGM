@@ -115,6 +115,12 @@ manoeuvre and harmful-cast doors, and tells the end.
   attacks") and for the mover past 180 ft; the sphere's members see each other, a
   member's attack ends its own, the recipient's ends all, and 10 ft from the recipient
   ends a member's (`_group_apart`, on the map only).
+Found driving the app: the built diversion was handed `dc: average` by
+`judgement.fill_bare_checks` and refused seven plans running (a search and a diversion
+are now left bare); "mass invisibility" did not name "Invisibility, Mass" (the book's
+inverted names are indexed as said, `judgement.spell_in_words`); and the plan's fallback
+cast magic missile at the two allies the player meant to hide (`judgement.the_named_spell`
+puts the named spell back and makes a plural-target spell one casting).
 Still open: creatures' spell-like invisibility (`spell_like` is stripped off the sheet,
 `bestiary._NOT_ON_THE_SHEET`) and the potions in their pockets (`kit_pending` until
 looted) never fire, so an NPC hides only by its own Stealth check or a scheme; the player
