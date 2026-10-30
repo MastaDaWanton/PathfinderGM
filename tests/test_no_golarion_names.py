@@ -8,9 +8,10 @@ were named for Golarion peoples. The owner chose to keep the mechanics and lose 
 is that rewrite, and the importers apply it too. This file holds the count at zero, so a
 re-import or a hand edit that brings a name back fails here, not in a licence review.
 
-Deliberately not held to zero, pending the owner's separate call: myth names Golarion
-adopted (Asmodeus, Lamashtu, Hastur) and cosmology words (Boneyard, Elysium). The alias
-files are exempt by design: they are where old saves find the old ids.
+The myth names Golarion adopted went the same way on 2026-10-30, at the owner's word: 27
+rows named Asmodeus, Lamashtu, Hastur, Apsu, Abaddon and their kin as Golarion's gods and
+planes. Deliberately not held to zero: cosmology words (Boneyard, Elysium), never ruled on.
+The alias files are exempt by design: they are where old saves find the old ids.
 """
 from __future__ import annotations
 
@@ -32,10 +33,12 @@ def _shipped(rel: str, key: str) -> list[dict]:
 
 def test_no_shipped_content_names_golarion():
     """271 spell and feat rows, 55 mechanics entries and 2 weapons named Golarion on
-    2026-10-29. Every one of them now reads world-agnostic or is gone."""
+    2026-10-29, and 27 more rows named its myth-born gods. Every one of them now reads
+    world-agnostic or is gone."""
     rows, _ = cp.measure()
     named = sorted({f"{rel} {rid}: {h.term} ({h.field})"
-                    for rel, rid, _src, _fam, hits in rows for h in hits if h.cls in cp.LORE})
+                    for rel, rid, _src, _fam, hits in rows for h in hits
+                    if h.cls in cp.LORE or h.cls == "myth"})
     assert not named, "Golarion names in shipped content:\n" + "\n".join(named[:40])
 
 
@@ -73,6 +76,7 @@ def test_old_ids_and_names_still_resolve():
     from rules import feats, spells, weapons
 
     assert spells.get("aroden-s-spellbane").id == "spellbane"
+    assert spells.get("waters-of-lamashtu").id == "foul-waters"
     assert spells.get("cultural-adaptation-taldan").id == "cultural-adaptation"
     assert feats.get("aldori dueling mastery").id == "dueling-sword-mastery"
     assert feats.get("eye-of-the-arclord").id == "eldritch-eye"

@@ -483,7 +483,7 @@
    "converted_by": "read",
    "notes": "The shaken condition and the -2 both last only while the creature stays inside the area, which the duration shape cannot express, so it is recorded on both specs."
   },
-  "vision-of-lamashtu": {
+  "vision-of-nightmares": {
    "effects": [
     {
      "type": "narrative",
@@ -1403,7 +1403,7 @@
    "converted_by": "read",
    "notes": "Protection from mundane liquid is not damage resistance and has no effect type."
   },
-  "waters-of-lamashtu": {
+  "foul-waters": {
    "effects": [
     {
      "type": "narrative",
@@ -2383,11 +2383,11 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Functions as symbol of death, except that creatures which succumb become dominated by Hastur, as dominate monster. They seek to aid any obvious minion or worshiper of Hastur in sight, and any true worshiper of Hastur can command them as if that worshiper had dominated them; conflicting commands from different true worshipers are settled by opposed Charisma checks, the winner commanding the targets that round. With no worshiper or agent of Hastur in sight, an affected creature acts normally. The domination lasts 1 round per level, and once triggered the Yellow Sign itself remains active for 10 minutes per caster level. There is a 1% chance when a creature fails its save that Hastur takes note and decides to control the target personally: the dominated creature's actions are then the GM's to determine, the effects persist for 1 day per level, and no other creature can countermand the commands, not even a Hastur worshiper. However long the effects last, and whether or not Hastur controls the victim directly, any creature that failed to resist this spell can be targeted by Hastur's fulvous dreams ability for the rest of its life, should the Great Old One ever choose to. Yellow Sign can be made permanent with permanency by a caster of 18th level or higher for 40,000 gp."
+     "target": "Functions as symbol of death, except that creatures which succumb become dominated by the god of the sign, as dominate monster. They seek to aid any obvious minion or worshiper of the god of the sign in sight, and any true worshiper of the god of the sign can command them as if that worshiper had dominated them; conflicting commands from different true worshipers are settled by opposed Charisma checks, the winner commanding the targets that round. With no worshiper or agent of the god of the sign in sight, an affected creature acts normally. The domination lasts 1 round per level, and once triggered the Yellow Sign itself remains active for 10 minutes per caster level. There is a 1% chance when a creature fails its save that the god of the sign takes note and decides to control the target personally: the dominated creature's actions are then the GM's to determine, the effects persist for 1 day per level, and no other creature can countermand the commands, not even a the god of the sign worshiper. However long the effects last, and whether or not the god of the sign controls the victim directly, any creature that failed to resist this spell can be targeted by the god of the sign's fulvous dreams ability for the rest of its life, should the Great Old One ever choose to. Yellow Sign can be made permanent with permanency by a caster of 18th level or higher for 40,000 gp."
     }
    ],
    "converted_by": "read",
-   "notes": "Domination has no effect type, and the three different durations here (1 round/level for the domination, 10 minutes/caster level for the sign, 1 day/level if Hastur intervenes) are why the corpus duration reads 'see text'; no single duration would be true, so it is omitted."
+   "notes": "Domination has no effect type, and the three different durations here (1 round/level for the domination, 10 minutes/caster level for the sign, 1 day/level if the god of the sign intervenes) are why the corpus duration reads 'see text'; no single duration would be true, so it is omitted."
   },
   "youthful-appearance": {
    "effects": [

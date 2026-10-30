@@ -2236,7 +2236,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "As plane shift, but you and up to four willing creatures - none of whom may currently be on their home plane - are sent to a randomly rolled plane instead of a chosen one: 1-7 Abyss, 8-14 Abaddon, 15-20 Hell, 21-24 Shadow Plane, 25-28 First World, 29-35 Maelstrom, 36-42 Boneyard, 43-49 Axis, 50-56 Ethereal, 57-63 Elysium, 64-70 Nirvana, 71-77 Heaven, 78-84 Astral, 85-90 a random demiplane, 91-95 a random world on the Material Plane, 96-100 the GM's choice. You always arrive somewhere not inherently harmful, but the exact spot is the GM's. A creature moved this way cannot be moved by another casting for 24 hours, though other planar travel works normally."
+     "target": "As plane shift, but you and up to four willing creatures - none of whom may currently be on their home plane - are sent to a randomly rolled plane instead of a chosen one: 1-7 Abyss, 8-14 the daemon wastes, 15-20 Hell, 21-24 Shadow Plane, 25-28 First World, 29-35 Maelstrom, 36-42 Boneyard, 43-49 Axis, 50-56 Ethereal, 57-63 Elysium, 64-70 Nirvana, 71-77 Heaven, 78-84 Astral, 85-90 a random demiplane, 91-95 a random world on the Material Plane, 96-100 the GM's choice. You always arrive somewhere not inherently harmful, but the exact spot is the GM's. A creature moved this way cannot be moved by another casting for 24 hours, though other planar travel works normally."
     }
    ],
    "duration": {
@@ -2445,7 +2445,7 @@
    "notes": "Corpus duration is 'instantaneous or hours/level (1)': sending resolves at once, receiving waits up to 1 hour per level for its trigger. The waiting form is emitted.",
    "converted_by": "read"
   },
-  "apsu-s-shining-scales": {
+  "shining-scales": {
    "effects": [
     {
      "type": "combat_mod",

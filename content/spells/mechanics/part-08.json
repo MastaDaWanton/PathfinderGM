@@ -971,7 +971,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "A rite of sacrifice to Mammon channels his power into one coin; which of three effects you get depends on the value offered."
+     "target": "A rite of sacrifice to an archdevil of greed channels his power into one coin; which of three effects you get depends on the value offered."
     },
     {
      "type": "narrative",
@@ -979,7 +979,7 @@
     },
     {
      "type": "narrative",
-     "target": "Mammon's Mantle (3,000 gp sacrifice): a creature that swallows the coin gains a bonus to Charisma equal to 1 per 3 caster levels, maximum 5 at 15th level, immunity to poison, disease and aging, automatic stabilisation below 0 hit points, and can eat gold to heal 1 hit point per 20 gp consumed. Lasts 1 day per caster level."
+     "target": "Miser's Mantle (3,000 gp sacrifice): a creature that swallows the coin gains a bonus to Charisma equal to 1 per 3 caster levels, maximum 5 at 15th level, immunity to poison, disease and aging, automatic stabilisation below 0 hit points, and can eat gold to heal 1 hit point per 20 gp consumed. Lasts 1 day per caster level."
     },
     {
      "type": "narrative",

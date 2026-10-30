@@ -2626,11 +2626,11 @@
    "converted_by": "read",
    "notes": "Sickened is named outright, so it is emitted; its 1d6-round length goes in the note because a spec's duration field takes no dice."
   },
-  "charon-s-dispensation": {
+  "ferryman-s-dispensation": {
    "effects": [
     {
      "type": "immunity",
-     "target": "the harmful effects of touching or drinking from the River Styx"
+     "target": "the harmful effects of touching or drinking from the river of forgetting"
     },
     {
      "type": "situational_mod",

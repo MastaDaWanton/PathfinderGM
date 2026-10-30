@@ -46,7 +46,7 @@
    "converted_by": "read",
    "notes": "The Craft DC is the new poison's own DC, which varies by poison, so no number is emitted."
   },
-  "dahak-s-release": {
+  "draconic-release": {
    "effects": [
     {
      "type": "save_gate",
@@ -1711,7 +1711,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Functions as nightmare, with the dream's subject always demons, inflicting nightmare's usual damage and fatigue. If the target worships a demon lord or Lamashtu you may instead have it function as dream."
+     "target": "Functions as nightmare, with the dream's subject always demons, inflicting nightmare's usual damage and fatigue. If the target worships a demon lord or a demon goddess you may instead have it function as dream."
     },
     {
      "type": "save_gate",
@@ -2015,7 +2015,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "As detect evil, except that it detects only outsiders with the evil subtype and the lingering traces of their gifts, presence and spells, plus clerics and paladins of fiendish deities including Asmodeus, the archdevils, the daemonic harbingers and the demon lords."
+     "target": "As detect evil, except that it detects only outsiders with the evil subtype and the lingering traces of their gifts, presence and spells, plus clerics and paladins of fiendish deities including the lord of Hell, the archdevils, the daemonic harbingers and the demon lords."
     }
    ],
    "duration": {

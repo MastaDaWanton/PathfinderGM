@@ -1200,7 +1200,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "As know direction, except that instead of true north it gives the direction of the palace or demesne of the ruling god or demigod of the plane or demiplane you are currently on, plus a brief generic vision of that entity's appearance or holy symbol. It reads only the plane you are actually standing on — inside a demon lord's Abyssal realm it points to that lord's seat, not Lamashtu's. Where a plane has several rulers it gives the directions of the nearest three so you can triangulate. It finds the official seat of power only, never the entity, fails automatically if that seat is magically hidden, and does not work on the Material Plane."
+     "target": "As know direction, except that instead of true north it gives the direction of the palace or demesne of the ruling god or demigod of the plane or demiplane you are currently on, plus a brief generic vision of that entity's appearance or holy symbol. It reads only the plane you are actually standing on — inside a demon lord's Abyssal realm it points to that lord's seat, not the ruling god's. Where a plane has several rulers it gives the directions of the nearest three so you can triangulate. It finds the official seat of power only, never the entity, fails automatically if that seat is magically hidden, and does not work on the Material Plane."
     }
    ],
    "duration": {

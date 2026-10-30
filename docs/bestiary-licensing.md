@@ -369,7 +369,20 @@ falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the
   shipped content outside the bestiary. `tests/test_no_golarion_names.py` holds that.
 - **Old saves:** they resolve through `content/spells/aliases.json`,
   `content/feats/aliases.json` and the weapon aliases in `rules/weapons.py`.
-- **Still the owner's call:** the 27 myth-only rows (§7.4).
+- **The myth names went the same way on 2026-10-30** (the owner: "rewrite the myth names
+  too, same way"). That is the 27 myth-only rows, plus every myth name in other rows and
+  columns:
+  - Apsu and Dahak became a good and an evil dragon god.
+  - Asmodeus became the lord of Hell, or a god of tyranny in feat gates.
+  - Lamashtu became a demon goddess, or a god of monsters in feat gates.
+  - Mammon became an archdevil of greed, and Hastur the god of the sign.
+  - Abaddon became the daemon wastes, and Charon's River Styx the river of forgetting.
+  - 6 spells were renamed: Shining Scales, Blessing of the Bull, Ferryman's Dispensation,
+    Draconic Release, Vision of Nightmares and Foul Waters. Nothing was dropped.
+- **Left as they were, on purpose:**
+  - Cosmology words (Boneyard, Elysium, First World), which were never ruled on.
+  - The app's own crafting materials Styx Water and Styx Mordant. They are house-authored,
+    not imported, and are the owner's to rename.
 - **Still outstanding:** Section 15 for the setting books.
 
 The section below is the measurement and the options as they were put.

@@ -91,6 +91,22 @@ MECHANICS_EDITS: dict[str, list[tuple[str, str]]] = {
                            "a single barghest from its Abyssal realm to serve you")],
     "rapid-perusal": [("such as those from the volumes of the Pathfinder Chronicles.",
                        "such as those some rare tomes grant.")],
+    # The myth names, 2026-10-30 (golarion_rewrites.py, "the myth names").
+    "anywhere-but-here": [("8-14 Abaddon", "8-14 the daemon wastes")],
+    "detect-fiendish-presence": [("fiendish deities including Asmodeus, the archdevils",
+                                  "fiendish deities including the lord of Hell, the "
+                                  "archdevils")],
+    "demon-dream": [("worships a demon lord or Lamashtu",
+                     "worships a demon lord or a demon goddess")],
+    "genius-avaricious": [("Mammon's Mantle (3,000 gp sacrifice)",
+                           "Miser's Mantle (3,000 gp sacrifice)"),
+                          ("A rite of sacrifice to Mammon channels his power",
+                           "A rite of sacrifice to an archdevil of greed channels his power")],
+    "malediction": [("goes to Hell, Abaddon or the Abyss",
+                     "goes to Hell, the daemon wastes or the Abyss")],
+    "planar-orientation": [("not Lamashtu's", "not the ruling god's")],
+    "ferryman-s-dispensation": [("the River Styx", "the river of forgetting")],
+    "yellow-sign": [("Hastur", "the god of the sign")],
 }
 
 

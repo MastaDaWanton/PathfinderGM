@@ -9332,7 +9332,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Critical Focus, base attack bonus +11, worshiper of Lamashtu.",
+   "prerequisites_text": "Critical Focus, base attack bonus +11, worshiper of a god of monsters.",
    "prerequisites": [
     {
      "kind": "feat",
@@ -9345,7 +9345,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Lamashtu"
+    "worshiper of a god of monsters"
    ],
    "tags": [],
    "multiples": false,
@@ -14943,7 +14943,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Intimidating Prowess, worshiper of Lamashtu.",
+   "prerequisites_text": "Intimidating Prowess, worshiper of a god of monsters.",
    "prerequisites": [
     {
      "kind": "feat",
@@ -14952,7 +14952,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Lamashtu"
+    "worshiper of a god of monsters"
    ],
    "tags": [],
    "multiples": false,
@@ -15888,10 +15888,10 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Worshiper of Asmodeus",
+   "prerequisites_text": "Worshiper of a god of tyranny",
    "prerequisites": [],
    "unparsed_prerequisites": [
-    "Worshiper of Asmodeus"
+    "Worshiper of a god of tyranny"
    ],
    "tags": [],
    "multiples": false,
@@ -29179,7 +29179,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Caster level 7th, lawful alignment, worshiper of Asmodeus.",
+   "prerequisites_text": "Caster level 7th, lawful alignment, worshiper of a god of tyranny.",
    "prerequisites": [
     {
      "kind": "caster_level",
@@ -29192,7 +29192,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Asmodeus"
+    "worshiper of a god of tyranny"
    ],
    "tags": [],
    "multiples": false,
@@ -29367,7 +29367,7 @@
     "general"
    ],
    "description": "You have seen the outer reaches of the multiverse, and have gleaned knowledge from these alien realms. You have a special affinity for one of these realms in particular, and carry some of that plane's power within you.",
-   "benefit": "Choose one of the planes below. The alignment of the plane must be within one step of your alignment. You gain a +2 bonus on saves against spells and spell-like abilities with the associated descriptor, and you cast spells with that descriptor at +1 caster level. Plane Alignment Descriptor Heaven LG Light Nirvana NG Good Elysium CG EmotionUM Axis LN Lawful The Boneyard N Death The Maelstrom CN Chaotic Hell LE PainUM Abaddon NE Evil The Abyss CE Fear",
+   "benefit": "Choose one of the planes below. The alignment of the plane must be within one step of your alignment. You gain a +2 bonus on saves against spells and spell-like abilities with the associated descriptor, and you cast spells with that descriptor at +1 caster level. Plane Alignment Descriptor Heaven LG Light Nirvana NG Good Elysium CG EmotionUM Axis LN Lawful The Boneyard N Death The Maelstrom CN Chaotic Hell LE PainUM the daemon wastes NE Evil The Abyss CE Fear",
    "normal": "",
    "special": "",
    "source": "Demon Hunter's Handbook",

@@ -14,8 +14,9 @@ name in. The same functions run from the importers (`build_spells.py`, `build_fe
 `build_weapons.py`), so re-importing a spreadsheet cannot bring the names back; and
 `tests/test_no_golarion_names.py` holds the shipped count at zero either way.
 
-Deliberately untouched, for the owner's separate call (§7.4): names older than Paizo that
-Golarion adopted (Asmodeus, Lamashtu, Hastur) and cosmology words (Boneyard, Elysium).
+Names older than Paizo that Golarion adopted (Asmodeus, Lamashtu, Hastur) went the same
+way on 2026-10-30, at the owner's word. Deliberately untouched: cosmology words (Boneyard,
+Elysium), which read as ordinary nouns and were never ruled on.
 
     python tools/strip_golarion.py      # applies this table to the shipped files
 """
@@ -674,6 +675,66 @@ FEAT_EDITS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+# --- the myth names (the owner, 2026-10-30: "rewrite the myth names too, same way") -------------
+#
+# Names older than Paizo that Golarion made its own: dragon gods (Apsu, Dahak), fiends
+# (Asmodeus, Lamashtu, Baphomet, Mammon, Mephistopheles), the Mythos (Hastur, Azathoth),
+# the ferryman and his river, and Abaddon as a plane. The word is nobody's, but in these
+# rows it names Golarion's god, so it goes the same way: the role stays, the name goes.
+
+SPELL_RENAMES.update({
+    "apsu-s-shining-scales": ("shining-scales", "Shining Scales"),
+    "baphomet-s-blessing": ("blessing-of-the-bull", "Blessing of the Bull"),
+    "charon-s-dispensation": ("ferryman-s-dispensation", "Ferryman's Dispensation"),
+    "dahak-s-release": ("draconic-release", "Draconic Release"),
+    "vision-of-lamashtu": ("vision-of-nightmares", "Vision of Nightmares"),
+    "waters-of-lamashtu": ("foul-waters", "Foul Waters"),
+})
+
+GODS.update({"Asmodeus": "a god of tyranny", "Lamashtu": "a god of monsters"})
+WORSHIPER_RE = re.compile(r"\b([Ww]orshiper of) (" + "|".join(map(re.escape, GODS)) + r")\b")
+
+for _sid, _pairs in {
+    "anywhere-but-here": [("8-14 Abaddon", "8-14 the daemon wastes")],
+    "aquatic-trail": [("in the Abyssal and Abaddonian zones",
+                       "in the Abyssal and daemonic zones")],
+    "apsu-s-shining-scales": [("who worship Apsu add", "who worship a good dragon god add")],
+    "charon-s-dispensation": [("the River Styx", "the river of forgetting")],
+    "dahak-s-release": [("who worship Dahak add", "who worship an evil dragon god add")],
+    "demon-dream": [("a worshiper of a demon lord or Lamashtu",
+                     "a worshiper of a demon lord or a demon goddess")],
+    "detect-fiendish-presence": [("including Asmodeus, archdevils,",
+                                  "including the lord of Hell, archdevils,")],
+    "draconic-ally": [("who worship Apsu or Dahak add", "who worship a dragon god add")],
+    "genius-avaricious": [
+        ("a vestige of the archdevil Mammon imbues", "a vestige of an archdevil of greed imbues"),
+        ("a rite of sacrifice to the archdevil Mammon, making an offering to the Lord of Erebus "
+         "and channeling", "a rite of sacrifice to an archdevil of greed, making an offering to "
+                           "the keeper of Hell's treasure vaults and channeling"),
+        ("Mammon's Mantle:", "Miser's Mantle:"),
+        ("relation to Mammon himself", "relation to the archdevil himself")],
+    "mad-sultan-s-melody": [("the awful beings associated with the Outer God, Azathoth",
+                             "the awful beings associated with a mad god at the heart of "
+                             "creation")],
+    "malediction": [("souls are sent to Abaddon", "souls are sent to the daemon wastes")],
+    "planar-orientation": [("not Lamashtu or Asmodeus", "not the god who rules that plane")],
+    "spellcasting-contract-lesser": [
+        ("requiring the target to pray to Asmodeus each morning",
+         "requiring the target to pray to your infernal patron each morning"),
+        ("relationship with Asmodeus; the Prince of Darkness accepts",
+         "relationship with your infernal patron; the lord of Hell accepts")],
+    "waters-of-lamashtu": [("a foul secretion known as the waters of Lamashtu.",
+                            "a foul secretion from a demon goddess's own realm.")],
+    "vision-of-lamashtu": [("For example, a cleric of Lamashtu could send",
+                            "For example, a cleric of a god of monsters could send")],
+    # The Yellow Sign's god, every time it is named; the sign itself is the spell.
+    "yellow-sign": [("Hastur", "the god of the sign")],
+}.items():
+    SPELL_EDITS.setdefault(_sid, []).extend(_pairs)
+
+FEAT_EDITS["outer-planes-traveler"] = [("Abaddon NE Evil", "the daemon wastes NE Evil")]
+
+
 # --- applying ----------------------------------------------------------------------------------
 
 class StaleEdit(ValueError):
@@ -768,16 +829,18 @@ def _lore_names():
 
 
 def _clear_columns(row: dict) -> dict:
-    """The `deity` and `bloodline` columns lose their Golarion entries. No code reads the
-    deity column (the 2026-09-19 ruling keeps deity out of the engine), and the Harrowed
-    bloodline is a setting bloodline this app does not offer."""
+    """The `deity` and `bloodline` columns lose their Golarion and myth entries. No code
+    reads the deity column (the 2026-09-19 ruling keeps deity out of the engine), and the
+    Harrowed bloodline is a setting bloodline this app does not offer. Run before the prose
+    edits, so an edit naming a god's role ("the god of the sign") never lands in a column."""
     name_re, class_of, lore = _lore_names()
     for col in ("deity", "bloodline"):
         value = row.get(col)
         if not isinstance(value, str) or not value:
             continue
         kept = [part.strip() for part in value.split(",")
-                if not any(class_of.get(m.group(1)) in lore for m in name_re.finditer(part))]
+                if not any(class_of.get(m.group(1)) in lore | {"myth"}
+                           for m in name_re.finditer(part))]
         row[col] = ", ".join(p for p in kept if p)
     return row
 
@@ -800,9 +863,9 @@ def apply_spells(entries: list[dict]) -> tuple[list[dict], dict[str, str | None]
         sid = e.get("id")
         if sid in SPELL_DROPS:
             continue
-        e = _edit_row(dict(e), _edits_for(SPELL_EDITS, sid, SPELL_RENAMES))
+        e = _clear_columns(dict(e))
+        e = _edit_row(e, _edits_for(SPELL_EDITS, sid, SPELL_RENAMES))
         e = _rewrite_prose(e, lambda s: rename(_common(s)))
-        e = _clear_columns(e)
         if sid in SPELL_RENAMES:
             e["id"], e["name"] = SPELL_RENAMES[sid]
         out.append(e)
