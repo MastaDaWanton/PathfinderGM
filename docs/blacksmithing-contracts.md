@@ -345,7 +345,10 @@ game with its heat gauge all work, and the blank glows on the anvil.
 2. After a game, focus lands on "Next: <method>", so a stray Space advances the step (both
    benches).
 3. No forge recipes: the plan's Recipes button has no API behind it.
-4. One-use finishes (ghost salt, holy anointing) are never spent (true before the revamp too).
+4. ~~One-use finishes (ghost salt, holy anointing) are never spent.~~ Closed 2026-10-30:
+   `rules/finish_uses.py` spends a blanch on its next hit (APG p.184), holy anointing at
+   the end of its first fight, wyroot and troll blood once a day; counts live on the
+   record (`spent`, `forge.spent.*` tags) and the bench re-applies a spent finish.
 5. Noqual's +20% spell failure applies to arcane casters only; elysian bronze's "natural weapons
    and unarmed strikes only" is not checked.
 6. Migrated old items show as "Old work" on the rack; the material colour table lives in

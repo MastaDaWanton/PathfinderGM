@@ -40,8 +40,10 @@ player still reads them, and listed here so they are not forgotten):
   Assaying it is a **house rule** (the owner, 2026-10-04): magic recoils, and the
   assayer's buffs and wards are suppressed for 1d4 rounds (`assay_danger`).
 - **Ghost-salt blanch**: full damage to incorporeal creatures, now `strikes_as:
-  ghost_touch` (lane H). "Until the next hit" is in the data (`uses: once`) and no reader
-  spends a finish yet, as for holy anointing.
+  ghost_touch` (lane H). "Until the next hit" (`uses: once`) is spent by the weapon's
+  next hit since 2026-10-30 (`rules/finish_uses.py`), as is cold iron blanching; holy
+  anointing is spent when its first fight ends, and re-applying a spent finish at the
+  forge gives a fresh dose.
 - **Wyroot**: stores a life point for ki or arcane pools. Approximated by 1 temporary hp
   on a critical, once a day.
 - **Fever skymetal**: glows like a candle. No light vocabulary.

@@ -27,6 +27,7 @@ from . import consumables
 from . import crafting
 from . import dc as dc_mod
 from . import effectspec
+from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
 from . import resources
@@ -2025,6 +2026,17 @@ class Scene:
         for note in _provocation.settle_outbursts(
                 [a for a in self.people.values() if not a.is_pc], self.clock_minutes):
             self.log.append({"op": "outburst-settled", "tell": "", "note": note})
+        # A battle-long finish (holy anointing, "for its first battle after the rite") is
+        # spent with the fight it was in: engaged by a hit (`Engine._spend_on_hit`), or
+        # simply in hand for the fight. Here for the reason above: the one door.
+        fought = {r for r, _ in self.initiative} | {
+            r for refs in (self.sides or {}).values() for r in refs or ()}
+        for ref in sorted(fought):
+            who = self.people.get(ref)
+            if who is None:
+                continue
+            for said in finish_uses.battle_over(who):
+                self.log.append({"op": "finish-spent", "tell": said, "ref": ref})
         self.initiative = []
         self.turn = -1
         self.round = 0
@@ -7961,6 +7973,10 @@ class Engine:
                     state["effects"].append(extra["effect"])
                     if extra["tell"]:
                         state["tells"].append(extra["tell"])
+                # A blanch is spent by the hit it just struck as (`_spend_on_hit`).
+                for extra in self._spend_on_hit(actor, weapon):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
                 # And the enchanter's riders that are not dice: wounding's bleed, a
                 # thundering crit's deafness, disruption's Will save, vorpal's severing,
                 # vicious's bite back at the wielder (`_magic_riders`).
@@ -16298,6 +16314,16 @@ class Engine:
             if trigger not in ("hit", "crit", "first_wound_daily"):
                 continue
             origin = str(rider.get("origin") or f"item:{build.get('id')}")
+            # A rider with limited uses (wyroot's "at most 1 life point per day", UE p.52;
+            # troll blood's once a day) is counted on the item's record and read LIVE:
+            # the row in hand was built before the swing, and a full attack keeps it for
+            # every swing (`finish_uses.left`).
+            uses_key = str(rider.get("uses_key") or "")
+            rec = weapon.get("crafted_record") if isinstance(
+                weapon.get("crafted_record"), dict) else None
+            if uses_key and rec is not None and (finish_uses.left(actor, rec, uses_key)
+                                                 or 0) <= 0:
+                continue
             if trigger == "first_wound_daily":
                 spent = f"first-wound:{build.get('id')}:{rider.get('source', '')}"
                 if any(e.kind == "item_spent" and e.key == spent for e in actor.effects):
@@ -16307,21 +16333,35 @@ class Engine:
                     key=spent, source=origin, origin=origin, duration="rounds",
                     rounds_left=self.ROUNDS_PER_DAY))
             spec = {k: v for k, v in rider.items()
-                    if k not in ("trigger", "origin", "source", "book")}
+                    if k not in ("trigger", "origin", "source", "book", "recipient",
+                                 "uses", "uses_count", "uses_key")}
             source_doc = forge_items.material(str(rider.get("source") or "")) or {}
             what = str(source_doc.get("name") or rider.get("source") or "metal").lower()
+            # `recipient: "self"` is the wielder's (effectspec's own field): troll blood's
+            # fast healing and wyroot's spark of life are the bearer's. Measured before
+            # 2026-10-30: every rider went to the defender, so a wyroot haft's crit gave
+            # the FOE its temporary hit point.
+            onto = actor if str(rider.get("recipient") or "") == "self" else defender
             intents = consumables.coating_intents(
                 consumables.Coating(item=f"the {what} in the {item}", specs=[spec]),
-                defender.ref)
+                onto.ref)
             if not intents:
                 continue
             for i in intents:
                 i["visibility"] = "hidden"
-            out.append({"effect": {"ref": defender.ref, "kind": "item_rider",
+            told = ""
+            if uses_key and rec is not None:
+                finish_uses.spend(actor, rec, uses_key)
+                daily = str(rider.get("uses") or "").strip().lower() == "per_day"
+                told = (f" The {what} has given what it has today." if daily
+                        else f" The {what} is spent.")
+            out.append({"effect": {"ref": onto.ref, "kind": "item_rider",
                                    "item": build.get("id"), "trigger": trigger,
-                                   "source": rider.get("source", ""), "origin": origin},
+                                   "source": rider.get("source", ""), "origin": origin,
+                                   **({"uses_key": uses_key} if uses_key else {})},
                         "tell": f"The {what} in {actor.name}'s {item} works on "
-                                f"{defender.name}."})
+                                f"{onto.name}."
+                                + told})
             res = self.run(self.validate(intents, origin=origin, origin_name=item))
             for o in res.outcomes:
                 for e in o.effects or []:
@@ -16329,6 +16369,57 @@ class Engine:
                 if o.tell:
                     out.append({"effect": {"ref": defender.ref, "kind": "item_rider_said"},
                                 "tell": o.tell})
+        return out
+
+    def _spend_on_hit(self, actor: Actor, weapon: dict) -> list[dict]:
+        """A forged weapon's limited finishes the hit that just landed uses up.
+
+        A strike-as finish (cold iron or ghost salt blanching) is spent: "The blanching
+        remains effective until you make a successful attack with the weapon" (APG p.184,
+        UE p.103), and it "counts as both materials for the first successful hit" — so the
+        hit has already struck as the material (the DR line above read `strikes_as`) and
+        is spent now, whether or not the target had any DR to bypass. The weapon row in
+        hand loses the strike too, so the next swing of a full attack is steel again.
+
+        A battle-long finish (holy anointing) is engaged by its first hit in a fight and
+        spent when the fight ends (`Scene.end_encounter`).
+
+        Measured before 2026-10-30: nothing read `uses` on a forge spec, and a blanched
+        blade struck as cold iron for every hit it ever landed.
+        """
+        rec = weapon.get("crafted_record")
+        if not isinstance(rec, dict) or not isinstance(weapon.get("build"), dict):
+            return []
+        rows = finish_uses.rows(actor, rec)
+        if not rows:
+            return []
+        item = str(weapon.get("name") or rec.get("name") or "weapon")
+        origin = f"item:{rec.get('id') or item}"
+        out: list[dict] = []
+        gone: set[str] = set()
+        for row in rows:
+            if row["left"] <= 0:
+                continue
+            if row["spent_on"] == "hit":
+                finish_uses.spend(actor, rec, row["key"])
+                if row["type"] == "strikes_as":
+                    gone.add(row["target"])
+                out.append({"effect": {"ref": actor.ref, "kind": "finish_spent",
+                                       "item": rec.get("id"), "finish": row["source"],
+                                       "origin": origin},
+                            "tell": f"The {finish_uses.what(row)} on {actor.name}'s "
+                                    f"{item} is spent."})
+            elif row["spent_on"] == "battle" and not row["engaged"] and self.scene.initiative:
+                finish_uses.engage(actor, rec, row["key"])
+        if gone:
+            # Unless something else still lends it (a cold iron head under a cold iron
+            # blanch: the book's "counts as both materials for the first successful hit").
+            from .sheet import built
+
+            still = set(built(actor.crafted_record(str(rec.get("id") or "")) or rec)
+                        .get("strikes_as") or ())
+            weapon["strikes_as"] = [s for s in weapon.get("strikes_as") or ()
+                                    if s not in gone or s in still]
         return out
 
     # --- a magic item's powers (enchanting contracts §4, plan §8.5) -------------------------
