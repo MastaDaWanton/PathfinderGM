@@ -17984,7 +17984,7 @@ class Engine:
 
     def _summon(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """Bring a creature in through the same door everything else arrives by."""
-        from .bestiary import UnknownTemplate
+        from .bestiary import UnknownTemplate, retired, suggestion
 
         name = str(spec.get("creature") or "").strip()
         side = "pc" if str(spec.get("side") or "caster") == "caster" else "them"
@@ -17992,6 +17992,11 @@ class Engine:
         if caster is not None and not caster.is_pc:
             side = "them" if side == "pc" else "pc"
         try:
+            # A summon names a creature in a document someone wrote (a spell, an item, a
+            # homebrew bundle); a retired id there would call up its stand-in — a CR 1
+            # nupperibo summoned as a CR 14 peri (`bestiary.retired`).
+            if retired(name):
+                raise UnknownTemplate(f"no creature {name!r}." + suggestion(name))
             made = self._bring_in(name, count=int(spec.get("count") or 1), side=side)
         except UnknownTemplate as exc:
             # Named rather than invented. A summon that quietly produces nothing is a

@@ -1552,9 +1552,11 @@ def _check_params(intent: Intent, index: int) -> None:
         from . import bestiary
 
         raw_t = str(p["template"]).strip().lower()
-        if bestiary.lookup(raw_t) is None:
+        # A retired id resolves for a save and never for a new creature (`bestiary.retired`):
+        # asked through `lookup` alone, "grue" spawned the CR 12 shining child it now lands on.
+        if bestiary.lookup(raw_t) is None or bestiary.retired(raw_t):
             # Nearest matches, never the whole list. Naming all four templates was the
-            # helpful thing to do; naming all 6,406 creatures is a wall of text, and a
+            # helpful thing to do; naming every creature is a wall of text, and a
             # model reading it loses the turn it was in the middle of.
             raise IntentError(
                 f"spawn: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
@@ -1592,7 +1594,7 @@ def _check_params(intent: Intent, index: int) -> None:
             from . import bestiary
 
             raw_t = str(p["template"]).strip().lower()
-            if bestiary.lookup(raw_t) is None:
+            if bestiary.lookup(raw_t) is None or bestiary.retired(raw_t):
                 raise IntentError(
                     f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                     "schema", index)

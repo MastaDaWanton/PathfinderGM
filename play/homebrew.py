@@ -176,9 +176,11 @@ def benches() -> list[Bench]:
             blurb="Stat blocks the engine can put in a scene and roll for. Unlike the "
                   "spell list these are executable: hit points, AC, saves, damage "
                   "reduction and an attack the engine rolls against.",
-            waiting="Two sources, and only one of them carries Environment: the 782 "
-                    "Bestiary blocks parsed from the PDFs do, and the 6,406 from the "
-                    "spreadsheet do not. Where two share a name the printed block wins. "
+            waiting="Only one source carries Environment: the Bestiary blocks parsed "
+                    "from the PDFs do; the rulebook rows from the spreadsheet (the NPC, "
+                    "Villain and Monster Codex and the Game Mastery Guide) and the "
+                    "people the app builds by the rules do not. Where two share a name "
+                    "the printed block wins. "
                     "Every creature carries biomes and a climate all the same — read from "
                     "that line where there is one, and guessed from the species in the "
                     "name or from the creature type where there is not. A guess says so.",
@@ -260,11 +262,12 @@ def authored_total() -> int:
 def _where(creature: dict) -> str:
     """Where a creature lives, for a bench row.
 
-    The list itself is no use here: 4,636 of the 7,133 expand "any" into eleven or thirteen
-    biomes, and printing those would be a paragraph per row that says nothing. So the ones
-    found anywhere say so in a word, and only a real habitat is named. A guess is marked,
-    because 6,406 of these were guessed and a row that reads like a fact from the book on a
-    page about authoring content is exactly the wrong impression to leave.
+    The list itself is no use here: on 0.2.22's bestiary 4,636 of the 7,133 expanded "any"
+    into eleven or thirteen biomes, and printing those would be a paragraph per row that
+    says nothing. So the ones found anywhere say so in a word, and only a real habitat is
+    named. A guess is marked, because every spreadsheet row's ground was guessed and a row
+    that reads like a fact from the book on a page about authoring content is exactly the
+    wrong impression to leave.
     """
     if not creature.get("biomes"):
         return "no environment given"

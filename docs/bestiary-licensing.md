@@ -9,6 +9,19 @@ in content/bestiary/aliases.json so no save loses a creature. The own versions o
 adventures' items come after (owner's order).** Written 2026-09-27, in answer to the
 question `docs/enemy-tactics-plan.md` raised under decision D1.
 
+**Amended 2026-10-30** (review of 0.2.23; tests/test_bestiary_aliases.py). The promise was
+13 ids short: the Bestiary 4 blocks the 2026-10-28 re-read could not parse (almiraj, bhole,
+the colossi, death dog, samsaran, the two scorpions...) and the great horned owl resolved to
+nothing. All 7,138 ids 0.2.22 shipped resolve now (`tools/ship_rulebook_line.py
+--aliases-from`, 5,549 aliases). And the aliases are for saves only: a retired id
+(`bestiary.retired`) no longer spawns, introduces or summons — "grue" made the CR 12 shining
+child it landed on — and a saved creature on a stand-in more than one CR from what it was
+fights on its own saved numbers (`bestiary.stand_in_far`). The map now lands a person on a
+build of its Hit Dice's class nearest its CR (not 2,164 of them on one level-1
+townsperson), a giant, an ogre or a people the Bestiaries print on the printed body, and
+everything else within one CR first: 41 printed stand-ins are more than a CR off, from
+1,412.
+
 A caution the measurement owes the decision: the alias ids themselves are the removed
 rows' ids — `aelzeldra`, `choral-the-conqueror` — kept as keys so old saves resolve. They
 are names from Paizo's adventures. They carry no stat block, description or text, only a
