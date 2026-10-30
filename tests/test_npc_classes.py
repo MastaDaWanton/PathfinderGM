@@ -118,21 +118,23 @@ GUARD = {"id": "town-guard", "name": "town guard", "race": "human", "class": "wa
 
 def test_a_teamster_built_from_the_rules():
     """Hand-checked: skill preset 10/12/11/13/8/9, +2 Str for a human; hp 3 (a d6's average,
-    Step 7) + 0 Con + 3 Toughness = 6; AC 10 + 1 Dex + 1 padded = 12; +1 with the club;
+    Step 7) + 0 Con + 3 Toughness + 1 favoured class = 7 (6 before the owner's ruling of
+    2026-10-30, `npc_builds.favoured_hp`); AC 10 + 1 Dex + 1 padded = 12; +1 with the club;
     CR 1/3 (commoner 1, "class levels –2", p. 398)."""
     assert npc_builds.check(TEAMSTER) == []
     a = npc_builds.actor(TEAMSTER)
     assert a.abilities == {"str": 12, "dex": 12, "con": 11, "int": 13, "wis": 8, "cha": 9}
-    assert (a.hp_max, a.ac(), sum(m.value for m in a.attack_modifiers("club"))) == (6, 12, 1)
+    assert (a.hp_max, a.ac(), sum(m.value for m in a.attack_modifiers("club"))) == (7, 12, 1)
     assert npc_builds.build(TEAMSTER)[0]["cr"] == "1/3"
 
 
 def test_a_town_guard_built_from_the_rules():
-    """Melee preset 13/11/12/9/10/8, +2 Str; hp 11 (2 x 5.5) + 2 Con + 3 Toughness = 16;
+    """Melee preset 13/11/12/9/10/8, +2 Str; hp 11 (2 x 5.5) + 2 Con + 3 Toughness + 2
+    favoured class = 18 (the NPC Codex's brigand, a warrior 2, is 2d10+4 at Con 12);
     AC 10 + 5 scale + 2 heavy shield = 17; BAB 2 + Str 2 = +4; Fort 3 + 1 = +4; CR 1/2."""
     assert npc_builds.check(GUARD) == []
     a = npc_builds.actor(GUARD)
-    assert (a.hp_max, a.ac(), a.bab) == (16, 17, 2)
+    assert (a.hp_max, a.ac(), a.bab) == (18, 17, 2)
     assert sum(m.value for m in a.attack_modifiers("longsword")) == 4
     assert _save(a, "fort") == 4
     assert npc_builds.build(GUARD)[0]["cr"] == "1/2"

@@ -1127,6 +1127,27 @@ def template_for(phrase: str, level: int = 1, floor: str = "guildhand") -> str:
     return floor
 
 
+def _unretired(template: str, level: int = 1) -> str:
+    """A spawn's template that is a retired id (`bestiary.retired`), read as the role word
+    it is when the chooser has that role: "raider" is the app's raider at the party's
+    level, by the door every person made from words comes through (`template_for`).
+
+    The validator refuses a retired id with the nearest names (`intents`, spawn): a new
+    creature is never made through a save's alias, which made "grue" a CR 12 shining
+    child (review of 0.2.23). But the spreadsheet the aliases replaced was full of plain
+    job words — "raider", "merchant", "pirate", "thief", "sailor", "guards" are all retired
+    ids — and the GM writes exactly those; refused, each cost a whole attempt for a role
+    the chooser answers. Anything the chooser does not answer as that very role (a "grue",
+    a "druid", which floors) is left for the validator to refuse."""
+    from rules import bestiary
+
+    said = str(template or "").strip()
+    if not said or not bestiary.retired(said):
+        return template
+    got = template_for(said.replace("-", " "), level, floor="")
+    return got or template
+
+
 def _can_be_fought(actor) -> bool:
     """Whether this creature is a plausible target for a fresh attack.
 
@@ -7137,7 +7158,7 @@ def split_plural_targets(raw_intents):
     return out
 
 
-def repair_bare_spawns(raw_intents, player_text: str):
+def repair_bare_spawns(raw_intents, player_text: str, level: int = 1):
     """A spawn the model could not shape is this code's to shape.
 
     Measured live: "I turn to fight the next group of guards" died in seven
@@ -7162,6 +7183,8 @@ def repair_bare_spawns(raw_intents, player_text: str):
                         break
             if not params.get("template"):
                 params["template"] = template_for(player_text or "", floor="thug")
+            else:
+                params["template"] = _unretired(str(params["template"]), level)
             r = dict(r, params=params)
         out.append(r)
     return out
@@ -9613,6 +9636,12 @@ def fill_introduce_templates(raw_intents, scene) -> list:
                 and (raw.get("params") or {}).get("who")):
             params = dict(raw["params"])
             params["template"] = template_for(str(params["who"]), _pc_level(scene))
+            raw = dict(raw, params=params)
+        elif (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "introduce"
+              and (raw.get("params") or {}).get("template")):
+            # A retired id the plan named ("merchant") read as its role, as a spawn's is.
+            params = dict(raw["params"])
+            params["template"] = _unretired(str(params["template"]), _pc_level(scene))
             raw = dict(raw, params=params)
         out.append(raw)
     return out

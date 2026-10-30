@@ -1,12 +1,17 @@
 """Creatures the engine can put in a scene and roll against.
 
-Three sources, one lookup:
+Four sources, one lookup (2,605 blocks since option D, 2026-10-29):
 
 - the hand-written town NPCs below — the people the opening scene actually needs;
-- 782 core creatures parsed out of the six Bestiary PDFs, which is where the plain Ogre,
-  Skeleton and Troll live, and the only source that carries **Environment**;
-- 6,406 stat blocks from a variant and NPC spreadsheet, which is where the named
-  adventure-path villains live.
+- the printed Bestiaries' blocks parsed out of the PDFs (core.json, 1,418 of them), which
+  is where the plain Ogre, Skeleton and Troll live, and the only source that carries
+  **Environment**; and the 164 creatures the Bestiary's templates make of them
+  (derived.json, `_derive`);
+- the rulebook line of a variant and NPC spreadsheet (creatures.json, 749 rows: the NPC,
+  Villain and Monster Codex and the Game Mastery Guide), which until option D also held
+  5,545 adventure, society and module rows — their ids land on a shipped body for old
+  saves (aliases.json, `raw_block`) and make no new creature (`retired`);
+- the app's own people, 272 builds made by the rules (content/npc-builds, `_people`).
 
 Unlike the spell list, this is **executable**. `instantiate()` builds an Actor with hit
 points, an AC, saves, damage reduction and an attack, and the engine rolls against it. An
@@ -18,8 +23,8 @@ where a variant shares its name.
 
 Environment is prose and only the core blocks have it, so every creature also carries
 `biomes` and `climates` — the same line read into the canonical vocabulary, or, for the
-6,406 that never had a line, guessed from the species in the name or from the creature
-type. `tools/tag_creature_biomes.py` writes them and `biomes_inferred` marks every guess.
+spreadsheet rows that never had a line, guessed from the species in the name or from the
+creature type. `tools/tag_creature_biomes.py` writes them and `biomes_inferred` marks every guess.
 """
 from __future__ import annotations
 
@@ -725,47 +730,109 @@ def _people(out: dict[str, dict], folders) -> None:
     ground is the build's own and marked as no Bestiary line (`biomes_inferred`): people
     are found by their work through `npcs.choose`, never drawn out of the land as a kind
     (`ground_stated`). A build the rules refuse is reported and left out."""
-    from . import npc_builds
-    from .sheet import to_dict
+    from django.conf import settings
 
+    shipped = Path(settings.BASE_DIR) / "content" / "npc-builds"
     for folder in folders:
         if not folder.is_dir():
             continue
+        # The shipped builds' sheets, made at tool time (`built_sheets`): building 272
+        # people through the engine took 1.90 s of every start (measured 2026-10-30, the
+        # first `imported()` 0.34-0.43 s before the builds and 2.07-2.12 s after). A
+        # homebrew build is always built here, live.
+        made = built_sheets() if folder.resolve() == shipped.resolve() else {}
         for path in sorted(folder.glob("*.json")):
+            if path.name == SHEETS_FILE:
+                continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
                 files.unreadable(path, exc)
                 continue
             for doc in (data.get("builds") if isinstance(data, dict) else None) or []:
+                pre = made.get(str(doc.get("id") or "").strip().lower())
+                # Only a sheet made from exactly this build: one edited since (the roster
+                # re-run without the sheets) is built live, so a stale file is slow, never
+                # wrong. tests/test_people_sheets.py fails while it is stale.
+                if pre is not None and pre.get("stamp") == build_stamp(doc):
+                    out.setdefault(pre["block"]["id"], pre["block"])
+                    continue
                 try:
-                    actor = npc_builds.actor(doc)
+                    block = people_block(doc)
                 except (ValueError, KeyError) as exc:
                     files.unreadable(path, exc)
                     continue
-                sheet, _ = npc_builds.build(doc)
-                block = to_dict(actor)
-                block.pop("ref", None)
-                block.update({
-                    "id": sheet["id"], "name": sheet["name"], "kind": "npc",
-                    "cr": sheet["cr"], "cr_value": sheet["cr_value"],
-                    "creature_type": "humanoid", "subtype": sheet["subtype"],
-                    "alignment": str(doc.get("alignment") or "N"),
-                    "biomes": list(doc.get("biomes") or ()), "climates": [],
-                    "biomes_any": not doc.get("biomes"), "biomes_inferred": True,
-                    "biomes_from": "build", "source": npc_builds.SOURCE,
-                    "description": str(doc.get("description") or ""),
-                    "role": str(doc.get("role") or ""),
-                    "build": doc,
-                    # Step 6's kit as a pocket claim (`_assemble_kit`), opened on first
-                    # look like any creature's; its coin is in the sheet's purse already.
-                    "pockets": list(sheet.get("pockets") or []),
-                })
-                if not block["biomes"]:
-                    from . import biomes as biomes_mod
-
-                    block["biomes"] = list(biomes_mod.LAND)
                 out.setdefault(block["id"], block)
+
+
+# Where `tools/build_people_sheets.py` writes the shipped builds' sheets, beside the builds.
+SHEETS_FILE = "people-sheets.json"
+
+
+def build_stamp(doc: dict) -> str:
+    """What a precomputed sheet was made from: the build document, every field of it."""
+    import hashlib
+
+    return hashlib.sha1(json.dumps(doc, sort_keys=True, ensure_ascii=False)
+                        .encode("utf-8")).hexdigest()[:16]
+
+
+def built_sheets() -> dict[str, dict]:
+    """{build id: {"stamp", "block"}} out of content/npc-builds/people-sheets.json, or {}
+    when there is no such file (then every build is made live, as before it existed)."""
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR) / "content" / "npc-builds" / SHEETS_FILE
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 — an unreadable file is no sheets
+        files.unreadable(path, exc)
+        return {}
+    return {str(k): v for k, v in (data.get("sheets") or {}).items()
+            if isinstance(v, dict) and isinstance(v.get("block"), dict)}
+
+
+def people_block(doc: dict) -> dict:
+    """One build as the block the store holds: the actor the engine makes of it (every
+    number derived from its race, class, level, scores, skills, feats and gear), as a
+    sheet, plus the block fields every reader of a block asks. Raises ValueError for a
+    build the rules refuse. The one maker, for the live build and the precomputed file."""
+    from . import npc_builds
+    from .sheet import to_dict
+
+    actor = npc_builds.actor(doc)
+    sheet, _ = npc_builds.build(doc)
+    block = to_dict(actor)
+    block.pop("ref", None)
+    block.update({
+        "id": sheet["id"], "name": sheet["name"], "kind": "npc",
+        "cr": sheet["cr"], "cr_value": sheet["cr_value"],
+        "creature_type": "humanoid", "subtype": sheet["subtype"],
+        "alignment": str(doc.get("alignment") or "N"),
+        "biomes": list(doc.get("biomes") or ()), "climates": [],
+        "biomes_any": not doc.get("biomes"), "biomes_inferred": True,
+        "biomes_from": "build", "source": npc_builds.SOURCE,
+        "description": str(doc.get("description") or ""),
+        "role": str(doc.get("role") or ""),
+        "build": doc,
+        # Step 6's kit as a pocket claim (`_assemble_kit`), opened on first look like any
+        # creature's; its coin is in the sheet's purse already.
+        "pockets": list(sheet.get("pockets") or []),
+    })
+    if not block["biomes"]:
+        from . import biomes as biomes_mod
+
+        block["biomes"] = list(biomes_mod.LAND)
+    # The build's own tags as the block's, where a stat block's are read (`Actor.
+    # standing_tags`, the watchman's `role.guard`): the sheet has no field for them, and
+    # passed only to the sheet they were lost — a built guardsman was no guard.
+    if doc.get("tags"):
+        block["tags"] = [str(t) for t in doc["tags"]]
+    # Through JSON, as the precomputed file holds it, so the live and the precomputed block
+    # are the same shape to every reader (a tuple is a list in both).
+    return json.loads(json.dumps(block, ensure_ascii=False))
 
 
 def _derive(out: dict[str, dict], declared: list) -> None:
@@ -824,7 +891,7 @@ def raw(key: str) -> dict | None:
     the creature's own words has to come here instead.
 
     Goes at the two stores directly rather than through `everything()`, which rebuilds a
-    7,136-entry dict on every call. `imported()` is cached, so this is a lookup.
+    dict of the whole store on every call. `imported()` is cached, so this is a lookup.
     """
     key = (key or "").strip().lower()
     if key in TEMPLATES:
@@ -864,16 +931,20 @@ def raw_block(key: str) -> dict | None:
     """
     key = (key or "").strip().lower()
     store = imported()
-    # An alias first: it is the printed Bestiary's own block, and the Bestiary wins a name
-    # it shares with the spreadsheet (`_build_imported` loads core.json last for that). The
-    # alias was consulted last at first, and `zombie` — the Bestiary's human zombie before
-    # the re-read — answered with an adventure's zombie from the spreadsheet.
+    # A block under exactly this id first: a homebrew creature named `black-bear` or
+    # `druid` is that creature. The alias was asked first until 2026-10-30, when it was
+    # there to beat the spreadsheet's own `zombie` row with the Bestiary's human zombie;
+    # option D took the spreadsheet's rows away (no shipped id is an alias key, pinned by
+    # tests/test_bestiary_aliases.py), and alias-first had come to mean that a homebrew
+    # `black-bear` could never be reached — it answered with the grizzly its retired id
+    # now lands on, and a homebrew `druid` with a townsperson.
+    for k in (key, key.replace(" ", "-")):
+        if k in store:
+            return store[k]
     alias = alias_of(key)
     if alias and alias in store:
         return store[alias]
-    return (store.get(key)
-            or store.get(key.replace(" ", "-"))
-            or store.get(_index_order(key)))
+    return store.get(_index_order(key))
 
 
 def _aliases() -> dict[str, str]:
@@ -892,11 +963,11 @@ def _aliases() -> dict[str, str]:
     That file's keys are hashes of the old ids (`alias_key`), not the ids: many were the
     names of Paizo's adventure characters, the very thing option D stopped shipping. A
     save's "aelzeldra" is hashed at lookup and finds its body; the name is in no file."""
-    global _ALIAS_MAP
+    global _ALIAS_MAP, _ALIAS_CR, _ALIAS_WINDOW
     if _ALIAS_MAP is None:
         from django.conf import settings
 
-        _ALIAS_MAP = {}
+        _ALIAS_MAP, _ALIAS_CR = {}, {}
         # A file of its own, not a key in the 16 MB creatures.json, which this would parse
         # again every time a test moves CAMPAIGN_DIR and clears the map.
         for name in ("aliases.json", "core.json"):
@@ -906,9 +977,69 @@ def _aliases() -> dict[str, str]:
                 mark = "#" if doc.get("hashed") else ""
                 _ALIAS_MAP.update({mark + str(k): str(v)
                                    for k, v in (doc.get("aliases") or {}).items()})
+                _ALIAS_CR.update({mark + str(k): float(v)
+                                  for k, v in (doc.get("was_cr") or {}).items()})
+                if doc.get("window") is not None:
+                    _ALIAS_WINDOW = float(doc["window"])
             except Exception as exc:  # noqa: BLE001 — a missing file is no aliases
                 files.unreadable(Path(f"content/bestiary/{name}"), exc)
     return _ALIAS_MAP
+
+
+def retired(key: str) -> bool:
+    """Whether `key` names a creature only through the hashed map of removed ids — a row
+    0.2.22 shipped and option D took out (`aliases.json`), or a block the 2026-10-28 re-read
+    lost — rather than a block, a hand-written template or a Bestiary rename (core.json's
+    `skeleton` is the human skeleton, and is still that creature).
+
+    The alias is for a SAVE: a creature that already exists keeps a body. A new creature
+    must never be made through it, and was (review of 0.2.23, 2026-10-30): the spawn and
+    introduce validators asked `lookup`, which accepts the alias, so the GM writing "grue"
+    (a CR 3 outsider) got a 152-hp CR 12 shining child, "stone-bat" a stone golem,
+    "nupperibo" a 180-hp peri and "druid" a townsperson — 125 non-person ids landed more
+    than four CR above the row they named. Every door that makes a creature from a name a
+    model, a world file or a summon wrote asks this and refuses with `suggestion`."""
+    key = (key or "").strip().lower()
+    if not key or key in TEMPLATES:
+        return False
+    store = imported()
+    m = _aliases()
+    for k in (key, key.replace(" ", "-")):
+        if k in store or k in m:
+            return False
+        if "#" + alias_key(k) in m:
+            return True
+    return False
+
+
+def stand_in_gap(key: str) -> float | None:
+    """How many CR a retired id's stand-in is from the row it was, or None when `key` is
+    not retired or either CR is unknown."""
+    key = (key or "").strip().lower()
+    if not retired(key):
+        return None
+    m = _aliases()
+    for k in (key, key.replace(" ", "-")):
+        h = "#" + alias_key(k)
+        if h in m:
+            was = _ALIAS_CR.get(h)
+            body = imported().get(m[h]) or {}
+            if was is None or body.get("cr_value") in (None, ""):
+                return None
+            return abs(float(body["cr_value"]) - was)
+    return None
+
+
+def stand_in_far(key: str) -> bool:
+    """Whether a saved creature of the retired id `key` stands on a body too far from what
+    it was for that body's printed attacks to be its own: more than aliases.json's `window`
+    (one CR; tools/ship_rulebook_line.py `WINDOW` has the measurement). Then
+    `Actor.stat_block_attacks` answers one attack, the stand-in's first for what the body
+    strikes with, at the numbers the save holds (`flat_attack`, `flat_damage`;
+    `Actor._saved_attacks`). Measured 2026-10-30: a saved nupperibo, flat_attack 1, on
+    the CR 14 peri swung a +2 flaming burst scimitar at +27/+22/+17/+12."""
+    gap = stand_in_gap(key)
+    return gap is not None and gap > _ALIAS_WINDOW
 
 
 def alias_key(key: str) -> str:
@@ -930,6 +1061,10 @@ def alias_of(key: str) -> str:
 
 
 _ALIAS_MAP: dict[str, str] | None = None
+# Filled beside `_ALIAS_MAP` and only ever read after it, so they need no clearing of their
+# own: a cleared map refills both.
+_ALIAS_CR: dict[str, float] = {}
+_ALIAS_WINDOW = 1.0
 
 
 def lookup(key: str) -> dict | None:
@@ -989,9 +1124,9 @@ def details(key: str) -> dict | None:
 def suggestion(key: str) -> str:
     """Name the nearest few, never all of them.
 
-    With four templates, listing every one was the helpful thing to do. With 6,406 it is a
-    wall of text in an error message, and a model reading it loses the turn it was in the
-    middle of.
+    With four templates, listing every one was the helpful thing to do. With thousands it
+    is a wall of text in an error message, and a model reading it loses the turn it was in
+    the middle of.
     """
     imported()
     key = (key or "").strip().lower().replace(" ", "-")
@@ -1008,6 +1143,12 @@ def suggestion(key: str) -> str:
         close = sorted((k for k in _INDEX if key in k), key=len)[:5]
     if not close:
         close = get_close_matches(key, _INDEX, n=5, cutoff=0.6)
+    # A retired id's own stand-in, when it is within a CR of what the id was: the nearest
+    # creature there is to the one asked for, offered first and never substituted. By
+    # spelling alone "black-bear" was offered black ice and a black butterfly.
+    stand_in = alias_of(key) if retired(key) and not stand_in_far(key) else ""
+    if stand_in and stand_in in imported():
+        close = [stand_in] + [c for c in close if c != stand_in][:4]
     if close:
         # Offered, never substituted: "ogre" must not quietly become an ogre boss.
         return " Did you mean " + ", ".join(repr(c) for c in close) + "?"
@@ -1117,9 +1258,10 @@ def search(text: str = "", creature_type: str = "", size: str = "",
     absent is not the same as none, and reading it as none would empty the results for
     two thirds of the book.
 
-    `specialists` drops the creatures whose biome list is an expansion of "any". 4,636 of
-    the 7,133 are found anywhere, so a swamp asked without it answers mostly with ghosts
-    and NPCs who merely could be there: 4,761 hits without it and 125 with.
+    `specialists` drops the creatures whose biome list is an expansion of "any". Measured on
+    0.2.22's bestiary, 4,636 of the 7,133 were found anywhere, so a swamp asked without it
+    answered mostly with ghosts and NPCs who merely could be there: 4,761 hits without it
+    and 125 with.
 
     (7,133, not the 7,188 the two source files hold between them — 55 names appear in both
     and the printed block wins. Counting the sum is the mistake that made the first three

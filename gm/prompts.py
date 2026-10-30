@@ -868,6 +868,31 @@ def _states_of(actor) -> str:
     return f" Conditions: {', '.join(names)}."
 
 
+def held_arms(actor) -> list[str]:
+    """The weapons a body with no printed attacks carries, by the name its own sheet
+    resolves (`Actor.weapon`), the one in hand first: a built guardsman's longspear, a
+    forged "masterwork longsword" record by that name. Never the fist, and never a thing
+    the sheet would refuse to swing (`weapons.wieldable`)."""
+    from rules import weapons as weapons_mod
+
+    out: list[str] = []
+    for key in [getattr(actor, "equipped", None), *(getattr(actor, "weapons", None) or [])]:
+        key = str(key or "").strip()
+        if not key or (weapons_mod.key_for(key) or key) in ("unarmed", "none"):
+            continue
+        try:
+            row = actor.weapon(key)
+        except Exception:  # noqa: BLE001 - a record the sheet cannot read names nothing
+            continue
+        name = str(row.get("name") or key)
+        base = str(row.get("crafted_base") or row.get("id") or key)
+        if not weapons_mod.wieldable(base)[0]:
+            continue
+        if name not in out:
+            out.append(name)
+    return out
+
+
 PLACE_WORDS_BUDGET = 900
 
 
@@ -3131,6 +3156,12 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
     # (`Actor.printed_arms`): a disarmed guard's halberd lies on the ground, and naming
     # it here would hand the model a swing the engine refuses.
     printed = actor.printed_arms() if hasattr(actor, "printed_arms") else []
+    if not printed:
+        # A body with no print — one of the app's built people, every number off a class
+        # (`rules/npc_builds.py`), or a saved creature on a far stand-in — fights with what
+        # it carries. Measured 2026-10-30: every built townsperson's turn went out with no
+        # "Their attacks" line, because `printed_arms` reads a print and a build has none.
+        printed = held_arms(actor)
     # "Their", matching the "They are" above it. It first read "Its attacks", and the
     # audit that followed had NPC turns calling a barkeep "it" in 12 of 23 where the
     # run before had 1 of 12 — not proven to be this line, not worth the risk either.

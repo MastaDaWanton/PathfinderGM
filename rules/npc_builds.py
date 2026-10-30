@@ -21,6 +21,17 @@ the book 2026-10-28:
   Step 4  feats: "one feat for every two levels beyond 1st", and humans one more.
   Step 7  "Determine the character's total hit points by assuming the average result."
 
+Then the favoured class bonus, the owner's ruling of 2026-10-30: a built person takes the
+hit point for every level in their favoured class (CRB Chapter 3, "Favored Class": "+1 hit point
+or +1 skill rank" each level), as Paizo's own NPC Codex people do. Every build has one class
+and it is the favoured one (James Jacobs and Sean K Reynolds on the Paizo rules forum: "NPCs
+do get favored class bonuses", and the first class taken is assumed favoured). Read off the
+NPC Codex's NPC-class blocks (legacy.aonprd.com/npcCodex/npc/, 2026-10-30), hit points less
+average dice, Constitution and Toughness: warriors take it in hit points 9 of 10 (the
+brigand's 2d10+4 at Con 12, the guard's 3d10+6 at Con 10 with Toughness), adepts 5 of 10,
+aristocrats 2, experts 2 and commoners 1 — the rest put it in a skill rank. The ruling takes
+the hit point for every build; that split is recorded here for the day it is revisited.
+
 And its CR from Chapter 12, "Adding NPCs" (p. 398): class levels with no racial Hit Dice are
 "a CR equal to its class levels –1"; NPC class levels only, "–2"; below 1 it steps down
 1/2, 1/3, 1/4, 1/6, 1/8.
@@ -70,6 +81,13 @@ def cr_value(cr: str) -> float:
 def average_hp(hit_die: int, level: int) -> int:
     """Step 7's "average result", rounded down over the whole: a d10 is 5.5 a level."""
     return int(level) * (int(hit_die) + 1) // 2
+
+
+def favoured_hp(level: int) -> int:
+    """The favoured class bonus taken in hit points: one a level (CRB Chapter 3), the NPC
+    Codex's way (module docstring). Measured 2026-10-30, before it: a warrior 3 guard built
+    here had 3 hit points fewer than the Codex's own guard of the same scores and feats."""
+    return int(level)
 
 
 def _scores(doc: dict, heroic: bool, problems: list[str]) -> dict[str, int]:
@@ -188,6 +206,7 @@ def build(doc: dict) -> tuple[dict | None, list[str]]:
         "cr": cr, "cr_value": cr_value(cr),
         "creature_type": "humanoid", "subtype": race_id,
         "hit_die_avg": average_hp(int(cls.get("hit_die") or 8), level),
+        "favoured_hp": favoured_hp(level),
     }
     for passthrough in ("tags", "kit", "notes", "appearance", "wealth", "pockets",
                         "description", "role"):
@@ -264,11 +283,12 @@ def actor(doc: dict, ref: str | None = None):
     sheet, problems = build(doc)
     if sheet is None:
         raise ValueError("; ".join(problems))
-    base = sheet.pop("hit_die_avg")
+    base = sheet.pop("hit_die_avg") + sheet.pop("favoured_hp", 0)
     coin = int(sheet.pop("coin_gp", 0) or 0)
     a = from_dict(sheet, ref=ref)
-    # The rolled part only: the sheet adds Constitution per Hit Die and the feat channel
-    # (Toughness) itself (`Actor.hp_max`), so the total follows the scores as a PC's does.
+    # The rolled part and the favoured class's hit point a level: the sheet adds
+    # Constitution per Hit Die and the feat channel (Toughness) itself (`Actor.hp_max`),
+    # so the total follows the scores as a PC's does.
     a.hp_base = base
     # The bought weapon and suit worn as their records, read on their own swing and in
     # their own AC; the weapon held by its record, and its plain key off the carried list

@@ -188,7 +188,7 @@ def test_a_free_action_does_not_hand_the_round_to_the_enemy(tmp_path):
             c.scene.depart(ref)
         # Refs are minted once and never reused, so the bear is not `c1` — the
         # companion the campaign opened with was, and departing him frees nothing.
-        bear = c.scene.add(instantiate("black-bear", scene=c.scene, name="a bear")).ref
+        bear = c.scene.add(instantiate("bear-grizzly", scene=c.scene, name="a bear")).ref
         e = c.engine()
         e.run(e.validate([{"op": "begin_encounter",
                            "params": {"sides": {"pc": ["pc"], "them": [bear]}}}]))

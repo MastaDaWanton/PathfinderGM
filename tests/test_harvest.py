@@ -131,7 +131,7 @@ def test_the_reader_never_reads_the_name():
     poisonous (deeds plan §13.5, `test_dangers_never_read_the_name`)."""
     assert _hides(harvest.parts(Body("wolf", "Old Greymuzzle"), _kesst(), now=0)) \
         == ["wolf-pelt"]
-    assert harvest.dangers(Body("advanced-giant-scorpion", "the thing")) == ["poison"]
+    assert harvest.dangers(Body("scorpion-giant", "the thing")) == ["poison"]
 
 
 def test_a_wolf_offers_fur_and_nothing_feathered_scaled_or_chitin():
@@ -480,7 +480,7 @@ def test_a_pseudodragon_is_a_good_dragon_by_its_printed_alignment():
     """Deeds plan §12 and open point 12: a good dragon's harvest is a deed, read from the
     printed alignment (the pseudodragon prints NG), never the name."""
     assert harvest.deed_of(Body("pseudodragon", "Sparkle")) == "deed.harvest.good-dragon"
-    assert harvest.deed_of(Body("choral-the-conqueror")) is None
+    assert harvest.deed_of(Body("adult-red-dragon")) is None
     assert harvest.deed_of(Body("wolf")) is None
 
 

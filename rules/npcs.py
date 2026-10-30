@@ -42,9 +42,12 @@ from pathfindergm import files
 # people in it, and the few it has are the species' plain stat block.
 # The app's own builds (`rules/npc_builds.SOURCE`) rank with the NPC Codex: a role, built
 # from the Core Rulebook's NPC rules, and nobody's story.
-_GENERIC = ("NPC Codex", "Inner Sea NPC Codex", "Game Mastery Guide", _BUILT_SOURCE)
-_ORGANISED = ("Villain Codex", "Monster Codex", "Inner Sea Monster Codex",
-              "NPC Guide", "NPC Guide Web")
+# Only sources that still ship: the Inner Sea NPC and Monster Codices and the NPC Guide
+# (web and print) were adventure-setting rows option D took out (2026-10-29), and ranking
+# them named three books nothing in the store comes from (review of 0.2.23, 2026-10-30).
+# A homebrew author's row with any other source ranks as a story block, tier 2.
+_GENERIC = ("NPC Codex", "Game Mastery Guide", _BUILT_SOURCE)
+_ORGANISED = ("Villain Codex", "Monster Codex")
 _BESTIARY = re.compile(r"^Bestiary", re.I)
 
 
@@ -359,7 +362,12 @@ def block_for(world_entity_id: str, role_words, level: int, name: str, *,
     """The template a world character plays as: what the codex remembers if that block
     still exists, else what the chooser picks — remembered on the way out."""
     known = recall(world_entity_id)
-    if known and bestiary.lookup(str(known.get("creature") or "")) is not None:
+    # A retired id does not "still exist": it lands on a stand-in for a save's sake
+    # (`bestiary.retired`), and a world character remembered on 0.2.22 as an adventure's
+    # row would otherwise be made, fresh, as whatever body that id now lands on — a
+    # townsperson for a CR 4 druid. The chooser picks again and the codex remembers it.
+    creature = str((known or {}).get("creature") or "")
+    if known and bestiary.lookup(creature) is not None and not bestiary.retired(creature):
         return str(known["creature"])
     got = choose(role_words, level, prefer_named=prefer_named) or {}
     template = str(got.get("id") or "guildhand")

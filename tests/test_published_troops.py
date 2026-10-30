@@ -110,7 +110,7 @@ def test_a_published_troop_loses_members_as_it_is_hurt():
 def test_an_ordinary_creature_is_not_a_crowd():
     """The guard on the whole change: only the subtype makes a unit."""
     s = Scene(location_id="t")
-    assert bestiary.instantiate("black-bear", scene=s).troop is None
+    assert bestiary.instantiate("bear-grizzly", scene=s).troop is None
 
 
 def test_the_unit_is_worth_what_it_was_and_the_members_share_it():

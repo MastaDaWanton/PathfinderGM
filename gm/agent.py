@@ -733,7 +733,8 @@ class GMAgent:
                     raw, self.engine.scene, notes=own_words,
                     addressed_refs=companions_mod.addressed(self.engine.scene,
                                                             player_input))
-                raw = judgement.repair_bare_spawns(raw, player_input)
+                raw = judgement.repair_bare_spawns(raw, player_input,
+                                                   judgement._pc_level(self.engine.scene))
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 # A thing thrown or swung is an improvised-weapon attack that names
                 # the thing — before the target fill reads "the man" it was thrown

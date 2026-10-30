@@ -2954,6 +2954,13 @@ class Actor:
         doc = self._creature_doc()
         if not doc or not (doc.get("melee") or doc.get("ranged")):
             return {}
+        # A saved creature whose id was retired, on a stand-in more than a CR from what it
+        # was, is not that print: it fights on its own saved numbers (`bestiary.
+        # stand_in_far`; a saved CR 1 nupperibo swung the CR 14 peri's +27 scimitar).
+        from . import bestiary as bestiary_mod
+
+        if bestiary_mod.stand_in_far(str(self.from_template or "")):
+            return self._saved_attacks(doc)
         from . import compile_block, statblock_attacks
 
         # The compiled record when the block has a fresh one (every shipped printed block,
@@ -3088,7 +3095,7 @@ class Actor:
             return [], ""
         doc = self._creature_doc() or {}
         if not doc.get("build"):
-            return [], ""
+            return self._arms_of_a_far_stand_in(doc)
         # A forged weapon is a record in the build's stock ("1-longsword"), which the saved
         # body does not own: it takes the plain weapon the record is made on, the number on
         # its own sheet being the old print's, not the build's +1.
@@ -3102,6 +3109,55 @@ class Actor:
                    if w]
         made = [w for w in dict.fromkeys(carried) if w and weapons_mod.wieldable(w)[0]
                 and (weapons_mod.key_for(w) or w) != "unarmed"]
+        return made, (made[0] if made else "")
+
+    def _saved_attacks(self, doc: dict) -> dict[str, list[list[dict]]]:
+        """One attack for a saved creature on a far stand-in (`bestiary.stand_in_far`): the
+        stand-in's primary attack for what the body strikes WITH — its name, natural or
+        made, automatic like a swarm's, touch — at the creature's own saved numbers: its
+        `flat_attack`, and its `flat_damage` as the dice and bonus. Never the stand-in's
+        totals, iteratives, riders or extra dice, which are a creature a CR and more away.
+
+        Not nothing: answered empty, the body fell back to the fist, and measured
+        2026-10-30 a saved book swarm (CR 2) on the CR 14 gray goo struck "for 1 non-lethal
+        bludgeoning" — the unarmed strike's die and its non-lethal rule, from a swarm."""
+        from . import compile_block, statblock_attacks
+
+        rec = compile_block.record_for(doc)
+        printed = rec["attacks"] if rec is not None else statblock_attacks.of_block(doc)
+        first = next((dict(opt[0]) for cat in ("melee", "ranged")
+                      for opt in printed.get(cat) or () if opt), None)
+        if first is None:
+            return {}
+        dice, bonus = first.get("dice"), 0
+        m = re.match(r"\s*(\d+d\d+)\s*(?:([+-])\s*(\d+))?", str(self.flat_damage or ""))
+        if m:
+            dice = m.group(1)
+            bonus = int(m.group(3) or 0) * (-1 if m.group(2) == "-" else 1)
+        first.update({"bonuses": [int(self.flat_attack or 0)], "dice": dice, "bonus": bonus,
+                      "count": 1, "riders": [], "extra": []})
+        return {"melee": [[first]] if first.get("category") != "ranged" else [],
+                "ranged": [[first]] if first.get("category") == "ranged" else []}
+
+    def _arms_of_a_far_stand_in(self, doc: dict) -> tuple[list[str], str]:
+        """The made weapons a far stand-in's print names (`bestiary.stand_in_far`): the
+        things a saved bandit archer on a printed archer carries, swung on its own saved
+        `flat_attack` because `stat_block_attacks` answers nothing for it. Possession only,
+        as `take_up_printed_arms` is: without it the body had no weapon at all and fought
+        with its fists. Natural attacks are the body and are not carried."""
+        from . import bestiary as bestiary_mod
+        from . import compile_block, statblock_attacks
+        from . import weapons as weapons_mod
+
+        if not bestiary_mod.stand_in_far(str(self.from_template or "")) \
+                or not (doc.get("melee") or doc.get("ranged")):
+            return [], ""
+        rec = compile_block.record_for(doc)
+        attacks = rec["attacks"] if rec is not None else statblock_attacks.of_block(doc)
+        made = [str(a.get("base") or "") for cat in ("melee", "ranged")
+                for opt in attacks.get(cat) or () for a in opt
+                if not a.get("natural") and a.get("base") not in (None, "", "unarmed")]
+        made = [w for w in dict.fromkeys(made) if weapons_mod.wieldable(w)[0]]
         return made, (made[0] if made else "")
 
     def primary_attack_key(self) -> str:

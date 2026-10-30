@@ -15497,6 +15497,9 @@
    ],
    "role": "warden",
    "description": "Keeps a place and what is kept in it.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longsword",
@@ -15563,6 +15566,9 @@
    ],
    "role": "warden",
    "description": "Keeps a place and what is kept in it.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longsword",
@@ -15637,6 +15643,9 @@
    ],
    "role": "warden",
    "description": "Keeps a place and what is kept in it.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longsword",
@@ -15714,6 +15723,9 @@
    ],
    "role": "warden",
    "description": "Keeps a place and what is kept in it.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longsword",
@@ -15794,6 +15806,9 @@
    ],
    "role": "warden",
    "description": "Keeps a place and what is kept in it.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longsword",
@@ -15858,6 +15873,9 @@
    ],
    "role": "jailer",
    "description": "Holds the keys, and the prisoners behind them.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "club",
@@ -15919,6 +15937,9 @@
    ],
    "role": "jailer",
    "description": "Holds the keys, and the prisoners behind them.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "club",
@@ -15985,6 +16006,9 @@
    ],
    "role": "jailer",
    "description": "Holds the keys, and the prisoners behind them.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "club",
@@ -16058,6 +16082,9 @@
    ],
    "role": "jailer",
    "description": "Holds the keys, and the prisoners behind them.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "club",
@@ -19637,6 +19664,9 @@
    ],
    "role": "guardsman",
    "description": "Walks a wall or a gate, and stops whoever should be stopped.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longspear",
@@ -19698,6 +19728,9 @@
    ],
    "role": "guardsman",
    "description": "Walks a wall or a gate, and stops whoever should be stopped.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longspear",
@@ -19764,6 +19797,9 @@
    ],
    "role": "guardsman",
    "description": "Walks a wall or a gate, and stops whoever should be stopped.",
+   "tags": [
+    "role.guard"
+   ],
    "gear": {
     "weapon": {
      "base": "longspear",

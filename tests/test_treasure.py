@@ -59,7 +59,7 @@ def test_silence_is_not_the_same_as_none():
     """6,355 of the bestiary's 7,136 entries never had the column filled in. Reading
     silence as "carries nothing" would make almost every fight in the game worthless;
     it means the GM decides, the same answer `xp.worth` gives for an unpriced creature."""
-    scene, _, bear = _scene_with("black-bear")
+    scene, _, bear = _scene_with("old-sailor")
     assert treasure.class_of(bear) == ""
     assert treasure.worth(bear) == 0
 

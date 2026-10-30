@@ -45,7 +45,7 @@ def _lane(seed=3):
     s.stand(WARRENS)
     pc = s.add(load_pc("fixtures/pc-kesst.json"))
     pc.purse = {"gp": 30}
-    carrier = s.add(instantiate("commoner-outlaw", scene=s, name="the basket carrier"))
+    carrier = s.add(instantiate("outlaw-level-1", scene=s, name="the basket carrier"))
     robber = s.add(instantiate("street-thug", scene=s, name="the robber"))
     second = s.add(instantiate("street-thug", scene=s, name="the second robber"))
     e = Engine(s, Dice(seed=seed))
