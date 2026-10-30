@@ -88,7 +88,14 @@ _BASE_ALIASES = {"flail": "light-flail", "unarmed strike": "unarmed",
                  "light shield bash": "light-shield"}
 _FLURRY = re.compile(r"\s*\b(?:unarmed\s+strike\s+)?flurry(?:\s+of\s+blows?)?\s*$", re.I)
 _DICE = re.compile(r"^\s*(?P<dice>\d+d\d+|\d+)\s*(?P<bonus>[+-]\s*\d+)?", re.I)
-_EXTRA = re.compile(r"^(?P<dice>\d+d\d+(?:\s*[+-]\s*\d+)?)\s+(?P<type>[a-z]+)", re.I)
+# "plus 6 fire" (a magma dragon's bite) is extra damage as surely as "plus 1d6 fire": the
+# dice are optional, and a constant is rolled as itself.
+# What follows the type is nothing or "damage": "1 fire [if hot]" (the barmaid's tankard)
+# is a condition this reader cannot hold, and is carried as an unsupported rider instead.
+# "3d6 electricity or sonic" (the marut) keeps its first type, as it always has: the
+# engine carries one type per packet.
+_EXTRA = re.compile(r"^(?P<dice>\d+(?:d\d+)?(?:\s*[+-]\s*\d+)?)\s+(?P<type>[a-z]+)"
+                    r"(?:\s+energy)?(?:\s+or\s+[a-z]+)?(?:\s+damage)?\s*$", re.I)
 _ENHANCEMENT = re.compile(r"^(?:[+-]\d+\s+|mwk\s+|masterwork\s+)+", re.I)
 
 # What a natural attack does, by the Bestiary's universal monster rules (natural attacks
@@ -209,6 +216,34 @@ def natural_kind(name: str) -> str:
     return last if last in NATURAL else ""
 
 
+_ABILITY_WORDS = {"str": "str", "strength": "str", "dex": "dex", "dexterity": "dex",
+                  "con": "con", "constitution": "con", "int": "int", "intelligence": "int",
+                  "wis": "wis", "wisdom": "wis", "cha": "cha", "charisma": "cha"}
+
+
+def _amounted(piece: str) -> tuple[str, str]:
+    """A rider printed with its amount in front, as (its word, the amount).
+
+    "1d8 bleed" -> ("bleed", "1d8"); "1d4 Con drain" -> ("con drain", "1d4"); "1d2 Str" and
+    "1 Con damage" -> ("str damage", "1d2"), ("con damage", "1"): the Bestiary's ability
+    damage and drain format ("1d4 Str drain", universal monster rules). "1d3 Charisma
+    bleed" is a score bled, and is kept as printed. Anything else keeps its whole print
+    and no amount ("7 precision", "1d4 nonlethal"), so it is listed, not lost.
+    """
+    low = " ".join(piece.lower().split())
+    m = re.match(r"^(\d+d\d+(?:\s*[+-]\s*\d+)?|\d+)\s+([a-z][a-z .]*)$", low)
+    if not m:
+        return low, ""
+    amount, rest = m.group(1).replace(" ", ""), m.group(2).strip(" .")
+    if rest == "bleed":
+        return "bleed", amount
+    words = rest.split()
+    ab = _ABILITY_WORDS.get(words[0]) if words else None
+    if ab and (len(words) == 1 or (len(words) == 2 and words[1] in ("damage", "drain"))):
+        return f"{ab} {words[1] if len(words) == 2 else 'damage'}", amount
+    return low, ""
+
+
 def _damage(text: str) -> dict | None:
     """"2d8+7/19-20 plus grab and 1d6 fire" -> dice, bonus, crit, riders, extra dice."""
     text = _clean(text)
@@ -227,7 +262,8 @@ def _damage(text: str) -> dict | None:
     out = {"dice": dice,
            "bonus": int((m.group("bonus") or "0").replace(" ", "")),
            "crit_range": None, "crit_mult": None, "nonlethal": False,
-           "type": "", "extra": [], "riders": [], "ability": "", "drain": False}
+           "type": "", "extra": [], "riders": [], "amounts": {}, "ability": "",
+           "drain": False}
     # The crit can sit after the riders ("1d6+3 plus grab/19-20"), so it is looked for in
     # the whole text, not only after the dice.
     for c in re.finditer(r"/\s*(?:(\d+)\s*-\s*20)?(?:\s*/?\s*x\s*(\d+))?", text, re.I):
@@ -267,7 +303,19 @@ def _damage(text: str) -> dict | None:
             if e and e.group("type").lower() in DAMAGE_TYPES:
                 out["extra"].append({"dice": e.group("dice").replace(" ", ""),
                                      "type": e.group("type").lower()})
-            elif not re.match(r"^\d", piece):
+            elif re.match(r"^\d", piece):
+                # "plus 1d8 bleed", "plus 1d4 Con drain", "plus 1d2 Str": a rider with its
+                # amount in front. Until 2026-10-30 every piece that began with a digit and
+                # was not a damage type was dropped here without a word — 26 bleeds, 13
+                # ability damages and drains, and "1d4 nonlethal", "7 precision", "5d6
+                # blight" with them. Now the rider is carried by its word with its amount
+                # beside it (`amounts`), and what is not a rider word keeps its whole print
+                # so `attack_riders` can list it as not supported rather than lose it.
+                word, amount = _amounted(piece)
+                out["riders"].append(word)
+                if amount:
+                    out["amounts"][word] = amount
+            else:
                 # "gra b": the PDF broke the word across a column, sixteen times; and its
                 # last letter off the line the same way, "poiso n" five times and
                 # "energy drai n" twice (2026-10-30). No rider ends in a lone letter.
