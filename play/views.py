@@ -1483,6 +1483,35 @@ def _flasks(pc) -> list[dict]:
     return out
 
 
+def _power_acts(s, d: dict, slot: str, on: bool, held_weapon: bool) -> list[dict]:
+    """A Use for each power a magic item on the shelf can be used for now (`/api/use`
+    with `power`, the engine's `use_item {item, power}`): one in a slot only while it is
+    worn, a slotless one (a pot of war paint, a compass) from the pack — the engine's own
+    rule (`Engine._power_of`). The power is named only once the item is identified; an
+    unidentified one says "Use", as its card says only "Magic". A weapon's powers stay
+    with the GM's words (its Wield is the act on its row)."""
+    from rules import magic_layer, materials
+
+    mag = getattr(s, "magic", None)
+    if held_weapon or not isinstance(mag, dict) or not mag.get("powers"):
+        return []
+    if slot and not on:
+        return []
+    rec = {"id": d["id"], "name": d["name"], "slot": slot or None, "magic": mag}
+    powers = magic_layer.layer(rec).get("powers") or []
+    known = bool((mag.get("known") or {}).get("intent", True))
+    out = []
+    for p in powers:
+        spec = p.get("spec") or {}
+        rid = str(p.get("source") or "").partition(":")[2]
+        word = (str(spec.get("spell") or "").replace("-", " ")
+                or str((materials.recipe(rid) or {}).get("name") or ""))
+        label = f"Use: {word}" if known and word and len(powers) > 1 else "Use"
+        out.append({"label": label, "api": "/api/use",
+                    "body": {"item": d["name"], "power": str(p.get("key"))}})
+    return out
+
+
 def _forged_weapon_line(rec: dict) -> list[str]:
     """A forged weapon's facts for its Equipment row: the base weapon's dice, type and crit,
     then each of the forge's own numbers by the piece it comes from ("+4 damage, forged iron
@@ -1834,6 +1863,12 @@ def _carried(pc) -> list[dict]:
                              "body": {"item": d["id"]}})
             else:
                 acts += by_name(d["name"], slot)
+        acts += _power_acts(s, d, slot, bool(on), held_weapon)
+        # A finished wondrous item is used by its power, never drunk: on the magic shelf it
+        # passed `usable`, and live (2026-10-30) a looted cloak of resistance and a bought
+        # pot of war paint each offered "Drink".
+        if isinstance(getattr(s, "magic", None), dict) and s.magic.get("powers"):
+            acts = [a for a in acts if a["label"] not in ("Drink", "Throw", "Coat")]
         effects = [str(x) for x in (d.get("effects") or []) if x]
         # A magic layer is something the engine runs (lane U5's report, 2026-10-06: an
         # enchanted sword read "for show, no effect in play"). Its line is the item card's,
@@ -1894,7 +1929,9 @@ def _carried(pc) -> list[dict]:
         # each way this row offers to use it on somebody: drunk, or each place the Use menu
         # puts it. "poisons whoever drinks it" was said of alchemist's fire, which is thrown,
         # and of a sickening drawback, which is no poison (the bench-shell lane, 2026-10-07).
-        offered = ([m["route"] for a in acts if a["label"] == "Use" for m in a["menu"]]
+        # `.get`: a magic item's Use (`_power_acts`) has no menu of places.
+        offered = ([m["route"] for a in acts if a["label"] == "Use"
+                    for m in a.get("menu") or ()]
                    + (["ingest"] if any(a["label"] == "Drink" for a in acts) else []))
         harm = []
         for route in dict.fromkeys(offered):
@@ -5747,8 +5784,15 @@ def use_item(request):
     # Eating out of the pack is the `eat` op with the item named (2026-10-01, "trail
     # rations reset my hunger"): it spends one and resets hunger through
     # rules/survival.py. A jar is drunk, thrown or coated by `use_item`, as before.
+    power = str(body.get("power", "") or "").strip()
     raw = ({"op": "eat", "actor": "pc", "because": f"{pc.name} eats",
             "params": {"item": item}} if how == "eat" else
+           # A magic item's power (`use_item {item, power}`, `Engine._use_power`): the
+           # Equipment row's Use for a worn ring's daily spell or a pot of war paint.
+           # Before 2026-10-30 only the GM's words reached it, so a bought paint had no
+           # button anywhere.
+           {"op": "use_item", "actor": "pc", "because": f"{pc.name} uses it",
+            "params": {"item": item, "power": power}} if power else
            {"op": "use_item", "actor": "pc", "because": f"{pc.name} reaches for it",
             "params": {"item": item, "how": how, "to": target,
                        # Where it goes (the Use menu): only `apply` takes one.
@@ -6152,7 +6196,11 @@ def _row(item, price: float, count: int = 1) -> dict:
             # when the answer is nothing — worth showing beside the number. A weapon, a
             # suit of armour and a horse are all things the engine runs (I2).
             "does_something": bool(getattr(item, "specs", None))
-            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")
+            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount",
+                                                  "magic")
+            # A finished wondrous item runs its layer (`magicitem.finished`); the deal line
+            # said "for show, no effect in play" of a pot of war paint (live, 2026-10-30).
+            or bool((getattr(item, "magic", None) or {}).get("powers"))
             # A craft's material is worked at a bench — charcoal feeds the forge — and
             # the panel had labelled it "for show, no effect in play" (live, 2026-10-05).
             or _craft_material(item)
@@ -6189,6 +6237,10 @@ def _shelf_of(item) -> str:
     name = str(getattr(item, "name", "") or "")
     if kind in ("mount", "tack"):
         return "animals"
+    if kind == "magic":
+        # A counter's finished wondrous item (`goods.magic_item_goods`): on the magic
+        # shelf, where it is filed once bought, not among the rope.
+        return "magic"
     if kind == "material":
         # A craft's staple consumable (`market.consumable_goods`): charcoal is what a
         # workshop works with, filed beside the drawn materials, not among the rope.

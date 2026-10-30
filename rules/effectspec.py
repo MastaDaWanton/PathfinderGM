@@ -352,7 +352,8 @@ PERMISSIONS: dict[str, dict] = {
     "breathe_water": {"name": "Breathes water", "tag": "breathes.water",
                       "reader": "water.breathes_water (drowning)"},
     "endure_elements": {"name": "Comfortable in heat and cold",
-                        "tag": "permission.endure_elements", "reader": ""},
+                        "tag": "permission.endure_elements",
+                        "reader": "Engine._exposure (cold and heat saves)"},
     "comprehend_languages": {"name": "Understands any language",
                              "tag": "permission.comprehend_languages", "reader": ""},
     "pass_without_trace": {"name": "Leaves no trail",
@@ -610,6 +611,7 @@ VOCAB: dict[str, list[dict]] = {
     "duration_unit": [{"id": k, "name": n} for k, n in (
         ("round", "rounds"), ("minute", "minutes"), ("hour", "hours"),
         ("day", "days"), ("permanent", "permanent"), ("instant", "instantaneous"))],
+    "dr_stacks_with": [{"id": "class", "name": "Damage reduction from a class"}],
     "lethality": [{"id": "lethal", "name": "Lethal"},
                   {"id": "nonlethal", "name": "Non-lethal"}],
     "uses": [{"id": k, "name": n} for k, n in (
@@ -1031,9 +1033,16 @@ CATEGORIES: list[Category] = [
                 Field("amount", "Points", "int"),
                 Field("bypass", "Bypassed by", "text", required=False,
                       hint="silver, cold iron. Empty for DR/—, which nothing bypasses."),
+                # The exception the book prints on the thing itself: orange war paint's
+                # DR 1/— "stacks with damage reduction gained via a character class, such
+                # as barbarian" (AoN). Read by `Actor.damage_reduction`.
+                Field("stacks_with", "Adds to", "choice", vocab="dr_stacks_with",
+                      required=False,
+                      hint="Leave empty: DR never adds up unless the item says so."),
             ], blocked="Granted with a clock or without one. Several kinds of damage "
                        "reduction do not add up: only the best applicable one applies, "
-                       "and none of them touches energy damage."),
+                       "and none of them touches energy damage — unless the document "
+                       "says it adds to a class's DR (`stacks_with`)."),
             EffectType("immunity", "Immunity", "Immune to fire for 2 hours", [
                 Field("target", "To what", "text",
                       hint="fire damage, poison, gaze attacks."),

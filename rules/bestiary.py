@@ -355,7 +355,22 @@ def _assemble_kit(actor, data: dict, block: dict | None = None) -> None:
     rec = compile_block.record_for(block)
     printed = [it for it in (rec or {}).get("carries") or ()
                if it.get("key") and it.get("table") not in ("weapon", "magic item")]
-    if printed:
+    # Its magic items too, the owner's ruling of 2026-10-30: a creature drops what it
+    # carries, as the book has it ("'NPC gear' indicates the monster has treasure as normal
+    # for an NPC", Bestiary intro; "Encounters against NPCs typically award three times the
+    # treasure ... due to NPC gear", CRB Placing Treasure). The compile leaves a magic
+    # item's `key` empty, so they were all dropped here: 2,039 entries in 567 blocks, 231
+    # of them a cloak of resistance +1. Each is read by the catalogue's own name
+    # (`magicitem.recipe_named`, 1,267 of the 2,039 by exact name); one the catalogue has
+    # no row for — a wand, a scroll, an ioun stone — is still not invented. Into the pack,
+    # never onto the body: the printed AC and saves already count what it wears.
+    from . import magicitem
+
+    magic = [rid for it in (rec or {}).get("carries") or ()
+             if it.get("table") == "magic item"
+             for rid in [magicitem.recipe_named(str(it.get("printed") or ""))] if rid
+             for _ in range(max(1, min(int(it.get("count") or 1), 10)))]
+    if printed or magic:
         coin = [f"{it.get('dice') or it['count']} {it['key']}"
                 for it in printed if it["table"] == "coin"]
         # A masterwork or magic suit is the forge's record, its +N laid on by the
@@ -373,7 +388,7 @@ def _assemble_kit(actor, data: dict, block: dict | None = None) -> None:
             for rec in npc_gear.records(gear):
                 actor.add_stock(forge_items.stock_item(rec), 1)
         pockets = [str(it["key"]) for it in printed if it["table"] != "coin"
-                   and it not in made for _ in range(_units(it))]
+                   and it not in made for _ in range(_units(it))] + magic
         actor.kit_pending = {"kit": "printed", "wealth": ", ".join(coin), "pockets": pockets}
         return
     kit_key = str(data.get("kit") or "").strip().lower()
@@ -452,11 +467,26 @@ def _pocket(actor, key: str) -> None:
     them — every pocket was `carry`'d since kits began, which was harmless while kits held
     work gloves and chalk and is not now that a body's pockets are its printed gear.
     A brewed thing is the alchemy bench's stock row (`goods.alchemy_stock`), a weapon, a
-    suit, a shield or a round goes through `goods.stow`, and the rest to the satchel as
-    before."""
+    suit, a shield or a round goes through `goods.stow`.
+
+    The rest went to the satchel by `carry` until 2026-10-30 — measured over the 1,041
+    printed bodies that carry pockets: 1,650 of their things landed in the herb satchel,
+    293 torches and 62 thieves' tools among them, and the lock-picking roll reads the tools
+    off the shelf (`pc.stock`, `Engine._op_break_in`), so looted tools never lifted the
+    no-tools penalty. Now: a wondrous item (`mi-` recipe id, from the printed gear) is the
+    finished record, found and unidentified (`magicitem.finished`); a general-store thing
+    is delivered as a purchase of it would be (`goods.deliver`); a craft material keeps the
+    satchel (`deliver`'s own rule); and a thing no table names (a kit's "work gloves") is a
+    plain shelf entry, where the Equipment tab lists it, as `deliver` files an unknown."""
+    from types import SimpleNamespace
+
     from . import formulae
     from . import goods as goods_mod
+    from . import magicitem, materials
 
+    if key.startswith("mi-") and materials.recipe(key) is not None:
+        actor.add_stock(magicitem.finished(key, how="found"), 1)
+        return
     book = formulae.all()
     slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-")
     # The classics by the shop's own ids ("acid" is `acid-flask`, `goods.CLASSIC_GEAR`).
@@ -473,7 +503,16 @@ def _pocket(actor, key: str) -> None:
         stowed, _ = goods_mod.stow(actor, key, 1)
         if stowed:
             return
-    actor.carry(key, 1)
+    spaced = key.replace("-", " ")
+    good = goods_mod.good(key) or goods_mod.good(spaced) or goods_mod.good(
+        key.replace(" ", "-"))
+    if good is not None:
+        goods_mod.deliver(None, actor, good, 1)
+        return
+    # A craft's material by its id (`deliver` puts one in the satchel), or a thing no
+    # table names, as `deliver` files an unknown purchase: a shelf entry by its name.
+    goods_mod.deliver(None, actor, SimpleNamespace(id=key, key=key, name=spaced, per=1,
+                                                   kind="", tier="common", track=""), 1)
 
 
 def next_ref(scene, taken=()) -> str:

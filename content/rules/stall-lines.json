@@ -133,7 +133,7 @@
      "gear": ["ink and paper", "signal whistle", "mirror", "holy symbol",
               "spell component pouch", "healer's kit", "thieves' tools", "manacles"],
      "tables": ["enchanting-manuals"],
-     "draw": ["blacksmith", "leatherworker", "enchanter"], "catch_all": true,
+     "draw": ["blacksmith", "leatherworker", "enchanter", "magic-items"], "catch_all": true,
      "consumables": ["blacksmith", "leatherworker", "enchanter"]}
   ],
   "holders": {"village": 2, "town": 4, "city": 5},

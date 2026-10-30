@@ -40,6 +40,7 @@ record and is not built on.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -732,6 +733,84 @@ def by_kind(kind: str) -> list[Item]:
     return [i for _, i in sorted(catalogue().items()) if i.kind == kind]
 
 
+# --- a finished catalogue item, as a shop sells it and a body drops it ------------------------
+#
+# The enchanter's bench makes a wondrous item by binding its recipe onto a vessel: the record
+# is the vessel with `magic.powers: [{"recipe": <id>}]` (`magic_layer.write`), and every
+# reader — the worn walk, `use_item`'s powers, the card, the fence — reads that layer. A
+# finished item bought at a counter or taken off a body is the same record, so it works the
+# way the bench's own does and no second shape exists to drift from it. Before 2026-10-30 no
+# counter sold one (docs/own-items.md: "No market sells catalogue wondrous items") and the
+# loot dropped every printed one (bestiary `_assemble_kit` filtered `table == "magic item"`:
+# 2,039 entries in 567 blocks, 231 of them a cloak of resistance +1).
+
+# What a body's printed gear names an item that the catalogue spells another way: the
+# Bestiary's "(type i)" against the catalogue's "(type I)" is case and is folded anyway;
+# these are the words, not the case.
+_PRINTED_ALIASES = {
+    "pearl of power (1st)": "pearl of power (1st level)",
+    "pearl of power (2nd)": "pearl of power (2nd level)",
+    "pearl of power (3rd)": "pearl of power (3rd level)",
+    "luckstone": "stone of good luck (luckstone)",
+    "stone of good luck": "stone of good luck (luckstone)",
+}
+
+
+def recipe_named(printed: str) -> str | None:
+    """The recipe id of the wondrous item a printed name means, or None.
+
+    By the catalogue's own name, case and spacing folded, through the few printed spellings
+    in `_PRINTED_ALIASES`; never a fuzzy match — a guessed item would be a fact nobody wrote.
+    Retired rows are no recipe and answer None (`materials.recipes`)."""
+    from . import materials
+
+    want = " ".join(str(printed or "").split()).strip().lower()
+    want = _PRINTED_ALIASES.get(want, want)
+    if not want:
+        return None
+    # Indexed under the recipe door's own key (the files' paths, sizes and mtimes), so a
+    # homebrew row added mid-session is seen and no stale index outlives its source;
+    # `recipes()` deep-copies the whole catalogue per call, too dear per spawned body.
+    key = materials._recipe_key()
+    if _NAMES.get("key") != key:
+        _NAMES.clear()
+        _NAMES["key"] = key
+        _NAMES["index"] = {" ".join(str(row.get("name") or "").split()).lower(): rid
+                           for rid, row in materials.recipes().items()}
+    return _NAMES["index"].get(want)
+
+
+_NAMES: dict = {}
+
+
+def finished(recipe_id: str, *, how: str = "bought"):
+    """A finished wondrous item as a shelf entry (`crafting.Stock`), the record the bench
+    writes: its vessel (worn in the row's slot, or slotless) with the recipe bound as its
+    one power. `how` is "bought" — a counter's item is known for what it is and known to be
+    clean — or "found": nothing about it is known (lane F's convention, `known = {}`), and
+    it is identified the way any found item is. Raises KeyError for no recipe."""
+    from . import magic_layer, materials
+    from .crafting import Stock
+
+    row = materials.recipe(recipe_id)
+    if row is None:
+        raise KeyError(f"no wondrous item {recipe_id!r}")
+    vessel = str(row.get("vessel") or "slotless")
+    slot = vessel if vessel not in ("slotless", "rod") else None
+    # The binder's level the layer's capacity reads (`magic_layer.capacity`): enough to hold
+    # the item, at the book's exchange rate — what the bench would have needed to make it.
+    plus = max(1, math.ceil(math.sqrt(float(row.get("price_gp") or 0) / 2000.0)))
+    rec = magic_layer.write({"id": str(row["id"]), "name": str(row["name"]), "slot": slot},
+                            {"powers": [{"recipe": str(row["id"])}]},
+                            binding={"quality_index": magic_layer.SUPERIOR,
+                                     "level": 2 * plus, "perks": {}})
+    known = ({"intent": True, "curse": True, "how": "bought"} if how == "bought" else {})
+    rec["magic"]["known"] = known
+    return Stock(base=str(row["name"]), count=1, craft=TRACK_ID, kind="crafted",
+                 slot=slot, wearable=bool(slot), masterwork=False,
+                 tier=str(row.get("tier") or "common"), magic=rec["magic"])
+
+
 def properties_for(vessel_kind: str) -> list[Item]:
     """Everything that can legally go on this kind of vessel — what the bench lists
     once the player has said what is on the anvil."""
@@ -744,4 +823,5 @@ __all__ = ["CRAFT_COST_FRACTION", "Chain", "CraftError", "HOURS_PER_1000_GP", "I
            "KIND_GLYPH", "MAX_ENHANCEMENT", "MAX_TOTAL_BONUS", "MODE_ID", "Result",
            "STATIONS", "TRACK_ID", "VESSEL_RULES", "by_kind", "catalogue",
            "chain_from_body", "check_bonus", "check_terms", "craft_cost", "craft_hours",
-           "from_dict", "get", "market_price", "preview", "properties_for"]
+           "finished", "from_dict", "get", "market_price", "preview", "properties_for",
+           "recipe_named"]

@@ -148,6 +148,20 @@ def _open_worth(item) -> float:
     book = alchemy_worth(item)
     if book is not None:
         return book
+    # A finished wondrous item — bought, looted, or bound at the circle — is worth its
+    # layer's book price (`magic_layer.market_price`), never the tier ladder. Measured
+    # 2026-10-30 when counters began selling them and bodies dropping them: a cloak of
+    # resistance +1 (1,000 gp) was priced by its tier as a jar would be.
+    magic = _field(item, "magic")
+    if isinstance(magic, dict) and magic.get("powers") and not _field(item, "weapon") \
+            and not _field(item, "armour"):
+        from . import magic_layer
+
+        rec = {"magic": magic, "slot": _field(item, "slot")}
+        gp = magic_layer.market_price(magic_layer.magic_of(rec),
+                                      magic_layer.vessel_kind(rec), str(rec["slot"] or ""))
+        if gp > 0:
+            return float(gp)
 
     potency = _as_float(_field(item, "potency"), 1.0)
     # A step-bench thing carries `potency` 1.0, because its strength is baked into the

@@ -1205,14 +1205,15 @@ def test_schrodingers_pockets_collapse_at_the_loot():
     thug = instantiate("thug", scene=scene, name="the tough")
     scene.add(thug)
     thug.hp = -13
-    assert thug.kit_pending and not thug.inventory
+    assert thug.kit_pending and not thug.stock
 
     eng = Engine(scene, Dice(seed=3))
     eng.run(eng.validate([{"op": "loot", "actor": "pc",
                            "params": {"from": thug.ref},
                            "because": "taking everything"}]))
     assert thug.kit_pending == {}
-    assert pc.inventory.get("dice-of-bone") == 1
+    # On the shelf, where a bought thing is, not the herb satchel (2026-10-30).
+    assert sum(s.count for s in pc.stock.values() if s.base == "dice of bone") == 1
     assert pc.purse.get("sp", 0) >= 2
 
 
@@ -1253,7 +1254,9 @@ def test_stuff_is_a_word_not_a_thing():
                                             "from_": m.ref, "to": "pc"}}])).outcomes[0]
     assert pc.goods.get("bolt-of-silk", 0) == 2
     assert m.goods == {} and m.kit_pending == {}
-    assert pc.inventory        # the collapsed kit's pockets came along
+    # The collapsed kit's pockets came along — on the shelf since 2026-10-30, which the
+    # bulk give did not move until then.
+    assert pc.stock and m.stock == {}
 
 
 def test_a_bulk_give_from_a_corpse_is_the_loot_it_meant():

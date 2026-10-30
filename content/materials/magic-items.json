@@ -7185,7 +7185,8 @@
        "duration": {
         "amount": 24,
         "unit": "hour"
-       }
+       },
+       "source": "war paint"
       }
      ],
      "uses": "once",
@@ -7234,7 +7235,8 @@
        "duration": {
         "amount": 24,
         "unit": "hour"
-       }
+       },
+       "source": "war paint"
       }
      ],
      "uses": "once",
@@ -7279,10 +7281,12 @@
        "type": "damage_reduction",
        "amount": 1,
        "bypass": "",
+       "stacks_with": "class",
        "duration": {
         "amount": 24,
         "unit": "hour"
-       }
+       },
+       "source": "war paint"
       }
      ],
      "uses": "once",
@@ -7330,7 +7334,8 @@
        "duration": {
         "amount": 24,
         "unit": "hour"
-       }
+       },
+       "source": "war paint"
       }
      ],
      "uses": "once",
@@ -7379,7 +7384,8 @@
        "duration": {
         "amount": 24,
         "unit": "hour"
-       }
+       },
+       "source": "war paint"
       }
      ],
      "uses": "once",
@@ -7428,7 +7434,8 @@
        "duration": {
         "amount": 24,
         "unit": "hour"
-       }
+       },
+       "source": "war paint"
       }
      ],
      "uses": "once",

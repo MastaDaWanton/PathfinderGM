@@ -353,7 +353,11 @@ Where this differs from §3.1-3.3 the reason is in the module docstring; in brie
   `spell_resistance` from worn items and stat blocks, with a tell either way.
 - **`use_item {item, power}`**: an op the engine validates; it runs the power's spell or effect
   through the cast door with `origin: item:<id>` and the item's CL, counts `magic.uses`, and
-  `run_periodic("day")` resets the counts. Refused with the uses left named.
+  `run_periodic("day")` resets the counts — except a `uses: "once"` power's, which stays
+  spent (2026-10-30: the reset wiped every count, and once-a-day war paint re-armed for
+  good). A slotless single-use item (a pot of paint, an elixir) is used from the pack and
+  taken off the shelf, one of its stack, rather than counted. Refused with the uses left
+  named.
 - **Bleed** from wounding: an `ActiveEffect` with `periodic: [{"damage": 1}]`, stacking `stack`.
 - **`Scene.advance`** calls `inprogress.settle(actor, clock)` for every actor and appends
   "<name> is ready to collect" to `ended` (lane G's §8).

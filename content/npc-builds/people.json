@@ -56,6 +56,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -63,7 +64,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -123,6 +124,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -130,7 +132,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -192,6 +194,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -199,7 +202,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -262,6 +265,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -269,7 +273,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -327,6 +331,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -334,7 +339,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -392,6 +397,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -399,7 +405,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -458,6 +464,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -465,7 +472,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -523,6 +530,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -530,7 +538,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -589,6 +597,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -596,7 +605,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -655,6 +664,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -662,7 +672,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -722,6 +732,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -729,7 +740,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -788,6 +799,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -795,7 +807,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -855,6 +867,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -862,7 +875,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -925,6 +938,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -932,7 +946,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -991,6 +1005,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -998,7 +1013,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1058,6 +1073,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1065,7 +1081,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1127,6 +1143,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1134,7 +1151,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1197,6 +1214,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1204,7 +1222,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1265,6 +1283,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1272,7 +1291,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1334,6 +1353,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1341,7 +1361,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1399,6 +1419,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1406,7 +1427,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1465,6 +1486,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1472,7 +1494,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1531,6 +1553,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1538,7 +1561,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 4,
+    "spent_gp": 5,
     "table_gp": 0,
     "table": false
    }
@@ -1598,6 +1621,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1605,7 +1629,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 4,
+    "spent_gp": 5,
     "table_gp": 0,
     "table": false
    }
@@ -1665,6 +1689,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1672,7 +1697,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1733,6 +1758,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1740,7 +1766,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1798,6 +1824,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1805,7 +1832,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -1864,6 +1891,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1871,7 +1899,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -1929,6 +1957,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -1936,7 +1965,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -1995,6 +2024,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2002,7 +2032,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -2099,6 +2129,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2106,7 +2137,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -2204,6 +2235,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2211,7 +2243,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -2273,6 +2305,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2280,7 +2313,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -2343,6 +2376,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2350,7 +2384,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -2448,6 +2482,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2455,7 +2490,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -2554,6 +2589,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2561,7 +2597,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -2657,6 +2693,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2664,7 +2701,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -2761,6 +2798,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2768,7 +2806,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -2864,6 +2902,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2871,7 +2910,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -2968,6 +3007,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -2975,7 +3015,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -3075,6 +3115,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3082,7 +3123,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -3179,6 +3220,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3186,7 +3228,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3284,6 +3326,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3291,7 +3334,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3392,6 +3435,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3399,7 +3443,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3503,6 +3547,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3510,7 +3555,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3609,6 +3654,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3616,7 +3662,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3716,6 +3762,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3723,7 +3770,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3826,6 +3873,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3833,7 +3881,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -3929,6 +3977,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -3936,7 +3985,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -4033,6 +4082,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4040,7 +4090,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -4140,6 +4190,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4147,7 +4198,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -4250,6 +4301,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4257,7 +4309,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -4353,6 +4405,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4360,7 +4413,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -4457,6 +4510,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4464,7 +4518,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -4564,6 +4618,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4571,7 +4626,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -4667,6 +4722,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4674,7 +4730,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -4771,6 +4827,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4778,7 +4835,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -4878,6 +4935,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4885,7 +4943,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -4981,6 +5039,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -4988,7 +5047,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -5085,6 +5144,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5092,7 +5152,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -5192,6 +5252,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5199,7 +5260,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -5296,6 +5357,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5303,7 +5365,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -5401,6 +5463,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5408,7 +5471,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -5509,6 +5572,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5516,7 +5580,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -5613,6 +5677,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5620,7 +5685,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -5720,6 +5785,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5727,7 +5793,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -5830,6 +5896,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5837,7 +5904,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -5943,6 +6010,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -5950,7 +6018,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6059,6 +6127,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6066,7 +6135,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6162,6 +6231,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6169,7 +6239,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6268,6 +6338,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6275,7 +6346,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6377,6 +6448,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6384,7 +6456,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6489,6 +6561,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6496,7 +6569,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6604,6 +6677,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6611,7 +6685,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6706,6 +6780,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6713,7 +6788,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6812,6 +6887,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6819,7 +6895,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -6921,6 +6997,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -6928,7 +7005,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -7023,6 +7100,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7030,7 +7108,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -7129,6 +7207,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7136,7 +7215,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -7238,6 +7317,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7245,7 +7325,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 8,
+    "spent_gp": 9,
     "table_gp": 0,
     "table": false
    }
@@ -7342,6 +7422,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7349,7 +7430,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -7450,6 +7531,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7457,7 +7539,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -7560,6 +7642,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7567,7 +7650,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -7673,6 +7756,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7680,7 +7764,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -7776,6 +7860,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7783,7 +7868,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -7882,6 +7967,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7889,7 +7975,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -7991,6 +8077,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -7998,7 +8085,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -8096,6 +8183,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8103,7 +8191,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -8204,6 +8292,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8211,7 +8300,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -8315,6 +8404,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8322,7 +8412,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 9,
+    "spent_gp": 10,
     "table_gp": 0,
     "table": false
    }
@@ -8419,6 +8509,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8426,7 +8517,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -8526,6 +8617,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8533,7 +8625,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -8636,6 +8728,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8643,7 +8736,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -8749,6 +8842,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8756,7 +8850,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -8865,6 +8959,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8872,7 +8967,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -8973,6 +9068,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -8980,7 +9076,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9084,6 +9180,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9091,7 +9188,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9198,6 +9295,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9205,7 +9303,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9315,6 +9413,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9322,7 +9421,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9435,6 +9534,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9442,7 +9542,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9541,6 +9641,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9548,7 +9649,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9650,6 +9751,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9657,7 +9759,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9762,6 +9864,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9769,7 +9872,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9876,6 +9979,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9883,7 +9987,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -9992,6 +10096,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -9999,7 +10104,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 38,
+    "spent_gp": 39,
     "table_gp": 0,
     "table": false
    }
@@ -10101,14 +10206,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 154,
-    "spent_gp": 105,
+    "worn": [],
+    "coin_gp": 153,
+    "spent_gp": 106,
     "table_gp": 260,
     "table": true
    }
@@ -10215,14 +10322,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 994,
-    "spent_gp": 655,
+    "worn": [],
+    "coin_gp": 993,
+    "spent_gp": 656,
     "table_gp": 1650,
     "table": true
    }
@@ -10330,20 +10439,20 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2144,
-    "spent_gp": 3855,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 843,
+    "spent_gp": 5156,
     "table_gp": 6000,
     "table": true
    }
@@ -10450,24 +10559,27 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 9494,
-    "spent_gp": 6855,
+    "worn": [
+     "mi-belt-dexterity-2",
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1443,
+    "spent_gp": 14906,
     "table_gp": 16350,
     "table": true
    }
@@ -10572,29 +10684,34 @@
     "weapon": {
      "base": "dagger",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 10144,
-    "spent_gp": 34855,
+    "worn": [
+     "mi-belt-dexterity-2",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 1443,
+    "spent_gp": 43556,
     "table_gp": 45000,
     "table": true
    }
@@ -10690,6 +10807,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -10697,7 +10815,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -10794,6 +10912,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -10801,7 +10920,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -10904,14 +11023,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 284,
-    "spent_gp": 105,
+    "worn": [],
+    "coin_gp": 283,
+    "spent_gp": 106,
     "table_gp": 390,
     "table": true
    }
@@ -11018,20 +11139,22 @@
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1594,
-    "spent_gp": 1855,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 443,
+    "spent_gp": 3006,
     "table_gp": 3450,
     "table": true
    }
@@ -11141,20 +11264,22 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 6194,
-    "spent_gp": 3855,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 443,
+    "spent_gp": 9606,
     "table_gp": 10050,
     "table": true
    }
@@ -11263,24 +11388,31 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 9144,
-    "spent_gp": 17855,
+    "worn": [
+     "mi-belt-dexterity-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 43,
+    "spent_gp": 26956,
     "table_gp": 27000,
     "table": true
    }
@@ -11377,6 +11509,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -11384,7 +11517,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -11485,6 +11618,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -11492,7 +11626,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -11595,6 +11729,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -11602,7 +11737,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -11708,6 +11843,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -11715,7 +11851,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -11811,6 +11947,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -11818,7 +11955,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -11918,6 +12055,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -11925,7 +12063,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -12027,6 +12165,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -12034,7 +12173,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -12139,6 +12278,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -12146,7 +12286,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -12242,6 +12382,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -12249,7 +12390,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -12348,6 +12489,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -12355,7 +12497,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -12459,14 +12601,16 @@
     "shield": "none",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 324,
-    "spent_gp": 455,
+    "worn": [],
+    "coin_gp": 323,
+    "spent_gp": 456,
     "table_gp": 780,
     "table": true
    }
@@ -12569,24 +12713,26 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 1
+     "enhancement": 0
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 794,
-    "spent_gp": 3855,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 643,
+    "spent_gp": 4006,
     "table_gp": 4650,
     "table": true
    }
@@ -12692,24 +12838,30 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 5894,
-    "spent_gp": 6855,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 2943,
+    "spent_gp": 9806,
     "table_gp": 12750,
     "table": true
    }
@@ -12818,24 +12970,31 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 16944,
-    "spent_gp": 17855,
+    "worn": [
+     "mi-belt-dexterity-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 2593,
+    "spent_gp": 32206,
     "table_gp": 34800,
     "table": true
    }
@@ -12934,6 +13093,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -12941,7 +13101,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -13044,6 +13204,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13051,7 +13212,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -13157,6 +13318,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13164,7 +13326,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -13273,6 +13435,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13280,7 +13443,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -13376,6 +13539,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13383,7 +13547,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -13483,6 +13647,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13490,7 +13655,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -13586,6 +13751,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13593,7 +13759,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -13692,6 +13858,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13699,7 +13866,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -13801,6 +13968,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -13808,7 +13976,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -13910,14 +14078,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 121,
-    "spent_gp": 138,
+    "worn": [],
+    "coin_gp": 120,
+    "spent_gp": 139,
     "table_gp": 260,
     "table": true
    }
@@ -14024,14 +14194,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 961,
-    "spent_gp": 688,
+    "worn": [],
+    "coin_gp": 960,
+    "spent_gp": 689,
     "table_gp": 1650,
     "table": true
    }
@@ -14084,14 +14256,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 171,
-    "spent_gp": 88,
+    "worn": [],
+    "coin_gp": 170,
+    "spent_gp": 89,
     "table_gp": 260,
     "table": true
    }
@@ -14149,14 +14323,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 461,
-    "spent_gp": 1188,
+    "worn": [],
+    "coin_gp": 460,
+    "spent_gp": 1189,
     "table_gp": 1650,
     "table": true
    }
@@ -14211,24 +14387,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1711,
-    "spent_gp": 4288,
+    "worn": [],
+    "coin_gp": 410,
+    "spent_gp": 5589,
     "table_gp": 6000,
     "table": true
    }
@@ -14286,24 +14460,28 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8061,
-    "spent_gp": 8288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1010,
+    "spent_gp": 15339,
     "table_gp": 16350,
     "table": true
    }
@@ -14359,29 +14537,34 @@
     "weapon": {
      "base": "longsword",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8711,
-    "spent_gp": 36288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 10,
+    "spent_gp": 44989,
     "table_gp": 45000,
     "table": true
    }
@@ -14435,14 +14618,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 171,
-    "spent_gp": 88,
+    "worn": [],
+    "coin_gp": 170,
+    "spent_gp": 89,
     "table_gp": 260,
     "table": true
    }
@@ -14501,14 +14686,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 461,
-    "spent_gp": 1188,
+    "worn": [],
+    "coin_gp": 460,
+    "spent_gp": 1189,
     "table_gp": 1650,
     "table": true
    }
@@ -14564,24 +14751,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1711,
-    "spent_gp": 4288,
+    "worn": [],
+    "coin_gp": 410,
+    "spent_gp": 5589,
     "table_gp": 6000,
     "table": true
    }
@@ -14640,24 +14825,28 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8061,
-    "spent_gp": 8288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1010,
+    "spent_gp": 15339,
     "table_gp": 16350,
     "table": true
    }
@@ -14714,29 +14903,34 @@
     "weapon": {
      "base": "longsword",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8711,
-    "spent_gp": 36288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 10,
+    "spent_gp": 44989,
     "table_gp": 45000,
     "table": true
    }
@@ -14789,14 +14983,16 @@
     "shield": "heavy shield",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 241,
-    "spent_gp": 538,
+    "worn": [],
+    "coin_gp": 240,
+    "spent_gp": 539,
     "table_gp": 780,
     "table": true
    }
@@ -14852,20 +15048,20 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 511,
-    "spent_gp": 4138,
+    "worn": [],
+    "coin_gp": 360,
+    "spent_gp": 4289,
     "table_gp": 4650,
     "table": true
    }
@@ -14924,20 +15120,26 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 7461,
-    "spent_gp": 5288,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1510,
+    "spent_gp": 11239,
     "table_gp": 12750,
     "table": true
    }
@@ -14999,20 +15201,27 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 15511,
-    "spent_gp": 19288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1160,
+    "spent_gp": 33639,
     "table_gp": 34800,
     "table": true
    }
@@ -15068,29 +15277,36 @@
     "weapon": {
      "base": "longsword",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 5
+     "enhancement": 3
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 36711,
-    "spent_gp": 59288,
+    "worn": [
+     "mi-belt-strength-4",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-2",
+     "mi-cloak-resistance-5"
+    ],
+    "coin_gp": 5510,
+    "spent_gp": 90489,
     "table_gp": 96000,
     "table": true
    }
@@ -15147,14 +15363,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 461,
-    "spent_gp": 1188,
+    "worn": [],
+    "coin_gp": 460,
+    "spent_gp": 1189,
     "table_gp": 1650,
     "table": true
    }
@@ -15208,24 +15426,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1711,
-    "spent_gp": 4288,
+    "worn": [],
+    "coin_gp": 410,
+    "spent_gp": 5589,
     "table_gp": 6000,
     "table": true
    }
@@ -15282,24 +15498,28 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8061,
-    "spent_gp": 8288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1010,
+    "spent_gp": 15339,
     "table_gp": 16350,
     "table": true
    }
@@ -15354,29 +15574,34 @@
     "weapon": {
      "base": "longsword",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8711,
-    "spent_gp": 36288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 10,
+    "spent_gp": 44989,
     "table_gp": 45000,
     "table": true
    }
@@ -15434,7 +15659,7 @@
     "weapon": {
      "base": "longsword",
      "masterwork": true,
-     "enhancement": 5
+     "enhancement": 4
     },
     "armour": {
      "base": "full plate",
@@ -15443,20 +15668,27 @@
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 45711,
-    "spent_gp": 77288,
+    "worn": [
+     "mi-belt-strength-4",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-2",
+     "mi-cloak-resistance-5"
+    ],
+    "coin_gp": 2510,
+    "spent_gp": 120489,
     "table_gp": 123000,
     "table": true
    }
@@ -15514,14 +15746,16 @@
     "shield": "heavy shield",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 241,
-    "spent_gp": 538,
+    "worn": [],
+    "coin_gp": 240,
+    "spent_gp": 539,
     "table_gp": 780,
     "table": true
    }
@@ -15582,20 +15816,20 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 511,
-    "spent_gp": 4138,
+    "worn": [],
+    "coin_gp": 360,
+    "spent_gp": 4289,
     "table_gp": 4650,
     "table": true
    }
@@ -15659,20 +15893,26 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 7461,
-    "spent_gp": 5288,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1510,
+    "spent_gp": 11239,
     "table_gp": 12750,
     "table": true
    }
@@ -15739,20 +15979,27 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 15511,
-    "spent_gp": 19288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1160,
+    "spent_gp": 33639,
     "table_gp": 34800,
     "table": true
    }
@@ -15813,29 +16060,36 @@
     "weapon": {
      "base": "longsword",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 5
+     "enhancement": 3
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 36711,
-    "spent_gp": 59288,
+    "worn": [
+     "mi-belt-strength-4",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-2",
+     "mi-cloak-resistance-5"
+    ],
+    "coin_gp": 5510,
+    "spent_gp": 90489,
     "table_gp": 96000,
     "table": true
    }
@@ -15889,14 +16143,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 186,
-    "spent_gp": 73,
+    "worn": [],
+    "coin_gp": 185,
+    "spent_gp": 74,
     "table_gp": 260,
     "table": true
    }
@@ -15955,14 +16211,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 476,
-    "spent_gp": 1173,
+    "worn": [],
+    "coin_gp": 475,
+    "spent_gp": 1174,
     "table_gp": 1650,
     "table": true
    }
@@ -16018,24 +16276,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1726,
-    "spent_gp": 4273,
+    "worn": [],
+    "coin_gp": 425,
+    "spent_gp": 5574,
     "table_gp": 6000,
     "table": true
    }
@@ -16094,24 +16350,28 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8076,
-    "spent_gp": 8273,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1025,
+    "spent_gp": 15324,
     "table_gp": 16350,
     "table": true
    }
@@ -16162,14 +16422,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 306,
-    "spent_gp": 83,
+    "worn": [],
+    "coin_gp": 305,
+    "spent_gp": 84,
     "table_gp": 390,
     "table": true
    }
@@ -16220,24 +16482,24 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2066,
-    "spent_gp": 1383,
+    "worn": [],
+    "coin_gp": 915,
+    "spent_gp": 2534,
     "table_gp": 3450,
     "table": true
    }
@@ -16295,20 +16557,21 @@
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 4766,
-    "spent_gp": 5283,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1015,
+    "spent_gp": 9034,
     "table_gp": 10050,
     "table": true
    }
@@ -16359,14 +16622,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 171,
-    "spent_gp": 88,
+    "worn": [],
+    "coin_gp": 170,
+    "spent_gp": 89,
     "table_gp": 260,
     "table": true
    }
@@ -16417,24 +16682,21 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1011,
-    "spent_gp": 1388,
+    "worn": [],
+    "coin_gp": 10,
+    "spent_gp": 2389,
     "table_gp": 2400,
     "table": true
    }
@@ -16492,20 +16754,20 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2511,
-    "spent_gp": 5288,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1010,
+    "spent_gp": 6789,
     "table_gp": 7800,
     "table": true
    }
@@ -16556,14 +16818,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 186,
-    "spent_gp": 73,
+    "worn": [],
+    "coin_gp": 185,
+    "spent_gp": 74,
     "table_gp": 260,
     "table": true
    }
@@ -16619,14 +16883,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 476,
-    "spent_gp": 1173,
+    "worn": [],
+    "coin_gp": 475,
+    "spent_gp": 1174,
     "table_gp": 1650,
     "table": true
    }
@@ -16679,24 +16945,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1726,
-    "spent_gp": 4273,
+    "worn": [],
+    "coin_gp": 425,
+    "spent_gp": 5574,
     "table_gp": 6000,
     "table": true
    }
@@ -16750,14 +17014,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 176,
-    "spent_gp": 83,
+    "worn": [],
+    "coin_gp": 175,
+    "spent_gp": 84,
     "table_gp": 260,
     "table": true
    }
@@ -16813,14 +17079,16 @@
     "shield": "heavy shield",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 246,
-    "spent_gp": 533,
+    "worn": [],
+    "coin_gp": 245,
+    "spent_gp": 534,
     "table_gp": 780,
     "table": true
    }
@@ -16874,24 +17142,24 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2066,
-    "spent_gp": 1383,
+    "worn": [],
+    "coin_gp": 915,
+    "spent_gp": 2534,
     "table_gp": 3450,
     "table": true
    }
@@ -16952,20 +17220,20 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2516,
-    "spent_gp": 5283,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1015,
+    "spent_gp": 6784,
     "table_gp": 7800,
     "table": true
    }
@@ -17017,14 +17285,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 306,
-    "spent_gp": 83,
+    "worn": [],
+    "coin_gp": 305,
+    "spent_gp": 84,
     "table_gp": 390,
     "table": true
    }
@@ -17076,24 +17346,21 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1016,
-    "spent_gp": 1383,
+    "worn": [],
+    "coin_gp": 15,
+    "spent_gp": 2384,
     "table_gp": 2400,
     "table": true
    }
@@ -17147,24 +17414,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1716,
-    "spent_gp": 4283,
+    "worn": [],
+    "coin_gp": 415,
+    "spent_gp": 5584,
     "table_gp": 6000,
     "table": true
    }
@@ -17219,14 +17484,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 81,
-    "spent_gp": 178,
+    "worn": [],
+    "coin_gp": 80,
+    "spent_gp": 179,
     "table_gp": 260,
     "table": true
    }
@@ -17286,14 +17553,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 921,
-    "spent_gp": 728,
+    "worn": [],
+    "coin_gp": 920,
+    "spent_gp": 729,
     "table_gp": 1650,
     "table": true
    }
@@ -17354,20 +17623,20 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2071,
-    "spent_gp": 3928,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 770,
+    "spent_gp": 5229,
     "table_gp": 6000,
     "table": true
    }
@@ -17418,14 +17687,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 186,
-    "spent_gp": 73,
+    "worn": [],
+    "coin_gp": 185,
+    "spent_gp": 74,
     "table_gp": 260,
     "table": true
    }
@@ -17478,14 +17749,16 @@
     "shield": "heavy shield",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 256,
-    "spent_gp": 523,
+    "worn": [],
+    "coin_gp": 255,
+    "spent_gp": 524,
     "table_gp": 780,
     "table": true
    }
@@ -17536,24 +17809,24 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2076,
-    "spent_gp": 1373,
+    "worn": [],
+    "coin_gp": 925,
+    "spent_gp": 2524,
     "table_gp": 3450,
     "table": true
    }
@@ -17611,20 +17884,20 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2526,
-    "spent_gp": 5273,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1025,
+    "spent_gp": 6774,
     "table_gp": 7800,
     "table": true
    }
@@ -17724,14 +17997,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 154,
-    "spent_gp": 105,
+    "worn": [],
+    "coin_gp": 153,
+    "spent_gp": 106,
     "table_gp": 260,
     "table": true
    }
@@ -17836,14 +18111,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 994,
-    "spent_gp": 655,
+    "worn": [],
+    "coin_gp": 993,
+    "spent_gp": 656,
     "table_gp": 1650,
     "table": true
    }
@@ -17949,20 +18226,20 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2144,
-    "spent_gp": 3855,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 843,
+    "spent_gp": 5156,
     "table_gp": 6000,
     "table": true
    }
@@ -18067,24 +18344,27 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 9494,
-    "spent_gp": 6855,
+    "worn": [
+     "mi-belt-dexterity-2",
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1443,
+    "spent_gp": 14906,
     "table_gp": 16350,
     "table": true
    }
@@ -18135,14 +18415,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 186,
-    "spent_gp": 73,
+    "worn": [],
+    "coin_gp": 185,
+    "spent_gp": 74,
     "table_gp": 260,
     "table": true
    }
@@ -18195,14 +18477,16 @@
     "shield": "heavy shield",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 256,
-    "spent_gp": 523,
+    "worn": [],
+    "coin_gp": 255,
+    "spent_gp": 524,
     "table_gp": 780,
     "table": true
    }
@@ -18253,24 +18537,24 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2076,
-    "spent_gp": 1373,
+    "worn": [],
+    "coin_gp": 925,
+    "spent_gp": 2524,
     "table_gp": 3450,
     "table": true
    }
@@ -18324,14 +18608,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 176,
-    "spent_gp": 83,
+    "worn": [],
+    "coin_gp": 175,
+    "spent_gp": 84,
     "table_gp": 260,
     "table": true
    }
@@ -18390,14 +18676,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 466,
-    "spent_gp": 1183,
+    "worn": [],
+    "coin_gp": 465,
+    "spent_gp": 1184,
     "table_gp": 1650,
     "table": true
    }
@@ -18453,24 +18741,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1716,
-    "spent_gp": 4283,
+    "worn": [],
+    "coin_gp": 415,
+    "spent_gp": 5584,
     "table_gp": 6000,
     "table": true
    }
@@ -18529,24 +18815,28 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8066,
-    "spent_gp": 8283,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1015,
+    "spent_gp": 15334,
     "table_gp": 16350,
     "table": true
    }
@@ -18599,14 +18889,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 308,
-    "spent_gp": 81,
+    "worn": [],
+    "coin_gp": 307,
+    "spent_gp": 82,
     "table_gp": 390,
     "table": true
    }
@@ -18659,24 +18951,24 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2068,
-    "spent_gp": 1381,
+    "worn": [],
+    "coin_gp": 917,
+    "spent_gp": 2532,
     "table_gp": 3450,
     "table": true
    }
@@ -18736,20 +19028,21 @@
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 4768,
-    "spent_gp": 5281,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1017,
+    "spent_gp": 9032,
     "table_gp": 10050,
     "table": true
    }
@@ -18808,6 +19101,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -18815,7 +19109,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -18875,6 +19169,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -18882,7 +19177,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -18935,14 +19230,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 176,
-    "spent_gp": 83,
+    "worn": [],
+    "coin_gp": 175,
+    "spent_gp": 84,
     "table_gp": 260,
     "table": true
    }
@@ -19000,14 +19297,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 466,
-    "spent_gp": 1183,
+    "worn": [],
+    "coin_gp": 465,
+    "spent_gp": 1184,
     "table_gp": 1650,
     "table": true
    }
@@ -19062,24 +19361,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1716,
-    "spent_gp": 4283,
+    "worn": [],
+    "coin_gp": 415,
+    "spent_gp": 5584,
     "table_gp": 6000,
     "table": true
    }
@@ -19131,14 +19428,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 171,
-    "spent_gp": 88,
+    "worn": [],
+    "coin_gp": 170,
+    "spent_gp": 89,
     "table_gp": 260,
     "table": true
    }
@@ -19195,14 +19494,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 461,
-    "spent_gp": 1188,
+    "worn": [],
+    "coin_gp": 460,
+    "spent_gp": 1189,
     "table_gp": 1650,
     "table": true
    }
@@ -19256,24 +19557,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1711,
-    "spent_gp": 4288,
+    "worn": [],
+    "coin_gp": 410,
+    "spent_gp": 5589,
     "table_gp": 6000,
     "table": true
    }
@@ -19330,24 +19629,28 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 8061,
-    "spent_gp": 8288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1010,
+    "spent_gp": 15339,
     "table_gp": 16350,
     "table": true
    }
@@ -19400,14 +19703,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 301,
-    "spent_gp": 88,
+    "worn": [],
+    "coin_gp": 300,
+    "spent_gp": 89,
     "table_gp": 390,
     "table": true
    }
@@ -19460,24 +19765,24 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2061,
-    "spent_gp": 1388,
+    "worn": [],
+    "coin_gp": 910,
+    "spent_gp": 2539,
     "table_gp": 3450,
     "table": true
    }
@@ -19537,20 +19842,21 @@
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 4761,
-    "spent_gp": 5288,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1010,
+    "spent_gp": 9039,
     "table_gp": 10050,
     "table": true
    }
@@ -19609,24 +19915,31 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 7711,
-    "spent_gp": 19288,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1610,
+    "spent_gp": 25389,
     "table_gp": 27000,
     "table": true
    }
@@ -19680,14 +19993,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 181,
-    "spent_gp": 78,
+    "worn": [],
+    "coin_gp": 180,
+    "spent_gp": 79,
     "table_gp": 260,
     "table": true
    }
@@ -19746,14 +20061,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 471,
-    "spent_gp": 1178,
+    "worn": [],
+    "coin_gp": 470,
+    "spent_gp": 1179,
     "table_gp": 1650,
     "table": true
    }
@@ -19809,24 +20126,22 @@
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1721,
-    "spent_gp": 4278,
+    "worn": [],
+    "coin_gp": 420,
+    "spent_gp": 5579,
     "table_gp": 6000,
     "table": true
    }
@@ -19878,14 +20193,16 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 176,
-    "spent_gp": 83,
+    "worn": [],
+    "coin_gp": 175,
+    "spent_gp": 84,
     "table_gp": 260,
     "table": true
    }
@@ -19937,24 +20254,21 @@
     "armour": {
      "base": "half-plate",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1016,
-    "spent_gp": 1383,
+    "worn": [],
+    "coin_gp": 15,
+    "spent_gp": 2384,
     "table_gp": 2400,
     "table": true
    }
@@ -20013,20 +20327,21 @@
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 4766,
-    "spent_gp": 5283,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 1015,
+    "spent_gp": 9034,
     "table_gp": 10050,
     "table": true
    }
@@ -20089,20 +20404,27 @@
     },
     "shield": "heavy shield",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 15516,
-    "spent_gp": 19283,
+    "worn": [
+     "mi-belt-strength-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1165,
+    "spent_gp": 33634,
     "table_gp": 34800,
     "table": true
    }
@@ -20159,29 +20481,36 @@
     "weapon": {
      "base": "lance",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "armour": {
      "base": "full plate",
      "masterwork": true,
-     "enhancement": 5
+     "enhancement": 3
     },
     "shield": "heavy shield",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 36716,
-    "spent_gp": 59283,
+    "worn": [
+     "mi-belt-strength-4",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-2",
+     "mi-cloak-resistance-5"
+    ],
+    "coin_gp": 5515,
+    "spent_gp": 90484,
     "table_gp": 96000,
     "table": true
    }
@@ -20241,6 +20570,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20248,7 +20578,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -20309,6 +20639,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20316,7 +20647,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -20376,6 +20707,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20383,7 +20715,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -20444,6 +20776,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20451,7 +20784,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -20509,6 +20842,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20516,7 +20850,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -20575,6 +20909,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20582,7 +20917,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 3,
+    "spent_gp": 4,
     "table_gp": 0,
     "table": false
    }
@@ -20678,6 +21013,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20685,7 +21021,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -20782,6 +21118,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20789,7 +21126,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -20889,6 +21226,7 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
@@ -20896,7 +21234,7 @@
      "torch"
     ],
     "coin_gp": 0,
-    "spent_gp": 5,
+    "spent_gp": 6,
     "table_gp": 0,
     "table": false
    }
@@ -20999,14 +21337,16 @@
     "shield": "none",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 324,
-    "spent_gp": 455,
+    "worn": [],
+    "coin_gp": 323,
+    "spent_gp": 456,
     "table_gp": 780,
     "table": true
    }
@@ -21108,24 +21448,26 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 1
+     "enhancement": 0
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 794,
-    "spent_gp": 3855,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 643,
+    "spent_gp": 4006,
     "table_gp": 4650,
     "table": true
    }
@@ -21230,24 +21572,30 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 5894,
-    "spent_gp": 6855,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 2943,
+    "spent_gp": 9806,
     "table_gp": 12750,
     "table": true
    }
@@ -21355,24 +21703,31 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 16944,
-    "spent_gp": 17855,
+    "worn": [
+     "mi-belt-dexterity-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 2593,
+    "spent_gp": 32206,
     "table_gp": 34800,
     "table": true
    }
@@ -21428,14 +21783,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 271,
-    "spent_gp": 118,
+    "worn": [],
+    "coin_gp": 270,
+    "spent_gp": 119,
     "table_gp": 390,
     "table": true
    }
@@ -21495,20 +21852,22 @@
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1581,
-    "spent_gp": 1868,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 430,
+    "spent_gp": 3019,
     "table_gp": 3450,
     "table": true
    }
@@ -21571,20 +21930,22 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 6181,
-    "spent_gp": 3868,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 430,
+    "spent_gp": 9619,
     "table_gp": 10050,
     "table": true
    }
@@ -21646,24 +22007,31 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 9131,
-    "spent_gp": 17868,
+    "worn": [
+     "mi-headband-charisma-2",
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 30,
+    "spent_gp": 26969,
     "table_gp": 27000,
     "table": true
    }
@@ -21719,14 +22087,16 @@
     "shield": "none",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 306,
-    "spent_gp": 473,
+    "worn": [],
+    "coin_gp": 305,
+    "spent_gp": 474,
     "table_gp": 780,
     "table": true
    }
@@ -21781,24 +22151,26 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 1
+     "enhancement": 0
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 776,
-    "spent_gp": 3873,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 625,
+    "spent_gp": 4024,
     "table_gp": 4650,
     "table": true
    }
@@ -21856,24 +22228,30 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 5876,
-    "spent_gp": 6873,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 2925,
+    "spent_gp": 9824,
     "table_gp": 12750,
     "table": true
    }
@@ -21921,14 +22299,16 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 256,
-    "spent_gp": 3,
+    "worn": [],
+    "coin_gp": 255,
+    "spent_gp": 4,
     "table_gp": 260,
     "table": true
    }
@@ -21978,14 +22358,16 @@
     "shield": "none",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 426,
-    "spent_gp": 353,
+    "worn": [],
+    "coin_gp": 425,
+    "spent_gp": 354,
     "table_gp": 780,
     "table": true
    }
@@ -22037,20 +22419,23 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2846,
-    "spent_gp": 603,
+    "worn": [
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-1"
+    ],
+    "coin_gp": 695,
+    "spent_gp": 2754,
     "table_gp": 3450,
     "table": true
    }
@@ -22105,20 +22490,22 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 5196,
-    "spent_gp": 2603,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-1"
+    ],
+    "coin_gp": 695,
+    "spent_gp": 7104,
     "table_gp": 7800,
     "table": true
    }
@@ -22175,20 +22562,24 @@
     "armour": null,
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 13746,
-    "spent_gp": 2603,
+    "worn": [
+     "mi-headband-wisdom-2",
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-2"
+    ],
+    "coin_gp": 1695,
+    "spent_gp": 14654,
     "table_gp": 16350,
     "table": true
    }
@@ -22237,14 +22628,16 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 256,
-    "spent_gp": 3,
+    "worn": [],
+    "coin_gp": 255,
+    "spent_gp": 4,
     "table_gp": 260,
     "table": true
    }
@@ -22298,14 +22691,18 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1246,
-    "spent_gp": 403,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 245,
+    "spent_gp": 1404,
     "table_gp": 1650,
     "table": true
    }
@@ -22360,20 +22757,21 @@
     "armour": null,
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 3396,
-    "spent_gp": 2603,
+    "worn": [
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-1"
+    ],
+    "coin_gp": 1095,
+    "spent_gp": 4904,
     "table_gp": 6000,
     "table": true
    }
@@ -22421,14 +22819,16 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 256,
-    "spent_gp": 3,
+    "worn": [],
+    "coin_gp": 255,
+    "spent_gp": 4,
     "table_gp": 260,
     "table": true
    }
@@ -22478,14 +22878,16 @@
     "shield": "none",
     "pockets": [
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 426,
-    "spent_gp": 353,
+    "worn": [],
+    "coin_gp": 425,
+    "spent_gp": 354,
     "table_gp": 780,
     "table": true
    }
@@ -22537,20 +22939,23 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "potion-of-cure-moderate-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2846,
-    "spent_gp": 603,
+    "worn": [
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-1"
+    ],
+    "coin_gp": 695,
+    "spent_gp": 2754,
     "table_gp": 3450,
     "table": true
    }
@@ -22605,20 +23010,22 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "potion-of-cure-serious-wounds",
      "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 5196,
-    "spent_gp": 2603,
+    "worn": [
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-1"
+    ],
+    "coin_gp": 695,
+    "spent_gp": 7104,
     "table_gp": 7800,
     "table": true
    }
@@ -22675,20 +23082,24 @@
     "armour": null,
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 13746,
-    "spent_gp": 2603,
+    "worn": [
+     "mi-headband-wisdom-2",
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-2"
+    ],
+    "coin_gp": 1695,
+    "spent_gp": 14654,
     "table_gp": 16350,
     "table": true
    }
@@ -22737,14 +23148,16 @@
     "armour": null,
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 256,
-    "spent_gp": 3,
+    "worn": [],
+    "coin_gp": 255,
+    "spent_gp": 4,
     "table_gp": 260,
     "table": true
    }
@@ -22798,14 +23211,18 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1246,
-    "spent_gp": 403,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 245,
+    "spent_gp": 1404,
     "table_gp": 1650,
     "table": true
    }
@@ -22860,20 +23277,21 @@
     "armour": null,
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 3396,
-    "spent_gp": 2603,
+    "worn": [
+     "mi-cloak-resistance-1",
+     "mi-bracers-armor-1"
+    ],
+    "coin_gp": 1095,
+    "spent_gp": 4904,
     "table_gp": 6000,
     "table": true
    }
@@ -22927,14 +23345,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 266,
-    "spent_gp": 123,
+    "worn": [],
+    "coin_gp": 265,
+    "spent_gp": 124,
     "table_gp": 390,
     "table": true
    }
@@ -22988,24 +23408,21 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 0
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 1526,
-    "spent_gp": 873,
+    "worn": [],
+    "coin_gp": 525,
+    "spent_gp": 1874,
     "table_gp": 2400,
     "table": true
    }
@@ -23065,20 +23482,20 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2126,
-    "spent_gp": 3873,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 825,
+    "spent_gp": 5174,
     "table_gp": 6000,
     "table": true
    }
@@ -23133,14 +23550,16 @@
     },
     "shield": "none",
     "pockets": [
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 136,
-    "spent_gp": 123,
+    "worn": [],
+    "coin_gp": 135,
+    "spent_gp": 124,
     "table_gp": 260,
     "table": true
    }
@@ -23200,14 +23619,16 @@
     "pockets": [
      "potion-of-cure-light-wounds",
      "potion-of-cure-light-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 976,
-    "spent_gp": 673,
+    "worn": [],
+    "coin_gp": 975,
+    "spent_gp": 674,
     "table_gp": 1650,
     "table": true
    }
@@ -23268,20 +23689,20 @@
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 2126,
-    "spent_gp": 3873,
+    "worn": [
+     "mi-cloak-resistance-1"
+    ],
+    "coin_gp": 825,
+    "spent_gp": 5174,
     "table_gp": 6000,
     "table": true
    }
@@ -23341,24 +23762,27 @@
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 2
+     "enhancement": 1
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-moderate-wounds",
+     "potion-of-cure-moderate-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 9476,
-    "spent_gp": 6873,
+    "worn": [
+     "mi-headband-charisma-2",
+     "mi-amulet-natural-armor-1",
+     "mi-cloak-resistance-2"
+    ],
+    "coin_gp": 1425,
+    "spent_gp": 14924,
     "table_gp": 16350,
     "table": true
    }
@@ -23416,29 +23840,34 @@
     "weapon": {
      "base": "rapier",
      "masterwork": true,
-     "enhancement": 3
+     "enhancement": 2
     },
     "armour": {
      "base": "chain shirt",
      "masterwork": true,
-     "enhancement": 4
+     "enhancement": 3
     },
     "shield": "none",
     "pockets": [
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
-     "potion-of-cure-light-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "potion-of-cure-serious-wounds",
+     "flint and steel",
      "rations",
      "bedroll",
      "rope",
      "backpack",
      "torch"
     ],
-    "coin_gp": 10126,
-    "spent_gp": 34873,
+    "worn": [
+     "mi-headband-charisma-2",
+     "mi-amulet-natural-armor-2",
+     "mi-ring-protection-1",
+     "mi-cloak-resistance-3"
+    ],
+    "coin_gp": 1425,
+    "spent_gp": 43574,
     "table_gp": 45000,
     "table": true
    }

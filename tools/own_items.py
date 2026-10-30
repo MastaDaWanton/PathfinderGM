@@ -38,6 +38,7 @@ ITEMS = ROOT / "content" / "materials" / "magic-items.json"
 # name on our item; the item's own name and words are ours (docs/own-items.md).
 AON = "https://aonprd.com/MagicWondrousDisplay.aspx?FinalName="
 DAY = {"amount": 24, "unit": "hour"}
+PAINT_SOURCE = "war paint"
 
 
 def _saves(amount: int, bonus: str) -> list[dict]:
@@ -54,7 +55,12 @@ def _paint(colour: str, price: int, spell: str, effect: dict, essence: dict,
         "price_gp": price, "obtain": "bought", "spell": spell, "spells": [[spell]],
         "text": (f"A clay pot of {colour} paint, ground with ash and bitter root. Smeared "
                  f"on the skin it {said} for a day; a second colour wipes out the first."),
-        "book": [{"type": "item_power", "effect": [dict(effect, duration=DAY)],
+        # One source for every colour: "you can benefit from only one color of Shoanti
+        # war paint at a time and applying a dose of a different color replaces the
+        # effects of the previous application" (AoN, read 2026-10-30). `use_item` lifts
+        # what an earlier power of the same `source` laid before it lays this one.
+        "book": [{"type": "item_power",
+                  "effect": [dict(effect, duration=DAY, source=PAINT_SOURCE)],
                   "uses": "once", "uses_count": 1, "book": True}],
         "essences": [essence], "source": src,
         "not_yet": ["Putting it on is a full-round action that provokes, in the book; "
@@ -141,7 +147,10 @@ ROWS = [
            {"type": "speed", "target": "land", "amount": 30, "bonus_type": "enhancement"},
            {"family": "speed", "count": 1}, "quickens the wearer's stride by thirty feet"),
     _paint("orange", 900, "stoneskin",
-           {"type": "damage_reduction", "amount": 1, "bypass": ""},
+           # "This effect stacks with damage reduction gained via a character class,
+           # such as barbarian" (AoN, read 2026-10-30): `stacks_with`, read by
+           # `Actor.damage_reduction`.
+           {"type": "damage_reduction", "amount": 1, "bypass": "", "stacks_with": "class"},
            {"family": "earth", "count": 1}, "hardens the skin against every blow (DR 1/—)"),
     _paint("red", 900, "resist-energy",
            {"type": "resistance", "target": "fire", "amount": 10},

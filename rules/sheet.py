@@ -1287,7 +1287,13 @@ class Actor:
             if holder is None and isinstance(getattr(item, "magic", None), dict):
                 holder = {"magic": item.magic}
                 built = forge_items.record_of(item) or {}
-                holder["id"], holder["name"] = built.get("id") or sid, built.get("name")
+                # The entry's own name when it is no forge item: a bought cloak or a pot of
+                # war paint (`magicitem.finished`) is named on its Stock, and "War Paint
+                # (Orange)" never matched the slug id `war-paint-orange#1`.
+                holder["id"] = built.get("id") or sid
+                holder["name"] = built.get("name") or getattr(item, "name", None)
+                holder["slot"] = getattr(item, "slot", None)
+                holder["_stock_id"] = sid
             if holder is None:
                 continue
             if not want or want in {str(sid).lower()} | {
@@ -1296,11 +1302,24 @@ class Actor:
         return out
 
     def reset_item_uses(self) -> None:
-        """Every magic item's per-day use counts back to nothing (a new day)."""
+        """Every magic item's per-day use counts back to nothing (a new day) — and a
+        power good for one use only stays spent.
+
+        This wiped every count, so a `uses: "once"` power came back each dawn: measured on
+        0.2.23 (review, 2026-10-30), six colours of war paint bound on a ring re-armed
+        daily and held AC 15→18, speed 30→60, DR 1, +5 Perception and blur for good, for
+        about 6,300 gp. The book's paint is "one dose"; the Core elixirs share the row
+        shape. A count is kept when its power says `once` (the layer's row, read live)."""
+        from . import magic_layer
+
         for holder in self.item_records():
             m = holder.get("magic")
-            if isinstance(m, dict) and m.get("uses"):
-                m["uses"] = {}
+            if not (isinstance(m, dict) and m.get("uses")):
+                continue
+            once = {str(p.get("key")) for p in (magic_layer.layer(holder).get("powers")
+                                                 or ())
+                    if str(p.get("uses") or "").strip().lower() == "once"}
+            m["uses"] = {k: v for k, v in m["uses"].items() if k in once}
 
     def worn_effects(self) -> dict[str, tuple[dict, str, str]]:
         """What worn things grant as standing effects, by a stable key — today fast
@@ -1835,7 +1854,8 @@ class Actor:
 
     def grant_defence(self, kind: str, against: str, amount: int = 0,
                       bypass: str = "", source: str = "",
-                      rounds: int | None = None, origin: str = "") -> ActiveEffect:
+                      rounds: int | None = None, origin: str = "",
+                      stacks_with: str = "") -> ActiveEffect:
         """Put a defence on this creature — innate when `rounds` is None, timed when not.
 
         The one door for all four. A stat block's `Immune cold` and a potion of fire
@@ -1855,7 +1875,8 @@ class Actor:
             duration="until-dismissed" if rounds is None else "rounds",
             rounds_left=rounds,
             payload={"against": str(against), "amount": int(amount),
-                     "bypass": str(bypass or "")}))
+                     "bypass": str(bypass or ""),
+                     **({"stacks_with": str(stacks_with)} if stacks_with else {})}))
 
     @property
     def immunities(self) -> list[str]:
@@ -4178,8 +4199,25 @@ class Actor:
         # paladin's 5/evil at 17th and 10/evil at 20th, armour mastery's 5/— — read off the
         # class's feature documents live, so it follows the level. Measured 2026-10-05: a
         # level-20 barbarian and paladin both had `dr=[]`.
-        for r in self.class_reductions():
+        classes = self.class_reductions()
+        for r in classes:
             pool.append(r)
+        # A document that says it adds to a class's DR (`stacks_with: "class"`) — orange
+        # war paint's 1/—, which "stacks with damage reduction gained via a character
+        # class, such as barbarian" (AoN) — is offered alone AND added to each class DR
+        # that nothing else bypasses differently (same bypass: 1/— onto a barbarian's
+        # 1/— is 2/—). Best-only still picks among the results. Before 2026-10-30 the
+        # paint's 1 beside a 7th-level barbarian's 1/— was best-of-two: still 1.
+        adders = [e for e in self.effects if e.kind == "damage_reduction"
+                  and str((e.payload or {}).get("stacks_with") or "") == "class"]
+        for e in adders:
+            d = dict(e.payload or {})
+            if int(d.get("amount", 0) or 0) <= 0 or not wants(d):
+                continue
+            for r in classes:
+                if r.bypass == str(d.get("bypass") or ""):
+                    pool.append(Reduction(r.amount + int(d["amount"]), r.bypass,
+                                          f"{r.source} and {e.source or e.name}"))
         # What is worn (`worn_specs_of`): adamantine armour's book DR, invulnerability's
         # 5/magic, a catalogue item's — read live while worn (contract §5), so taking it
         # off takes the DR with it.
@@ -4959,6 +4997,19 @@ class Actor:
                 from .effectspec import sense_tag
 
                 out.append(sense_tag(spec.get("target"), spec.get("range")))
+        # A worn permission (`effectspec.PERMISSIONS`), and a worn constant spell whose
+        # whole effect IS one — the Wardstar Ring's and the boots of the winterlands'
+        # "endure elements" (`spell_effect`, trigger worn). Read by nobody until
+        # 2026-10-30: the ring was listed with an empty `not_yet` and its wearer still
+        # rolled the cold's hourly Fortitude saves (`Engine._exposure`).
+        from .effectspec import permission_tag
+
+        for kind in ("permission", "spell_effect"):
+            for spec, _, _ in self.worn_specs_of(kind, walk=walk):
+                said = spec.get("tag") if kind == "permission" else spec.get("target")
+                tag = permission_tag(str(said or "").replace("-", "_"))
+                if tag:
+                    out.append(tag)
         on = [self.armour_record(), self.shield_record(), self.wielded_record()]
         seen = {id(r) for r in on if r is not None}
         # A cursed ring or cloak lays its drawback's `curse.*` tag on its wearer too
