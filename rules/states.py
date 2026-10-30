@@ -373,12 +373,23 @@ TAGS: dict[str, tuple[str, ...]] = {
     # result in the payload) and ended by an attack (`_ends_on_act`), by being found, or
     # by leaving the place. `state.slowed` is the book's no-penalty speed: "You can move
     # up to half your normal speed and use Stealth at no penalty" — the -5 band between
-    # half and full speed is not offered.
+    # half and full speed is `sneaking-fast`, below.
     #
     # Its readers, and the `knows.*` it is checked into, are in rules/awareness.py:
     # `knows.where.<ref>` (pinpointed) and `knows.near.<ref>` (a hunch) on the OBSERVER,
     # a family with the ref in the leaf like `state.wanted.<town>`, so not rows here.
     "sneaking":    ("state.hidden.stealth", "state.slowed"),
+    # The same hiding taken at more than half speed: "When moving at a speed greater than
+    # half but less than your normal speed, you take a -5 penalty" (Stealth, CRB p.106).
+    # No `state.slowed` — the -5 on the check is the price instead (2026-10-30; before it
+    # every Stealth check capped the hider at half speed). Chosen by the player's words
+    # through the reader's `pace` (gm/interpret.py), never by a word list.
+    "sneaking-fast": ("state.hidden.stealth",),
+    # A Bluff that drew the watchers' eyes away for a moment: "If your observers are
+    # momentarily distracted (such as by a Bluff check), you can attempt to use Stealth"
+    # (Stealth, CRB p.106). Who was distracted rides in the payload; the next Stealth
+    # check spends it (`Engine._diversion`). Not a hiding — nobody is hidden by it.
+    "diverting":   ("state.diverting",),
     "prone":       ("state.position.prone", "recovery.rest"),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),

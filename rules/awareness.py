@@ -87,6 +87,7 @@ HIDDEN = "state.hidden"
 INVISIBLE = "state.hidden.invisible"
 SNEAKING = "state.hidden.stealth"
 SNEAKING_KEY = "sneaking"
+SNEAKING_FAST_KEY = "sneaking-fast"
 
 KNOWS_WHERE = "knows.where"
 KNOWS_NEAR = "knows.near"
@@ -96,6 +97,11 @@ PERCEPTION_ORIGIN = "rule:perception"
 
 # The book's numbers (module docstring for the sources).
 NOTICE_DC = 20
+# Perception's own table (aonprd.com/Skills.aspx?ItemName=Perception, CRB p.102): "Notice
+# a visible creature 0", "Notice a creature using Stealth: Opposed by Stealth", and among
+# the DC modifiers "Creature or object is invisible +20". NOTICE_DC is the first plus this;
+# the Invisibility table's row "Using Stealth: Stealth Check +20" is the second plus this.
+INVISIBLE_DC = 20
 PINPOINT_STEP = 20
 NOTICE_RANGE_FT = 30
 MOTION_DC = {"still": 20, "half": -5, "full": -10, "run": -20}
@@ -145,6 +151,13 @@ def sneaking(subject) -> ActiveEffect | None:
     return None
 
 
+def _stealth_bonus(subject) -> int:
+    try:
+        return sum(int(m.value) for m in subject.skill_modifiers("stealth"))
+    except Exception:  # noqa: BLE001 — a body with no sheet hides with its 10 alone
+        return 0
+
+
 def stealth_result(subject) -> int | None:
     e = sneaking(subject)
     if e is None:
@@ -191,13 +204,33 @@ def sees(scene, observer, subject) -> bool:
         return True
     if not subject.has_state(HIDDEN):
         return True
-    if subject.has_state(INVISIBLE) and not sees_invisible(observer):
+    if subject.has_state(INVISIBLE) and not sees_invisible(observer) \
+            and not one_sphere(observer, subject):
         return False
     other = [t for t in _tags_of(subject)
              if states.matches(t, HIDDEN) and not states.matches(t, INVISIBLE)]
     if not other:
         return True
     return knows_where(scene, observer, subject)
+
+
+def group_of(actor) -> dict:
+    """The group an invisibility shared by several creatures holds `actor` in — its
+    `ends_when` with a `group` id (`Engine._lay_condition`, mass invisibility and
+    invisibility sphere) — or {}."""
+    for e in getattr(actor, "effects", ()) or ():
+        ends = (e.payload or {}).get("ends_when") or {}
+        if ends.get("group") and any(states.matches(str(t), INVISIBLE) for t in e.tags or ()):
+            return dict(ends)
+    return {}
+
+
+def one_sphere(observer, subject) -> bool:
+    """Both inside one invisibility sphere: "Those affected by this spell can see each other
+    and themselves as if unaffected by the spell" (Invisibility Sphere, CRB p.302). Mass
+    invisibility's group cannot ("Individuals in the group cannot see each other")."""
+    a, b = group_of(observer), group_of(subject)
+    return bool(a) and a.get("group") == b.get("group") and bool(a.get("see_each_other"))
 
 
 def locates(scene, observer, subject) -> bool:
@@ -280,8 +313,10 @@ def motion(scene, subject) -> str:
     if best is None or int(best.get("feet", 0) or 0) <= 0:
         return "still"
     speed = max(5, int(getattr(subject, "speed_feet", 30) or 30))
-    if sneaking(subject) is not None:
-        speed *= 2          # the sneaking state's own halving is not the measure
+    sneak = sneaking(subject)
+    if sneak is not None and any(states.matches(str(t), "state.slowed")
+                                 for t in sneak.tags or ()):
+        speed *= 2          # the half-speed hiding's own halving is not the measure
     feet = int(best.get("feet", 0))
     if feet > speed:
         return "run"
@@ -347,20 +382,38 @@ def notice_dcs(scene, observer, subject) -> tuple[int | None, int | None, list[s
         how = motion(scene, subject)
         base = NOTICE_DC + MOTION_DC[how]
         why.append(f"invisible, {'holding still' if how == 'still' else how + ' speed'}")
-        if loud(scene, subject):
-            base += LOUD_DC
+        noisy = LOUD_DC if loud(scene, subject) else 0
+        if noisy:
+            base += noisy
             why.append("fighting or speaking")
-        # "Using Stealth: Stealth check +20" — read as the invisible condition's own +20
-        # to Stealth, which is already inside the stored result (`invisible_stealth`), so
-        # it is not added a second time. The larger of the two stands.
-        if hidden_by_stealth is not None and hidden_by_stealth > base:
-            base = hidden_by_stealth
+        # "Using Stealth | Stealth Check +20" (the Invisibility table, CRB p.564). Read
+        # until 2026-10-30 as the invisible condition's own +20 on Stealth, already inside
+        # the stored result, and so never added. Settled from the pages: the +20 is
+        # Perception's DC modifier "Creature or object is invisible +20" — the same +20
+        # that makes "Notice a visible creature 0" the table's DC 20 — laid on Perception's
+        # "Notice a creature using Stealth: Opposed by Stealth". The condition's Stealth
+        # bonus is a different line on a different roll ("If you are invisible, you gain a
+        # +40 bonus on Stealth checks if you are immobile, or a +20 bonus on Stealth checks
+        # if you're moving", Stealth, CRB p.106), and stays inside the result. So: the
+        # result, +20. The motion rows are not laid again: how it moved is already in the
+        # check (the +20/+40, half speed or the -5). A Stealth roll worse than the table's
+        # own DC does not make an invisible body easier to find — the larger stands.
+        if hidden_by_stealth is not None \
+                and hidden_by_stealth + INVISIBLE_DC + noisy > base:
+            base = hidden_by_stealth + INVISIBLE_DC + noisy
             why.append("hiding as well")
         notice = base + far + wall
         return notice, notice + PINPOINT_STEP, why + (
             [f"{int(gap)} ft away"] if far else []) + (["behind a wall"] if wall else [])
     if hidden_by_stealth is None:
-        return None, None, ["nothing to find"]
+        if not subject.has_state(HIDDEN):
+            return None, None, ["nothing to find"]
+        # Hidden with no check behind it — a scheme's "hide" (rules/schemes.py), done off
+        # the page with nobody's Perception to oppose: taken as the hider's 10 ("Taking
+        # 10", CRB p.86: "When your character is not in immediate danger or distracted").
+        # Before 2026-10-30 this answered "nothing to find", and a hidden NPC could never
+        # be found by anybody's search.
+        hidden_by_stealth = 10 + _stealth_bonus(subject)
     dc = hidden_by_stealth + far + wall
     return dc, dc, ["hiding"] + ([f"{int(gap)} ft away"] if far else []) + (
         ["behind a wall"] if wall else [])
@@ -416,9 +469,26 @@ def check(engine, observer, subject, *, searching: bool = False) -> dict | None:
         mods = []
     roll = engine.dice.d20(mods, label=f"{observer.name} Perception"
                            + (" (searching)" if searching else ""), visibility="hidden")
-    out = {"rolls": [roll.as_dict()], "effects": [], "tell": "", "found": ""}
+    out = judge(scene, observer, subject, roll.total, searching=searching)
+    out["rolls"] = [roll.as_dict()]
+    return out
+
+
+def judge(scene, observer, subject, total: int, *, searching: bool = False) -> dict:
+    """What a Perception result of `total` finds of `subject`, applied to `observer`
+    through the one applicator — the half of `check` after the die, shared with the
+    player's own roll (`Engine._player_finds`), which the player throws themselves.
+
+    Returns {"rolls": [], "effects": [...], "tell": str, "found": "where"|"near"|""}."""
+    out = {"rolls": [], "effects": [], "tell": "", "found": ""}
+    if not can_perceive(observer) or sees(scene, observer, subject) \
+            or knows_where(scene, observer, subject):
+        return out
+    notice, pin, _why = notice_dcs(scene, observer, subject)
+    if notice is None:
+        return out
     subject_word = "you" if subject.is_pc else subject.name
-    if roll.total >= pin:
+    if total >= pin:
         pinpoint(scene, observer, subject, "searched" if searching else "noticed")
         out["found"] = "where"
         out["effects"].append({"kind": "knows_where", "ref": observer.ref,
@@ -427,7 +497,7 @@ def check(engine, observer, subject, *, searching: bool = False) -> dict | None:
                        f"{'are' if subject.is_pc else 'is'}." if searching else
                        f"{observer.name} fixes on where {subject_word} "
                        f"{'are' if subject.is_pc else 'is'} standing.")
-    elif roll.total >= notice and pin != notice and not has_hunch(observer, subject):
+    elif total >= notice and pin != notice and not has_hunch(observer, subject):
         hunch(scene, observer, subject)
         out["found"] = "near"
         out["effects"].append({"kind": "knows_near", "ref": observer.ref,
@@ -490,8 +560,9 @@ def brief_line(scene, observer, subject) -> str:
     sensed = (" It senses something unseen close by, and cannot tell where."
               if has_hunch(observer, subject) else "")
     return (f"{observer.name} cannot see {name}: they are {how}, and {observer.name} does "
-            f"not know where they are.{sensed} It cannot attack them by name and cannot "
-            f"describe them. It may search (a Perception check: {search_fix(observer.ref)}), "
+            f"not know where they are.{sensed} It cannot attack them, cast at them or use an "
+            f"ability on them by name, and cannot describe them. It may search (a "
+            f"Perception check: {search_fix(observer.ref)}), "
             f"swing blind at where it guesses they are ({guess_fix(observer.ref)}), deal "
             f"with somebody it can see, or wait.")
 
@@ -514,5 +585,6 @@ __all__ = ["HIDDEN", "INVISIBLE", "SNEAKING", "SNEAKING_KEY", "KNOWS_WHERE", "KN
            "SNIPE_FROM_FT", "where_tag", "near_tag", "sees", "locates", "knows_where",
            "has_hunch", "sneaking", "stealth_result", "sees_invisible", "can_perceive",
            "note_motion", "note_loud", "motion", "loud", "invisible_stealth",
-           "notice_dcs", "pinpoint", "hunch", "forget_one", "check", "moved_away",
+           "notice_dcs", "pinpoint", "hunch", "forget_one", "check", "judge", "moved_away",
+           "INVISIBLE_DC", "group_of", "one_sphere",
            "sweep", "brief_line", "unseen_by", "search_fix", "guess_fix"]

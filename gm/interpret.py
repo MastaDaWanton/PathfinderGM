@@ -55,6 +55,19 @@ ACTS = (
 # (`WORKS`): a special material, masterwork, a finish or an enchantment is the bench's.
 CRAFTS = ("blacksmith", "leatherworker", "alchemist", "herbalist", "enchanter")
 WORKS = ("plain", "finer")
+# The two closed answers a `stealth` action carries since 2026-10-30, both read off the
+# player's words by the reader and never by a word list in code:
+#   `pace`: careful (up to half speed, no penalty) or hurried (faster, up to full speed,
+#     -5) — "You can move up to half your normal speed and use Stealth at no penalty. When
+#     moving at a speed greater than half but less than your normal speed, you take a -5
+#     penalty" (Stealth, CRB p.106). Before, every hiding was capped at half speed.
+#   `diversion`: none, or bluff when the same words first draw the watchers' eyes away by
+#     a trick, a shout or a lie — "You can use Bluff to allow you to use Stealth. A
+#     successful Bluff check can give you the momentary diversion you need to attempt a
+#     Stealth check while people are aware of you" (Stealth, CRB p.106). Built whole into
+#     the Bluff and the Stealth check (`acts_to_ops._sneak`).
+PACES = ("careful", "hurried")
+DIVERSIONS = ("none", "bluff")
 # `exert` since 2026-10-16. The owner: "my wife was playing and a man needed help with his
 # cart. When she helped him the game narrated that i lifted his cart but never gave a
 # strength check." Probed the same day (gemma-4-12B heretic): "I help the man lift his
@@ -238,7 +251,9 @@ rest      sleep, lie down, make camp, rest, take a room
 rise      get up, wake, break camp, pack up: the end of a rest
 call_on   go to somebody's house, knock at their door, visit them at home
 break_in  kick in, force or pick the lock of a door
-stealth   sneak, hide, slip past
+stealth   sneak, hide, slip past. `pace` is careful, or hurried when the words hurry
+          (dash, rush, quickly, at a run-walk); `diversion` is bluff when the same words
+          first distract the onlookers by a trick, a shout or a lie, else none
 athletics climb, swim, jump
 exert     lift, push, pull, heave, drag, hold up or shift something heavy by main
           strength, alone or with somebody; the target is whoever you help with it
@@ -645,6 +660,23 @@ _DEMOS = [
          {"span": "forge a masterwork warhammer of adamantine",
           "object": "a masterwork warhammer of adamantine", "craft": "blacksmith",
           "work": "finer", "act": "craft"}]}),
+    # Hiding (2026-10-30): the pace and the diversion, closed. A careful creep, a hurried
+    # dash still hidden, and a trick that pulls the eyes away first. None is a probe or a
+    # labelled line.
+    ("I creep along the hedge, keeping low.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "creep along the hedge, keeping low", "place": "the hedge",
+          "pace": "careful", "diversion": "none", "act": "stealth"}]}),
+    ("I dash for the woodpile, keeping out of sight.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "dash for the woodpile, keeping out of sight", "place": "the woodpile",
+          "pace": "hurried", "diversion": "none", "act": "stealth"}]}),
+    ("I yell that the mill is on fire, and while they turn I duck behind the cart.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "yell that the mill is on fire", "says": "the mill is on fire",
+          "act": "talk"},
+         {"span": "while they turn I duck behind the cart", "place": "the cart",
+          "pace": "careful", "diversion": "bluff", "act": "stealth"}]}),
     ("I walk over to the tannery and look at the drying hides.",
      {"question": False, "claims": [], "actions": [
          {"span": "walk over to the tannery", "place": "the tannery", "act": "go"},
@@ -716,6 +748,10 @@ def per_act_schema() -> dict:
                  **({"craft": {"type": "string", "enum": list(CRAFTS)},
                      "work": {"type": "string", "enum": list(WORKS)}}
                     if act == "craft" else {}),
+                 # How fast, and whether a diversion comes first (`PACES`, `DIVERSIONS`).
+                 **({"pace": {"type": "string", "enum": list(PACES)},
+                     "diversion": {"type": "string", "enum": list(DIVERSIONS)}}
+                    if act == "stealth" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -750,7 +786,10 @@ def _demo_reply(frame: dict) -> str:
                         if a["act"] == "request" else {}),
                      **({"craft": a.get("craft") or CRAFTS[0],
                          "work": a.get("work") or WORKS[0]}
-                        if a["act"] == "craft" else {}), **means})
+                        if a["act"] == "craft" else {}),
+                     **({"pace": a.get("pace") or PACES[0],
+                         "diversion": a.get("diversion") or DIVERSIONS[0]}
+                        if a["act"] == "stealth" else {}), **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -860,6 +899,16 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             else:
                 dropped.append(f"craft.craft={a.get('craft')!r}")
                 kept["act"] = "other"
+        if kept["act"] == "stealth":
+            # The enums' or the default: outside them (a hosted provider, a remembered
+            # frame) the hiding is the careful one with no diversion — the reading the
+            # turn always acted on. Kept only when they say something, as `commit` is.
+            pace = str(a.get("pace") or "").strip().lower()
+            if pace in PACES and pace != PACES[0]:
+                kept["pace"] = pace
+            div = str(a.get("diversion") or "").strip().lower()
+            if div in DIVERSIONS and div != DIVERSIONS[0]:
+                kept["diversion"] = div
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is

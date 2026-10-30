@@ -713,8 +713,41 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _request(row, a, scene, pc)
             if act == "craft" and pc is not None:
                 _craft(row, a, pc)
+            if act == "stealth" and pc is not None:
+                _sneak(row, a, scene, pc)
         rows.append(row)
     return rows
+
+
+def _sneak(row: Row, a: dict, scene, pc) -> None:
+    """A hiding, built whole: the player's Stealth check opposed by whoever here is
+    likeliest to notice (`judgement.stealth_opposed`, CRB p.106), at the pace the words
+    chose (`interpret.PACES`: hurried is the -5 band, `pace: full`), and — when the same
+    words first pull the watchers' eyes away (`interpret.DIVERSIONS`) — the Bluff that
+    makes the diversion, ahead of it (`diversion: true`; Stealth, CRB p.106: "You can use
+    Bluff to allow you to use Stealth").
+
+    Both closed answers are the reader's, never a word list (the owner's direction of
+    2026-10-03, docs/structured-turn.md). The plan's own Stealth or Bluff check for the
+    same deed is replaced by these (`apply`'s built-check rule), so one hiding rolls once.
+    With nobody here to hide from there is nothing to roll, as before."""
+    from . import judgement
+
+    opposed = judgement.stealth_opposed(scene)
+    if opposed is None:
+        row.note = "a hiding with nobody here to notice: nothing to roll"
+        return
+    params: dict = {"skill": "stealth", "opposed_by": opposed}
+    if a.get("pace") == "hurried":
+        params["pace"] = "full"
+    if a.get("diversion") == "bluff":
+        row.intents.append({"op": "check", "actor": pc.ref,
+                            "params": {"skill": "bluff", "diversion": True},
+                            "because": "the player draws the watchers' eyes away"})
+    row.intents.append({"op": "check", "actor": pc.ref, "params": params,
+                        "because": "the player hides"})
+    row.note = ("a Bluff to divert, then " if a.get("diversion") == "bluff" else "") + (
+        "Stealth at full speed (-5)" if params.get("pace") else "Stealth at half speed")
 
 
 def _craft(row: Row, a: dict, pc) -> None:

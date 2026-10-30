@@ -461,10 +461,14 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
         # And `asks_for` on a request alone (2026-10-16): the closed choice of what is
         # asked for, which the engine reads (tests/test_requests_and_rewards.py). And
         # `craft` and `work` on a craft alone (2026-10-28, tests/test_typed_crafting.py).
+        # And `pace` and `diversion` on a stealth alone (2026-10-30,
+        # tests/test_hidden_state_followups.py).
         assert set(alt["properties"]) == {"span", "commit", "act", "power", "means",
                                           *interpret.ACT_SLOTS[act],
                                           *(["asks_for"] if act == "request" else []),
-                                          *(["craft", "work"] if act == "craft" else [])}
+                                          *(["craft", "work"] if act == "craft" else []),
+                                          *(["pace", "diversion"] if act == "stealth"
+                                            else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 
