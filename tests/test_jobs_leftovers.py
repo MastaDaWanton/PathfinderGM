@@ -34,7 +34,7 @@ def test_a_reptoid_met_on_the_road_wears_no_local_peoples_face(worlds):
     a merchant sailor) is what a local person wears, and keeps its face."""
     assert not bestiary.has_a_people("reptoid")
     assert bestiary.body_words("reptoid") == "Medium humanoid"
-    assert bestiary.has_a_people("bandit") and bestiary.has_a_people("tian-merchant-sailor")
+    assert bestiary.has_a_people("bandit") and bestiary.has_a_people("old-sailor")
     row = (worlds.play.get("settlements") or [])[0]
     s = Scene(location_id=row["id"])
     from rules.sheet import load_pc

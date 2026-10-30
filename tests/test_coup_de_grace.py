@@ -248,7 +248,7 @@ def test_undead_take_the_blow_and_have_no_save_to_fail():
 
 @pytest.mark.parametrize("state, template, weapon, said", [
     ("standing", "thug", "rapier", "not helpless"),
-    ("bound", "stun-jelly", "rapier", "critical hits"),
+    ("bound", "gelatinous-cube", "rapier", "critical hits"),
     ("bound", "thug", "sling", "melee weapon"),
 ])
 def test_what_1e_refuses_is_refused_with_the_reason(state, template, weapon, said):
@@ -278,7 +278,7 @@ def test_a_bow_must_be_point_blank():
 
 def test_crit_immunity_reads_the_creatures_own_traits():
     s = Scene(location_id="x")
-    assert coup_de_grace.crit_immunity(instantiate("stun-jelly", scene=s))
+    assert coup_de_grace.crit_immunity(instantiate("gelatinous-cube", scene=s))
     assert not coup_de_grace.crit_immunity(instantiate("zombie", scene=s))
     assert not coup_de_grace.crit_immunity(instantiate("thug", scene=s))
     assert coup_de_grace.fortitude_exempt(instantiate("zombie", scene=s)) == "undead traits"

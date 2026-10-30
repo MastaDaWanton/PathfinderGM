@@ -105,8 +105,8 @@ def test_the_engine_reads_the_modes_it_says_it_reads():
     get off the ground, and is a creature that cannot refused? Those two facts are what
     "the engine reads a movement mode" means, and no rename can slip past them.
     """
-    spider = instantiate("giant-spider")
-    bear = instantiate("black-bear")
+    spider = instantiate("spider-giant")
+    bear = instantiate("bear-grizzly")
 
     assert spider.movement_modes().get("climb"), "the spider lost its climb speed"
     assert spider.can_move_vertically() == "climb"
@@ -160,7 +160,7 @@ def _scene_with_a_map():
     s = Scene(location_id="t")
     man = instantiate("guildhand", scene=s, name="the man")
     s.add(man, at=(5, 5))
-    spider = instantiate("giant-spider", scene=s, name="the spider")
+    spider = instantiate("spider-giant", scene=s, name="the spider")
     s.add(spider, at=(6, 5))
     s.grid = Grid()
     return s, Engine(s, Dice(seed=2), world=None), man, spider

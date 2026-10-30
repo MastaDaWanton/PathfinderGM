@@ -59,18 +59,23 @@ def test_a_crowd_is_one_actor_with_the_combined_hit_points_of_its_members(table)
     (docs/bestiary-licensing.md): the 29-hp Raider was an adventure row, and the GM's word
     "raider" now lands, through content/bestiary/aliases.json, on the app's own 4th-level
     raider build — 30 hp, CR 2, 600 XP — so twelve of them are 360. Every number in this
-    file that was a raider's 29 is that build's 30."""
+    file that was a raider's 29 is that build's 30.
+
+    And 34 since 2026-10-30: the build takes its favoured class hit point a level (the
+    owner's ruling, `npc_builds.favoured_hp`), and the tests name the build, not "raider" —
+    a retired id now spawns nothing (`bestiary.retired`), and through the alias these tests
+    were testing whatever body the map happened to land on."""
     scene, _ = table
-    assert bestiary.alias_of("raider") == "raider-level-4"
-    assert bestiary.raw_block("raider")["hp"] == 30
-    unit = troops.form("raider", 12, scene=scene)
+    assert bestiary.retired("raider")
+    assert bestiary.raw_block("raider-level-4")["hp"] == 34
+    unit = troops.form("raider-level-4", 12, scene=scene)
     assert unit.troop is not None
-    assert unit.troop.members == 12 and unit.troop.member_hp == 30
-    assert unit.hp == unit.hp_max == 360
+    assert unit.troop.members == 12 and unit.troop.member_hp == 34
+    assert unit.hp == unit.hp_max == 408
     assert unit.name == "twelve raiders"
     # And it fights like a raider, because it is built out of one: the block's numbers
     # stand for the whole, which is how Pathfinder's own troops are put together.
-    assert unit.from_template == "raider"
+    assert unit.from_template == "raider-level-4"
 
 
 def test_the_unit_takes_up_as_many_squares_as_the_people_would(table):
@@ -84,7 +89,7 @@ def test_the_unit_takes_up_as_many_squares_as_the_people_would(table):
     assert troops.size_for(9) == "huge"
     assert troops.size_for(12) == "gargantuan"      # 4x4, four squares to spare
     assert troops.size_for(30) == "colossal"
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     assert unit.size == "gargantuan"
     from rules import grid
 
@@ -107,11 +112,11 @@ def test_a_handful_still_arrives_as_people(table):
 def test_a_spawn_of_five_or_more_arrives_as_one_unit(table):
     scene, engine = table
     engine.run(engine.validate([{"op": "spawn", "because": "the band",
-                                 "params": {"template": "raider", "count": 8}}]))
+                                 "params": {"template": "raider-level-4", "count": 8}}]))
     bodies = [a for a in scene.actors.values() if not a.is_pc]
     assert len(bodies) == 1
     assert bodies[0].troop.members == 8
-    assert bodies[0].hp == 8 * 30          # the raider build's 30 since option D (29 before)
+    assert bodies[0].hp == 8 * 34          # the raider build: 29 before option D, 30, 34
 
 
 # --- the attrition ----------------------------------------------------------------------
@@ -121,14 +126,14 @@ def test_every_members_worth_of_damage_takes_one_of_them_off_their_feet(table):
     the excess cascading. That is what makes the unit visibly shrink, and the shrinking is
     the "scatter" the request asks to see."""
     scene, engine = table
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     scene.add(unit)
-    # One raider's worth: 30 since option D, the raider build's hit points (29 before).
-    eff = _hit(engine, unit, 30)
+    # One raider's worth: the raider build's 34 (29 before option D, 30 before 2026-10-30).
+    eff = _hit(engine, unit, 34)
     assert eff["fell"] == 1 and eff["members"] == 11
     assert unit.size == "gargantuan"
-    # Excess cascades: 90 is three raiders' worth.
-    eff = _hit(engine, unit, 90)
+    # Excess cascades: 102 is three raiders' worth.
+    eff = _hit(engine, unit, 102)
     assert eff["fell"] == 3 and eff["members"] == 8
     assert unit.size == "huge", "eight fit in a 3x3; the footprint shrinks with them"
     assert "3 raiders go down" in eff["unit_note"]
@@ -160,7 +165,7 @@ def test_the_two_moments_a_crowd_checks_its_nerve(table):
     killed, or when half of the monster's group have been killed", higher than the score and
     they run. A 12 never checks; two passes and they fight to the death."""
     scene, _ = table
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     t = unit.troop
     assert t.morale == troops.MORALE_DEFAULT == 8
     assert troops.owes_a_check(t, 0) == "", "nobody fell; nothing to check"
@@ -176,17 +181,17 @@ def test_the_two_moments_a_crowd_checks_its_nerve(table):
     assert troops.morale_holds(t, 11, "half of them down") is False
     assert t.routed is True
     # A fearless unit never checks at all, and two passes ends the checking.
-    brave = troops.form("raider", 12, scene=scene).troop
+    brave = troops.form("raider-level-4", 12, scene=scene).troop
     brave.morale = troops.MORALE_FEARLESS
     assert troops.owes_a_check(brave, 3) == ""
-    steady = troops.form("raider", 12, scene=scene).troop
+    steady = troops.form("raider-level-4", 12, scene=scene).troop
     steady.checks_passed = troops.CHECKS_BEFORE_RESOLVE
     assert troops.owes_a_check(steady, 3) == ""
 
 
 def test_a_unit_whose_morale_breaks_leaves_the_board_and_scatters(table):
     scene, engine = table
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     scene.add(unit)
     engine.run(engine.validate([{"op": "begin_encounter", "because": "the road",
                                  "params": {"sides": {"pc": ["pc"], "them": [unit.ref]}}}]))
@@ -209,12 +214,12 @@ def test_the_fallen_are_paid_for_even_when_the_rest_run(table):
     it: eight raiders dead and four fled is not mercy, and paying nothing would be the
     answer the player would notice first."""
     scene, engine = table
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     scene.add(unit)
     engine.run(engine.validate([{"op": "begin_encounter", "because": "the road",
                                  "params": {"sides": {"pc": ["pc"], "them": [unit.ref]}}}]))
     unit.troop.morale = troops.MORALE_FEARLESS      # no rout: measure the standing case
-    _hit(engine, unit, 90)                          # three raider builds' worth (30 each)
+    _hit(engine, unit, 102)                         # three raider builds' worth (34 each)
     assert unit.troop.fallen == 3
     assert troops.xp_owed(unit.troop) == 3 * 600
     total, names = xp.award_for_fallen(scene, scene.pc())
@@ -224,12 +229,12 @@ def test_the_fallen_are_paid_for_even_when_the_rest_run(table):
 
 def test_a_routed_units_debt_is_settled_once(table):
     scene, engine = table
-    unit = troops.form("raider", 6, scene=scene)
+    unit = troops.form("raider-level-4", 6, scene=scene)
     scene.add(unit)
     engine.run(engine.validate([{"op": "begin_encounter", "because": "the road",
                                  "params": {"sides": {"pc": ["pc"], "them": [unit.ref]}}}]))
     unit.troop.morale = 2                            # they break at the first death
-    _hit(engine, unit, 30)                           # one raider build's worth
+    _hit(engine, unit, 34)                           # one raider build's worth
     assert unit.ref not in scene.actors
     total, _ = xp.award_for_fallen(scene, scene.pc())
     assert total == 600, "one raider fell and the other five ran"
@@ -249,7 +254,7 @@ def test_an_area_effect_hurts_a_crowd_half_again_as_much(table):
     area." The rule that makes a fireball feel right against a crowd, and the reason a caster
     has something better to do than pick members off one at a time."""
     scene, engine = table
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     scene.add(unit)
     eff = _hit(engine, unit, 20, traits=("area",))
     assert eff["amount"] == 30
@@ -292,7 +297,7 @@ def test_a_crowd_at_zero_breaks_up_and_does_not_bleed_out(table):
     up, effectively destroying the troop" — no dying, no stabilising, no round-by-round
     loss, because what has been reduced is a formation and not a body."""
     scene, engine = table
-    unit = troops.form("raider", 3, scene=scene)
+    unit = troops.form("raider-level-4", 3, scene=scene)
     scene.add(unit)
     _hit(engine, unit, 500)
     assert unit.troop.members == 0
@@ -308,8 +313,8 @@ def test_saves_are_thrown_once_because_it_is_one_actor(table):
     nothing added, since a unit IS one actor. Recorded so nobody builds a second mechanism
     for it."""
     scene, _ = table
-    unit = troops.form("raider", 12, scene=scene)
-    one = instantiate("raider", scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
+    one = instantiate("raider-level-4", scene=scene)
     assert unit.save_modifiers("fort") == one.save_modifiers("fort")
 
 
@@ -317,7 +322,7 @@ def test_saves_are_thrown_once_because_it_is_one_actor(table):
 
 def test_the_unit_survives_a_save_and_comes_back_whole(table):
     scene, _ = table
-    unit = troops.form("raider", 12, scene=scene)
+    unit = troops.form("raider-level-4", 12, scene=scene)
     unit.take_damage(60)
     back = from_dict(to_dict(unit), ref=unit.ref)
     assert back.troop is not None
