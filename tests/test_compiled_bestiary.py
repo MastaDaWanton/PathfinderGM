@@ -60,7 +60,7 @@ def test_the_record_is_what_the_parser_reads(shipped):
     for bid in ("ogre", "owlbear", "goblin", "adult-red-dragon"):
         live = statblock_attacks.of_block(shipped[bid])
         rec = compile_block.record_for(shipped[bid])["attacks"]
-        strip = [[{k: v for k, v in a.items() if k not in ("class", "mode", "item")}
+        strip = [[{k: v for k, v in a.items() if k not in ("class", "mode", "item", "rules")}
                   for a in opt] for cat in ("melee", "ranged") for opt in rec[cat]]
         assert strip == [opt for cat in ("melee", "ranged") for opt in live[cat]], bid
 

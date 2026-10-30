@@ -22,7 +22,11 @@ Each attack is exactly what `statblock_attacks.parse` reads, plus:
   (bite, claw), `fist` (the unarmed strike, a flurry), `body` (touch, tendrils, swarm,
   troop), `thrown_object` (a giant's rock), `worn` (armour spikes, a shield bash) or
   `ability` (a bomb);
-- `mode`: "flurry" for a flurry of blows, which is a way of attacking, not a weapon.
+- `mode`: "flurry" for a flurry of blows, which is a way of attacking, not a weapon;
+- `rules`: one document per rider word (`attack_riders.rule_for`) — the manoeuvre, the
+  affliction with its save, onset, frequency, effect and cure, the save-or-be condition —
+  read from Special Attacks and Special Abilities; `kind: unsupported` with `why` for a
+  rider no rule applies, so `Engine._printed_riders` reports it instead of dropping it.
 
 Each carried item: `printed` (as the book wrote it), `key` and `table` (`goods.known_item`:
 weapon, ammunition, armour, shield, gear — or `potion`, `coin`, `magic item`, or "" when
@@ -46,10 +50,15 @@ import re
 
 # Bump when the compile's output changes for the same input: every shipped record is then
 # stale and the content test names the command that rewrites them.
-COMPILER = 2
+# 3 (2026-10-30): each attack carries `rules`, its riders read into documents
+# (`attack_riders.rules_for`), and `amounts` ("plus 1d8 bleed").
+COMPILER = 3
 
-# The lines a record is compiled from. Change one and the record is stale.
-SOURCE_FIELDS = ("melee", "ranged", "printed_gear", "printed_other_gear")
+# The lines a record is compiled from. Change one and the record is stale. The two
+# special fields joined at COMPILER 3: a rider's DC and effect are printed there
+# ("paralysis (1d4+1 rounds, DC 13)", "Poison (Ex) Bite—injury; save Fort DC 14; ...").
+SOURCE_FIELDS = ("melee", "ranged", "printed_gear", "printed_other_gear",
+                 "special_attacks", "special_abilities")
 
 # CRB Chapter 6, "Special Materials", the ones a stat block's gear prints.
 MATERIALS = ("alchemical silver", "cold iron", "adamantine", "mithral", "darkwood",
@@ -298,6 +307,7 @@ def _class(a: dict) -> tuple[str, str]:
 
 
 def attacks(block: dict) -> tuple[dict, list[str]]:
+    from .attack_riders import rules_for
     from .statblock_attacks import of_block, unread_of
 
     parsed = of_block(block)
@@ -313,6 +323,10 @@ def attacks(block: dict) -> tuple[dict, list[str]]:
         for option in parsed[cat]:
             for a in option:
                 a["class"], a["mode"] = _class(a)
+                # What rides the hit, read once here and never at play
+                # (`attack_riders.rules_for`); a rider no rule applies is a document
+                # saying so (`kind: unsupported`, with `why`), counted by the compile.
+                a["rules"] = rules_for(block, a)
     return parsed, unread
 
 

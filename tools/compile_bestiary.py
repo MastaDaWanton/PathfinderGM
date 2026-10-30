@@ -62,6 +62,9 @@ def counts(doc: dict) -> dict:
                     c[f"attack.{a['class']}"] += 1
                     if a["class"] == "item":
                         c["item.linked" if a.get("item") is not None else "item.unlinked"] += 1
+                    # Riders by what the engine does with them (docs/attack-riders.md).
+                    for r in a.get("rules") or ():
+                        c[f"rider.{r['kind']}"] += 1
         for it in rec["carries"]:
             c[f"carried.{it['table'] or 'unresolved'}"] += 1
         for u in rec["unread"]:
