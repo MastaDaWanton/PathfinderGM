@@ -20,8 +20,10 @@ attack. Re-deriving any of it from the ability scores is how a converter drifts 
 book. What the sheet adds on top is only what the printed block cannot know: conditions,
 spells, the board. See `Actor.attack_modifiers`.
 
-Riders the engine has no executor for yet ("plus grab", "plus poison", "plus trip") are
-parsed and carried, not fired. A typed extra die ("plus 1d6 fire") is damage, and is rolled.
+Riders ("plus grab", "plus poison", "plus 1d8 bleed") are carried as words, with any
+printed amount beside them; `attack_riders` reads each into a document and
+`Engine._printed_riders` fires it (docs/attack-riders.md). A typed extra die ("plus 1d6
+fire") is damage, and is rolled.
 
 Nothing here is model output. The corpus is two imported files and the parse is pure: the
 same line always reads the same way, so it is cached by the line itself.

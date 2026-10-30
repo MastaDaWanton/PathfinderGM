@@ -154,12 +154,12 @@ leaves them alone.
 
 ## Not done, on purpose or not yet
 
-- **Riders are carried, not fired.** Grab 650, poison 415, disease 213, paralysis 173,
-  energy drain 147, trip 82, bleed 74. The engine's `_natural_riders` resolves trip and
-  grab as a Reflex save for races, which is not 1e's free combat manoeuvre, and poison
-  and disease need their documents. Each is its own piece of work. The one exception,
-  since 2026-10-30: a swarm's distraction (`Engine._distraction`, Bestiary 1 pp. 299 and
-  313) — on its automatic damage, Fortitude against the printed DC or nauseated 1 round.
+- **Riders fire since 2026-10-30** (docs/attack-riders.md). Until then they were carried
+  and not fired. A swarm's distraction (`Engine._distraction`, Bestiary 1 pp. 299 and 313)
+  came first; the rest followed the same day through `Engine._printed_riders`: grab, trip,
+  push and pull as free manoeuvres, poison and disease as afflictions, paralysis, bleed,
+  burn, attach and ability damage. Energy drain and 358 rarer riders are reported, not
+  applied.
 
 ## 2026-10-30: what the reader still dropped
 

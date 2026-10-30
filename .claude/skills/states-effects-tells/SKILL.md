@@ -184,9 +184,13 @@ bestiary special attacks have no locator, so a creature's fight turn keeps
 monster's printed ATTACKS are read now (2026-09-27, docs/printed-attacks.md: printed
 bonus and damage as the base term through the funnel, full attack = the printed option,
 hits stamped `creature:<template>`; before it every monster swung its fists), while its
-riders — grab, poison, trip — are parsed and still not fired (one exception since
-2026-10-30: a swarm's distraction, `Engine._distraction`, a Fort save or nauseated 1 round
-on its automatic damage); feat actions
+riders FIRE since 2026-10-30 (docs/attack-riders.md: `Engine._printed_riders` applies the
+compiled `rules` — grab/trip/push/pull as free manoeuvres, poison and disease as an
+`affliction` effect the one executor runs (`Actor._afflicted`, saves on the printed
+frequency to the printed cure, across `Scene.advance` and a save), paralysis, bleed, burn,
+attach, constrict, ability damage; a swarm's distraction is `_distraction`) — energy drain
+is reported, not applied (negative levels stay `engine=False`), and 358 rider documents are
+`unsupported` with a reason; the grapple MAINTAINED on later turns has no executor; feat actions
 (Cleave, Vital Strike) have no `find_ability` branch; no level-up feat writer exists;
 the claims scrubber let prose describe a struck target after a `cast` that never
 resolved (measured once, before the actor fill); "I set off the trap" came back as
