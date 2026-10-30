@@ -150,7 +150,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The 2d6 nonlethal and the ability damage REPEAT every round; the vocabulary has no repeating-damage type, so they are narrative rather than a damage/ability_damage spec that would fire once for the whole spell. The -10 ft speed is emitted as a state because the prose says 'reduced by 10 feet', not 'an additional 10 feet each round' \u2014 but it sits inside the same 'Each round' sentence, so a reviewer should confirm. The Fortitude save recurs each round to suppress for 1 round; it is not an on-cast negates, so it is not a save_gate."
+   "notes": "The 2d6 nonlethal and the ability damage REPEAT every round; the vocabulary has no repeating-damage type, so they are narrative rather than a damage/ability_damage spec that would fire once for the whole spell. The -10 ft speed is emitted as a state because the prose says 'reduced by 10 feet', not 'an additional 10 feet each round' — but it sits inside the same 'Each round' sentence, so a reviewer should confirm. The Fortitude save recurs each round to suppress for 1 round; it is not an on-cast negates, so it is not a save_gate."
   },
   "expeditious-construction": {
    "effects": [
@@ -251,7 +251,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "Duration in the corpus is the compound 'instantaneous and rounds/level (1) (see text)': the Constitution damage is instantaneous and the summoned elemental is what lasts, so the per-level half is emitted because it is the only half a timer can use. The elemental's blood drain (1d3 Con) is NOT converted \u2014 it is the summoned creature's attack, not the spell's effect. No effect on Small or smaller creatures or those without blood."
+   "notes": "Duration in the corpus is the compound 'instantaneous and rounds/level (1) (see text)': the Constitution damage is instantaneous and the summoned elemental is what lasts, so the per-level half is emitted because it is the only half a timer can use. The elemental's blood drain (1d3 Con) is NOT converted — it is the summoned creature's attack, not the spell's effect. No effect on Small or smaller creatures or those without blood."
   },
   "expend": {
    "effects": [
@@ -411,7 +411,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Functions as shadow conjuration emulating summon monster I, summoning one of six named Varisian folktale characters as a shadow creature that is 40% real. Only one copy of a given character can exist at a time, even across multiple castings. A creature that interacts with it may attempt a Will save to disbelieve."
+     "target": "Functions as shadow conjuration emulating summon monster I, summoning one of six named folktale characters as a shadow creature that is 40% real. Only one copy of a given character can exist at a time, even across multiple castings. A creature that interacts with it may attempt a Will save to disbelieve."
     }
    ],
    "converted_by": "read",
@@ -552,7 +552,7 @@
     },
     {
      "type": "narrative",
-     "target": "The symbol of Abadar appears above the head of every affected creature, making it obvious who is and is not affected."
+     "target": "The symbol of a god of law and commerce appears above the head of every affected creature, making it obvious who is and is not affected."
     }
    ],
    "converted_by": "read",
@@ -761,7 +761,7 @@
     "unit": "day",
     "dismissible": false
    },
-   "notes": "Possession, calling and raising the dead have no spec types. The spell resistance clause is unusual \u2014 failing to beat SR gives the SOUL a choice, it does not simply negate \u2014 so it is left in prose rather than modelled."
+   "notes": "Possession, calling and raising the dead have no spec types. The spell resistance clause is unusual — failing to beat SR gives the SOUL a choice, it does not simply negate — so it is left in prose rather than modelled."
   },
   "false-resurrection-greater": {
    "effects": [
@@ -822,7 +822,7 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "Castable at any distance, with the save DC depending on your knowledge of and connection to the subject \u2014 a GM judgement the vocabulary cannot hold, so the standard DC formula is used and the qualifier is noted. The +5 another-plane figure is a modifier to the TARGET's resistance roll, not a bonus this spell grants, so it is not a save_mod spec."
+   "notes": "Castable at any distance, with the save DC depending on your knowledge of and connection to the subject — a GM judgement the vocabulary cannot hold, so the standard DC formula is used and the qualifier is noted. The +5 another-plane figure is a modifier to the TARGET's resistance roll, not a bonus this spell grants, so it is not a save_mod spec."
   },
   "familiar-double": {
    "effects": [
@@ -857,7 +857,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "A 50% miss chance has no spec type. The figment's touch attack is an attack the spell grants, so no damage is emitted for it \u2014 it deals none anyway."
+   "notes": "A 50% miss chance has no spec type. The figment's touch attack is an attack the spell grants, so no damage is emitted for it — it deals none anyway."
   },
   "familiar-melding": {
    "effects": [
@@ -871,7 +871,7 @@
     },
     {
      "type": "narrative",
-     "target": "If your familiar is slain while you inhabit it, your soul returns unharmed if your body is in range \u2014 if it is out of range, you die."
+     "target": "If your familiar is slain while you inhabit it, your soul returns unharmed if your body is in range — if it is out of range, you die."
     }
    ],
    "converted_by": "read",
@@ -992,7 +992,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The +2 on saves to disbelieve is granted to creatures who already know you \u2014 that is a bonus to someone else's save against this spell, not a bonus this spell confers, so it is not emitted as a save_mod. The -4 Perception penalty is untyped because the prose states no type."
+   "notes": "The +2 on saves to disbelieve is granted to creatures who already know you — that is a bonus to someone else's save against this spell, not a bonus this spell confers, so it is not emitted as a save_mod. The -4 Perception penalty is untyped because the prose states no type."
   },
   "feast-of-ashes": {
    "effects": [
@@ -1020,7 +1020,7 @@
     "unit": "day",
     "dismissible": false
    },
-   "notes": "The starvation damage is the starvation rules', applied over days, not a number this spell states \u2014 nothing is invented for it. The DC 12 save is a separate, fixed-DC save triggered by eating rather than by casting, so it is not a save_gate. Removable by break enchantment, limited wish, miracle, remove curse or wish; damage already suffered must be healed normally."
+   "notes": "The starvation damage is the starvation rules', applied over days, not a number this spell states — nothing is invented for it. The DC 12 save is a separate, fixed-DC save triggered by eating rather than by casting, so it is not a save_gate. Removable by break enchantment, limited wish, miracle, remove curse or wish; damage already suffered must be healed normally."
   },
   "feast-on-fear": {
    "effects": [
@@ -1126,13 +1126,13 @@
    "duration": {
     "kind": "instantaneous"
    },
-   "notes": "Setting an ability score TO a value is not a modifier and not ability damage, so ability_mod/ability_damage cannot express it \u2014 the drop to 1 is narrative. The -4 save penalty for arcane casters is a penalty on the target's save against THIS spell, not a lasting Will penalty the spell grants, so it is not emitted as a save_mod."
+   "notes": "Setting an ability score TO a value is not a modifier and not ability damage, so ability_mod/ability_damage cannot express it — the drop to 1 is narrative. The -4 save penalty for arcane casters is a penalty on the target's save against THIS spell, not a lasting Will penalty the spell grants, so it is not emitted as a save_mod."
   },
   "ferment": {
    "effects": [
     {
      "type": "narrative",
-     "target": "Imbue a potable liquid \u2014 including elixirs, extracts, potions and poisons \u2014 with an intoxicant and any flavour you choose. Affecting a magic liquid or a poison requires a caster level check (DC 10 + item level for magic liquids, the poison's own save DC for a poison) or the spell fails."
+     "target": "Imbue a potable liquid — including elixirs, extracts, potions and poisons — with an intoxicant and any flavour you choose. Affecting a magic liquid or a poison requires a caster level check (DC 10 + item level for magic liquids, the poison's own save DC for a poison) or the spell fails."
     },
     {
      "type": "narrative",
@@ -1182,7 +1182,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The granted spell resistance is NOT a combat_mod on spell_resistance: it is 12 + caster level, which the integer `amount` field cannot hold, and it applies only against healing \u2014 a combat_mod would give the subject SR against every spell, which would be a large and silent buff. Fortitude partial only shortens the duration, so on_failure is empty by design."
+   "notes": "The granted spell resistance is NOT a combat_mod on spell_resistance: it is 12 + caster level, which the integer `amount` field cannot hold, and it applies only against healing — a combat_mod would give the subject SR against every spell, which would be a large and silent buff. Fortitude partial only shortens the duration, so on_failure is empty by design."
   },
   "fester-mass": {
    "effects": [
@@ -1243,7 +1243,7 @@
     }
    ],
    "converted_by": "read",
-   "notes": "Corpus data defect: see the note on `fey-blight` \u2014 this id's description reads as the bane and refers to itself as 'fey blight', so the two descriptions appear swapped in spells.json. Converted as written. The bane is a per-race table not present in the description, so no number could be read. Duration is 'see text', so none is emitted."
+   "notes": "Corpus data defect: see the note on `fey-blight` — this id's description reads as the bane and refers to itself as 'fey blight', so the two descriptions appear swapped in spells.json. Converted as written. The bane is a per-race table not present in the description, so no number could be read. Duration is 'see text', so none is emitted."
   },
   "fey-form-i": {
    "effects": [
@@ -1263,7 +1263,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The size bonuses are an either/or between two rows, so they are NOT emitted as ability_mod specs \u2014 doing so would stack Small's +2 Dex with Medium's +2 Str on the same caster. Every other listed ability is conditional on which fey the caster picks, which the vocabulary cannot gate on."
+   "notes": "The size bonuses are an either/or between two rows, so they are NOT emitted as ability_mod specs — doing so would stack Small's +2 Dex with Medium's +2 Str on the same caster. Every other listed ability is conditional on which fey the caster picks, which the vocabulary cannot gate on."
   },
   "fey-form-ii": {
    "effects": [
@@ -1504,7 +1504,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "Four numbers here were deliberately not converted. The 3d6 is unarmed-attack damage \u2014 it fires when you punch someone, not when you cast. The 2d6 in water REPEATS every round and the vocabulary has no repeating-damage type. The fire-to-healing conversion triggers on being attacked, so it is not a `heal` spec. The dazzling is applied to onlookers, not to the spell's target. Half damage from acid/electricity is not a flat `resistance` amount. NOTE A CONTRADICTION IN THE PRINTED TEXT: the spell lists immunity to electricity and then says you take half damage from acid OR electricity. Both are recorded as written rather than one being silently dropped. `element` is omitted because the corpus already derives it as fire."
+   "notes": "Four numbers here were deliberately not converted. The 3d6 is unarmed-attack damage — it fires when you punch someone, not when you cast. The 2d6 in water REPEATS every round and the vocabulary has no repeating-damage type. The fire-to-healing conversion triggers on being attacked, so it is not a `heal` spec. The dazzling is applied to onlookers, not to the spell's target. Half damage from acid/electricity is not a flat `resistance` amount. NOTE A CONTRADICTION IN THE PRINTED TEXT: the spell lists immunity to electricity and then says you take half damage from acid OR electricity. Both are recorded as written rather than one being silently dropped. `element` is omitted because the corpus already derives it as fire."
   },
   "film-of-filth": {
    "effects": [
@@ -1537,7 +1537,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "Two effects are deliberately left narrative. The 20-foot aura lands on bystanders, not on the spell's single touched target, so applying `sickened` as a spec would sicken the wrong creature. The nausea is RETRIBUTIVE \u2014 it happens to whoever bites the subject, not to the subject. Creatures immune to poison are unaffected by any of it."
+   "notes": "Two effects are deliberately left narrative. The 20-foot aura lands on bystanders, not on the spell's single touched target, so applying `sickened` as a spec would sicken the wrong creature. The nausea is RETRIBUTIVE — it happens to whoever bites the subject, not to the subject. Creatures immune to poison are unaffected by any of it."
   },
   "find-fault": {
    "effects": [
@@ -1581,7 +1581,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "The recipient senses the shortest direct physical route to a named prominent destination on the same plane \u2014 a city, keep, lake or dungeon, but not somewhere as minor as a lone cabin \u2014 being shown the exact turn to take or action to perform whenever a choice arises. It finds locations, never objects or creatures, and ends when the destination is reached."
+     "target": "The recipient senses the shortest direct physical route to a named prominent destination on the same plane — a city, keep, lake or dungeon, but not somewhere as minor as a lone cabin — being shown the exact turn to take or action to perform whenever a choice arises. It finds locations, never objects or creatures, and ends when the destination is reached."
     },
     {
      "type": "permission",
@@ -1622,7 +1622,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The insight bonus could NOT be emitted as a situational_mod: the spec's `amount` field must be a number and this bonus is half the caster level, which has no fixed value. Emitting any single integer would be a guess. This is a vocabulary gap worth reporting \u2014 per-caster-level modifiers are very common in 1e."
+   "notes": "The insight bonus could NOT be emitted as a situational_mod: the spec's `amount` field must be a number and this bonus is half the caster level, which has no fixed value. Emitting any single integer would be a guess. This is a vocabulary gap worth reporting — per-caster-level modifiers are very common in 1e."
   },
   "finger-of-death": {
    "effects": [
@@ -1654,7 +1654,7 @@
    "duration": {
     "kind": "instantaneous"
    },
-   "notes": "`scaling` is omitted on purpose. The two branches use two different formulas \u2014 10 per caster level on a failure, 3d6 + 1 per caster level on a success \u2014 and a single scaling object can hold only one. The failure branch also has no die at all, which the scaling schema (which requires a real die size) cannot represent. Both formulas are therefore stated on the specs themselves. Damage type is untyped because the prose names no energy; the target may die from the damage even on a successful save."
+   "notes": "`scaling` is omitted on purpose. The two branches use two different formulas — 10 per caster level on a failure, 3d6 + 1 per caster level on a success — and a single scaling object can hold only one. The failure branch also has no die at all, which the scaling schema (which requires a real die size) cannot represent. Both formulas are therefore stated on the specs themselves. Damage type is untyped because the prose names no energy; the target may die from the damage even on a successful save."
   },
   "fins-to-feet": {
    "effects": [
@@ -1706,7 +1706,7 @@
     },
     {
      "type": "narrative",
-     "target": "If the target starts its turn in a square adjacent to you it counts as entangled to an immobile object \u2014 you \u2014 and cannot move at all."
+     "target": "If the target starts its turn in a square adjacent to you it counts as entangled to an immobile object — you — and cannot move at all."
     }
    ],
    "converted_by": "read",
@@ -1769,7 +1769,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The 1d6 is RETRIBUTIVE \u2014 it burns whoever strikes or grapples you, never the spell's target, which is you. This is the exact shape that made the previous pass convert thorn body backwards, so no damage spec is emitted. `element` is omitted because the corpus already derives it as fire."
+   "notes": "The 1d6 is RETRIBUTIVE — it burns whoever strikes or grapples you, never the spell's target, which is you. This is the exact shape that made the previous pass convert thorn body backwards, so no damage spec is emitted. `element` is omitted because the corpus already derives it as fire."
   },
   "fire-shield": {
    "effects": [
@@ -1779,7 +1779,7 @@
     },
     {
      "type": "narrative",
-     "target": "Any creature striking you with its body or a handheld weapon takes 1d6 damage + 1 point per caster level, maximum +15 \u2014 cold damage from a chill shield, fire damage from a warm shield. Spell resistance applies to it, and creatures attacking you with reach weapons are not subject to it at all."
+     "target": "Any creature striking you with its body or a handheld weapon takes 1d6 damage + 1 point per caster level, maximum +15 — cold damage from a chill shield, fire damage from a warm shield. Spell resistance applies to it, and creatures attacking you with reach weapons are not subject to it at all."
     },
     {
      "type": "narrative",
@@ -1793,7 +1793,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The 1d6 + 1/level is RETRIBUTIVE \u2014 it is dealt to each attacker, not to the spell's target, who is you. Emitting it as damage would burn the caster on casting. Its energy type is also chosen at cast time, so damage_type could not be filled in honestly. The half-damage protection is not a flat `resistance` amount, so it stays narrative too. `element` is omitted: the corpus already derives one, and the spell is genuinely either cold or fire."
+   "notes": "The 1d6 + 1/level is RETRIBUTIVE — it is dealt to each attacker, not to the spell's target, who is you. Emitting it as damage would burn the caster on casting. Its energy type is also chosen at cast time, so damage_type could not be filled in honestly. The half-damage protection is not a flat `resistance` amount, so it stays narrative too. `element` is omitted: the corpus already derives one, and the spell is genuinely either cold or fire."
   },
   "fire-sneeze": {
    "effects": [
@@ -1903,7 +1903,7 @@
     },
     {
      "type": "narrative",
-     "target": "You still feel pain but suffer none of its effects \u2014 burning would still wake you, though the spell may negate the damage. Once the spell has prevented 10 points of damage per caster level, to a maximum of 100 points, it is discharged."
+     "target": "You still feel pain but suffer none of its effects — burning would still wake you, though the spell may negate the damage. Once the spell has prevented 10 points of damage per caster level, to a maximum of 100 points, it is discharged."
     },
     {
      "type": "permission",
@@ -1919,7 +1919,7 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "The +4 is untyped because the prose states no bonus type, and it is a situational_mod rather than a save_mod because it applies only against pain effects. The upgraded DR 10 / resist 30 values are not emitted as their own specs \u2014 they replace the base ones only if the caster spends the immediate action, and emitting both pairs would stack them."
+   "notes": "The +4 is untyped because the prose states no bonus type, and it is a situational_mod rather than a save_mod because it applies only against pain effects. The upgraded DR 10 / resist 30 values are not emitted as their own specs — they replace the base ones only if the caster spends the immediate action, and emitting both pairs would stack them."
   },
   "first-world-revisions": {
    "effects": [
@@ -1950,13 +1950,13 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "The LOSS of darkvision cannot be expressed \u2014 the vocabulary has `sense` to grant one but nothing to remove one \u2014 so it is recorded as a note on the low-light grant. The +20 is untyped because the prose states no bonus type, and situational because it applies only to passing as a gnome."
+   "notes": "The LOSS of darkvision cannot be expressed — the vocabulary has `sense` to grant one but nothing to remove one — so it is recorded as a note on the low-light grant. The +20 is untyped because the prose states no bonus type, and situational because it applies only to passing as a gnome."
   },
   "flame-arrow": {
    "effects": [
     {
      "type": "narrative",
-     "target": "Turn up to 50 pieces of ammunition \u2014 arrows, bolts, shuriken, sling stones \u2014 into fiery projectiles. Each one deals an extra 1d6 fire damage to whatever it hits. They readily ignite a flammable object or structure, but never set a struck creature alight."
+     "target": "Turn up to 50 pieces of ammunition — arrows, bolts, shuriken, sling stones — into fiery projectiles. Each one deals an extra 1d6 fire damage to whatever it hits. They readily ignite a flammable object or structure, but never set a struck creature alight."
     }
    ],
    "converted_by": "read",
@@ -1992,7 +1992,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "A glowing rune gives a weapon you wield the flaming property, adding 1d6 fire damage on a successful hit \u2014 flaming burst instead if you are using the judgment class feature. The spell works only while you hold the weapon and ends if it leaves your hand, and it does not stack with an existing flaming or flaming burst property."
+     "target": "A glowing rune gives a weapon you wield the flaming property, adding 1d6 fire damage on a successful hit — flaming burst instead if you are using the judgment class feature. The spell works only while you hold the weapon and ends if it leaves your hand, and it does not stack with an existing flaming or flaming burst property."
     }
    ],
    "converted_by": "read",
@@ -2089,7 +2089,7 @@
    "duration": {
     "kind": "instantaneous"
    },
-   "notes": "The blinding is not emitted as a condition spec: the spell's target is the FIREARM, while the blindness lands on everyone within 15 feet of its bearer, and 1d4 rounds is not an integer duration. Note the corpus records two different saves for this spell \u2014 Will (object) for the weapon and Fortitude for the blinding \u2014 and the derived `save` field keeps only one of them."
+   "notes": "The blinding is not emitted as a condition spec: the spell's target is the FIREARM, while the blindness lands on everyone within 15 feet of its bearer, and 1d4 rounds is not an integer duration. Note the corpus records two different saves for this spell — Will (object) for the weapon and Fortitude for the blinding — and the derived `save` field keeps only one of them."
   },
   "flash-forward": {
    "effects": [
@@ -2136,7 +2136,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The 1d6-per-3-levels is NOT emitted as a damage spec and `scaling` is deliberately left off with it. The damage fires when a creature enters the area or starts its turn there \u2014 repeatedly, and to whoever is standing in it, not to a target chosen at casting. Emitting scaling alone, with no damage spec for it to modify, would leave a stray formula that a later reader could mistake for on-cast damage; the progression is stated in the narrative instead. The corpus `save` field says fort while the description says the Reflex save is what negates \u2014 worth a look. `element` is omitted because the corpus already derives it as fire."
+   "notes": "The 1d6-per-3-levels is NOT emitted as a damage spec and `scaling` is deliberately left off with it. The damage fires when a creature enters the area or starts its turn there — repeatedly, and to whoever is standing in it, not to a target chosen at casting. Emitting scaling alone, with no damage spec for it to modify, would leave a stray formula that a later reader could mistake for on-cast damage; the progression is stated in the narrative instead. The corpus `save` field says fort while the description says the Reflex save is what negates — worth a look. `element` is omitted because the corpus already derives it as fire."
   },
   "fleeting-defect": {
    "effects": [
@@ -2203,7 +2203,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "`broken` is not in the condition vocabulary, so the object branch is narrative. The construct branch's -2 IS emitted, split across the three saves because the vocabulary has no 'all saves' target, and as situational_mods for skill and ability checks because neither has an 'all skills' target. Every one of those specs carries a note saying it applies only to a construct \u2014 the two branches are mutually exclusive and the vocabulary cannot gate on the target's type."
+   "notes": "`broken` is not in the condition vocabulary, so the object branch is narrative. The construct branch's -2 IS emitted, split across the three saves because the vocabulary has no 'all saves' target, and as situational_mods for skill and ability checks because neither has an 'all skills' target. Every one of those specs carries a note saying it applies only to a construct — the two branches are mutually exclusive and the vocabulary cannot gate on the target's type."
   },
   "fleeting-memory": {
    "effects": [
@@ -2225,7 +2225,7 @@
     },
     {
      "type": "narrative",
-     "target": "If the spell ends early \u2014 dismissed or dispelled \u2014 it disperses without touching the target's memory at all."
+     "target": "If the spell ends early — dismissed or dispelled — it disperses without touching the target's memory at all."
     }
    ],
    "converted_by": "read",
@@ -2299,7 +2299,7 @@
     },
     {
      "type": "narrative",
-     "target": "Unlike flesh puppet, you may order a zombie to attack \u2014 but the moment you do, every zombie you control becomes staggered and stops appearing alive. The spell ends if you cast flesh puppet or flesh puppet horde on a new corpse."
+     "target": "Unlike flesh puppet, you may order a zombie to attack — but the moment you do, every zombie you control becomes staggered and stops appearing alive. The spell ends if you cast flesh puppet or flesh puppet horde on a new corpse."
     }
    ],
    "converted_by": "read",
@@ -2362,7 +2362,7 @@
    "duration": {
     "kind": "instantaneous"
    },
-   "notes": "`petrified` is the one condition in the vocabulary that this spell's prose unambiguously describes \u2014 turning to an inert statue \u2014 so it is applied rather than left narrative."
+   "notes": "`petrified` is the one condition in the vocabulary that this spell's prose unambiguously describes — turning to an inert statue — so it is applied rather than left narrative."
   },
   "flesh-wall": {
    "effects": [
@@ -2416,7 +2416,7 @@
     },
     {
      "type": "narrative",
-     "target": "Most undead are susceptible, but amorphous and fleshless creatures \u2014 elementals, oozes, plants, gaseous or incorporeal creatures and skeletons \u2014 are immune."
+     "target": "Most undead are susceptible, but amorphous and fleshless creatures — elementals, oozes, plants, gaseous or incorporeal creatures and skeletons — are immune."
     }
    ],
    "converted_by": "read",
@@ -2426,7 +2426,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The three effects are an exclusive choice made at cast time, so none is emitted as a spec: doing so would inflict all three at once. The natural armor and speed penalties are also unrepresentable on their own terms \u2014 the vocabulary has no natural-armour combat target, and 'halved' is not a signed number."
+   "notes": "The three effects are an exclusive choice made at cast time, so none is emitted as a spec: doing so would inflict all three at once. The natural armor and speed penalties are also unrepresentable on their own terms — the vocabulary has no natural-armour combat target, and 'halved' is not a signed number."
   },
   "fleshwarping-swarm": {
    "effects": [
@@ -2442,7 +2442,7 @@
     "unit": "hour",
     "dismissible": false
    },
-   "notes": "The -4 penalties are NOT emitted as ability_mod/save_mod specs. They land on whichever creatures later fail a save against the SUMMONED SWARM's distraction ability \u2014 the spell itself has no target \u2014 so a spec would have nothing correct to attach to. Corpus duration is the three-part compound 'concentration + rounds (2) and hours/level (1)'; the shared rule emits the countable hours/level, which is the penalty's duration rather than the swarm's. A reviewer should know the swarm itself lasts concentration + 2 rounds."
+   "notes": "The -4 penalties are NOT emitted as ability_mod/save_mod specs. They land on whichever creatures later fail a save against the SUMMONED SWARM's distraction ability — the spell itself has no target — so a spec would have nothing correct to attach to. Corpus duration is the three-part compound 'concentration + rounds (2) and hours/level (1)'; the shared rule emits the countable hours/level, which is the penalty's duration rather than the swarm's. A reviewer should know the swarm itself lasts concentration + 2 rounds."
   },
   "fleshworm-infestation": {
    "effects": [
@@ -2462,7 +2462,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "Nothing here is emitted as a spec. The save is made EVERY ROUND rather than at casting, so it is not a save_gate, and both the 1d6 and the 2 points of Dexterity damage repeat every round \u2014 the vocabulary has no repeating-damage type. Even the staggered/sickened conditions are re-decided each round."
+   "notes": "Nothing here is emitted as a spec. The save is made EVERY ROUND rather than at casting, so it is not a save_gate, and both the 1d6 and the 2 points of Dexterity damage repeat every round — the vocabulary has no repeating-damage type. Even the staggered/sickened conditions are re-decided each round."
   },
   "fleshy-facade": {
    "effects": [
@@ -2543,7 +2543,7 @@
     "kind": "permanent",
     "dismissible": false
    },
-   "notes": "The -1 is NOT emitted as a combat_mod on AC. It degrades the ARMOUR, not the wearer, it grows by 1 every hour worn with no stated cap, and it applies only if the target wears armour at all \u2014 none of which a fixed signed amount can express."
+   "notes": "The -1 is NOT emitted as a combat_mod on AC. It degrades the ARMOUR, not the wearer, it grows by 1 every hour worn with no stated cap, and it applies only if the target wears armour at all — none of which a fixed signed amount can express."
   },
   "flickering-lights": {
    "effects": [
@@ -2577,7 +2577,7 @@
     },
     {
      "type": "narrative",
-     "target": "It winks out when the duration ends, if you move beyond its range, or if you try to take it more than 3 feet from the surface below it \u2014 and whatever it was carrying falls."
+     "target": "It winks out when the duration ends, if you move beyond its range, or if you try to take it more than 3 feet from the surface below it — and whatever it was carrying falls."
     }
    ],
    "converted_by": "read",
@@ -2611,7 +2611,7 @@
     },
     {
      "type": "narrative",
-     "target": "Your body turns slick, oily and slightly transparent \u2014 not enough to grant concealment \u2014 and your reach increases by 10 feet. You count as having the water subtype for the duration."
+     "target": "Your body turns slick, oily and slightly transparent — not enough to grant concealment — and your reach increases by 10 feet. You count as having the water subtype for the duration."
     }
    ],
    "converted_by": "read",
@@ -2633,7 +2633,7 @@
     },
     {
      "type": "permission",
-     "target": "Attack and cast spells normally while flying, and charge \u2014 but not run \u2014 carrying no more than your maximum load plus worn armour."
+     "target": "Attack and cast spells normally while flying, and charge — but not run — carrying no more than your maximum load plus worn armour."
     },
     {
      "type": "narrative",
@@ -2651,7 +2651,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "This spell's own description states no numbers \u2014 it says only 'functions as fly, save that it can target numerous creatures and lasts longer'. The 60/40 feet, the maneuverability and the descent were READ OUT OF `fly`'s own prose in the corpus, not guessed. The armour/load case is a condition the vocabulary cannot gate on, so 60 is emitted with the 40 recorded in the note. The Fly-check bonus is half caster level, which the numeric `amount` field cannot hold, so it stays narrative.\nSEPARATE BUG FOUND WHILE READING, NOT IN THIS PARTITION: `fly` itself currently carries a converted top-level effect of `damage 1d6 untyped, scales full`. There is no damage anywhere in fly \u2014 that 1d6 is the 'floats downward 60 feet/round for 1d6 rounds' descent timer. It is the same class of defect as the teleport mishap example and should be re-read."
+   "notes": "This spell's own description states no numbers — it says only 'functions as fly, save that it can target numerous creatures and lasts longer'. The 60/40 feet, the maneuverability and the descent were READ OUT OF `fly`'s own prose in the corpus, not guessed. The armour/load case is a condition the vocabulary cannot gate on, so 60 is emitted with the 40 recorded in the note. The Fly-check bonus is half caster level, which the numeric `amount` field cannot hold, so it stays narrative.\nSEPARATE BUG FOUND WHILE READING, NOT IN THIS PARTITION: `fly` itself currently carries a converted top-level effect of `damage 1d6 untyped, scales full`. There is no damage anywhere in fly — that 1d6 is the 'floats downward 60 feet/round for 1d6 rounds' descent timer. It is the same class of defect as the teleport mishap example and should be re-read."
   },
   "focused-scrutiny": {
    "effects": [
@@ -2732,7 +2732,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "A bank of fog billows from the point you choose, obscuring all sight \u2014 including darkvision \u2014 beyond 5 feet. A creature within 5 feet has concealment (20% miss chance); anything further away has total concealment (50% miss chance, and attackers cannot use sight to locate it)."
+     "target": "A bank of fog billows from the point you choose, obscuring all sight — including darkvision — beyond 5 feet. A creature within 5 feet has concealment (20% miss chance); anything further away has total concealment (50% miss chance, and attackers cannot use sight to locate it)."
     },
     {
      "type": "narrative",
@@ -2746,7 +2746,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "Concealment and miss chances have no spec type \u2014 they are not AC bonuses and not damage reduction."
+   "notes": "Concealment and miss chances have no spec type — they are not AC bonuses and not damage reduction."
   },
   "follow-aura": {
    "effects": [
@@ -2760,7 +2760,7 @@
     },
     {
      "type": "narrative",
-     "target": "While tracking a given alignment the spell gains the opposite alignment's descriptor \u2014 tracking evil gives it the good descriptor, and so on."
+     "target": "While tracking a given alignment the spell gains the opposite alignment's descriptor — tracking evil gives it the good descriptor, and so on."
     }
    ],
    "converted_by": "read",
@@ -2819,13 +2819,13 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The -2 is not emitted as a save_mod: the spell's target is the COINS, and the penalty attaches to whoever later carries them and only against this caster's own magic. Note a corpus discrepancy \u2014 the derived save field reads 'Fortitude negates (object)' while the description calls for a Will save from the coin's holder."
+   "notes": "The -2 is not emitted as a save_mod: the spell's target is the COINS, and the penalty attaches to whoever later carries them and only against this caster's own magic. Note a corpus discrepancy — the derived save field reads 'Fortitude negates (object)' while the description calls for a Will save from the coin's holder."
   },
   "fool-s-gold-vc": {
    "effects": [
     {
      "type": "narrative",
-     "target": "Make up to 1 gp per caster level worth of copper or silver appear to be an equivalent amount of gold \u2014 at 3rd level, up to 300 copper pieces, 30 silver pieces, or a copper or silver item worth no more than 3 gp. Coins gain the value of the new coinage; other items appear to be worth 5 times (silver) or 50 times (copper) their true value, since craftsmanship carries part of the price."
+     "target": "Make up to 1 gp per caster level worth of copper or silver appear to be an equivalent amount of gold — at 3rd level, up to 300 copper pieces, 30 silver pieces, or a copper or silver item worth no more than 3 gp. Coins gain the value of the new coinage; other items appear to be worth 5 times (silver) or 50 times (copper) their true value, since craftsmanship carries part of the price."
     },
     {
      "type": "narrative",
@@ -2929,7 +2929,7 @@
     },
     {
      "type": "narrative",
-     "target": "If the line of effect passes through a space too small for your body, such as a portcullis or arrow slit, the hook pulls you to that spot and you take damage as though you had fallen the distance travelled. If you are restrained you are pulled to the limit of your restraints, which do not break. The spell does not guarantee a safe landing space \u2014 if the target is flying or on a ledge with no room, you begin to fall on arrival."
+     "target": "If the line of effect passes through a space too small for your body, such as a portcullis or arrow slit, the hook pulls you to that spot and you take damage as though you had fallen the distance travelled. If you are restrained you are pulled to the limit of your restraints, which do not break. The spell does not guarantee a safe landing space — if the target is flying or on a ledge with no room, you begin to fall on arrival."
     },
     {
      "type": "permission",
@@ -2964,13 +2964,13 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The sword's damage is the longsword's, dealt when someone swings it, not damage this spell deals \u2014 so no damage spec. The +1/+2/+3 is a weapon enhancement bonus on a created item rather than a bonus granted to a creature, and it steps with caster level, so no combat_mod either. `element` is omitted because the corpus already derives it as force."
+   "notes": "The sword's damage is the longsword's, dealt when someone swings it, not damage this spell deals — so no damage spec. The +1/+2/+3 is a weapon enhancement bonus on a created item rather than a bonus granted to a creature, and it steps with caster level, so no combat_mod either. `element` is omitted because the corpus already derives it as force."
   },
   "forcecage": {
    "effects": [
     {
      "type": "narrative",
-     "target": "Create an immobile, invisible prison of force \u2014 your choice of a 20-foot barred cage or a 10-foot windowless cell. Creatures inside are contained; if a creature is too big to fit, the spell automatically fails."
+     "target": "Create an immobile, invisible prison of force — your choice of a 20-foot barred cage or a 10-foot windowless cell. Creatures inside are contained; if a creature is too big to fit, the spell automatically fails."
     },
     {
      "type": "narrative",
@@ -2988,7 +2988,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "Note a corpus discrepancy: the derived save reads 'Reflex negates', but this description never mentions a saving throw \u2014 containment depends on size and on fitting through the gaps. No save_gate is invented on the strength of the derived field alone. `element` is omitted because the corpus derives it as force."
+   "notes": "Note a corpus discrepancy: the derived save reads 'Reflex negates', but this description never mentions a saving throw — containment depends on size and on fitting through the gaps. No save_gate is invented on the strength of the derived field alone. `element` is omitted because the corpus derives it as force."
   },
   "forced-mutation": {
    "effects": [
@@ -3024,7 +3024,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The -4 penalties are untyped because the prose states no type. The deformity is one option chosen from a list in an external template, so emitting any of them would both pick for the caster and import numbers this description does not state \u2014 for example the lame deformity cannot be applied to a creature with a base speed under 20 feet."
+   "notes": "The -4 penalties are untyped because the prose states no type. The deformity is one option chosen from a list in an external template, so emitting any of them would both pick for the caster and import numbers this description does not state — for example the lame deformity cannot be applied to a creature with a base speed under 20 feet."
   },
   "forced-quiet": {
    "effects": [
@@ -3117,7 +3117,7 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The bull rush CMB belongs to the conjured hand, not to the caster, so it is not emitted as a combat_mod \u2014 doing so would hand the caster a +8 Strength bonus to their own manoeuvres. `element` is omitted because the corpus already derives it as force."
+   "notes": "The bull rush CMB belongs to the conjured hand, not to the caster, so it is not emitted as a combat_mod — doing so would hand the caster a +8 Strength bonus to their own manoeuvres. `element` is omitted because the corpus already derives it as force."
   },
   "forceful-strike": {
    "effects": [
@@ -3163,7 +3163,7 @@
     "cap_dice": 10,
     "damage_type": "force"
    },
-   "notes": "This damage IS converted: the spell's target is the creature you strike, the force damage is explicitly the spell's own and separate from the weapon damage ('you deal normal weapon damage from the blow, but ALSO deal an additional amount of force damage'), and it is dealt once when the spell is cast. The normal weapon damage is NOT converted \u2014 that is the weapon's. `element` is omitted because the corpus already derives it as force."
+   "notes": "This damage IS converted: the spell's target is the creature you strike, the force damage is explicitly the spell's own and separate from the weapon damage ('you deal normal weapon damage from the blow, but ALSO deal an additional amount of force damage'), and it is dealt once when the spell is cast. The normal weapon damage is NOT converted — that is the weapon's. `element` is omitted because the corpus already derives it as force."
   },
   "foresight": {
    "effects": [
@@ -3187,7 +3187,7 @@
     },
     {
      "type": "narrative",
-     "target": "When another creature is the subject you receive the warnings about it, and must pass them on \u2014 by shout, by a pull, or telepathically \u2014 for them to help; without a warning the subject can still be caught unprepared."
+     "target": "When another creature is the subject you receive the warnings about it, and must pass them on — by shout, by a pull, or telepathically — for them to help; without a warning the subject can still be caught unprepared."
     }
    ],
    "converted_by": "read",
@@ -3197,7 +3197,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "FLAGGED FOR REVIEW: the +2 insight bonus always belongs to the CASTER \u2014 the text says plainly that a touched subject does not gain it. The spell's range is 'personal or touch', so in the personal case the target and the caster are the same creature and these specs are exactly right, while in the touch case an engine that applies specs to the target would buff the wrong creature. They are emitted rather than left narrative because the number and the bonus type are both stated outright and personal is the ordinary use, but the exception is recorded on both specs."
+   "notes": "FLAGGED FOR REVIEW: the +2 insight bonus always belongs to the CASTER — the text says plainly that a touched subject does not gain it. The spell's range is 'personal or touch', so in the personal case the target and the caster are the same creature and these specs are exactly right, while in the touch case an engine that applies specs to the target would buff the wrong creature. They are emitted rather than left narrative because the number and the bonus type are both stated outright and personal is the ordinary use, but the exception is recorded on both specs."
   },
   "forest-friend": {
    "effects": [
@@ -3265,7 +3265,7 @@
     "unit": "minute",
     "dismissible": true
    },
-   "notes": "The +5 outlasts the spell \u2014 it runs for 1 day from casting while the spell lasts minutes/level \u2014 so its own duration is carried on the spec rather than inherited from the spell."
+   "notes": "The +5 outlasts the spell — it runs for 1 day from casting while the spell lasts minutes/level — so its own duration is carried on the spec rather than inherited from the spell."
   },
   "foretell-failure": {
    "effects": [
@@ -3347,7 +3347,7 @@
     },
     {
      "type": "narrative",
-     "target": "You become a Medium esoteric or outer dragon \u2014 psychics are limited to the esoteric forms: astral, dream, etheric, nightmare or occult."
+     "target": "You become a Medium esoteric or outer dragon — psychics are limited to the esoteric forms: astral, dream, etheric, nightmare or occult."
     },
     {
      "type": "narrative",
@@ -3355,7 +3355,7 @@
     },
     {
      "type": "narrative",
-     "target": "Each dragon adds its own breath shape, resistance and extras \u2014 for example the occult dragon raises the natural armour bonus to +6, the solar and vortex dragons add vulnerability to cold, and the astral and etheric dragons roll their breath damage in d4s rather than d8s."
+     "target": "Each dragon adds its own breath shape, resistance and extras — for example the occult dragon raises the natural armour bonus to +6, the solar and vortex dragons add vulnerability to cold, and the astral and etheric dragons roll their breath damage in d4s rather than d8s."
     }
    ],
    "converted_by": "read",
@@ -3365,7 +3365,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. Note that the occult dragon raises the natural armour bonus from +4 to +6; the +4 is emitted because it is the general case, and the exception is recorded in the narrative."
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec — `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. Note that the occult dragon raises the natural armour bonus from +4 to +6; the +4 is emitted because it is the general case, and the exception is recorded in the narrative."
   },
   "form-of-the-alien-dragon-ii": {
    "effects": [
@@ -3419,7 +3419,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'."
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec — `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'."
   },
   "form-of-the-alien-dragon-iii": {
    "effects": [
@@ -3478,7 +3478,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. The immunity is to 'one form of energy or effect' chosen with the dragon, and `immunity` requires a named target, so it is not emitted."
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec — `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. The immunity is to 'one form of energy or effect' chosen with the dragon, and `immunity` requires a named target, so it is not emitted."
   },
   "form-of-the-dragon-i": {
    "effects": [
@@ -3521,7 +3521,7 @@
     },
     {
      "type": "narrative",
-     "target": "Each dragon brings its own breath shape and resistance \u2014 black 60-ft line of acid, resist acid 20, swim 60; blue 60-ft line of electricity, resist electricity 20, burrow 20; green 30-ft cone of acid, resist acid 20, swim 40; red 30-ft cone of fire, resist fire 30, vulnerable to cold; white 30-ft cone of cold, resist cold 20, swim 60, vulnerable to fire; brass 60-ft line of fire, resist fire 20, burrow 30, vulnerable to cold; bronze 60-ft line of electricity, resist electricity 20, swim 60; copper 60-ft line of acid, resist acid 20, spider climb; gold 30-ft cone of fire, resist fire 20, swim 60; silver 30-ft cone of cold, resist cold 30, vulnerable to fire."
+     "target": "Each dragon brings its own breath shape and resistance — black 60-ft line of acid, resist acid 20, swim 60; blue 60-ft line of electricity, resist electricity 20, burrow 20; green 30-ft cone of acid, resist acid 20, swim 40; red 30-ft cone of fire, resist fire 30, vulnerable to cold; white 30-ft cone of cold, resist cold 20, swim 60, vulnerable to fire; brass 60-ft line of fire, resist fire 20, burrow 30, vulnerable to cold; bronze 60-ft line of electricity, resist electricity 20, swim 60; copper 60-ft line of acid, resist acid 20, spider climb; gold 30-ft cone of fire, resist fire 20, swim 60; silver 30-ft cone of cold, resist cold 30, vulnerable to fire."
     }
    ],
    "converted_by": "read",
@@ -3531,7 +3531,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. The swim, burrow and vulnerability entries vary by dragon too, so none of them is emitted as a speed or vulnerability spec."
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec — `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. The swim, burrow and vulnerability entries vary by dragon too, so none of them is emitted as a speed or vulnerability spec."
   },
   "form-of-the-dragon-ii": {
    "effects": [
@@ -3585,7 +3585,7 @@
     "unit": "minute",
     "dismissible": false
    },
-   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'."
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec — `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'."
   }
  }
 }

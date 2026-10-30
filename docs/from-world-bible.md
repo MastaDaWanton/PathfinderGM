@@ -363,6 +363,19 @@ stat block on every build), a tannery's rent, a fauna list, or a sky.
 | a settlement's words that imply tanners | Read (`places.TANNERY_CUES`, lane G): a settlement with no authored tannery whose own facts or paragraphs say `tanner`, `tannery`, `tanning`, `tanyard`, `tan pits`, `currier`, `leatherworker`, `the leather trade`, `leather goods` or `the hide trade` gets one on its outskirts. Measured 2026-10-08: no cue fires in any shipped export (their tanneries are authored) | Nothing new: describe a town's trades in its own words. "Leather" alone and "hides" or "pelts" alone are deliberately not cues (what people wear; trappers selling pelts). A world that wants a tannery in a town it lists rooms for authors the room |
 | the leatherworker's counter | Every settlement, village up (`stall-lines.json` `leatherworker`, lane G) | Nothing from a world, besides the `play.places[].supplies[]` ask above (`"supplies": ["leatherworker"]` on a world's own saddler or cobbler). A tanner, currier, saddler or cobbler in `play.cast[]` is the occupation `tanner` by their words |
 
+### Gods, and what each keeps (2026-10-29)
+
+The imported feats and spells lost Golarion's gods (docs/bestiary-licensing.md §7). Where
+a god was a gate, the gate now names what the god keeps: 13 feats ask for "worshiper of a
+god of battle", "of a god of commerce", "of a god of magic", and a few spells are
+"associated with" a god of the hunt or of wealth. Today those gates are unparsed, so the
+feats cannot be taken (`rules/feats.py` `meets` answers "cannot tell"), which is what they
+were before.
+
+| field | today | ask |
+|---|---|---|
+| a world's gods, each with an `id`, its `name` and what it keeps | Absent. The fixtures say only that "gods are real, distant, and plural" | Per god, the things it keeps in plain words (`battle`, `commerce`, `the sea`, `death`, `secrets`), so a gate reading "a god of battle" can be answered by the world's own god of battle. Words only, no domains or alignments: the rules side maps words to its gates. No reader yet. Until one exists the gates stay closed, as above |
+
 ## Things worth stealing
 
 Patterns from World Bible that solved problems this app will hit too:

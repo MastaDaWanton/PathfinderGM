@@ -31,6 +31,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "content" / "feats" / "feats.json"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import golarion_rewrites  # noqa: E402
+
 # Split on commas *and semicolons* that are not inside parentheses: "Spell Focus
 # (conjuration), Int 13" must not become "Spell Focus (conjuration" and "conjuration)".
 #
@@ -323,6 +326,9 @@ def build(src: Path) -> dict:
     stats["reprints_merged"] = reprints
 
     feats.sort(key=lambda f: f["name"].lower())
+    # Golarion's names out, the way the shipped file has them (the owner's ruling of
+    # 2026-10-29, docs/bestiary-licensing.md §7): a re-import must not put them back.
+    feats = golarion_rewrites.apply_feats(feats)[0]
     return {
         "schema": 1,
         "source": src.name,

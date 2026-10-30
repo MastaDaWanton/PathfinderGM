@@ -348,9 +348,34 @@ before any option that keeps them.
 
 ## 7. Follow-up, 2026-10-29: Golarion names outside the bestiary
 
-**Status: measured, waiting on the owner. No content has been changed.** The owner chose
-option D for the bestiary on 2026-10-28: ship Paizo's rulebook line and no Product
-Identity. The spells and feats came in through the same kind of spreadsheet import, from
+**Status: decided 2026-10-29 — F3, falling back to F2 (the owner's words: "go with F3,
+falling back to F2"). Applied the same day by `tools/strip_golarion.py` from the table in
+`tools/golarion_rewrites.py`:**
+
+- **Renamed:** 36 spells, 12 feats and 2 weapons, plus 7 feat ids re-slugged. Examples:
+  Spellbane, Touch of Truthtelling, Dueling Sword Mastery, the dueling sword.
+- **Prose rewritten:** 136 rows edited sentence by sentence (109 spells, 27 feats), with
+  the mechanics untouched.
+- **Columns cleared:** the deity and bloodline column entries.
+- **Deity gates:** 13 feats now ask for a god by portfolio ("a god of battle").
+- **Product prefixes:** stripped from the book citations.
+- **Dropped, the F2 fallback:**
+  - 17 prestige-award feats;
+  - Improved Day Job, Eagle Knight Candidate and Osirionology;
+  - an import duplicate of Lastwall Phalanx;
+  - Cultural Adaptation (Taldan), the rulebook's spell with a Taldan origin story;
+  - What Grows Within, which was built on AP 113's Great Old One.
+- **Result:** spells 3,040 → 3,038, feats 1,474 → 1,453, and zero Golarion names in
+  shipped content outside the bestiary. `tests/test_no_golarion_names.py` holds that.
+- **Old saves:** they resolve through `content/spells/aliases.json`,
+  `content/feats/aliases.json` and the weapon aliases in `rules/weapons.py`.
+- **Still the owner's call:** the 27 myth-only rows (§7.4).
+- **Still outstanding:** Section 15 for the setting books.
+
+The section below is the measurement and the options as they were put.
+
+The owner chose option D for the bestiary on 2026-10-28: ship Paizo's rulebook line and no
+Product Identity. The spells and feats came in through the same kind of spreadsheet import, from
 the whole Pathfinder line. This section measures how much Golarion they carry and sets out
 the options. The letters run F1–F4 so they cannot be confused with A–E above.
 

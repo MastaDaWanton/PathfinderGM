@@ -170,7 +170,9 @@ def test_the_panel_lists_what_a_list_caster_may_prepare(cleric):
     sheet = full_sheet(pc)["spells"]
     groups = {g["level"]: g for g in sheet["choose_from"]}
     assert groups[0]["total"] == 20, "the orisons on the cleric list"
-    assert groups[1]["total"] == 159, "and the first-level spells"
+    # 158 since 2026-10-29: Cultural Adaptation (Taldan), a setting book's duplicate of
+    # the rulebook's Cultural Adaptation, left with Golarion's names (test_no_golarion_names).
+    assert groups[1]["total"] == 158, "and the first-level spells"
     assert groups[0]["castable"] and groups[1]["castable"]
     assert len(groups[1]["spells"]) < groups[1]["total"], "a page of them, and a search"
 

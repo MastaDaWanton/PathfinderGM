@@ -1857,7 +1857,7 @@
    "converted_by": "read",
    "notes": "The corpus duration field for this spell is empty, so no duration was emitted rather than supplying one."
   },
-  "gorum-s-armor": {
+  "quill-armor": {
    "effects": [
     {
      "type": "narrative",
@@ -2689,7 +2689,7 @@
     },
     {
      "type": "narrative",
-     "target": "Members of the Prophet of Kalistrade prestige class can cast this spell even though it is neither divination nor enchantment."
+     "target": "Members of an ascetic merchant-prophets' prestige class can cast this spell even though it is neither divination nor enchantment."
     }
    ],
    "duration": {
@@ -2829,7 +2829,7 @@
    "converted_by": "read",
    "notes": ""
   },
-  "hanspur-s-flotsam-vessel": {
+  "flotsam-vessel": {
    "effects": [
     {
      "type": "narrative",
@@ -2910,7 +2910,7 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Using a Harrow deck, you tell a fortune for yourself or a creature you stay adjacent to for the whole 10-minute casting. The harrowing must name one set of events or course of action the subject intends to undertake during the duration. Draw nine cards — or simulate each with a d6 and a d10 — and record the ability score and alignment of each."
+     "target": "Using a fortune-telling deck, you tell a fortune for yourself or a creature you stay adjacent to for the whole 10-minute casting. The harrowing must name one set of events or course of action the subject intends to undertake during the duration. Draw nine cards — or simulate each with a d6 and a d10 — and record the ability score and alignment of each."
     },
     {
      "type": "narrative",

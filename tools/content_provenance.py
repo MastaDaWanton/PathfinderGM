@@ -103,7 +103,7 @@ GOLARION = {
         Hallit Tien Varki Jistkan Andoren Andorens Irriseni Gebite Gebites Nexian Nexians
         Mendevian Molthuni Galtan Brevic Isgeri Thuvian Katapeshi Qadiran Rahadoumi
         Ustalavic Sarkorian Iobarian Sargavan Aldori Razmiri Numerian Jalmeri Absalomian
-        Korvosan Magnimarian Shoki Novotnian
+        Korvosan Magnimarian Shoki Novotnian Hermean Lissalan
     """,
     "organisation": """
         Hellknight Hellknights Aspis Sczarni Magaambya Arcanamirium Acadamae Riftwardens
@@ -299,6 +299,9 @@ BOOK_FILES = {
     "content/feats/feats.json": "feats",
 }
 SKIP_DIRS = {"bestiary"}  # measured on its own in tools/bestiary_provenance.py
+# `aliases.json` files are skipped too: old id -> new id, kept so a save written before a
+# rename still loads (tools/strip_golarion.py). They are the one sanctioned home of the
+# old names, as content/bestiary/aliases.json is for the bestiary's.
 # This project's typed mechanics for the imported rows, keyed by the rows' ids and quoting
 # their prose: not separate content, but a copy any rename or drop has to follow.
 DERIVED = re.compile(r"^content/(spells/mechanics/|spells/spells-mechanics|feats/mechanics/)")
@@ -381,7 +384,7 @@ def measure():
     rows, totals = [], collections.defaultdict(collections.Counter)
     for path in sorted((ROOT / "content").rglob("*.json")):
         rel = path.relative_to(ROOT).as_posix()
-        if SKIP_DIRS & set(path.relative_to(ROOT).parts):
+        if SKIP_DIRS & set(path.relative_to(ROOT).parts) or path.name == "aliases.json":
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         if rel in BOOK_FILES:

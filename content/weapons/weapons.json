@@ -503,8 +503,8 @@
    }
   },
   {
-   "id": "aldori-dueling-sword",
-   "name": "Aldori dueling sword",
+   "id": "dueling-sword",
+   "name": "Dueling sword",
    "prof": "exotic",
    "section": "One-Handed Weapons",
    "category": "melee",
@@ -12922,8 +12922,8 @@
    }
   },
   {
-   "id": "shoanti-bolas",
-   "name": "Shoanti bolas",
+   "id": "heavy-bolas",
+   "name": "Heavy bolas",
    "prof": "exotic",
    "section": "Ranged Weapons",
    "category": "ranged",

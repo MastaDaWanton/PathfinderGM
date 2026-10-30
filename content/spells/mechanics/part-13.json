@@ -446,7 +446,7 @@
    "converted_by": "read",
    "notes": "The -3 is a temporary replacement for the -2, not an additional penalty, so it stays in prose rather than becoming a second spec. 2026-10-07: the blanket skill bonus is skill_mod target `all` (Actor.skill_modifiers reads ALL_SKILLS since the Touch of Good fix); as a situational_mod it reached no roll."
   },
-  "petulengro-s-validation": {
+  "companion-s-validation": {
    "effects": [
     {
      "type": "narrative",
@@ -3009,7 +3009,7 @@
     },
     {
      "type": "narrative",
-     "target": "Against similar hazards or monsters of CR 7 or higher, the target instead gains a bonus on all saving throws against the effect equal to half your caster level. The spell offers no protection at all against fungal infestations created by the seeded, by the spell what grows within, or by Xhamen-Dor."
+     "target": "Against similar hazards or monsters of CR 7 or higher, the target instead gains a bonus on all saving throws against the effect equal to half your caster level. The spell offers no protection at all against fungal infestations created by the seeded or by the fungal powers they serve."
     }
    ],
    "duration": {

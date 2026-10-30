@@ -247,18 +247,6 @@
    "effects": [
     {
      "type": "combat_mod",
-     "amount": 1,
-     "bonus_type": "dodge",
-     "target": "ac"
-    }
-   ],
-   "effects_converted": true,
-   "id": "aldori-alacrity"
-  },
-  {
-   "effects": [
-    {
-     "type": "combat_mod",
      "amount": 2,
      "bonus_type": "shield",
      "target": "ac"
@@ -483,18 +471,6 @@
    ],
    "effects_converted": true,
    "id": "ardor-s-onslaught"
-  },
-  {
-   "effects": [
-    {
-     "type": "combat_mod",
-     "amount": 1,
-     "bonus_type": "enhancement",
-     "target": "attack"
-    }
-   ],
-   "effects_converted": true,
-   "id": "aroden-s-magic-army"
   },
   {
    "scaling": {
@@ -2159,6 +2135,18 @@
    "id": "campfire-wall"
   },
   {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "profane",
+     "target": "attack"
+    }
+   ],
+   "effects_converted": true,
+   "id": "carrion-beacon"
+  },
+  {
    "scaling": {
     "kind": "damage",
     "die": 8,
@@ -2994,6 +2982,28 @@
   {
    "scaling": {
     "kind": "damage",
+    "die": 6,
+    "dice_per": 1,
+    "per_levels": 3,
+    "damage_type": "untyped",
+    "cap_dice": 6
+   },
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "scales": "full",
+     "note": "scales with caster level"
+    }
+   ],
+   "effects_converted": true,
+   "id": "corpse-hammer"
+  },
+  {
+   "scaling": {
+    "kind": "damage",
     "die": 4,
     "dice_per": 1,
     "per_levels": 1,
@@ -3197,18 +3207,6 @@
    ],
    "effects_converted": true,
    "id": "cultural-adaptation"
-  },
-  {
-   "effects": [
-    {
-     "type": "skill_mod",
-     "amount": 2,
-     "bonus_type": "circumstance",
-     "target": "disguise"
-    }
-   ],
-   "effects_converted": true,
-   "id": "cultural-adaptation-taldan"
   },
   {
    "scaling": {
@@ -3615,6 +3613,59 @@
    ],
    "effects_converted": true,
    "id": "decollate"
+  },
+  {
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "base_dice": 3,
+    "damage_type": "force"
+   },
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "3d6",
+     "damage_type": "force",
+     "lethality": "lethal",
+     "scales": "full",
+     "note": "scales with caster level"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "shield",
+     "target": "ac"
+    }
+   ],
+   "effects_converted": true,
+   "id": "defending-sword"
+  },
+  {
+   "id": "defending-sword-mass",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "3d6",
+     "damage_type": "force",
+     "lethality": "lethal",
+     "scales": "full",
+     "note": "scales with caster level"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "shield",
+     "target": "ac"
+    }
+   ],
+   "effects_converted": true,
+   "inherited_from": "defending-sword",
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "base_dice": 3,
+    "damage_type": "force"
+   }
   },
   {
    "effects": [
@@ -4189,6 +4240,18 @@
    ],
    "effects_converted": true,
    "id": "dread-bolt"
+  },
+  {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "dodge",
+     "target": "ac"
+    }
+   ],
+   "effects_converted": true,
+   "id": "duelist-s-alacrity"
   },
   {
    "scaling": {
@@ -5943,28 +6006,6 @@
    "id": "gaseous-form"
   },
   {
-   "scaling": {
-    "kind": "damage",
-    "die": 6,
-    "dice_per": 1,
-    "per_levels": 3,
-    "damage_type": "untyped",
-    "cap_dice": 6
-   },
-   "effects": [
-    {
-     "type": "damage",
-     "dice": "1d6",
-     "damage_type": "untyped",
-     "lethality": "lethal",
-     "scales": "full",
-     "note": "scales with caster level"
-    }
-   ],
-   "effects_converted": true,
-   "id": "geb-s-hammer"
-  },
-  {
    "effects": [
     {
      "type": "ability_mod",
@@ -5985,6 +6026,43 @@
    ],
    "effects_converted": true,
    "id": "genius-avaricious"
+  },
+  {
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "base_dice": 1,
+    "damage_type": "negative"
+   },
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "1d6",
+       "damage_type": "negative",
+       "lethality": "lethal",
+       "scales": "full",
+       "note": "scales with caster level"
+      }
+     ],
+     "on_success": [
+      {
+       "type": "damage",
+       "dice": "1d6",
+       "damage_type": "negative",
+       "lethality": "lethal",
+       "scales": "half",
+       "note": "half on a successful save"
+      }
+     ]
+    }
+   ],
+   "effects_converted": true,
+   "id": "ghoul-army"
   },
   {
    "effects": [
@@ -6112,26 +6190,6 @@
     "damage_type": "untyped",
     "cap_dice": 5
    }
-  },
-  {
-   "scaling": {
-    "kind": "damage",
-    "die": 8,
-    "base_dice": 1,
-    "damage_type": "electricity"
-   },
-   "effects": [
-    {
-     "type": "damage",
-     "dice": "1d8",
-     "damage_type": "electricity",
-     "lethality": "lethal",
-     "scales": "full",
-     "note": "scales with caster level"
-    }
-   ],
-   "effects_converted": true,
-   "id": "gozreh-s-trident"
   },
   {
    "effects": [
@@ -7647,43 +7705,6 @@
     "kind": "damage",
     "die": 6,
     "base_dice": 1,
-    "damage_type": "negative"
-   },
-   "effects": [
-    {
-     "type": "save_gate",
-     "target": "fort",
-     "dc": "10 + spell level + casting ability modifier",
-     "on_failure": [
-      {
-       "type": "damage",
-       "dice": "1d6",
-       "damage_type": "negative",
-       "lethality": "lethal",
-       "scales": "full",
-       "note": "scales with caster level"
-      }
-     ],
-     "on_success": [
-      {
-       "type": "damage",
-       "dice": "1d6",
-       "damage_type": "negative",
-       "lethality": "lethal",
-       "scales": "half",
-       "note": "half on a successful save"
-      }
-     ]
-    }
-   ],
-   "effects_converted": true,
-   "id": "khain-s-army"
-  },
-  {
-   "scaling": {
-    "kind": "damage",
-    "die": 6,
-    "base_dice": 1,
     "damage_type": "sonic"
    },
    "effects": [
@@ -7727,32 +7748,6 @@
    ],
    "effects_converted": true,
    "id": "lash-of-the-astradaemon"
-  },
-  {
-   "scaling": {
-    "kind": "damage",
-    "die": 6,
-    "base_dice": 3,
-    "damage_type": "force"
-   },
-   "effects": [
-    {
-     "type": "damage",
-     "dice": "3d6",
-     "damage_type": "force",
-     "lethality": "lethal",
-     "scales": "full",
-     "note": "scales with caster level"
-    },
-    {
-     "type": "combat_mod",
-     "amount": 4,
-     "bonus_type": "shield",
-     "target": "ac"
-    }
-   ],
-   "effects_converted": true,
-   "id": "last-azlanti-s-defending-sword"
   },
   {
    "scaling": {
@@ -8061,6 +8056,18 @@
    ],
    "effects_converted": true,
    "id": "mage-s-private-sanctum"
+  },
+  {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "attack"
+    }
+   ],
+   "effects_converted": true,
+   "id": "magic-army"
   },
   {
    "effects": [
@@ -10300,6 +10307,16 @@
   {
    "effects": [
     {
+     "type": "fast_healing",
+     "amount": 2
+    }
+   ],
+   "effects_converted": true,
+   "id": "restorative-song"
+  },
+  {
+   "effects": [
+    {
      "type": "ability_mod",
      "amount": 4,
      "bonus_type": "enhancement",
@@ -10581,18 +10598,6 @@
    "id": "sands-of-time"
   },
   {
-   "effects": [
-    {
-     "type": "skill_mod",
-     "amount": 10,
-     "bonus_type": "insight",
-     "target": "perception"
-    }
-   ],
-   "effects_converted": true,
-   "id": "sarzari-shadow-memory"
-  },
-  {
    "scaling": {
     "kind": "damage",
     "die": 8,
@@ -10793,6 +10798,18 @@
    ],
    "effects_converted": true,
    "id": "sense-spirit-magic"
+  },
+  {
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 10,
+     "bonus_type": "insight",
+     "target": "perception"
+    }
+   ],
+   "effects_converted": true,
+   "id": "shadow-memory"
   },
   {
    "scaling": {
@@ -11392,16 +11409,6 @@
    "id": "song-of-discord-greater"
   },
   {
-   "effects": [
-    {
-     "type": "fast_healing",
-     "amount": 2
-    }
-   ],
-   "effects_converted": true,
-   "id": "song-of-kyonin"
-  },
-  {
    "scaling": {
     "kind": "damage",
     "die": 4,
@@ -11850,6 +11857,26 @@
    ],
    "effects_converted": true,
    "id": "storm-step"
+  },
+  {
+   "scaling": {
+    "kind": "damage",
+    "die": 8,
+    "base_dice": 1,
+    "damage_type": "electricity"
+   },
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d8",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "scales": "full",
+     "note": "scales with caster level"
+    }
+   ],
+   "effects_converted": true,
+   "id": "storm-trident"
   },
   {
    "scaling": {
@@ -13013,18 +13040,6 @@
   {
    "effects": [
     {
-     "type": "combat_mod",
-     "amount": 1,
-     "bonus_type": "profane",
-     "target": "attack"
-    }
-   ],
-   "effects_converted": true,
-   "id": "urgathoa-s-beacon"
-  },
-  {
-   "effects": [
-    {
      "type": "temp_hp",
      "dice": "5"
     }
@@ -13420,18 +13435,6 @@
    ],
    "effects_converted": true,
    "id": "weird"
-  },
-  {
-   "effects": [
-    {
-     "type": "save_mod",
-     "amount": 3,
-     "bonus_type": "profane",
-     "target": "will"
-    }
-   ],
-   "effects_converted": true,
-   "id": "what-grows-within"
   },
   {
    "scaling": {

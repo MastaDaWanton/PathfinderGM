@@ -83,7 +83,7 @@ and a painter's depth sort — because the app bundles no third-party JavaScript
 Faces are shaded per normal against one lamp that belongs to the room, the same light
 `dice3d.js` throws on the brass, so turning the board turns the board and not the light.
 
-**Characters.** Full guided 1e creation with legality enforced, 1,474 feats, point buy,
+**Characters.** Full guided 1e creation with legality enforced, 1,453 feats, point buy,
 outfitting from starting gold, and levelling to 20th. A fresh install ships **12 classes**
 (the Core eleven plus Blood Bending) and **25 races**; both catalogues merge anything in
 your homebrew directory on top, so the app's own count on a given machine is usually
@@ -91,7 +91,7 @@ higher than this one. **14 backgrounds** give a character a past in the world th
 about to walk into — the trader you were apprenticed to is somebody that world has, named
 in the first paragraph you read.
 
-**Content.** 3,040 spells (every one carrying a mechanics document; the workhorses
+**Content.** 3,038 spells (every one carrying a mechanics document; the workhorses
 execute, the rest resolve as prose), 7,136 creature stat blocks, 459 weapons, magic items,
 and five crafting disciplines with their own materials and gathering.
 

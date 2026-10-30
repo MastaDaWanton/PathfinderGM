@@ -2,7 +2,7 @@
  "partition": 1,
  "source": "read from the spell descriptions in content/spells/spells.json",
  "spells": {
-  "abadar-s-truthtelling": {
+  "touch-of-truthtelling": {
    "effects": [
     {
      "type": "narrative",
@@ -931,7 +931,7 @@
    },
    "converted_by": "read"
   },
-  "alaznist-s-jinx": {
+  "burning-jinx": {
    "effects": [
     {
      "type": "save_gate",
@@ -984,7 +984,7 @@
    "notes": "The Fortitude save is an object save for an item someone else holds, not a gate on the transformation the caster performs on their own gear, so no save_gate.",
    "converted_by": "read"
   },
-  "aldori-alacrity": {
+  "duelist-s-alacrity": {
    "effects": [
     {
      "type": "speed",
@@ -2531,7 +2531,7 @@
    "notes": "The opening 2d6 is emitted; the identical 2d6 taken each round while engulfed is repeating damage and is left narrative, as is the engulf itself, which needs a second save the shape cannot chain.",
    "converted_by": "read"
   },
-  "aram-zey-s-focus": {
+  "trapfinder-s-focus": {
    "effects": [
     {
      "type": "narrative",
@@ -2547,7 +2547,7 @@
    "notes": "The +5 and the granted trapfinding are alternatives decided by whether the caster already has trapfinding, so emitting the skill_mod would hand +5 Disable Device to a wizard who should instead be getting the ability itself.",
    "converted_by": "read"
   },
-  "aram-zey-s-trap-ward": {
+  "trap-ward": {
    "effects": [
     {
      "type": "narrative",

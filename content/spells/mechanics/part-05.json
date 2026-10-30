@@ -1418,7 +1418,7 @@
    "converted_by": "read",
    "notes": "The 30-foot fly speed belongs to the glove, not the caster. A speed spec would have the wizard flying."
   },
-  "deivon-s-parry": {
+  "arcane-parry": {
    "effects": [
     {
      "type": "permission",

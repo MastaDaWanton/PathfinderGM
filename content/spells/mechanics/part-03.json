@@ -358,7 +358,7 @@
     "kind": "until_discharged"
    },
    "converted_by": "read",
-   "notes": "The bonus size is chosen by the caster at casting (damage/5), so there is no number to emit. The '+4' and '20 hit points' in the prose belong to the worked example about Stigur and the bandit leader - not converted. Corpus duration is 'special (see text)'; until_discharged is the only kind that matches 'ends when the oath is fulfilled or forsaken'."
+   "notes": "The bonus size is chosen by the caster at casting (damage/5), so there is no number to emit. The '+4' and '20 hit points' in the prose belong to the worked example about the bandit leader - not converted. Corpus duration is 'special (see text)'; until_discharged is the only kind that matches 'ends when the oath is fulfilled or forsaken'."
   },
   "bloody-arrows": {
    "effects": [
@@ -1507,7 +1507,7 @@
    "converted_by": "read",
    "notes": "Every one of the three results is determined by a die roll against an external table at cast time - which energy, which school, which roll type. No vulnerability, combat_mod or situational_mod can be written without picking one of eight outcomes and calling it the spell."
   },
-  "calistria-s-guardian-wasps": {
+  "guardian-wasps": {
    "effects": [
     {
      "type": "narrative",

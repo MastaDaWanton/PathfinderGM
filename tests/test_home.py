@@ -429,7 +429,7 @@ def test_the_picker_can_reach_a_spell_past_the_first_four_hundred(client):
     out of reach — the page said "type in the box to narrow it" while having no box.
     Fireball is the proof: it is nowhere near the first 400 by name."""
     plain = client.get("/api/spells/list").json()
-    assert plain["total"] == 3040
+    assert plain["total"] == 3038      # 3,040 until two left with Golarion's names
     assert "fireball" not in {s["id"] for s in plain["spells"]}
 
     found = client.get("/api/spells/list?q=fireball").json()

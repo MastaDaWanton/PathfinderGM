@@ -291,14 +291,18 @@ def test_the_conversion_covers_what_it_claims_and_no_more():
     schedule.
     """
     entries, report = spells.build_mechanics()
-    assert report["total"] == 3040
+    # 3,038 and 639 since 2026-10-29: two spells left with Golarion's names (a setting
+    # book's duplicate of Cultural Adaptation, and What Grows Within), and Defending Sword,
+    # Mass gained an inheritance once its text named "defending sword" rather than
+    # "Aroden's defending sword" (tests/test_no_golarion_names.py).
+    assert report["total"] == 3038
     # 354 before the flat-bonus reader and the "functions like" pass. The scaling and
     # curated counts are untouched by either — damage and healing are read exactly as
     # they were, and the widening is entirely in the quiet half of a spell.
-    assert report["effects"] == 640
+    assert report["effects"] == 639
     assert report["scaling"] == 342
     assert report["curated"] == 12
-    assert report["prose"] == 2400
+    assert report["prose"] == 2399
     assert report["invalid"] == []
     assert report["by_kind"] == {"damage": 327, "healing": 15}
 
@@ -869,7 +873,9 @@ def test_the_whole_corpus_converts_without_a_single_invalid_spec():
     before this and 640 do now, and every one of them validates."""
     out, report = spells.build_mechanics()
     assert report["invalid"] == []
-    assert len(out) >= 640, f"only {len(out)} spells carry mechanics"
+    # 639 since 2026-10-29 (two spells dropped with Golarion's names, one gained): see
+    # test_the_conversion_covers_what_it_claims_and_no_more.
+    assert len(out) >= 639, f"only {len(out)} spells carry mechanics"
 
 
 

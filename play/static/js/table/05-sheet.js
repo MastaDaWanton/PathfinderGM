@@ -403,7 +403,7 @@ function tabFeats(s) {
     <div>
       <h3 class="cardsub">Browse the feats</h3>
       <label class="vh" for="featq">Search the feats</label>
-      <input type="search" id="featq" class="v2-well" placeholder="Search 1,474 feats"
+      <input type="search" id="featq" class="v2-well" placeholder="Search 1,453 feats"
              value="${esc(FEAT_QUERY)}" autocomplete="off">
       <div id="featresults">${featResults()}</div>
     </div>

@@ -7673,6 +7673,56 @@ def _compulsion(raw: dict):
     return compulsion_from_dict(raw)
 
 
+# A save written before the imported spells and feats lost Golarion's names
+# (docs/bestiary-licensing.md §7) holds the old ids and names: "aroden-s-spellbane" in a
+# spellbook, "aldori dueling mastery" in the feats. They are read as what they are now,
+# once, on load — the aliases live in content/{spells,feats}/aliases.json.
+
+def _current_spellbook(ids: list) -> list[str]:
+    """Each id as it ships now; a spell that no longer ships at all leaves the book
+    rather than sitting in it as an id nothing can cast."""
+    if not ids:
+        return []
+    from . import spells as spells_mod
+
+    out: list[str] = []
+    renamed: set[str] = set()
+    for sid in ids:
+        now = spells_mod.current_id(str(sid))
+        if now is None:
+            continue                                    # no longer shipped at all
+        if now in out and (now != sid or now in renamed):
+            continue            # the old id and its new one both in the book: one spell
+        if now != sid:
+            renamed.add(now)
+        out.append(now)
+    return out
+
+
+def _current_prepared(prepared: dict) -> dict[str, int]:
+    out: dict[str, int] = {}
+    if not prepared:
+        return out
+    from . import spells as spells_mod
+
+    for sid, n in prepared.items():
+        now = spells_mod.current_id(str(sid))
+        if now and int(n) > 0:
+            out[now] = out.get(now, 0) + int(n)
+    return out
+
+
+def _current_feats(feats: list) -> list[str]:
+    """A renamed feat under its new name; a dropped one stays as the player wrote it —
+    the sheet already shows a feat it cannot read, and silently deleting a line a player
+    chose is worse than showing it unread."""
+    if not feats:
+        return []
+    from . import feats as feats_mod
+
+    return [feats_mod.current_name(f) if isinstance(f, str) else f for f in feats]
+
+
 def from_dict(data: dict, ref: str | None = None) -> Actor:
     immunities, resistances, vulnerabilities = _defences(data)
     a = Actor(
@@ -7690,7 +7740,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         # since it was written, so a sword handed to one thug armed the whole bestiary.
         abilities=dict(data.get("abilities") or {}),
         ranks={k.lower(): v for k, v in (data.get("ranks") or {}).items()},
-        feats=list(data.get("feats") or []),
+        feats=_current_feats(data.get("feats") or []),
         armour=data.get("armour", "none"),
         shield=data.get("shield", "none"),
         natural_armour=data.get("natural_armour", 0),
@@ -7714,9 +7764,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         from_template=str(data.get("from_template", "") or ""),
         pristine={k: int(v) for k, v in (data.get("pristine") or {}).items()
                   if int(v) > 0},
-        spellbook=list(data.get("spellbook") or []),
-        prepared={k: int(v) for k, v in (data.get("prepared") or {}).items()
-                  if int(v) > 0},
+        spellbook=_current_spellbook(data.get("spellbook") or []),
+        prepared=_current_prepared(data.get("prepared") or {}),
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},
         hit_dice_per_level=int(data.get("hit_dice_per_level", 1) or 1),

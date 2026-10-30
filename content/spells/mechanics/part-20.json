@@ -1707,28 +1707,6 @@
    "converted_by": "read",
    "notes": "A created structure; the total cover it gives is a property of the shelter rather than a modifier on a creature."
   },
-  "what-grows-within": {
-   "effects": [
-    {
-     "type": "save_mod",
-     "amount": 3,
-     "bonus_type": "profane",
-     "target": "will"
-    },
-    {
-     "type": "narrative",
-     "target": "While the spell lasts your mind-affecting spells carry a supernatural taint. Whenever you successfully affect a creature with one of them — the target failing its save, or the spell allowing none — that target must also succeed at a Fortitude save against what grows within or be afflicted by a lesser seeded infestation. Lesser seeded infestation: save Fortitude at this spell's save DC; onset immediate; frequency 1/day; effect 1d4 Constitution drain; cure none, curable by magic alone. A creature whose Constitution is reduced to 0 by it dies and rises 1d4 rounds later as a seeded creature. Each creature so afflicted reduces this spell's remaining duration by 1 round, and if you affect several in a round you choose the order in which they save. The infestation does not expose its victim to Xhamen-Dor's infectious dreams. Preparing this spell for the first time, or first using it from a spell-completion or spell-trigger item, makes you a possible target of Xhamen-Dor's infected dreams ability thereafter."
-    }
-   ],
-   "duration": {
-    "kind": "per_level",
-    "amount": 1,
-    "unit": "round",
-    "dismissible": false
-   },
-   "converted_by": "read",
-   "notes": "The +3 profane on Will saves is the only thing that happens to you at casting and is emitted. The 1d4 Constitution drain lands on a third party — a creature your later mind-affecting spells affect — and recurs daily, so it is not an ability_drain spec."
-  },
   "whip-of-spiders": {
    "effects": [
     {

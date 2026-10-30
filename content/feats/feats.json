@@ -4,7 +4,7 @@
  "source_note": "Pathfinder OGL feat data, sheet dated 2014-03-23.",
  "licence": "Open Game Content, Open Game License v1.0a. The licence text must travel with any build that ships this file.",
  "counts": {
-  "feats": 1474,
+  "feats": 1453,
   "clauses": 3158,
   "typed": 2666,
   "unparsed": 492,
@@ -449,34 +449,6 @@
    "completion_benefit": ""
   },
   {
-   "id": "advanced-defensive-combat-training",
-   "name": "Advanced Defensive Combat Training",
-   "types": [
-    "combat"
-   ],
-   "description": "You are a master at defending yourself from all manner of combat maneuvers.",
-   "benefit": "You gain a +4 bonus to your CMD.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Defensive Combat Training, Bellf lower Network 10 TPA.",
-   "prerequisites": [
-    {
-     "kind": "feat",
-     "feat": "defensive-combat-training",
-     "name": "Defensive Combat Training"
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Bellf lower Network 10 TPA"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "advanced-ranger-trap",
    "name": "Advanced Ranger Trap",
    "types": [
@@ -581,23 +553,23 @@
    "completion_benefit": ""
   },
   {
-   "id": "aldori-dueling-mastery",
-   "name": "Aldori Dueling Mastery",
+   "id": "dueling-sword-mastery",
+   "name": "Dueling Sword Mastery",
    "types": [
     "combat"
    ],
-   "description": "You have mastered the grueling fighting style perfected by the Aldori Swordlords.",
-   "benefit": "You gain a +2 bonus on Initiative checks as long as you start combat with an Aldori dueling sword in your hand. As long as you wield only a single Aldori dueling sword in one hand, you gain a +2 shield bonus to your AC-if you wield the sword in two hands, this bonus drops to a +1 shield bonus to AC. Although the dueling sword inf licts slashing damage, you treat it as if it were also a piercing weapon when determining the effects of weapons used by a duelist.",
+   "description": "You have mastered the grueling fighting style of the dueling-sword masters.",
+   "benefit": "You gain a +2 bonus on Initiative checks as long as you start combat with a dueling sword in your hand. As long as you wield only a single dueling sword in one hand, you gain a +2 shield bonus to your AC-if you wield the sword in two hands, this bonus drops to a +1 shield bonus to AC. Although the dueling sword inf licts slashing damage, you treat it as if it were also a piercing weapon when determining the effects of weapons used by a duelist.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
    "race": "",
-   "prerequisites_text": "Exotic Weapon Proficiency (Aldori dueling sword), Quick Draw, Weapon Finesse, Weapon Focus (Aldori dueling sword).",
+   "prerequisites_text": "Exotic Weapon Proficiency (dueling sword), Quick Draw, Weapon Finesse, Weapon Focus (dueling sword).",
    "prerequisites": [
     {
      "kind": "feat",
      "feat": "exotic-weapon-proficiency",
-     "name": "Exotic Weapon Proficiency (Aldori dueling sword)"
+     "name": "Exotic Weapon Proficiency (dueling sword)"
     },
     {
      "kind": "feat",
@@ -612,7 +584,7 @@
     {
      "kind": "feat",
      "feat": "weapon-focus",
-     "name": "Weapon Focus (Aldori dueling sword)"
+     "name": "Weapon Focus (dueling sword)"
     }
    ],
    "unparsed_prerequisites": [],
@@ -749,7 +721,7 @@
     "general"
    ],
    "description": "You have hardened your body against the grueling rigors of surviving at high altitudes.",
-   "benefit": "You are automatically acclimated at high altitudes (Pathfinder RPG Core Rulebook 430). In addition, you gain a +2 competence bonus on all Survival checks made at altitudes of 5,000 feet or higher.",
+   "benefit": "You are automatically acclimated at high altitudes (Core Rulebook 430). In addition, you gain a +2 competence bonus on all Survival checks made at altitudes of 5,000 feet or higher.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -918,12 +890,12 @@
    "completion_benefit": ""
   },
   {
-   "id": "andoren-falconry",
-   "name": "Andoren Falconry",
+   "id": "falconer-s-art",
+   "name": "Falconer's Art",
    "types": [
     "general"
    ],
-   "description": "You know the secret Andoren arts of falconry developed by the Novotnian family of Darkmoon Vale.",
+   "description": "You know the secret arts of falconry handed down by a noble family of falconers.",
    "benefit": "You improve your affinity with birds of prey, such as eagles, falcons, hawks, and owls. You gain a +2 bonus on Animal Handling checks made to train or control birds of prey. In addition, if you have a bird of prey as an animal companion, your animal companion gains one of the following bonuses chosen at the time this animal companion is gained: a +1 dodge bonus to AC, a +1 morale bonus on all attack rolls, or a +2 morale bonus on all Will saves.",
    "normal": "",
    "special": "",
@@ -1418,7 +1390,7 @@
    "special": "",
    "source": "Faiths Of Balance",
    "race": "",
-   "prerequisites_text": "Worshiper of Nethys, Arcane Shield (see the Advanced Player's Guide).",
+   "prerequisites_text": "Worshiper of a god of magic, Arcane Shield (see the Advanced Player's Guide).",
    "prerequisites": [
     {
      "kind": "feat",
@@ -1427,7 +1399,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Worshiper of Nethys"
+    "Worshiper of a god of magic"
    ],
    "tags": [],
    "multiples": false,
@@ -1637,7 +1609,7 @@
    "types": [
     "general"
    ],
-   "description": "The mistreatment of your people by an arcane society (such as Numeria's Technic League or the White Witches of Irrisen) has made you particularly eager to inf lict harm on those who use arcane magic.",
+   "description": "The mistreatment of your people by an arcane society (such as a cabal of tyrant wizards or a ruling coven of witches) has made you particularly eager to inf lict harm on those who use arcane magic.",
    "benefit": "You deal +2 damage with weapon attacks made against any target you have witnessed casting an arcane spell (not using a spell-like ability) in the last 5 rounds. You must have successfully identified the spell with a Spellcraft check to know without a doubt that the spell is arcane.",
    "normal": "",
    "special": "",
@@ -2552,7 +2524,7 @@
    "description": "Your unarmed strikes cause your opponent to bleed.",
    "benefit": "When you damage an opponent with an unarmed strike, you deal an extra 1d4 bleed damage.",
    "normal": "",
-   "special": "This ability does not stack with other special abilities, attacks, or items that allow you to deal bleed damage. The belier devil appears in Pathfinder Adventure Path volume #12.",
+   "special": "This ability does not stack with other special abilities, attacks, or items that allow you to deal bleed damage. The belier devil appears in Adventure Path volume #12.",
    "source": "Cheliax Empire Of Devils",
    "race": "",
    "prerequisites_text": "Improved Unarmed Strike.",
@@ -3500,7 +3472,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "blood-vengeance-orcs-of-golarion",
+   "id": "blood-vengeance-orcs",
    "name": "Blood Vengeance",
    "types": [
     "general"
@@ -3546,10 +3518,10 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Worshiper of Zon-Kuthon.",
+   "prerequisites_text": "Worshiper of a god of pain.",
    "prerequisites": [],
    "unparsed_prerequisites": [
-    "Worshiper of Zon-Kuthon"
+    "Worshiper of a god of pain"
    ],
    "tags": [],
    "multiples": false,
@@ -3583,28 +3555,6 @@
    "tags": [
     "racial"
    ],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "bloodstone-manhunter",
-   "name": "Bloodstone Manhunter",
-   "types": [
-    "general"
-   ],
-   "description": "You are skilled at fighting criminal humans such as bandits.",
-   "benefit": "You gain a +1 bonus on Bluff, Knowledge, Perception, Sense Motive, and Survival checks against humans, and a +1 bonus on weapon attack and damage rolls against humans. If you have a favored enemy bonus against humans, this feat does not stack with that bonus.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Bloodstone Swords 10 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Bloodstone Swords 10 TPA"
-   ],
-   "tags": [],
    "multiples": false,
    "goal": "",
    "completion_benefit": ""
@@ -3656,7 +3606,7 @@
    "special": "",
    "source": "Faiths Of Balance",
    "race": "",
-   "prerequisites_text": "Worshiper of Calistria, base attack bonus +1.",
+   "prerequisites_text": "Worshiper of a god of revenge, base attack bonus +1.",
    "prerequisites": [
     {
      "kind": "bab",
@@ -3664,7 +3614,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Worshiper of Calistria"
+    "Worshiper of a god of revenge"
    ],
    "tags": [],
    "multiples": false,
@@ -4629,34 +4579,12 @@
    "completion_benefit": ""
   },
   {
-   "id": "calm-disposition",
-   "name": "Calm Disposition",
-   "types": [
-    "general"
-   ],
-   "description": "You always appear to be in control of your situation.",
-   "benefit": "You gain +2 bonus on saving throws against effects that affect your composure. This includes all mindaffecting spells, as well as any spell or ability that would cause you to behave in an out-of-control manner, such as fear effects and nausea. This does not include physical effects such as fatigue, and does not reduce any damage taken from concurrent effects.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Prophets of Kalistrade 10 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Prophets of Kalistrade 10 TPA"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "careful-speaker",
    "name": "Careful Speaker",
    "types": [
     "general"
    ],
-   "description": "The paranoid terror that comes from living in a region with a dangerous government (such as Cheliax or Galt) has made you unusually aware of what you say.",
+   "description": "The paranoid terror that comes from living in a region with a dangerous government (such as a devil-ruled empire or a land in endless revolution) has made you unusually aware of what you say.",
    "benefit": "You gain a +2 bonus on all Bluff checks made to fool someone or pass secret messages (but not to feint in combat), and a +2 bonus on all Will saves against attempts to scry upon you or read your mind.",
    "normal": "",
    "special": "",
@@ -5071,7 +4999,7 @@
     "general"
    ],
    "description": "Your channel is bolstered by your faith, allowing you to move and damage your foes.",
-   "benefit": "When you channel energy to deal damage, you may choose to affect only a single target within 30 feet. In addition to dealing damage, if that single target fails its saving throw, you may pull or push (Pathfinder RPG Bestiary 303) the target up to 5 feet for every 2d6 points of channel energy damage you are capable of dealing.",
+   "benefit": "When you channel energy to deal damage, you may choose to affect only a single target within 30 feet. In addition to dealing damage, if that single target fails its saving throw, you may pull or push (Bestiary 303) the target up to 5 feet for every 2d6 points of channel energy damage you are capable of dealing.",
    "normal": "",
    "special": "",
    "source": "Advanced Race Guide",
@@ -7592,7 +7520,7 @@
    "types": [
     "general"
    ],
-   "description": "Your intimacy with runes and the mysteries of ancient arcana has taught you secret ways to draw greater power from magical writings. These unusual methods were initially devised by the Cyphermages of Riddleport, but they have since spread far and wide through the Inner Sea region.",
+   "description": "Your intimacy with runes and the mysteries of ancient arcana has taught you secret ways to draw greater power from magical writings. These unusual methods were initially devised by a society of rune-scholars in a pirate city, but they have since spread far and wide.",
    "benefit": "You cast spells from scrolls at +1 caster level higher than the scroll's caster level. This benefit extends to scrolls that you have created. In addition, you gain a +2 bonus on caster level checks made to activate a scroll with a higher caster level than your own.",
    "normal": "",
    "special": "",
@@ -7623,7 +7551,7 @@
    "types": [
     "general"
    ],
-   "description": "Through researching lengthy, ancient, arcane scripts, you have discovered a more efficient method of recording spells. As with the Cypher Magic feat, Cypher Script was originally developed by the Cyphermages of Riddleport, but has been spreading through the Inner Sea region recently.",
+   "description": "Through researching lengthy, ancient, arcane scripts, you have discovered a more efficient method of recording spells. As with the Cypher Magic feat, Cypher Script was originally developed by a society of rune-scholars, but has been spreading far and wide recently.",
    "benefit": "Any spell you scribe in your spellbook costs half as much as normal and takes up only half the room it normally would (round all fractions up). It only takes you 10 minutes per spell level to scribe a spell into your spellbook (5 minutes for cantrips).",
    "normal": "",
    "special": "",
@@ -8041,7 +7969,7 @@
     "general"
    ],
    "description": "Your skill with handling cards and arcane talents allow you to turn mundane cards into deadly weapons.",
-   "benefit": "You can throw a card as though it were a dart, with the same damage, range, and other features. You must use the Arcane Strike feat when throwing a card in this way, or else the card lacks the magical force and precision to deal lethal damage. A card is destroyed when thrown in this way. Harrow cards are treated as masterwork weapons when thrown using this feat, but are still destroyed after they are thrown. A harrow deck can no longer be used as a fortune-telling device after even a single card is thrown. A spellcaster with this feat can enhance a deck of cards as though it were a ranged weapon with 54 pieces of ammunition. This enhancement functions only when used in tandem with this feat, and has no affect on any other way the cards might be used. Only a character who possesses this feat can make use of an enhanced deck of cards, and must still use the Arcane Strike feat to activate the cards' enhancement. You have mastered the ancient Shoanti Thunder and Fang fighting style, allowing you to fight with increased effectiveness when wielding an earth breaker and klar. Prerequisites: Str 15, Two-Weapon Fighting, Weapon Focus (earth breaker), Weapon Focus (klar) You can use an earth breaker as though it were a one-handed weapon. When using an earth breaker in one hand and a klar in your off hand, you retain the shield bonus your klar grants to your Armor Class even when you use it to attack. Treat your klar as a light weapon for the purposes of determining your two-weapon fighting penalty.",
+   "benefit": "You can throw a card as though it were a dart, with the same damage, range, and other features. You must use the Arcane Strike feat when throwing a card in this way, or else the card lacks the magical force and precision to deal lethal damage. A card is destroyed when thrown in this way. Fortune-telling cards are treated as masterwork weapons when thrown using this feat, but are still destroyed after they are thrown. A fortune-telling deck can no longer be used as a fortune-telling device after even a single card is thrown. A spellcaster with this feat can enhance a deck of cards as though it were a ranged weapon with 54 pieces of ammunition. This enhancement functions only when used in tandem with this feat, and has no affect on any other way the cards might be used. Only a character who possesses this feat can make use of an enhanced deck of cards, and must still use the Arcane Strike feat to activate the cards' enhancement.",
    "normal": "An earth breaker is a two-handed weapon, preventing the use of a klar in one hand without imposing penalties for using the earth breaker one-handed. A klar can be used either as a one-handed weapon or a shield; it does not grant a bonus to AC during rounds in which it is used as a weapon.",
    "special": "This is a combat feat, and may be selected with class features that grant bonus combat feats.",
    "source": "Varisia",
@@ -8329,28 +8257,6 @@
     }
    ],
    "unparsed_prerequisites": [],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "death-s-suitor",
-   "name": "Death's Suitor",
-   "types": [
-    "general"
-   ],
-   "description": "You have died and returned so often that even Pharasma now deems it part of your fate.",
-   "benefit": "Once per day, you may reroll a save or skill check if failure has a chance of killing you (whether from hit point damage, ability damage, or some instant effect). You must decide to use this ability before the results are revealed. You must take the second roll, even if it is worse.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Risen Guard 20 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Risen Guard 20 TPA"
-   ],
    "tags": [],
    "multiples": false,
    "goal": "",
@@ -8982,7 +8888,7 @@
     "item creation"
    ],
    "description": "Your studies into demonic anatomy and physiology allow you to graft their immortal tissues onto mortal flesh.",
-   "benefit": "You gain a +2 bonus on Heal checks regarding evil outsiders or creatures that already have a demonic graft. In addition, you can create demonic implants (see page 12) as if you had the Craft Wondrous Item feat, using your ranks in Heal as your caster level. The DC to create the item still increases for any necessary spell requirements (see the magic item creation rules in Chapter 15 of the Pathfinder RPG Core Rulebook).",
+   "benefit": "You gain a +2 bonus on Heal checks regarding evil outsiders or creatures that already have a demonic graft. In addition, you can create demonic implants (see page 12) as if you had the Craft Wondrous Item feat, using your ranks in Heal as your caster level. The DC to create the item still increases for any necessary spell requirements (see the magic item creation rules in Chapter 15 of the Core Rulebook).",
    "normal": "",
    "special": "",
    "source": "AP 74",
@@ -9334,7 +9240,7 @@
     "general"
    ],
    "description": "Your time spent living in merciless deserts has granted you resistance to extreme heat, starvation, and thirst.",
-   "benefit": "You treat extreme heat conditions (Pathfinder RPG Core Rulebook 444) as severe heat, and severe heat as very hot conditions. You are not impacted at all by very hot conditions. In addition, you gain a +4 bonus on all Constitution checks made to resist the effects of starvation or thirst.",
+   "benefit": "You treat extreme heat conditions (Core Rulebook 444) as severe heat, and severe heat as very hot conditions. You are not impacted at all by very hot conditions. In addition, you gain a +4 bonus on all Constitution checks made to resist the effects of starvation or thirst.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -9481,7 +9387,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "destroyer-s-blessing-orcs-of-golarion",
+   "id": "destroyer-s-blessing-orcs",
    "name": "Destroyer's Blessing",
    "types": [
     "combat"
@@ -9996,29 +9902,6 @@
     }
    ],
    "unparsed_prerequisites": [],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "disassemble-magic-item",
-   "name": "Disassemble Magic Item",
-   "types": [
-    "general"
-   ],
-   "description": "You can take apart and reassemble magic items.",
-   "benefit": "You can break a magic item down into component pieces. These pieces are nonmagical and may have little resemblance to the original item other than being of the same material (a magical sword may be three recognizable metal pieces or simply a collection of metal scraps). Disassembling a magic item takes 1 hour per 1,000 gp of the item's price and requires you to concentrate as if crafting an item. You can only use this feat on items your item creation feat would let you craft (for example, if you have Craft Wondrous Item, you can disassemble wondrous items but not magic weapons or armor). You may reassemble a dismantled item as long as all the pieces are present; this takes the same amount of time as taking it apart did. There is a 10% chance the reconstruction fails and the item is permanently destroyed.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Any item creation feat, Aspis Consortium 20 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Any item creation feat",
-    "Aspis Consortium 20 TPA"
-   ],
    "tags": [],
    "multiples": false,
    "goal": "",
@@ -11754,7 +11637,7 @@
     "mythic"
    ],
    "description": "Strong drink fuels the mythic fires within you.",
-   "benefit": "You never take penalties for consuming nonmagical alcohol, and you can consume an alcoholic beverage as a swift action instead of a move action. Each time you consume an alcoholic beverage, you may gain one of the benefits of polypurpose panacea (Pathfinder RPG Ultimate Magic 232). You can have only one of these benefits active at a time. If you expend one use of mythic power while drinking an alcoholic beverage, you can heal 2 points of ability damage, negate a temporary penalty to one ability score, or remove one of the following conditions: confused, diseased, exhausted, fatigued, frightened, nauseated, poisoned, shaken, sickened, or staggered.",
+   "benefit": "You never take penalties for consuming nonmagical alcohol, and you can consume an alcoholic beverage as a swift action instead of a move action. Each time you consume an alcoholic beverage, you may gain one of the benefits of polypurpose panacea (Ultimate Magic 232). You can have only one of these benefits active at a time. If you expend one use of mythic power while drinking an alcoholic beverage, you can heal 2 points of ability damage, negate a temporary penalty to one ability score, or remove one of the following conditions: confused, diseased, exhausted, fatigued, frightened, nauseated, poisoned, shaken, sickened, or staggered.",
    "normal": "",
    "special": "",
    "source": "Mythic Adventures",
@@ -11943,7 +11826,7 @@
    "description": "You will claim rulership of a city, whether under a larger government or independently.",
    "benefit": "You gain followers as if you had the Leadership feat, although you cannot attract followers of a level higher than your level - 2. If you also have the Leadership feat, increase your Leadership score by 3 for the purpose of determining how many followers you have.",
    "normal": "",
-   "special": "For groups using the kingdom-building rules from Pathfinder RPG Ultimate Campaign, you can optionally use the rules for establishing a settlement to complete the goal of this story feat.",
+   "special": "For groups using the kingdom-building rules from Ultimate Campaign, you can optionally use the rules for establishing a settlement to complete the goal of this story feat.",
    "source": "Quests and Campaigns",
    "race": "",
    "prerequisites_text": "You must have lived in the chosen city for at least 1 year or be the heir of a former city leader.",
@@ -11954,7 +11837,7 @@
    "tags": [],
    "multiples": false,
    "goal": "Thwart all rivals to rulership over the chosen region, including at least one challenging foe.",
-   "completion_benefit": "You gain control of the settlement (see the settlement rules in the Pathfinder RPG GameMastery Guide). Upon gaining this benefit and once per year thereafter, you can attempt to alter the settlement in one of the following ways by attempting a DC 25 Diplomacy check modified by the settlement's Society modifier or a DC 25 Intimidate check modified by its Law modifier: &#8226; Move the settlement's alignment 1 step closer to yours along either the good-evil or law-chaos axis. &#8226; Replace one settlement quality with another. &#8226; Change the government type. &#8226; Significantly alter the laws. Failure indicates that popular opinion in the city successfully opposes you. In addition, from now on, your followers gain a +1 morale bonus on attack rolls and saving throws as long as they can see you."
+   "completion_benefit": "You gain control of the settlement (see the settlement rules in the GameMastery Guide). Upon gaining this benefit and once per year thereafter, you can attempt to alter the settlement in one of the following ways by attempting a DC 25 Diplomacy check modified by the settlement's Society modifier or a DC 25 Intimidate check modified by its Law modifier: &#8226; Move the settlement's alignment 1 step closer to yours along either the good-evil or law-chaos axis. &#8226; Replace one settlement quality with another. &#8226; Change the government type. &#8226; Significantly alter the laws. Failure indicates that popular opinion in the city successfully opposes you. In addition, from now on, your followers gain a +1 morale bonus on attack rolls and saving throws as long as they can see you."
   },
   {
    "id": "eagle-eyes",
@@ -12005,33 +11888,6 @@
     }
    ],
    "unparsed_prerequisites": [],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "eagle-knight-candidate",
-   "name": "Eagle Knight Candidate",
-   "types": [
-    "achievement"
-   ],
-   "description": "You have proven your courage and skill to both the Eagle Knights and the leaders of Andoran.",
-   "benefit": "Choose one branch of the Eagle Knights you hope to join. You gain a specific benefit based on this choice. Golden Legion: Each round as a move action, you may issue commands to all allies within 30 feet who can see and hear you. Each affected ally that obeys your orders gains a +1 bonus on attack rolls, Armor Class, and saving throws during that round. Steel Falcons: You deal +1 damage with weapon attacks directed at any creature against which you have concealment. If you have total concealment against the creature, this bonus increases to +2. Twilight Talons: During the surprise round, the threat range of your weapons doubles for any attack made against unaware targets. This does not stack with any other effect that expands the threat range of a weapon.",
-   "normal": "",
-   "special": "",
-   "source": "Andoran Spirit Of Liberty",
-   "race": "",
-   "prerequisites_text": "Character level 5th, convince four different Eagle Knights and either a member of the People's Council or an Andoran town mayor to write letters of commendation on your behalf.",
-   "prerequisites": [
-    {
-     "kind": "character_level",
-     "value": 5
-    }
-   ],
-   "unparsed_prerequisites": [
-    "convince four different Eagle Knights and either a member of the People's Council or an Andoran town mayor to write letters of commendation on your behalf"
-   ],
    "tags": [],
    "multiples": false,
    "goal": "",
@@ -13175,7 +13031,7 @@
    "special": "",
    "source": "Dragon Empires Primer",
    "race": "",
-   "prerequisites_text": "Ki pool class feature, Ki Throw (see the Pathfinder RPG Advanced Player's Guide).",
+   "prerequisites_text": "Ki pool class feature, Ki Throw (see the Advanced Player's Guide).",
    "prerequisites": [
     {
      "kind": "class_feature",
@@ -13184,7 +13040,7 @@
     {
      "kind": "feat",
      "feat": "ki-throw",
-     "name": "Ki Throw (see the Pathfinder RPG Advanced Player's Guide)"
+     "name": "Ki Throw (see the Advanced Player's Guide)"
     }
    ],
    "unparsed_prerequisites": [],
@@ -14384,12 +14240,12 @@
    "completion_benefit": ""
   },
   {
-   "id": "eye-of-the-arclord",
-   "name": "Eye of the Arclord",
+   "id": "eldritch-eye",
+   "name": "Eldritch Eye",
    "types": [
     "general"
    ],
-   "description": "Your understanding of the esoteric teachings of the Arclords of Nex allows you to open an eldritch eye that grants you superior perception of the magical world.",
+   "description": "Your understanding of the esoteric teachings of an ancient mage-council allows you to open an eldritch eye that grants you superior perception of the magical world.",
    "benefit": "Once per day as a standard action, you can open an incandescent third eye upon your forehead. The eye can remain open for 1 minute, during which time you cast all divination spells at +1 caster level (as long as you begin casting the spell before the eye closes), gain darkvision 60 feet, and can use detect magic (as the spell of the same name). You gain a +8 bonus on Perception checks to notice invisible creatures while the eye is open as well.",
    "normal": "",
    "special": "",
@@ -15076,34 +14932,6 @@
    "completion_benefit": "If you died and came back, you become a living symbol of faith. Once per day as a standard action, you can inspire those who share your faith to great effort, granting them a +2 morale bonus on attack rolls and saving throws for 1 minute. This is a mind-affecting, language-dependent effect. If you create a new character inspired by your previous character, the new PC receives a +2 bonus to a single ability score. This ability score can't be one that already has a racial bonus. The new PC can later take this feat if he meets the prerequisite."
   },
   {
-   "id": "fearsome-barricade",
-   "name": "Fearsome Barricade",
-   "types": [
-    "combat"
-   ],
-   "description": "Your wrath is as potent a barrier as your blades.",
-   "benefit": "Choose an adjacent ally as a free action on your turn. Once per round, when an opponent attacks that ally, you may make an Intimidate check to demoralize the opponent as an immediate action. This action counts as an attack of opportunity.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Intimidate 5 ranks, Ulfen Guard TPA 20.",
-   "prerequisites": [
-    {
-     "kind": "skill_ranks",
-     "skill": "intimidate",
-     "ranks": 5
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Ulfen Guard TPA 20"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "fearsome-finish",
    "name": "Fearsome Finish",
    "types": [
@@ -15525,7 +15353,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "ferocious-tenacity-orcs-of-golarion",
+   "id": "ferocious-tenacity-orcs",
    "name": "Ferocious Tenacity",
    "types": [
     "combat"
@@ -16822,8 +16650,8 @@
    "types": [
     "general"
    ],
-   "description": "As a result of being raised in a land steeped in tradition and superstition (such as Varisia or Ustalav), you are skilled at communicating with the spirit world.",
-   "benefit": "Upon taking this feat, choose a focus item for your divination magic-a crystal ball, runes, a Harrow deck, or some such item. Whenever you cast a spell from the divination school, you may use this focus item instead of the spell's material component, as long as the cost of the material component is no more than 1,000 gp. If you choose to perform the spell using your focus item and the spell's normal material component (regardless of that component's cost), you cast the spell at +1 caster level.",
+   "description": "As a result of being raised in a land steeped in tradition and superstition (such as a land of wandering fortune-tellers or haunted moors), you are skilled at communicating with the spirit world.",
+   "benefit": "Upon taking this feat, choose a focus item for your divination magic-a crystal ball, runes, a fortune-telling deck, or some such item. Whenever you cast a spell from the divination school, you may use this focus item instead of the spell's material component, as long as the cost of the material component is no more than 1,000 gp. If you choose to perform the spell using your focus item and the spell's normal material component (regardless of that component's cost), you cast the spell at +1 caster level.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -17610,7 +17438,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "gore-fiend-orcs-of-golarion",
+   "id": "gore-fiend-orcs",
    "name": "Gore Fiend",
    "types": [
     "combat"
@@ -17730,48 +17558,6 @@
     }
    ],
    "unparsed_prerequisites": [],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "grand-master-performer",
-   "name": "Grand Master Performer",
-   "types": [
-    "general"
-   ],
-   "description": "You grant your allies even greater bonuses when using your bardic performance abilities.",
-   "benefit": "When any of your bardic performance abilities grant your allies a bonus, that bonus increases by +1. This bonus stacks with the bonus from the Master Performer feat.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Bardic performance class feature, Extra Performance, Master Performer, bard level 8th, Kitharodian Academy 20 TPA.",
-   "prerequisites": [
-    {
-     "kind": "class_feature",
-     "text": "Bardic performance class feature"
-    },
-    {
-     "kind": "feat",
-     "feat": "extra-performance",
-     "name": "Extra Performance"
-    },
-    {
-     "kind": "feat",
-     "feat": "master-performer",
-     "name": "Master Performer"
-    },
-    {
-     "kind": "class_level",
-     "class": "bard",
-     "value": 8
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Kitharodian Academy 20 TPA"
-   ],
    "tags": [],
    "multiples": false,
    "goal": "",
@@ -19568,7 +19354,7 @@
    "description": "You have mastered a deadly fighting form inspired by the hideous attacks of the barbed devil.",
    "benefit": "Your unarmed attacks can deal either bludgeoning or piercing damage. You decide which type of damage you deal whenever you attack a foe, but you may only choose one type at a time. If you critically hit a foe with your unarmed strike while doing piercing damage, the additional pain caused by the strike causes the foe to become sickened for 1 round (or staggered for 1 round if the target is already sickened). Multiple critical hits in a round against a single foe do not increase the duration of the sickened or staggered condition.",
    "normal": "",
-   "special": "Hamatulatsu may be selected as a substitute bonus feat at 6th level by a monk even if the monk does not otherwise meet the prerequisites. This fighting style is normally only taught to women of the Sisterhood of the Golden Erinyes.",
+   "special": "Hamatulatsu may be selected as a substitute bonus feat at 6th level by a monk even if the monk does not otherwise meet the prerequisites. This fighting style is normally only taught to the women of a secretive infernal sisterhood.",
    "source": "Inner Sea World Guide",
    "race": "",
    "prerequisites_text": "Improved Unarmed Strike, Weapon Focus (unarmed strike).",
@@ -19704,8 +19490,8 @@
    "types": [
     "general"
    ],
-   "description": "Numerous Harrow readings early in your life seem to have hit the mark precisely, increasing your belief that you are destined for a specific purpose in life.",
-   "benefit": "You get a +1 bonus on all Will saves made to resist enchantment effects. Once per day, you may draw a card from a Harrow deck you own. At any one time for the rest of that day, you may apply a +2 bonus on any d20 roll modified by the card's suit. For example, if you drew a card from the suit of Dexterity, you could apply this +2 bonus on an Initiative check, a Ref lex save, a Dexterity-based skill check, or a ranged attack roll. You may assign this +2 bonus after you make the roll, but you must do so before you know whether the roll was a success or not.",
+   "description": "Numerous fortune-telling readings early in your life seem to have hit the mark precisely, increasing your belief that you are destined for a specific purpose in life.",
+   "benefit": "You get a +1 bonus on all Will saves made to resist enchantment effects. Once per day, you may draw a card from a fortune-telling deck you own. At any one time for the rest of that day, you may apply a +2 bonus on any d20 roll modified by the card's suit. For example, if you drew a card from the suit of Dexterity, you could apply this +2 bonus on an Initiative check, a Ref lex save, a Dexterity-based skill check, or a ranged attack roll. You may assign this +2 bonus after you make the roll, but you must do so before you know whether the roll was a success or not.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -20019,13 +19805,13 @@
    "completion_benefit": ""
   },
   {
-   "id": "hermean-blood",
-   "name": "Hermean Blood",
+   "id": "bred-for-perfection",
+   "name": "Bred for Perfection",
    "types": [
     "general"
    ],
-   "description": "You are the descendant of someone recruited to Hermea or the bastard result of a Hermean's illicit pairing with someone foreign to that land.",
-   "benefit": "Though you may not know it, the blood of greatness flows in your veins. Pick two skills that share the same associated ability score. Those skills are always considered class skills for you. It's possible that Hermean agents may come looking for you, either to evaluate you for an invitation or to cover up an embarrassing dalliance, as determined by the GM's whim.",
+   "description": "You are the descendant of someone recruited to an island bred for perfection, or the bastard result of an islander's illicit pairing with an outsider.",
+   "benefit": "Though you may not know it, the blood of greatness flows in your veins. Pick two skills that share the same associated ability score. Those skills are always considered class skills for you. It's possible that the island's agents may come looking for you, either to evaluate you for an invitation or to cover up an embarrassing dalliance, as determined by the GM's whim.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -21150,28 +20936,6 @@
    "completion_benefit": ""
   },
   {
-   "id": "improved-day-job",
-   "name": "Improved Day Job",
-   "types": [
-    "general"
-   ],
-   "description": "You learned the importance of an honest day's work while training as an initiate of the Pathf inder Society.",
-   "benefit": "You gain a +3 bonus on Day Job checks using one skill you choose when you take this feat. This bonus stacks with other feats that grant a bonus to the chosen skill, including Skill Focus.",
-   "normal": "",
-   "special": "",
-   "source": "Pathfinder Society Primer",
-   "race": "",
-   "prerequisites_text": "Ability to attempt Day Job checks (see the Guide to Pathfinder Society Organized Play).",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Ability to attempt Day Job checks (see the Guide to Pathfinder Society Organized Play)"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "improved-death-stealing",
    "name": "Improved Death-Stealing",
    "types": [
@@ -21494,7 +21258,7 @@
     "general"
    ],
    "description": "This feat allows you to acquire a powerful familiar, but only when you could normally acquire a new familiar.",
-   "benefit": "When choosing a familiar, the creatures listed below are also available to you (see the Pathfinder RPG Bestiary for statistics on these creatures). You may choose a familiar with an alignment up to one step away on each alignment axis (lawful through chaotic, good through evil). Arcane Spellcaster Familiar Alignment Level Celestial hawk1 Neutral good 3rd Dire rat Neutral 3rd Fiendish viper2 Neutral evil 3rd Elemental, Small (any type) Neutral 5th Stirge Neutral 5th Homunculus3 Any 7th Imp Lawful evil 7th Mephit (any type) Neutral 7th Pseudodragon Neutral good 7th Quasit Chaotic evil 7th 1 Or other celestial animal from the standard familiar list. 2 Or other fiendish animal from the standard familiar list. 3 The master must first create the homunculus. Improved familiars otherwise use the rules for regular familiars, with two exceptions: if the creature's type is something other than animal, its type does not change; and improved familiars do not gain the ability to speak with other creatures of their kind (although many of them already have the ability to communicate).",
+   "benefit": "When choosing a familiar, the creatures listed below are also available to you (see the Bestiary for statistics on these creatures). You may choose a familiar with an alignment up to one step away on each alignment axis (lawful through chaotic, good through evil). Arcane Spellcaster Familiar Alignment Level Celestial hawk1 Neutral good 3rd Dire rat Neutral 3rd Fiendish viper2 Neutral evil 3rd Elemental, Small (any type) Neutral 5th Stirge Neutral 5th Homunculus3 Any 7th Imp Lawful evil 7th Mephit (any type) Neutral 7th Pseudodragon Neutral good 7th Quasit Chaotic evil 7th 1 Or other celestial animal from the standard familiar list. 2 Or other fiendish animal from the standard familiar list. 3 The master must first create the homunculus. Improved familiars otherwise use the rules for regular familiars, with two exceptions: if the creature's type is something other than animal, its type does not change; and improved familiars do not gain the ability to speak with other creatures of their kind (although many of them already have the ability to communicate).",
    "normal": "",
    "special": "",
    "source": "PFRPG Core",
@@ -21699,7 +21463,7 @@
     "general"
    ],
    "description": "Your skill with foul sorcery is even more potent than that of others of your race.",
-   "benefit": "If you are a sorcerer and possess the Rakshasa bloodline (Pathfinder RPG Ultimate Magic 68) or Shadow bloodline (Pathfinder RPG Advanced Player's Guide 140), treat your Charisma score as 2 points higher for all sorcerer class abilities.",
+   "benefit": "If you are a sorcerer and possess the Rakshasa bloodline (Ultimate Magic 68) or Shadow bloodline (Advanced Player's Guide 140), treat your Charisma score as 2 points higher for all sorcerer class abilities.",
    "normal": "",
    "special": "",
    "source": "Blood Of Fiends",
@@ -21937,7 +21701,7 @@
     "general"
    ],
    "description": "When you infuse weapons, you may add an additional magical quality.",
-   "benefit": "When you infuse a weapon, you can add an additional +1 worth of weapon qualities to that weapon; this could either be used to increase a weapon infused to be a +1 weapon to be a +2 weapon, or to grant a weapon quality like flaming, defending, keen, or any other +1 quality from the Pathfinder RPG Core Rulebook. This effect occurs automatically as you infuse a weapon, but you may only do so to one weapon you wield at a time.",
+   "benefit": "When you infuse a weapon, you can add an additional +1 worth of weapon qualities to that weapon; this could either be used to increase a weapon infused to be a +1 weapon to be a +2 weapon, or to grant a weapon quality like flaming, defending, keen, or any other +1 quality from the Core Rulebook. This effect occurs automatically as you infuse a weapon, but you may only do so to one weapon you wield at a time.",
    "normal": "",
    "special": "You may take this feat more than once; each time you do, the limit to the number of weapons on which you can simultaneously use Improved Infuse Weapon increases by 2.",
    "source": "Demons Revisited",
@@ -24333,38 +24097,6 @@
    "completion_benefit": ""
   },
   {
-   "id": "ki-diversity",
-   "name": "Ki Diversity",
-   "types": [
-    "combat"
-   ],
-   "description": "You have trained at the feet of the masters of the Kusari- Gama, a secret society of monk warriors. With their secrets you have mastered new ways to apply your ki.",
-   "benefit": "You learn how to channel your ki in a new ability. Choose one of the following ki powers: Bone Crusher: When you succeed at a trip or disarm combat maneuver, you may spend 1 point from your ki pool as a swift action to deal damage to your opponent as if you had hit them with an unarmed strike. Dim Mak: You may spend 1 point from your ki pool as a swift action to execute your next Stunning Fist attack as a melee touch attack rather than a normal melee attack. Mind of the Kensai: You may spend 1 point from your ki pool as a swift action to imbue a single melee weapon in your hands with the ki focus weapon special ability until your next turn. Wings of the Crane: If you have the Deflect Arrows feat, you may spend 1 point from your ki pool as an immediate action to use that feat to deflect a second missile weapon that round. If you have the Snatch Arrows feat, you may use this ability to catch a second weapon, but not throw it back. Zen Combatant: You may spend 1 point from your ki pool as a swift action to substitute your Wisdom score for your Strength or Dexterity for all melee or ranged attacks you make that round.",
-   "normal": "",
-   "special": "You can gain this feat multiple times. Its effects do not stack. Each time you take the feat, you may choose an additional ability from the list above. Monks can select this feat as a monk bonus feat.",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Ki pool class feature, Wis 13, Kusari-Gama 25 TPA.",
-   "prerequisites": [
-    {
-     "kind": "class_feature",
-     "text": "Ki pool class feature"
-    },
-    {
-     "kind": "ability",
-     "ability": "wis",
-     "value": 13
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Kusari-Gama 25 TPA"
-   ],
-   "tags": [],
-   "multiples": true,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "ki-stand",
    "name": "Ki Stand",
    "types": [
@@ -24871,44 +24603,12 @@
    "completion_benefit": ""
   },
   {
-   "id": "lastwall-phalanx",
-   "name": "Lastwall Phalanx",
+   "id": "shieldwall-phalanx",
+   "name": "Shieldwall Phalanx",
    "types": [
     "general"
    ],
-   "description": "When battling the terrifying hordes of Belkzen, you find strength in your shield brothers and sisters.",
-   "benefit": "You gain a sacred bonus to your AC against the attacks of evil creatures and a sacred bonus to saves against the spells and abilities of evil creatures equal to the number of adjacent allies who also have this feat.",
-   "normal": "",
-   "special": "",
-   "source": "Champions Of Purity",
-   "race": "",
-   "prerequisites_text": "Base attack bonus +3, good alignment.",
-   "prerequisites": [
-    {
-     "kind": "bab",
-     "value": 3
-    },
-    {
-     "kind": "alignment",
-     "component": "good",
-     "negated": false
-    }
-   ],
-   "unparsed_prerequisites": [],
-   "tags": [
-    "teamwork"
-   ],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "lastwallphalanx",
-   "name": "LastwallPhalanx",
-   "types": [
-    "general"
-   ],
-   "description": "When battling the terrifying hordes of Belkzen, you find strength in your shield brothers and sisters.",
+   "description": "When battling the terrifying orc hordes, you find strength in your shield brothers and sisters.",
    "benefit": "You gain a sacred bonus to your AC against the attacks of evil creatures and a sacred bonus to saves against the spells and abilities of evil creatures equal to the number of adjacent allies who also have this feat.",
    "normal": "",
    "special": "",
@@ -25103,7 +24803,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "learn-ranger-trap-kobolds-of-golarion",
+   "id": "learn-ranger-trap-kobolds",
    "name": "Learn Ranger Trap",
    "types": [
     "general"
@@ -25163,8 +24863,8 @@
    "completion_benefit": ""
   },
   {
-   "id": "legacy-of-ozem",
-   "name": "Legacy of Ozem",
+   "id": "legacy-of-the-crusade",
+   "name": "Legacy of the Crusade",
    "types": [
     "general"
    ],
@@ -25208,33 +24908,6 @@
    "prerequisites": [],
    "unparsed_prerequisites": [
     "Any two teamwork feats"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "let-them-come",
-   "name": "Let Them Come",
-   "types": [
-    "combat"
-   ],
-   "description": "You have trained to fight onrushing enemy hordes. With a carefully timed strike you ensure that their reckless charge will be their undoing.",
-   "benefit": "You treat all one- or two-handed melee weapons as if they had the brace special feature.",
-   "normal": "Only weapons with the brace special feature can be readied against charges.",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Dwarf, Ninth Battalion TPA 25.",
-   "prerequisites": [
-    {
-     "kind": "race",
-     "race": "dwarf"
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Ninth Battalion TPA 25"
    ],
    "tags": [],
    "multiples": false,
@@ -26684,38 +26357,6 @@
    "completion_benefit": ""
   },
   {
-   "id": "master-performer",
-   "name": "Master Performer",
-   "types": [
-    "general"
-   ],
-   "description": "When using your bardic performance abilities, you grant your allies greater bonuses.",
-   "benefit": "When any of your bardic performance abilities grant your allies a bonus, that bonus is increased by +1.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Bardic performance class feature, Extra Performance, Kitharodian Academy 15 TPA.",
-   "prerequisites": [
-    {
-     "kind": "class_feature",
-     "text": "Bardic performance class feature"
-    },
-    {
-     "kind": "feat",
-     "feat": "extra-performance",
-     "name": "Extra Performance"
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Kitharodian Academy 15 TPA"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "master-siege-engineer",
    "name": "Master Siege Engineer",
    "types": [
@@ -26857,7 +26498,7 @@
    "special": "",
    "source": "Faiths Of Balance",
    "race": "",
-   "prerequisites_text": "Worshiper of Abadar, base attack bonus +1.",
+   "prerequisites_text": "Worshiper of a god of commerce, base attack bonus +1.",
    "prerequisites": [
     {
      "kind": "bab",
@@ -26865,7 +26506,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Worshiper of Abadar"
+    "Worshiper of a god of commerce"
    ],
    "tags": [],
    "multiples": false,
@@ -27166,7 +26807,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Improved Bull Rush, worshiper of Rovagug.",
+   "prerequisites_text": "Improved Bull Rush, worshiper of a god of destruction.",
    "prerequisites": [
     {
      "kind": "feat",
@@ -27175,7 +26816,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Rovagug"
+    "worshiper of a god of destruction"
    ],
    "tags": [],
    "multiples": false,
@@ -28021,7 +27662,7 @@
    "special": "",
    "source": "Qadira",
    "race": "",
-   "prerequisites_text": "Ride 3 ranks, Mounted Combat, Ride-By Attack, base attack bonus +1, Qadira affinity",
+   "prerequisites_text": "Ride 3 ranks, Mounted Combat, Ride-By Attack, base attack bonus +1, affinity with a desert nation of horsemen",
    "prerequisites": [
     {
      "kind": "skill_ranks",
@@ -28044,7 +27685,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Qadira affinity"
+    "affinity with a desert nation of horsemen"
    ],
    "tags": [],
    "multiples": false,
@@ -28259,7 +27900,7 @@
    ],
    "description": "This multi-armed creature is skilled at making attacks with multiple weapons.",
    "benefit": "Penalties for fighting with multiple weapons are reduced by -2 with the primary hand and by -6 with off hands.",
-   "normal": "A creature without this feat takes a -6 penalty on attacks made with its primary hand and a -10 penalty on attacks made with all of its off hands. (It has one primary hand, and all the others are off hands.) See Two- Weapon Fighting in the Pathfinder RPG Core Rulebook.",
+   "normal": "A creature without this feat takes a -6 penalty on attacks made with its primary hand and a -10 penalty on attacks made with all of its off hands. (It has one primary hand, and all the others are off hands.) See Two- Weapon Fighting in the Core Rulebook.",
    "special": "This feat replaces the Two-Weapon Fighting feat for creatures with more than two arms.",
    "source": "PFRPG Bestiary",
    "race": "",
@@ -28529,29 +28170,6 @@
    "tags": [
     "grit"
    ],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "nameless-servitor",
-   "name": "Nameless Servitor",
-   "types": [
-    "general"
-   ],
-   "description": "The fact that you have given up your real name makes you resistant to certain types of magic.",
-   "benefit": "Anyone who attempts to use magic in order to learn personal information about you, such as through divination, scrying, or similar magic, must make a caster level check with a DC equal to 10 plus your level to succeed. You are immune to spells that require the use of your name in order to function (such as trap the soul). Most members of the Risen Guard with this feat are addressed by their rank.",
-   "normal": "",
-   "special": "If you ever choose a real name, you lose all benefits of this feat.",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Risen Guard rank, Risen Guard 10 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Risen Guard rank",
-    "Risen Guard 10 TPA"
-   ],
-   "tags": [],
    "multiples": false,
    "goal": "",
    "completion_benefit": ""
@@ -29427,51 +29045,6 @@
    "completion_benefit": "You gain renown throughout a region, perhaps even an entire continent. You are sung of in bardic tales and can be the subject of spells such as legend lore, regardless of your actual level. Commoners in nearby lands know of your deeds, and your reputation precedes you in numerous lands. In addition, you gain a specific benefit keyed to the object of your quest. See the quest objects in this section for examples of completion benefits when devising your own quest objects for use with this feat."
   },
   {
-   "id": "old-cults-awakener",
-   "name": "Old Cults Awakener",
-   "types": [
-    "general"
-   ],
-   "description": "You hear the voices of the Old Ones, and believe it is your destiny to awaken others to their ancient cause using bizarre and torturous rituals. Whether your work leaves these individuals mad or truly touched by alien sentience remains unproven.",
-   "benefit": "You can attempt a DC 25 Heal check upon an unconscious but stable intelligent creature. The ritual takes 1 hour to complete. If it's successful, the victim must make a DC 25 Will save or he gains a false memory of a vision that he has personally been chosen by the Great Old Ones to serve them (treat as an implanted memory from modify memory, except this is a nonmagical effect). If the ritual is unsuccessful, the victim takes 1d2 points of Intelligence and Wisdom drain; you may attempt the ritual again.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Old Cults 20 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Old Cults 20 TPA"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "ominous-mien",
-   "name": "Ominous Mien",
-   "types": [
-    "general"
-   ],
-   "description": "Your walk, stance, and voice all amplify your status as a Hellknight when you cast spells or use spell-like abilities against opponents.",
-   "benefit": "Whenever you cast a spell or use a spell-like ability from the compulsion, fear, phantasm, or shadow sub-schools, add +1 to the DC of the saving throw against that spell or effect.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Hellknight rank, Hellknight 10 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Hellknight rank",
-    "Hellknight 10 TPA"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "opening-volley",
    "name": "Opening Volley",
    "types": [
@@ -29704,46 +29277,13 @@
    "completion_benefit": ""
   },
   {
-   "id": "osirionology",
-   "name": "Osirionology",
-   "types": [
-    "general"
-   ],
-   "description": "You have a broad interest in Osirion and are something of an authority in one specialized field.",
-   "benefit": "Pick one Intelligence-based skill. You gain a +3 bonus on all checks made using that skill in relation to Osirion or its people. In addition, you gain a +1 bonus on all other Intelligence-based skill checks made in relation to Osirion or its people.",
-   "normal": "",
-   "special": "",
-   "source": "People Of The Sands",
-   "race": "",
-   "prerequisites_text": "Knowledge (history) 1 rank, Knowledge (local) 1 rank, must be able to speak Osiriani and Ancient Osiriani.",
-   "prerequisites": [
-    {
-     "kind": "skill_ranks",
-     "skill": "knowledge (history)",
-     "ranks": 1
-    },
-    {
-     "kind": "skill_ranks",
-     "skill": "knowledge (local)",
-     "ranks": 1
-    }
-   ],
-   "unparsed_prerequisites": [
-    "must be able to speak Osiriani and Ancient Osiriani"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "ostentatious-display",
    "name": "Ostentatious Display",
    "types": [
     "general"
    ],
    "description": "Your extravagant jewelry and accessories give you an air of importance you can use to your advantage in many social situations.",
-   "benefit": "As long as you are wearing a valuable nonmagical item in a magic item slot, you gain a +1 bonus on skill checks with a corresponding skill. Bonuses from wearing items in multiple slots that affect the same skill do not stack. Each item must be worth at least 5% of your character wealth by level (see Table 12-4 on page 399 of the Pathfinder RPG Core Rulebook). For example, a 6th-level PC gains a +1 bonus on Bluff checks while wearing a gem-studded tiara (which fills the headband slot) worth at least 800 gp. When she reaches 7th level, she must wear an accessory in the appropriate slot worth at least 1,175 gp in order to continue gaining this bonus. Item Slot Skill Bonus Belt, chest, shoulders +1 Intimidate Body, feet, neck +1 Diplomacy Eyes, hands, headband +1 Bluff Head, ring, wrists +1 Perform (any)",
+   "benefit": "As long as you are wearing a valuable nonmagical item in a magic item slot, you gain a +1 bonus on skill checks with a corresponding skill. Bonuses from wearing items in multiple slots that affect the same skill do not stack. Each item must be worth at least 5% of your character wealth by level (see Table 12-4 on page 399 of the Core Rulebook). For example, a 6th-level PC gains a +1 bonus on Bluff checks while wearing a gem-studded tiara (which fills the headband slot) worth at least 800 gp. When she reaches 7th level, she must wear an accessory in the appropriate slot worth at least 1,175 gp in order to continue gaining this bonus. Item Slot Skill Bonus Belt, chest, shoulders +1 Intimidate Body, feet, neck +1 Diplomacy Eyes, hands, headband +1 Bluff Head, ring, wrists +1 Perform (any)",
    "normal": "",
    "special": "",
    "source": "Dungeoneer's Handbook",
@@ -30103,7 +29643,7 @@
     "general"
    ],
    "description": "You can throw an enemy spell back at its caster.",
-   "benefit": "Whenever you successfully counter a spell, it returns back to its caster. This works exactly like the spell turning spell (Pathfinder RPG Core Rulebook page 347).",
+   "benefit": "Whenever you successfully counter a spell, it returns back to its caster. This works exactly like the spell turning spell (Core Rulebook page 347).",
    "normal": "",
    "special": "",
    "source": "Advanced Player's Guide",
@@ -31297,7 +30837,7 @@
     "mythic"
    ],
    "description": "The forms you take in wild shape tower over their natural counterparts.",
-   "benefit": "You can apply the giant simple template (quick rules version, from Pathfinder RPG Bestiary 295) to any form you take with wild shape. This replaces the benefit from Powerful Shape. As a free action, you can expend one use of mythic power to combine the benefit from this feat with the benefit from non-mythic Powerful Shape for a number of rounds equal to your tier.",
+   "benefit": "You can apply the giant simple template (quick rules version, from Bestiary 295) to any form you take with wild shape. This replaces the benefit from Powerful Shape. As a free action, you can expend one use of mythic power to combine the benefit from this feat with the benefit from non-mythic Powerful Shape for a number of rounds equal to your tier.",
    "normal": "",
    "special": "",
    "source": "Mythic Adventures",
@@ -33018,7 +32558,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Dex 13, poison use class feature, worshiper of Norgorber.",
+   "prerequisites_text": "Dex 13, poison use class feature, worshiper of a god of secrets.",
    "prerequisites": [
     {
      "kind": "ability",
@@ -33031,7 +32571,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Norgorber"
+    "worshiper of a god of secrets"
    ],
    "tags": [],
    "multiples": false,
@@ -33680,7 +33220,7 @@
    "special": "",
    "source": "Faiths Of Balance",
    "race": "",
-   "prerequisites_text": "Worshiper of Gozreh, Improved Drag, Improved Trip.",
+   "prerequisites_text": "Worshiper of a god of sea and sky, Improved Drag, Improved Trip.",
    "prerequisites": [
     {
      "kind": "feat",
@@ -33694,7 +33234,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Worshiper of Gozreh"
+    "Worshiper of a god of sea and sky"
    ],
    "tags": [],
    "multiples": false,
@@ -33771,7 +33311,7 @@
     "general"
    ],
    "description": "You live a hard life in a cold climate and gain some benefit from it.",
-   "benefit": "You treat extreme cold conditions (Pathfinder RPG Core Rulebook 442) as severe cold, and severe cold as cold weather conditions. You are not impacted at all by normal cold weather conditions. In addition, you do not become fatigued by frostbite or hypothermia.",
+   "benefit": "You treat extreme cold conditions (Core Rulebook 442) as severe cold, and severe cold as cold weather conditions. You are not impacted at all by normal cold weather conditions. In addition, you do not become fatigued by frostbite or hypothermia.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -34092,7 +33632,7 @@
    "types": [
     "general"
    ],
-   "description": "You have graduated from one of the many colleges, universities, and specialty schools of higher learning scattered throughout the Inner Sea region.",
+   "description": "You have graduated from one of the many colleges, universities, and specialty schools of higher learning scattered throughout the world.",
    "benefit": "Pick any two Knowledge skills. You gain a +2 bonus on these two skills. If you have 10 or more ranks in one of these Knowledge skills, the bonus increases to +4 for that skill.",
    "normal": "",
    "special": "",
@@ -34675,7 +34215,7 @@
     "combat"
    ],
    "description": "You are adept at vexing multiple foes with your whip.",
-   "benefit": "As a standard action, you can make a disarm or trip maneuver with your whip. If it succeeds, you can make an additional disarm or trip maneuver with the same bonus against a target adjacent to the first and also within your whip's reach. In addition, you can use your whip to perform reposition maneuvers, though you take a -4 penalty on your CMB and you may only move the target toward you from its original position. This feat originally appeared in Pathfinder Campaign Setting: Osirion, Land of the Pharaohs.",
+   "benefit": "As a standard action, you can make a disarm or trip maneuver with your whip. If it succeeds, you can make an additional disarm or trip maneuver with the same bonus against a target adjacent to the first and also within your whip's reach. In addition, you can use your whip to perform reposition maneuvers, though you take a -4 penalty on your CMB and you may only move the target toward you from its original position.",
    "normal": "",
    "special": "",
    "source": "Rival Guide",
@@ -34699,22 +34239,22 @@
    "completion_benefit": ""
   },
   {
-   "id": "shade-of-the-uskwood",
-   "name": "Shade of the Uskwood",
+   "id": "shadow-effigy",
+   "name": "Shadow Effigy",
    "types": [
     "general"
    ],
-   "description": "Ordained as one of the sinister albino druids who dwell within the heart of the Uskwood, you carry with you into the wider world a powerful effigy of hair, twigs, and blood that crawls with the deepening cold of the Midnight Lord's hallowed hunting grounds.",
+   "description": "Ordained as one of the sinister albino druids who dwell within the heart of a shadowed forest, you carry with you into the wider world a powerful effigy of hair, twigs, and blood that crawls with the deepening cold of a god of darkness's hallowed hunting grounds.",
    "benefit": "Add the following spells to your druid spell list. 0-disrupt undead, ray of frost; 1st-ghost sound, touch of fatigue; 2nd-chill touch, spectral hand; 3rd-ghoul touch, invisibility; 4th-displacement, ray of exhaustion; 5th-animate dead, phantasmal killer; 6th-nightmare, waves of fatigue; 7th-circle of death, shadow walk; 8th-mass invisibility, waves of exhaustion; 9th-horrid wilting, weird. Remove all spells with the fire descriptor from all your spell lists (not just your druid spell list). You cannot cast any spells with the fire descriptor, nor activate them off scrolls, wands, or any other magic devices. In addition, you may not use wild shape to take the form of any creature with the fire subtype.",
    "normal": "",
-   "special": "As part of this feat, you create a personal Umbrae-Token that ties your soul and your doings to the fell power of the Uskwood. This potent object is treated as a wooden unholy symbol that radiates faint necromancy magic. If your Umbrae-Token is ever destroyed, your connection to the shadowy heart of the Uskwood is severed and all benefits of this feat are lost until another is created. This process requires a journey to the Uskwood and an atonement spell cast by a fellow worshiper of Zon-Kuthon.",
+   "special": "As part of this feat, you create a personal Umbrae-Token that ties your soul and your doings to the fell power of that forest. This potent object is treated as a wooden unholy symbol that radiates faint necromancy magic. If your Umbrae-Token is ever destroyed, your connection to the shadowy heart of the forest is severed and all benefits of this feat are lost until another is created. This process requires a journey to the forest and an atonement spell cast by a fellow worshiper of the god of pain.",
    "source": "Inner Sea World Guide",
    "race": "",
-   "prerequisites_text": "Neutral evil, patron deity Zon-Kuthon.",
+   "prerequisites_text": "Neutral evil, patron deity a god of pain and darkness.",
    "prerequisites": [],
    "unparsed_prerequisites": [
     "Neutral evil",
-    "patron deity Zon-Kuthon"
+    "patron deity a god of pain and darkness"
    ],
    "tags": [],
    "multiples": false,
@@ -34764,7 +34304,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Dex 13, worshiper of Norgorber.",
+   "prerequisites_text": "Dex 13, worshiper of a god of secrets.",
    "prerequisites": [
     {
      "kind": "ability",
@@ -34773,7 +34313,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Norgorber"
+    "worshiper of a god of secrets"
    ],
    "tags": [],
    "multiples": false,
@@ -35451,7 +34991,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Channel negative energy class feature, worshiper of Urgathoa.",
+   "prerequisites_text": "Channel negative energy class feature, worshiper of a god of undeath.",
    "prerequisites": [
     {
      "kind": "class_feature",
@@ -35459,7 +34999,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Urgathoa"
+    "worshiper of a god of undeath"
    ],
    "tags": [],
    "multiples": false,
@@ -36169,48 +35709,6 @@
    "tags": [
     "grit"
    ],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "silent-performer",
-   "name": "Silent Performer",
-   "types": [
-    "general"
-   ],
-   "description": "You can use any bardic performance ability without making a sound.",
-   "benefit": "You can use your audible-component bardic performance as visual-component bardic performances. Any bardic ability used in this manner expends 4 times as many bardic performance rounds as normal.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Bardic performance class feature, Extra Performance, Master Performer, bard level 12th, Kitharodian Academy 15 TPA.",
-   "prerequisites": [
-    {
-     "kind": "class_feature",
-     "text": "Bardic performance class feature"
-    },
-    {
-     "kind": "feat",
-     "feat": "extra-performance",
-     "name": "Extra Performance"
-    },
-    {
-     "kind": "feat",
-     "feat": "master-performer",
-     "name": "Master Performer"
-    },
-    {
-     "kind": "class_level",
-     "class": "bard",
-     "value": 12
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Kitharodian Academy 15 TPA"
-   ],
-   "tags": [],
    "multiples": false,
    "goal": "",
    "completion_benefit": ""
@@ -37828,7 +37326,7 @@
    "special": "",
    "source": "Faiths Of Balance",
    "race": "",
-   "prerequisites_text": "Worshiper of Gorum, proficient in spiked armor.",
+   "prerequisites_text": "Worshiper of a god of battle, proficient in spiked armor.",
    "prerequisites": [
     {
      "kind": "proficiency",
@@ -37836,7 +37334,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Worshiper of Gorum"
+    "Worshiper of a god of battle"
    ],
    "tags": [],
    "multiples": false,
@@ -38267,7 +37765,7 @@
    "special": "",
    "source": "Faiths Of Corruption",
    "race": "",
-   "prerequisites_text": "Improved Bull Rush, Merciless Rush, worshiper of Rovagug.",
+   "prerequisites_text": "Improved Bull Rush, Merciless Rush, worshiper of a god of destruction.",
    "prerequisites": [
     {
      "kind": "feat",
@@ -38281,7 +37779,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "worshiper of Rovagug"
+    "worshiper of a god of destruction"
    ],
    "tags": [],
    "multiples": false,
@@ -38590,7 +38088,7 @@
    "special": "",
    "source": "Faiths Of Balance",
    "race": "",
-   "prerequisites_text": "Worshiper of Irori, Combat Reflexes, Stand Still.",
+   "prerequisites_text": "Worshiper of a god of self-perfection, Combat Reflexes, Stand Still.",
    "prerequisites": [
     {
      "kind": "feat",
@@ -38604,7 +38102,7 @@
     }
    ],
    "unparsed_prerequisites": [
-    "Worshiper of Irori"
+    "Worshiper of a god of self-perfection"
    ],
    "tags": [],
    "multiples": false,
@@ -39381,7 +38879,7 @@
     "combat"
    ],
    "description": "Your Stunning Fist strikes become even deadlier.",
-   "benefit": "Add +1 to the saving throw DC against your Stunning Fist attacks. This bonus does not stack with feats that grant you bonuses to the DC for saving throws against your Stunning Fist attacks, such as Mantis Style (see Pathfinder RPG Ultimate Combat).",
+   "benefit": "Add +1 to the saving throw DC against your Stunning Fist attacks. This bonus does not stack with feats that grant you bonuses to the DC for saving throws against your Stunning Fist attacks, such as Mantis Style (see Ultimate Combat).",
    "normal": "",
    "special": "",
    "source": "Dragon Empires Primer",
@@ -39686,7 +39184,7 @@
    ],
    "description": "Your footing is secure in unstable terrain.",
    "benefit": "You gain a +2 bonus on Acrobatics checks to keep your balance and Reflex saves to avoid falling. You can move at a normal speed on steep slopes and stairs and do not risk falling when running or charging downhill.",
-   "normal": "Moving uphill costs 2 squares of movement to enter each square of steep slope. Running or charging downhill requires a successful DC 10 Acrobatics check (or DC 10 Ride check for mounted characters) or you risk falling (Pathfinder RPG Core Rulebook 428).",
+   "normal": "Moving uphill costs 2 squares of movement to enter each square of steep slope. Running or charging downhill requires a successful DC 10 Acrobatics check (or DC 10 Ride check for mounted characters) or you risk falling (Core Rulebook 428).",
    "special": "",
    "source": "Animal Archive",
    "race": "",
@@ -40066,7 +39564,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "sympathetic-rage-orcs-of-golarion",
+   "id": "sympathetic-rage-orcs",
    "name": "Sympathetic Rage",
    "types": [
     "combat"
@@ -40107,7 +39605,7 @@
     "combat"
    ],
    "description": "You excel at moving foes right where you want them.",
-   "benefit": "When making a reposition combat maneuver (Pathfinder RPG Advanced Player's Guide 322), you can move an enemy into a trap or other hazardous area, such as a pit, wall scythe, or blade barrier. When you do so, the moved enemy is treated as though it had activated the trap or triggered the hazard, and it takes a -2 penalty to AC and on saving throws to mitigate the trap or hazard's effects.",
+   "benefit": "When making a reposition combat maneuver (Advanced Player's Guide 322), you can move an enemy into a trap or other hazardous area, such as a pit, wall scythe, or blade barrier. When you do so, the moved enemy is treated as though it had activated the trap or triggered the hazard, and it takes a -2 penalty to AC and on saving throws to mitigate the trap or hazard's effects.",
    "normal": "You cannot reposition a foe into an intrinsically dangerous space such as a pit or blade barrier.",
    "special": "",
    "source": "Dungeoneer's Handbook",
@@ -40168,12 +39666,12 @@
    "completion_benefit": ""
   },
   {
-   "id": "taldan-duelist",
-   "name": "Taldan Duelist",
+   "id": "buckler-duelist",
+   "name": "Buckler Duelist",
    "types": [
     "combat"
    ],
-   "description": "You trained at one of Taldor's elite fighting schools and are skilled at rondelero, the art of fighting with the falcata (see the Advanced Player's Guide) and buckler.",
+   "description": "You trained at one of an old empire's elite fighting schools and are skilled at rondelero, the art of fighting with the falcata (see the Advanced Player's Guide) and buckler.",
    "benefit": "When fighting with the falcata and buckler, your shield bonus to AC increases by +1 and you gain a +2 bonus on Acrobatics checks.",
    "normal": "",
    "special": "",
@@ -40209,12 +39707,12 @@
    "completion_benefit": ""
   },
   {
-   "id": "talmandor-s-lifting",
-   "name": "Talmandor's Lifting",
+   "id": "wings-of-grace",
+   "name": "Wings of Grace",
    "types": [
     "achievement"
    ],
-   "description": "You felt the powerful wings of Talmandor surround you when you risked death from a fall, and somehow a tiny spark of his essence remains connected to your soul.",
+   "description": "You felt powerful angelic wings surround you when you risked death from a fall, and somehow a tiny spark of their essence remains connected to your soul.",
    "benefit": "When you cast a healing spell on an unharmed creature, it briefly manifests as a pair of wings made of golden light. The spell's duration becomes \"1 hour or until discharged.\" For the next hour, the spell remains on the target, triggering automatically as a swift action if the creature takes damage or experiences an effect that the spell could cure, mitigate, or remove (which causes the wings of light to appear briefly). For example, if you cast lesser restoration on an ally who had no ability damage, the spell would trigger immediately if the target became fatigued, exhausted, or took ability damage, but not if the target suffered ability drain, energy drain, or hit point damage (none of which are affected by lesser restoration).",
    "normal": "",
    "special": "",
@@ -40374,7 +39872,7 @@
    "types": [
     "general"
    ],
-   "description": "Your many visits to the Hao Jin Tapestry demiplane have made you an expert in long-distance travel.",
+   "description": "Your many visits to a vast tapestry demiplane have made you an expert in long-distance travel.",
    "benefit": "You cast spells of the teleportation subschool as though your caster level were 2 higher, and you treat yourself as one step more familiar when teleporting to an established Pathfinder lodge with the teleport spell. If you can teleport as a supernatural ability, you treat your class level as if it were 2 higher when calculating the total distance that you can travel with this ability.",
    "normal": "",
    "special": "",
@@ -41029,7 +40527,7 @@
    "completion_benefit": ""
   },
   {
-   "id": "thrill-of-the-kill-orcs-of-golarion",
+   "id": "thrill-of-the-kill-orcs",
    "name": "Thrill of the Kill",
    "types": [
     "general"
@@ -41114,7 +40612,7 @@
    "types": [
     "general"
    ],
-   "description": "You have mastered the ancient Shoanti Thunder and Fang fighting style, allowing you to fight with increased effectiveness when wielding an earth breaker and klar.",
+   "description": "You have mastered the ancient Thunder and Fang fighting style, allowing you to fight with increased effectiveness when wielding an earth breaker and klar.",
    "benefit": "You can use an earth breaker as though it were a one-handed weapon. When using an earth breaker in one hand and a klar in your off hand, you retain the shield bonus your klar grants to your Armor Class even when you use it to attack. Treat your klar as a light weapon for the purposes of determining your two-weapon fighting penalty.",
    "normal": "An earth breaker is a two-handed weapon, preventing the use of a klar in one hand without imposing penalties for using the earth breaker one-handed. A klar can be used either as a one-handed weapon or a shield; it does not grant a bonus to AC during rounds in which it is used as a weapon.",
    "special": "This is a combat feat, and may be selected with class features that grant bonus combat feats.",
@@ -41170,8 +40668,8 @@
    "completion_benefit": ""
   },
   {
-   "id": "thuvian-grenadier",
-   "name": "Thuvian Grenadier",
+   "id": "careful-grenadier",
+   "name": "Careful Grenadier",
    "types": [
     "general"
    ],
@@ -41443,15 +40941,15 @@
     "general"
    ],
    "description": "You are mystically tied to your tribe's sacred totem.",
-   "benefit": "The benefit granted by this feat depends on which Shoanti tribe you belong to: Lyrune-Quah (Moon Clan): You gain a +1 bonus on Will saves and a +2 bonus on Perception checks. Shadde-Quah (Axe Clan): If you have the rage ability, you can rage for 3 additional rounds per day. You also gain a +2 bonus on Intimidate checks. Shriikirri-Quah (Hawk Clan): You gain a +2 bonus on Initiative checks and a +2 bonus on Ride checks. Shundar-Quah (Spire Clan): You gain a +1 bonus on Fortitude saves and a +2 bonus on Perception checks. Sklar-Quah (Sun Clan): You gain a +1 bonus on Ref lex saves and a +2 bonus on Acrobatics checks. Skoan-Quah (Skull Clan): You gain a +2 bonus on weapon damage against undead and a +2 bonus on Heal checks. Tamiir-Quah (Wind Clan): Your base land speed increases by 5 feet. You also gain a +2 bonus on Acrobatics checks.",
+   "benefit": "The benefit granted by this feat depends on which clan of your tribe you belong to: Moon Clan: You gain a +1 bonus on Will saves and a +2 bonus on Perception checks. Axe Clan: If you have the rage ability, you can rage for 3 additional rounds per day. You also gain a +2 bonus on Intimidate checks. Hawk Clan: You gain a +2 bonus on Initiative checks and a +2 bonus on Ride checks. Spire Clan: You gain a +1 bonus on Fortitude saves and a +2 bonus on Perception checks. Sun Clan: You gain a +1 bonus on Ref lex saves and a +2 bonus on Acrobatics checks. Skull Clan: You gain a +2 bonus on weapon damage against undead and a +2 bonus on Heal checks. Wind Clan: Your base land speed increases by 5 feet. You also gain a +2 bonus on Acrobatics checks.",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
    "race": "",
-   "prerequisites_text": "Member of a Shoanti tribe.",
+   "prerequisites_text": "Member of a clan-based tribe that honors totem spirits.",
    "prerequisites": [],
    "unparsed_prerequisites": [
-    "Member of a Shoanti tribe"
+    "Member of a clan-based tribe that honors totem spirits"
    ],
    "tags": [],
    "multiples": false,
@@ -41488,35 +40986,6 @@
     }
    ],
    "unparsed_prerequisites": [],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
-   "id": "touched-by-sacred-fire",
-   "name": "Touched By Sacred Fire",
-   "types": [
-    "general"
-   ],
-   "description": "Regular contact with an elemental guardian of the Ruby Prince (such as Khemet's invisible fire elemental cohort Janhelia) has left you able to shrug off many sources of unnatural heat, even if the effort required sometimes makes it difficult to defend yourself from attacks.",
-   "benefit": "You gain fire resistance 5 and a +2 bonus on all saving throws to resist the effects of fire or heat. As a swift action, you can increase your fire resistance to 10 and your save bonus to +4 until your next turn; this causes you to lose your Dexterity bonus to Armor Class until your next turn (which leaves you vulnerable to sneak attacks).",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Endurance, Risen Guard rank, Risen Guard 15 TPA.",
-   "prerequisites": [
-    {
-     "kind": "feat",
-     "feat": "endurance",
-     "name": "Endurance"
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Risen Guard rank",
-    "Risen Guard 15 TPA"
-   ],
    "tags": [],
    "multiples": false,
    "goal": "",
@@ -41844,15 +41313,15 @@
     "general"
    ],
    "description": "You endured the grueling coming-of-age rituals of your tribe or following, and proudly bear the scars that grant you the blessings of your tribe's ancestors or totem.",
-   "benefit": "You gain 6 hit points. In addition, you gain another benefit, depending on which Mammoth Lords following you belong to. Bearpelt: You gain a +1 bonus on Fortitude saves and a +2 bonus on Intimidate checks. Greattusk: You gain a +2 bonus on combat maneuver checks to make bull rush or overrun maneuvers and a +2 bonus on Ride checks. Ice Chasm: You gain a +1 bonus on Reflex saves and a +2 bonus on Climb checks. Night Hunt: You gain a +2 bonus on Perception and Survival checks. Raptorscale: Your base land speed increases by 5 feet, and you gain a +2 bonus on Acrobatics checks. Slothjaw: You gain a +1 bonus on Will saves and a +2 bonus on Handle Animal checks.",
+   "benefit": "You gain 6 hit points. In addition, you gain another benefit, depending on which following of the mammoth-riding tribes you belong to. Bearpelt: You gain a +1 bonus on Fortitude saves and a +2 bonus on Intimidate checks. Greattusk: You gain a +2 bonus on combat maneuver checks to make bull rush or overrun maneuvers and a +2 bonus on Ride checks. Ice Chasm: You gain a +1 bonus on Reflex saves and a +2 bonus on Climb checks. Night Hunt: You gain a +2 bonus on Perception and Survival checks. Raptorscale: Your base land speed increases by 5 feet, and you gain a +2 bonus on Acrobatics checks. Slothjaw: You gain a +1 bonus on Will saves and a +2 bonus on Handle Animal checks.",
    "normal": "",
    "special": "",
    "source": "People Of The North",
    "race": "",
-   "prerequisites_text": "Member of a Mammoth Lords tribe or following.",
+   "prerequisites_text": "Member of a mammoth-riding tribe or following.",
    "prerequisites": [],
    "unparsed_prerequisites": [
-    "Member of a Mammoth Lords tribe or following"
+    "Member of a mammoth-riding tribe or following"
    ],
    "tags": [],
    "multiples": false,
@@ -43394,13 +42863,13 @@
    "completion_benefit": ""
   },
   {
-   "id": "varisian-tattoo",
-   "name": "Varisian Tattoo",
+   "id": "mystic-tattoo",
+   "name": "Mystic Tattoo",
    "types": [
     "general"
    ],
-   "description": "You bear intricate tattoos that inspire and empower your natural magic ability. These tattoos mark you as a worker of the ancient traditions of Varisian magic. A Varisian tattoo typically consists of a long string of complex characters from the Thassilonian alphabet.",
-   "benefit": "Select a school of magic (other than divination) in which you have Spell Focus-you cast spells from this school at +1 caster level. Additionally, you gain a single spell-like ability usable up to three times per day. The spelllike ability gained (and its Varisian name) are as follows: Abjuration (avidais): resistance Conjuration (idolis): acid splash Enchantment (carnasia): daze Evocation (ragario): dancing lights Illusion (vangloris): ghost sound Necromancy (voratalo): touch of fatigue Transmutation (avaria): mage hand",
+   "description": "You bear intricate tattoos that inspire and empower your natural magic ability. These tattoos mark you as a worker of an ancient tradition of tattoo magic. A mystic tattoo typically consists of a long string of complex characters from an ancient alphabet.",
+   "benefit": "Select a school of magic (other than divination) in which you have Spell Focus-you cast spells from this school at +1 caster level. Additionally, you gain a single spell-like ability usable up to three times per day. The spell-like ability gained is as follows: Abjuration: resistance Conjuration: acid splash Enchantment: daze Evocation: dancing lights Illusion: ghost sound Necromancy: touch of fatigue Transmutation: mage hand",
    "normal": "",
    "special": "",
    "source": "Inner Sea World Guide",
@@ -43477,7 +42946,7 @@
    "types": [
     "story"
    ],
-   "description": "You've witnessed demons and their madness firsthand, likely in one of the lands detailed in this section, or perhaps some other demon-marked region such as the Worldwound or the Abyss. Since then, you've sworn to send these wretched fiends back to whence they came, and you've become an expert at rooting out their kind and their servants.",
+   "description": "You've witnessed demons and their madness firsthand, likely in one of the lands detailed in this section, or perhaps some other demon-marked region such as a demon-blighted rift or the Abyss. Since then, you've sworn to send these wretched fiends back to whence they came, and you've become an expert at rooting out their kind and their servants.",
    "benefit": "You gain a +2 bonus on saving throws against spells or effects originating from demon worshipers and from creatures of the demon type.",
    "normal": "",
    "special": "",
@@ -43493,48 +42962,6 @@
    "multiples": false,
    "goal": "Convince the leader of a demon cult to renounce her Abyssal lord and seek atonement for her actions. Alternatively, if you kill the cult leader, you must also decisively defeat at least half of the cultists and have the cult's base of operations consecrated by a well-known local priest.",
    "completion_benefit": "When a demon damages you with an attack, spell, spell-like ability, or special ability and reduces you to fewer than 0 hit points, you may allow righteous energy to pour through you and into the demon, instantly sending it to another plane of existence (as dismissal) if it fails a Will save (DC = 10 + 1/2 your Hit Dice + your Charisma modifier). This dismissal takes place after you are damaged but before you fall unconscious, so you can use this ability even if the demon kills you. You can use this ability once per day. Once you have used this ability, you must be healed to your maximum number of hit points before you can use the ability again."
-  },
-  {
-   "id": "verbose-performer",
-   "name": "Verbose Performer",
-   "types": [
-    "general"
-   ],
-   "description": "The range of your bardic performances increases.",
-   "benefit": "Double the range of any bardic performance ability that possesses a range in the ability description.",
-   "normal": "",
-   "special": "",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Bardic performance class feature, Extra Performance, Master Performer, bard level 8th, Kitharodian Academy 15 TPA.",
-   "prerequisites": [
-    {
-     "kind": "class_feature",
-     "text": "Bardic performance class feature"
-    },
-    {
-     "kind": "feat",
-     "feat": "extra-performance",
-     "name": "Extra Performance"
-    },
-    {
-     "kind": "feat",
-     "feat": "master-performer",
-     "name": "Master Performer"
-    },
-    {
-     "kind": "class_level",
-     "class": "bard",
-     "value": 8
-    }
-   ],
-   "unparsed_prerequisites": [
-    "Kitharodian Academy 15 TPA"
-   ],
-   "tags": [],
-   "multiples": false,
-   "goal": "",
-   "completion_benefit": ""
   },
   {
    "id": "vermin-heart",
@@ -43594,7 +43021,7 @@
    "types": [
     "general"
    ],
-   "description": "You made a good name for yourself in the Pathf inder Society in part because you knew how to prepare for the challenges before you, even if your natural magical abilities lend themselves less to preparation and more to spontaneity.",
+   "description": "You made a good name for yourself among adventurers in part because you knew how to prepare for the challenges before you, even if your natural magical abilities lend themselves less to preparation and more to spontaneity.",
    "benefit": "When you regain spell slots at the start of the day, you may opt to prepare one spell you don't know in place of a daily spell slot 1 level higher than the prepared spell's level. To do so, you must have access to the selected spell on a scroll or in a spellbook, and the spell must be on your spell list (even if it is not one of your spells known). This process takes 10 minutes per spell level of the selected spell. You can cast the selected spell a single time, expending the spell slot as though it were a known spell being cast by you. Preparing a spell in this manner expends a scroll but not a spellbook. A spell prepared in this way is considered its actual level rather than the level of the spell slot expended. You can apply metamagic feats to the spell as normal, as long as the spell's actual level plus the increases from metamagic feats is 1 level lower than the highest-level spell you can cast. For example, a 12th-level sorcerer with this feat, a scroll of fireball, and the Empower Spell metamagic feat could prepare an empowered fireball spell in her 6th-level spell slot.",
    "normal": "",
    "special": "If you spontaneously cast arcane spells, you must have an Intelligence score of at least 13 to take this feat. If you spontaneously cast divine spells, you must have a Wisdom score of at least 13 to take this feat. If you have both arcane and divine spellcasting classes, you can use this feat to prepare a spell using a given class's spell slot as long as you meet the associated ability score prerequisite.",
@@ -43839,7 +43266,7 @@
    "types": [
     "general"
    ],
-   "description": "You are trained in a tradition of Garundi courtesans and court mages that melds dance with the use of magic wands.",
+   "description": "You are trained in a tradition of desert courtesans and court mages that melds dance with the use of magic wands.",
    "benefit": "When using a spell trigger item, you can move both before and after triggering the item, as long as the total distance moved is not greater than your speed. Choose one creature potentially affected by your spell trigger item. Your movement does not provoke attacks of opportunity from that creature only. You must move at least 5 feet before and after using your spell trigger item to utilize this feat.",
    "normal": "",
    "special": "",
@@ -44417,29 +43844,6 @@
    "completion_benefit": ""
   },
   {
-   "id": "whispered-knowledge",
-   "name": "Whispered Knowledge",
-   "types": [
-    "general"
-   ],
-   "description": "You possess secret knowledge that enhances and helps perfect your undead form.",
-   "benefit": "Choose one of the following secrets: Secret of Blood: After successfully dealing damage to a living creature with a melee attack, you can consume that creature's blood from your weapon as a swift action, gaining 1d8 temporary hit points, a +2 enhancement bonus to Strength, and a +1 bonus to your caster level. This lasts 10 minutes per Hit Die of your target, and otherwise acts as a death knell spell. Secret of Bone: Your bones harden and calcify. You gain DR 5/bludgeoning. Secret of Brains: As secret of blood, but you gain a +2 enhancement bonus to your Intelligence instead of Strength. This ability has no effect on mindless targets. Secret of the Grave: You can designate an unholy container for your remains, such as a coffin, canopic jar, or burial urn. When in this container and not taking any actions, you gain fast healing 5.",
-   "normal": "",
-   "special": "You can gain this feat multiple times. Its effects do not stack. Each time you take the feat, you learn a new secret.",
-   "source": "Faction Guide",
-   "race": "",
-   "prerequisites_text": "Corporeal undead, Whispering Way 15 TPA.",
-   "prerequisites": [],
-   "unparsed_prerequisites": [
-    "Corporeal undead",
-    "Whispering Way 15 TPA"
-   ],
-   "tags": [],
-   "multiples": true,
-   "goal": "",
-   "completion_benefit": ""
-  },
-  {
    "id": "wicked-valor",
    "name": "Wicked Valor",
    "types": [
@@ -44656,7 +44060,7 @@
     "combat"
    ],
    "description": "You can reshape the kinetic energy of foes' charges.",
-   "benefit": "You gain a +2 bonus to AC against charge attacks. If a creature charges you and fails its attack roll, as an immediate action you can attempt a reposition combat maneuver (Pathfinder RPG Advanced Player's Guide 322) to reposition that foe. If you use a readied action to attack a creature charging you, you can roll to attack and then attempt to reposition that creature as a free action before it resolves its charge attack.",
+   "benefit": "You gain a +2 bonus to AC against charge attacks. If a creature charges you and fails its attack roll, as an immediate action you can attempt a reposition combat maneuver (Advanced Player's Guide 322) to reposition that foe. If you use a readied action to attack a creature charging you, you can roll to attack and then attempt to reposition that creature as a free action before it resolves its charge attack.",
    "normal": "",
    "special": "",
    "source": "People Of The Sands",
@@ -44954,8 +44358,8 @@
    "completion_benefit": ""
   },
   {
-   "id": "worldwound-walker",
-   "name": "Worldwound Walker",
+   "id": "veiled-purity",
+   "name": "Veiled Purity",
    "types": [
     "general"
    ],
