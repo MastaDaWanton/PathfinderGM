@@ -16,6 +16,12 @@ The unread are what no table resolves (a holy symbol, a disguise kit, the book's
 "jewelry and magic items only") and the pieces of an attack line no attack is made of
 (spell-like abilities the import ran into the ranged column). They are kept, word for
 word, in each record's `unread`, and the ratchet below lets the count only fall.
+
+Recompiled 2026-10-30 (compiler 2) after the reader stopped dropping attacks
+(tests/test_monster_attacks_read_whole.py): 4,564 attacks (item 1,920 · natural 2,202 ·
+fist 92 · worn 20), 1,730 items linked, unread melee 51 · ranged 135. The fall is mostly
+leaked headings no longer split into pieces; the 34 attacks the old reader dropped had
+been in neither column.
 """
 from __future__ import annotations
 
@@ -31,8 +37,8 @@ DOC = json.loads((ROOT / "content" / "bestiary" / "compiled.json").read_text(enc
 
 # The ratchet: what the compile could not account for on 2026-10-29. Lower these as the
 # tables learn more; never raise them.
-UNREAD_AT_MOST = {"gear": 1210, "melee": 164, "ranged": 178}
-LINKED_AT_LEAST = 1688
+UNREAD_AT_MOST = {"gear": 1210, "melee": 51, "ranged": 135}
+LINKED_AT_LEAST = 1730
 
 
 @pytest.fixture(scope="module")
