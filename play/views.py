@@ -348,7 +348,7 @@ def talk_act(request):
     except (IntentError, ValueError, KeyError) as exc:
         scene.restore(undo)
         return JsonResponse({"error": str(exc)}, status=400)
-    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    tell = _page_tells(c, resolution.outcomes)
     if tell:
         c.transcript.append({"who": "gm", "text": tell})
     c.save()
@@ -502,7 +502,90 @@ def _attack_slots(pc) -> dict:
         # alchemy's products work "also as thrown flasks", and the panel where attacks
         # are picked offered none (the bench-shell lane, 2026-10-07).
         "flasks": _flasks(pc),
+        # Where a melee strike with what is in hand reaches each foe from (`_reach_from`),
+        # so the plan can warn before a move and a strike are committed together.
+        "reach": _reach_from(pc),
     }
+
+
+def _strike_out_of_reach(scene, pc, raw: list) -> str:
+    """The sentence that refuses a panel turn whose melee blow cannot reach from the square
+    its move ends on, or "" — measured by `position.out_of_reach_from`, the engine's rule."""
+    from rules import position as position_mod
+
+    square = None
+    for r in raw:
+        if r.get("op") == "move":
+            sq = (r.get("params") or {}).get("square")
+            if isinstance(sq, (list, tuple)) and len(sq) >= 2:
+                square = sq
+            continue
+        if r.get("op") != "attack" or square is None:
+            continue
+        foe = scene.actors.get(str(r.get("target") or ""))
+        if foe is None:
+            continue
+        p = r.get("params") or {}
+        weapon = str(p.get("weapon") or pc.equipped or "unarmed")
+        try:
+            miss = position_mod.out_of_reach_from(scene, pc, foe, weapon, square,
+                                                  manoeuvre=str(p.get("manoeuvre") or ""))
+        except Exception:  # noqa: BLE001 — what cannot be measured is left to the engine
+            miss = None
+        if miss is None:
+            continue
+        x, y = int(square[0]), int(square[1])
+        if miss.too_close:
+            return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away — too "
+                    f"close for a reach weapon, which strikes from {miss.reach} ft. Nothing "
+                    f"was done: pick another square, or strike without moving.")
+        return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away, and you "
+                f"reach {miss.reach} ft — the blow could not land. Nothing was done: pick a "
+                f"square beside them, or strike without moving.")
+    return ""
+
+
+def _reach_from(pc) -> dict:
+    """`{foe ref: [[x, y], …]}` — the squares within this round's move from which the
+    wielded weapon reaches each standing foe, measured by the engine's own rule
+    (`position.out_of_reach_from`). Empty outside a fight or off the map.
+
+    Measured on the owner's report of 2026-11-01 (Corvin T., the shrine): "move to (5,4);
+    strike giant rot grub" spent the move and lost the blow — the grub was 25 ft from that
+    square and nothing said so until after both were committed. The combat panel reads
+    this and says so in the plan; `combat_act` refuses the pair before running it."""
+    from rules import position as position_mod
+
+    c = _live_of(pc)
+    if c is None:
+        return {}
+    scene = c.scene
+    here = scene.positions.get(pc.ref) if scene.in_encounter and scene.has_grid else None
+    if here is None:
+        return {}
+    foes = {r for side, refs in (scene.sides or {}).items() for r in refs
+            if pc.ref not in refs}
+    steps = max(1, int(getattr(pc, "speed_feet", 30) or 30) // 5)
+    weapon = pc.equipped or "unarmed"
+    out: dict[str, list] = {}
+    for ref in sorted(foes):
+        foe = scene.actors.get(ref)
+        if foe is None or foe.is_down or ref not in scene.positions:
+            continue
+        squares = []
+        for dx in range(-steps, steps + 1):
+            for dy in range(-steps, steps + 1):
+                sq = (here[0] + dx, here[1] + dy)
+                if not scene.grid.inside(sq):
+                    continue
+                try:
+                    miss = position_mod.out_of_reach_from(scene, pc, foe, weapon, sq)
+                except Exception:  # noqa: BLE001 — a square that cannot be measured is left out
+                    continue
+                if miss is None:
+                    squares.append(list(sq))
+        out[ref] = squares
+    return out
 
 
 def _usable_abilities(pc) -> list[dict]:
@@ -547,6 +630,26 @@ def _usable_abilities(pc) -> list[dict]:
                     if cond:
                         entry["toggle"] = True
                         entry["active"] = pc.has_condition(str(cond))
+                    # A use with a document (Battle Blood Ki Pool): its action, its modes
+                    # and what is left in its pool, read off the document as the core
+                    # classes' entries are (`class_abilities.usable`), so the Swift menu
+                    # offers "Battle Blood Ki Pool (dodge)" and the bar shows ki 2/2.
+                    doc = (det.get("grants") or {}).get(key) or {}
+                    if isinstance(doc, dict) and doc and not cond:
+                        if doc.get("action"):
+                            entry["action"] = str(doc["action"])
+                        modes = list(((doc.get("choice") or {}).get("options") or {}))
+                        if modes:
+                            entry["choices"] = modes
+                            entry["choice_kind"] = "mode"
+                        entry["aim"] = "self"
+                        pid = str((doc.get("cost") or {}).get("pool") or "")
+                        pool = pc.pool(pid) if pid else None
+                        if pool is not None:
+                            entry.update({"uses": pool.current, "max": pool.maximum,
+                                          "pool": pid,
+                                          "cost": int((doc.get("cost") or {}).get(
+                                              "amount", 1) or 1)})
                     out.append(entry)
     return out
 
@@ -657,6 +760,8 @@ def _state(c) -> dict:
                  # the browser could read it from.
                  "burning": bool(a.has_state("state.burning")),
                  "glued": bool(a.has_state("state.held.glued")),
+                 # Held in a grapple, for the bar's Break free (`escape`, CRB p.200).
+                 "grappled": bool(a.held_in_grapple),
                  "conditions": _shown_conditions(a)}
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
@@ -812,17 +917,37 @@ _TELL_NUMBERS = re.compile(r"\s*\((?=[^)]*\d)[^()]*(?:\([^()]*\)[^()]*)*\)")
 _TELL_MARGIN = re.compile(r"\s+by \d+(?=[.,:;]|\s|$)")
 
 
-def plain_tell(tell: str) -> str:
+def plain_tell(tell: str, scene=None) -> str:
     """A tell rendered for the player rather than for the log.
 
     Tells are written by the engine for the GM to narrate, so they carry the arithmetic:
     "the guildhand's attack misses Kesst Vayr (5 against AC 12 (flat-footed))". When the
     narrator is unavailable the tell is shown raw, and that put an NPC's hidden roll in
     front of the player — the one thing the whole hidden/player split exists to prevent.
+
+    With the `scene`, its keys go too (`narration.names_not_keys`): a ref or a thing's id
+    is the log's, never the page's (the ruling of 2026-09-28), and a refusal's tell named
+    "backpack#1" until 2026-11-05.
     """
     text = _TELL_NUMBERS.sub("", tell or "")
     text = _TELL_MARGIN.sub("", text)
-    return " ".join(text.split())
+    text = " ".join(text.split())
+    if scene is not None:
+        text, _keys = narration_mod.names_not_keys(text, scene)
+    return text
+
+
+def _page_tells(c, outcomes) -> str:
+    """The engine's own lines for a button door's page (the talk panel, the gear, the drink
+    and the counter buttons), where no narrator writes: a refusal by its page sentence
+    (`Outcome.for_a_person`, when the refusing rule wrote one) and every key said by name
+    (`narration.names_not_keys`; refs never on the page, 2026-09-28). A refused sale's tell
+    listed the whole pack by key until 2026-11-05 ("They have: backpack#1, …")."""
+    lines = [(str(getattr(o, "for_a_person", "") or "")
+              if getattr(o, "status", "") == "refused" else "") or o.tell
+             for o in outcomes if o.tell]
+    text, _keys = narration_mod.names_not_keys(" ".join(lines), c.scene)
+    return text
 
 
 def _player_visible_entry(entry: dict) -> dict:
@@ -2301,14 +2426,25 @@ def level_up(request):
     if pc is None:
         return JsonResponse({"error": "nobody is being played"}, status=409)
 
-    result = leveling.level_up(pc, dice=c.engine().dice)
+    # The favoured class bonus this level is taken as (CRB p.31): the Class tab's choice,
+    # sent with the button; a body without one takes the default (`creation.
+    # FAVOURED_DEFAULT`), as the forge does.
+    favoured = str(read_body(request).get("favoured") or "").strip().lower() or None
+    result = leveling.level_up(pc, dice=c.engine().dice, favoured=favoured)
     if not result.get("ok"):
         return JsonResponse({"error": result.get("why", "cannot level")}, status=409)
 
+    per_die = result.get("faces") or []
+    con_said = (f" {result['con']:+d} Con" + (f" on each of {len(per_die)} Hit Dice"
+                                             if len(per_die) > 1 else "")
+                if result['con'] else "")
     bits = [f"{pc.name} reaches level {result['level']}.",
-            f"Hit points: rolled {result['rolled']}"
-            + (f" {result['con']:+d} Con" if result['con'] else "")
+            f"Hit points: rolled {result.get('hit_dice') or ''} "
+            f"{'+'.join(str(f) for f in per_die) or result['rolled']}{con_said}"
+            + (" +1 favoured class" if result.get("favoured") == "hp" else "")
             + f" = {result['hp']} ({pc.hp}/{pc.hp_max})."]
+    if result.get("favoured") == "skill":
+        bits.append("Favoured class: +1 skill rank.")
     if result["grants"]:
         bits.append("Gains: " + ", ".join(result["grants"]) + ".")
     # An animal companion grows with the level it is bound to. `sync` ran only when a
@@ -3145,7 +3281,7 @@ def _put_back_free_actions(c, pending: list) -> None:
 # here, so a player on fire from a thrown flask, or glued by a tanglefoot bag, could only
 # type it and hope the planner sampled it. The bar offers each only while it applies.
 _COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast",
-               "extinguish", "break_free"}
+               "extinguish", "break_free", "escape"}
 
 
 @require_POST
@@ -3216,10 +3352,34 @@ def combat_act(request):
             **({"visibility": "player"} if op == "cast" else {}),
         })
 
+    # A move to a square and a melee blow behind it, measured BEFORE either happens: from
+    # the square the player picked, does the blow reach? `_reach_from` lets the plan warn;
+    # this is the door's own answer, in the engine's measurement, so a stale page cannot
+    # spend the move and lose the blow (the owner's report of 2026-11-01: "move to (5,4);
+    # strike giant rot grub", 25 ft from (5,4), the move walked and the blow refused).
+    stop = _strike_out_of_reach(scene, pc, raw)
+    if stop:
+        return JsonResponse({"error": stop}, status=400)
+
     engine = c.engine()
     agent = GMAgent(c.world, engine)
     _arm_cards(agent, c)
 
+    seen = body.get("seen_round")
+    if not raw and end_turn and seen is not None and scene.in_encounter:
+        # A pass pressed on a page that had not yet drawn the new round: the turn it was
+        # meant to end already ended (the dice finished it, and the other side has acted
+        # since). Spending it would hand the other side a second turn in a row — the shape
+        # measured on the owner's report of 2026-11-01 (Lila Duskwatch, log rows 315 and
+        # 320, the second after an empty turn post).
+        try:
+            stale = int(seen) != int(scene.round)
+        except (TypeError, ValueError):
+            stale = False
+        if stale:
+            return JsonResponse({"error": f"That turn already ended. It is round "
+                                          f"{scene.round} now, and your turn again."},
+                                status=409)
     if not raw:
         # End turn with nothing declared: the round moves on. Marked as acted so the
         # first blow of the next fight does not find the PC flat-footed for passing.
@@ -4391,7 +4551,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # prose call whiffed. The fallback gets the same person treatment
             # the prose does.
             pc = c.scene.pc()
-            text = " ".join(plain_tell(o.tell) for o in outcomes)
+            text = " ".join(plain_tell(o.tell, c.scene) for o in outcomes)
             if pc is not None and text:
                 text, _ = narration_mod.pc_to_second_person(text, pc.name)
         if not text and plan is not None and plan.narration:
@@ -4712,6 +4872,12 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # tells and brief, and the training record carries the whole prompt.
             corrections.remember_input(c, beat_at, agent=agent, player_input=player_input,
                                        brief=brief, facts=[o.tell for o in outcomes])
+            # And every slot the tells check caught breaking a tell, for the machine-
+            # corrections training log (the owner, 2026-11-02): spent once logged, so a
+            # later beat the free narrator writes never logs this one's again.
+            corrections.log_auto(c, beat_at, agent=agent, player_input=player_input,
+                                 brief=brief, facts=[o.tell for o in outcomes])
+            agent.last_tells_remade = []
             for line in struck_lines:
                 c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
             # What became of a struck item, when the beat did not say. Read off the
@@ -4723,7 +4889,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 if m and not narration_mod.item_fate_on_the_page(text, m.group(1)):
                     line = plain_tell(next(
                         s for s in re.split(r"(?<=[.!?])\s+", o.tell)
-                        if "through hardness" in s))
+                        if "through hardness" in s), c.scene)
                     pc = c.scene.pc()
                     if pc is not None:
                         line, _ = narration_mod.pc_to_second_person(line, pc.name)
@@ -4740,7 +4906,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             text, attempt = "", None
         if not text:
             pc = c.scene.pc()
-            text = " ".join(plain_tell(o.tell) for o in outcomes)
+            text = " ".join(plain_tell(o.tell, c.scene) for o in outcomes)
             if pc is not None and text:
                 text, _ = narration_mod.pc_to_second_person(text, pc.name)
         c.transcript.append({"who": "gm", "text": text, "kind": "consequence"})
@@ -4776,6 +4942,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
         joined = False
     if hand_over and not joined:
         _run_npc_turns(c, agent)
+    # A death outside a fight — the law's sentence carried out (rules/trial.py) — ends the
+    # campaign in this reply, as a death on the creatures' turns does inside one. Measured
+    # live 2026-11-01: "Corvin T. is hanged for murder. Corvin T. is dead." and the page went
+    # on offering "What do you do?"; only the NEXT line reached the death screen.
+    _the_player_died(c)
     if plan is not None:
         c.last_intent_signature = judgement._signature(plan.intents)
     c.save()
@@ -5124,6 +5295,86 @@ def _book_confide(agent, ref: str, line: str, text: str, life: str) -> None:
         said.append({"who": ref, "to": "", "from": "confide", "line": quoted})
 
 
+def _log_turn_remakes(c, agent, beat_index: int, player_input: str, facts) -> int:
+    """The tells check's remakes on a creature's planned turn, into the machine-corrections
+    training log (`corrections.log_auto`), the way the player's beat's go — the count
+    written. Measured 2026-11-04: only the player's beat set `last_tells_remade`, so the
+    remakes on enemy turns (2 of 16 enemy turns on the plan lane's bench) were never
+    logged. The record's input is the turn's own (`GMAgent.last_turn_written`): its plan,
+    its slot calls, its brief and its tells — not the player's beat before it."""
+    from types import SimpleNamespace
+
+    from . import corrections
+
+    written = getattr(agent, "last_turn_written", None)
+    if not written or not written.get("remade"):
+        return 0
+    turn = SimpleNamespace(
+        last_tells_remade=list(written["remade"]),
+        last_prose_messages=list(written.get("messages") or []),
+        last_prose_slots=list(written.get("slots") or []),
+        last_prose_model=str(written.get("model") or ""),
+        prose_model=getattr(agent, "prose_model", ""), last_prose_draft="",
+        last_narration="planned", _intimate_beat=lambda: False)
+    return corrections.log_auto(c, beat_index, agent=turn, player_input=player_input,
+                                brief=str(written.get("brief") or ""), facts=facts)
+
+
+def _brief_the_npc_turns(c, agent, events=None) -> None:
+    """THE SCENE for the creatures' turns, when nothing earlier in this request wrote one.
+
+    The planned narrator writes a creature's turn from the brief the player's beat was
+    written from (`GMAgent.last_brief`, set by `narrate_after`). A turn ended with the
+    End-turn button and nothing declared — and the two doors that finish a stalled order
+    before the player's post — build a fresh agent, so `last_brief` was empty and every
+    enemy slot was asked with "THE SCENE (reference; the only things that exist):" and
+    nothing under it: the plan lane's bench (2026-11-04) named it, with no person, place or
+    thing the slot was allowed to name. The same `scene_brief` the player's turn gets, with
+    nothing of the player's words in it, because there are none on this turn."""
+    if getattr(agent, "last_brief", ""):
+        return
+    from rules import houserules
+
+    if houserules.narration() != "planned":
+        return
+    engine = getattr(agent, "engine", None) or c.engine()
+    report: dict = {}
+    try:
+        brief = prompts.scene_brief(
+            c.world, c.scene, c.location,
+            events if events is not None else _recent_events(c.world, c.location),
+            here=engine.here(), known=engine.places(),
+            recent=[b["text"] for b in c.transcript[-4:]], turn=len(c.transcript),
+            player_text="", report=report)
+    except Exception as exc:  # noqa: BLE001 — a brief never costs the creatures their turns
+        c.turn_log.append({"kind": "npc-brief-lost",
+                           "error": f"{type(exc).__name__}: {str(exc)[:160]}"})
+        return
+    agent.last_brief = brief
+    if not getattr(agent, "brief_facts", None):
+        agent.brief_facts = dict(report.get("facts") or {})
+
+
+def _side_lost(scene) -> str | None:
+    """The line for a fight the player's side has lost — nobody on it standing — or None
+    when it has not (the other side fell, or the player has no side). Who stands over the
+    player is `defeat.standing_over`, the one reader the winners' aftermath uses."""
+    from rules import defeat
+
+    pc = scene.pc()
+    if pc is None:
+        return None
+    mine = next((refs for refs in (scene.sides or {}).values() if pc.ref in refs), None)
+    if mine is None or any(scene.conscious(r) for r in mine):
+        return None
+    over = [narration_mod.definite(a.name) for a in defeat.standing_over(scene)]
+    if not over:
+        return "Nobody on your side is left standing, and the fight is lost."
+    named = over[0] if len(over) == 1 else ", ".join(over[:-1]) + " and " + over[-1]
+    return (f"Nobody on your side is left standing, and the fight is lost: {named} "
+            f"{'stands' if len(over) == 1 else 'stand'} over you.")
+
+
 def _run_npc_turns(c, agent, limit: int = 12) -> None:
     """Let every creature between the player's turns act.
 
@@ -5147,6 +5398,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     world = c.world
     location = c.location
     events = _recent_events(world, location)
+    _brief_the_npc_turns(c, agent, events)
 
     # The player down is not the fight over, and it is not a licence for the order to run
     # its whole budget either. Measured 2026-10-08 in the caravan ambush (gemma-4-12B,
@@ -5166,8 +5418,24 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     for _ in range(max(limit, len(scene.initiative) * 2)):
         if _the_player_died(c):
             return
-        # A side with nobody standing means the fight is over.
+        # A side with nobody standing means the fight is over — when it is the other side.
         if scene.sides and scene.sides_standing() <= 1:
+            lost = _side_lost(scene)
+            if lost is not None:
+                # The player's side is the one with nobody standing. "The fight is over."
+                # was printed here whichever side fell: the 2026-11-05 rerun had it under
+                # a wizard lying dying with both robbers on their feet (2 errors scored, on
+                # 3 of 14 spell turns). The fight is lost, not over: said so, with who
+                # stands over them, and a player bleeding or out cold is left in it for
+                # the downed door (`downed.resolve`), which bleeds them round by round,
+                # ends the fight when they are stable and lets the winners act — "the
+                # player down is not the fight over", above. A player held (paralysed,
+                # bound) has no rounds on that door, so their fight ends here as before.
+                c.transcript.append({"who": "gm", "text": lost, "kind": "consequence"})
+                if downed.state_of(scene.pc()) in ("dying", "stable"):
+                    return
+                scene.end_encounter()
+                return
             # Settled while the sides are still declared — the same payout the
             # end_encounter op makes, because two pieces of code end fights and both
             # must pay the same way.
@@ -5253,6 +5521,27 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             if o.tell:
                 c.transcript.append({"who": "gm", "kind": "consequence",
                                      "text": _plain_tells(c, [o])})
+        # A creature holding somebody in a grapple spends its turn keeping the hold (CRB
+        # p.200: "you must continue to make a check each round, as a standard action, to
+        # maintain the hold"), rolled by the engine — the grab's damage on a kept hold, the
+        # grapple's end on a failed one (`Engine.grapple_turn`). No model is asked: the
+        # rule decides the turn. Measured on the owner's report of 2026-11-01: the grub's
+        # later turns were ordinary bites, and its hold did nothing after the round it won.
+        try:
+            kept = engine.grapple_turn(ref)
+        except (IntentError, ValueError, KeyError) as exc:
+            c.turn_log.append({"kind": "npc-turn", "ref": ref,
+                               "error": f"grapple: {str(exc)[:400]}"})
+            kept = None
+        if kept is not None and not kept.awaiting:
+            for o in kept.outcomes:
+                if o.tell:
+                    c.transcript.append({"who": "gm", "kind": "consequence",
+                                         "text": _plain_tells(c, [o])})
+            c.turn_log.append(history_mod.stamp(c, {
+                "kind": "npc-turn", "ref": ref, "grapple": True,
+                "outcomes": [o.as_dict() for o in kept.outcomes]}))
+            continue
         # A companion hears what the player said to them (owner's ruling, 2026-10-01):
         # read off the transcript and the conversation log, never guessed (gm/companions).
         from gm import companions as companions_mod
@@ -5383,10 +5672,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # `acting`: the call is told whose turn it was, and the prose is checked
                 # for being told the wrong way round (narration.wrong_actor).
                 agent.last_added = []
+                # The page's last beat, for the planned narrator's slots (what is still
+                # true: a foe knocked prone a moment ago is still on the ground).
+                last_beat = next((b.get("text") or "" for b in reversed(c.transcript)
+                                  if b.get("who") == "gm" and b.get("text")), "")
                 text, attempt = agent.narrate_outcome(windup, tells,
                                                       f"{actor.name} acts",
                                                       rewrite=False, acting=actor.name,
-                                                      manner=manner)
+                                                      manner=manner, last_beat=last_beat)
                 if attempt is not None and attempt.note:
                     entry["repairs"] += [r for r in attempt.note.split("; ") if r]
                 # The wind-up was held to the manner in `npc_turn`; the turn on the page
@@ -5425,6 +5718,10 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             c.transcript.append({"who": "gm", "text": passage,
                                  "kind": "setup" if prose else "consequence",
                                  **({"added": ours} if prose and ours else {})})
+            if not fell_back:
+                _log_turn_remakes(c, agent, len(c.transcript) - 1, f"{actor.name} acts",
+                                  [o.tell for o in tells])
+        agent.last_turn_written = None
         _log_mentions(c, agent)
         # An NPC's turn is not the player speaking, so the ledger gets no speech
         # from it — only whatever the engine decided on their behalf.
@@ -5497,7 +5794,7 @@ def _plain_tells(c, outcomes) -> str:
     player as "you". The player-turn fallback got the person treatment after the gemma4
     fight audit; the two creature-turn fallbacks here did not, and "Borin Lyraxys hits
     Kesst Vayr for 1 bludgeoning" reached the page as the enemy's beat."""
-    text = " ".join(plain_tell(o.tell) for o in outcomes if o.tell)
+    text = " ".join(plain_tell(o.tell, c.scene) for o in outcomes if o.tell)
     pc = c.scene.pc()
     if pc is not None and text:
         text, _ = narration_mod.pc_to_second_person(text, pc.name)
@@ -5743,7 +6040,7 @@ def _wear_by_the_engine(c, pc, item: str, op: str = "wear"):
     except Exception as exc:     # noqa: BLE001 — a sentence on the page, never a 500
         c.scene.restore(undo)
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
-    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    tell = _page_tells(c, resolution.outcomes)
     if not any(o.effects for o in resolution.outcomes):
         return JsonResponse({"error": tell or "Nothing happened."}, status=400)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
@@ -5826,7 +6123,7 @@ def use_item(request):
         # nothing" was exactly this, twice over.
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
 
-    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    tell = _page_tells(c, resolution.outcomes)
     if not any(o.effects for o in resolution.outcomes):
         # A refusal, printed by the engine since stage 7 rather than raised: the only
         # `use_item` outcome with no effects. The button shows it as the error it is
@@ -6475,7 +6772,7 @@ def trade_do(request):
         # sentence on the screen, never a 500 with an invisible error.
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
 
-    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    tell = _page_tells(c, resolution.outcomes)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     c.save()
     return JsonResponse({"ok": True, "tell": tell})

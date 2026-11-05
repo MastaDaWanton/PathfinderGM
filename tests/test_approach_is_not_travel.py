@@ -1,7 +1,7 @@
 """Walking up to somebody here is not going somewhere else (item 8, the approach part).
 
 Measured on the owner's 2026-09-30 save, turn_log row 82. A forage at the outskirts met a
-Clockwork Spy, put in the scene beside Sam. The player typed **"I aprouch the clockwork
+Clockwork Spy, put in the scene beside Dace. The player typed **"I aprouch the clockwork
 Spy"**; the reading was `seek target: the clockwork Spy`; the plan was ONE `travel` to the
 gate. The tell read "You come back into Ledgerwarren … You are at the gate now … Left
 behind: Clockwork Spy", and the prose, written at the gate, said the Spy did not exist.

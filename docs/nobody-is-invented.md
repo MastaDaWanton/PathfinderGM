@@ -106,7 +106,7 @@ span keeps its length, so every offset downstream still lines up: `note_cast` re
 out of the beat and asks `zone_of_mention` about them, and a shortened string would point
 those at the wrong words.
 
-## Measured live, three runs on a copy of the `masta` save
+## Measured live, three runs on a copy of the `torvo` save
 
 | Run | Result |
 |---|---|

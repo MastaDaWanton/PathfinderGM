@@ -1,7 +1,7 @@
 """The owner's homebrew Power leaf: +20 Str and +20 Con, permanent, landed as +26 each.
 
 Playtest 2026-09-30, the aside in docs/playtest-2026-09-30-findings.md. Traced on the
-owner's save: Sam's `Power leaf Tea` carried `potency: 1.3` and specs reading "+20"; the
+owner's save: Dace's `Power leaf Tea` carried `potency: 1.3` and specs reading "+20"; the
 drink scaled the bonus by the potency and landed +26, while the card printed the authored
 "+20". Two readers of one number. The fix then was one reader, `consumables.scaled_bonus`.
 

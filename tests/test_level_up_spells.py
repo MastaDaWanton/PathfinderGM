@@ -5,7 +5,7 @@ Rulebook (Wizard, "Spells Gained at a New Level"): "Each time a character attain
 wizard level, he gains two spells of his choice to add to his spellbook. The two free
 spells must be of spell levels he can cast."
 
-Measured on the owner's own save before the fix: Sam, a wizard with 2,600 XP, 35
+Measured on the owner's own save before the fix: Dace, a wizard with 2,600 XP, 35
 cantrips and 13 first-level spells (3 + Int +10) — and nothing anywhere in the level-up
 path (play/views.py `level_up`, rules/leveling.py `level_up`, the rest path in
 rules/engine.py) that asked for, offered or counted a spell. The book stayed at its
@@ -30,7 +30,7 @@ from rules.sheet import from_dict, full_sheet, to_dict
 def forge_wizard():
     """A wizard as the forge builds one: every cantrip, and 3 + Int 5 = 8 first-level."""
     built, problems = creation.build({
-        "name": "Sam Test", "race": "elf", "class": "wizard", "pronouns": "he/him",
+        "name": "Dace Test", "race": "elf", "class": "wizard", "pronouns": "he/him",
         "abilities": {"str": 10, "dex": 10, "con": 10, "int": 18, "wis": 10, "cha": 10},
         "skills": ["appraise", "craft", "fly", "knowledge (arcana)",
                    "linguistics", "perception", "spellcraft"],
@@ -61,7 +61,7 @@ def ids_at(level: int, n: int, actor) -> list[str]:
 # --- what a level owes ------------------------------------------------------------------
 
 def test_a_new_wizard_owes_nothing_and_a_second_level_owes_two():
-    """Before the fix the level-up record carried no spells at all: Sam went from 1 to 2
+    """Before the fix the level-up record carried no spells at all: Dace went from 1 to 2
     and the book stayed 48 long. Two a level after the first, and each of a spell level
     castable then — at wizard 2 that is 1st level or lower."""
     w = forge_wizard()

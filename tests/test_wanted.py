@@ -209,6 +209,27 @@ def test_moving_inside_the_walls_is_not_watched():
         assert not _refused(out), out.tell
 
 
+def test_a_city_crossing_is_a_street_and_not_the_way_out():
+    """Owner report 2026-11-01 (Corvin, wanted in Reedsink, turn 60): "walk away" was planned
+    as a walk from the market to the north crossing, and refused "the gate is where the
+    watch stands: they would take you at the arch". A city's four crossings were in
+    `places.ENTRANCES` since the city was quartered, so every walk to one was a walk into
+    the arch — four of a city's twenty-three rooms shut to the wanted, inside the walls.
+    Only the real way out is the gate: each crossing opens, the gate stays shut."""
+    from rules import places as places_mod
+
+    s, e, pc = _table()
+    _want(pc)
+    for name in places_mod._QUARTERS:
+        e.place_party(MARKET)
+        out = _run(e, "travel", {"place": name})
+        assert not _refused(out), (name, out.tell)
+        assert "watch stands" not in out.tell
+    e.place_party(MARKET)
+    assert _refused(_run(e, "travel", {"place": "the gate"}))
+    assert not set(places_mod._QUARTERS) & set(places_mod.ENTRANCES)
+
+
 def _outskirts(e):
     from rules import places as places_mod
 

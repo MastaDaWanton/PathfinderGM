@@ -190,7 +190,7 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
         # The face their population record rolled, when they have one — chosen to
         # agree with their work (rules/lives.py) — and the people it is drawn from,
         # recorded (`person_words.settle_people`). Until 2026-09-30 only the face text
-        # was kept: 8 of 8 NPCs in Sam's save were race "human" with a Ratfolk face and
+        # was kept: 8 of 8 NPCs in Dace's save were race "human" with a Ratfolk face and
         # no people. The words first ("the elf at the bar"), then a grant here (F2:
         # "any human women here?" — "There is one"), then the town's people.
         own = ((rec.get("life") or {}).get("face") if rec else None)

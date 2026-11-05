@@ -165,6 +165,11 @@ def resolve(campaign) -> Outcome:
             scene.end_encounter()
         # The winners act while the player lies there, before the clock moves.
         effects, after = _the_winners_act(campaign, pc)
+        if pc.is_dead:
+            # The law's sentence, carried out on a prisoner beaten on the walk to the
+            # gallows (rules/trial.py `beaten`): there is no coming round.
+            return Outcome(state="dead", playable=False, lines=lines + after + [
+                death_notice(pc)], effects=effects)
         per_hour = max(1, int(getattr(pc, "level", 1) or 1))
         hours = max(1, -(-(pc.nonlethal - pc.nonlethal_threshold) // per_hour))
         scene.advance(hours * 60)
@@ -191,6 +196,9 @@ def resolve(campaign) -> Outcome:
     if scene.in_encounter:
         scene.end_encounter()
     effects, after = _the_winners_act(campaign, pc)
+    if pc.is_dead:
+        return Outcome(state="dead", playable=False, lines=lines + after + [
+            death_notice(pc)], effects=effects)
     # An hour used to pass with nothing ticking at all — not conditions, not buffs,
     # not pools, not compulsions.
     scene.advance(HOURS_UNTIL_CONSCIOUS * 60)
@@ -217,8 +225,15 @@ def _the_winners_act(campaign, pc) -> tuple[list[dict], list[str]]:
     narration each said something different about them. The sentence about the winners
     is now built from what they actually did, and says nothing when nobody was there.
     """
-    from rules import defeat, goods
+    from rules import defeat, goods, trial
 
+    # Beaten by the law where the player is wanted: taken in, not robbed — and on the walk
+    # to the gallows, the end (the owner's ruling of 2026-11-01, rules/trial.py).
+    engine = campaign.engine() if hasattr(campaign, "engine") else None
+    if engine is not None:
+        got = trial.beaten(engine, pc, defeat.standing_over(campaign.scene))
+        if got is not None:
+            return got
     coins = None
     world = getattr(campaign, "world", None)
     if world is not None:

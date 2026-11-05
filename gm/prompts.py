@@ -1995,8 +1995,13 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> st
     actors = getattr(scene, "actors", {}) or {}
     if getattr(scene, "in_encounter", False):
         facts.append("a fight is running")
+    # Dead by the engine's tag alone. Below 0 hit points is dying, not dead (CRB p.191;
+    # `rules.engine.left_after`), and a dying foe is "down but alive" below. Until
+    # 2026-11-04 it was "dead on the ground here" too, beside a blow the engine banded
+    # "down": the diagnosis's "I finish off the dying bandit" was told as a kill the tells
+    # never made (gm/planned.py `present`, the same fix).
     dead = [a.name for a in actors.values()
-            if not a.is_pc and a.name and (a.hp < 0 or a.has_state("state.down.dead"))]
+            if not a.is_pc and a.name and a.has_state("state.down.dead")]
     if dead:
         facts.append(f"dead on the ground here: {', '.join(dead)}")
     down = [a.name for a in actors.values()
@@ -2169,7 +2174,7 @@ def body_now(pc) -> str:
     """What the player's body is carrying, as engine facts in words, last in the prompt.
 
     The owner, 2026-10-05: *"prose acts like im okay but im literally starving and days
-    past the last rest."* Measured on the save: Sammy at 18 of 73 hit points, five days
+    past the last rest."* Measured on the save: Ilse at 18 of 73 hit points, five days
     without food or sleep, and the beat was a calm walk — the brief carried "18/73 hp"
     in the middle of the cast list and not one word of hunger or sleep, which lived only
     on the sidebar. `survival.strains` is the one derivation (the check that holds the
@@ -3103,6 +3108,14 @@ def stuck_note(actor) -> str:
                      f'"{ref}", "params": {{"how": "strength"}}}} to heave free, or '
                      '"how": "slash" to '
                      'hack it off with a slashing weapon.')
+    # Held in a grapple by somebody (the condition's own `by`, written by the engine): the
+    # one op that breaks it. Whoever HOLDS somebody keeps the hold on its own turn without
+    # being asked (`Engine.grapple_turn`), so only the held one is told.
+    if getattr(actor, "held_in_grapple", False):
+        lines.append('They are HELD in a grapple and cannot move until they break it: '
+                     '{"op": "escape", "actor": '
+                     f'"{ref}"}}. The engine rolls the better of their combat manoeuvre '
+                     'and Escape Artist against the holder\'s CMD.')
     return "".join(line + "\n" for line in lines)
 
 
@@ -3677,7 +3690,8 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
 # by a tanglefoot bag could not be sampled putting itself out or tearing loose, which is
 # exactly when either is wanted. `npc_turn_messages` says when one applies.
 _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools",
-              "guard", "end_encounter", "check", "save", "extinguish", "break_free")
+              "guard", "end_encounter", "check", "save", "extinguish", "break_free",
+              "escape")
 
 # The one exception, named: a bestiary creature has no path, no spellbook and no
 # satchel, and its bite's poison lives in a stat block no locator reads yet — 5,735

@@ -152,7 +152,7 @@ token) go through `Engine._give_money`, never into the goods. The amount is the 
   on the 2026-10-03 save "I take the pouch and count the coins", "I pocket the coins" and
   "I transfer the coins from the pouch" would otherwise each have paid again;
 - with no record at all, one copper piece, once an hour: the one coin the engine can
-  vouch for, not a model's count (law 3). Sam's pocketed coin (2026-09-30) is in the purse
+  vouch for, not a model's count (law 3). Dace's pocketed coin (2026-09-30) is in the purse
   now, not in the goods.
 
 Coin set down lies as a pile holding its amount (it used to vanish), and `coin_named` no

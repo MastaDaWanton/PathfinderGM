@@ -414,7 +414,11 @@ def resolve(scene, card_id: str, how: str = "resolved", turn: int = 0) -> Card |
     card = next((c for c in cards if c.id == card_id), None)
     if card is None:
         return None
-    card.stage = "resolved" if how != "dropped" else "dropped"
+    # A matter that FAILED is not one seen through: "failed" lands as dropped, so the
+    # Journal does not list it among the finished. Measured on the owner's 0.2.25 save:
+    # "Fetch Chasmyre Leaf" sat under finished at two objectives of three, the leaf never
+    # brought back, because a-small-favour's `betrayed` resolves its errand "failed".
+    card.stage = "dropped" if how in ("dropped", "failed") else "resolved"
     card.resolved_turn = int(turn)
     _ungrant(scene, card)
     save(scene, cards)
@@ -681,7 +685,7 @@ def quest_log(scene) -> dict:
     """What the table page shows: the quests underway, then the ones finished."""
     # The whole store, not `actors` (who is here): a giver left behind in the back streets
     # printed as "for c1" in the Journal, a ref on the page (ruling 2026-09-28), measured
-    # on the scratch Sam campaign 2026-10-01. A giver with no name anywhere is left out.
+    # on the scratch Dace campaign 2026-10-01. A giver with no name anywhere is left out.
     people = {**(getattr(scene, "people", {}) or {}), **(getattr(scene, "actors", {}) or {})}
 
     def row(c: Card) -> dict:

@@ -31,8 +31,14 @@ def test_first_level_takes_the_whole_die_and_never_rolls_it():
     })
     assert problems == [], problems
     # Con 14 +2 half-orc = 16, a +3 modifier. 16 from the dice, and no dice were rolled.
+    # Constitution on EACH of the two Hit Dice (CRB p.30, "add your Constitution modifier
+    # to each roll"), as the sheet itemises it ("Con x 2 HD"): until 2026-11-01 the forge
+    # added +3 once and the stored roll came out 13, three short of the 16 the dice show.
+    # And the favoured class's hit point, the forge's default (CRB p.31).
     assert built["sheet"]["abilities"]["con"] == 16
-    assert built["sheet"]["hp"] == 16 + 3 == built["sheet"]["hp_max"]
+    assert built["sheet"]["hp"] == 16 + 3 * 2 + 1 == built["sheet"]["hp_max"]
+    from rules.sheet import from_dict
+    assert from_dict(built["sheet"]).hp_base == 16
 
 
 @pytest.mark.parametrize("cid,die", [
@@ -46,7 +52,8 @@ def test_the_core_classes_take_their_own_die_whole(cid, die):
         "spellbook": creation.starter_spells(cid),
     })
     assert problems == []
-    assert built["sheet"]["hp"] == die       # Con 10 is no modifier either way
+    # Con 10 is no modifier either way; +1 is the favoured class's hit point (CRB p.31).
+    assert built["sheet"]["hp"] == die + 1
 
 
 # --- the opening reads off any world -------------------------------------------------

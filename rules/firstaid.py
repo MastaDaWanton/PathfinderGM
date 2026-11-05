@@ -81,7 +81,7 @@ def stabilise(engine, healer, patient):
     mods = healer.skill_modifiers(SKILL)
     roll = engine.dice.d20(mods, label=f"{healer.name} Heal check", visibility="hidden")
     margin = roll.total - DC
-    tell = (f"{healer.name} makes the heal check by {margin}." if margin >= 0
+    tell = (f"{healer.name} makes the heal check{dc_mod.by(margin)}." if margin >= 0
             else f"{healer.name} misses the heal check by {-margin}.")
     if not dying(patient):
         return Outcome(intent_id="", op="check", rolls=[roll],

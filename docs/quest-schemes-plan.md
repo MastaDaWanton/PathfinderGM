@@ -403,10 +403,16 @@ Criteria (all engine-measurable, none prose):
 - `since(open|step-id) >= Nh`, `clock >= N` — time;
 - `event:<name>` — a registered engine event (objective done, item gained, travel,
   fight ended, talk with `$slot`), from the same registry the homebrew rules keep;
-- `alive($slot)`, `present($slot)`, `holds(pc, $item)`.
+- `alive($slot)`, `present($slot)`, `holds(pc, $item)`;
+- (2026-11-01) `event:give($who, $item)` — the player's own hand gave THAT thing to
+  THAT person this batch; `taken(cardkey)` / `not taken(cardkey)` — the player took on
+  that quest card (`cards.standing` OWN). A return objective asks for the hand-over, not
+  `holds` beside `present` (the owner's 0.2.25 save ticked "Get it back to Maren" on
+  walking in with the herb); a step that implicates the player asks `taken` (the frame).
 
 Selection: on every tick (turn end, travel arrival, clock advance) every step of every
-open instance whose criteria all hold is a candidate; most criteria wins; ties by
+open instance whose criteria all hold is a candidate; a step keyed on an `event:` of this
+batch first (2026-11-01: an event is now or never), then most criteria wins; ties by
 authored order; one step per tick. Deterministic, seeded, testable.
 
 Actions (existing vocabulary only): `move($who, $place)`, `hide($who)` (a `state.hidden`

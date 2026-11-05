@@ -1,9 +1,9 @@
 """What comes in and what goes out are two questions, not one (item 13, 2026-09-30).
 
-Measured on Sam's save: turn 7, "I pocket the coin and give them a piece of paper with my
+Measured on Dace's save: turn 7, "I pocket the coin and give them a piece of paper with my
 name on it. "Remember me when you have a bone that needs setting."" The plan carried a
 `give` of the paper to the cage owner, and `judgement.inject_goods` bowed out whenever ANY
-`give` was present — so the lead coin Sam pocketed was never recorded, and his goods at
+`give` was present — so the lead coin Dace pocketed was never recorded, and his goods at
 the end of the session held a scholar's outfit, herbs and a key, and no coin.
 
 Since 2026-10-03 the reading drives these ops (gm/acts_to_ops.py; `inject_goods` is
@@ -39,7 +39,7 @@ def _read(said, scene, frame, plan):
 def test_the_coin_is_recorded_beside_the_paper_given_away():
     scene = _sam("the cage owner")
     out = _read(TURN_7, scene, READING_7, PLAN_7)
-    # The paper is not in Sam's pack, so the reading's give of it is not built and the
+    # The paper is not in Dace's pack, so the reading's give of it is not built and the
     # plan's own give of it stands (an act of the reading, `give`, stands behind it).
     assert out[:2] == PLAN_7
     assert out[2]["op"] == "give" and out[2]["params"] == {"item": "coin", "to": "pc"}

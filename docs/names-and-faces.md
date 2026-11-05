@@ -57,7 +57,7 @@ sentences. No module read either.
   front — "the Reeve's men" → "the men", "at the Reeve" → "at the stranger", never "the
   the".
 
-## Measured live, two replays on a copy of the `masta` save
+## Measured live, two replays on a copy of the `torvo` save
 
 Five lines: stand and ask the stranger his name; look the woman in the doorway over;
 the insult; hit him; Continue.

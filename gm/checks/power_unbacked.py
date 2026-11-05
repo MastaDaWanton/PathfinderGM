@@ -33,6 +33,13 @@ from ._page import cut
 ORDER = 61
 KINDS = frozenset({"power-unbacked"})
 DOORS = frozenset({"plan", "turn"})
+# On a planned beat: no rewrite, and the backstop cuts without its line (round 2,
+# 2026-11-05). A power the player DECLARED out of reach is refused before the turn is
+# planned (gm/means.py), so a power on a planned page is the slot's invention, and the
+# line — the refusal of a reach the player made — is false of it. On the rerun the
+# rewrite fixed 1 of 6 planned findings (4 "still did it"), and the line shipped on 3
+# pages ("Whatever you reach for does not answer", 2 scored errors and 3 Q pages).
+PLANNED_NO_REWRITE = frozenset({"power-unbacked"})
 
 POOL = (
     "Whatever you reach for does not answer; the moment stays exactly as it was.",
@@ -101,6 +108,9 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
     sentence = _found(ctx, text)
     if not sentence or sentence not in text:
         return text, []
+    if getattr(ctx, "planned", False):
+        # The slot's invention, not the player's reach (`PLANNED_NO_REWRITE`): cut, no line.
+        return cut(text, [sentence]), [f"a power no tell backs: cut {sentence[:60]!r}"]
     line = POOL[narration_mod.least_recently_used(getattr(ctx.scene, "said", None),
                                                   "power-unbacked", len(POOL))]
     at = text.find(sentence)

@@ -123,6 +123,11 @@ def test_through_the_real_door_the_beat_reaches_the_page_without_the_claim(monke
         raise client.ModelUnavailable("down")
 
     monkeypatch.setattr(agent_mod.client, "chat", chat)
+    # The consequence call's own door (the free narrator; a planned turn in a fight is
+    # written by gm/planned.py since 2026-11-04 and shares this tail, `_groom_outcome`).
+    from rules import houserules
+
+    monkeypatch.setattr(houserules, "narration", lambda: "free")
     text, attempt = gm.narrate_outcome("", res.outcomes, "Clockwork Spy acts",
                                        rewrite=False, acting="Clockwork Spy")
     assert "landing right before you" not in text

@@ -1,7 +1,7 @@
 """A people the page granted in reply binds the next person made there (owner ruling F2).
 
 Measured on the 2026-09-30 playtest (docs/playtest-2026-09-30-findings.md item 10, turns
-22-23 of Sam's save). The player asked the barkeep "any human women here?"; Gorm answered
+22-23 of Dace's save). The player asked the barkeep "any human women here?"; Gorm answered
 "There is one," and the narrator described a woman humming behind the curtain. When the
 party went through, the chamber's keeper was minted — Quin Nutmeg — with the town's
 people's face: "Ratfolk: Small, rodent-featured…". The prose described human hair and skin

@@ -37,6 +37,7 @@ from rules import alchemist as al
 from rules import alchemy_items as items
 from rules import crafting, effectspec, formulae, knowledge, survival, worldclass
 
+from . import bench_clock
 from . import campaign as campaign_mod
 from .apiutil import read_body
 
@@ -762,6 +763,12 @@ def alchemy_roll(request):
                     f"{plan.impossible}.")
     if not plan.can_roll:
         return _err("Nothing on the bench to work.")
+    # Before the toxic reagent, the die, the rent and the clock: work the pack cannot
+    # carry the body through is refused in words, and nothing has happened
+    # (`bench_clock`).
+    said = bench_clock.refusal(c, pc, plan.minutes)
+    if said:
+        return _err(said, 409)
     engine = c.engine()
     track, progress = _progress(pc)
 
@@ -790,7 +797,7 @@ def alchemy_roll(request):
             pc.purse = purse
             paid.append({"cp": rent, "words": _coins(rent),
                          "to": (plan.lab or {}).get("keeper")})
-    c.scene.advance(plan.minutes)
+    lived = bench_clock.pass_time(c, engine, pc, plan.minutes, "at the alchemy bench")
     roll = {"face": best, "faces": faces, "bonus": plan.bonus, "total": total,
             "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms,
             "dc_terms": plan.dc_terms if not _secret(plan) else None}
@@ -798,7 +805,8 @@ def alchemy_roll(request):
            "verdict": {"verdict": "success" if success else "failure", "natural": best,
                        "word": "Success" if success else "Failure", "good": success},
            "lost": [], "minutes": plan.minutes, "rent": paid,
-           "toxic": _outcome_rows(toxic), "flare": False, "mishap": []}
+           "toxic": _outcome_rows(toxic), "flare": False, "mishap": [],
+           "lived": lived}
     line = ""
     if success:
         token = secrets.token_urlsafe(16)
@@ -1089,7 +1097,7 @@ def _companion_knows(c, pc, ref: str, spell_id: str) -> str:
     if not getattr(a, "is_companion", False) and getattr(a, "side", "") != getattr(pc, "side", ""):
         return f"{a.name} is no companion of yours."
     try:
-        if casting.knows(a, spells.get(spell_id)):
+        if casting.castable_now(a, spells.get(spell_id)):
             return ""
     except Exception:      # noqa: BLE001
         pass
@@ -1135,11 +1143,16 @@ def alchemy_learn(request):
         from rules import casting, spells
 
         try:
-            ok = bool(row.get("spell")) and casting.knows(pc, spells.get(row["spell"]))
+            ok = bool(row.get("spell")) and casting.castable_now(pc, spells.get(row["spell"]))
         except Exception:      # noqa: BLE001
             ok = False
         if not ok:
-            return _err("Your spellbook does not hold that spell.", 409)
+            try:
+                listed = bool(row.get("spell")) and casting.knows(pc, spells.get(row["spell"]))
+            except Exception:      # noqa: BLE001
+                listed = False
+            return _err("You cannot cast that spell yet, so there is nothing of it to write "
+                        "down." if listed else "Your spellbook does not hold that spell.", 409)
     elif source == "teacher":
         ref = str(body.get("who") or "")
         if not any(t["ref"] == ref for t in alchemists_here(c, pc)):
@@ -1173,12 +1186,19 @@ def alchemy_learn(request):
     plan = formulae.learn_route(pc, fid, source, clock=now)
     if plan["refused"]:
         return _err(" ".join(plan["refused"]), 409)
-    cost_cp = int(round(float(plan.get("cost_gp") or 0) * 100)) + fee_cp
-    if cost_cp:
-        purse, ok = goods.spend(pc.purse, cost_cp)
+    # The writing's cost is paid for the writing, and only a formula written is one
+    # (CRB, Arcane Magical Writings: on a failed check "the wizard cannot understand the
+    # spell" and nothing is written). Owner report 2026-11-01 (Ansel): two failed copies
+    # took 50 gp between them, and nothing on the page said a coin had moved. The fee for
+    # a teacher's hour is the teacher's and is paid up front; the writing waits for the
+    # roll, and a purse that could not pay it is refused before anything is rolled.
+    write_cp = int(round(float(plan.get("cost_gp") or 0) * 100))
+    if write_cp + fee_cp:
+        _purse, ok = goods.spend(pc.purse, write_cp + fee_cp)
         if not ok:
-            return _err(f"It costs {_coins(cost_cp)}, and you cannot pay it.", 409)
-        pc.purse = purse
+            return _err(f"It costs {_coins(write_cp + fee_cp)}, and you cannot pay it.", 409)
+    if fee_cp:
+        pc.purse, _ok = goods.spend(pc.purse, fee_cp)
         if teacher is not None:
             teacher.purse = goods.credit(getattr(teacher, "purse", None) or {}, fee_cp)
     total = None
@@ -1194,6 +1214,11 @@ def alchemy_learn(request):
                                        visibility="player").faces[0]
         total = face + sum(t["value"] for t in terms)
     got = formulae.resolve_learn(pc, fid, source, total, clock=now)
+    paid_writing = 0
+    if write_cp and got.get("learned"):
+        pc.purse, _ok = goods.spend(pc.purse, write_cp)
+        paid_writing = write_cp
+    cost_cp = fee_cp + paid_writing
     if got.get("spent") and sid and st is not None:
         pc.take_stock(sid, 1)
     minutes = int(plan.get("minutes") or 60)
@@ -1214,6 +1239,14 @@ def alchemy_learn(request):
     else:
         said = (f"{pc.name} learns the formula for {name}." if got.get("learned")
                 else f"{pc.name} cannot make out the formula for {name}.")
+    # What moved from the purse, said: the writing when it was written, the teacher's fee
+    # when there was one, and the writing NOT charged when the copy failed.
+    if paid_writing:
+        said += f" Writing it into the book costs {_coins(paid_writing)}."
+    elif write_cp:
+        said += f" Nothing is written, so the {_coins(write_cp)} of writing is not spent."
+    if fee_cp:
+        said += f" The lesson costs {_coins(fee_cp)}."
     c.transcript.append({"who": "gm", "kind": "consequence", "text": said})
     c.save()
     return JsonResponse({"fid": "" if secret else fid, "name": None if secret else name,
@@ -1523,7 +1556,7 @@ def alchemy_formulary(request):
         if row.get("kind") != "spell" or not row.get("spell") or formulae.knows(pc, fid):
             continue
         try:
-            if not casting.knows(pc, spells.get(row["spell"])):
+            if not casting.castable_now(pc, spells.get(row["spell"])):
                 continue
         except Exception:      # noqa: BLE001 - a spell the engine cannot read is not known
             continue

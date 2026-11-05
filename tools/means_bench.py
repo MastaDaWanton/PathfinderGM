@@ -108,8 +108,16 @@ def main() -> None:
                 nonlocal asks
                 asks += 1
                 return means.which_power(sc, deed)
+        # As the turn runs it (`GMAgent.plan_turn`, round 2): a bare claim is asked once,
+        # with the whole line, and a line said aloud becomes talk before the gate.
+        if not args.no_ask:
+            frame = means.said_aloud(json.loads(json.dumps(frame)), line,
+                                     ask=means.claim_kind)
+        kind = (frame or {}).get("claim_kind")
         judged = means.judge(frame, scene, ask=ask,
-                             claim_ask=None if args.no_ask else means.claim_kind)
+                             claim_ask=None if args.no_ask else (
+                                 lambda c, _k=kind, _l=line:
+                                 _k or means.claim_kind(c, sentence=_l)))
         refused = any(j.get("refused_name") for j in judged)
         want_refused = expect == REFUSE
         ok = refused == want_refused

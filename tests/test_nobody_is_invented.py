@@ -135,7 +135,7 @@ def test_nobody_is_created_for_a_person_the_player_named_who_is_not_here(scene):
     engine = Engine(scene, Dice(seed=1), world=WORLD)
     res = engine.run(engine.validate(amended))
     assert any("no mayor in Vormoor" in o.tell for o in res.outcomes)
-    assert [a.name for a in scene.actors.values()] == ["Masta"] or \
+    assert [a.name for a in scene.actors.values()] == ["Torvo"] or \
         all(a.is_pc for a in scene.actors.values()), "the scene gained nobody"
 
 

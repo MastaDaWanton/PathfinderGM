@@ -20,6 +20,28 @@ class BadDC(ValueError):
     pass
 
 
+# What a tell says after "makes the check" for a success by `margin`. A success by
+# nothing — the total exactly the DC, which 1e calls a success ("equal to or greater than
+# the DC", CRB p.86) — was told "makes the perception check by 0", and the narrator wrote
+# it failed: on the narration diagnosis bench (2026-11-04, mechanism 4, 10% of the
+# baseline's errors) the 12B narrator read "by 0" as "by nothing" — the climb a slip, a
+# trip "by 0" the wolf still standing. Said as what it is: made, only just.
+#
+# Weighed against the plan lane's "just makes the perception check" on the same recorded
+# call (the climb-fail run 1 slot, re-asked 6 times each at the slot's own temperature,
+# 2026-11-04, read by hand): "by 0" came back failed 6 of 6, "just makes" made 6 of 6, and
+# ", only just" made 6 of 6 — narrowly ("you just barely make out the shapes"), which is
+# what the dice said. Both read as success; this one also keeps the margin, so it stays.
+JUST_MADE = ", only just"
+
+
+def by(margin: int) -> str:
+    """" by 3" after a success by 3, or `JUST_MADE` after a success by 0 — the one writer
+    of every "makes … by N" a tell says. A failure is always by one or more, so it never
+    needs this."""
+    return f" by {int(margin)}" if int(margin) else JUST_MADE
+
+
 @dataclass
 class ResolvedDC:
     value: int

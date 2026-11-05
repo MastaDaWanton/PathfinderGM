@@ -234,3 +234,31 @@ def test_a_walk_out_of_the_place_is_still_caught_without_a_refusal():
                   reading={"actions": [{"act": "go", "place": "the street"}]},
                   was_at=agent.engine.scene.at)
     assert [f.kind for f in refused_move.find(ctx)] == ["refused-move-shown-as-moved"]
+
+
+_STEP = {"intent_id": "i1", "op": "move", "status": "resolved",
+         "tell": "Corvin T. moves to near (50 ft).",
+         "effects": [{"ref": "pc", "kind": "position", "from": [5, 7], "to": [0, 0],
+                      "feet": 50, "zone": "near"}]}
+
+
+def test_a_resolved_step_across_the_ground_is_a_move():
+    """Measured on the owner's report of 2026-11-01 (Corvin T., the outskirts, log 259):
+    "move closser" resolved an in-scene `move` 50 ft to (0,0), and this check, counting
+    only travel, journey, venture and found, read "You move closer, closing the distance
+    to the creature" as a walk nobody made — its repair wrote "You move closer in your
+    mind" on three turns running. A step the engine resolved is a step; a refused one is
+    not."""
+    agent = _in_a_tavern()
+    text = ("You move closer, closing the distance to the creature until it sits within "
+            "fifty feet.")
+    reading = {"actions": [{"act": "go", "span": "move closser"}]}
+    ctx = context(agent, text, outcomes=[_STEP], player="move closser", reading=reading,
+                  was_at=agent.engine.scene.at)
+    assert refused_move.find(ctx) == []
+    refused = [dict(_STEP, status="refused", effects=[])]
+    ctx = context(agent, "You leave the Copper Kettle and walk out into the street.",
+                  outcomes=refused, player="I walk out into the street.",
+                  reading={"actions": [{"act": "go", "place": "the street"}]},
+                  was_at=agent.engine.scene.at)
+    assert [f.kind for f in refused_move.find(ctx)] == ["refused-move-shown-as-moved"]

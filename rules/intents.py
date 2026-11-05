@@ -290,8 +290,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `pace` (Stealth: "half" or "full", CRB p.106's -5 band) and `diversion` (a Bluff to
     # draw the watchers' eyes away so a Stealth check may follow) are the reader's closed
     # answers about the player's words (`acts_to_ops._sneak`), never a word list.
+    # `past` (2026-11-01): the check is a push past the people who cut the player's walk
+    # short (`states.MAKING_FOR`); made, the walk goes on to where it was for
+    # (`Engine._drive`). Written only by the act→op table (`acts_to_ops._exert`).
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
-                           "pace", "diversion"),
+                           "pace", "diversion", "past"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -401,6 +404,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # check) or "slash" (15 points of slashing damage dealt to the goo, which is hit
     # automatically). The engine owns both numbers (CRB, Goods and Services).
     "break_free": ((), ("how",), "player"),
+    # Breaking a grapple (CRB p.200): a combat manoeuvre check or an Escape Artist check
+    # against the holder's CMD, a standard action that provokes nothing. `how` is "cmb" or
+    # "escape artist"; left out, the better of the two. The holder is the engine's (the
+    # condition's own `by`), aimed by `target` only to choose among two holders.
+    "escape": ((), ("actor", "how"), "player"),
     "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
     # `drain` for the permanent kind, which no amount of resting brings back.
@@ -429,6 +437,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # for what the work is made FROM, grounded in the craft's catalogue by the engine.
     # Written only by the act->op table from the reader's `craft` act (CODE_ONLY_OPS).
     "make": (("craft",), ("item", "work", "words"), "player"),
+    # Parts cut off a carcass, aimed by `target` (the dead creature): the harvest sheet's
+    # own rules (`harvest.take_part`). `parts` is the player's words for what is cut,
+    # matched against the sheet's rows. Written only by the act->op table from the
+    # reader's `harvest` act (CODE_ONLY_OPS).
+    "harvest": ((), ("actor", "parts"), "player"),
     # Spending or granting a pool: ki, rage rounds, a use per day, a stack on an enemy.
     # `to` because a stack lives on the creature it was applied to, not on whoever
     # applied it.
@@ -502,6 +515,17 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # out of the place, or by the other party leaving, falling or drawing — never by
     # silence (2026-09-24).
     "leave_talk": ((), ("actor", "who", "do"), "player"),
+    # Going up to somebody here and speaking to them with no words given: the talk opens
+    # (2026-11-01). Written only by the act->op table from the reader's `talk` act with a
+    # person and no words (CODE_ONLY_OPS); `say` needs words, and "Speak to Snik Dunmoor"
+    # has none. `who` is the ref of the person spoken to.
+    "greet": (("who",), ("actor",), "player"),
+    # Paying a keeper to do craft work on the player's own things (rules/commission.py,
+    # 2026-11-01): `who` the keeper, `item` the words for what is to be made or finished.
+    # Written only by the act->op table from the reader's `commission` act (CODE_ONLY_OPS).
+    # `haggle`: the commission was OFFERED, not agreed (a `tried` reading) — the price is
+    # talked down with Diplomacy before the job is taken (owner ruling 2026-11-01).
+    "commission": (("who",), ("actor", "item", "haggle", "agree"), "player"),
     # Two ships and the distance between them. `do` is close / sheer off / ram / grapple
     # / board, and `with` names whoever goes across — the same word travel uses for the
     # people who come along, because a boarding party is a party.
@@ -757,7 +781,7 @@ PARAM_ALIASES = {
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
 CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
-                              "ends_when", "pace", "diversion"})
+                              "ends_when", "pace", "diversion", "past"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
@@ -768,7 +792,8 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "
 # mastery with no item, no roll and no material spent. A typed craft line is the reader's
 # `craft` act, built whole into `make`; the chain bench (play/craft_views.py) still writes
 # `craft` itself, from code.
-CODE_ONLY_OPS = frozenset({"job", "make", "craft"})
+# `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
+CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest"})
 JOB_DOES = ("offer", "accept", "decline")
 
 ENGINE_OWNED_PARAMS = {
@@ -941,7 +966,7 @@ def is_null(value) -> bool:
 # `defensively` is the cast's (2026-10-09): read at last by the concentration check, and
 # "false" written as a word must not cost a caster a spell.
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
-                         "thrown", "quoted", "own", "roll", "defensively", "aid"})
+                         "thrown", "quoted", "own", "roll", "defensively", "aid", "past"})
 
 
 def _flag(value) -> bool:
@@ -2006,6 +2031,11 @@ _BACKED_BY = {
               "states items gained; the satchel is the engine's to fill"),
     "xp": ("states advancement; levels and experience are the engine's",),
     "moved": ("states the player went somewhere; where they are is the engine's",),
+    # A death the engine dealt (a `condition` effect of "dead": the law's sentence carried
+    # out, `rules/trial.py`). The row's "you are dead" is then the report, not a claim:
+    # on the 2026-11-05 final rerun "You are dead." after the hanging was rewritten by the
+    # outcome-claims repair to "You are breathless." (gallows, run 5).
+    "killed": ("states being hit",),
 }
 
 
@@ -2074,8 +2104,21 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
         # so a dug haul's prose could be scrubbed as an invented item.
         if op in ("forage", "prospect", "gather", "craft", "take"):
             allow("items")
+        # And a harvest that kept a part, and a piece made: both land in the pack by the
+        # engine's hand. Missing from the list, the 2026-11-05 round-2 bench had a true
+        # "peeling away the wolf's pelt and cutting out the sinew threads to stow them
+        # safely in your pack" cut as an invented haul, leaving a harvest beat with no
+        # harvest on it (scored as both parts untold, by both scorers).
+        if op == "harvest" and any(isinstance(e, dict) and (e.get("stock") or e.get("carried"))
+                                   for e in effects):
+            allow("items")
+        if op == "make" and str(get("status", "") or "resolved") != "refused":
+            allow("items")
         if op == "xp":
             allow("xp")
+        if any(isinstance(e, dict) and e.get("kind") == "condition"
+               and e.get("condition") == "dead" for e in effects):
+            allow("killed")
         # Where the party is standing is `Actor.at`, and the engine is its one writer
         # (docs/places-8b-plan.md). Prose may say the player went through a door only
         # when an op actually took them through one.

@@ -345,7 +345,7 @@ Nothing keys on a name, an id or a fact label. Facts are read through candidate 
 Tests live in `tests/test_c_*.py` and run over the `worlds` fixture unless marked otherwise. Each docstring records its measurement.
 
 1. `start_town_is_not_always_the_last_village`: over 1,000 seeds (Aurvantis), ≥ 40 towns, and no single town above 8%. *Measured: Vormoor 100%.*
-2. `name_no_longer_decides_the_start`: "masta" over 50 seeds gives ≥ 6 start ids. *Measured: 1 name = 1 start.*
+2. `name_no_longer_decides_the_start`: one name over 50 seeds gives ≥ 6 start ids. *Measured: 1 name = 1 start.*
 3. `same_seed_same_start` and `old_saves_reopen_the_same_way`: with no story seed and an empty `start_id`, the `SITUATIONS` opening comes out byte-identical.
 4. `every_shipped_start_validates` and `validator_names_the_fix`: a table of broken documents, one per rule (an `-ing` label, a digit, an undeclared slot, an unknown kind, night, an unknown background).
 5. `road_start_waits_for_the_outskirts`: over 1,000 draws, never placed.

@@ -63,16 +63,40 @@ class Encounter:
     extras: dict = field(default_factory=dict)
 
 
-def _cr_window(level: int, guarding: bool) -> tuple[float, float]:
+def _cr_window(level: int, guarding: bool, party: int | None = None) -> tuple[float, float]:
+    """The CR window for the trade `level`, and never above what the party's own level
+    allows. Measured on the owner's 0.2.25 report (2026-11-01): a first-level herbalist on
+    a third-level character met a CR 19 vishap (362 hp) as the forage's creature. The window
+    was the trade's level alone, so a character whose trade outran their body — or a body
+    whose trade outran it, Herbalist 8 on a level-3 character — drew creatures by the
+    craft. 1e prices an encounter by the party's level: Table 12-1 runs from APL-1 (easy)
+    to APL+3 (epic), and stops there (CRB p.397). The ground's hazard of the work stays
+    inside challenging (character level +1), the guard's inside hard (+2): both windows are
+    capped by the character's level, whichever is lower. (The book also counts a party of
+    three or fewer one level lower, Step 1; not applied, so a solo forager's cap is the
+    book's challenging-to-hard band for a party of four of their level.)"""
+    above = GUARD_ABOVE if guarding else ABOVE
     low = max(1 / 3, level - BELOW)
-    high = max(1, level + (GUARD_ABOVE if guarding else ABOVE))
+    high = max(1, level + above)
+    if party is not None:
+        cap = max(1, int(party) + above)
+        high = min(high, cap)
+        low = min(low, max(1 / 3, int(party) - BELOW))
     return low, high
 
 
-def creature_for(biome: str, level: int, dice, guarding: bool = False) -> dict | None:
+def creature_for(biome: str, level: int, dice, guarding: bool = False,
+                 party: int | None = None) -> dict | None:
     """A bestiary row that lives here and is a fair match, or None when the book has
-    nothing for this ground — a stone shelf where no creature is tagged is quiet."""
-    low, high = _cr_window(level, guarding)
+    nothing for this ground — a stone shelf where no creature is tagged is quiet.
+
+    The row is checked again after it is picked: the creature the engine will bring in
+    is the block `bestiary.raw_block` resolves its id to, and that block's CR must be
+    inside the window too. A row and its block are the same thing in the shipped book;
+    a homebrew file or an alias that merged a different block under the id would not be,
+    and the vishap above could not be reproduced from the shipped book at trade levels
+    1-17 — so the spawned block is held to the window rather than trusted."""
+    low, high = _cr_window(level, guarding, party)
     # Only creatures whose ground is the book's own words (`bestiary.ground_stated`): the
     # spreadsheet's guessed ground drew a named hag of an adventure, Aelzeldra, onto a
     # seam in the hills and the tell called her "an Aelzeldra" (the owner, 2026-10-09:
@@ -82,7 +106,12 @@ def creature_for(biome: str, level: int, dice, guarding: bool = False) -> dict |
             and r.get("creature_type") not in ("humanoid", "outsider", "undead")]
     if not rows:
         return None
-    return rows[pick_index(dice, len(rows), "what lives here")]
+    row = rows[pick_index(dice, len(rows), "what lives here")]
+    block = bestiary.raw_block(str(row.get("id") or "")) or row
+    cr = block.get("cr_value")
+    if cr is None or not (low <= float(cr) <= high):
+        return None
+    return row
 
 
 def pick_index(dice, n: int, label: str) -> int:
@@ -100,16 +129,17 @@ def pick_index(dice, n: int, label: str) -> int:
     return dice.roll(f"1d{n}", label=label, visibility="hidden").total - 1
 
 
-def roll(biome: str, level: int, dice) -> Encounter:
+def roll(biome: str, level: int, dice, party: int | None = None) -> Encounter:
     """Once per expedition. The d100 is the engine's, hidden, like every other roll a
-    player could not have known the number of."""
+    player could not have known the number of. `party` is the party's level, which caps
+    the creature's CR as well as the trade's level does (`_cr_window`)."""
     r = dice.roll("1d100", label="the ground's own answer", visibility="hidden").total
     kind = next(k for lo, hi, k in BANDS if lo <= r <= hi)
     if kind == "quiet":
         return Encounter("quiet", r)
     if kind == "rich":
         return Encounter("rich", r, yield_times=RICH_YIELD)
-    row = creature_for(biome, level, dice, guarding=(kind == "guarded"))
+    row = creature_for(biome, level, dice, guarding=(kind == "guarded"), party=party)
     if row is None:
         # Nothing lives here that the book prices for this level; the ground is
         # quiet, and a rich find is what a guarded one becomes with nobody on it.

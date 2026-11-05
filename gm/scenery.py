@@ -70,7 +70,21 @@ BROKEN = "not here: a piece of something no passage shows broken"
 ELSEWHERE = "not here: taken away, gone, far off, or only spoken of or remembered"
 WRONG_PLACE = "not here: would not be found in a place like this"
 ABSENT = WRONG_PLACE           # the old name, for callers that only ask "refused?"
-REFUSALS = (BROKEN, ELSEWHERE, WRONG_PLACE)
+# Two more ways, both from the owner's 0.2.25 report (2026-11-01), each a thing that is in
+# the world and is still never a loose thing to pick up:
+#   * a plant growing in the land. "pick the chaSMIER LEAF" was answered "shown here" with
+#     the quote "The rare Chasmyre Leaf grows among the tangled roots and stagnant waters
+#     of the marsh." — a sentence about where the herb grows, written by the planned
+#     narrator's thread slot. The quote was the page's own, so it passed, the leaf was
+#     ledgered, and the give took it: any herb the prose mentioned could be had with no
+#     forage roll. Herbs come out of the ground by foraging and out of a carcass by
+#     harvesting, never off the page.
+#   * a body. "loot the body" was read as a take of the thing "body", answered "shown
+#     here" off a sentence about the grub's jaws, and the give put `"body": 1` in the
+#     pack. A dead creature's body is where its loot is, not goods (`_bodies_looted`).
+GROWING = "not here: a plant growing in the land, had only by foraging for it"
+BODY = "a body: the body, corpse or remains of a person or creature"
+REFUSALS = (BROKEN, ELSEWHERE, WRONG_PLACE, GROWING)
 # The fourth way: the thing is the player's already, because the engine put it in their pack
 # here and the page described it. Measured on the owner's 0.2.21 report (2026-10-27): the
 # engine paid a grioth's guarded find into the satchel, the planned beat wrote "you find a
@@ -82,7 +96,7 @@ REFUSALS = (BROKEN, ELSEWHERE, WRONG_PLACE)
 # grammar holds); code checks the number is one it was shown. Offered only when there is a
 # grant to name, so a reader with nothing given here cannot answer it.
 ALREADY = "already the player's: the game put it in their pack"
-ANSWERS = (SHOWN, COMMON, *REFUSALS, ALREADY)
+ANSWERS = (SHOWN, COMMON, *REFUSALS, BODY, ALREADY)
 
 # The most things one turn asks about: a plan reaching for more than this from nowhere is
 # a plan conjuring, and the rest stay refused.
@@ -95,7 +109,9 @@ _SYSTEM = (
     "doubt it is there: a player who has read about a thing must be able to use it.\n"
     "\"shown here\": a passage's narration shows this thing, or the things it is one of, "
     "here where the player is — lying, standing, hanging, set out, thrown down, or in "
-    "somebody's hands within reach. Copy the narration's own words into \"quote\".\n"
+    "somebody's hands within reach. Copy the narration's own words into \"quote\". A "
+    "passage that only says what grows or is found in this land, or what a place is "
+    "known for, shows nothing lying here.\n"
     "\"fits a place like this\": no passage shows it, but a place of this kind would "
     "plausibly have one to hand without anything having to happen first — a stone on a "
     "road, a stool in a tavern, a hammer in a smithy. quote is \"\".\n"
@@ -107,6 +123,10 @@ _SYSTEM = (
     "else, in somebody's speech or in a memory.\n"
     "\"" + WRONG_PLACE + "\": no passage shows it and a place of this kind would not "
     "have one lying about — a sword in a wood, a crossbow in a tavern.\n"
+    "\"" + GROWING + "\": a herb, leaf, flower, root, berry, mushroom or other plant "
+    "still growing here or in this land: picking it is foraging, not picking up a thing.\n"
+    "\"" + BODY + "\": the thing is a body, corpse, carcass or remains of somebody or "
+    "some creature.\n"
     "When the player has been given things here, they are listed, numbered:\n"
     "\"" + ALREADY + "\": the thing is one of those, or holds them, or is made of them — "
     "the passages describing what the player was given, however they put it. Put its "
@@ -137,6 +157,16 @@ _DEMOS = [
     ("the toll house (inside a building)",
      "The clerk slams the ledger shut and stands, his chair grinding back on the boards.",
      "a pitchfork", {"answer": WRONG_PLACE, "quote": ""}),
+    # A sentence about what grows in the land is not a thing lying here (the owner's
+    # 0.2.25 report: "The rare Chasmyre Leaf grows among the tangled roots…" ledgered a
+    # leaf). Neither demonstration's words are the report's.
+    ("the fen (open country)",
+     "Mist hangs over the fen. Bitterwort is said to grow along these banks, though few "
+     "who come looking find it.",
+     "the bitterwort", {"answer": GROWING, "quote": ""}),
+    ("the old orchard (open country)",
+     "A dead wolf lies in the long grass where it fell, its pelt matted with blood.",
+     "the wolf's body", {"answer": BODY, "quote": ""}),
     # Given things listed: the page's own words for what the game put in the pack are that,
     # and a thing beside it on the same page is still answered as scenery.
     ("the old quarry (open country)",
@@ -251,7 +281,20 @@ def decide(place: str, kinds, passages: list[str], thing: str, *, ask_fn=None,
     answer, quote = got[0], got[1]
     which = str(got[2]) if len(got) > 2 else ""
     out = {"answer": answer or "unread", "quote": quote, "ledger": False, "origin": "",
-           "why": "", "given": None}
+           "why": "", "given": None, "body": answer == BODY}
+    herb = growing_herb(thing)
+    if herb and answer not in (ALREADY, BODY):
+        # Checked in code whatever the reader said: a name off the herbalist's own
+        # catalogue is a plant, and a plant is foraged (`Engine._gather`) or harvested,
+        # never picked up off a page. Near names count — the player typed "chasmier"
+        # for the catalogue's Chasmyre, which `ingredients.by_name` (deliberately exact,
+        # for the satchel) does not match, so the give minted a goods line "chasmier
+        # leaf". Names compared against a closed catalogue, never English read.
+        out["answer"] = GROWING
+        out["why"] = f"{herb} is a plant: foraged, never picked up"
+        return out
+    if answer == BODY:
+        return out
     if answer == ALREADY:
         # The number checked against what was shown: one grant needs no number, and a
         # number that names nothing shown is no answer — nothing is ledgered, so nothing
@@ -292,6 +335,43 @@ def decide(place: str, kinds, passages: list[str], thing: str, *, ask_fn=None,
         out["ledger"] = True
         out["origin"] = "narrated" if answer == SHOWN else "commonplace"
     return out
+
+
+def growing_herb(thing: str) -> str:
+    """The catalogue name of the plant the player's words name, or "": a herb or fungus
+    off the ingredient list (`ingredients.all_ingredients`, the forageable kinds), by its
+    name or a near spelling of it. Near is a ratio of 0.84 on the whole name (difflib's
+    SequenceMatcher): "chasmier leaf" against "Chasmyre Leaf" is 0.85, while "a stool"
+    against "Stoolcap" (0.77) and "a rose" against "rope" are not near enough. Only
+    plants: a monster part is harvested, not foraged (a herb that is also a salve base,
+    Marsh-Mallow's root, is still a plant)."""
+    from difflib import SequenceMatcher
+
+    from rules import holding, ingredients
+
+    def norm(text) -> str:
+        return " ".join(str(text or "").lower().replace("-", " ").split())
+
+    said = norm(holding.plain(str(thing or "")))
+    if not said:
+        return ""
+    plants = [i for i in ingredients.all_ingredients().values()
+              if (i.forageable or str(i.kind or "") in ("herb", "fungus"))
+              and str(i.kind or "") not in ("monster part", "poison")]
+    # The whole name against the whole name, never a name found inside the words:
+    # `ingredients.by_name` would answer "an oak branch" with the herb Oak, and a branch
+    # picked up to swing is scenery.
+    best, score = "", 0.0
+    for ing in plants:
+        for k, name in enumerate([ing.name, *str(ing.aka or "").split(",")]):
+            name = norm(name)
+            if not name:
+                continue
+            # A herb's own name outranks another's alias for it on a tie.
+            r = SequenceMatcher(None, said, name).ratio() - (0.001 if k else 0.0)
+            if r > score:
+                best, score = ing.name, r
+    return best if score >= 0.84 else ""
 
 
 def _named_on(thing: str, texts: list[str]) -> bool:
@@ -395,6 +475,80 @@ def steals_off_the_ground(raw, engine) -> list[str]:
     return out
 
 
+def body_meant(engine, words: str = "") -> str:
+    """`fallen_meant` of the engine's scene."""
+    return fallen_meant(engine.scene, words)
+
+
+def fallen_meant(scene, words: str = "") -> str:
+    """The ref of the fallen body a take or loot means, or "": somebody down or dead here
+    whom the words name (`scope.in_the_room`, which knows the fallen too), else the one
+    body lying here, else the body nearest the player on the map. The engine's own
+    finders and state; the words are never read for what they mean."""
+    from rules import scope
+
+    actors = getattr(scene, "actors", {}) or {}
+    bodies = [r for r, a in actors.items() if not a.is_pc and a.is_down]
+    if not bodies:
+        return ""
+    if words:
+        named = scope.in_the_room(scene, words)
+        if named in bodies:
+            return named
+    if len(bodies) == 1:
+        return bodies[0]
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pos = getattr(scene, "positions", {}) or {}
+    if pc is not None and pc.ref in pos:
+        px, py = pos[pc.ref][:2]
+
+        def gap(r):
+            x, y = (pos.get(r) or (px + 999, py))[:2]
+            return max(abs(x - px), abs(y - py))
+        return min(bodies, key=gap)
+    return bodies[0]
+
+
+def _names_the_fallen(engine, thing: str) -> bool:
+    """Whether the words name somebody down or dead here (`scope.in_the_room`)."""
+    from rules import scope
+
+    scene = engine.scene
+    ref = scope.in_the_room(scene, thing)
+    who = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
+    return who is not None and not who.is_pc and who.is_down
+
+
+def _bodies_looted(raw, engine, thing: str) -> str:
+    """Every give in the plan that takes `thing` — a body — rewritten in place as the
+    `loot` of the body meant (`body_meant`). Returns the body's ref, "" when nobody lies
+    here (the give is then dropped: there is no body to take and nothing to mint)."""
+    ref = body_meant(engine, thing)
+    for i, r in enumerate(list(raw)):
+        if not isinstance(r, dict) or str(r.get("op") or "").lower() != "give":
+            continue
+        p = r.get("params") or {}
+        if " ".join(str(p.get("item") or "").split()) != thing:
+            continue
+        if ref:
+            raw[i] = {"op": "loot", "actor": r.get("actor") or "pc",
+                      "because": "the player searches the body",
+                      "params": {"from_": ref}}
+        else:
+            raw[i] = {"op": "narrate_only", "actor": None,
+                      "because": "there is no body here to take"}
+    # A loot the plan already had of the same body is the same deed: kept once.
+    seen = False
+    for i in range(len(raw) - 1, -1, -1):
+        r = raw[i]
+        if isinstance(r, dict) and str(r.get("op") or "").lower() == "loot" \
+                and str((r.get("params") or {}).get("from_") or "") == ref and ref:
+            if seen:
+                del raw[i]
+            seen = True
+    return ref
+
+
 def _picked(raw, engine) -> list[dict]:
     return [{"kind": "scenery", "thing": t, "answer": "on the ground", "picked_up": True}
             for t in steals_off_the_ground(raw, engine)]
@@ -444,10 +598,19 @@ def ground(raw, engine, passages: list[str], *, ask_fn=None, skip=()) -> list[di
     rows: list[dict] = []
     for thing in things:
         verdict = decide(place, kinds, passages, thing, ask_fn=ask_fn, given=given)
+        if not verdict["body"] and _names_the_fallen(engine, thing):
+            # The thing is somebody lying here, by the engine's own finder — "the grub",
+            # "Lila's body" — whatever the reader answered: never goods.
+            verdict.update(body=True, ledger=False, answer=BODY,
+                           why="the words name somebody lying here")
         row = {"kind": "scenery", "thing": thing, "answer": verdict["answer"],
                **({"quote": verdict["quote"]} if verdict["quote"] else {}),
                **({"note": verdict["why"]} if verdict["why"] else {})}
-        if verdict["given"] is not None:
+        if verdict["body"]:
+            # Not ledgered and never goods: the take becomes the loot of the body meant.
+            ref = _bodies_looted(raw, engine, thing)
+            row["looted"] = ref or ""
+        elif verdict["given"] is not None:
             # Not ledgered: it is the grant, under the page's name for it, and the take
             # is answered "already in the pack" (`Engine._already_carried`).
             rec = grants[verdict["given"]]

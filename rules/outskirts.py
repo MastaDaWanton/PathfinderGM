@@ -122,8 +122,7 @@ def _joined_to(home: tuple) -> "places_mod.Place | None":
     for want in ("the gate", "the way in"):
         if want in by_name:
             return by_name[want]
-    inner = {"the docks", "the bridge", "the north crossing", "the east crossing",
-             "the south crossing", "the west crossing"}
+    inner = {"the docks", "the bridge"}
     for label in places_mod.ENTRANCES:
         if label in by_name and label not in inner:
             return by_name[label]

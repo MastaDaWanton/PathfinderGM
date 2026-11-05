@@ -16,7 +16,7 @@
 
 The owner, playing 0.2.12, Aurvantis: *"A beast that should have left / I was told it left
 by the narration and the figure but it stayed in the scene. then it introduced itself as
-its species like it was a name."* The save (sammy.json) has the whole path.
+its species like it was a name."* The save (ilse.json) has the whole path.
 
 ## The real path
 
@@ -115,7 +115,7 @@ Live replays through `/api/say` (Django's client, the browser's view) on copies 
 owner's own saves in a scratch data root, gemma-4-12B heretic; "before" is master fa478ec
 (0.2.12), "after" this branch. Ollama was shared with other sessions.
 
-**The rest turn** (sammy.json.2, "i lay on the ground and rest watching the aelzeldra"):
+**The rest turn** (ilse.json.2, "i lay on the ground and rest watching the aelzeldra"):
 
 | | before (6) | after (6) |
 |---|---|---|
@@ -129,7 +129,7 @@ The after run's repair read *"The Aelzeldra is here—not moved, but simply stil
 leaving only a patch of disturbed earth"* — agreeing with the engine, clumsily. One after
 run met a gourd leshy in the night (`ontheway.night`), a printed kind, named "gourd leshy".
 
-**The name turn** (sammy.json.1, "My name is Sammy, What is your name"):
+**The name turn** (ilse.json.1, "My name is Ilse, What is your name"):
 
 | | before (6) | after, first (6) | after, with the people shown (6) |
 |---|---|---|---|
@@ -137,7 +137,7 @@ run met a gourd leshy in the night (`ontheway.night`), a printed kind, named "go
 | an `absent` finding on the goblin standing there | 0 | 6 | 2 |
 
 **A kind on the seam** (the same save with c28 made a gargoyle, the kind the fixed forage
-could draw, told of by its kind; "My name is Sammy. What is your name?"):
+could draw, told of by its kind; "My name is Ilse. What is your name?"):
 
 | | before (6) | after (6) |
 |---|---|---|
@@ -155,7 +155,7 @@ move 4/6 — each as on master. The absent check's new people list did not cost 
 departed raiders: 6 of 6 kept.
 
 **On our own server** (`manage.py runserver` on a free port, the scratch root seeded from
-sammy.json.2, the turn posted as the browser posts it): the panel's `scene.actors` held
+ilse.json.2, the turn posted as the browser posts it): the panel's `scene.actors` held
 c28 "Aelzeldra", Holding Ground, before and after — the panel and the map figure were
 never wrong; only the page was. The first live rest turn wrote *"the beast is no longer
 within your immediate sight … the first light is your only companion"*, and the reader

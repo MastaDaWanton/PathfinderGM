@@ -43,7 +43,7 @@ def _run(e, plan):
 
 
 def _tavern(engine):
-    """The Velvet Veil, founded off the gate as Sam founded it, and walked into."""
+    """The Velvet Veil, founded off the gate as Dace founded it, and walked into."""
     _run(engine, [{"op": "found", "because": "t",
                    "params": {"name": "the Velvet Veil", "parent": "the gate",
                               "kind": "tavern"}}])
@@ -58,7 +58,7 @@ def _keepers(scene):
 
 
 def test_no_keeper_is_shown_by_name_before_introduction():
-    """4 of 4 keepers shown by full name before any introduction (Sam's save). Now: the
+    """4 of 4 keepers shown by full name before any introduction (Dace's save). Now: the
     market's master and its general store, and the tavern's barkeep, all go by what they
     are, and every one of them still holds a name from the world to give."""
     scene, engine = _table(MARKET)
@@ -94,7 +94,7 @@ def test_asked_their_name_a_keeper_gives_it_and_the_panel_learns_it():
 
 
 def test_a_name_asked_for_and_narrated_is_learned():
-    """Live, 2026-09-30, on a copy of Sam's save: "What's your name, sergeant?" — the page
+    """Live, 2026-09-30, on a copy of Dace's save: "What's your name, sergeant?" — the page
     wrote "The sergeant's name is Caspian Tidestone." in narration, and the panel kept
     "the sergeant of the watch". The asked name on the page is learned however it is
     carried (`play/aftermath/name_given.py`); not asked, it is not."""
@@ -161,7 +161,7 @@ def _named_on_sight(scene, engine):
 
 
 def test_an_old_save_takes_back_a_name_the_page_never_used():
-    """Sam's save, measured: Oren Bramble and Soren Moorcock appear in none of its 82
+    """Dace's save, measured: Oren Bramble and Soren Moorcock appear in none of its 82
     transcript entries; Gorm Vesper and Quin Nutmeg were on the page (from the leaked
     brief). A name never on the page goes back to the descriptor; a name the player has
     read is kept — taking it back would contradict the page they read."""

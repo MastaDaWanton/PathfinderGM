@@ -87,7 +87,8 @@ def test_a_level_rolls_its_hit_points_rather_than_maximising_them():
     assert got["ok"] and pc.level == was + 1
     assert 1 <= got["rolled"] <= 8              # a rogue's d8, rolled not assumed
     assert pc.hp_max == before + got["hp"]
-    assert got["hp"] == max(1, got["rolled"] + got["con"])
+    # And the favoured class bonus, a hit point by default (CRB p.31, 2026-11-01).
+    assert got["hp"] == max(1, got["rolled"] + got["con"]) + 1 and got["favoured"] == "hp"
 
 
 def test_a_level_never_costs_hit_points():

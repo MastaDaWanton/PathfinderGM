@@ -61,6 +61,23 @@ first."). Not yet covered: a goodbye said with no other deed. The reader has no 
 slot for parting words, and code does not read the words; a closed `talk` slot would be
 the way, measured on the interpreter bench first (a slot offered is a slot filled).
 
+**What is not a leaving deed (2026-11-01).** Four misfires in one session (Corvin, owner
+report that day; `tests/test_leave_by_deed_misfires.py`): a `go` to "next to her" and a
+walk across the market to a stall each ended the talk — a `go` takes leave only when the
+plan walks out of here now; a leave was put after a `say` to a placeholder nobody brought
+in and refused — a say opens a talk only to somebody here or introduced by the same plan;
+the plan's own bare `leave_talk` with nobody in conversation reached the player as "You
+are not in conversation with anybody" — it is dropped; and "go find a quiet place to sleep"
+(read `search, stealth`) had its plan rest refused — a search the plan carries out as a
+`rest` takes leave before it.
+
+**Speaking to somebody with no words given opens the talk (2026-11-01).** "Speak to Snik
+Dunmoor." and "go back to the guards and ask what they called me for" read as `talk` with
+a person and no words; `say` needs words, so nothing opened. The table now builds the
+code-only `greet` op (`Engine._op_greet`, through `join_talk`); a pronoun after a walk up
+to somebody here is that somebody. The room finder matches a plural to its singular
+("the guardsmen" is the guardsman, `scope._one`).
+
 A wait is not an exit (2026-10-09). When the player waits (advance_time, a bench's Wait
 for it) the people with the party go about their day (docs/the-population.md, "A wait
 moves the people with the party too"): a talker whose day keeps them here is still in the

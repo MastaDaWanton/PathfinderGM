@@ -32,14 +32,14 @@ def _paid_facts():
     _s, _pc, _keeper, engine = _inn()
     out = _rest(engine)
     return bv.Facts(start="the inn", end="the inn", places=("the inn",),
-                    people=(bv.Person(ref="pc", name="Sam", pc=True),),
+                    people=(bv.Person(ref="pc", name="Dace", pc=True),),
                     outcomes=(out.as_dict(),)), out
 
 
 def test_the_engine_records_the_payments_own_sentence():
     _facts, out = _paid_facts()
     line = next(e["line"] for e in out.effects if e.get("kind") == "lodging")
-    assert line.startswith("Sam pays the innkeeper 5 silver pieces for a room at")
+    assert line.startswith("Dace pays the innkeeper 5 silver pieces for a room at")
     assert line.endswith("for the night.") and out.tell.startswith(line)
 
 
@@ -47,7 +47,7 @@ def test_a_page_with_the_sleep_and_no_coin_owes_the_payment():
     facts, out = _paid_facts()
     found = bv.diff([], facts, SHIPPED)
     assert [(d.kind, d.category) for d in found] == [("omission", "lodging")]
-    assert found[0].line.startswith("Sam pays the innkeeper 5 silver pieces")
+    assert found[0].line.startswith("Dace pays the innkeeper 5 silver pieces")
 
 
 def test_a_page_that_shows_the_payment_owes_nothing_and_is_not_a_phantom_sale():

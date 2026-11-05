@@ -324,6 +324,33 @@ def out_of_reach(scene, actor, defender, weapon_key: str | None,
     return miss
 
 
+def out_of_reach_from(scene, actor, defender, weapon_key: str | None, square,
+                      manoeuvre: str = "") -> OutOfReach | None:
+    """`out_of_reach`, asked as though `actor` already stood on `square` — the question the
+    combat panel needs before a "move to (5,4); strike" is committed.
+
+    Measured on the owner's report of 2026-11-01 (Corvin T., the shrine): the panel sent a
+    move to (5,4) and a strike at a grub 25 ft from that square; the move was spent and the
+    blow refused after it, because validation skips reach for a list that moves first and
+    only the floor in `_op_attack` measured it — on the board after the move. The same
+    measurement, on the square the player picked, before anything happens. The actor's
+    own entry in `scene.positions` is set for the one measurement and put back."""
+    if square is None or actor is None or getattr(scene, "positions", None) is None:
+        return None
+    was = scene.positions.get(actor.ref)
+    here = tuple(int(v) for v in list(square)[:2])
+    if was is not None and len(was) > 2:
+        here = here + tuple(was[2:3])
+    scene.positions[actor.ref] = here
+    try:
+        return out_of_reach(scene, actor, defender, weapon_key, manoeuvre=manoeuvre)
+    finally:
+        if was is None:
+            scene.positions.pop(actor.ref, None)
+        else:
+            scene.positions[actor.ref] = was
+
+
 def occupancy_toward(scene, actor, defender) -> set[tuple[int, int]]:
     """The squares `actor` must route around on its way to `defender`.
 

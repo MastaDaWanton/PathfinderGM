@@ -12,7 +12,10 @@
     "looking-away is the hook's `withholds`, shown only when the giver is asked.",
     "2026-09-29 (Phase 3, I4): `noticed` also needs `event:talk($giver)` — the player and the",
     "giver have spoken — so the glance away is something seen in an exchange, never",
-    "a thing known of a man the player only walked past."
+    "a thing known of a man the player only walked past.",
+    "2026-11-01: the lost thing is on the rival (`held_by`), as the truth card says it is,",
+    "so looting, robbing or being handed it puts it in the player's hands and `returned` can",
+    "fire; until then it was a label nobody carried (the owner's 0.2.25 report)."
   ],
   "schemes": [
     {
@@ -44,7 +47,8 @@
         },
         "lost": {
           "item": "keepsake",
-          "biome": "$wild"
+          "biome": "$wild",
+          "held_by": "rival"
         }
       },
       "cards": [
@@ -136,10 +140,8 @@
         {
           "id": "returned",
           "criteria": [
-            "at($market)",
-            "present($giver)",
-            "has(pc, knows.rival-has-it)",
-            "holds(pc, $lost)"
+            "event:give($giver, $lost)",
+            "has(pc, knows.rival-has-it)"
           ],
           "action": {
             "do": "objective",
@@ -153,7 +155,7 @@
             }
           ],
           "tell": {
-            "perceptible": "At $market, $giver takes the $lost back."
+            "perceptible": "$giver takes the $lost back."
           }
         },
         {

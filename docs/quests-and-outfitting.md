@@ -27,11 +27,17 @@ ones as `[ ]`, then "promised: …", then the facts.
 **Doors.** The GM proposes `quest` when somebody gives the party a task and the player
 takes it — title, objectives (one to six sentences), giver, reward. The engine refuses
 a number anywhere on it (the engine prices rewards, never the model), a giver who is
-nobody on the board, and a repeated title. `quest_step` ticks one objective by number
-with a note; the watcher may propose the same tick when it sees an objective plainly
-done on stage. The last objective done resolves the quest and pays the story award for
-seeing a matter through — the one place a model's word moves experience, and only
-through the engine's own award.
+nobody on the board, and a repeated title. `quest_step` claims one objective by number
+with a note; the watcher may make the same claim when it sees an objective plainly
+done on stage. Since 2026-11-01 a claim is judged (`rules/objectives.py`): a quest the
+player never took on is refused; a scheme's quest is ticked by its own step when that
+step's criteria hold (a place reached, a thing handed over) and refused with what is
+missing when they do not; a job or a loss to get back ticks itself. Only a quest the GM
+opened with the `quest` op still ticks on the claim — its objectives are the model's own
+sentences, with nothing the engine can check — and that is the one place left where a
+model's word moves experience. Measured before the change on the owner's 0.2.25 save:
+800 XP for "find a place to rest" claimed as "Go out by the edge" with the player in
+town, and 1,600 XP for three bare claims from the marsh.
 
 **The log.** The table page's character sheet has a Quests tab: underway first, with
 the giver, the objectives (done ones struck through), the promise and the steps; then

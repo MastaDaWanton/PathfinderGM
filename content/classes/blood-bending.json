@@ -1122,6 +1122,51 @@
           },
           "tell": "{name} forms the blood armament. The armed punch is ready as an attack."
         },
+        "Battle Blood Ki Pool": {
+          "_note": "Control Blood 2: 'Spend 1 ki point as a swift action to: make 1 extra attack at highest bonus, gain +20 ft speed, or gain +4 dodge bonus to AC for 1 round.' The monk's ki pool (CRB p.58), which this is written against; the same grammar as content/class-abilities/monk.json's Ki Dodge and Ki Speed, run by the one executor (Engine._use_class_ability). Until 2026-11-01 it had no document, and using it resolved as a sentence and nothing else.",
+          "action": "swift",
+          "cost": {
+            "pool": "ki",
+            "amount": 1
+          },
+          "choice": {
+            "kind": "mode",
+            "options": {
+              "attack": {
+                "aliases": ["extra attack", "an extra attack", "strike", "attack again"],
+                "self": {
+                  "rounds": 1,
+                  "modifiers": [
+                    {"type": "combat_mod", "target": "extra_attacks", "bonus_type": "ki", "amount": 1}
+                  ],
+                  "ends_when": {"acts": ["attack"]}
+                },
+                "tell": "{name} spends ki: the next attack this round strikes once more, at full bonus."
+              },
+              "speed": {
+                "aliases": ["move", "movement", "run", "faster"],
+                "self": {
+                  "rounds": 1,
+                  "modifiers": [
+                    {"type": "speed", "target": "land", "bonus_type": "untyped", "amount": 20}
+                  ]
+                },
+                "tell": "{name} spends ki, and their feet quicken: +20 ft of speed this round."
+              },
+              "dodge": {
+                "aliases": ["ac", "defence", "defense", "dodge bonus"],
+                "self": {
+                  "rounds": 1,
+                  "modifiers": [
+                    {"type": "combat_mod", "target": "ac", "bonus_type": "dodge", "amount": 4}
+                  ]
+                },
+                "tell": "{name} spends ki, and their body is hard to find: +4 dodge to AC for a round."
+              }
+            }
+          },
+          "tell": "{name} spends ki."
+        },
         "Blood Rage": {
           "action": "free",
           "cost": {

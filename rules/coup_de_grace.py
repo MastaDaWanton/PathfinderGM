@@ -36,11 +36,18 @@ save (unless the effect also works on objects, or is harmless)". So the blow lan
 crits them, and there is no save to fail: a skeleton finished off is finished by the
 damage or not at all.
 
-NOT BUILT, and said so rather than faked: the attack of opportunity (only movement
-provokes today — `rules/reactions.py`), the two-round version against total concealment,
-and the full-round cost as an enforced budget (the engine enforces no action economy for
-any op; the panel files the blow in the standard slot, as it does a full attack). Ghost
-touch is not read either: an incorporeal creature is refused whatever the weapon.
+IN A FIGHT (the owner's ruling, 2026-11-04, "by the book"): the attacks of opportunity
+it provokes, from every foe threatening the attacker, raised at the blow's point of
+commitment (`Engine._coup_provokes`), and the full round it costs — refused after a move
+or a blow this turn (`Engine._coup_round_spent`), and no later blow of the attacker's
+and no closing step after it (`Engine._coup_paid` marks the move spent). The engine
+keeps no standard-action record across batches, so "a blow this turn" is a blow in the
+same batch; a turn is one batch.
+
+NOT BUILT, and said so rather than faked: the two-round version against total
+concealment, and a declared `move` after the coup in the same turn (a full-round action
+leaves only a 5-foot step; the move op does not ask `move_spent`). Ghost touch is not
+read either: an incorporeal creature is refused whatever the weapon.
 """
 from __future__ import annotations
 

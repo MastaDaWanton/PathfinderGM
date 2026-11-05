@@ -183,12 +183,12 @@ def test_the_view_appends_the_face_when_the_beat_left_it_out():
 def test_the_player_is_not_a_creature_noun_in_narration_when_everyone_else_is_a_person():
     text = ("The beast lunges, and the man steps back. 'Stay back, you beast!' he shouts. "
             "The creature's shadow falls over the stall.")
-    fixed, swapped = narration.creature_nouns_for_pc(text, "Masta", others_are_people=True)
-    assert fixed.startswith("Masta lunges") and "Masta's shadow" in fixed
+    fixed, swapped = narration.creature_nouns_for_pc(text, "Torvo", others_are_people=True)
+    assert fixed.startswith("Torvo lunges") and "Torvo's shadow" in fixed
     assert "'Stay back, you beast!'" in fixed, "his own words are his"
     assert swapped == ["beast", "creature"]
     # With a creature present, the noun may be its own.
-    same, none = narration.creature_nouns_for_pc(text, "Masta", others_are_people=False)
+    same, none = narration.creature_nouns_for_pc(text, "Torvo", others_are_people=False)
     assert same == text and none == []
 
 

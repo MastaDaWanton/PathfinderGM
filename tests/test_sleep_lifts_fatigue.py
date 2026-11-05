@@ -4,9 +4,9 @@ toll is told before the night that followed it.
 The owner's 0.2.21 report (2026-10-27), turn-log row 84, transcript beat 57: after some
 21 hours at the herb bench, "I will sleep in my bedroll until morning" resolved
 
-    "Jason rests for 15 hours. The bedroll kept the ground off Jason … Jason was already
-    unhurt."  then  "Jason fails a Will save against sleep (8 against DC 12) … Jason is
-    fatigued. Jason is exhausted."
+    "Ansel rests for 15 hours. The bedroll kept the ground off Ansel … Ansel was already
+    unhurt."  then  "Ansel fails a Will save against sleep (8 against DC 12) … Ansel is
+    fatigued. Ansel is exhausted."
 
 and the beat wrote "the grueling struggle leaves you drained and exhausted". The save then
 held `fatigued (source: slept off exhaustion)`, and every later beat said "your limbs
@@ -17,7 +17,7 @@ counts 0 in the save):
     batch's first op — the rest — so the night read as its cause;
   * `Actor.rest` counted every night as eight hours, so exhaustion only ever became fatigue
     (CRB Appendix 2: an hour of complete rest turns exhausted into fatigued, eight hours
-    lift fatigued — nine in all, and Jason slept fifteen);
+    lift fatigued — nine in all, and Ansel slept fifteen);
   * the night lifted or kept the conditions in silence, so nothing said why he was tired.
 """
 from __future__ import annotations
@@ -166,5 +166,7 @@ def test_the_planned_slot_gives_the_players_line_to_their_own_act():
     slots = planned.build_plan(e, "I sleep in my bedroll", outs)
     facts = [sl for sl in slots if sl["key"].startswith("fact")]
     assert len(facts) == 2
-    assert 'The player said' not in facts[0]["say"]
-    assert facts[1]["say"].startswith('The player said: "I sleep in my bedroll"')
+    assert 'The player' not in facts[0]["say"]
+    # The engine's decision first and the line after it (2026-11-04, gm/planned.py).
+    assert facts[1]["say"].startswith("The engine decided this: Kesst rests for 15 hours.")
+    assert 'The player had said: "I sleep in my bedroll"' in facts[1]["say"]

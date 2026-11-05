@@ -1,6 +1,6 @@
 """repair-claimed / ownership-claimed: the page mends or tames a construct the engine did not.
 
-Measured on the owner's save, 2026-10-01. Sam wrote "I attempt to use my knowledge of
+Measured on the owner's save, 2026-10-01. Dace wrote "I attempt to use my knowledge of
 engineering and my deft hands to fix the spy in a way that makes it recognize me as its
 owner." Nothing resolved — the Clockwork Spy was wreckage at -1 hit points — and the page
 described a full repair and a machine recognising its new master. The next turn printed

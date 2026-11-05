@@ -1,10 +1,9 @@
 """Intimate scenes at an explicit table: detected in code, briefed at the end of the
 prompt, and shown the table's own demonstrations.
 
-**The measurement this answers (2026-10-01, the owner's save `sam`).** With the content
-house rule on "explicit", two beats the player asked for in as many words — "We go all
-the way" and "we climax together and then clean up and get dressed" — came back soft and
-metaphorical, a beat that ended "Every touch is a spark". The pipeline did not soften
+**The measurement this answers (2026-10-01, the owner's save `dace`).** With the content
+house rule on "explicit", two beats the player asked for in as many words came back soft
+and metaphorical, a beat that ended "Every touch is a spark". The pipeline did not soften
 them: the prose rows show the model's first drafts reached the page unchanged, the only
 edit a recurring-phrase polish. The cause was the prompt. "Explicit" added one
 ~350-character line (`prompts.content_line`) to a system message of 13,103 characters of
@@ -462,8 +461,8 @@ def partners(scene) -> list:
 def reads_intimate(player_input: str, earlier, scene) -> tuple[bool, str]:
     """Whether this beat is an intimate scene, and why, decided in code.
 
-    Measured cases (tests/test_intimate_scenes.py): the owner's "We go all the way" and
-    "we climax together and then clean up and get dressed" detect; "I pay for the room",
+    Measured cases (tests/test_intimate_scenes.py): stand-ins for the owner's two lines (a
+    soft cue in a warm scene, a strong word with a person in it) detect; "I pay for the room",
     "she hugs her brother goodbye", "I go all the way to the docks", a kiss goodbye after
     an ordinary beat, and "I wait for the climax of the play" do not.
 

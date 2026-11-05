@@ -2227,6 +2227,15 @@ class StepPlan:
     dropped: list[dict] = field(default_factory=list)
     removed: list[dict] = field(default_factory=list)
     pre: dict = field(default_factory=dict)      # potency/duration/drawback before quality
+    # What the line carries in (`Material.mult`, or Mix's weighted mean) and this step's
+    # own multipliers before the quality the hands give it; `strength_at` combines them
+    # by `combine_multipliers`. `pre` is the same thing at quality 1.0, kept for readers.
+    carried: dict = field(default_factory=dict)
+    factors: dict = field(default_factory=dict)
+    # Drying is a batch method (owner, 2026-11-01): how many batches the doses take and
+    # how many doses one batch holds. 0 for every method timed per dose.
+    batches: int = 0
+    batch_capacity: int = 0
     concentration: int = 0
     tier: str = "common"
     rank_in: int = 1
@@ -2430,13 +2439,16 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
     perk_p = float(perks.get("potency", 1.0) or 1.0)
     perk_d = float(perks.get("duration", 1.0) or 1.0)
     prod_p, prod_d = float(prow.get("potency", 1.0)), float(prow.get("duration", 1.0))
-    plan.pre = {
-        "potency": p_in * float(mrow_p) * prod_p * perk_p,
-        "duration": d_in * float(mrow_d) * prod_d * perk_d,
+    plan.carried = {"potency": p_in, "duration": d_in, "drawback": w_in}
+    plan.factors = {
+        "potency": [float(mrow_p), prod_p, perk_p],
+        "duration": [float(mrow_d), prod_d, perk_d],
         # Harm grows with concentration and the form's strength, as the dose does; the
         # crafter's perks are a benefit and leave it alone.
-        "drawback": w_in * float(mrow_p) * prod_p,
+        "drawback": [float(mrow_p), prod_p],
     }
+    plan.pre = {k: combine_multipliers(plan.carried[k], plan.factors[k])
+                for k in plan.carried}
 
     # --- which effects the form can carry --------------------------------------------
     seen = set()
@@ -2500,6 +2512,18 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
 
     # --- the name and the time ------------------------------------------------------
     plan.name = _product_name(method, plan.form, lead, prow)
+    if row.get("minutes_per_batch"):
+        # A batch method (Dry; the owner's ruling of 2026-11-01): one batch takes its
+        # time however many doses are on the racks, up to what they hold, and more than
+        # that takes another batch. Measured on Ansel's save before it: 24 Ground
+        # Caranator dried into 12 doses at 480 minutes a dose took 96 hours, and two
+        # such steps 8 days. How much one batch holds grows with the Herbalist level, as
+        # Ultimate Wilderness p.152 has an herbalist prepare as many doses at once as
+        # she has ranks in Profession (herbalist); the size per level is the rule row's.
+        plan.batch_capacity = max(1, int(row.get("batch_doses_per_level", 1)) * level)
+        plan.batches = math.ceil(plan.doses / plan.batch_capacity) if plan.doses else 0
+        plan.minutes = int(row["minutes_per_batch"]) * plan.batches
+        return plan
     per_dose = row.get("minutes_per_dose", 0)
     if isinstance(per_dose, dict):
         per_dose = per_dose.get(plan.form, max(per_dose.values()))
@@ -2523,10 +2547,47 @@ def _product_name(method: str, form: str | None, lead: Material, prow: dict) -> 
     }.get(form or "", f"{who} {prow.get('name', (form or 'Preparation').title())}")
 
 
+def combine_multipliers(carried: float, factors) -> float:
+    """What a line carries in, combined with one step's multipliers, by the Pathfinder
+    rule for multiplying rather than by multiplying.
+
+    The owner's ruling of 2026-11-01: potency stays uncapped but must grow much more
+    slowly. Until then every step multiplied the running strength by method x product x
+    perk x quality, so a chain compounded geometrically. Measured on Ansel's save: a
+    four-step Caranator Decoction (grind Fine, dry Flawless +4, brew Flawless +6, reduce
+    Flawless +4, read off his transcript) reached potency 33.7147 and duration 30.6497, a
+    +2 Will became +68 for 31 hours; at Flawless +9 every step the same chain is 128x
+    (+257). docs/herbalism-revamp-plan.md §17 has the full before/after table.
+
+    Prior art. The Core Rulebook's Multiplying rule (Getting Started, Common Terms; also
+    d20pfsrd's glossary): "When you are asked to apply more than one multiplier to a
+    roll, the multipliers are not multiplied by one another. Instead, you combine them
+    into a single multiplier, with each extra multiple adding 1 less than its value to
+    the first multiple" -- x2 twice is x3. League of Legends abandoned compounding
+    percentage cooldown reduction for linear Ability Haste in patch 10.23 (its notes: the
+    old stat was "more valuable the more of it you got"); Path of Exile pools
+    every "increased" modifier additively for the same reason. So every multiplier above
+    1 adds what it is worth less one, whether it is this step's or one carried in, and the
+    strength grows linearly in steps and in quality, never geometrically.
+
+    A multiplier BELOW 1 (Crude hands, Neutralize's 0.9, the drawback's softening by good
+    hands) still multiplies. The Core Rulebook's rule speaks only of multiples; I could
+    not find a Pathfinder rule for stacked fractions, so this keeps what the bench always
+    did with them. It also keeps the drawback's softening exactly as it was (0.25 per
+    Flawless step, and on past Flawless, `quality_mult`), so a long chain made in good
+    hands still sheds its harm, and nothing can reach zero or go negative.
+    """
+    gain = sum(float(f) - 1.0 for f in factors if float(f) > 1.0)
+    keep = math.prod(float(f) for f in factors if float(f) < 1.0)
+    return (float(carried) + gain) * keep
+
+
 def strength_at(plan: StepPlan, tier: int) -> dict:
-    return {"potency": plan.pre["potency"] * quality_mult("potency", tier),
-            "duration": plan.pre["duration"] * quality_mult("duration", tier),
-            "drawback": plan.pre["drawback"] * quality_mult("drawback", tier)}
+    """The step's strength at the tier the hands earned: what it carries in combined with
+    the method, the form, the perks and that tier's quality (`combine_multipliers`)."""
+    return {k: combine_multipliers(plan.carried[k],
+                                   list(plan.factors[k]) + [quality_mult(k, tier)])
+            for k in ("potency", "duration", "drawback")}
 
 
 def make(plan: StepPlan, tier: int, now_minute: int) -> Stock:

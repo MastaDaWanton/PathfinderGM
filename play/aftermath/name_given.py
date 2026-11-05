@@ -1,6 +1,6 @@
 """The name the player asked for, written on the page, is learned — said or narrated.
 
-Measured live 2026-09-30 on a copy of Sam's save (lane F's check of owner ruling F1): Sam
+Measured live 2026-09-30 on a copy of Dace's save (lane F's check of owner ruling F1): Dace
 asked "What's your name, sergeant?"; the brief handed the sergeant's true name over for
 that turn (`judgement.names_asked_for`), and the page wrote **"The sergeant's name is
 Caspian Tidestone."** — in narration, not in his mouth. `apply_introductions` reads a name

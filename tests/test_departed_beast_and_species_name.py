@@ -1,6 +1,6 @@
 """The beast that left and stayed, and the kind that introduced itself as a name.
 
-The owner, 2026-10-09, playing 0.2.12 (sammy.json, the ridgelines above an Aurvantis
+The owner, 2026-10-09, playing 0.2.12 (ilse.json, the ridgelines above an Aurvantis
 town): prospecting for ore, "Making for one last seam, you find an Aelzeldra there before
 you. The Aelzeldra holds the ground between you and the seam". The player rested twelve
 hours in front of it; the page said "The Aelzeldra is gone. There is no sign of the
@@ -183,7 +183,7 @@ def test_the_engines_own_seam_creature_is_a_kind(town, world):
     effects: list = []
     wyvern = bestiary.imported()["wyvern"]
     monkey = gathering.roll
-    gathering.roll = lambda biome, level, dice: gathering.Encounter(
+    gathering.roll = lambda biome, level, dice, party=None: gathering.Encounter(
         "creature", 80, creature=wyvern, aggressive=False)
     try:
         clause = engine._gathering_encounter(pc, "hills", 5, "ore", found={"iron-ore": 2},

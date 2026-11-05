@@ -1,6 +1,6 @@
 """A bite in hand whose race cannot be read made the whole save unplayable.
 
-Measured 2026-10-29 on master 3175a72d: the owner's Sammy (an asura wizard 2, 410 turns
+Measured 2026-10-29 on master 3175a72d: the owner's Ilse (an asura wizard 2, 410 turns
 played) carries
 
     weapons  = ["bite", "slam", "claws", "unarmed"]
@@ -10,7 +10,7 @@ which is the intended shape: `creation.build` writes a race's natural attacks on
 sheet by name, and `Actor.natural_weapon` reads their dice off the race document live.
 The asura is the owner's own bench race (homebrew/races/asura.json). Loaded anywhere that
 file could not be read — a reported save, a bench race deleted or edited — `from_dict`
-raised `IllegalSheet: Sammy: unknown weapon 'bite'`, the roster card said "the sheet
+raised `IllegalSheet: Ilse: unknown weapon 'bite'`, the roster card said "the sheet
 cannot be read" and 410 turns could not be played. With the file present it loaded, on
 master and on 0.2.22 alike: the defect is the missing document being fatal, and the bite
 was the only part of the body whose absence was.
@@ -38,10 +38,10 @@ ASURA = {
 
 
 def _sammy() -> dict:
-    """A level-1 caster sheet in Sammy's shape: an asura with the bite in hand."""
+    """A level-1 caster sheet in Ilse's shape: an asura with the bite in hand."""
     with open("fixtures/pc-caster.json", encoding="utf-8") as fh:
         d = json.load(fh)
-    d.update(name="Sammy", race="asura",
+    d.update(name="Ilse", race="asura",
              weapons=["bite", "slam", "claws", "unarmed"], equipped="bite")
     return d
 

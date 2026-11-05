@@ -149,6 +149,10 @@ _FAMILIES = (
 # The world's own ops that make somebody or somewhere real for the act that follows them.
 _MADE_FOR_THE_ACT = frozenset({"introduce", "spawn", "found"})
 
+# An act slot's ask when nothing else shapes it; the player's own `say` slot has it swapped
+# for "say it and stop" when the one spoken to answers in the reply slot (`build_plan`).
+_AS_IT_HAPPENS = "Show it as it happens."
+
 
 class PlanFailed(RuntimeError):
     """A slot call failed or came back empty. The beat goes to the free narrator."""
@@ -167,6 +171,11 @@ class Planned:
     notes: list[str] = field(default_factory=list)
     suggestions: list[str] = field(default_factory=list)
     model: str = ""
+    # The tells check (`_tells_kept`): each read as `TellsRead.as_log` gave it, for the
+    # turn log's `tells-faith` row; and one record per slot it remade or cut, for the
+    # machine-corrections training log (`play/corrections.log_auto`).
+    faith: list[dict] = field(default_factory=list)
+    remade: list[dict] = field(default_factory=list)
 
 
 # --- what the engine decided ---------------------------------------------------------
@@ -180,6 +189,103 @@ def arriving(outcomes) -> bool:
             e.get("kind") == "biome" and e.get("place") != e.get("was_place")
             for e in (getattr(o, "effects", None) or []))
         for o in outcomes or [])
+
+
+def _words_in_a_deed(reading, words: str) -> bool:
+    """Whether the words a say of the player's carries lie inside the span the reader gave
+    to a deed — an act that is not speech — so that the asking and the deed are one span of
+    the line, read twice (the say comes of the speech injector, `judgement.inject_say`).
+    Spans and their places, read in code; no English is read."""
+    from . import interpret
+
+    if not isinstance(reading, dict) or not words:
+        return False
+    said = " ".join(str(words).lower().split()).strip(" .,;:!?")
+    if not said:
+        return False
+    return any(isinstance(a, dict) and a.get("act") not in interpret._SPEECH_ACTS
+               and said in " ".join(str(a.get("span") or "").lower().split())
+               for a in reading.get("actions") or [])
+
+
+def ask_before_the_deed(grouped: list[list], engine, reading) -> list[list]:
+    """The player's request told before the deed it asked for, when the two are one span
+    of the line: the say's act moved to just before the first act of the player's that is
+    about the person they spoke to (`Outcome.about`).
+
+    The engine runs the say last (`judgement.inject_say` appends it, "speech last among the
+    declarers"), and the plan's slots follow the outcomes. Measured on the final rerun of
+    2026-11-05, "I ask the smith to forge me a longsword" (read as one `commission` span;
+    the say injected from the same words): the page told the smith spoiling the blank, or
+    taking the fee, and THEN "You look at the smith and request that they forge a longsword
+    for you" — on 7 of 7 runs, and in the baseline and round 1 alike; 6 of the 7 scored
+    broken pages ("request told after the result; events told backwards").
+
+    Only when the say's words lie inside a deed's span (`_words_in_a_deed`): a line of
+    speech the reader read as speech of its own ("I pay the smith and thank him") keeps its
+    place in the order the engine ran it."""
+    pc = engine.scene.pc() if hasattr(engine.scene, "pc") else None
+    me = str(getattr(pc, "ref", "") or "")
+    for n, act in enumerate(grouped):
+        said = next((e for o in act if getattr(o, "op", "") == "say"
+                     for e in (getattr(o, "effects", None) or [])
+                     if isinstance(e, dict) and e.get("kind") == "said"
+                     and str(e.get("who") or "") in ("", me)), None)
+        if said is None:
+            continue
+        to = str(said.get("to") or "")
+        if not to or not _words_in_a_deed(reading, str(said.get("words") or "")):
+            return grouped
+        for k in range(n):
+            if any(str(getattr(o, "actor", "") or "") in ("", me)
+                   and getattr(o, "op", "") != "say"
+                   and to in (getattr(o, "about", None) or ())
+                   for o in grouped[k]):
+                return grouped[:k] + [act] + grouped[k:n] + grouped[n + 1:]
+        return grouped
+    return grouped
+
+
+# The ops whose work the person answering did this very turn at the player's word: their
+# reply is told what came of it. Only the commission is measured (below); a sale or a haggle
+# is the player's deed with somebody, and how a reply reads beside one was not re-asked.
+_ANSWERS_KNOWING = frozenset({"commission"})
+
+
+def _their_own_work(grouped: list[list], speaker: dict) -> str:
+    """What the person answering has just done at the player's word this turn, as the
+    engine decided it, for their reply (`build_plan`): the act's own tell as its page line
+    (`engine_line`, numbers off). Whom the act was about is `Outcome.about`, a ref; the
+    fact itself is the tell and nothing else (law 3) — that a spoiled job is no job is in
+    the commission's own tell (`rules/commission.py`).
+
+    Measured on the final rerun of 2026-11-05, the commission line: the smith spoiled the
+    blank on 5 of 7 runs and the reply answered the request as if nothing had happened ("I
+    can shape this for you", "I'll have it ready once I've hammered the shape true") or, on
+    the made-up-work re-ask, as done ("It is finished. The metal is stubborn", run 2).
+    Re-asked with the recorded calls, 4 spoiled runs x 4 at the slot's temperature: the
+    reply told the work done, promised or held as a job 13 of 16 times as recorded (the ask
+    told first); 7-9 of 16 with the act's line; 3-5 of 16 with the line and "holds no job
+    of the player's now: nothing is being made for them" (judged by hand; "I can redo it"
+    counted as an offer, not a job) — the words the tell now ends on."""
+    lines = [engine_line([o.tell]) for act in grouped for o in act
+             if getattr(o, "op", "") in _ANSWERS_KNOWING and getattr(o, "tell", "")
+             and speaker["ref"] in (getattr(o, "about", None) or ())]
+    if not lines:
+        return ""
+    name = speaker["name"]
+    return (f" {name[:1].upper() + name[1:]} has just done this, as the engine decided it, "
+            f"and answers knowing it: {' '.join(lines)}")
+
+
+def player_dead(engine) -> bool:
+    """The player's character is dead this moment: the engine's tag (`state.down.dead`, a
+    prefix question, never a condition string), read after the turn resolved. A beat that
+    dealt the death ends on it (`build_plan`, `GMAgent._groom`), and the death screen takes
+    the turn (`views._the_player_died`)."""
+    scene = getattr(engine, "scene", None)
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    return pc is not None and pc.has_state("state.down.dead")
 
 
 def _family(op: str):
@@ -231,17 +337,35 @@ def present(engine) -> list[dict]:
     """Everyone here but the player, as the plan names them: ref, name, and what they are
     — down, dead, and their people said as a people, never as a name."""
     from rules import faces
+    from rules import states as states_mod
 
     out = []
     for ref, a in engine.scene.actors.items():
         if a.is_pc or not a.name or a.has_state("state.hidden"):
             continue
         what = []
-        dead = a.has_state("state.down.dead") or a.hp < 0
+        # Dead is the engine's tag, never "below zero": a creature under 0 hit points is
+        # dying (CRB p.191; `rules.engine.left_after` bands it "down", not "dead"). Called
+        # "dead" here until 2026-11-04, beside the blow's own "down", and the diagnosis's
+        # "I finish off the dying bandit" was scored as an invented kill on 4 of 7 runs
+        # (the player's line and the severity wording carried it too: see `_SEVERITY`).
+        dead = a.has_state("state.down.dead")
         if dead:
             what.append("dead")
+        elif a.hp < 0:
+            what.append("dying, on the ground")
         elif a.is_down:
             what.append("down")
+        elif a.has_state("state.position.prone"):
+            # Lying where they fell. The diagnosis's trip line had the wolf knocked prone,
+            # and the next turn's blow at it wrote "though it remains standing".
+            what.append("prone, on the ground")
+        if a.has_state(states_mod.GUARD):
+            # Who is the law, said where the people are listed: an arrest's tell names
+            # the watch who come, and without this the next name on the list came with
+            # them ("Pallo Farrow, Vessa Duskwatch, and the two Grippli guardsmen", the
+            # 2026-11-05 rerun; `arrest.who_come` has the counts).
+            what.append("of the watch")
         people = faces.people_of(str(getattr(a, "appearance", "") or ""))
         if people:
             what.append(f"one of the {people} people; {people} is their people, not "
@@ -327,14 +451,21 @@ def _place(engine) -> str:
 
 # The engine's bands (`rules.engine.blow_severity`, `left_after`, `miss_how`, carried on
 # `Outcome.blows`), each in three wordings.
+#
+# Each phrase is read as a fact, so each must be true of the band and no more (2026-11-04,
+# the 704-beat diagnosis, docs/narration-diagnosis.md). "a brutal blow that could end it"
+# was written as the end: re-asked six times with the slot's own recorded call, the dying
+# bandit's blow came back killed 6 of 6 ("ends the bandit's life", "finished"); without the
+# player's "finish off" 3 of 6, still from this phrase; with neither, 0 of 6. "rocks them"
+# came back "you are thrown back by the force of the strike" on an enemy turn.
 _SEVERITY = {
     "glancing": ("a glancing blow that barely bites", "a light touch, more sting than wound",
                  "a scrape of a blow"),
     "solid": ("a solid blow that lands true", "a clean strike with real weight behind it",
               "a hit that tells"),
-    "heavy": ("a heavy blow that rocks them", "a hard strike that drives deep",
+    "heavy": ("a heavy blow that lands hard", "a hard strike that drives deep",
               "a punishing hit"),
-    "brutal": ("a brutal blow that could end it", "a savage strike that tears into them",
+    "brutal": ("a brutal blow that bites deep", "a savage strike that tears into them",
                "a devastating hit"),
 }
 _NONLETHAL = ("it bruises and stuns rather than cuts", "it hurts without drawing blood",
@@ -343,7 +474,9 @@ _LEFT = {
     "marked": ("barely marked", "hardly touched", "still fresh"),
     "hurt": ("hurt but steady", "marked but still sure on their feet",
              "wounded, still dangerous"),
-    "bloodied": ("bloodied", "hurt and slowing", "badly marked"),
+    # Never "slowing": slowed is a condition (CRB p.567) the engine did not apply, and the
+    # 2026-11-05 rerun's wolf bite came back "leaving you reeling and slowed".
+    "bloodied": ("bloodied", "blood running from it", "badly marked"),
     "badly hurt": ("badly hurt, barely holding on", "staggering under it",
                    "close to falling"),
     "shaken": ("shaken by it", "rattled", "blinking it away"),
@@ -357,7 +490,11 @@ _MISS = {
              "a wild swing that finds only air"),
     "cover": ("the cover between them takes it", "it strikes the cover instead",
               "it is turned by what stands between them"),
-    "close": ("a near thing, only just turned aside", "it grazes past by a finger's width",
+    # Never "grazes": a graze is a hit. In the 2026-11-04 diagnosis the wolf's close misses
+    # (two short of the AC) came back "Its teeth graze your skin" on 6 of its baseline turns,
+    # 3 of them scored as errors; the recordings do not keep which of the three wordings
+    # each call was shown, so this word is the likely source, not a proven one.
+    "close": ("a near thing, only just turned aside", "it passes a finger's width wide",
               "so close it stirs the air at their ear"),
     "wide": ("well wide of the mark", "it never comes close", "easily avoided"),
     "plain": ("turned aside", "it misses", "it is evaded"),
@@ -421,6 +558,14 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
                 left = str(b.get("left") or "hurt")
                 bits.append(f"{name} after it: "
                             + _pick(said, f"blow:left:{left}", _LEFT.get(left, _LEFT["hurt"])))
+                # What rode the hit (`Engine._rider_then`: a trip, a grab), as the blow's
+                # own fact: "then the wolf's trip takes: you are knocked prone". Left out,
+                # the trip was never told (2 of 7 runs of the 2026-11-05 rerun).
+                for then in b.get("then") or ():
+                    said_then = _said_as_read(str(then), scene)
+                    if said_then.startswith(("The ", "A ", "An ")):
+                        said_then = said_then[:1].lower() + said_then[1:]
+                    bits.append("then " + said_then)
                 out.append("HIT — " + head + "; ".join(bits))
             elif b.get("result") == "miss":
                 how = str(b.get("how") or "plain")
@@ -431,6 +576,21 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
                            + (f"weapon: {b['weapon']}; " if b.get("weapon") else "")
                            + _pick(said, f"blow:miss:{how}", _MISS.get(how, _MISS["plain"])))
     return out
+
+
+def _said_as_read(text: str, scene) -> str:
+    """An engine sentence as a tell leaves the engine: every person's label with its
+    article (`names.with_articles`, as `Engine._articled` does) and the player as "you"
+    (`narration.pc_to_second_person`)."""
+    from rules import names as names_mod
+
+    people = getattr(scene, "people", None) or getattr(scene, "actors", {}) or {}
+    text = names_mod.with_articles(text, [a.name for a in people.values()
+                                          if not a.is_pc and a.name])
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is not None and getattr(pc, "name", ""):
+        text = narration_mod.pc_to_second_person(text, pc.name)[0]
+    return text
 
 
 def blows_aimed(outcomes) -> list[tuple[str, str]] | None:
@@ -711,6 +871,14 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
     slots: list[dict] = []
     carry_on = player_input == prompts.CARRY_ON
     fighting = bool(engine.scene.in_encounter)
+    # The player's character died this turn: the beat is the acts that brought the death,
+    # and it ends on it. No open matter, no aside, no answer, no ground, no "still" — each
+    # is a sentence of a life that goes on. Measured on the final rerun of 2026-11-05, the
+    # gallows walk (7 of 7 pages broken): the matter slot gave the hanged man "the road
+    # ahead leads through the east crossing" and "just enough coin to gather the supplies
+    # you need" (both after a tells-check remake of the same slot), and with the budget
+    # spare the aside slot had the master of the market "collecting the morning's fees".
+    dead = player_dead(engine)
     # The "still" slot (rough edge 1). Measured 2026-10-10 on the live fight: the slot was
     # asked to say where the last beat's situation stands, the last beat was an action, and
     # it restated the action — "your fist inches from the Korvu's face" before the move
@@ -722,7 +890,8 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
     # the air") — on a turn the engine decided, the act and the answer are the beat. On an
     # idle turn it says how things stand, as a state from THE SCENE NOW, the last beat as
     # reference only.
-    if last_beat and not fighting and not any(getattr(o, "tell", "") for o in outcomes or []):
+    if last_beat and not fighting and not dead \
+            and not any(getattr(o, "tell", "") for o in outcomes or []):
         slots.append({
             "key": "still", "want": STILL_WANT,
             "say": "How things stand now between the people here, in one short sentence, "
@@ -731,12 +900,27 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                    "event: nobody moves, speaks, strikes or does anything in it, and it "
                    "does not say where the player is. In new words; never reuse a phrase "
                    "from the last thing you wrote."})
-    grouped = acts(outcomes)
+    grouped = ask_before_the_deed(acts(outcomes), engine, reading)
     # The player's own line rides the first act that came of something they did. An act of
     # the engine's own before it — what the clock did at a bench before this turn, told
     # first since 2026-10-27 (`Engine.run`) — is not what came of their words.
-    lead_at = next((n for n, act in enumerate(grouped)
-                    if any(str(getattr(o, "intent_id", "") or "") for o in act)), 0)
+    #
+    # Nor is somebody else's act: a `say` the plan gave the smith ("A fair trade …") is the
+    # smith's, whatever intent it rode. Measured on the 2026-11-05 rerun: "I agree to his
+    # price and pay" rode the smith's say, and the slot wrote "eyes narrowing as they
+    # inspect the payment" (2 of 7 runs; 4 of 6 re-asks of its recorded call, 0 of 8 with
+    # the line off it) beside the engine's refusal of any payment.
+    me = getattr(engine.scene.pc(), "ref", "") if hasattr(engine.scene, "pc") else ""
+
+    def theirs(o) -> bool:
+        who = str(getattr(o, "actor", "") or "")
+        return bool(who) and bool(me) and who != me
+
+    with_intent = [n for n, act in enumerate(grouped)
+                   if any(str(getattr(o, "intent_id", "") or "") for o in act)]
+    lead_at = next((n for n in with_intent
+                    if not all(theirs(o) for o in grouped[n])),
+                   None if with_intent else 0)
     # Unless the player's own words were spoken this turn (a `say` of theirs): then the line
     # rides the act that says them, once. Measured on the 0.2.22 release check: "I walk up to
     # the guild clerk and tell them I can fight" made a step, the job offer and the say; the
@@ -769,11 +953,17 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         # blow. Measured on the first live planned fight (2026-10-10): "I punch the guard
         # in the face" came back "You lunge forward and strike the Korvu guard across the
         # face", the truth pass cut it, and the beat lost the declaration entirely.
-        declared = any(e.get("kind") == "battle_joined"
-                       for o in act for e in (getattr(o, "effects", None) or []))
-        show = ("Show the player squaring up to do it, and stop there: it has not "
-                "happened yet, so no blow lands and nobody is hurt." if declared else
-                "Show the player doing it and what came of it, once.")
+        #
+        # Not when the same act then struck it: the declared shot rolled in the same batch
+        # (`Engine._their_first_blow`) carries its blow, and an act holding a blow is a
+        # blow. Measured on the 2026-11-05 rerun (3 errors, unchanged from the baseline):
+        # "I shoot the wolf" joined and hit, the slot was told "nobody moves, no blow lands
+        # and nobody is hurt yet", and the page read "You hit the wolf with the shortbow …
+        # You square your shoulders and face the wolf … before the first strike".
+        struck = any(getattr(o, "blows", None) for o in act)
+        declared = not struck and any(
+            e.get("kind") == "battle_joined"
+            for o in act for e in (getattr(o, "effects", None) or []))
         # Declared, and the engine moved nobody: the player's own line is left out, because
         # its words carry the walk the engine did not make. Measured live 2026-10-16: "I walk
         # over to the packing trader and punch him" came back "You stride toward the packing
@@ -788,9 +978,14 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             # under it. Measured 2026-10-16 before this: fight beats of 120-190
             # characters, "You lunge forward and strike at the Korvu, but your blow fails
             # to connect" — true, and all there was.
-            lead = (f'The player said: "{player_input}". ' if i == lead_at and not carry_on
-                    else "")
-            say = (f"{lead}The engine decided this: {decided}\nTHE BLOW (engine facts, "
+            #
+            # And never the player's own line: the facts already say who swung at whom with
+            # what, and the line says what they MEANT the blow to do. The 2026-11-04
+            # diagnosis: "I finish off the dying bandit with my longsword", a blow the
+            # engine banded "down", re-asked six times with its recorded call — killed 6 of 6
+            # with the line in the slot, 3 of 6 without it (the rest from the severity
+            # wording, since changed), 0 of 6 without either.
+            say = (f"The engine decided this: {decided}\nTHE BLOW (engine facts, "
                    "in order):\n" + "\n".join(f"- {b}" for b in blows)
                    + "\nWrite the blow itself, in two or three sentences, from these facts "
                      "only: how it is struck, how it lands or misses, and how the one struck "
@@ -800,17 +995,57 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                           "want": min(FACT_CEILING, BLOW_WANT + BLOW_EACH * (len(blows) - 1)),
                           "say": say, "tells": tells})
             continue
-        if declared and not moved:
-            say = (f"The engine decided this: {decided} Show the player squaring up to "
-                   "them from where they stand, and stop there: nobody moves, no blow lands "
-                   "and nobody is hurt.")
-        elif i == lead_at and not carry_on:
-            say = (f'The player said: "{player_input}". The engine decided what came of '
-                   f"it: {decided} {show}")
+        # What the player's line may add to an act: how they go about what the engine
+        # decided, and only on the act their words led to. Not on their own `say` — its tell
+        # carries the words as the engine heard them, and the line's other deeds are other
+        # acts' or nobody's (the 2026-11-04 diagnosis: "I agree to his price and pay" rode
+        # the say slot and came back "reaching into your pouch to settle the payment"; the
+        # refused payment's own slot then wrote the smith taking the coins, scored on 3 of
+        # 7 runs and on 6 of 6 re-asks of its recorded call). Not on an act the engine
+        # refused, whose tell says it did not happen.
+        refused = all(getattr(o, "status", "") == "refused" for o in act)
+        lead = (i == lead_at and not carry_on and i != spoken_at and not refused)
+        must: list[str] = []
+        if declared:
+            # THE MOMENT, every part of it in order: the squaring-up, then the rest of the
+            # act's own tell (who saw it and what the law will make of it, `trial.report`,
+            # carried on its effect as `told`). Until 2026-11-04 the slot was told to show
+            # the squaring-up "and stop there", and it did: the witnesses and the warrant in
+            # the same tell were never told — 14% of the diagnosis's baseline errors: 7 of 7
+            # runs of the declared punch, 2 of 7 of the declared cruelty. Re-asked with this
+            # shape, 8 of 8 carried the warrant (0 of 4 before).
+            first = ("the player squares up to them from where they stand: nobody moves, "
+                     "no blow lands and nobody is hurt yet" if not moved else
+                     "the player closes and squares up to them: no blow lands and nobody "
+                     "is hurt yet")
+            rest = [str(e["told"]) for o in act for e in (getattr(o, "effects", None) or [])
+                    if isinstance(e, dict) and e.get("told")]
+            moment = [first, *dict.fromkeys(rest)]
+            # And read back for them (`_all_told`): on the bench of this change the slot
+            # still left the warrant out on 1 of 6 declared beats.
+            must = list(dict.fromkeys(rest))
+            say = (f"The engine decided this: {decided}\nTHE MOMENT (engine facts, in "
+                   "order):\n" + "\n".join(f"- {m}" for m in moment)
+                   + ("\nWrite the moment from these facts, in order: every one of them is "
+                      "told." if len(moment) > 1 else "\nWrite the moment from this fact."))
+        elif refused:
+            # Refused: what was tried did not happen, said as the engine says it — never
+            # "show it as it happens", which wrote the refused payment as paid: re-asked
+            # with the old ask, 6 of 6 paid whether or not the say slot carried the line;
+            # with this one, 1 of 8. "In your own words": "as it says it" was answered with
+            # the tell copied verbatim, 5 of 8.
+            say = (f"What the player tried here did not happen: the engine refused it, and "
+                   f"says: {decided} Show that in your own words.")
+        elif lead:
+            # What the engine decided first, and the line after it as how the player went
+            # about it. "The player said … The engine decided what came of it … Show the
+            # player doing it and what came of it" showed the line done and then invented
+            # what came of it: "the guild clerk hands you the supplies to deliver" for a job
+            # taken (the diagnosis, 2 of 8 re-asks; 0 of 8 in this order).
+            say = (f"The engine decided this: {decided} The player had said: "
+                   f'"{player_input}". Show the player doing what the engine decided, once.')
         else:
-            say = (f"The engine decided this: {decided} "
-                   + ("Show it as it happens: no blow lands yet." if declared
-                      else "Show it as it happens."))
+            say = f"The engine decided this: {decided} {_AS_IT_HAPPENS}"
         # A scheme's step on a quest the player has not taken (`schemes._progress_not_
         # taken`): said so, and the slot read back like the matter slot. Live 2026-10-27,
         # "the approach, the ground where Glowvine grows" came back "You scan … searching
@@ -821,22 +1056,30 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             say += (f" It concerns {theirs}, which is somebody else's matter: the player "
                     "has not taken it on, so never write it as something they seek, "
                     "pursue or keep in mind.")
+        # The player's character named in the act's own tells: said once who that is. The
+        # 2026-11-05 rerun's gallows walk came back "snaps Corvin T. into the air, and he dies
+        # instantly" — the name turned to "you" downstream (`pc_to_second_person`), the
+        # "he" left, which that step cannot resolve without reading English. Re-asked with
+        # its recorded call: third person 8 of 8; with this sentence, 0 of 8. Not the tells
+        # themselves put in the second person, which also gave 0 of 8 but changes every
+        # act slot's wording that the other measurements were made on.
+        pc_name = str(getattr(pc, "name", "") or "")
+        if pc_name and any(pc_name in str(t or "") for t in tells):
+            say += (f' {pc_name} is the player\'s character: "you" in every sentence, never '
+                    f'"he", "she" or "they".')
         slots.append({"key": f"fact{i + 1}",
                       "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
-                      "say": say, "tells": tells, **({"not_own": theirs} if theirs else {})})
+                      "say": say, "tells": tells, **({"not_own": theirs} if theirs else {}),
+                      **({"must_tell": must} if must else {})})
         employer = next((e.get("employer") for o in act
                          for e in (getattr(o, "effects", None) or [])
                          if isinstance(e, dict) and e.get("kind") == "job"
                          and e.get("state") == "offered" and e.get("employer")), "")
         if employer and len(act) == 1 and i != lead_at:
             offered_by[f"fact{i + 1}"] = employer
-    if spoken_at is not None and any(getattr(o, "op", "") in ("move", "travel")
-                                     for act in grouped[:spoken_at] for o in act):
-        # The player's line rides their words, and a walk in it already has its slot.
-        for x in slots:
-            if x["key"] == f"fact{spoken_at + 1}":
-                x["say"] += (" Their walk or step is already written in its own sentence "
-                             "before this one: none of it here, only the words.")
+    # (The say slot was told, until 2026-11-04, that a walk in the line already had its own
+    # sentence. It carried the player's whole line then; it carries only the words the
+    # engine heard now, so there is no walk in it to hold back.)
     if not any(s["key"].startswith("fact") for s in slots):
         if carry_on:
             # Continue moves the scene (the ruling of 2026-09-18): with no tells, the
@@ -858,11 +1101,18 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                                  "here, looking where they meant to go, and nothing more: "
                                  "no walking, no arriving."})
         else:
+            # No tell at all: the engine decided nothing of the line. "The player's
+            # character does what the player said … Show exactly that" showed the deed done:
+            # "I take the job", with no job taken, came back "You nod your head and accept
+            # the task" (the 2026-11-04 diagnosis; 6 of 6 re-asks of its recorded call),
+            # and "I buy the silver bracelet", with nothing sold, "you purchase the silver
+            # bracelet" (2 of 3). Asked as an attempt: 1 of 8 and 0 of 4.
             slots.append({"key": "doing", "want": DOING_WANT,
-                          "say": "The player's character does what the player said: "
-                                 f'"{player_input}". Show exactly that, in the place they '
-                                 "are. Nothing more."})
-    if fighting and any(s["key"].startswith("fact") for s in slots):
+                          "say": f'The player said: "{player_input}". The engine decided '
+                                 "nothing of it this moment. Show the player starting on it "
+                                 "where they are, in what they do or say, and nothing that "
+                                 "comes of it."})
+    if fighting and not dead and any(s["key"].startswith("fact") for s in slots):
         # Where the fight is, in one clause, from the brief's own words for the place
         # (UNDERFOOT, HERE): the ground the blows land on. Never a new thing that matters —
         # a weapon to snatch or a door to run for is the engine's to put there. Lowest
@@ -884,7 +1134,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                                  f"{focus}, from what THE SCENE says is here and nothing "
                                  "else. Nothing new that matters: no new person, weapon, "
                                  "or way out; nobody acts in it."})
-    matter = matter_slot(pull)
+    matter = None if dead else matter_slot(pull)
     if matter is not None:
         # The matter's own identity words (`cards.identity_keys`, the pull's `keys`): what
         # its sentence is read back for (`_matter_is_its_own`).
@@ -893,7 +1143,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             matter["about"] = _one_line(pull.get("title"), 120)
         slots.append(matter)
     people = [p for p in present(engine) if p["can_answer"]]
-    if people and not fighting:
+    if people and not fighting and not dead:
         # Who answers is the engine's (rough edge 2): measured live 2026-10-15, "'I have not
         # seen that particular face before today…' What do you do?" — nobody said it. The
         # slot returns the words and how they are said; code writes the speaker in.
@@ -929,6 +1179,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             work = (f" Of work, they know exactly this and nothing more: {held} If the "
                     "player asks about work, its pay, place or hour, they answer from it."
                     if held else "")
+            work += _their_own_work(grouped, speaker)
             # The player's own words to this speaker: their slot shows them said, and the
             # answer is this slot's alone. Measured on the 0.2.22 job-offer re-run: "I ask the
             # clerk what the caravan job pays" — the say slot, told to show "what came of
@@ -941,7 +1192,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                 for x in slots:
                     if x["key"] == f"fact{spoken_at + 1}":
                         x["say"] = x["say"].replace(
-                            "Show the player doing it and what came of it, once.",
+                            _AS_IT_HAPPENS,
                             f"Show the player saying it, once, and stop there: "
                             f"{speaker['name']}'s answer is written next, so none of it "
                             f"here.")
@@ -969,6 +1220,87 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                                  "goes on with what they were already doing, in one "
                                  "sentence, without speaking."})
     return slots
+
+
+# --- somebody else's turn in a fight (2026-11-04) ----------------------------------------
+#
+# A creature's or an ally's turn was written by the consequence call (`GMAgent.
+# narrate_outcome`, `prompts.call_two_messages`): one free passage from the turn's tells and
+# blow facts, with no tells check and none of the planned repairs. 11% of the 2026-11-04
+# diagnosis's baseline errors were born there — a close miss written "Its teeth graze your
+# skin", a wolf the player had just knocked prone left "standing to face the next strike",
+# "you are thrown back by the force of the strike". The same facts now go through the
+# planned machinery: one slot per blow (CLAUDE.md: a model asked for N things answers in
+# parallel; each blow is written seeing the ones before it), then the page checks, the
+# tells check and its remake, exactly as the player's own beat is.
+#
+# Not given: the "still", ground, matter and reply slots. A MUD's combat message is the
+# blow and nothing else (tbaMUD `fight.c`), and this beat sits between two of the player's.
+
+# What a blow slot on somebody else's turn asks: one blow, two sentences at most.
+TURN_BLOW_WANT = 220
+
+
+def turn_plan(engine, outcomes, said=None) -> list[dict]:
+    """The slots of somebody else's turn in a fight: one per blow the engine resolved
+    (`blow_facts`, one fact each, in order), and one per act that struck no blow. The act's
+    tells ride its first slot, as an act slot's do. Whose turn it is, whom the blows were
+    aimed at and how a companion goes about it are the turn's, not a slot's: they are the
+    plan's `turn` block (`turn_block`)."""
+    pc = engine.scene.pc() if hasattr(engine.scene, "pc") else None
+    pc_name = str(getattr(pc, "name", "") or "")
+    slots: list[dict] = []
+    for i, act in enumerate(acts(outcomes)):
+        tells = [o.tell for o in act]
+        # The player as "you" in what the slot reads, as the consequence call had it
+        # (Inform's adaptive text: one report, rendered "you" for the player).
+        shown = [narration_mod.pc_to_second_person(t, pc_name)[0] if pc_name else t
+                 for t in tells]
+        decided = (shown[0] if len(shown) == 1 else
+                   "these, which are ONE moment (show them together, once, not one "
+                   "sentence each): " + " ".join(f"({n + 1}) {t}"
+                                                 for n, t in enumerate(shown)))
+        blows = blow_facts(act, engine, said)
+        if not blows:
+            slots.append({"key": f"fact{i + 1}",
+                          "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
+                          "say": f"The engine decided this: {decided} {_AS_IT_HAPPENS}",
+                          "tells": tells})
+            continue
+        for k, b in enumerate(blows):
+            head = (f"The engine decided this: {decided}\n" if k == 0 else
+                    "The same act goes on: its next blow.\n")
+            slots.append({
+                "key": f"fact{i + 1}" + (f"-{k + 1}" if k else ""),
+                "want": TURN_BLOW_WANT,
+                "say": (head + f"THE BLOW (engine facts):\n- {b}\n"
+                        "Write this blow, in one or two sentences, from these facts only: "
+                        "how it is struck, how it lands or misses, and how the one struck is "
+                        "left. Nothing the facts and THE SCENE do not give, and never a "
+                        "number. " + blow_opening(said)),
+                "tells": tells if k == 0 else []})
+    return slots
+
+
+def turn_block(engine, outcomes, acting: str, manner: str = "") -> str:
+    """Whose turn it is, for the plan's prompt: the creature by name, whom its blows were
+    aimed at (`aimed_line`), whether it can see the player at all (`unseen_line`), and a
+    companion's manner (`companions.manner_line`) — the facts the consequence call carried
+    beside its tells, kept beside every slot of the turn."""
+    name = narration_mod.definite(str(acting or "somebody"))
+    # Not "acts in every slot": a creature's turn can hold other people's blows too (the
+    # attacks of opportunity its walk in drew, `blows_aimed`), each named in its own fact.
+    lines = [f"WHOSE TURN: {name[:1].upper() + name[1:]}'s, not the player's; the player's "
+             "character is \"you\"."]
+    aimed = aimed_line(engine, outcomes)
+    if aimed:
+        lines.append(aimed)
+    unseen = unseen_line(engine, acting)
+    if unseen:
+        lines.append(unseen)
+    if manner:
+        lines.append(manner.strip())
+    return "\n".join(lines)
 
 
 def budget_for(engine) -> int:
@@ -1034,9 +1366,11 @@ Reply with the JSON object each request asks for."""
 
 def plan_messages(brief: str, slots: list[dict], people: list[dict], place: str, *,
                   last_beat: str = "", since: list[str] | None = None,
-                  scene_now: str = "", claim: str = "", gone=()) -> list[dict]:
+                  scene_now: str = "", claim: str = "", gone=(),
+                  turn: str = "") -> list[dict]:
     """The plan as one prompt: [system + the scene, the plan]. Every slot call opens with
-    exactly these bytes, so Ollama reuses their cache from the second slot on."""
+    exactly these bytes, so Ollama reuses their cache from the second slot on. `turn` is
+    somebody else's turn in a fight (`turn_block`), set just before the plan."""
     scene = f"THE SCENE (reference; the only things that exist):\n{brief}"
     blocks = []
     if last_beat:
@@ -1065,6 +1399,8 @@ def plan_messages(brief: str, slots: list[dict], people: list[dict], place: str,
         blocks.append(scene_now.strip())
     if claim:
         blocks.append(claim.strip())
+    if turn:
+        blocks.append(turn.strip())
     blocks.append("PLAN:\n" + "\n".join(f'{i + 1}. "{s["key"]}": {s["say"]}'
                                         for i, s in enumerate(slots)))
     return [{"role": "system", "content": PLAN_SYSTEM + "\n\n" + scene},
@@ -1181,6 +1517,13 @@ def cut_slot_sentence(text: str, said: str) -> str:
     m = _COMPOSED.match(str(text or "").strip())
     if m is None:
         cut = narration_mod._cut_sentences(text, [said]).strip()
+        # What is left must be whole sentences: a piece that opens on a lowercase letter is
+        # the tail of the sentence just cut, not a sentence of its own. Measured on the
+        # rerun of 2026-11-05: "to his execution." stood as the whole act slot (gallows,
+        # runs 1 and 4), where nothing left must mean the engine's own line stands in. Read
+        # off the text's shape, never its words.
+        cut = " ".join(x for x in narration_mod._sentences(cut)
+                       if not x.lstrip("\"'“‘(")[:1].islower()).strip()
         return cut if narration_mod._sentences(narration_mod.unquoted(cut)) else ""
     head, words, tail = m.groups()
     parts = narration_mod._sentences(words)
@@ -1252,7 +1595,8 @@ def _unwrap_quotes(text: str) -> str:
 def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
           last_beat: str = "", last_plain: str = "", since=None, scene_now: str = "",
           pull=None, claim: str = "", lift=None, check=None,
-          budget: int | None = None, reading=None, goal=None, job=None) -> Planned:
+          budget: int | None = None, reading=None, goal=None, job=None,
+          faith=None, acting: str = "", manner: str = "", before: str = "") -> Planned:
     """Plan the beat and write it slot by slot. `who` is (model, host, provider, key) —
     the prose role's, so a hosted narrator writes planned beats too. `last_beat` is the
     beat before as the model is shown it (speaker tags back on); `last_plain` the same
@@ -1263,28 +1607,45 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     `budget` is the beat's length in characters (`budget_for` when None). `goal(matter,
     text)` reads back a slot carrying somebody else's matter (`_not_their_goal`); `job(
     speaker, text)` the reply of somebody who holds no work for the player
-    (`_no_job_made_up`).
+    (`_no_job_made_up`). `faith(text, tells)` reads the written beat against its own tells
+    (`beat_verify.against_tells`), and a slot holding a sentence that cannot be true beside
+    one is asked again with that tell named (`_tells_kept`).
+    `acting` makes it somebody else's turn in a fight, written from `turn_plan` (one slot a
+    blow) with `turn_block` beside the plan; `manner` is a companion's (`companions.
+    manner_line`), and `before` what is already on the page of this turn (a companion's
+    wind-up), shown as written so far. No suggestions on such a turn: the player's own beat
+    offers them.
     Raises `PlanFailed` (or the client's own error) when a core slot call fails or comes
     back empty: the caller hands the beat to the free narrator."""
     model, host, provider, key = who
     budget = budget if budget is not None else budget_for(engine)
-    slots, dropped = allocate(
-        build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat,
-                   reading=reading), budget)
+    said = getattr(engine.scene, "said", None)
+    built = (turn_plan(engine, outcomes, said) if acting else
+             build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat,
+                        reading=reading))
+    slots, dropped = allocate(built, budget)
     people = present(engine)
     plan = plan_messages(brief, slots, people, _place(engine), last_beat=last_beat,
                          since=since, scene_now=scene_now, claim=claim,
-                         gone=gone(engine, outcomes))
+                         gone=gone(engine, outcomes),
+                         turn=turn_block(engine, outcomes, acting, manner) if acting else "")
     out = Planned(text="", slots=[], messages=plan, model=model)
     if dropped:
         out.notes.append(f"over the {budget}-character budget: no {', '.join(dropped)} slot")
     try:
-        _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check, goal, job)
+        _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check, goal, job,
+                     suggest=not acting and not player_dead(engine), before=before,
+                     told=getattr(faith, "second", None) if faith is not None else None)
     except Exception as exc:
         # The calls made before the failure, for the turn log beside the free beat.
         exc.calls = list(out.calls)
         raise
     _hold_to_budget(out, budget)
+    if faith is not None:
+        _tells_kept(out, who, faith, [getattr(o, "tell", "") for o in outcomes or []], lift,
+                    refused=[getattr(o, "tell", "") for o in outcomes or []
+                             if getattr(o, "status", "") == "refused"
+                             and getattr(o, "tell", "")], outcomes=outcomes)
     out.text = " ".join(s["wrote"] for s in out.slots if s.get("wrote")).strip()
     if not out.text:
         raise PlanFailed("every slot came back empty")
@@ -1443,11 +1804,268 @@ def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: s
     return text
 
 
+def _untold(s: dict, text: str, told) -> list[str] | None:
+    """The slot's `must_tell` facts its text says nothing about, by the fact-first read
+    (`beat_verify.second_on_tell`, `told(text, fact)`): None when a read went unanswered."""
+    missing = []
+    for fact in s.get("must_tell") or ():
+        verdict = told(text, fact)
+        if verdict is None:
+            return None
+        if verdict == "says nothing about it":
+            missing.append(fact)
+    return missing
+
+
+def _all_told(out: Planned, plan, slots, i, written, who, s: dict, text: str, told, *,
+              final: bool, lift) -> str:
+    """A slot that must tell certain facts of its own act (`must_tell`: a declared fight's
+    witnesses and warrant) read back for each, the fact first, and asked once more with the
+    ones it left out named. The remake stands if it leaves fewer out; otherwise the first
+    answer does. An omission is the one slip the tells check cannot see — a sentence that is
+    missing contradicts nothing (docs/narration-faithfulness.md).
+
+    Measured on the 2026-11-04 bench of the declared-fight shape: the warrant told on 5 of 6
+    declared beats; the sixth wrote the witnesses "noting your defiance" and stopped."""
+    missing = _untold(s, text, told)
+    if not missing:
+        if missing is None:
+            out.notes.append(f'the "{s["key"]}" slot: whether it told its whole act was not '
+                             f"answered — left as written")
+        return text
+    named = " ".join(f'"{m}"' for m in missing)
+    redo = (f"You wrote: {text!r}. It leaves out what the engine decided: {named} Write it "
+            f"again with every fact of THE MOMENT told, in order.")
+    # Not core: a re-ask that fails keeps the first answer rather than failing the beat.
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    again = _untold(s, text2, told) if text2 else missing
+    better = text2 and again is not None and len(again) < len(missing)
+    out.calls[-1]["note"] = "untold fact named" + ("" if better and not again
+                                                   else " — still untold")
+    out.notes.append(f'the "{s["key"]}" slot left out {missing[0][:60]!r} — asked again, '
+                     + ("told" if better and not again else
+                        "told in part" if better else "still untold: first answer kept"))
+    return text2 if better else text
+
+
+# A bracketed aside of an engine line: "(Escape Artist)", "(a combat manoeuvre)".
+_BRACKETED = re.compile(r"\s*\([^()]*\)")
+
+
+def tells_check_on() -> bool:
+    """Whether the tells check runs (`_tells_kept`). Always, in the app: the owner's ruling
+    of 2026-11-02 is "always on, with no Settings switch", so no house rule and no request
+    can turn it off. `PATHFINDER_GM_TELLS_CHECK=0` turns it off for a bench's
+    before-and-after run and for the suite (tests/conftest.py) — an environment variable
+    the packaged app never sets."""
+    import os
+
+    env = os.environ.get("PATHFINDER_GM_TELLS_CHECK", "").strip()
+    return not env or env not in ("0", "off", "false", "no")
+
+
+def _same_deed(clash, slot: dict, outcomes) -> bool:
+    """Whether a clash judges a slot's RESOLVED act against a REFUSED tell of the same
+    deed — the refusal about the very body the slot's own resolved outcome was about
+    (`Outcome.about`, refs, never words), and the refusal not the slot's own tell.
+
+    Measured on the narration diagnosis bench (2026-11-04, mechanism 1): "skin the wolf and
+    take its pelt" built a harvest and a refused take; the tells check read the harvest
+    slot's true "you peel the wolf's pelt away" against "the wolf has no pelt to take",
+    the remake could not agree with both, the engine's line stood in, and a backstop cut
+    it. A refusal says what the refused op did not do; the resolved op beside it is the
+    engine's word on what was done to that body. The act table folds that take now
+    (`acts_to_ops._take_is_the_harvest`); this keeps any other pair like it from costing
+    a true sentence. A sentence in the refused deed's own slot is still judged."""
+    from . import beat_verify
+
+    def premise(o) -> str:
+        got = beat_verify.tell_premises([getattr(o, "tell", "")])
+        return got[0] if got else ""
+
+    mine = {str(t) for t in slot.get("tells") or ()}
+    own = [o for o in outcomes or () if getattr(o, "tell", "") in mine]
+    if any(premise(o) == clash.tell for o in own):
+        return False
+    resolved = {r for o in own if getattr(o, "status", "") != "refused"
+                for r in (getattr(o, "about", ()) or ())}
+    return any(getattr(o, "status", "") == "refused" and premise(o) == clash.tell
+               and resolved & set(getattr(o, "about", ()) or ())
+               for o in outcomes or ())
+
+
+def _tells_kept(out: Planned, who, faith, tells, lift=None, refused=(),
+                outcomes=()) -> None:
+    """The extra step the owner asked for (2026-11-02: "perhaps a extra step in the
+    preparation of the narration even if it adds a few seconds"): the beat as written, read
+    sentence by sentence against its own tells (`faith`, `beat_verify.against_tells`: a
+    closed verdict per sentence naming the tell and the clashing words, checked in code,
+    then confirmed by a second read). Only a slot holding a confirmed clash is touched, and
+    only it is asked again — its own kept call, the clashing sentence and the tell it breaks
+    named — and the remade slot is read again. Still clashing, or the remake unread: the
+    clashing sentences are cut; an act slot left with nothing gets the engine's own line
+    (`narration.page_line`), any other slot goes.
+
+    RARR's lesson (Gao et al. 2023): edit only where a disagreement was found, or an editor
+    over-edits; every other slot's words stand exactly as written. One read on a clean beat.
+    Measured on the slips of 2026-11-01 (docs/narration-faithfulness.md): "it remains on the
+    tray" against the theft's tell, "You hold the six gold pieces" against the fine's, and
+    "hanged at six in the evening" against "at first light".
+
+    A clash with a REFUSED tell is named as a refusal in the remake ("the engine refused
+    it: it did not happen"), and the remake is judged against the very tell it broke as
+    well as read again whole (`faith.second`, the fact-first second read). Measured live
+    on 2026-11-03: the refused "pays nothing more: the smith took the fee with the job"
+    caught "You hand over the coins as agreed"; the remake, told only "the engine decided
+    …", wrote "You agree to his price and pay the fee", and the whole re-read passed it."""
+    from . import beat_verify
+
+    refused_premises = set(beat_verify.tell_premises(refused))
+    second = getattr(faith, "second", None)
+    text = " ".join(s["wrote"] for s in out.slots if s.get("wrote")).strip()
+    read = faith(text, tells)
+    if not read.calls:
+        return              # nothing to read against (no tells): nothing asked, nothing logged
+    out.faith.append({"pass": "beat", **read.as_log()})
+    if read.error:
+        out.notes.append(f"the tells check was not answered ({read.error[:80]}): the beat "
+                         f"stands as written")
+        return
+    if not read.clashes:
+        return
+    kept = [s for s in out.slots if s.get("wrote") and not s.get("dropped")]
+    by_slot: dict[int, list] = {}
+    for c in read.clashes:
+        n = slot_of(c.sentence, kept)
+        if n is None:
+            out.notes.append(f"the tells check: {c.sentence[:80]!r} is no slot's: left")
+            continue
+        if _same_deed(c, kept[n], outcomes):
+            out.notes.append(f"the tells check: {c.sentence[:80]!r} tells a resolved act; "
+                             f"the refused tell beside it is the same deed's: left")
+            continue
+        by_slot.setdefault(n, []).append(c)
+    for n, clashes in sorted(by_slot.items()):
+        s = kept[n]
+        before = s["wrote"]
+        named = " ".join(
+            (f"The sentence {c.sentence!r} says \"{c.words}\", and that did not happen: the "
+             f"engine REFUSED it — \"{c.tell}\". Write nothing that has it happen."
+             if c.tell in refused_premises else
+             f"The sentence {c.sentence!r} says \"{c.words}\", and that cannot be "
+             f"true: the engine decided \"{c.tell}\".") for c in clashes)
+        redo = (f"You wrote: {before!r}. {named} Write this slot again so that every "
+                f"sentence agrees with what the engine decided, and change nothing else.")
+        msgs = [dict(m) for m in (s.get("messages") or [])]
+        # The training record (`corrections.log_auto`): the slot's own call as it was
+        # sent, its reply, and what came of the remake — a DPO pair when it passed.
+        record = {"slot": s["key"], "prompt": [dict(m) for m in msgs],
+                  "rejected": before, "rejected_raw": s.get("reply") or "",
+                  "clashes": [c.as_log() for c in clashes], "remade": "",
+                  "remade_raw": "", "passed": False, "stood": ""}
+        text2, again, raw = "", None, ""
+        if msgs:
+            msgs[-1]["content"] += "\n\n" + redo
+            started = time.monotonic()
+            try:
+                reply, data = call_slot(s, msgs, who)
+                raw = reply.text
+                text2 = realise(s, data, lift)
+                out.calls.append({"key": s["key"], "messages": msgs, "raw": raw,
+                                  "seconds": round(reply.seconds, 1),
+                                  "model": reply.model or who[0],
+                                  "note": "tells: remade with the tell named"})
+            except Exception as exc:  # noqa: BLE001 — unremade: the cut below stands in
+                if isinstance(exc, client.ModelStalled):
+                    raise
+                out.calls.append({"key": s["key"], "messages": msgs, "raw": raw,
+                                  "seconds": round(time.monotonic() - started, 1),
+                                  "model": who[0],
+                                  "note": f"tells: remake failed: {type(exc).__name__}"})
+        # A remake that is not whole prose is no remake: measured on the bench's first run
+        # (2026-11-02), a matter slot came back "… beyond the east crossing. (Note: This
+        # matter remains as your objective." — the model talking to us, its bracket left
+        # open. The page's own checks, and an unclosed bracket.
+        broken = (page_fault(text2) or ("an unclosed bracket" if text2.count("(")
+                                        != text2.count(")") else "")) if text2 else ""
+        if broken:
+            out.notes.append(f'the tells check: the "{s["key"]}" remake was not whole '
+                             f"({broken}): not used")
+            record["remade_broken"] = broken
+        against: list[dict] = []
+        if text2 and not broken:
+            again = faith(text2, tells)
+            out.faith.append({"pass": f"remade {s['key']}", **again.as_log()})
+            if second is not None and not again.error and not again.clashes:
+                # The remake against the tell it was remade for, sentence by sentence, the
+                # fact first: the whole re-read can pass a remake that says the same thing
+                # in new words.
+                for sent in narration_mod._sentences(text2):
+                    for c in clashes:
+                        if sent.strip() and second(sent, c.tell) == "cannot both be true":
+                            against.append({"sentence": sent, "tell": c.tell})
+                out.faith.append({"pass": f"remade {s['key']} against its tell",
+                                  "clashes": against})
+        record.update(remade=text2, remade_raw=raw)
+        if against:
+            record["remade_against_tell"] = against
+        if text2 and again is not None and not again.error and not again.clashes \
+                and not against:
+            s.update(wrote=text2, messages=msgs, reply=raw)
+            record.update(passed=True, stood=text2)
+            out.notes.append(f'the tells check: the "{s["key"]}" slot broke a tell '
+                             f'({clashes[0].words[:60]!r}) — asked again, fixed')
+        else:
+            cut = before
+            for c in clashes:
+                cut = cut_slot_sentence(cut, c.sentence) or ""
+                if not cut:
+                    break
+            if cut.strip():
+                s["wrote"] = cut.strip()
+                how = f"cut {clashes[0].sentence[:80]!r}"
+            elif s["key"].startswith("fact"):
+                # Nothing of the act left: the engine's own line, numbers off, stands in
+                # (the read back's backstop shape; the groom makes the name "you"). Its
+                # bracketed labels go: a skill or a manoeuvre named for the player's
+                # choice is the table's, not the story's, and the un-namer took "(Escape
+                # Artist)" for a person — "slip it (the stranger)" on 2 of 6 gallows runs
+                # of the first-read-alone bench (2026-11-03).
+                s["wrote"] = engine_line(s.get("tells") or [c.tell for c in clashes])
+                how = "the engine's own line put in its place"
+            else:
+                s.update(wrote="", dropped=True)
+                how = "dropped"
+            record["stood"] = s["wrote"]
+            out.notes.append(f'the tells check: the "{s["key"]}" slot broke a tell twice '
+                             f'({clashes[0].words[:60]!r}) — {how}')
+        out.remade.append(record)
+
+
+def engine_line(tells) -> str:
+    """An act slot's tells as the engine's own page lines, numbers and bracketed labels off:
+    what stands in for a slot when nothing of what it wrote can (the tells check's fallback,
+    `agent.keep_act_slots`). Each tell's sentences stay whole and in the engine's third
+    person; the groom's un-naming and second-person steps run over it as over everything
+    else, so the player's name becomes "you" there, once, for every narrator. The XP line
+    goes, as the tells check's own premises drop it (`beat_verify.tell_premises`): the
+    replay of the rerun put "You gain 100 XP for the intimidate check." on a page."""
+    from .beat_verify import _XP_LINE
+
+    lines = (_XP_LINE.sub("", _BRACKETED.sub("", narration_mod.page_line(t)))
+             for t in tells or () if t)
+    return " ".join(" ".join(x.split()) for x in lines if x.strip()).strip()
+
+
 def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
-                 goal=None, job=None) -> None:
-    written: list[str] = []
+                 goal=None, job=None, *, suggest: bool = True, before: str = "",
+                 told=None) -> None:
+    # `before`: what this turn already put on the page ahead of the slots (a companion's
+    # wind-up), shown to every slot as written so far and never written again.
+    written: list[str] = [before.strip()] if before and before.strip() else []
     for i, s in enumerate(slots):
-        final = i == len(slots) - 1
+        final = suggest and i == len(slots) - 1
         core = _prio(s) <= 1
         text, data = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
                           core=core)
@@ -1518,6 +2136,9 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
         if s.get("no_job") and job is not None:
             text = _no_job_made_up(out, plan, slots, i, written, who, s, text, job,
                                    final=final, lift=lift, core=core)
+        if s.get("must_tell") and told is not None:
+            text = _all_told(out, plan, slots, i, written, who, s, text, told,
+                             final=final, lift=lift)
         if s.get("not_own") and goal is not None:
             text = _not_their_goal(out, plan, slots, i, written, who, s, text, goal,
                                    final=final, lift=lift, core=core)

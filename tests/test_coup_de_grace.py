@@ -325,3 +325,36 @@ def test_the_param_survives_validation():
     got = engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"coup_de_grace": "yes"}}])
     assert got[0].params["coup_de_grace"] is True
+
+
+def test_it_reaches_the_dying_beast_and_the_blow_is_the_coup_de_grace():
+    """Measured on the owner's report of 2026-11-01 (Corvin T., the shrine, log 631): "kill
+    it and skin iot for parts" with the giant rot grub dying at -1 and nobody else here.
+    The reader read `attack, target: it`; the pronoun pooled only the standing, so it
+    resolved to nobody ("nobody resolved; the plan's own blow stands"), the plan wrote
+    `narrate_only`, and the coup de grâce branch never ran. "It" now reaches a body on the
+    floor that still breathes, and is never the dead."""
+    from tests._violence import through_the_reading
+
+    s = Scene()
+    s.grid = Grid(width=20, height=20)
+    s.add(load_pc("fixtures/pc-kesst.json"), at=(5, 5))
+    grub = s.add(instantiate("giant-rot-grub", scene=s, name="giant rot grub"), at=(6, 5))
+    grub.hp = -1
+    grub.apply_hp_state()
+    assert grub.is_down and not grub.has_state("state.down.dead")
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "attack", "target": "it", "span": "kill it"}]}
+    out, stop = through_the_reading([{"op": "narrate_only"}], "kill it and skin iot for parts",
+                                    s, frame=frame)
+    blows = [r for r in out if r.get("op") == "attack"]
+    assert not stop and len(blows) == 1, out
+    assert blows[0]["target"] == grub.ref and blows[0]["params"] == {"coup_de_grace": True}
+
+    # A corpse is never "it" for a fresh blow.
+    grub.hp = -30
+    grub.apply_hp_state()
+    assert grub.has_state("state.down.dead")
+    out, _ = through_the_reading([{"op": "narrate_only"}], "kill it", s, frame=frame)
+    assert not [r for r in out if r.get("op") == "attack"
+                and (r.get("params") or {}).get("coup_de_grace")], out

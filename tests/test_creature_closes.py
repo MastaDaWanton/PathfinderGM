@@ -1,9 +1,9 @@
 """A creature's move toward somebody walks the board (the owner's play, 2026-10-01).
 
 The measurement, from the owner's save: a Clockwork Spy (Tiny, slam, speed 30) stood
-forty feet from Sam at (0, 13) against (5, 7). Its slam was refused — "Clockwork Spy
-reaches 0 ft with the slam and Sam is 40 ft away ... There is no open square in reach of
-Sam that Clockwork Spy can get to. Take another action." — and its retry,
+forty feet from Dace at (0, 13) against (5, 7). Its slam was refused — "Clockwork Spy
+reaches 0 ft with the slam and Dace is 40 ft away ... There is no open square in reach of
+Dace that Clockwork Spy can get to. Take another action." — and its retry,
 `{"op": "move", "actor": "c7", "target": "pc", "params": {}}`, resolved "Clockwork Spy
 moves from far to far." Its square never changed; the prose had it "closing the gap and
 landing right before you". The owner: "the clockwork spy should have moved in front of
@@ -87,8 +87,8 @@ def test_only_creatures_under_a_square_across_enter_an_occupied_one(size, shares
 
 def test_a_reach_of_zero_names_the_targets_own_square():
     """Measured: `square_in_reach` returned None for the spy — the one square in a reach
-    of 0 is Sam's, and it was counted taken — so the refusal said "There is no open
-    square in reach of Sam". The square is Sam's own, 45 ft by the open route (the walls
+    of 0 is Dace's, and it was counted taken — so the refusal said "There is no open
+    square in reach of Dace". The square is Dace's own, 45 ft by the open route (the walls
     at (2,12) and (3,12) and the rough square at (3,9) are in the way)."""
     scene, _ = _owners_board()
     spy, pc = scene.get("c1"), scene.get("pc")
@@ -113,7 +113,7 @@ def test_the_refusal_names_the_real_reason_not_no_open_square():
 def test_a_move_at_the_player_walks_the_grid_on_the_owners_board():
     """The measured line: `move target=pc` with no square resolved "Clockwork Spy moves
     from far to far." and left it at (0, 13), 40 ft off. Now it walks its 30 ft toward
-    Sam and the tell says where it stopped."""
+    Dace and the tell says where it stopped."""
     scene, engine = _owners_board()
     assert scene.distance_between("c1", "pc") == 40
     res = _run(engine, [TOWARD])
@@ -130,9 +130,9 @@ def test_a_move_at_the_player_walks_the_grid_on_the_owners_board():
 
 
 def test_the_next_round_it_enters_the_square_is_swung_at_and_slams():
-    """Ten feet off with its move fresh, the slam closes the last step into Sam's own
+    """Ten feet off with its move fresh, the slam closes the last step into Dace's own
     square (ID=179) — the walk the engine composes for a blow one move short — and the
-    entry provokes Sam's attack of opportunity, rolled with the spy where it LANDED.
+    entry provokes Dace's attack of opportunity, rolled with the spy where it LANDED.
     Asked before the move, the first cut measured that swing from 10 ft and refused it:
     "Kesst Vayr reaches 5 ft with the rapier and Clockwork Spy is 10 ft away"."""
     scene, engine = _owners_board()
@@ -229,7 +229,7 @@ def test_a_tiny_creature_may_be_moved_into_an_occupied_square_and_a_medium_may_n
 
 
 def test_entering_provokes_only_on_arrival_and_only_for_a_small_body():
-    """`provoked_by_entering`: a Tiny body ending in Sam's square provokes Sam, even by
+    """`provoked_by_entering`: a Tiny body ending in Dace's square provokes Dace, even by
     a five-foot step (the rule's sentence has no step exception); a thug ending beside
     him provokes nothing by entering, and `provoked_by_move` is unchanged for both."""
     scene, _ = _owners_board(spy_at=(5, 8))

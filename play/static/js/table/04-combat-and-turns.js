@@ -71,6 +71,9 @@ function renderCombat(s) {
   const ext = $("#cb-extinguish"), tear = $("#cb-breakfree");
   if (ext) ext.hidden = !me.burning;
   if (tear) tear.hidden = !me.glued;
+  // Held in somebody's grapple (`grappled`, the server's `held_in_grapple`): Break free.
+  const esc_ = $("#cb-escape");
+  if (esc_) esc_.hidden = !me.grappled;
   // A flask to throw: offered while one is carried (the server's `attacks.flasks`).
   const thr = $("#cb-throw");
   if (thr) thr.hidden = !flasksCarried().length;
@@ -95,7 +98,29 @@ function renderPlan() {
     title="Remove">Swift: ${esc(COMBAT.swift)}</span>`);
   COMBAT.frees.forEach((f, i) => bits.push(`<span class="cb-step" data-unplan="free:${i}"
     title="Remove">Free: ${esc(f)}</span>`));
+  const far = strikeOutOfReach();
+  if (far) bits.push(`<span class="cb-warn" role="alert">${esc(far)}</span>`);
   $("#cb-plan").innerHTML = bits.join("");
+}
+
+// A move and a melee strike staged together, where the strike will not reach from the
+// square the move ends on. The squares are the engine's (`_reach_from`, play/views.py,
+// measured by `position.out_of_reach_from`); the page only looks the square up. Measured
+// on the owner's report of 2026-11-01: "move to (5,4); strike giant rot grub" walked and
+// then lost the blow, the grub 25 ft from (5,4), with nothing said before the commit.
+// The server refuses the same pair (`_strike_out_of_reach`); this says it while planning.
+function strikeOutOfReach() {
+  if (!COMBAT.move || !COMBAT.standard) return "";
+  const blow = (COMBAT.standard.actions || []).find(a => a.op === "attack" && a.target);
+  if (!blow) return "";
+  const reach = ((STATE && STATE.attacks) || {}).reach || {};
+  const squares = reach[blow.target];
+  if (!squares) return "";
+  const [x, y] = COMBAT.move;
+  if (squares.some(s => s[0] === x && s[1] === y)) return "";
+  const f = (STATE.scene.actors || []).find(a => a.ref === blow.target);
+  return `From ${x},${y} the strike will not reach ${f ? f.name : "them"}: pick a square ` +
+    `beside them, or strike without moving.`;
 }
 
 function targetName() {
@@ -282,6 +307,17 @@ async function commitTurn(endOnly) {
     actions.push(...COMBAT.standard.actions);
     said.push(COMBAT.standard.label.toLowerCase());
   }
+  // Commit turn with nothing planned is not a pass. It posted an empty list with
+  // `end_turn`, the same request End turn makes, so the turn went to the other side with
+  // nothing said. Measured on the owner's report of 2026-11-01 (Corvin T., the marsh): after
+  // the dice of the opening strike, an empty turn post (no player line, log rows 315 and
+  // 320) gave Lila Duskwatch a second turn before the player's second swing. Passing is
+  // End turn's, on purpose.
+  if (!endOnly && !actions.length) {
+    $("#err").textContent = "Nothing is planned for this turn. Pick an action first — " +
+      "or press End turn to pass it.";
+    return;
+  }
   // Cleared as the spoken turn clears it. A refusal ("…15 ft away… Click square 6,8…")
   // is a normal step since strikes need reach, and it stayed on the page under the
   // turn that had just followed its advice (live run, 2026-09-28).
@@ -294,6 +330,10 @@ async function commitTurn(endOnly) {
       actions: endOnly ? [] : actions,
       end_turn: true,
       label: endOnly ? "" : said.join("; ") || "",
+      // The round this page last drew, so a pass pressed for a turn that already ended
+      // (the dice finished it and the other side has acted) is refused, not spent on the
+      // player's new turn (`combat_act`).
+      seen_round: (STATE && STATE.scene && STATE.scene.round) || null,
     });
     COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
     COMBAT.aim = COMBAT.picked = null;
@@ -442,7 +482,23 @@ document.addEventListener("click", async e => {
       <span class="cb-note">Hacking needs a slashing weapon in hand.</span>`);
     return;
   }
+  // Breaking a grapple (CRB p.200): a standard action, the combat manoeuvre or Escape
+  // Artist against the holder's CMD; the engine takes the better when none is named.
+  if (t.closest("#cb-escape")) {
+    combatMenu(`<button data-stuck="escape:">Break free (the better roll)</button>
+      <button data-stuck="escape:cmb">Force it (combat manoeuvre)</button>
+      <button data-stuck="escape:escape artist">Slip out (Escape Artist)</button>
+      <span class="cb-note">Against the holder's CMD. It provokes nothing.</span>`);
+    return;
+  }
   const stuck = t.closest("[data-stuck]");
+  if (stuck && stuck.dataset.stuck.startsWith("escape:")) {
+    const how = stuck.dataset.stuck.slice("escape:".length);
+    COMBAT.standard = { label: how === "cmb" ? "Force free of the grapple"
+                               : how ? "Slip out of the grapple" : "Break free of the grapple",
+                        actions: [{ op: "escape", params: how ? { how } : {} }] };
+    combatMenu(""); renderPlan(); return;
+  }
   if (stuck) {
     const [op, how] = stuck.dataset.stuck.split(":");
     COMBAT.standard = op === "extinguish"

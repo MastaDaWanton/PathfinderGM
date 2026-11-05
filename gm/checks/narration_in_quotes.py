@@ -1,6 +1,6 @@
 """narration-in-quotes: narration printed as somebody's speech.
 
-Measured on the 2026-09-30 playtest (item 12), Sam's save, beats 51 and 53: five
+Measured on the 2026-09-30 playtest (item 12), Dace's save, beats 51 and 53: five
 narration sentences inside Gorm Vesper's quotation marks —
 
     'Gorm Vesper watches you from their workspace, remaining silent until you turn to

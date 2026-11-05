@@ -127,7 +127,7 @@ def test_the_name_is_handed_over_only_on_the_turn_it_is_asked_for(step):
 
 
 def test_only_the_person_actually_asked_answers(step):
-    """Measured live 2026-09-19 against a copy of the `masta` save: "I turn to the woman in
+    """Measured live 2026-09-19 against a copy of the `torvo` save: "I turn to the woman in
     the corner and ask her what her name is" matched BOTH the woman in the corner and the
     woman, so two names were offered and the beat ended with a second stranger
     volunteering hers to nobody — '"Kael Throk," the woman says.' appended by the backstop.

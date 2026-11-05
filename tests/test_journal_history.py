@@ -15,7 +15,7 @@ What it must be, and what is measured here:
   anywhere is left out, not printed as "c99";
 * by day where the row kept the clock — which rows written from 2026-10-01 do.
 
-First measured on the 200-turn scratch copy of the owner's Sam campaign (not committed):
+First measured on the 200-turn scratch copy of the owner's Dace campaign (not committed):
 thirteen lines, from "You took on “The Fighter's Debt” for the cage owner." to "Quin Nutmeg
 is well disposed towards you." Two defects the first run showed are pinned below: a
 crafted jar named by its key ("power_leaf_tea#1") and the outskirts as "outside".
@@ -93,7 +93,7 @@ def test_rolls_and_diagnostics_are_not_history(camp):
 
 def test_a_resumed_turn_is_told_once(camp):
     """The resolution row after a roll repeats the turn's outcomes under the same
-    per-turn intent ids; measured on the scratch Sam campaign, every lie and every quest
+    per-turn intent ids; measured on the scratch Dace campaign, every lie and every quest
     would have been listed twice."""
     c = camp
     quest = {"kind": "quest", "id": "q1", "title": "The Debt", "giver": "c77"}
@@ -193,7 +193,7 @@ def test_the_journal_reads_it_over_http(camp):
 
 
 def test_a_quest_giver_left_behind_is_named_not_reffed(camp):
-    """Seen beside the history in the running app (scratch Sam campaign, 2026-10-01): the
+    """Seen beside the history in the running app (scratch Dace campaign, 2026-10-01): the
     Matters card read "for c1" once the cage owner was out of the room, because the quest
     log named givers from who is HERE. Refs are never on the page."""
     from rules import cards as cards_mod

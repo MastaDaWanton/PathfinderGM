@@ -707,7 +707,7 @@ def test_the_declared_blow_is_not_added_twice_when_its_target_is_disabled():
     (i1 attack pc -> c13), but `inject_fight` counted only targets above 0 hp, so it
     added it again (i2 attack pc -> c12, "because: the player said they attack") at the
     lowest ref it could find: the drover, holding `bond.travels-with-you`. The engine
-    resolved both: "Sam hits a young drover with the shortbow for 5 piercing ... a young
+    resolved both: "Dace hits a young drover with the shortbow for 5 piercing ... a young
     drover is unconscious and dying", and the prose wrote "your second shot catches the
     young drover in the shoulder". Two blows for one declared, the second at a friend."""
     from tests._violence import through_the_reading
@@ -724,7 +724,12 @@ def test_the_declared_blow_is_not_added_twice_when_its_target_is_disabled():
     thug.hp = -1
     thug.add_condition("dying", source="the second arrow")
     out, _ = through_the_reading(raw, "I shoot the thug again.", room)
-    assert out == raw
+    # On him, and (since 2026-11-04) as the coup de grâce the act table builds for a blow
+    # at somebody down out of a fight (`acts_to_ops.victims`), which the plan's own blow at
+    # the same body now carries — before, the plan's blow stood in without it, and "finish
+    # off the dying bandit" was an ordinary swing (the narration diagnosis bench).
+    assert [(i["op"], i["target"], i.get("params")) for i in out] == [
+        ("attack", thug.ref, {"coup_de_grace": True})]
     assert judgement.redirect_attacks_off_corpses(raw, "I shoot the thug again.",
                                                   room) is None
 

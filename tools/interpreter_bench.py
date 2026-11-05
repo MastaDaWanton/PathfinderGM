@@ -31,7 +31,7 @@ from tests.interpreter.score import score  # noqa: E402
 # What each op the detectors declare means as an act of the frame.
 _OP_ACT = {
     "travel": "go", "venture": "go", "journey": "journey", "buy": "buy", "sell": "sell",
-    "give": "give", "loot": "take", "attack": "attack", "begin_encounter": "attack",
+    "give": "give", "loot": "loot", "attack": "attack", "begin_encounter": "attack",
     "cast": "cast", "use_ability": "use", "use_item": "consume", "drink": "consume",
     "eat": "consume", "advance_time": "wait", "rest": "rest", "forage": "gather",
     "prospect": "gather", "provoke": "insult", "say": "talk", "introduce": "seek",

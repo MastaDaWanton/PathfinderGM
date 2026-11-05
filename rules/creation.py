@@ -155,6 +155,13 @@ def allowance(cid: str, level: int = 1, int_mod: int = 0) -> dict[int, int]:
     return casting.known_row(casting.CASTERS.get(cid, {}), int(level or 1))
 
 
+# The favoured class bonus a level may be taken in (CRB p.31): a hit point or a skill rank.
+# The book names no default; this app's NPCs take the hit point by the owner's ruling of
+# 2026-10-30 (rules/npc_builds.py), and a player who chooses nothing gets the same.
+FAVOURED_BONUSES = ("hp", "skill")
+FAVOURED_DEFAULT = "hp"
+
+
 def max_hit_die(spec) -> int:
     """The best a class's first-level hit die can roll.
 
@@ -178,6 +185,35 @@ def max_hit_die(spec) -> int:
     if m.group(3):
         total += int(m.group(4)) * (-1 if m.group(3) == "-" else 1)
     return max(1, total)
+
+
+def hit_dice_of(spec, per_level: int = 1) -> tuple[int, int, int]:
+    """(dice, sides, flat) a level of this class rolls: `"4d8"` is four d8s, `"2d8"` two,
+    and a bare `8` one d8 for each Hit Die the class gives a level (`hit_dice_per_level`).
+
+    Measured on the owner's report of 2026-11-01: a homebrew class declaring `"4d8"` (four
+    Hit Dice a level) was rolled at level-up as one flat d32 (`max_hit_die` read the
+    notation as its maximum, 32, and the level rolled `1d32`). Four d8s and a d32 have the
+    same top and nothing else in common — 4d8 averages 18 and never rolls under 4. An
+    unreadable spec is a d8 a Hit Die, as `max_hit_die` falls back."""
+    per = max(1, int(per_level or 1))
+    if isinstance(spec, (int, float)) or str(spec).strip().isdigit():
+        return per, max(1, int(float(str(spec).strip()))), 0
+    m = re.fullmatch(r"(\d*)d(\d+)\s*(?:([+-])\s*(\d+))?", str(spec).strip().lower())
+    if not m:
+        return per, 8, 0
+    flat = int(m.group(4)) * (-1 if m.group(3) == "-" else 1) if m.group(3) else 0
+    return max(1, int(m.group(1) or per)), max(1, int(m.group(2))), flat
+
+
+def first_level_hp(spec, con_mod: int, per_level: int = 1) -> int:
+    """Hit points at 1st level: every die of the level at its maximum (CRB p.30, the
+    "kind rule" this app has always used) plus Constitution for EACH Hit Die, at least 1
+    a die. Until 2026-11-01 Constitution was added once whatever the dice — a Blood Bender
+    (2d8 a level) and a 4d8 homebrew class were each short of Con × (dice − 1) from the
+    forge on, while the sheet's breakdown said "Con × 2 HD" (`Actor.hp_max_modifiers`)."""
+    dice, sides, flat = hit_dice_of(spec, per_level)
+    return max(dice, dice * max(1, sides + int(con_mod)) + flat)
 
 
 def die_label(spec) -> str:
@@ -746,11 +782,24 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     con_mod = (abilities.get("con", 10) - 10) // 2
     int_mod = (abilities.get("int", 10) - 10) // 2
 
+    # The favoured class bonus for 1st level (CRB p.31, "Favored Class": "Whenever a
+    # character gains a level in his favored class, he receives either +1 hit point or +1
+    # skill rank"). The favoured class is the one taken at 1st, as the book says it
+    # typically is; which bonus is the player's, at the forge and at every level after
+    # (`leveling.level_up`). Kept as its own list on the sheet (`Actor.favoured`), never
+    # folded into the rolled base, so the sheet can say where the point came from.
+    favoured = str(payload.get("favoured_bonus") or FAVOURED_DEFAULT).strip().lower()
+    if favoured not in FAVOURED_BONUSES:
+        problems.append(f"The favoured class bonus is {' or '.join(FAVOURED_BONUSES)}, "
+                        f"not {favoured!r}.")
+        favoured = FAVOURED_DEFAULT
+
     # --- skills --------------------------------------------------------------------
     ranks_budget = 0
     if cls:
         ranks_budget = max(1, int(cls["skill_ranks"]) + int_mod) \
-            + (int((race.get("budget") or {}).get("ranks", 0)) if race else 0)
+            + (int((race.get("budget") or {}).get("ranks", 0)) if race else 0) \
+            + (1 if favoured == "skill" else 0)
     picked = [str(s).strip().lower() for s in (payload.get("skills") or [])]
     for s in picked:
         if s not in SKILLS:
@@ -761,7 +810,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"That is {len(picked)} skills against "
                         f"{ranks_budget} ranks ({cls['skill_ranks']} class"
                         f"{' + Int' if int_mod else ''}"
-                        f"{' + race' if race and (race.get('budget') or {}).get('ranks') else ''}).")
+                        f"{' + race' if race and (race.get('budget') or {}).get('ranks') else ''}"
+                        f"{' + favoured class' if favoured == 'skill' else ''}).")
 
     # --- paths ---------------------------------------------------------------------
     # A class that declares branches must have one chosen at creation: the user's own
@@ -930,7 +980,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     own = [str(w.get("key")) for w in (race.get("weapons") or []) if w.get("key")]
     weapons = own + ["unarmed"] if own else ["unarmed"]
     outfit = OUTFITS.get(cid, DEFAULT_OUTFIT)
-    hp = max(1, max_hit_die(cls["hit_die"]) + con_mod)  # max die at 1st, the kind rule
+    # Max dice at 1st, the kind rule, with Constitution on every Hit Die of the level.
+    hp = first_level_hp(cls["hit_die"], con_mod, int(cls.get("hit_dice_per_level") or 1))
     sheet = {
         "name": name, "kind": "pc", "class": cid, "level": 1,
         "race": race["id"],
@@ -964,7 +1015,9 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "goods": {outfit: 1},
         "slots": {"body": [outfit]},
         "purse": starting_purse(cls),
-        "hp": hp, "hp_max": hp,
+        "hp": hp + (1 if favoured == "hp" else 0),
+        "hp_max": hp + (1 if favoured == "hp" else 0),
+        "favoured": [favoured],
         "notes": str(payload.get("notes", "")).strip(),
     }
     if spellbook:
@@ -1118,6 +1171,7 @@ def _provisional(payload: dict):
             "feats": [str(f) for f in (payload.get("feats") or [])]
             + [feats_mod.get(fid).name.lower() for fid in leveling.granted_feats(cid, 1)],
             "background": str(payload.get("background", "")).strip().lower(),
+            "favoured": [str(payload.get("favoured_bonus") or FAVOURED_DEFAULT)],
             "hp": 1, "hp_max": 1,
         }), ""
     except Exception as exc:      # noqa: BLE001

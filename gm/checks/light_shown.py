@@ -58,6 +58,24 @@ from ._page import field, page_sentences
 ORDER = 63
 KINDS = frozenset({"light-miss-unshown", "light-left-off-the-page", "light-contradicted"})
 DOORS = frozenset({"turn", "outcome"})
+# Kept on planned beats, rewrite and all (round 2, 2026-11-05). Measured on the rerun's
+# recorded beats: 17 findings on planned beats, the rewrite folding the gloom into a slot's
+# sentence ("You close the distance in the gloom and land …") on 13, none scored an error
+# but one — a Perception check made by 15 rewritten into "a sea of barely discernible,
+# shifting shapes" (climb, run 7), which `_searching` now never asks for. Replayed with the
+# rewrite off, those 13 beats got the backstop's appended gloom line instead: a formula on
+# every night fight, for no error removed.
+#
+# But a light MISS is never rewritten on a planned beat (round 3, 2026-11-05). The final
+# rerun's two rewrites of `light-miss-unshown` on planned beats were both scored errors, and
+# both moved the miss onto the wrong man: "the robber finds nothing there — dim light" was
+# folded into the sentence about the SECOND robber ("The second robber swings at a target
+# lost in the gloom", burning hands runs 1 and 3; on run 3 over a sentence that had told his
+# hit). The anchor is the first sentence about any blow, and on a turn of several blows that
+# is often somebody else's. The other two findings on planned beats went to the backstop
+# anyway (no sentence to anchor; the rewrite still did it). The backstop names nobody, and
+# says "at you" only when the engine's own record says the blow was at the player.
+PLANNED_NO_REWRITE = frozenset({"light-miss-unshown"})
 
 # Words that show poor sight, as a family (`body_shown`'s shape). Not "night", "moon" or
 # "stars" alone — they say the hour, not how little can be seen ("the night air is cold"
@@ -189,8 +207,13 @@ def _fighting(ctx) -> bool:
 
 
 def _searching(ctx) -> bool:
+    """A Perception check this beat that did not succeed. A made one found what it looked
+    for, poor light or not: demanding that the page show the player can barely see
+    contradicts the engine's own verdict (round 2, 2026-11-05: "makes the perception
+    check by 15" rewritten into murk on the climb). Read off the outcome's verdict."""
     return any(field(o, "op") == "check"
                and "perception" in str(field(o, "tell") or "").lower()
+               and str(field(o, "verdict") or "") != "success"
                for o in ctx.outcomes)
 
 

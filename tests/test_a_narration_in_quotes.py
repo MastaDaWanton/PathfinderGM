@@ -1,6 +1,6 @@
 """Item 12 of docs/playtest-2026-09-30.md: narration put inside a speaker's quotation marks.
 
-Measured in Sam's save (the owner's first play of 0.2.0): 5 narration sentences inside
+Measured in Dace's save (the owner's first play of 0.2.0): 5 narration sentences inside
 Gorm Vesper's quotes across beats 51 and 53. `keeper_forward` flagged his spoken lines,
 `_repair_sentences` spliced the model's rewrite in with a string replace INSIDE the
 quotation marks, and the rewrite paraphrased the check's own fix hint ("…until you turn to

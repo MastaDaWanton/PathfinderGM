@@ -411,7 +411,7 @@ CASES: list[dict] = [
     {
         "id": "synthetic-the-sergeant-gives-his-name",
         "why": "a name given in play is the panel's name from then on (2026-09-18, 'call me "
-               "Kael'); written here in the shape of Sam's sergeant (2026-09-30), not "
+               "Kael'); written here in the shape of Dace's sergeant (2026-09-30), not "
                "copied from a save",
         "cast": [KESST, ("c5", "the sergeant of the watch", "watchman")], "vague": [],
         "town": ZHIL, "here": "the gate",
@@ -621,9 +621,9 @@ CASES: list[dict] = [
         "names": {},
         "pronouns": {"c2": "*"},
     },
-    # --- Sam's save, replayed 2026-10-01 (the seen-people ruling's own cases) ------------
+    # --- Dace's save, replayed 2026-10-01 (the seen-people ruling's own cases) ------------
     {
-        "id": "sam-a-figure-it-is-a-woman",
+        "id": "dace-a-figure-it-is-a-woman",
         "why": "'a figure … It is a woman' stayed prose; '/cheat the woman …' was refused "
                "and every 'her' went to Quin Nutmeg in another room",
         "cast": [KESST, ("c9", "Gorm Vesper", "barkeep")], "vague": [],
@@ -637,7 +637,7 @@ CASES: list[dict] = [
         "lines": {},
     },
     {
-        "id": "sam-a-woman-in-the-stories",
+        "id": "dace-a-woman-in-the-stories",
         "why": "the player standing, and a woman who exists in stories, were read as a woman "
                "here: a phantom walked on with a Ratfolk face",
         "cast": [KESST, ("c9", "Gorm Vesper", "barkeep")], "vague": [],
@@ -651,7 +651,7 @@ CASES: list[dict] = [
         "lines": {},
     },
     {
-        "id": "sam-the-question-you-posed",
+        "id": "dace-the-question-you-posed",
         "why": "talk of the woman three streets over recorded her where the party stood",
         "cast": [KESST, ("c9", "Gorm Vesper", "barkeep")], "vague": [],
         "town": ZHIL, "here": "the tavern",

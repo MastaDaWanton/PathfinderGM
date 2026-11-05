@@ -839,19 +839,45 @@ def _apply_cards(c, p: dict) -> bool:
                                    "action": "refused", "fact": fact[:200],
                                    "why": "the fact is not about this card"})
                 continue
-            cards_mod.touch(c.scene, card.id, ch["fact"], turn=turn, tick=True)
+            # A scheme's card moves by the scheme's own steps (rules/schemes.py): the
+            # watcher may say a fact of it, never fill its clock. Measured on the owner's
+            # 0.2.25 save: three scheme cards — the lost thing's truth, the favour's plan,
+            # the sickness's prognosis, all secret — were "advanced" or "resolved" by the
+            # watcher and paid 200 XP each for a story the engine still had running.
+            cards_mod.touch(c.scene, card.id, ch["fact"], turn=turn,
+                            tick=not _schemes_own(card))
             c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
                                "action": "advance", "fact": ch["fact"]})
             changed = True
         elif ch["action"] == "resolve":
+            # A quest is finished by its objectives (`objective` below, judged), and a
+            # scheme's card by its scheme: neither is the watcher's to close by fiat.
+            if card.kind in cards_mod.TASKS or _schemes_own(card):
+                c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                                   "action": "refused",
+                                   "why": "a quest or a scheme's card is not resolved by "
+                                          "the watcher's word"})
+                continue
             cards_mod.resolve(c.scene, card.id, turn=turn)
             c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
                                "action": "resolve"})
             changed = True
         elif ch["action"] == "objective":
-            # A quest's objective seen done on stage. The engine ticks it, and the
-            # story award for the finished quest is paid below like any resolve.
-            done = cards_mod.objective_done(c.scene, card.id, int(ch["objective"]) - 1,
+            # A quest's objective seen done on stage — a claim, judged against what the
+            # engine holds (`rules/objectives.py`) exactly as the planner's quest_step
+            # is. Only an objective the engine has nothing to check against is ticked on
+            # the watcher's word; one whose scheme step holds is left to that step.
+            from rules import objectives as objectives_mod
+
+            engine = engine or c.engine()
+            index = int(ch["objective"]) - 1
+            verdict = objectives_mod.judge(engine, card, index)
+            if verdict.verdict != objectives_mod.TICK:
+                c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                                   "action": "refused", "objective": ch["objective"],
+                                   "why": verdict.why or "the engine ticks it itself"})
+                continue
+            done = cards_mod.objective_done(c.scene, card.id, index,
                                             note=ch.get("fact", ""), turn=turn)
             if done is not None:
                 c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
@@ -894,6 +920,53 @@ def _apply_cards(c, p: dict) -> bool:
     return changed
 
 
+def _schemes_own(card) -> bool:
+    """Whether a scheme opened this card, so its stage is the scheme's to move."""
+    return str(getattr(card, "origin", "") or "").startswith("scheme:")
+
+
+# The undercurrent's story award, as a ledger on the scene (`Scene.rewarded`, saved with
+# it): which thread of the note this is — counted up each time the watcher says the old
+# one resolved and writes a `new` — and, per thread, whether its advance and its ending
+# have been paid. The note itself is a sentence a model rewrites; nothing in the engine
+# holds what it is about, so what CAN be held is that one thread is moved once and ended
+# once. Measured on the owner's 0.2.25 save (Corvin): one private note, rewritten in place
+# with the same stallholder's grip on the same sleeve, was paid seven "advance" awards —
+# 1,700 XP — and with the unchecked quest steps the character went from level 1 to level 3
+# in about two game days.
+#
+# What was weighed and refused: a similarity test between the old sentence and the new
+# (reading English to price a number, which the owner's direction rules out), and a cap per
+# game day (a rate, not a fact: a real thread moved twice in a day would pay once, a
+# recycled one every day). A thread must have been moved before its ending pays, so a model
+# that answers `new` at every look ends nothing it never moved.
+_THREAD_KEY = "story:undercurrent"
+
+
+def _undercurrent_award(c, action: str) -> str:
+    """The story award for the undercurrent moving, or "" when this thread has already
+    been paid for this step. The line names no thread: the note is the GM's own, and the
+    award line used to print it on the page whole ("You gain 200 XP for moving a matter
+    along: The stallholder's grip on your sleeve tightens…")."""
+    paid = c.scene.rewarded
+    thread = int(paid.get(_THREAD_KEY, 0) or 0)
+    moved = f"{_THREAD_KEY}:{thread}:advance"
+    if action == "advance":
+        key = moved
+    elif action == "new":
+        key = f"{_THREAD_KEY}:{thread}:new"
+        # The new sentence is a new thread, paid or not.
+        paid[_THREAD_KEY] = thread + 1
+        if moved not in paid:
+            return ""
+    else:
+        return ""
+    if key in paid:
+        return ""
+    paid[key] = int(getattr(c.scene, "clock_minutes", 0) or 0)
+    return c.engine().award_story(action, "").strip()
+
+
 def _apply_undercurrent(c, p: dict) -> bool:
     from play import opening
 
@@ -914,7 +987,8 @@ def _apply_undercurrent(c, p: dict) -> bool:
     # fight for a storyline concluded, and half of one here for a storyline moved —
     # lands as its own line on the page, since the watcher writes between turns and
     # has no beat to ride on. "i should be receiving EXP for ... resolving situations".
-    line = c.engine().award_story(p.get("action", ""), p.get("thread", "")).strip()
+    # Once per thread and step (`_undercurrent_award`), never once per rewrite.
+    line = _undercurrent_award(c, str(p.get("action", "")))
     if line:
         # An engine line, not narration: "consequence", like every other award and tell
         # `play/views.py` appends. Measured 2026-09-17 on the first sixty-turn audit

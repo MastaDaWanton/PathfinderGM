@@ -425,9 +425,13 @@ def test_the_four_callers_each_build_a_context_for_their_door():
     tree = ast.parse((ROOT / "gm" / "agent.py").read_text(encoding="utf-8"))
     callers = sorted({f.name for f in ast.walk(tree) if isinstance(f, ast.FunctionDef)
                       and _calls(f, "_groom")})
-    assert callers == ["narrate_outcome", "narrate_turn", "npc_turn", "plan_turn"]
+    # `narrate_outcome`'s tail is `_groom_outcome` since 2026-11-04: the consequence call's
+    # passage and a planned turn's go through it alike.
+    assert callers == ["_groom_outcome", "narrate_turn", "npc_turn", "plan_turn"]
+    # Both of `narrate_outcome`'s writers reach that one tail.
+    assert len(_calls(_agent_method("narrate_outcome"), "_groom_outcome")) == 2
     for name, door in (("plan_turn", "plan"), ("npc_turn", "npc"),
-                       ("narrate_turn", "turn"), ("narrate_outcome", "outcome")):
+                       ("narrate_turn", "turn"), ("_groom_outcome", "outcome")):
         for call in _calls(_agent_method(name), "_groom"):
             ctx = next((k.value for k in call.keywords if k.arg == "ctx"), None)
             assert isinstance(ctx, ast.Call) and ctx.func.attr == "_beat_context", name

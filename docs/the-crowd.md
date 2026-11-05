@@ -83,7 +83,7 @@ the default here.
 - **The prose door.** `promote_cast` forms a unit when the ledger's count reaches five, which
   is what finally settles item 30's cap: "a band of twelve raiders" is a unit of twelve.
 
-## Measured live, one fight on a copy of the `masta` save
+## Measured live, one fight on a copy of the `torvo` save
 
 "I charge the twelve raiders coming up the road and swing at the nearest of them", then a
 dozen turns of cutting them down, each dice popup answered through `/api/roll`.

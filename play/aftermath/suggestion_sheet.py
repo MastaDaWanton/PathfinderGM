@@ -1,12 +1,12 @@
 """The suggestions are held to the sheet: a line that offers what the character cannot do
 is dropped, and the page is never left with fewer than two to choose from.
 
-Item 4 of the 2026-09-30 playtest. Sam, a bonesetter wizard with no healing spell, was
+Item 4 of the 2026-09-30 playtest. Dace, a bonesetter wizard with no healing spell, was
 offered **"I use a healing spell to knit the flesh"**, and later **"I keep my hand on the
 hilt of my blade as I navigate the crowd"** with a shortbow in hand and no blade anywhere.
 The owner: "the example inputs should probably not suggest the use of spells if it isnt
 going to be aware of what the character can do." The prose call writes the suggestions;
-the brief lists what Sam can cast, and the model ignored it, because instructions lose
+the brief lists what Dace can cast, and the model ignored it, because instructions lose
 (CLAUDE.md). Nothing in code checked a suggestion against the sheet, and clicking one
 passed every detector silently.
 

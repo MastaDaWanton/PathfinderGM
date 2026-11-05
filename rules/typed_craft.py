@@ -81,9 +81,14 @@ def pointer(craft: str) -> str:
     planned narrator's fact slot wrote "quenching and tempering the rare metal to create a
     masterwork blade. The mithral longsword emerges with a flawless finish" — the list
     dressed as the deed. The shape of the tell became the shape of the beat (CLAUDE.md).
-    The list lives on the line under the beat, which code writes (`bench_line`)."""
+    The list lives on the line under the beat, which code writes (`bench_line`).
+
+    Conditional since 2026-11-04: "Finer work is done at the leather bench" was the only
+    place a typed belt's tell named, and the narrator put the player at that bench on run
+    after run of the diagnosis bench (mechanism 7) — "would be" is a bench not used, and
+    the make op's tell now opens on where the work IS done (`Engine._op_make`)."""
     b = BENCHES.get(craft) or {}
-    return f"Finer work is done at {b.get('name', 'the bench')}."
+    return f"Finer work would be done at {b.get('name', 'the bench')}."
 
 
 def bench_line(craft: str) -> str:
@@ -105,7 +110,9 @@ class Refusal:
 class Step:
     """One step of the bench's chain, ready to roll: the check, its time and its rent, and
     `settle(made, margin)`, which changes the world by the craft's own rule and answers
-    {"tell", "effects", "made": [names], "mastery": int, "levelled": [...]}."""
+    {"tell", "effects", "made": [names], "mastery": int, "levelled": [...]}. A made step is
+    the plain quality unless `quality` says otherwise: a keeper's own roll decides it on a
+    commission (rules/commission.py), never the typed line's player."""
     craft: str
     method: str
     label: str
@@ -350,10 +357,10 @@ class Blacksmith:
               doing: str) -> Step:
         from . import blacksmith as bs
 
-        def settle(made: bool, margin: int) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
             now = int(engine.scene.clock_minutes or 0)
             if made:
-                tier = min(PLAIN_QUALITY, plan.step_ceiling)
+                tier = min(PLAIN_QUALITY if quality is None else int(quality),plan.step_ceiling)
                 got = bs.settle_made(actor, progress, plan, tier, plan.consumes,
                                      dice=engine.dice, now=now)
                 landed = got["landed"]
@@ -444,8 +451,10 @@ class Blacksmith:
         if not cands:
             what = ("a haft or grip" if gear == "weapon"
                     else "fastenings — buckles or a bar of iron for rivets")
+            # Its own code: a keeper on commission supplies a plain fitting from stock
+            # when this is all that is missing (rules/commission.py).
             return Refusal(f"Finishing {_a(info['name'].lower())} needs {what}, and none is "
-                           f"in the pack.", "no_material")
+                           f"in the pack.", "no_fitting")
         got, refused = self._plan(engine, actor, progress, where, known, "assemble",
                                   {names[0]: (main, 1), second: (cands[0], 1)}, 1, "")
         if refused:
@@ -568,11 +577,11 @@ class Herbalist:
                            f"{method}, not {_a(str(want).lower())}.", "cannot_craft")
         name = crafting.product_row(plan.form).get("name", plan.form or "")
 
-        def settle(made: bool, margin: int) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
             now = int(engine.scene.clock_minutes or 0)
             if made:
                 ceiling = wc.ceiling_index(progress)
-                tier = min(PLAIN_QUALITY, ceiling)
+                tier = min(PLAIN_QUALITY if quality is None else int(quality),ceiling)
                 got = crafting.settle_made(actor, progress, plan, tier, plan.consumes,
                                            dice=engine.dice, now=now)
                 stock = got["made"]
@@ -756,7 +765,7 @@ class Alchemist:
     def _step(self, engine, actor, progress, plan, where, *, final: bool, doing: str):
         from . import alchemist as al
 
-        def settle(made: bool, margin: int) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
             now = int(engine.scene.clock_minutes or 0)
             told_toxic = []
             if plan.toxics:
@@ -766,7 +775,7 @@ class Alchemist:
                     if getattr(o, "tell", ""):
                         told_toxic.append(str(o.tell))
             if made:
-                tier = min(PLAIN_QUALITY, plan.ceiling)
+                tier = min(PLAIN_QUALITY if quality is None else int(quality),plan.ceiling)
                 got = al.settle_made(actor, progress, plan, tier, plan.consumes,
                                      dice=engine.dice, now=now, where=where)
                 bits, effects, names = [], [], []
@@ -994,11 +1003,11 @@ class Leatherworker:
                            f"{actor.name} carries {goods.in_copper(actor.purse)} cp.",
                            "cannot_pay")
 
-        def settle(made: bool, margin: int) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
             now = int(scene.clock_minutes or 0)
             stop = False
             if made:
-                tier = min(PLAIN_QUALITY, plan.step_ceiling)
+                tier = min(PLAIN_QUALITY if quality is None else int(quality),plan.step_ceiling)
                 ceiling = max(0, int(plan.step_ceiling))
                 got = lw.settle_made(actor, progress, plan, tier, plan.consumes, now=now,
                                      where=where, setup_score=tier / (ceiling + 1),

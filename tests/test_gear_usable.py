@@ -277,7 +277,7 @@ def test_three_bundles_of_twenty_arrows_are_sixty_arrows():
 
 
 def test_an_old_save_with_arrows_on_the_weapons_list_is_migrated_to_rounds():
-    """Sam's save, 2026-09-30: `weapons: [..., "arrows-20", "arrows-20", "arrows-20"]`."""
+    """Dace's save, 2026-09-30: `weapons: [..., "arrows-20", "arrows-20", "arrows-20"]`."""
     d = to_dict(load_pc("fixtures/pc-borin.json"))
     d["weapons"] = ["shortbow", "arrows-20", "arrows-20", "arrows-20"]
     pc = from_dict(d, ref="pc")

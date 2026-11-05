@@ -2,7 +2,7 @@
 
 Owner ruling B1, 2026-09-30 (docs/fix-plan-2026-09-30.md): a spoken lie is opposed by the
 listener's Sense Motive, with 1e's believability modifiers, instead of the flat DC 30
-"heroic" band `judgement.inject_false_claim` used to write. With Sam's Bluff +6 that band
+"heroic" band `judgement.inject_false_claim` used to write. With Dace's Bluff +6 that band
 failed by construction — 10, 18 and 7 against 30, three times in one session — and it
 was never the rule.
 

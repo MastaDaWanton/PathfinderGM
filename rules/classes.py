@@ -1210,7 +1210,7 @@ def member_noun(class_id: str) -> str:
 
     Eleven of the thirteen shipped names are already nouns for a person — a Rogue, a
     Paladin — so this never bit until a class was named for the practice rather than
-    the practitioner: the opening read "You are Masta, a Blood Bending". The document
+    the practitioner: the opening read "You are Torvo, a Blood Bending". The document
     carries the word (`member`) and falls back to the name, so a homebrew class named
     "Storm Calling" fixes itself by saying so rather than by a special case here.
     """

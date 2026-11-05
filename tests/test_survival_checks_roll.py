@@ -2,7 +2,7 @@
 
 *"save DC for rest scales like crazy"* — the needs panel read Thirst "parched — a check
 every hour, DC 12", Hunger "starving — a check every day, DC 11", and Rest "past a day
-awake — Will save every active hour, DC 274". An earlier save, Sammy, read DC 107 at 121
+awake — Will save every active hour, DC 274". An earlier save, Ilse, read DC 107 at 121
 hours awake.
 
 The DC was the symptom. `Scene.advance` — the clock's one door, behind waiting, walking
@@ -48,8 +48,8 @@ def _pc(**kw):
 
 
 @pytest.fixture
-def sammy():
-    """The owner's Sammy at beat 63: 18 of 73, 121 hours unslept and unfed, no save made."""
+def ilse():
+    """The owner's Ilse at beat 63: 18 of 73, 121 hours unslept and unfed, no save made."""
     pc = _pc()
     pc.hp_max, pc.hp = 73, 18
     pc.fed_minutes = pc.awake_minutes = 121 * HOUR
@@ -92,86 +92,86 @@ class _Rigged:
 
 # --- the checks roll on the clock's own door ------------------------------------------------
 
-def test_waiting_rolls_the_checks_the_hours_owe(sammy, monkeypatch):
-    """Sammy waited, walked and worked for five days on `Scene.advance` and not one Will
+def test_waiting_rolls_the_checks_the_hours_owe(ilse, monkeypatch):
+    """Ilse waited, walked and worked for five days on `Scene.advance` and not one Will
     save was asked: the counters said 121 hours and `awake_checks` said 0. Two hours of
     waiting are two waking hours past the grace, and each is a save."""
     rig = _Rigged(monkeypatch)
-    _s, engine = _engine(sammy)
+    _s, engine = _engine(ilse)
     res = _wait(engine, 2)
     assert rig.of("Exhaustion") == [10, 11]
-    assert sammy.awake_checks == 2
+    assert ilse.awake_checks == 2
     told = [o for o in res.outcomes if o.op == "body"]
     assert len(told) == 1, [o.op for o in res.outcomes]
     assert "Will save against sleep" in told[0].tell
 
 
-def test_a_backlog_is_not_rolled_retroactively(sammy, monkeypatch):
+def test_a_backlog_is_not_rolled_retroactively(ilse, monkeypatch):
     """Ninety-seven hours past the grace had passed unasked when the fix landed. Rolling
     them would be a wall of ninety-seven saves in one turn ending in a certain collapse;
     the hours that passed before are not rolled, and the next hour starts the count at
     DC 10 (tbaMUD freezes needs while a player is away, and caps its own catch-up)."""
     rig = _Rigged(monkeypatch)
-    _s, engine = _engine(sammy)
+    _s, engine = _engine(ilse)
     _wait(engine, 1)
     assert rig.of("Exhaustion") == [10]
 
 
-def test_a_body_that_keeps_failing_is_fatigued_then_exhausted_then_asleep(sammy, monkeypatch):
+def test_a_body_that_keeps_failing_is_fatigued_then_exhausted_then_asleep(ilse, monkeypatch):
     """The owner's ladder, which nothing ever climbed: every failure was `pass_hours`'s,
     and nothing but forage, a journey and venture reached it."""
     _Rigged(monkeypatch, passed=lambda kind: False)
-    s, engine = _engine(sammy)
+    s, engine = _engine(ilse)
     _wait(engine, 1)
-    assert sammy.has_condition("fatigued")
+    assert ilse.has_condition("fatigued")
     _wait(engine, 1)
-    assert sammy.has_condition("exhausted")
-    assert not sammy.has_condition("fatigued"), "exhausted replaces fatigued"
+    assert ilse.has_condition("exhausted")
+    assert not ilse.has_condition("fatigued"), "exhausted replaces fatigued"
     res = _wait(engine, 1)
-    assert survival.asleep(sammy) is not None
-    assert sammy.has_state("state.down.unconscious")
+    assert survival.asleep(ilse) is not None
+    assert ilse.has_state("state.down.unconscious")
     assert "falls asleep where they stand" in " ".join(o.tell for o in res.outcomes)
 
 
-def test_asleep_the_awake_clock_stands_still_and_no_save_is_asked(sammy, monkeypatch):
+def test_asleep_the_awake_clock_stands_still_and_no_save_is_asked(ilse, monkeypatch):
     rig = _Rigged(monkeypatch, passed=lambda kind: False)
-    s, engine = _engine(sammy)
+    s, engine = _engine(ilse)
     _wait(engine, 3)
-    assert survival.asleep(sammy) is not None
-    awake, asked = sammy.awake_minutes, len(rig.of("Exhaustion"))
+    assert survival.asleep(ilse) is not None
+    awake, asked = ilse.awake_minutes, len(rig.of("Exhaustion"))
     s.advance(3 * HOUR)
-    assert sammy.awake_minutes == awake
+    assert ilse.awake_minutes == awake
     assert len(rig.of("Exhaustion")) == asked
-    assert survival.sleep_left(sammy) == survival.COLLAPSE_SLEEP_MINUTES - 3 * HOUR
+    assert survival.sleep_left(ilse) == survival.COLLAPSE_SLEEP_MINUTES - 3 * HOUR
 
 
-def test_eight_hours_on_they_wake_and_it_was_a_night(sammy, monkeypatch):
+def test_eight_hours_on_they_wake_and_it_was_a_night(ilse, monkeypatch):
     """Waking is `Actor.rest("night")`: the awake clock and its saves back to nothing,
     exhaustion down to fatigue. Without it the general knockout branch woke them after
     an hour with the awake clock untouched, and the next hour's save dropped them again."""
     _Rigged(monkeypatch, passed=lambda kind: False)
-    s, engine = _engine(sammy)
+    s, engine = _engine(ilse)
     _wait(engine, 3)
     s.advance(survival.COLLAPSE_SLEEP_MINUTES)
-    assert survival.asleep(sammy) is None
-    assert not sammy.has_state("state.down")
-    assert sammy.awake_minutes == 0 and sammy.awake_checks == 0
-    assert sammy.has_condition("fatigued") and not sammy.has_condition("exhausted")
+    assert survival.asleep(ilse) is None
+    assert not ilse.has_state("state.down")
+    assert ilse.awake_minutes == 0 and ilse.awake_checks == 0
+    assert ilse.has_condition("fatigued") and not ilse.has_condition("exhausted")
     said = " ".join(r for rec in s.take_body_said() for r in rec["said"])
     assert "wakes after eight hours' sleep" in said
 
 
-def test_a_collapse_mid_stretch_spends_the_rest_of_it_asleep(sammy, monkeypatch):
+def test_a_collapse_mid_stretch_spends_the_rest_of_it_asleep(ilse, monkeypatch):
     """The caller chose how far the clock goes — the reason `Scene.advance` once refused
     to roll at all. The stretch is not cut: the hour they drop is an hour in it, and the
     hours after it are sleep."""
     _Rigged(monkeypatch, passed=lambda kind: False)
-    s, _engine_ = _engine(sammy)
-    awake = sammy.awake_minutes
+    s, _engine_ = _engine(ilse)
+    awake = ilse.awake_minutes
     s.advance(5 * HOUR)
-    assert survival.asleep(sammy) is not None
-    assert sammy.awake_minutes - awake == 3 * HOUR
-    assert survival.sleep_left(sammy) == survival.COLLAPSE_SLEEP_MINUTES - 2 * HOUR
+    assert survival.asleep(ilse) is not None
+    assert ilse.awake_minutes - awake == 3 * HOUR
+    assert survival.sleep_left(ilse) == survival.COLLAPSE_SLEEP_MINUTES - 2 * HOUR
 
 
 def test_the_dc_never_runs_away_once_the_checks_happen(monkeypatch):
@@ -215,14 +215,14 @@ def test_only_the_player_rolls(monkeypatch):
     assert other.awake_checks == other.thirst_checks == 0
 
 
-def test_the_dead_keep_no_clock(sammy):
+def test_the_dead_keep_no_clock(ilse):
     """Nine to twenty-seven days in the grave (the resurrection in play/views.py) are not
     days without water: a raised character came back three weeks parched."""
-    sammy.add_condition("dead", source="test")
-    s, _e = _engine(sammy)
-    awake = sammy.awake_minutes
+    ilse.add_condition("dead", source="test")
+    s, _e = _engine(ilse)
+    awake = ilse.awake_minutes
     s.advance(20 * DAY)
-    assert sammy.awake_minutes == awake
+    assert ilse.awake_minutes == awake
 
 
 # --- thirst and hunger, as the book has them ---------------------------------------------------
@@ -268,26 +268,26 @@ def test_thirst_fatigues_and_never_exhausts(monkeypatch):
 
 # --- what the player is told -----------------------------------------------------------------
 
-def test_every_toll_is_told_once(sammy, monkeypatch):
+def test_every_toll_is_told_once(ilse, monkeypatch):
     """Law 3. The clock's door has no outcome of its own, so the toll waits on the scene
     and is told at the end of the batch — once: the next batch tells nothing again."""
     _Rigged(monkeypatch, passed=lambda kind: False)
-    s, engine = _engine(sammy)
+    s, engine = _engine(ilse)
     first = [o for o in _wait(engine, 1).outcomes if o.op == "body"]
     assert len(first) == 1 and "fails a Will save" in first[0].tell
     again = engine.run(engine.validate([{"op": "narrate_only", "because": "x"}]))
     assert not [o for o in again.outcomes if o.op == "body"]
 
 
-def test_two_stretches_before_one_telling_are_told_as_one(sammy, monkeypatch):
-    """Measured live on the owner's save: a walk and a wait came back as "Sammy holds
-    out against thirst once (DC 10)." and then "Sammy holds out against thirst 3 times
+def test_two_stretches_before_one_telling_are_told_as_one(ilse, monkeypatch):
+    """Measured live on the owner's save: a walk and a wait came back as "Ilse holds
+    out against thirst once (DC 10)." and then "Ilse holds out against thirst 3 times
     (DC 11-13)." — two outcomes for one body. Every op is told behind itself now, but an
     op (or a bench view before a batch) can move the clock more than once before the
     telling, and those are folded into one."""
     _Rigged(monkeypatch, passed=lambda kind: True)
-    sammy.watered_minutes = 200 * HOUR
-    s, engine = _engine(sammy)
+    ilse.watered_minutes = 200 * HOUR
+    s, engine = _engine(ilse)
     s.advance(HOUR)
     s.advance(3 * HOUR)
     told = engine._body_settles()
@@ -296,12 +296,12 @@ def test_two_stretches_before_one_telling_are_told_as_one(sammy, monkeypatch):
     assert len(told[0].effects) == 2
 
 
-def test_the_toll_is_told_behind_the_op_that_spent_the_hours(sammy, monkeypatch):
-    """Measured live: a wait that put Sammy to sleep, followed in the same plan by a
-    `rest`, was told as "Sammy rests for 8 hours" and only then "falls asleep where they
+def test_the_toll_is_told_behind_the_op_that_spent_the_hours(ilse, monkeypatch):
+    """Measured live: a wait that put Ilse to sleep, followed in the same plan by a
+    `rest`, was told as "Ilse rests for 8 hours" and only then "falls asleep where they
     stand" — the batch's end is too late for a fact the next op stands on."""
     _Rigged(monkeypatch, passed=lambda kind: False)
-    s, engine = _engine(sammy)
+    s, engine = _engine(ilse)
     res = engine.run(engine.validate([
         {"op": "advance_time", "actor": "pc", "because": "a", "params": {"amount": 3, "unit": "hour"}},
         {"op": "advance_time", "actor": "pc", "because": "b", "params": {"amount": 1, "unit": "hour"}}]))
@@ -309,12 +309,12 @@ def test_the_toll_is_told_behind_the_op_that_spent_the_hours(sammy, monkeypatch)
     assert "falls asleep" in res.outcomes[1].tell
 
 
-def test_work_tells_its_own_toll_and_leaves_nothing_pending(sammy):
+def test_work_tells_its_own_toll_and_leaves_nothing_pending(ilse):
     """The activity ops spend their hours through `pass_hours` and say what it cost in
     their own sentence, then move the clock with `charge_body=False` — so nothing waits on
     the scene to be told a second time."""
-    s, engine = _engine(sammy)
-    survival.pass_hours(sammy, 3, engine.dice)
+    s, engine = _engine(ilse)
+    survival.pass_hours(ilse, 3, engine.dice)
     s.advance(3 * HOUR, charge_body=False)
     assert s.take_body_said() == []
 
@@ -339,23 +339,23 @@ def _campaign(scene, engine):
     return SimpleNamespace(scene=scene, engine=lambda: engine, world=None, location=None)
 
 
-def test_the_turn_gate_lets_the_sleep_run_out(sammy, monkeypatch):
+def test_the_turn_gate_lets_the_sleep_run_out(ilse, monkeypatch):
     """play/downed.py had no branch for sleep: its general one woke the player after one
     hour with hit points floored and the awake clock untouched — "You come round about an
     hour later" — and the next hour's save dropped them again, for ever."""
     from play import downed
 
     _Rigged(monkeypatch, passed=lambda kind: False)
-    s, engine = _engine(sammy)
+    s, engine = _engine(ilse)
     _wait(engine, 3)
     s.take_body_said()
-    assert downed.state_of(sammy) == "stable"
+    assert downed.state_of(ilse) == "stable"
     _Rigged(monkeypatch, passed=lambda kind: True)
     out = downed.resolve(_campaign(s, engine))
     assert out.playable
     assert out.lines[0].startswith("You sleep on where you dropped, 8 hours more")
-    assert downed.state_of(sammy) == "fine"
-    assert sammy.awake_minutes == 0
+    assert downed.state_of(ilse) == "fine"
+    assert ilse.awake_minutes == 0
 
 
 def test_a_knockout_that_does_not_lift_is_not_told_as_coming_round(monkeypatch):

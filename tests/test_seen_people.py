@@ -5,7 +5,7 @@ where they were said to be (owner's ruling, 2026-10-01).
 fully made person ready to be interacted with and saved if not already existing." It
 overturns the ruling of 2026-09-27 that the prose only records people.
 
-Every test here names a measurement from the owner's own save (Sam, 2026-10-01; the beats
+Every test here names a measurement from the owner's own save (Dace, 2026-10-01; the beats
 below are written for the tests in the same shape, not copied from it):
 
 1. Gorm, the barkeep, told the player about a human woman who lives in "the house three
@@ -482,11 +482,11 @@ def test_seen_and_heard_are_the_readers_answer_and_the_bench_holds_the_cases():
     from tests.beat_reader.gold import CASES
 
     by_id = {c["id"]: c for c in CASES}
-    ghost = by_id["sam-a-woman-in-the-stories"]
+    ghost = by_id["dace-a-woman-in-the-stories"]
     assert all(v == "nobody" or "nobody" in v.split("|") or v.startswith("new")
                for v in ghost["people"].values())
     assert not any(n["where"] == "here" for n in ghost["new"].values())
-    asked = by_id["sam-the-question-you-posed"]
+    asked = by_id["dace-the-question-you-posed"]
     assert all(n["where"] == "elsewhere" for n in asked["new"].values())
-    figure = by_id["sam-a-figure-it-is-a-woman"]
+    figure = by_id["dace-a-figure-it-is-a-woman"]
     assert figure["new"]["woman"] == {"head": "woman", "where": "here"}

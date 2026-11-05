@@ -1,6 +1,6 @@
 """A suggestion offers only what the sheet can do (item 4 of the 2026-09-30 playtest).
 
-Measured on the owner's save: Sam, a bonesetter wizard whose prepared spells are Burning
+Measured on the owner's save: Dace, a bonesetter wizard whose prepared spells are Burning
 Hands, Hydraulic Push, Magic Missile, Shocking Grasp and three cantrips — no healing — was
 offered **"I use a healing spell to knit the flesh"**, and the save's last beat offered
 **"I keep my hand on the hilt of my blade as I navigate the crowd."** with a shortbow in
@@ -57,12 +57,12 @@ def _after(s, e, world, suggestions, turn_log=None):
 
 def test_the_healing_spell_sam_was_offered_is_dropped():
     why = suggestion_sheet.why_not(HEALING_SPELL, _sam())
-    assert why == "heals with magic, and Sam has no healing spell ready"
+    assert why == "heals with magic, and Dace has no healing spell ready"
 
 
 def test_the_blade_sam_was_offered_is_dropped():
     why = suggestion_sheet.why_not(HILT, _sam())
-    assert why == "reaches for Sam's blade, which is not on the sheet"
+    assert why == "reaches for Dace's blade, which is not on the sheet"
 
 
 def test_a_bow_no_longer_vouches_for_a_blade_and_a_longsword_does():
@@ -105,12 +105,12 @@ def test_the_interpreter_reads_the_spell_the_same_way():
 
 
 @pytest.mark.parametrize("line,why", [
-    ("I cast cure light wounds on him", "names Cure Light Wounds, which Sam cannot cast"),
+    ("I cast cure light wounds on him", "names Cure Light Wounds, which Dace cannot cast"),
     ("I cast a healing spell on the fighter",
-     "heals with magic, and Sam has no healing spell ready"),
-    ("I channel positive energy to heal him", "channels energy, which Sam cannot"),
-    ("I use Lay on Hands on the fighter", "names Lay on Hands, which Sam does not have"),
-    ("I use Blood Nova on the merchant", "names Blood Nova, which Sam does not have"),
+     "heals with magic, and Dace has no healing spell ready"),
+    ("I channel positive energy to heal him", "channels energy, which Dace cannot"),
+    ("I use Lay on Hands on the fighter", "names Lay on Hands, which Dace does not have"),
+    ("I use Blood Nova on the merchant", "names Blood Nova, which Dace does not have"),
 ])
 def test_what_the_sheet_cannot_back_is_named(line, why):
     assert suggestion_sheet.why_not(line, _sam("the fighter")) == why
@@ -152,7 +152,7 @@ def test_the_member_drops_the_blade_and_keeps_two(worlds):
     rows, c = _after(s, e, worlds, [*SOUND, HILT], turn_log=[prose])
     assert c.suggestions == SOUND
     assert rows == [{"kind": "suggestion-sheet", "filled": [], "dropped": [
-        {"text": HILT, "why": "reaches for Sam's blade, which is not on the sheet"}]}]
+        {"text": HILT, "why": "reaches for Dace's blade, which is not on the sheet"}]}]
     assert c.turn_log[0]["suggested"] == [*SOUND, HILT]
 
 

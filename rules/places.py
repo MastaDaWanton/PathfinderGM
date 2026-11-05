@@ -270,9 +270,16 @@ ONLY_WHEN_NAMED = frozenset({"the laboratory"})
 # `home_set` and by the engine's warrant check, so "is this the gate" cannot be answered
 # two ways — the check used to compare the place's name against the literal word "gate",
 # which no village could ever satisfy.
-ENTRANCES = ("the gate", "the way in", "the bridge", "the docks",
-             "the north crossing", "the east crossing",
-             "the south crossing", "the west crossing")
+#
+# A city's four crossings are NOT in it (2026-11-01). They were, from the day cities were
+# quartered, and they are street junctions INSIDE the walls (`_districted`: "A crossing is
+# a real room ... a street junction you can stand in") — the outskirts already said so
+# (`outskirts._joined_to`: "A city's crossings are junctions inside it, not exits"). Kept
+# here, the warrant check took a walk from the market to the north crossing for a walk
+# into the arch: Corvin, wanted in Reedsink, typed "walk away" and was refused "the gate is
+# where the watch stands" for a junction two streets off (owner report 2026-11-01, turn
+# 60). A city always has "the gate" (`ALWAYS_BY_SCALE`), so no city lost its way in.
+ENTRANCES = ("the gate", "the way in", "the bridge", "the docks")
 # The guildhall joined the list 2026-09-16, and it was this app's own checker that put it
 # there. `the-patron` is a shipped scheme whose `books` step fires `at($hall)`, and a
 # settlement with no hall is one where that step never fires and the quest quietly stalls
@@ -2177,6 +2184,43 @@ def find(places, wanted: str) -> Place | None:
         if len(ending) == 1:
             return ending[0]
     return None
+
+
+# What a settlement is called as a whole, in the one vocabulary a walk names it by: its
+# scale's words and its own name (`the_settlement`). A closed list, as `KINDS` is.
+SETTLEMENT_WORDS = frozenset({"town", "city", "village", "settlement", "hamlet",
+                              "town centre", "town center", "city centre", "city center",
+                              "centre of town", "center of town", "middle of town",
+                              "heart of town", "heart of the city", "middle of the city"})
+# Where "the town" is from inside it: the middle of the place. A city's is its great
+# square (`_districted`); a town's or a village's the first of these it has.
+_CENTRES = ("the great square", "the market", "the square", "the green", "the well")
+
+
+def the_settlement(places, wanted: str, here: str, name: str = "") -> Place | None:
+    """The place a walk to "the town" means, or None when the words are not the town.
+
+    Owner report 2026-11-01 (Corvin, turn 35): "go to the town" from the smithy was planned
+    as a travel with nowhere in it, because no place is called "the town", and refused with
+    a sixty-place list. A settlement named whole is two different places by where the
+    walker stands — from outside its walls, the way in (`ENTRANCES`, the door the warrant
+    is read at); from inside them, the middle of it (`_CENTRES`). `name` is the
+    settlement's own name, which means the same."""
+    want = " ".join(str(wanted or "").split()).lower()
+    for article in ("the ", "a "):
+        want = want.removeprefix(article)
+    if not want or not (want in SETTLEMENT_WORDS or (name and want == name.lower())):
+        return None
+    rooms = [p for p in places or () if setting_of(p.id) != "outside"
+             and storey_of(p.id) == 0]
+    if not rooms:
+        return None
+    if setting_of(here) == "outside":
+        return next((p for p in rooms if " ".join(p.name.split()).lower() in ENTRANCES),
+                    rooms[0])
+    by_name = {" ".join(p.name.split()).lower(): p for p in rooms}
+    centre = next((by_name[c] for c in _CENTRES if c in by_name), rooms[0])
+    return centre
 
 
 def route(places, start: str, dest: str) -> tuple[str, ...]:

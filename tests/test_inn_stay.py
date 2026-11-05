@@ -49,7 +49,7 @@ def test_a_night_at_the_inn_costs_the_house_price_and_holds_the_room():
     out = _rest(engine)
     assert out.status != "refused", out.tell
     assert goods.in_copper(pc.purse) == 70 - 50
-    assert out.tell.startswith("Sam pays the innkeeper 5 silver pieces for a room at")
+    assert out.tell.startswith("Dace pays the innkeeper 5 silver pieces for a room at")
     assert any(e.get("kind") == "lodging" and e.get("paid") == 50
                and e.get("origin") == "rule:inn-stay" for e in out.effects)
     assert pc.has_state("holds.room") and lodging.held(pc, s.at)

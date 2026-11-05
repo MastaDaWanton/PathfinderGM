@@ -1,9 +1,9 @@
 """Every night heals by the book, and fast healing heals by the round of time.
 
-The owner, 2026-10-09, playing 0.2.12 as Sammy, an asura (a homebrew race card) at level 1
+The owner, 2026-10-09, playing 0.2.12 as Ilse, an asura (a homebrew race card) at level 1
 with 73 maximum hit points: "i have slept multiple times now and my health is not going
 up. i also have fast healing so i should be healing all the time". The turn log settled
-the first half — every `rest` resolved "Sammy recovers 1 hit points (34/73)", which IS
+the first half — every `rest` resolved "Ilse recovers 1 hit points (34/73)", which IS
 the rule at level 1 (CRB p.191: "1 hit point per character level"), said without the rate.
 The second half was real: the save held no fast healing anywhere. The race's evolution
 tag `fast-healing.1` reached `has_state` and nothing with a clock, its `not_yet` still
@@ -78,7 +78,7 @@ def test_a_working_weeks_camp_nights_heal():
 
 
 def test_the_rest_op_says_the_rate_beside_the_number():
-    """The owner read "Sammy recovers 1 hit points (34/73)" as no healing at all. The rule
+    """The owner read "Ilse recovers 1 hit points (34/73)" as no healing at all. The rule
     was right; the sentence did not say it. Bed rest is the book's 2 per level."""
     s, pc = _scene()
     e = Engine(s, Dice(seed=3))

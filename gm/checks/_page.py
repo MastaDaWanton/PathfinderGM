@@ -54,6 +54,10 @@ def moved(ctx) -> bool:
     somewhere else than the turn began."""
     if str(getattr(ctx.scene, "at", "") or "") != str(ctx.was_at or ""):
         return True
+    # A step across the ground is a move, unless a walk to somewhere else was refused in
+    # the same turn — then the page's walk may be that one, and is still checked.
+    if stepped(ctx) and not refused_moves(ctx):
+        return True
     for o in ctx.outcomes:
         if field(o, "op") not in MOVE_OPS or field(o, "status") == "refused":
             continue
@@ -61,6 +65,28 @@ def moved(ctx) -> bool:
             if e.get("place") and e.get("place") != e.get("was_place"):
                 return True
             if field(o, "op") == "journey" and e.get("kind") in ("journey", "arrived"):
+                return True
+    return False
+
+
+def stepped(ctx) -> bool:
+    """Whether the player walked across the ground they stand on this turn: a resolved
+    in-scene `move` whose own record puts them on another square (`kind: position`).
+
+    Measured on the owner's report of 2026-11-01 (Corvin T., the outskirts, log 259):
+    "move closser" resolved `move` to (0,0), 50 ft, and `moved` counted only the ops that
+    change the PLACE (`MOVE_OPS`), so refused_move read "You move closer, closing the
+    distance to the creature" as a walk nobody made, and its repair wrote "You move closer
+    in your mind" — on that turn and the two after it. A refused in-scene move stays
+    refused: only a resolved one, with a square changed, is a step."""
+    pc = ctx.scene.pc() if hasattr(ctx.scene, "pc") else None
+    me = {str(getattr(pc, "ref", "") or "pc"), "pc"}
+    for o in ctx.outcomes:
+        if field(o, "op") != "move" or field(o, "status") == "refused":
+            continue
+        for e in effects(o):
+            if e.get("kind") == "position" and str(e.get("ref") or "") in me \
+                    and e.get("to") is not None and e.get("to") != e.get("from"):
                 return True
     return False
 

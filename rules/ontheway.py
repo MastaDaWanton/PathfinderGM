@@ -308,6 +308,26 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     return None
 
 
+def walk_cut(scene, actor=None) -> dict | None:
+    """The walk `actor` (the player by default) still means to finish from where they
+    stand — {"to", "name", "at", "by", "kind"} — read off their `states.MAKING_FOR`
+    effect (granted by `Engine._mark_the_walk_cut`), or None. Only from the place it was
+    cut at: a walker who has gone anywhere since has lifted it, and a save loaded
+    elsewhere does not resume a walk from somewhere they are not."""
+    from . import states
+
+    if actor is None and scene is not None and hasattr(scene, "pc"):
+        actor = scene.pc()
+    if actor is None or scene is None:
+        return None
+    for e in getattr(actor, "effects", ()) or ():
+        if e.source == states.MAKING_FOR_SOURCE and states.MAKING_FOR in (e.tags or ()):
+            pay = dict(e.payload or {})
+            if pay.get("at") == getattr(scene, "at", None) and pay.get("to"):
+                return pay
+    return None
+
+
 def hours_walked(meeting: "Meeting | None", hours: int) -> int:
     """How far along the road the party got before it stopped.
 

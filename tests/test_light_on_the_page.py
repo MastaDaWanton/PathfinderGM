@@ -228,23 +228,37 @@ def test_through_the_real_door_a_thugs_blow_lost_in_the_dim_reaches_the_page(mon
     # The engine records the swallowed blow like any miss, at the one swung at.
     assert any(b.get("how") == "unseen" and b.get("ref") == "pc"
                for o in res.outcomes for b in o.blows)
-    gm = agent_mod.GMAgent(_World(), e)
-    calls = []
+    import json
 
-    def chat(messages, model, *a, **kw):
-        calls.append(messages)
-        if len(calls) == 1:
-            return client.Reply("The thug swings his sap at you, and the blow misses.",
-                                0.1, model)
-        raise client.ModelUnavailable("down")
+    from gm import planned
+    from rules import houserules
 
-    monkeypatch.setattr(agent_mod.client, "chat", chat)
-    text, attempt = gm.narrate_outcome("", res.outcomes, "the thug acts",
-                                       rewrite=False, acting="the thug")
-    assert any(line in text for line in L.POOL["theirs:dim"]), text
-    assert L.find(_ctx(s, text, tells=[o.tell for o in res.outcomes],
-                       door="outcome")) == []
-    assert any(line in gm.last_added for line in L.POOL["theirs:dim"])
+    # Both writers of the turn: the consequence call (free), and since 2026-11-04 the
+    # planned narrator's slots (`planned.turn_plan`) — the same tail holds both to the light.
+    for mode in ("free", "planned"):
+        gm = agent_mod.GMAgent(_World(), e)
+        calls = []
+        said = "The thug swings his sap at you, and the blow misses."
+
+        def chat(messages, model, *a, **kw):
+            calls.append(messages)
+            if mode == "planned" and messages[0]["content"].startswith(
+                    planned.PLAN_SYSTEM):
+                return client.Reply(json.dumps({"text": said}), 0.1, model)
+            if mode == "free" and len(calls) == 1:
+                return client.Reply(said, 0.1, model)
+            raise client.ModelUnavailable("down")
+
+        monkeypatch.setattr(agent_mod.client, "chat", chat)
+        monkeypatch.setattr(houserules, "narration", lambda mode=mode: mode)
+        text, attempt = gm.narrate_outcome("", res.outcomes, "the thug acts",
+                                           rewrite=False, acting="the thug")
+        assert any(line in text for line in L.POOL["theirs:dim"]), (mode, text)
+        assert L.find(_ctx(s, text, tells=[o.tell for o in res.outcomes],
+                           door="outcome")) == [], mode
+        assert any(line in gm.last_added for line in L.POOL["theirs:dim"]), mode
+        if mode == "planned":
+            assert attempt.kind == "plan-slot", "written by the planned narrator"
 
 
 def test_a_sunlit_sentence_or_the_rule_printed_in_a_dark_fight_is_a_contradiction():

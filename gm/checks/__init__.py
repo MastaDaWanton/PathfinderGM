@@ -87,6 +87,14 @@ class BeatContext:
     # page passes no time the engine did not (`time_kept`). None — a test, an NPC's turn
     # built elsewhere — and that member reads nothing.
     was_clock: int | None = None
+    # A beat the planned narrator wrote (gm/planned.py), and its act slots as they stood:
+    # each {"key", "wrote", "tells"}. Every act slot of a planned beat was already read
+    # against its own tells (`planned._tells_kept`), so a member may stand aside on one
+    # (`PLANNED_OFF`), or be backstopped without a rewrite (`PLANNED_NO_REWRITE`), and no
+    # repair may leave an act slot's tells untold (`GMAgent._repair_sentences`). Round 2,
+    # 2026-11-05: `_repair_sentences` wrote 9 of the rerun's 53 errors on planned beats.
+    planned: bool = False
+    slots: tuple = ()
 
 
 class CheckContractError(TypeError):
@@ -117,6 +125,11 @@ def _validate(module: ModuleType) -> None:
     if not callable(getattr(module, "find", None)):
         raise CheckContractError(f"gm.checks.{name}: needs `def find(ctx) -> "
                                  f"list[Finding]`")
+    for flag in ("PLANNED_OFF", "PLANNED_NO_REWRITE"):
+        got = getattr(module, flag, frozenset())
+        if not isinstance(got, frozenset) or not got <= kinds:
+            raise CheckContractError(f"gm.checks.{name}: {flag} must be a frozenset of "
+                                     f"its own KINDS (got {got!r})")
     if hasattr(module, "backstop") and not callable(module.backstop):
         raise CheckContractError(f"gm.checks.{name}: `backstop` must be a function "
                                  f"(ctx, text, findings) -> (text, notes)")
@@ -149,6 +162,13 @@ def registered() -> tuple[ModuleType, ...]:
                     f"kind {kind!r}; a kind has one owner — rename one of them")
             seen[kind] = _short(m)
     return tuple(members)
+
+
+def planned_off(member: ModuleType, ctx: BeatContext) -> frozenset:
+    """The kinds `member` does not judge on this beat: its `PLANNED_OFF` on a planned one."""
+    if not getattr(ctx, "planned", False):
+        return frozenset()
+    return getattr(member, "PLANNED_OFF", frozenset())
 
 
 def owner_of(kind: str) -> ModuleType | None:
@@ -193,8 +213,11 @@ def run(ctx: BeatContext, *, errors: list | None = None,
     for member in registered():
         if ctx.door not in member.DOORS:
             continue
+        off = planned_off(member, ctx)
+        if off and off >= member.KINDS:
+            continue
         try:
-            out = list(member.find(ctx) or [])
+            out = [f for f in (member.find(ctx) or []) if f.kind not in off]
             stray = sorted({f.kind for f in out} - member.KINDS)
             if stray:
                 raise CheckContractError(

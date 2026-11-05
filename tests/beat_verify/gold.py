@@ -76,14 +76,14 @@ XY_RAIDER2 = ["c5", "the second raider", "", False, "away"]
 XY_PEOPLE = (XY_TAM, XY_MASTER, XY_DROVER, XY_DROVER2, XY_RAIDER, XY_RAIDER2)
 
 
-# The owner's ore seam on the ridgelines above an Aurvantis town (sammy.json, 2026-10-09):
+# The owner's ore seam on the ridgelines above an Aurvantis town (ilse.json, 2026-10-09):
 # a creature holding the seam (`state.holding-ground`), the player asleep in front of it
 # for twelve hours. The engine kept it there; the narrator wrote it gone.
 RG_PLACES = ("the ridgelines", "the outskirts", "the road to Blackline")
-RG_SAMMY = ["pc", "Sammy", "", True]
+RG_SAMMY = ["pc", "Ilse", "", True]
 RG_HOLDER = ["c28", "Aelzeldra", "monstrous humanoid"]
 RG_REST = {"intent_id": "i1", "op": "rest", "status": "resolved",
-           "tell": "Sammy rests for 12 hours.",
+           "tell": "Ilse rests for 12 hours.",
            "effects": [{"ref": "pc", "kind": "rest", "hours": 12}]}
 
 
@@ -886,7 +886,7 @@ GOLD = [
       claims=[C("harm", opt=True, who="pc", how="hurt"), C("shown", opt=True, who="c1")]),
     # --- somebody the engine keeps here, written gone (2026-10-09, the owner's report: "I
     # was told it left by the narration … but it stayed in the scene") ---------------------
-    B("gone-while-you-slept", "sammy:rest draft",
+    B("gone-while-you-slept", "ilse:rest draft",
       "You wake on the hard ground, the taste of dust and dry earth still in your mouth. The "
       "air of the morning is sharp and thin, smelling of mineral and old stone. The "
       "Aelzeldra is gone. There is no sign of the beast, no scrap of fur or iron left "
@@ -900,7 +900,7 @@ GOLD = [
               C("hour", opt=True, part=["dawn", "morning"]),
               C("hour", opt=True, part=["dawn", "morning"])],
       alarms=["presence"]),
-    B("out-of-sight", "sammy:rest live (the fixed branch, own server)",
+    B("out-of-sight", "ilse:rest live (the fixed branch, own server)",
       "Somewhere in the distance, the low, rhythmic rumble of the Aelzeldra's breathing has "
       "faded into the morning haze, and the beast is no longer within your immediate sight. "
       "The sun is a pale, rising coin on the horizon, casting long shadows across the rocky "
@@ -914,14 +914,14 @@ GOLD = [
               C("hour", opt=True, part=["dawn", "morning"]),
               C("hour", opt=True, part=["dawn", "morning"])],
       may_alarm=["presence"]),
-    B("still-there-at-dawn", "sammy:rest replay",
+    B("still-there-at-dawn", "ilse:rest replay",
       "You wake as the first gray light of morning filters through the haze, the air tasting "
       "of dust and ancient stone. The Aelzeldra is still there, a silhouette of iron against "
       "the waking world, its presence a constant, looming weight.",
       world="RG", start="the ridgelines", people=(RG_SAMMY, RG_HOLDER), clock=36360,
       player="i lay on the ground and rest watching the aelzeldra", outcomes=[RG_REST],
       claims=[C("hour", opt=True, part=["dawn", "morning"])]),
-    B("has-not-moved", "sammy:rest replay",
+    B("has-not-moved", "ilse:rest replay",
       "A few feet away, the Aelzeldra remains a silent, looming shadow against the morning "
       "light. It has not moved in the time you were unconscious, though it seems to have "
       "settled deeper into its stance, its presence a constant, oppressive weight in the air.",
@@ -1472,7 +1472,7 @@ GOLD += [
                      effects=[{"ref": "pc", "kind": "tracks", "ground": "firm", "dc": 15,
                                "found": []}])],
       claims=[C("attempt", attempt="a1", shown="succeeds")], alarms=["attempt"]),
-    B("ho-att-perform", "data/sammy (held out)",
+    B("ho-att-perform", "data/ilse (held out)",
       "You strike a final, definitive pose, one hand gripped tight on the hilt of your "
       "blade. Silence falls over the gate. Then the goblin with the scarred cheek lets out "
       "a wild, barking laugh that echoes off the archway. 'Not bad, outsider! Not bad at "
@@ -1481,7 +1481,7 @@ GOLD += [
                                                     "goblin"]),
       outcomes=[_chk("Perform check", True)],
       claims=[C("attempt", attempt="a1", shown="succeeds")]),
-    B("ho-att-ore", "data-hinterland/sammy (held out)",
+    B("ho-att-ore", "data-hinterland/ilse (held out)",
       "You spend the better part of the evening digging into the rocky soil, your hands "
       "becoming raw and stained with the grime of the earth. You manage to pull four chunks "
       "of copper ore from a vein, the metal heavy and dull in your pack.",
@@ -1515,7 +1515,7 @@ GOLD += [
       start="the road to Kalixiri", world="XY", people=(XY_TAM,),
       outcomes=[_chk("Survival check", False)],
       claims=[C("attempt", attempt="a1", shown="fails")]),
-    B("ho-att-bluff-doubted", "mindgate/sammy (held out)",
+    B("ho-att-bluff-doubted", "mindgate/ilse (held out)",
       "The lie hangs in the air, brittle as dry glass. 'You're a long way from home, then,' "
       "he says. 'If you weren't here, you'd have a lot of explaining to do about why "
       "you're currently standing in my district.' He waits, his eyes searching yours for "

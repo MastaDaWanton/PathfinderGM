@@ -151,8 +151,8 @@ def test_the_player_on_the_receiving_end_is_still_not_a_beast():
     """The 2026-09-18 case the swap was written for, on a creature's turn: the thug's
     swing at "the beast" is a swing at the player."""
     out, swapped = narration.creature_nouns_for_pc(
-        "The thug's swing misses the beast by a hair.", "Masta", True, acting="thug")
-    assert out == "The thug's swing misses Masta by a hair." and swapped == ["beast"]
+        "The thug's swing misses the beast by a hair.", "Torvo", True, acting="thug")
+    assert out == "The thug's swing misses Torvo by a hair." and swapped == ["beast"]
 
 
 def test_the_first_name_alone_becomes_you():

@@ -129,6 +129,14 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
 CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early", "beat-struck-at-early",
                       "beat-aimed-wrong"})
 
+# Not on a planned beat (round 2, 2026-11-05): what was made is the make tell itself,
+# which the act slot is told item by item and the tells check holds it to. On the rerun
+# both planned findings were the reader naming the work wrong ("cutting the goat leather"
+# read as a made "something else", "a sturdy belt is finished" likewise) beside a tell that
+# listed the belt, and the backstop cut the slot's only sentence: the finished belt never
+# told (craft-belt runs 1 and 5; 4 scored omissions over both scorers).
+PLANNED_OFF = frozenset({"beat-makes-item"})
+
 # The confirmations already asked this beat: (facts, sentence, question) -> kept. The repair
 # asks `find` again after each rewrite and once more before the backstops; a sentence it
 # did not touch must not cost the question twice.
@@ -203,6 +211,8 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
 
     notes: list[str] = []
     found = discrepancies(replace(ctx, text=text))
+    if getattr(ctx, "planned", False):
+        found = [d for d in found if _KIND.get(d.category, ("",))[0] not in PLANNED_OFF]
     moves = [d for d in found if d.kind == "contradiction" and d.category == "move"
              and d.sentence in text]
     if moves:

@@ -85,20 +85,29 @@ def _still(ctx) -> bool:
     pc = ctx.scene.pc() if hasattr(ctx.scene, "pc") else None
     if pc is None or pc.is_down or survival.asleep(pc) is not None:
         return False
+    # The clock first, whatever was refused: hours the engine passed are hours that went
+    # by. Measured on the bench of 2026-11-02 (the night in the condemned cell, 2 of 3
+    # runs): the rest was refused ("still in conversation …") while the trial passed 672
+    # minutes, and this backstop cut "the hours bleed into one another as you sit in the
+    # dim, damp cell" — the trial's own "the night passes in the cell" — and wrote the
+    # refusal in its place.
+    was = getattr(ctx, "was_clock", None)
+    now = getattr(ctx.scene, "clock_minutes", None)
+    try:
+        if was is not None and now is not None and int(now) - int(was) >= STILL_MINUTES:
+            return False
+    except (TypeError, ValueError):
+        pass
     if _refused_rest(ctx) is not None:
         return True
     reading = getattr(ctx, "reading", None) or {}
     if not any(a.get("act") in ASKS_FOR_TIME and interpret.acting(a)
                for a in reading.get("actions") or [] if isinstance(a, dict)):
         return False
-    was = getattr(ctx, "was_clock", None)
-    scene = ctx.scene
-    now = getattr(scene, "clock_minutes", None)
     if was is None or now is None:
         return False
     try:
-        if int(now) - int(was) >= STILL_MINUTES:
-            return False
+        int(now) - int(was)
     except (TypeError, ValueError):
         return False
     return True

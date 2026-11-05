@@ -30,6 +30,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from rules import crafting, herbknowledge, ingredients, worldclass
 
+from . import bench_clock
 from . import campaign as campaign_mod
 from .apiutil import read_body, read_int
 
@@ -278,6 +279,9 @@ def _check_body(plan, items, pc, level) -> dict:
         "problems": list(plan.problems),
         "can_roll": plan.can_roll,
         "minutes": plan.minutes, "doses": plan.doses, "batch": plan.batch,
+        # Drying is timed by the batch (the owner, 2026-11-01): how many 8-hour batches
+        # the doses take and how many one batch holds. 0 for a method timed per dose.
+        "batches": plan.batches, "batch_capacity": plan.batch_capacity,
         "dc": plan.dc, "bonus": plan.bonus, "terms": plan.terms,
         "need": plan.need, "impossible": plan.impossible,
         # How many batch units what is on the tool allows, for the batch stepper's "all"
@@ -318,6 +322,12 @@ def bench_check(request):
     if refused:
         return refused
     out = _check_body(plan, items, pc, pc.track(TRACK_ID).level)
+    # The roll refuses work the pack cannot carry the body through (`bench_clock`); said
+    # here as well, so Roll is greyed with the reason before the player throws a die.
+    said = bench_clock.refusal(c, pc, plan.minutes) if plan.can_roll else ""
+    if said:
+        out["problems"].append(said)
+        out["can_roll"] = False
     out["recipe"] = _recipe_ref(body)
     return JsonResponse(out)
 
@@ -364,6 +374,11 @@ def bench_roll(request):
                     f"{plan.impossible}.")
     if not plan.can_roll:
         return _err("Nothing on the bench to work.")
+    # Before the die, the spend and the clock: work the pack cannot carry the body
+    # through is refused in words, and nothing has happened (`bench_clock`).
+    said = bench_clock.refusal(c, pc, plan.minutes)
+    if said:
+        return _err(said, 409)
 
     engine = c.engine()
     if face is None:
@@ -375,13 +390,15 @@ def bench_roll(request):
     success = margin >= 0
     track, progress = _progress(pc)
 
-    c.scene.advance(plan.minutes)
+    lived = bench_clock.pass_time(c, engine, pc, plan.minutes,
+                                  f"at the herb bench on the {plan.name}")
     roll = {"face": face, "bonus": plan.bonus, "total": total, "dc": plan.dc,
             "success": success, "margin": margin, "terms": plan.terms}
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": face,
                        "word": "Success" if success else "Failure"},
-           "lost": [], "minutes": plan.minutes, "recipe": _recipe_ref(body)}
+           "lost": [], "minutes": plan.minutes, "recipe": _recipe_ref(body),
+           "lived": lived}
     if success:
         token = secrets.token_urlsafe(16)
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll,

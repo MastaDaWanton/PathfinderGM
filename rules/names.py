@@ -143,7 +143,7 @@ def face_people(world, location_id: str | None,
     ONE answer, read by `appearance_for` for the face and by `person_words.people_drawn`
     for the record, so a body and its people cannot disagree.
 
-    Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Sam's save carried a
+    Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Dace's save carried a
     Ratfolk face and `race: "human"` with no people at all, because this function's pick
     was kept as text and thrown away. The people asked for when it has a body; else the
     town's people; else the first body that belongs to a PEOPLE; ("", None) for none.

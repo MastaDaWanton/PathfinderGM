@@ -1,7 +1,7 @@
 """Taking a thing is not a boast about having it, and a lie is Bluff against a listener.
 
 Item 5 of the 2026-09-30 playtest (docs/playtest-2026-09-30-findings.md). The owner played
-Sam, a bonesetter wizard, and the room rolled a Bluff against him **four times** — turns 4,
+Dace, a bonesetter wizard, and the room rolled a Bluff against him **four times** — turns 4,
 5, 12 and 23 — at a flat DC 30 ("heroic"): 10, 18 and 7 against 30, the fourth unseen.
 His note: "random Bluff check that seemed to do nothing and worse i didnt lie about
 anything." Every one came from `judgement.inject_false_claim`, not the model:
@@ -15,7 +15,7 @@ anything." Every one came from `judgement.inject_false_claim`, not the model:
 hilt" and "Lay on Hands on the fighter" both misfired when replayed), `_IDENTITY_HEAD`
 matched any word of the predicate, and nothing passed the interpreter's reading — which
 had already read `act: take` — into the check. `note_heat` then told the crowd it had
-heard a delusion, and the prose mocked Sam for boasts he never made (beats 18, 25, 47).
+heard a delusion, and the prose mocked Dace for boasts he never made (beats 18, 25, 47).
 
 And the DC: owner ruling B1, 2026-09-30, a spoken lie is opposed by the listener's Sense
 Motive with the Core Rulebook's believability modifiers (CRB p.90; `rules/bluff.py`).
@@ -30,12 +30,12 @@ from rules.dice import Dice
 from rules.engine import Engine, Outcome, Scene
 from rules.sheet import from_dict
 
-# Sam's sheet as the save had it on 2026-09-30, the fields these detectors read: a level 1
+# Dace's sheet as the save had it on 2026-09-30, the fields these detectors read: a level 1
 # wizard with the bonesetter background, a shortbow in hand, a bo staff and arrows, and
 # nothing in his goods but his clothes — the herbs (turn 4) and the key (turn 23) are taken
 # out, because the replay asks what the sheet said BEFORE those turns gave them to him.
 SAM = {
-    "ref": "pc", "name": "Sam", "kind": "pc", "level": 1, "class": "wizard",
+    "ref": "pc", "name": "Dace", "kind": "pc", "level": 1, "class": "wizard",
     "abilities": {"str": 10, "dex": 14, "con": 10, "int": 16, "wis": 12, "cha": 11},
     "ranks": {"bluff": 1, "sense motive": 1, "spellcraft": 1},
     "weapons": ["unarmed", "bo-staff", "shortbow", "arrows-20"],
@@ -240,7 +240,7 @@ def test_believability_is_read_from_the_claim_in_code(claim, lie):
 
 
 def test_the_lie_is_opposed_by_the_listeners_sense_motive():
-    """Was {"dc": {"band": "heroic"}}: DC 30 against Sam's Bluff +6, three failures in
+    """Was {"dc": {"band": "heroic"}}: DC 30 against Dace's Bluff +6, three failures in
     three. Now the listener is named and the check is opposed."""
     scene = _sam("the foreman")
     out = judgement.inject_false_claim([{"op": "narrate_only"}],

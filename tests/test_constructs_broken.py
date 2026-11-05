@@ -1,6 +1,6 @@
 """A construct at 0 to -10 hit points is broken, not dying and not destroyed (house rule).
 
-The owner's report, 2026-10-01, playing Sam: a Magic Missile left a Clockwork Spy (a Tiny
+The owner's report, 2026-10-01, playing Dace: a Magic Missile left a Clockwork Spy (a Tiny
 construct) at -1 hit points, and the engine's tell read "Clockwork Spy takes 3 untyped.
 Clockwork Spy is unconscious and dying." Two turns later: "Clockwork Spy has bled out
 where they fell." A machine, bleeding — because `apply_hp_state` put the bottom of the

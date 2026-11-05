@@ -34,7 +34,7 @@ exemption fails loudly instead of silently making a character immortal.
 `pass_hours` rolled them, and it was reached from four ops (forage, the crafting trip, a
 journey's march, venture); `Scene.advance` — waiting, walking the town, repairs, the
 crafting benches, a knockout's hours — moved the counters and rolled nothing. The owner's
-Sammy went 121 hours without sleep, food or water and nothing ever asked, and the panel's
+Ilse went 121 hours without sleep, food or water and nothing ever asked, and the panel's
 DC climbed past anything a Will save can make. `charge` is the one place a body's hour is
 spent: the clock's door calls it for the player, and `pass_hours` is the same hour in a
 loop that stops when the work must.
@@ -290,7 +290,7 @@ def awake_dc(checks_made: int, biome: str = "") -> int:
     already count it.
 
     It counted HOURS AWAKE until 2026-10-05, and the two are not the same number: the
-    owner's panel read "past a day awake — Will save every active hour, DC 107" (Sammy,
+    owner's panel read "past a day awake — Will save every active hour, DC 107" (Ilse,
     day 6, 121 hours awake). Hours reach the awake counter by two doors — `pass_hours`,
     which rolls a save for each one, and `Scene.advance`, which moves the counters and
     rolls nothing — so ninety-seven hours that had never been asked raised the DC as if
@@ -554,7 +554,7 @@ def fatigue_said(actor, slept: dict) -> str:
     condition lifted is an effect, and an effect is told) — or "" when there was neither.
 
     Until 2026-10-27 the night lifted them in silence, and a fatigue it left told nothing
-    either: the owner's report woke Jason "fatigued (slept off exhaustion)" after fifteen
+    either: the owner's report woke Ansel "fatigued (slept off exhaustion)" after fifteen
     hours, and the page said only that his limbs were heavy, every beat after."""
     f = slept.get("fatigue") or {}
     name = getattr(actor, "name", "") or "They"
@@ -580,7 +580,7 @@ def fatigue_said(actor, slept: dict) -> str:
 
 
 def heal_said(actor, healed: int, kind: str = "night") -> str:
-    """"Sammy recovers 1 hit point (35/73) — a night's rest heals 1 per character level."
+    """"Ilse recovers 1 hit point (35/73) — a night's rest heals 1 per character level."
     The natural healing of CRB p.191, with its rate, so a slow night reads as the rule."""
     name = getattr(actor, "name", "") or "They"
     per = 2 if kind == "bed rest" else 1
@@ -938,7 +938,7 @@ def said(actor, toll: Toll, biome: str = "") -> list[str]:
     if toll.stopped:
         out.append(stopped_said(actor, toll, biome))
     # What thirst and hunger hold is said where the healing met it, not where it was
-    # dealt: "It costs Sammy 4 non-lethal damage" already told the blow, and the reader
+    # dealt: "It costs Ilse 4 non-lethal damage" already told the blow, and the reader
     # learns the rule the first time an hour's rest does not take it off.
     if toll.unmended:
         line = unmended_said(actor)
@@ -1025,6 +1025,27 @@ def stopped_said(actor, toll: Toll, biome: str = "") -> str:
                 f"and they cannot go longer without a {act}.{hint}")
     return (f"{name} cannot wait {_span(toll.unwaited)}: there is no {what} in the pack, "
             f"and they cannot go longer without a {act}.{hint}")
+
+
+def cannot_work_said(actor, minutes: int, covered: int, need: str, biome: str = "") -> str:
+    """Why a bench step of a day or more is refused before its roll: the pack cannot carry
+    the body through it (`lasts`). `stopped_said`'s words and hint, said before the work
+    rather than part-way, because a bench step cannot stop half-dried and keep its roll.
+
+    Measured on Ansel's save (2026-11-01): two Dry steps of 96 hours each and the rest
+    went through `Scene.advance` with nothing asking, and he starved through days 4 to 9
+    of a 9.5-day stretch that the page never mentioned."""
+    name = getattr(actor, "name", "") or "They"
+    what, act, unit = _NEED_WORDS.get(need, ("supplies", "meal", ""))
+    amount = daily_need(actor, need, biome) if need in PROVISIONS else 0
+    hint = (f" A day needs {_amount(amount)} {unit}{'s' if amount != 1 else ''} of {what}."
+            if amount else "")
+    # The span is how long the body lasts, grace included, not how long the pack's own
+    # stores last: an empty pack still "carries" three days of hunger's grace.
+    how_long = (f"on the {what} in the pack they can last {_span(covered)}" if covered
+                else f"there is no {what} in the pack")
+    return (f"{name} cannot work {_span(minutes)} at this: {how_long}, and they cannot go "
+            f"longer without a {act}.{hint} Eat, or buy {what}, or work a smaller batch.")
 
 
 def wait_lines(passed: dict, ref: str) -> list[str]:
@@ -1150,7 +1171,7 @@ def strains(actor) -> list[Strain]:
     return out
 
 
-def sleep(actor, hours: int = 8) -> None:
+def sleep(actor, hours: int = 8, *, minutes: int | None = None) -> None:
     """A night resets the awake clock. Called by `rest`, which already does the healing.
 
     The awake clock and its saves only. It reset the thirst and hunger counts too until
@@ -1159,8 +1180,13 @@ def sleep(actor, hours: int = 8) -> None:
     water, and nothing about sleep. Clearing it on a meal and a drink (`eat`, `drink`) is
     the reading that ties the count to the need it measures; clearing it on a night let a
     character three days without water sleep their way back to DC 10 every morning.
+
+    `minutes`, when the sleep was not whole hours: six hours slept is six hours, and a
+    5 h 34 min short night rounded to "6" reset the clock it had not earned (owner report
+    2026-11-01, Ansel).
     """
-    if int(hours) >= 6:
+    slept = int(minutes) if minutes is not None else int(hours) * MINUTES_PER_HOUR
+    if slept >= 6 * MINUTES_PER_HOUR:
         actor.awake_minutes = 0
         actor.awake_checks = 0
 

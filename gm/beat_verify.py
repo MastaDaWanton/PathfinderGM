@@ -227,6 +227,41 @@ class Facts:
     # judged by `_unseen_wrong`. Measured 2026-10-30, live: three gemma turns against the
     # invisible player each wound up "aimed at your head".
     unseen: tuple[str, ...] = ()
+    # The clock when the turn began (`BeatContext.was_clock`). An hour claim is judged
+    # against every hour the clock passed through this turn (`passed`), not the hour it
+    # stopped at. Measured on the bench of 2026-11-02 ("I wait until morning", 816 minutes
+    # from 18:24): the page's "you wait through the long, quiet hours of the night until
+    # the first light" was judged against 08:00 alone, and the repair wrote "you wait
+    # through the long, quiet hours of the early morning" — on all three runs. None (a
+    # test, the bench's gold) judges the clock as it stands, as before.
+    was_clock: int | None = None
+    # The player is on the escort's walk to the gallows (rules/trial.py, stage `walk`):
+    # the engine's own tell leads them out of the hold "toward" the gallows while the
+    # scene still stands at the hold — the walk is the next turn's. A sentence that has
+    # them led out is the tell; no move claim is judged. Measured on the bench of
+    # 2026-11-02 (the night in the cell, 3 runs of 3): "seize your arms and lead you out
+    # of the guardhouse toward the market" was flagged a move the engine never made, and
+    # the repair wrote "seize your arms and hold you" over the engine's own sentence.
+    led: bool = False
+    # The engine let the player go this turn (a custody that ended served, cleared, for
+    # want of proof or cowed). Said in the move fact a repair is given, so the rewrite
+    # keeps them free: on the bench of 2026-11-02 the fact "the player did not move" alone
+    # turned "you are released from the guardhouse" into "you are held in the
+    # guardhouse" — beside the tell "is let go, the matter closed".
+    let_go: bool = False
+
+    @property
+    def passed(self) -> frozenset[int] | None:
+        """The hours (0-23) the clock stood in at any point this turn, or None when the
+        turn's start is not known."""
+        if self.clock is None or self.was_clock is None:
+            return None
+        a, b = int(self.was_clock), int(self.clock)
+        if b <= a:
+            return frozenset({(b % (24 * 60)) // 60})
+        if b - a >= 24 * 60:
+            return frozenset(range(24))
+        return _hours((a % (24 * 60)) // 60, (b % (24 * 60)) // 60)
 
     @property
     def bodies(self) -> bool:
@@ -279,7 +314,8 @@ class Facts:
                            [(a.code, a.who, a.verdict) for a in attempts_of(self)],
                            self.settings, self.blows, self.arms, self.joined,
                            self.foe, self.foe_blows, self.foe_arms, self.foe_natural,
-                           self.at_you, self.struck_by, self.aimed, self.unseen],
+                           self.at_you, self.struck_by, self.aimed, self.unseen,
+                           self.was_clock, self.led, self.let_go],
                           default=str, sort_keys=True)
 
 
@@ -404,6 +440,14 @@ def facts_from(ctx) -> Facts:
             if settings and p is not here_place:
                 more = places_mod.settings_for(p, known)
                 settings = (settings | more) if more else frozenset()
+    led, let_go, cell = _custody_of(pc, outcomes, here_place)
+    if settings and cell:
+        # The engine's own cell at the hold (rules/trial.py): a condemned cell is told "the
+        # night passes in the cell", and the reader files a cell with the cellars. Measured
+        # on the bench of 2026-11-02, 2 of 3 cell nights: "you sit in the damp, cramped
+        # cell" was judged set underground in a guardhouse, and the repair wrote "the damp,
+        # cramped guardhouse".
+        settings = settings | {places_mod.SET_UNDER}
     return Facts(start=start, end=end,
                  places=tuple(dict.fromkeys(n for n in (_name_of(p) for p in known) if n)),
                  went_by=tuple(dict.fromkeys(went_by)), pack=pack, props=props,
@@ -416,7 +460,38 @@ def facts_from(ctx) -> Facts:
                  **_foe_blows_of(ctx, outcomes, scene),
                  **_struck_by_of(ctx, outcomes, pc, scene),
                  **_aimed_of(ctx, outcomes, scene),
-                 **_unseen_of(ctx, scene, pc))
+                 **_unseen_of(ctx, scene, pc),
+                 was_clock=(None if getattr(ctx, "was_clock", None) is None
+                            else int(ctx.was_clock)),
+                 led=led, let_go=let_go)
+
+
+# How a custody ends when the watch lets the player go (rules/trial.py `_release`,
+# `_sentence`, `_after_questioning`): the engine's own `ended` values. An escape is not one —
+# the escaped are moved by the engine, and a run is a move.
+_LET_GO = frozenset({"served", "cleared", "no-proof", "cowed"})
+
+
+def _custody_of(pc, outcomes, here_place) -> tuple[bool, bool, bool]:
+    """(on the escort's walk, let go this turn, the party at the hold that held them in a
+    cell this turn) — off the engine's custody record and this turn's trial outcomes, never
+    the words."""
+    led = cell = False
+    try:
+        from rules import trial
+
+        held = trial.custody(pc) if pc is not None else None
+    except Exception:  # noqa: BLE001 — no custody to read is no custody
+        held = None
+    pay = dict(getattr(held, "payload", None) or {})
+    here_id = str(getattr(here_place, "id", "") or "")
+    if held is not None and not pay.get("escaped"):
+        led = pay.get("stage") == "walk"
+        cell = bool(here_id) and str(pay.get("hold") or "") == here_id
+    let_go = any(e.get("kind") == "custody" and e.get("ended") in _LET_GO
+                 for o in outcomes if o.get("status") != "refused"
+                 for e in o.get("effects") or () if isinstance(e, dict))
+    return led, let_go, cell
 
 
 def _unseen_of(ctx, scene, pc) -> dict:
@@ -441,6 +516,19 @@ UNARMED = "unarmed strike"
 
 def _weapon_name(name) -> str:
     return " ".join(str(name or "").split()).lower()
+
+
+_MAKE = re.compile(r"^(?:mwk|masterwork|\+\d+)\s+")
+
+
+def _same_weapon(said: str, swung) -> bool:
+    """Whether the weapon a sentence names is one the engine swung, a masterwork or an
+    enhanced one being the same weapon by name. Round 2, 2026-11-05: the guard captain's
+    stat block prints "guisarme" and the engine swung his "mwk guisarme"; the reader named
+    the guisarme, and the check replaced the slot's blow with the engine's line on 7 of 7
+    runs of the second punch. Names from the sheet and the engine, never prose."""
+    base = _MAKE.sub("", _weapon_name(said))
+    return bool(base) and any(base == _MAKE.sub("", _weapon_name(w)) for w in swung or ())
 
 
 def _blows_of(ctx, outcomes, pc) -> dict:
@@ -684,7 +772,7 @@ def schema(facts: Facts) -> dict:
         # 2026-10-05, and one object is one claim: the owner's beat at 17:49 said "The
         # morning air is cold" and, a sentence later, "the gray morning"; the reader
         # reported the second, its repair held, and the first shipped untouched because
-        # the slot had no room for it (sammy.json's beat-verify rows: 2 of 2 beats with a
+        # the slot had no room for it (ilse.json's beat-verify rows: 2 of 2 beats with a
         # wrong "morning" kept it in a sentence the reader never named).
         "time_of_day": lst({"part": {"type": "string", "enum": list(PARTS)}}),
         # Somebody held elsewhere whom the page shows here anyway, doing anything at all —
@@ -1446,7 +1534,7 @@ SHOWN = ("succeeds", "fails", "unsure")
 # contradiction; the item itself, when made, is an effect `to` the player, which the hands
 # lane already reads (`_anything_into`, `Facts.things`).
 _ATTEMPT_OPS = ("check", "save", "judge", "mend", "trade_lore", "haggle", "work", "track",
-                "extinguish", "break_free", "repair", "make")
+                "extinguish", "break_free", "repair", "make", "escape")
 
 
 @dataclass(frozen=True)
@@ -1486,12 +1574,26 @@ def attempts_of(facts: Facts) -> list[Attempt]:
     a tell's words. An outcome with no actor on record (a turn log written before the
     stamp) is left out: there is nobody to name, so nothing is asked."""
     out: list[Attempt] = []
-    for o in _resolved(facts):
+    resolved = _resolved(facts)
+    for at, o in enumerate(resolved):
         verdict = str(o.get("verdict") or "")
         if o.get("op") not in _ATTEMPT_OPS or verdict not in ("success", "failure"):
             continue
         who = str(o.get("actor") or "")
         if not who or facts.person(who) is None:
+            continue
+        if verdict == "failure" and o.get("op") == "check" and any(
+                e.get("kind") == "give" and e.get("to") == who and e.get("from")
+                and e.get("from") != who
+                for later in resolved[at + 1:] for e in _effects(later)):
+            # A failed check whose deed the engine did anyway: a thing taken out of
+            # somebody else's hands into the checker's, later this same turn. A Sleight of
+            # Hand miss is the theft SEEN, not the theft undone — the give's own tell says
+            # "Seen by the guardsman…". Measured on the bench of 2026-11-02 (the live slip
+            # of 2026-11-01 again): "Your fingers close around the bracelet, snatching it
+            # from the tray" was asked as the failed check, and the repair, told "what was
+            # tried is not done", wrote "failing to snatch it from the tray" beside the
+            # engine's own "takes the silver bracelet". The give is judged by `hands`.
             continue
         if o.get("op") == "track" and verdict == "success" and not _track_found_it(o):
             # A track's roll that beat the ground and found nothing — or nothing of what
@@ -2324,7 +2426,7 @@ def _weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
     never for "not shown". "something else" is judged: the live shard was exactly that — a
     thing no list held, against an unarmed strike the engine rolled."""
     said = str(c.slots.get("weapon") or "")
-    if not facts.blows or said in ("", NOT_SHOWN) or said in facts.blows:
+    if not facts.blows or said in ("", NOT_SHOWN) or _same_weapon(said, facts.blows):
         return None
     struck = " and ".join(_said_weapon(w) for w in facts.blows)
     instead = "anything else" if said == OTHER_WEAPON else f"the {said}"
@@ -2391,7 +2493,7 @@ def _foe_weapon_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
     """A creature's blow, on its own turn, shown struck with something the engine did not
     swing, or None. "not shown" is never judged; "something else" is, as for the player."""
     said = str(c.slots.get("weapon") or "")
-    if not facts.foe_blows or said in ("", NOT_SHOWN) or said in facts.foe_blows:
+    if not facts.foe_blows or said in ("", NOT_SHOWN) or _same_weapon(said, facts.foe_blows):
         return None
     # A natural attack has no name a reader can hold it to: on the recorded fight beats
     # (2026-10-17, gemma-4-12B x2) the one false alarm of 10 was Zygomind's tentacle
@@ -2548,6 +2650,17 @@ def _setting_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
         f"{_SET_ABSENT.get(kind, 'none of that')} here.", c.sentence, "", c)
 
 
+# The engine's records of somebody coming or going this turn: a `presence` claim about them
+# is true. `arrives`, `back` and `leaves` are the clock's own (`Engine._comings_settles`: a
+# keeper opening the counter at first light), and were missing until 2026-11-02 — measured
+# on that day's bench, 3 of 3 runs of "I wait until morning": the tell "the master of the
+# market comes to the market and opens the counter" beside a page that had them "arrive at
+# their posts" was judged "has been here all along", and the repair wrote it so.
+# `joins_fight` and `summon` bring somebody into a fight.
+_COMINGS = frozenset({"introduce", "spawn", "arrive", "arrives", "back", "enter", "position",
+                      "moved", "left", "leave", "leaves", "joins_fight", "summon"})
+
+
 def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]:
     """The page's claims against the engine's outcomes and state. Code only.
 
@@ -2573,11 +2686,17 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             continue
         if c.category == "move":
             place = s["place"]
+            if facts.led:
+                # Led out toward the gallows by the escort: the engine's own tell, not a
+                # walk the page made up (`Facts.led`).
+                continue
             if not moved:
                 why = next((_refusal_line(o) for o in refused_moves if _refusal_line(o)), "")
+                free = (" They have been let go and are free, and they are still at "
+                        if facts.let_go else " They are still at ")
                 out.append(Discrepancy(
                     "contradiction", "move",
-                    f"The player did not move{': ' + why if why else ''}. They are still at "
+                    f"The player did not move{': ' + why if why else ''}.{free}"
                     f"{facts.start}.", c.sentence,
                     next((str(o.get("for_a_person") or "") for o in refused_moves
                           if o.get("for_a_person")), "") or f"You are still at {facts.start}.",
@@ -2671,8 +2790,12 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # resting there (rules/lodging.py), and the live turn that pinned this ("The
             # transaction of coin is a formality…", dn-live) had a refused rest and nothing
             # else — a payment the engine never took, which the page must not keep.
+            # A commission too since 2026-11-03: a price agreed for work already paid is
+            # refused ("pays nothing more"), and the page that hands the coins over again
+            # is a payment the engine never took.
             if item == OTHER_THING and not any(
-                    o.get("op") in (*_TRADE_OPS, "haggle", "rest") for o in facts.outcomes):
+                    o.get("op") in (*_TRADE_OPS, "haggle", "rest", "commission")
+                    for o in facts.outcomes):
                 continue
             done = [o for o in trades if o.get("status") != "refused"]
             refused = [o for o in trades if o.get("status") == "refused"]
@@ -2685,6 +2808,16 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # a purchase the engine made. "You pay for the room" is true on that turn, and
             # was a sale nobody made to this judgement until 2026-10-17.
             paid = paid or bool(_rooms_paid(facts))
+            # And coin the engine took for a keeper's work (rules/commission.py, `cp`) or
+            # for a fine (rules/trial.py, `paid_cp`): "the smith accepts the commission for
+            # 1 gold, 4 silver" and "accepts your payment of six gold pieces" are both
+            # true. Measured on the bench of 2026-11-02: each was cut as "no sale was made
+            # this turn", and the commission's rewrite first made it "for 0 gold, 0 silver,
+            # and 0 copper pieces".
+            paid = paid or any(
+                (e.get("kind") == "commission" and int(e.get("cp") or 0) > 0)
+                or (e.get("kind") == "fine" and int(e.get("paid_cp") or 0) > 0)
+                for o in _resolved(facts) for e in _effects(o))
             if s["settled"] and not done and not paid:
                 why = _refusal_line(refused[0]) if refused else ""
                 out.append(Discrepancy(
@@ -2745,9 +2878,7 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                 if c.category == "arrived":
                     out.append(_not_here(p, c))
                 continue
-            came = any(str(e.get("ref") or "") == who
-                       and e.get("kind") in ("introduce", "spawn", "arrive", "enter",
-                                             "position", "moved", "left", "leave")
+            came = any(str(e.get("ref") or "") == who and e.get("kind") in _COMINGS
                        for o in _resolved(facts) for e in _effects(o))
             if not came:
                 verb = "has been here all along" if c.category == "arrived" else "is still here"
@@ -2792,7 +2923,11 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                 out.append(found)
         elif c.category == "hour":
             h = _hour(facts)
-            if h is not None and h not in PARTS[s["part"]]:
+            # Any hour the clock stood in this turn (`Facts.passed`): a long wait is told
+            # through the hours it passed, not only the one it stopped at.
+            passed = facts.passed or frozenset({h})
+            if h is not None and not (passed & PARTS[s["part"]]) \
+                    and not _hour_told(c, facts):
                 from rules import residency
 
                 out.append(Discrepancy(
@@ -2802,6 +2937,35 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
 
     out += _omissions(claims, facts, text)
     return out
+
+
+def _hour_told(c: Claim, facts: Facts) -> bool:
+    """Whether the hour claim is a part of the day the engine set something for this turn —
+    an effect record's `scheduled` minute (the hanging at first light, `trial`; the
+    caravan's meeting, `job`) — so the page is telling the engine's appointment, not the
+    clock now, and is not judged against the clock.
+
+    Measured on the bench of 2026-11-02, the live slip of 2026-11-01 again: at six in the
+    evening the narrator wrote "sentences you to death by hanging at first light", the hour
+    judgement read it as the time now, and its repair wrote "at six in the evening" over the
+    engine's own sentence.
+
+    The engine's data, never the words (the owner's direction, 2026-10-03: no regex reading
+    English). Until 2026-11-03 this matched a list of hour words in the tell against the
+    claim's quote. What that gave up: a page that says dawn is breaking NOW, on the same
+    turn the engine sets something for dawn, is not judged either. The gold beat
+    `finalized` (a shop's "opens at first light" refusal, "the pre-dawn light is just
+    beginning" at 01:28) keeps its alarm: opening hours are a keeper's standing record, not
+    an appointment this turn made, and carry no `scheduled`."""
+    part = PARTS.get(str(c.slots.get("part") or ""))
+    if not part:
+        return False
+    for o in facts.outcomes:
+        for e in o.get("effects") or ():
+            when = e.get("scheduled") if isinstance(e, dict) else None
+            if isinstance(when, (int, float)) and (int(when) % (24 * 60)) // 60 in part:
+                return True
+    return False
 
 
 def _omissions(claims: list[Claim], facts: Facts, text: str) -> list[Discrepancy]:
@@ -3583,7 +3747,7 @@ def _struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, host, p
         said = str((reply.json() or {}).get("weapon") or "")
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
-    return bool(said) and said != NOT_SHOWN and said not in facts.blows
+    return bool(said) and said != NOT_SHOWN and not _same_weapon(said, facts.blows)
 
 
 # The felling, as `narration._felled_question` words it — probed 2026-10-17 at 4/4 felled
@@ -3673,7 +3837,7 @@ def _foe_struck_with(d: Discrepancy, before: str, facts: Facts, chat, model, hos
         said = str((reply.json() or {}).get("weapon") or "")
     except Exception:  # noqa: BLE001 — unconfirmable: the first read's answer stands
         return True
-    return bool(said) and said != NOT_SHOWN and said not in facts.foe_blows
+    return bool(said) and said != NOT_SHOWN and not _same_weapon(said, facts.foe_blows)
 
 
 def _strikes_at_you(d: Discrepancy, before: str, facts: Facts, chat, model, host, provider,
@@ -3855,3 +4019,389 @@ def clear_cache() -> None:
     _CACHE.clear()
     _FELLED.clear()
     _LAST = None
+
+
+# --- the beat's own tells, sentence by sentence (2026-11-02) ----------------------------------
+#
+# The owner, 2026-11-02: "anything we can do about the narration slips? perhaps a extra step
+# in the preparation of the narration even if it adds a few seconds". The slips seen live on
+# the integration build (planned narration) were each a sentence that cannot be true beside
+# one of the beat's own tells, of a shape no typed slot above reads:
+#
+#   * a theft written as failed — the tell "takes the silver bracelet from <the
+#     stallholder>, who did not hand it over", the page "it remains on the tray" (a negation
+#     claims no change of hands, so the `changed_hands` slot has nothing to read);
+#   * a fine garbled — the tell "<the player> pays 6 … gold pieces … silver bracelet to <the
+#     stallholder>", the page "You hold the six gold pieces and the silver bracelet for
+#     <her>" (a fine is not a sale, so `trades` has nothing to judge);
+#   * a scheduled hour — hanged "at first light", the page "at six in the evening" (the
+#     `time_of_day` slot reads the clock NOW, not an hour something is set for).
+#
+# So the check here asks the most general question of each sentence of a planned beat,
+# against all of that beat's tells as the premise: does it agree with a tell, contradict one,
+# or speak of none? Prior art (docs/narration-faithfulness.md has the numbers and the
+# sources): SummaC (Laban et al. 2022) — sentence granularity is what made NLI work for
+# consistency; MiniCheck (Tang et al. 2024) — a claim per sentence, decomposition below it
+# "no clear indication" of helping; RARR (Gao et al. 2023) — edit only on a disagreement, or
+# the editor over-edits; NCP-Bench (Ma et al. 2026) — a second confirming read before a
+# conflict counts; CoVe (Dhuliawala et al. 2023) — a yes-or-no verification question is
+# answered the way it is framed, so the confirming read names three answers, not two; Huang
+# et al. 2024 and CRITIC (Gou et al. 2024) — a model's critique of itself without grounding
+# does not help, so the verdict must name WHICH tell and quote the clashing words, and code
+# checks both before anything is remade.
+#
+# Only "contradicts" costs a sentence. "Not about it" is the narrator's licence for colour
+# (a binary supported/unsupported checker would flag every embellishment).
+
+TELL_VERDICTS = ("agrees", "contradicts", "not about it")
+TELL_SECOND = ("tells it", "cannot both be true", "says nothing about it")
+# The fewest words of the sentence a contradiction must quote: "it remains" is two.
+MIN_CLASH_WORDS = 2
+
+_TELLS_SYSTEM = (
+    "You check a passage of a story against the FACTS the game engine decided. The facts "
+    "are true. \"You\" in the passage is the player's character, named in the facts. For "
+    "EACH numbered sentence answer:\n"
+    "- \"contradicts\" when the sentence cannot be true if a fact is true: the opposite "
+    "outcome (kept where the fact has it taken, failed where it is made, refused where it "
+    "is agreed), a different person doing it or getting it, a different thing, sum or "
+    "place, a different time, or something done that the fact says is not done yet;\n"
+    "- \"agrees\" when it tells what a fact says, in any words;\n"
+    "- \"not about it\" when it is colour — a look, a sound, a feeling, a gesture — that no "
+    "fact speaks of.\n"
+    "Leaving a fact out is not contradicting it. A person's words contradict a fact only "
+    "where they state what the engine decided (a verdict, a sum, an hour, who did it); a "
+    "claim the facts record being made (\"speaks … to the effect that\") agrees. Name the "
+    "fact (\"none\" when not about it), and for \"contradicts\" copy the sentence's own "
+    "words that clash.")
+_TELLS_DEMO_USER = (
+    "FACTS (the player's character is Pell Arrow):\n"
+    "F1. Pell Arrow takes the copper ring from the tinker, who did not hand it over. Pell "
+    "Arrow has it now; it still belongs to the tinker.\n"
+    "F2. The tinker's cart leaves the green at first light.\n"
+    "F3. Pell Arrow speaks to the tinker, to the effect that he found it in the mud.\n\n"
+    "SENTENCES:\n"
+    "1. Your fingers brush the copper ring, but it stays on the tinker's blanket.\n"
+    "2. Smoke from a cookfire drifts across the green.\n"
+    "3. You insist you found the ring lying in the mud.\n"
+    "4. The tinker grumbles that his cart rolls out at sundown.")
+_TELLS_DEMO_ANSWER = {
+    "1": {"verdict": "contradicts", "fact": "F1", "words": "it stays on the tinker's blanket"},
+    "2": {"verdict": "not about it", "fact": "none", "words": ""},
+    "3": {"verdict": "agrees", "fact": "F3", "words": ""},
+    "4": {"verdict": "contradicts", "fact": "F2", "words": "his cart rolls out at sundown"}}
+_TELLS_DEMO_USER_2 = (
+    "FACTS (the player's character is Mira Holt):\n"
+    "F1. The reeve finds Mira Holt guilty of trespass. The reeve will pass sentence after "
+    "Mira Holt's last word, and has not passed it yet: the law's sentence will be a fine of "
+    "3 silver pieces. Still for Mira Holt to choose: speak once more, or say nothing.\n"
+    "F2. The reeve gives the reward of 5 gold pieces to the miller.\n"
+    "F3. Mira Holt is held by the bailiff, and his hold is firm: Mira Holt walks nowhere "
+    "else while it holds. Still for Mira Holt to choose: slip his hold and run, wrench "
+    "free of it and run, or fight.\n\n"
+    "SENTENCES:\n"
+    "1. The reeve's voice rings out as he names you guilty of trespass.\n"
+    "2. You count three silver pieces into the clerk's waiting hand.\n"
+    "3. He presses the purse of gold into your palm.\n"
+    "4. The miller weighs the reward and grins.\n"
+    "5. You wrench your arm out of the bailiff's grip.")
+_TELLS_DEMO_ANSWER_2 = {
+    "1": {"verdict": "agrees", "fact": "F1", "words": ""},
+    "2": {"verdict": "contradicts", "fact": "F1",
+          "words": "You count three silver pieces into the clerk's waiting hand"},
+    "3": {"verdict": "contradicts", "fact": "F2", "words": "presses the purse of gold into "
+                                                          "your palm"},
+    "4": {"verdict": "agrees", "fact": "F2", "words": ""},
+    # The ways out a fact offers are not taken: the gallows bench (2026-11-02) wrote "You
+    # wrench your arms free from their hold" off the engine's "break their hold — slip it
+    # or wrench free" on 6 of 6 runs, and the first wording of this read passed every one.
+    "5": {"verdict": "contradicts", "fact": "F3",
+          "words": "You wrench your arm out of the bailiff's grip"}}
+
+_TELL_SECOND_SYSTEM = (
+    "You compare one sentence of a story with one FACT the game engine decided. The fact is "
+    "true. \"You\" in the sentence is the player's character, named in the fact. Answer "
+    "\"tells it\" when the sentence says what the fact says, in any words; \"cannot both be "
+    "true\" when the sentence and the fact cannot both be true — another outcome, another "
+    "person, thing, sum, place or time, or done when the fact has it not done yet; \"says "
+    "nothing about it\" when the sentence speaks of something else.")
+
+
+# The second read's demonstrations, one per answer and the two shapes it got wrong on the
+# bench of 2026-11-02 with none: a way out the fact offers, written taken ("You wrench your
+# arms free from their hold" beside "break their hold — slip it or wrench free"), refused on
+# 6 of 6 asks; and people called by what they are rather than as the fact names them ("the
+# two guards" for "the guardsman and the second guardsman"), kept as a clash. Synthetic.
+_TELL_SECOND_DEMOS = (
+    ("FACT (the player's character is Mira Holt): Mira Holt is held by the bailiff, and "
+     "his hold is firm. Still for Mira Holt to choose: slip his hold and run, wrench free "
+     "of it and run, or fight."
+     "\n\nSENTENCE: You twist out of the bailiff's grip and stumble clear.",
+     "cannot both be true"),
+    ("FACT (the player's character is Mira Holt): The watchman and the second watchman take "
+     "Mira Holt in to the lock-up.\n\nSENTENCE: The two burly guards march you to the "
+     "lock-up.", "tells it"),
+    ("FACT (the player's character is Mira Holt): The reeve passes sentence: Mira Holt is to "
+     "hang at noon tomorrow.\n\nSENTENCE: The candle gutters low on the reeve's desk.",
+     "says nothing about it"),
+)
+
+
+@dataclass
+class TellClash:
+    """One sentence that cannot be true beside one of the beat's tells: the sentence as it
+    stands, the tell (numbered from 1 in the order given), the words that clash, whether
+    the second read kept it, and what the second read said (`second`: its answer, "" when it
+    was not asked) or why it was not asked (`unasked`)."""
+    sentence: str
+    tell: str
+    n: int
+    words: str
+    confirmed: bool = False
+    second: str = ""
+    unasked: str = ""
+
+    def as_log(self) -> dict:
+        return {"sentence": self.sentence, "tell": self.tell, "fact": f"F{self.n}",
+                "words": self.words, "confirmed": self.confirmed,
+                **({"second": self.second} if self.second else {}),
+                **({"unasked": self.unasked} if self.unasked else {})}
+
+
+# Who may refuse a clash the first read found (2026-11-03). Measured offline on the 102
+# labelled bench beats (22 contradictions a tell can catch, 71 clean beats; numbers in
+# docs/narration-faithfulness.md, "Who may refuse a clash"):
+#   "second" — the fact-first second read refuses any clash it does not call "cannot both
+#              be true": 5 of 22 caught, 5 of 71 clean beats flagged;
+#   "none"   — the first read alone: 11 of 22, 12 of 71;
+#   "echo"   — the second read refuses only a clash whose words do not echo the tell
+#              (`echoes_tell`): 9 of 22, 5 of 71.
+# The second read's refusals were of two kinds. Right: "the two guardsmen" flagged against
+# "the guardsman and the second guardsman", 5 beats, sharing no word with the tell. Wrong:
+# "you wrench your arms free from their grip" against a tell offering "wrench free" as a
+# way out, 4 of 4 refused — "tells it", fooled by its own words, the lexical-overlap
+# weakness documented for LLM judges. `PATHFINDER_GM_TELLS_VETO` picks one for a bench.
+#
+# On full turns (two blind scorers a round): over the whole bench (17 lines x 3 and a fight
+# round x 3, 60 beats a veto) the three were within noise of each other (errors 13/11,
+# 15/13 and 12/10 for second, none and echo). What the veto changed, read slot by slot: the
+# escort's hold written broken on the walk to the gallows, shipped on 6 of 6 runs with the
+# second read and 0 of 6 without it (a second round of the five lines the check acted on,
+# 15 beats a veto: errors 5/6 against 1/1). Remakes did not double (10 and 10 in the first
+# round). Against it: one first-read false alarm cut a true blow from a fight page, and 2
+# of the 6 gallows catches failed their remake and took the engine's own line. Seconds a
+# turn did not move (median 31.2 s and 31.1 s). So the first read alone; the second read
+# stays for a remake judged against the tell it was remade for (`planned._tells_kept`),
+# where it only ever adds a clash.
+TELLS_VETOES = ("second", "none", "echo")
+TELLS_VETO = "none"
+
+
+def tells_veto() -> str:
+    """Who may refuse a first-read clash (`TELLS_VETOES`): `TELLS_VETO`, or
+    `PATHFINDER_GM_TELLS_VETO` for a bench's conditions. Not a Settings switch: the owner's
+    ruling of 2026-11-02 keeps the check itself always on and unswitchable in the app."""
+    import os
+
+    env = os.environ.get("PATHFINDER_GM_TELLS_VETO", "").strip().lower()
+    return env if env in TELLS_VETOES else TELLS_VETO
+
+
+# Function words (NLTK's English list), which echo nothing: "until evening" against "Until
+# then" is not the tell's own phrase.
+_ECHO_STOP = frozenset("""
+    i me my myself we our ours ourselves you your yours yourself yourselves he him his himself
+    she her hers herself it its itself they them their theirs themselves what which who whom
+    this that these those am is are was were be been being have has had having do does did
+    doing a an the and but if or because as until while of at by for with about against
+    between into through during before after above below to from up down in out on off over
+    under again further then once here there when where why how all any both each few more
+    most other some such no nor not only own same so than too very can will just should now
+    """.split())
+# The fewest of the tell's own words a clash must repeat to echo it: "wrench … free" is
+# two. One shared noun is the topic, not the tell's phrase: "you pay it in gold" against
+# "pays 6 gold pieces" shares "gold" and agrees.
+MIN_ECHO_WORDS = 2
+
+
+def _content_words(text: str, names: frozenset = frozenset()) -> set[str]:
+    return {w for w in re.findall(r"[a-z]+", _norm(text))
+            if len(w) > 1 and w not in _ECHO_STOP and w not in names}
+
+
+def echoes_tell(words: str, tell: str) -> bool:
+    """Whether a clash's words repeat at least `MIN_ECHO_WORDS` of the tell's own content
+    words — the shape the second read refuses wrongly ("you wrench your arms free" beside
+    "slip it or wrench free", 4 of 4 bench beats), so under the "echo" veto it is not asked.
+    A NAME the tell gives is not an echo: it says who the sentence is about, and a clash on
+    who ("the two guardsmen" beside "the guardsman and the second guardsman") is the shape
+    the second read refuses rightly. No stemming, for the same reason: "guardsmen" is not
+    "guardsman". Every capitalised word of the tell counts as a name: one that only opens a
+    sentence ("Seen by …", "Taken back …") costs an echo a word, never a false one."""
+    names = frozenset(w.lower() for w in re.findall(r"\b[A-Z][a-z]+", str(tell or "")))
+    shared = _content_words(words, names) & _content_words(tell, names)
+    return len(shared) >= MIN_ECHO_WORDS
+
+
+@dataclass
+class TellsRead:
+    """What `against_tells` found: the clashes the second read kept, those it refused, the
+    answers code dropped (and why), the seconds both reads took, how many calls, and the
+    error when the first read failed (then nothing was judged)."""
+    clashes: list[TellClash] = field(default_factory=list)
+    refused: list[TellClash] = field(default_factory=list)
+    dropped: list[dict] = field(default_factory=list)
+    seconds: float = 0.0
+    calls: int = 0
+    error: str = ""
+
+    def as_log(self) -> dict:
+        return {"clashes": [c.as_log() for c in self.clashes],
+                "refused": [c.as_log() for c in self.refused],
+                "dropped": self.dropped, "seconds": round(self.seconds, 2),
+                "calls": self.calls, **({"error": self.error} if self.error else {})}
+
+
+_XP_LINE = re.compile(r"\s*You gain \d[\d,]* XP\b[^.]*\.")
+
+
+def tell_premises(tells) -> list[str]:
+    """The beat's tells as the check's premise: each made fit for prose (`narration.
+    page_line`: no roll arithmetic, no damage amount), the XP line dropped (bookkeeping no
+    sentence tells), empty tells and repeats gone."""
+    from . import narration as narration_mod
+
+    out: list[str] = []
+    for t in tells or ():
+        line = _XP_LINE.sub("", narration_mod.page_line(str(t or ""))).strip()
+        if line and line not in out:
+            out.append(line)
+    return out
+
+
+def tells_schema(n_sentences: int, n_tells: int) -> dict:
+    """One required entry per sentence, keyed by its number — a sentence cannot be skipped,
+    and a fact cannot be named that is not on the list (enum and required hold under
+    Ollama's grammar: 6 of 6 probes, 2026-10-03)."""
+    item = {"type": "object",
+            "properties": {"verdict": {"type": "string", "enum": list(TELL_VERDICTS)},
+                           "fact": {"type": "string",
+                                    "enum": ["none"] + [f"F{i}" for i in
+                                                        range(1, n_tells + 1)]},
+                           "words": {"type": "string", "maxLength": 200}},
+            "required": ["verdict", "fact", "words"]}
+    keys = [str(i) for i in range(1, n_sentences + 1)]
+    return {"type": "object", "properties": {k: item for k in keys}, "required": keys}
+
+
+def tells_messages(sentences: list[str], premises: list[str], who: str = "") -> list[dict]:
+    user = ("FACTS" + (f" (the player's character is {who})" if who else "") + ":\n"
+            + "\n".join(f"F{i}. {t}" for i, t in enumerate(premises, 1))
+            + "\n\nSENTENCES:\n"
+            + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
+    return [{"role": "system", "content": _TELLS_SYSTEM},
+            {"role": "user", "content": _TELLS_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_TELLS_DEMO_ANSWER)},
+            {"role": "user", "content": _TELLS_DEMO_USER_2},
+            {"role": "assistant", "content": json.dumps(_TELLS_DEMO_ANSWER_2)},
+            {"role": "user", "content": user}]
+
+
+def _clash_quoted(words: str, sentence: str) -> bool:
+    """The clashing words are the sentence's own (folded as quotes are, `_norm`), and at
+    least `MIN_CLASH_WORDS` of them: the grounding a verdict needs before it costs a
+    sentence — a reader that names a clash it cannot point at has not found one."""
+    w = _norm(words)
+    return len(w.split()) >= MIN_CLASH_WORDS and w in _norm(sentence)
+
+
+def second_on_tell(sentence: str, tell: str, who: str = "", *, chat=None, model: str = "",
+                   host: str = "", provider: str = "ollama", api_key: str = "") -> str | None:
+    """The confirming read of one clash: the fact FIRST and the sentence after it (the first
+    read had them the other way: a small model's verdict moves with the order, AFaCTA
+    measured 97-99% for 7-13B models), three answers (`TELL_SECOND`). None unanswered."""
+    user = ("FACT" + (f" (the player's character is {who})" if who else "")
+            + f": {tell}\n\nSENTENCE: {sentence}")
+    msgs = [{"role": "system", "content": _TELL_SECOND_SYSTEM}]
+    for demo_user, demo_answer in _TELL_SECOND_DEMOS:
+        msgs += [{"role": "user", "content": demo_user},
+                 {"role": "assistant", "content": json.dumps({"answer": demo_answer})}]
+    msgs.append({"role": "user", "content": user})
+    return _one_of(msgs, list(TELL_SECOND), chat=chat, model=model, host=host,
+                   provider=provider, api_key=api_key)
+
+
+def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
+                  model: str = "", host: str = "", provider: str = "ollama",
+                  api_key: str = "") -> TellsRead:
+    """Every sentence of `text` (speech kept: a reply's words are what the narrator made the
+    speaker say) read against the beat's tells (`tell_premises`), each contradiction named
+    by its tell and the words it clashes on, validated in code (`_clash_quoted`, the fact on
+    the list), then asked once more alone (`second_on_tell`) and kept only on "cannot both
+    be true" — unless `tells_veto` lets no read refuse it, or not the second read on a clash
+    that echoes its tell. `only` limits the read to those sentences (a remade slot's). A first read that
+    fails judges nothing (`error`): the caller leaves the text as it is, as every read back
+    does."""
+    from . import narration as narration_mod
+
+    out = TellsRead()
+    premises = tell_premises(tells)
+    sentences = [" ".join(s.split()) for s in narration_mod._sentences(text)
+                 if re.search(r"[A-Za-z]{2,}", s)]
+    if only is not None:
+        want = {" ".join(str(s).split()) for s in only}
+        sentences = [s for s in sentences if s in want]
+    if not premises or not sentences:
+        return out
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    msgs = tells_messages(sentences, premises, who)
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    started = time.monotonic()
+    out.calls = 1
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=60 + 60 * len(sentences), provider=provider,
+                     api_key=api_key, schema=tells_schema(len(sentences), len(premises)))
+        answer = reply.json() or {}
+    except Exception as exc:  # noqa: BLE001 — unread: nothing judged, the caller says so
+        out.error = f"{type(exc).__name__}: {str(exc)[:160]}"
+        out.seconds = time.monotonic() - started
+        return out
+    found: list[TellClash] = []
+    for k, sentence in enumerate(sentences, 1):
+        row = answer.get(str(k)) if isinstance(answer, dict) else None
+        if not isinstance(row, dict) or row.get("verdict") != "contradicts":
+            continue
+        fact = str(row.get("fact") or "")
+        words = " ".join(str(row.get("words") or "").split())
+        n = int(fact[1:]) if re.fullmatch(r"F\d+", fact) else 0
+        if not 1 <= n <= len(premises):
+            out.dropped.append({"sentence": sentence, "why": "no fact named"})
+            continue
+        if not _clash_quoted(words, sentence):
+            out.dropped.append({"sentence": sentence, "fact": fact, "words": words,
+                                "why": "the clashing words are not the sentence's own"})
+            continue
+        found.append(TellClash(sentence, premises[n - 1], n, words))
+    veto = tells_veto()
+    for c in found:
+        # Who may refuse it (`tells_veto`): no one, or not the second read when the clash
+        # repeats the tell's own words — the shape it is fooled by.
+        if veto == "none" or (veto == "echo" and echoes_tell(c.words, c.tell)):
+            c.confirmed = True
+            c.unasked = "the first read alone" if veto == "none" else "echoes the tell"
+            out.clashes.append(c)
+            continue
+        said = second_on_tell(c.sentence, c.tell, who, chat=chat, model=model, host=host,
+                              provider=provider, api_key=api_key)
+        out.calls += 1
+        c.second = said or "unanswered"
+        # Unanswered: the first read stands, as in every second read (`ask`).
+        c.confirmed = said in (None, "cannot both be true")
+        (out.clashes if c.confirmed else out.refused).append(c)
+    out.seconds = time.monotonic() - started
+    return out

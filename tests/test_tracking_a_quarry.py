@@ -197,3 +197,33 @@ def test_following_somebody_standing_here_is_not_a_trail():
         {"act": "follow", "target": body.name, "span": f"follow {body.name}"}]}
     rows = acts_to_ops.table(frame, s, places=e.places())
     assert not any(i["op"] == "track" for i in rows[0].intents)
+
+
+def test_going_quietly_with_them_is_not_a_trail():
+    """Measured live 2026-11-01: "I sigh and go quietly with them", the captain and two
+    guards arresting the player, was read as a follow of "them"; nobody was being talked
+    to, so the pronoun named nobody and a Survival roll looked for their tracks on the
+    market floor. A bare pronoun with somebody standing here is them."""
+    s, e = _grasslands(717)
+    rec = population.note(s, "a lone rider")
+    population.embody(s, "a lone rider", "guildhand", world=WORLD, rec=rec)
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "follow", "target": "them", "span": "go quietly with them"}]}
+    rows = acts_to_ops.table(frame, s, places=e.places())
+    assert not any(i["op"] == "track" for i in rows[0].intents)
+
+
+def test_look_then_follow_them_is_still_the_trail_with_somebody_here():
+    """The pronoun rule above must not take "follow them" off a trail the same line looked
+    for: with a rider standing by, "look for tracks of the caravan and follow them" is one
+    track, followed."""
+    s, e = _grasslands(717)
+    rec = population.note(s, "a lone rider")
+    population.embody(s, "a lone rider", "guildhand", world=WORLD, rec=rec)
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "track", "object": "tracks of the caravan",
+         "span": "look for tracks of the caravan"},
+        {"act": "follow", "target": "them", "span": "follow them"}]}
+    rows = acts_to_ops.table(frame, s, places=e.places())
+    built = [i for r in rows for i in r.intents]
+    assert [(i["op"], i["params"]) for i in built] == [("track", {"follow": True})]

@@ -9,7 +9,7 @@ degree of protection from the cold. trail rations reset my hunger, a backpack al
 carry more than a couple of things / increases my carry weight. ink and paper allow me to
 write notes or draw maps using ink and paper."*
 
-Measured before this module, on the owner's own save (Sam, 2026-10-01): nine of the ten
+Measured before this module, on the owner's own save (Dace, 2026-10-01): nine of the ten
 things in the pack — backpack, bedroll, blanket, hemp rope, ink and paper, trail rations,
 tent, flint and steel, traveler's outfit — drew "for show, no effect in play" on the
 Equipment tab, because a bought good lands in `stock` as a jar with no `specs`, and a jar

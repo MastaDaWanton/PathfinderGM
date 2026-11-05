@@ -95,7 +95,9 @@ def test_an_8_day_wait_at_the_table_on_an_empty_pack_stops_and_says_why():
         {"op": "advance_time", "actor": "pc", "because": "the player waits",
          "params": {"amount": 8, "unit": "day"}}]))
     tells = [o.tell for o in res.outcomes]
-    assert any(t == "The wait ends after 1 day 12 hours of the 8 days asked." for t in tells), tells
+    # With the hour it ends at since 2026-11-04 (`Engine._hour_now`).
+    assert any(t.startswith("The wait ends after 1 day 12 hours of the 8 days asked: it is "
+                            "now ") for t in tells), tells
     assert any("stops waiting after 1 day 12 hours" in t for t in tells), tells
     assert not pc.has_state("state.down") and not pc.nonlethal
 

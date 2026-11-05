@@ -29,6 +29,12 @@ from ._page import effects, field, page_sentences
 ORDER = 20
 KINDS = frozenset({"stop-not-shown"})
 DOORS = frozenset({"plan", "turn"})
+# Not on a planned beat (round 2, 2026-11-05): the stop is the travel tell itself, which
+# an act slot is told and the tells check holds it to. On the rerun all 3 findings on
+# planned beats were slots that had shown the stop ("A hand grabs your purse, and you
+# seize the wrist …"), and the backstop pasted the engine's meeting sentence in beside
+# them: the stop told twice, 3 Q pages over both scorers.
+PLANNED_OFF = frozenset({"stop-not-shown"})
 
 MOVE_OPS = ("travel", "venture", "journey")
 

@@ -41,8 +41,51 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
-    "follow", "request", "claim", "craft", "other",
+    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "other",
 )
+# `commission` since 2026-11-01. Owner report that day (Corvin, turns 21-29): "can you put
+# them together and i will give you 10 gold peices" to the smith, about a forged blank for a
+# trident — read as a question with no action, then a `give` of "the money" with no
+# amount. The vocabulary had no word for paying somebody to do work on your things: `craft`
+# is the player's own hands, `buy` is goods off the shelf, `request` is a favour or pay
+# asked FOR the player. `commission` owes the engine's `commission` op, built whole
+# (`acts_to_ops._commission`): the keeper's trade and the work are the engine's.
+# `escape` since 2026-11-01, from the owner's report (Corvin T., held by a giant rot grub):
+# "excape grap[ple", "escape grapple" and "roll escape artist to escape grappled condition"
+# came back `other`, `other` and a question — `other` owes no op, so nothing broke the
+# hold; the planner reached for a grapple at the grub (refused five times as "already
+# grappled") and a plain Escape Artist check at DC 10 that removed nothing. Breaking a
+# grapple is its own deed in the book (CRB p.200: a combat manoeuvre or Escape Artist
+# check against the holder's CMD), and the fix is the enum, not a word list. `escape` owes
+# the engine's `escape` op, built whole (`acts_to_ops._escape`); HOW is a closed choice
+# (`ESCAPE_WAYS`): force (the combat manoeuvre), slip (Escape Artist), or either.
+ESCAPE_WAYS = ("either", "force", "slip")
+# `blow` since 2026-11-04, on `attack`: whether the words are a killing stroke given to
+# somebody who cannot defend themselves — "I finish him off", "I slit his throat", "put it
+# out of its misery" — or an ordinary blow. The owner's ruling that day: finishing words
+# aimed at a helpless foe in a fight make 1e's coup de grâce (CRB p.197, a full-round
+# action that provokes, hits and crits by right, Fortitude or die). Until then the act
+# table made every blow at a body on the floor inside a fight an ordinary swing at helpless
+# AC, whatever the words, because nothing told the two apart but a regex in the free
+# narrator's door (`judgement.is_finishing_blow`). The reader reads the words; whether the
+# one struck IS helpless is the engine's state, never the reader's (`acts_to_ops.victims`).
+BLOWS = ("ordinary", "finishing")
+# `loot` and `harvest` since 2026-11-01, both from the owner's 0.2.25 report (Corvin's game):
+#
+# * "loot the body" was read `take, object: the body`, a take of a THING, and the give
+#   minted `"body": 1` into the pack beside the loot a regex detector added; "punch until
+#   she is dead thernm loot her" was read `take, target: her` with no object, which the
+#   act table answers "nothing named to take" — and the detector stood down because she
+#   was not yet down when the plan was read, so the loot half was dropped. Searching a
+#   body is its own deed (the engine's `loot` op: the down or dead body's whole kit), and
+#   its target is whose body: `loot` owes that op, built whole (`acts_to_ops._loot`).
+# * "kill it and skin iot for parts" was read `craft, craft: leatherworker`, and the make
+#   op refused it for want of a tannery. Taking parts off a carcass is not a craft at a
+#   bench: it is the harvest (rules/harvest.py — Ultimate Wilderness's "Harvesting
+#   Trophies", Survival for what is outside the body, Heal for what is inside, DC 15 +
+#   CR), until now reachable only from the harvest sheet's button. `harvest` owes the
+#   engine's `harvest` op, which runs the sheet's own rules (`acts_to_ops._harvest`).
+# The fix is the enum, not a word list: nothing in code reads "loot" or "skin".
 # `craft` since 2026-10-28. The report: "My wife tries to level up blacksmithing through
 # narration and didn't get real items or experience." Probed on gemma-4-12B before the
 # change: of eleven craft lines ("I forge a dagger at the anvil", "I brew a basic healing
@@ -68,6 +111,19 @@ WORKS = ("plain", "finer")
 #     the Bluff and the Stealth check (`acts_to_ops._sneak`).
 PACES = ("careful", "hurried")
 DIVERSIONS = ("none", "bluff")
+# `until` since 2026-11-01, on `wait` and `rest`: the time of day the words wait or sleep
+# until, as a closed choice the sampler holds. The owner's report that day (Corvin): "wait
+# till tomarrow" was read `wait, time: till tomarrow`, nothing in code could turn the words
+# into a clock time (`timewords.minutes_until` has no "tomorrow", and a misspelling defeats
+# any table), the plan wrote `advance_time 1 day`, and the party woke at ten at night of
+# the next day. Not one more regex: the reader already reads the words, misspellings and
+# all, so it names the time of day; code turns the name into minutes against the clock
+# (`until_minutes`). "Tomorrow" and "the next day" are the next morning (the owner's
+# ruling, the same day). `an hour named` hands the time slot's own words to the
+# numbers table ("until ten at night"); `a while` is a length, which stays the plan's;
+# `none` says no time at all.
+UNTILS = ("none", "a while", "dawn", "morning", "noon", "dusk", "midnight", "an hour named")
+DAY_PARTS = frozenset({"dawn", "morning", "noon", "dusk", "midnight"})
 # `exert` since 2026-10-16. The owner: "my wife was playing and a man needed help with his
 # cart. When she helped him the game narrated that i lifted his cart but never gave a
 # strength check." Probed the same day (gemma-4-12B heretic): "I help the man lift his
@@ -167,6 +223,9 @@ ACTING = frozenset({"done", "tried"})
 MEANS = ("ordinary", "power", "beyond")
 
 
+UNTIL_ACTS = frozenset({"wait", "rest"})
+
+
 def acting(a: dict) -> bool:
     """Whether this action of a reading is done or attempted now — the ones the engine
     acts on. A reading from before commitment existed has none, and is `done`."""
@@ -213,6 +272,12 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     # What is made or worked (the thing named: "a dagger", "this hide"), and where. Which
     # craft and how fine are the closed `craft` and `work`, written after (`per_act_schema`).
     "craft": ("object", "place"),
+    # Who is paid to do the work, and the thing it is done to or makes.
+    "commission": ("target", "object"),
+    # Whose hold is broken ("the grub's grip"); HOW is the closed `way` (`ESCAPE_WAYS`).
+    "escape": ("target",),
+    # Whose body is searched; what creature is cut up, and which part when one is named.
+    "loot": ("target",), "harvest": ("target", "object"),
     "other": ("target", "object", "place"),
 }
 
@@ -238,16 +303,27 @@ buy       buy, order, shop for, pay for goods, take goods and pay the seller for
           the object is the goods
 sell      sell, offer for sale, agree a sale, accept a price, close a deal
 give      hand over, pay a debt or a fee, buy somebody a drink
-take      pick up, loot, take, tip or count out of a container; the target is the
+take      pick up, take, tip or count out of a container; the target is the
           person or the container it comes out of
 drop      put down, set down, drop or leave a thing behind
 steal     pick a pocket, steal, filch
-attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish somebody
+loot      loot, strip, search or go through the body or belongings of somebody or some
+          creature that is down or dead; the target is whose body
+harvest   skin, butcher, gut, or cut a hide, horns, teeth, venom or other parts off a dead
+          creature; the target is the creature, the object the part
+attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish somebody.
+          `blow` is finishing when the words kill somebody who is down, dying, bound or
+          helpless — finish off, slit a throat, put out of its misery, the killing stroke
+          — else ordinary
 cast      cast a named spell
 use       draw a weapon, put on, show, use, bandage, light
 consume   eat or drink
 wait      wait, sit, stand, stay, keep watch, pass time
 rest      sleep, lie down, make camp, rest, take a room
+          (wait and rest: `until` is the time of day it lasts until — tomorrow or the next
+          day is morning; first light or sunrise is dawn; dark or nightfall is dusk; a
+          clock hour said ("ten at night") is an hour named; a length ("for an hour",
+          "two days") is a while; none when no time is said)
 rise      get up, wake, break camp, pack up: the end of a rest
 call_on   go to somebody's house, knock at their door, visit them at home
 break_in  kick in, force or pick the lock of a door
@@ -258,7 +334,8 @@ athletics climb, swim, jump
 exert     lift, push, pull, heave, drag, hold up or shift something heavy by main
           strength, alone or with somebody; the target is whoever you help with it
 gather   forage, gather, fill waterskins
-follow    follow somebody or a trail
+follow    follow somebody or a trail; go along with, come quietly with or give yourself
+          up to whoever is taking you somewhere (going quietly is never stealth)
 claim     assert who or what you are
 craft     make or work something yourself at a trade: forge, smith, hammer out or
           assemble metal work; tan, cure or stitch leather; brew, mix or bottle alchemy;
@@ -266,7 +343,13 @@ craft     make or work something yourself at a trade: forge, smith, hammer out o
           made or worked. `craft` is which trade: blacksmith, leatherworker, alchemist,
           herbalist or enchanter. `work` is plain for the ordinary thing, or finer when
           the words ask for more: a special metal or hide, masterwork, a finish, an
-          enchantment. Asking somebody else to make it is talk or buy, never craft
+          enchantment. Paying somebody else to make it is commission, never craft
+commission pay or offer to pay somebody to make, fit, finish, mend or put together
+          something for you, from your own things; the target is who does the work, the
+          object the thing worked on or made
+escape    break free of a grapple, a hold, a grip or a pin; wriggle, twist or force your
+          way out of somebody's hands. `way` is force (overpower the hold), slip (wriggle
+          out, Escape Artist), or either when the words say neither
 other     anything else
 
 Each action also says by what MEANS it is done:
@@ -300,7 +383,7 @@ _DEMOS = [
     ("I sit on the steps until noon.",
      {"question": False, "claims": [], "actions": [
          {"span": "sit on the steps until noon", "place": "the steps", "time": "until noon",
-          "act": "wait"}]}),
+          "until": "noon", "act": "wait"}]}),
     ("I ask him his name.",
      {"question": False, "claims": [], "actions": [
          {"span": "ask him his name", "target": "him", "says": "his name", "act": "talk"}]}),
@@ -345,7 +428,8 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "find somewhere dry to shelter", "object": "somewhere dry to shelter",
           "act": "search"},
-         {"span": "sleep until first light", "time": "until first light", "act": "rest"}]}),
+         {"span": "sleep until first light", "time": "until first light", "until": "dawn",
+          "act": "rest"}]}),
     ("I go round to the cooper's house.",
      {"question": False, "claims": [], "actions": [
          {"span": "go round to the cooper's house", "target": "the cooper",
@@ -369,6 +453,23 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "tell the crowd the reeve is a thief and a liar", "target": "the crowd",
           "says": "the reeve is a thief and a liar", "act": "insult"}]}),
+    # An oath, a denial or a protest is said aloud, so it is talk — its words in `says` —
+    # never a claim, whatever they say happened (round 2, 2026-11-05). Measured on the
+    # rerun of the 44 lines: "I swear I never touched her", at the trial, came back
+    # `claims: ["I never touched her"]` with no deed on 7 of 7 runs and 6 of 6 probes, and
+    # the means gate refused the turn as a declaration ("saying so does not make it so").
+    # Before 8c6cf4e8 it came back the `claim` act, which owes no op and narrated by luck;
+    # "I insist …", "I deny everything" and "I swear on my mother's grave …" still did
+    # (0 of 24 probes read as talk). Neither line below is a probe or a labelled line.
+    ("I swear by the old gods the ox was dead when I found it.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "swear by the old gods the ox was dead when I found it",
+          "says": "the ox was dead when I found it", "act": "talk"}]}),
+    ("I protest to the sergeant that the purse was mine all along.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "protest to the sergeant that the purse was mine all along",
+          "target": "the sergeant", "says": "the purse was mine all along",
+          "act": "talk"}]}),
     ("I head for the cooper to ask about barrels.",
      {"question": False, "claims": [], "actions": [
          {"span": "head for the cooper", "target": "the cooper", "act": "seek"},
@@ -398,7 +499,18 @@ _DEMOS = [
     ("I sit on the bench for an hour.",
      {"question": False, "claims": [], "actions": [
          {"span": "sit on the bench for an hour", "place": "the bench", "time": "for an hour",
-          "act": "wait"}]}),
+          "until": "a while", "act": "wait"}]}),
+    # Going on, with nowhere named, is a walk all the same (owner report 2026-11-01,
+    # Corvin, turn 14: "keep going" came back with no action at all, so the walk a crowd
+    # had cut short could not be carried on — `acts_to_ops._carry_on`).
+    ("I keep going.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "keep going", "act": "go"}]}),
+    # "Tomorrow" is the next morning (`UNTILS`, the owner's ruling 2026-11-01).
+    ("I wait by the fountain till tomorrow.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "wait by the fountain till tomorrow", "place": "the fountain",
+          "time": "till tomorrow", "until": "morning", "act": "wait"}]}),
     ("I buy the old soldier a pint.",
      {"question": False, "claims": [], "actions": [
          {"span": "buy the old soldier a pint", "target": "the old soldier",
@@ -660,6 +772,36 @@ _DEMOS = [
          {"span": "forge a masterwork warhammer of adamantine",
           "object": "a masterwork warhammer of adamantine", "craft": "blacksmith",
           "work": "finer", "act": "craft"}]}),
+    # Searching a body and cutting up a carcass (2026-11-01, `loot` and `harvest`): never
+    # a take of the thing "body", and never a craft at a bench. A blow before either is its
+    # own deed, and the loot's target is whose body even when the words say "her body".
+    # None of these is a probe or a labelled line.
+    ("I finish off the jackal and go through its pack.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "finish off the jackal", "target": "the jackal", "blow": "finishing",
+          "act": "attack"},
+         {"span": "go through its pack", "target": "its pack", "act": "loot"}]}),
+    # The killing stroke and an ordinary blow meant to kill (2026-11-04, `blow`): finishing
+    # is the stroke at somebody who cannot fight back, never the wish to kill a foe who
+    # can. Neither is a probe or a labelled line.
+    ("I kneel and slit the bound smuggler's throat.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "kneel and slit the bound smuggler's throat",
+          "target": "the bound smuggler", "blow": "finishing", "act": "attack"}]}),
+    ("I swing my axe to kill the charging boar.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "swing my axe to kill the charging boar", "target": "the charging boar",
+          "object": "my axe", "blow": "ordinary", "act": "attack"}]}),
+    ("I strip the drowned sailor's corpse.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "strip the drowned sailor's corpse",
+          "target": "the drowned sailor's corpse", "act": "loot"}]}),
+    ("I skin the dead boar and cut out its tusks.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "skin the dead boar", "target": "the dead boar", "object": "the dead boar",
+          "act": "harvest"},
+         {"span": "cut out its tusks", "target": "its", "object": "its tusks",
+          "act": "harvest"}]}),
     # Hiding (2026-10-30): the pace and the diversion, closed. A careful creep, a hurried
     # dash still hidden, and a trick that pulls the eyes away first. None is a probe or a
     # labelled line.
@@ -677,6 +819,33 @@ _DEMOS = [
           "act": "talk"},
          {"span": "while they turn I duck behind the cart", "place": "the cart",
           "pace": "careful", "diversion": "bluff", "act": "stealth"}]}),
+    # Going quietly is giving yourself up (live 2026-11-01, the integration build's arrest):
+    # "I sigh and go quietly with them" was read as stealth, rolled against the stallholder
+    # and left the prisoner hidden between his two guards, 200 XP the richer.
+    ("I hold out my hands and come quietly with the watchmen.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "hold out my hands", "act": "other"},
+         {"span": "come quietly with the watchmen", "target": "the watchmen",
+          "act": "follow"}]}),
+    # Paying somebody to do the work (owner report 2026-11-01, Corvin, turn 22).
+    ("Can you fit a haft to this axe head for me? I'll pay you two silver.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "fit a haft to this axe head for me", "object": "this axe head",
+          "act": "commission"}]}),
+    # Breaking a hold (2026-11-01): the way, closed. None is a probe or a labelled line.
+    ("I twist out of the bandit's grip and step back.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "twist out of the bandit's grip", "target": "the bandit",
+          "way": "slip", "act": "escape"},
+         {"span": "step back", "act": "go"}]}),
+    ("I wrench myself free of the ogre's hold.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "wrench myself free of the ogre's hold", "target": "the ogre",
+          "way": "force", "act": "escape"}]}),
+    ("I try to get loose.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "try to get loose", "commit": "tried", "way": "either",
+          "act": "escape"}]}),
     ("I walk over to the tannery and look at the drying hides.",
      {"question": False, "claims": [], "actions": [
          {"span": "walk over to the tannery", "place": "the tannery", "act": "go"},
@@ -752,6 +921,15 @@ def per_act_schema() -> dict:
                  **({"pace": {"type": "string", "enum": list(PACES)},
                      "diversion": {"type": "string", "enum": list(DIVERSIONS)}}
                     if act == "stealth" else {}),
+                 # Until what time of day (`UNTILS`), after the time slot's own words.
+                 **({"until": {"type": "string", "enum": list(UNTILS)}}
+                    if act in UNTIL_ACTS else {}),
+                 # How a grapple is broken (`ESCAPE_WAYS`), after the words, as `pace`.
+                 **({"way": {"type": "string", "enum": list(ESCAPE_WAYS)}}
+                    if act == "escape" else {}),
+                 # Whether a blow is the killing stroke (`BLOWS`), after the words.
+                 **({"blow": {"type": "string", "enum": list(BLOWS)}}
+                    if act == "attack" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -789,7 +967,13 @@ def _demo_reply(frame: dict) -> str:
                         if a["act"] == "craft" else {}),
                      **({"pace": a.get("pace") or PACES[0],
                          "diversion": a.get("diversion") or DIVERSIONS[0]}
-                        if a["act"] == "stealth" else {}), **means})
+                        if a["act"] == "stealth" else {}),
+                     **({"until": a.get("until") or UNTILS[0]}
+                        if a["act"] in UNTIL_ACTS else {}),
+                     **({"way": a.get("way") or ESCAPE_WAYS[0]}
+                        if a["act"] == "escape" else {}),
+                     **({"blow": a.get("blow") or BLOWS[0]}
+                        if a["act"] == "attack" else {}), **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -909,6 +1093,25 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             div = str(a.get("diversion") or "").strip().lower()
             if div in DIVERSIONS and div != DIVERSIONS[0]:
                 kept["diversion"] = div
+        if kept["act"] in UNTIL_ACTS:
+            # The enum's or nothing, kept only when it names something (`UNTILS`). Outside
+            # it (a hosted provider, a remembered frame) the time slot's words are read
+            # by the numbers table as they always were (`until_minutes`).
+            until = str(a.get("until") or "").strip().lower()
+            if until in UNTILS and until != UNTILS[0]:
+                kept["until"] = until
+        if kept["act"] == "escape":
+            # The way is the enum's or "either": the engine then rolls the better of the
+            # two (`Engine._escape_from`). Kept only when it says something.
+            way = str(a.get("way") or "").strip().lower()
+            if way in ESCAPE_WAYS and way != ESCAPE_WAYS[0]:
+                kept["way"] = way
+        if kept["act"] == "attack":
+            # The enum's or ordinary: outside it (a hosted provider, a remembered frame)
+            # the blow is the one the turn always built. Kept only when it is finishing.
+            blow = str(a.get("blow") or "").strip().lower()
+            if blow in BLOWS and blow != BLOWS[0]:
+                kept["blow"] = blow
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is
@@ -1653,7 +1856,7 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             add("journey")
         elif act in ("call_on", "break_in", "rest"):
             add(act)
-        elif act == "wait" and a.get("time"):
+        elif act == "wait" and (a.get("time") or a.get("until") in DAY_PARTS):
             add("advance_time")
         elif act == "insult":
             add("provoke")
@@ -1670,6 +1873,32 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             if person is not None and not getattr(person, "is_pc", False):
                 a["here"] = ref
     return ops
+
+
+def until_words(action: dict | None) -> str:
+    """The words a wait or a sleep runs until, for the clock's numbers table
+    (`timewords.minutes_until`): "until morning" when the reader named a time of day
+    (`UNTILS`), the time slot's own words when it named an hour or nothing (an old frame),
+    and "" for a length or no time at all. Structure only — the reader's enum and slot."""
+    if not isinstance(action, dict):
+        return ""
+    until = str(action.get("until") or "")
+    if until in DAY_PARTS:
+        return f"until {until}"
+    if until in ("a while", "none"):
+        return ""
+    return str(action.get("time") or "").strip()
+
+
+def until_minutes(action: dict | None, clock: int) -> int | None:
+    """Minutes from `clock` to the time a wait or a sleep runs until, or None when the
+    reading names no time of day (`until_words`). Read against the clock by the one table
+    the sleep door reads (`timewords.minutes_until`), so "till tomorrow" waits to the next
+    morning — not a day of twenty-four hours."""
+    from rules import timewords
+
+    words = until_words(action)
+    return timewords.minutes_until(words, clock) if words else None
 
 
 def spell_named(scene, words) -> object | None:
@@ -1901,7 +2130,7 @@ _OP_NEEDS = {
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
     "gather": {"gather"},
-    "loot": {"take", "steal"}, "cast": {"cast"},
+    "loot": {"take", "steal", "loot"}, "cast": {"cast"},
     "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},
     "taste": {"consume", "use"},
 }
@@ -1926,7 +2155,14 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     elsewhere = {a.get("act") for a in actions
                  if not (a.get("act") in ("seek", "go") and a.get("here"))}
     kept, dropped = [], []
+    # A body searched and nothing else (`acts_to_ops.body_search_only`): the check the
+    # check detector reads off "search" is not the player's — the loot is the search, and
+    # rolls nothing (the narration diagnosis bench, 2026-11-04).
+    looting_only = "loot" in acts and not acts & {"gather", "search", "look", "track"}
     for op in ops:
+        if op == "check" and looting_only:
+            dropped.append(op)
+            continue
         need = _OP_NEEDS.get(op)
         have = elsewhere if op == "travel" else acts
         (kept if need is None or have & need else dropped).append(op)
@@ -1937,7 +2173,8 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
 # doors that judge a give to the player: `drop_unread_gifts` and the act→op table's
 # overrule (`acts_to_ops.apply`; until 2026-10-03 the other door was the retired
 # `judgement.inject_goods`).
-GETTING_ACTS = frozenset({"give", "take", "buy", "steal", "gather", "sell"})
+GETTING_ACTS = frozenset({"give", "take", "buy", "steal", "gather", "sell", "loot",
+                          "harvest"})
 
 
 def gets_nothing(frame: dict | None) -> bool:
@@ -1989,6 +2226,61 @@ def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
             continue
         kept.append(r)
     return kept, dropped
+
+
+_SPEECH_ACTS = frozenset({"talk", "insult", "request"})
+
+
+def words_said(frame: dict | None, sentence: str) -> str:
+    """The whole of what the player's character says now, as words of the sentence: the
+    first speech act done or tried with words (`says`), run on through the speech acts
+    whose spans follow it in the sentence with nothing between but a comma or space, to
+    nobody else — reported speech from the first one's verb, a quotation as quoted, to
+    the end of the last.
+
+    Round 2, 2026-11-05: "I invite the innkeeper up to my room to share my bed tonight" was
+    read as a talk saying "up to my room" and an intended talk "to share my bed tonight",
+    and only "up to my room" reached the say (7 of 7 runs). The say slot then told the
+    invitation as asking for a room ("You turn to the gnome and ask for a room for the
+    night"), the deed backstop put the line on the page as well, and the invitation was
+    told twice. Spans and their places in the sentence, read in code; no English is read.
+    "" when nothing is said."""
+    if not isinstance(frame, dict) or not sentence:
+        return ""
+    acts = [a for a in frame.get("actions") or [] if isinstance(a, dict)]
+    low = str(sentence)
+    for i, a in enumerate(acts):
+        says = str(a.get("says") or "").strip()
+        if a.get("act") not in _SPEECH_ACTS or not acting(a) or not says:
+            continue
+        span = str(a.get("span") or "")
+        at = low.find(span) if span else -1
+        start = low.find(says, at if at >= 0 else 0)
+        if at < 0 or start < 0:
+            return says
+        end, who = at + len(span), a.get("target")
+        for b in acts[i + 1:]:
+            nxt = str(b.get("span") or "")
+            if b.get("act") not in _SPEECH_ACTS or not nxt:
+                break
+            if b.get("target") and who and b.get("target") != who:
+                break
+            k = low.find(nxt, end)
+            if k < 0 or low[end:k].strip(" ,") != "":
+                break
+            end = k + len(nxt)
+        # Reported speech is said whole, from its own verb: the live bench of round 2
+        # carried "up to my room to share my bed tonight" (read as one talk, or run on from
+        # two), and the say slot wrote "you request a room to share your bed" on 5 of 5
+        # runs — without "invite" the words read as a room asked for. The verb is the
+        # player's own word for what the speaking does (invite, swear, beg). Quoted words
+        # are the quotation alone, as typed.
+        from . import speech
+
+        if any(qa <= start < qb for qa, qb in speech.spans(low)):
+            return says
+        return " ".join(low[at:end].split()).strip(" ,")
+    return ""
 
 
 def brief_lines(frame: dict | None) -> str:

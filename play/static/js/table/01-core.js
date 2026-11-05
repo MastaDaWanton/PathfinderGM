@@ -79,9 +79,13 @@ document.addEventListener("click", async e => {
   if (!e.target.closest("#levelup")) return;
   e.target.closest("#levelup").disabled = true;
   try {
+    // The favoured class bonus chosen beside the button (CRB p.31); hit point if none.
+    const fav = document.querySelector('input[name="lvfavoured"]:checked');
     const r = await fetch("/api/level-up", {
       method: "POST", headers: {"X-CSRFToken":
-        document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""}});
+        document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+        "Content-Type": "application/json"},
+      body: JSON.stringify({ favoured: fav ? fav.value : "hp" })});
     // The level moved the game's revision; without noting it, the very next write from
     // this page — choosing the feat the level owed — was refused as "another device
     // moved the game on" (measured live 2026-10-04).
@@ -90,18 +94,25 @@ document.addEventListener("click", async e => {
     if (!r.ok) { $("#levelerr").textContent = d.error || "could not level"; return; }
     // Shown before the sheet redraws, so the number arrives as a die landing rather than
     // as a figure that was already on the sheet by the time anybody looked.
-    if (d.rolled != null) {
+    // The level's record is `levelled` on the reply (play/views.py `level_up`); this read
+    // the reply's top level, where `rolled` never is, so the die never landed at all.
+    const L = d.levelled || d;
+    if (L.rolled != null) {
+      // Every Hit Die of the level (Blood Bending two, a homebrew class four): one die
+      // drawn over the whole range, each face named in the terms with Constitution on it.
+      const n = L.die_count || 1, s = L.die_sides || L.hit_die || 8;
       await Dice3D.land({
         title: "Hit points",
-        why: `${d.name || "You"} reaches level ${d.level}`,
-        sides: d.hit_die || 8,
-        result: d.rolled,
+        why: `${L.name || "You"} reach level ${L.level}`,
+        sides: s, lo: n, hi: n * s,
+        result: L.rolled,
         terms: [
-          { label: `d${d.hit_die || 8}`, value: d.rolled },
-          ...(d.con ? [{ label: "Constitution", value: sign(d.con) }] : []),
-          { label: "hit points gained", value: d.hp, total: true },
+          ...(L.faces || [L.rolled]).map((f, i) => ({ label: `d${s}${n > 1 ? " #" + (i + 1) : ""}`, value: f })),
+          ...(L.con ? [{ label: `Constitution${n > 1 ? " × " + n : ""}`, value: sign(L.con * n) }] : []),
+          ...(L.favoured === "hp" ? [{ label: "favoured class", value: "+1" }] : []),
+          { label: "hit points gained", value: L.hp, total: true },
         ],
-        note: `${d.hp_max != null ? "Now " + d.hp_max + " at full." : ""}`,
+        note: `${L.hp_max != null ? "Now " + L.hp_max + " at full." : ""}`,
       });
     }
     render(d);

@@ -354,6 +354,27 @@ def test_a_reaction_and_a_coup_de_grace_never_walk():
         assert engine._closing_step(intent, pc, thug, "unarmed") is None
 
 
+def test_out_of_a_fight_a_coup_de_grace_walks_up_to_the_body_first():
+    """Out of a fight no time is short, and the act table makes a blow at somebody down a
+    coup de grâce there (`acts_to_ops.victims`). Measured on the narration diagnosis bench
+    (2026-11-04): "I finish off the dying bandit with my longsword", the bandit 15 ft off,
+    came back 422 — "… the bandit is 15 ft away; a melee attack needs them within reach.
+    Click square 7,8 …" — and the whole turn was lost. Now the step is walked, then the
+    blow; in a fight the coup de grâce still never walks (the test above)."""
+    scene, engine = _fight()
+    thug = scene.get("c1")
+    thug.hp = -2
+    thug.add_condition("dying")
+    engine.run(engine.validate([{"op": "end_encounter", "because": "test"}]))
+    assert not scene.in_encounter and scene.has_grid
+    res = _finish(engine, engine.run(engine.validate(
+        [_attack({"coup_de_grace": True})], origin="author:test")))
+    assert [(o.op, o.status) for o in res.outcomes] == [("move", "resolved"),
+                                                         ("attack", "resolved")]
+    assert scene.positions["pc"] == (6, 10)
+    assert "coup de gr" in res.outcomes[1].tell and thug.has_state("state.down.dead")
+
+
 def test_a_pick_up_spends_the_move_so_a_rearmed_swing_out_of_reach_closes_instead():
     """Picking a weapon up is a move action (Table 7-2), and it is a `give`, not a walk,
     so the engine's `move_spent` cannot see it. Without the rearm settling it, a disarmed

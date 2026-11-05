@@ -204,21 +204,32 @@ def test_an_allys_turn_reaches_the_model_as_not_at_you_on_both_narrators(monkeyp
         s, engine, sword, keeper = _scene()
         gm = agent_mod.GMAgent(_World(), engine)
         calls = []
+        prose = ("The hired sword swings the halberd at Toll-Keeper, who steps back from "
+                 "it.")
 
         def chat(messages, model, *a, **kw):
             calls.append(messages)
-            return client.Reply("The hired sword swings the halberd at Toll-Keeper, who "
-                                "steps back from it.", 0.1, model)
+            # The planned narrator's slot asks for JSON; the consequence call for prose.
+            if kw.get("as_json"):
+                return client.Reply(json.dumps({"text": prose}), 0.1, model)
+            return client.Reply(prose, 0.1, model)
 
         monkeypatch.setattr(agent_mod.client, "chat", chat)
         monkeypatch.setattr(houserules, "narration", lambda mode=mode: mode)
         gm.narrate_outcome("", [_sword_miss(sword, keeper)], "the hired sword acts",
                            rewrite=False, acting="the hired sword")
         first = calls[0]
-        assert first[1]["content"] == prompts.CONSEQUENCE_NPC_ASIDE_EXAMPLE["user"], mode
         assert "No blow this turn was aimed at you" in first[-1]["content"], mode
         if mode == "planned":
+            # Since 2026-11-04 a turn in a fight is written the planned way
+            # (`planned.turn_plan`): the slot is shown the turn block and the blow fact,
+            # and no consequence demonstration at all.
             assert "MISS — the hired sword at Toll-Keeper" in first[-1]["content"]
+            assert "WHOSE TURN: The hired sword's" in first[-1]["content"]
+            assert all(m["content"] != prompts.CONSEQUENCE_NPC_ASIDE_EXAMPLE["user"]
+                       for m in first)
+        else:
+            assert first[1]["content"] == prompts.CONSEQUENCE_NPC_ASIDE_EXAMPLE["user"]
 
 
 def test_the_wrong_actor_repair_no_longer_aims_every_act_at_the_player():

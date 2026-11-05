@@ -592,7 +592,7 @@ setting (`narration.intimate`, `judgement.a_child_in`, `views._finish`).
 
 ## The body and the clock (2026-10-05)
 
-Two reports from the owner on the same save (Sammy, a Kasatha, Aurvantis):
+Two reports from the owner on the same save (Ilse, a Kasatha, Aurvantis):
 
 > "prose acts like im okay but im literally starving and days past the last rest. the
 > prose should reflect this."
@@ -785,7 +785,7 @@ the rest. One repair passage repeated the beat's own next clause ("You whistle a
 hangs in the humid air. The tune you whistle hangs in the humid air…") — the reader had
 called "The tune you whistle hangs" not shown; borderline, and not guarded against.
 
-**Live, on a scratch copy of the owner's save** (Sammy in the smithy, the server from this
+**Live, on a scratch copy of the owner's save** (Ilse in the smithy, the server from this
 branch on a scratch data directory):
 1. "I flirt with the smith" — the draft opened "You offer him a playful wink and a charming
    grin, leaning against the heavy workbench…"; read shown; no repair.
@@ -812,7 +812,7 @@ branch on a scratch data directory):
   turn, one closed question (`deed_reader.read_under`) names the first sentence where they
   are up again; one rewrite, then cut from it and an authored line (LRU, marked added).
   Unit-tested on that shape; **not measured on a bench and not seen live** — two attempts
-  to make Sammy fall asleep in the scratch save passed eight hours without a sleep check.
+  to make Ilse fall asleep in the scratch save passed eight hours without a sleep check.
 
 **Not done.**
 - The reader judges deeds; it does not judge the player's words when the player quoted
@@ -951,8 +951,8 @@ and none was a misgendering.
 - 11 were the ±90-character window cutting a word at its edge: the window string was
   tokenised, so "the competing cries" read as "he competing", "The ground here" as "The
   ground he" — on a she/her character's opening line, in eight different saves.
-- 1 was an intimate scene: five she/her, every one the partner's, around her "I want more,
-  Sam" and "Sam…".
+- 1 was an intimate scene: five she/her, every one the partner's, around two lines of hers
+  that said the player's name aloud.
 
 Fixed in the finder (`narration.misgendered_tokens`): tokens are the page's own words that
 fall inside the window, and a narration pronoun is not held to a name only said aloud (the
@@ -971,8 +971,9 @@ part-of-speech tags (Lu et al. 2018, arXiv 1807.11714; Maudslay et al. 2019, arX
   repaired. The word hidden, yes/no: 8/22; name-or-somebody-else: 14/22; hidden and the
   person copied: 12/22. The word in its they-form, the person copied and compared with the
   name in code: 20/22 (the misses: "watches the boy run off, and «they» does not look
-  back", which reads either way). The intimate partner's vocative ("'Sam…' «they» cries
-  out") was copied as "Sam" by every wording — why the narration/speech rule above exists;
+  back", which reads either way). The intimate partner's vocative (the player's name said
+  aloud, then «they») was copied as the name by every wording — why the narration/speech
+  rule above exists;
 - what follows "his"/"her": "followed by a thing it owns, or stands on its own?" 6/12;
   "what comes right after it — a thing it owns ('his sword', 'his face'), or not?" 12/12;
 - end to end on eight made cases x2: every swap right ("It's her!", "I'd know her face",

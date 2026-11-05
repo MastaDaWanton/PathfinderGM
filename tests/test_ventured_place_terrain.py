@@ -1,6 +1,6 @@
 """A place made in play stands on its own ground.
 
-The owner, 2026-10-05: "on a mountain still considered farmland". On the save `sammy`,
+The owner, 2026-10-05: "on a mountain still considered farmland". On the save `ilse`,
 "i go up the mountain" from the road to Grotburrow planned `found kind="mountain"` (refused:
 no such kind of place), then `found name="the mountain"` with no kind, then `travel`.
 `places.mint` gave the child its parent's ground, so the id read

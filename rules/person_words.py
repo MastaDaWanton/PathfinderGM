@@ -264,7 +264,7 @@ def settle_people(scene, world, actor, *, words: str = "", template: str = "",
     person (`population.embody`, behind introduce, the finder and the speaker made real)
     and the named spawn (`honour_spawn`). Returns the people id, or "".
 
-    Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Sam's save were
+    Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Dace's save were
     `race: "human"` — the `Actor` default — with a Ratfolk face and no `world_people_id`,
     because `names.appearance_for` chose the people and only its text was kept. Which
     people, in order:
@@ -358,7 +358,7 @@ def heal_ref_names(scene) -> list[tuple[str, str, str]]:
     """On load: a person an older build NAMED with a ref gets a descriptor back. Returns
     [(ref, old name, new name)].
 
-    Measured on Sam's save (2026-09-30, item 7): `introduce {who: "c8"}` minted c9 named
+    Measured on Dace's save (2026-09-30, item 7): `introduce {who: "c8"}` minted c9 named
     "c8", and the Here list printed "c8" as a person — a ref on the page, which the owner
     ruled the player never sees (2026-09-28). `Engine._op_introduce` stops new ones; this
     repairs the ones already saved. The descriptor, first that holds:
@@ -508,7 +508,7 @@ def record_peoples(scene, world) -> list[str]:
 
     The face is the evidence and nothing is redrawn: "Ratfolk: Small, rodent-featured…"
     is what the player was shown, so the person IS Ratfolk and the record now says so.
-    Measured on Sam's save (2026-09-30): 8 of 8 NPCs carried such a face and no
+    Measured on Dace's save (2026-09-30): 8 of 8 NPCs carried such a face and no
     `world_people_id`; the construct (the Clockwork Spy) has no face and gets nothing."""
     if world is None:
         return []

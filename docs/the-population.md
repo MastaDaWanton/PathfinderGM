@@ -729,7 +729,7 @@ the plan makes them actors"): "show described people in the scene. if i can see 
 should be in the scene as a fully made person ready to be interacted with and saved if not
 already existing."
 
-**Measured on the owner's save (Sam, 2026-10-01):**
+**Measured on the owner's save (Dace, 2026-10-01):**
 
 1. Gorm told the player a human woman lives in "the house three streets over". She was
    recorded twice in one beat (p16 from the narration's report, p17 heard from Gorm), and

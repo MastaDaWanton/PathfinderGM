@@ -239,7 +239,7 @@ def enters_occupied(size: str = "medium") -> bool:
     across — rather than a list of three size words, so the table stays the one source.
 
     Measured 2026-10-01: a Clockwork Spy (Tiny, reach 0) forty feet from the player was
-    refused its slam with "There is no open square in reach of Sam that Clockwork Spy can
+    refused its slam with "There is no open square in reach of Dace that Clockwork Spy can
     get to" — the only square in a reach of 0 is the player's own, and every occupancy
     check in the engine counted it taken.
     """

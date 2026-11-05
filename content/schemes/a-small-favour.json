@@ -96,6 +96,12 @@
             "knows.giver-uneasy"
           ],
           "say": "$giver would not meet your eye when asking, and kept looking toward $lodging"
+        },
+        {
+          "to": "$captain",
+          "tags": [
+            "role.guard.officer"
+          ]
         }
       ],
       "steps": [
@@ -243,6 +249,7 @@
           "id": "guards-arrive",
           "criteria": [
             "at($market)",
+            "taken(errand)",
             "holds(pc, $errand)",
             "not alive($victim)",
             "not has(pc, knows.giver-lied)",
@@ -320,7 +327,8 @@
             "not holds(pc, $errand)",
             "has(pc, knows.news.killed)",
             "not has(pc, knows.betrayed)",
-            "since(killed) >= 1d"
+            "since(killed) >= 1d",
+            "not has(pc, knows.errand-moot)"
           ],
           "action": {
             "do": "resolve",
@@ -332,12 +340,57 @@
               "do": "grant",
               "to": "pc",
               "tags": [
-                "knows.victim-dead"
+                "knows.victim-dead",
+                "knows.errand-moot"
               ]
             }
           ],
           "tell": {
             "perceptible": "Whatever $giver wanted from $wild, nobody at $market is asking for it now."
+          }
+        },
+        {
+          "id": "moot-untaken",
+          "criteria": [
+            "at($market)",
+            "not taken(errand)",
+            "holds(pc, $errand)",
+            "has(pc, knows.news.killed)",
+            "not has(pc, knows.betrayed)",
+            "since(killed) >= 1d",
+            "not has(pc, knows.errand-moot)"
+          ],
+          "action": {
+            "do": "resolve",
+            "card": "errand",
+            "how": "dropped"
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.victim-dead",
+                "knows.errand-moot"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "Whatever $giver wanted from $wild, nobody at $market is asking for it now."
+          }
+        },
+        {
+          "id": "returned",
+          "criteria": [
+            "event:give($giver, $errand)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 3
+          },
+          "tell": {
+            "perceptible": "$giver takes the $errand and puts it away without looking at it."
           }
         }
       ],
@@ -461,7 +514,8 @@
           "to": "pc",
           "tags": [
             "state.wanted.$town"
-          ]
+          ],
+          "charge": "murder"
         }
       ],
       "steps": [
@@ -671,6 +725,31 @@
           "fairness": [
             "knows.betrayed"
           ]
+        },
+        {
+          "id": "released",
+          "criteria": [
+            "not has(pc, state.wanted)",
+            "not has(pc, knows.two-clues)",
+            "not has(pc, knows.fled-town)"
+          ],
+          "fairness": [
+            "knows.betrayed"
+          ],
+          "action": {
+            "do": "resolve",
+            "card": "road",
+            "how": "dropped"
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "released"
+            }
+          ],
+          "tell": {
+            "perceptible": "The watch has no more hold on you in the matter of $victim, though not everyone at $market believes you had no part in it."
+          }
         }
       ],
       "outcomes": {
@@ -727,6 +806,17 @@
               ]
             }
           ]
+        },
+        "released": {
+          "resolve": "clear",
+          "grants": [
+            {
+              "to": "pc",
+              "tags": [
+                "state.suspected.$town"
+              ]
+            }
+          ]
         }
       },
       "on_open": [
@@ -734,6 +824,19 @@
           "do": "move",
           "who": "$witness",
           "to": "$lodging"
+        },
+        {
+          "do": "remove",
+          "who": "$giver",
+          "to": "$giver",
+          "tags": [
+            "state.hidden"
+          ]
+        },
+        {
+          "do": "move",
+          "who": "$giver",
+          "to": "$wild"
         }
       ]
     },

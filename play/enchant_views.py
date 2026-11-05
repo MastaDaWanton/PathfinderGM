@@ -35,6 +35,7 @@ from django.views.decorators.http import require_GET, require_POST
 from rules import crafting, effectspec, sky, survival, worldclass
 from rules import enchanter as en
 
+from . import bench_clock
 from . import campaign as campaign_mod
 from .apiutil import read_body
 
@@ -402,6 +403,11 @@ def enchant_roll(request):
     if plan.need is None:
         return _err(f"No roll can make DC {plan.dc} with +{plan.bonus}: it "
                     f"{plan.impossible}.")
+    # Before the die, the clock: work the pack cannot carry the body
+    # through is refused in words, and nothing has happened (`bench_clock`).
+    said = bench_clock.refusal(c, pc, plan.minutes)
+    if said:
+        return _err(said, 409)
     engine = c.engine()
     label = f"Enchanting: {plan.method.title()}"
     if face is None:
@@ -416,7 +422,7 @@ def enchant_roll(request):
     margin = total - plan.dc
     verdict = en.verdict_of(plan, margin)       # no naturals: a skill check (CRB p.180)
     track, progress = _progress(pc)
-    c.scene.advance(plan.minutes)
+    lived = bench_clock.pass_time(c, engine, pc, plan.minutes, "at the circle")
     roll = {"face": best, "faces": faces, "bonus": plan.bonus, "total": total,
             "dc": plan.dc, "success": verdict == "success", "margin": margin,
             "terms": plan.terms, "dc_terms": plan.dc_terms}
@@ -425,7 +431,7 @@ def enchant_roll(request):
                        "good": verdict == "success",
                        "line": ("It took, but something went wrong in the binding."
                                 if verdict == "flawed" else "")},
-           "lost": [], "minutes": plan.minutes}
+           "lost": [], "minutes": plan.minutes, "lived": lived}
     line = ""
     if verdict in ("success", "flawed"):
         token = secrets.token_urlsafe(16)

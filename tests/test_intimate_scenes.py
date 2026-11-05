@@ -2,8 +2,7 @@
 and the table's own passages as demonstrations — between adults only, enforced in code.
 
 Measured 2026-10-01 on the owner's save: with content on "explicit", the two beats the
-player asked for in so many words — "We go all the way" and "we climax together and then
-clean up and get dressed" — came out metaphorical, and the pipeline had not softened them:
+player asked for in so many words came out metaphorical, and the pipeline had not softened them:
 the model's drafts reached the page unedited but for a recurring-phrase polish. The cause
 was one ~350-character line against the whole briefing — 13,103 characters of turn
 briefing and 13,634 of worked examples written in a restrained register. Instruction
@@ -60,11 +59,13 @@ def data(tmp_path):
 
 
 @pytest.mark.parametrize("line, earlier", [
-    # The owner's two lines, measured: both came back metaphorical at an explicit table.
-    ("We go all the way", [WARM_BEFORE, WARM]),
-    ("we climax together and then clean up and get dressed", [WARM_BEFORE, WARM]),
+    # Stand-ins for the owner's two lines, which both came back metaphorical at an explicit
+    # table: a soft cue in a warm scene, and a strong word with a person in it. The owner's
+    # own words are private and are not kept here (2026-11-05).
+    ("We take it all the way", [WARM_BEFORE, WARM]),
+    ("we climax together and then lie still", [WARM_BEFORE, WARM]),
     # A sexual line with a person in it detects even before the scene is warm.
-    ("we climax together and then clean up and get dressed", [COLD]),
+    ("we climax together and then lie still", [COLD]),
     # Continue keeps the standing action (the 2026-09-18 ruling): in an intimate scene
     # that action is the scene.
     (prompts.CARRY_ON, [WARM_BEFORE, WARM]),
@@ -97,11 +98,11 @@ def test_an_ordinary_beat_is_not(scene, line, earlier, why):
 def test_nobody_to_be_with_and_a_fight_are_not_intimate(scene):
     alone = Scene(location_id="5bbd0c40345f")
     alone.add(load_pc("fixtures/pc-kesst.json"))
-    assert intimate.reads_intimate("We go all the way", [WARM], alone)[0] is False
+    assert intimate.reads_intimate("We take it all the way", [WARM], alone)[0] is False
     scene.initiative = [("pc", 15)]
     scene.turn = 0
     assert scene.in_encounter
-    assert intimate.reads_intimate("We go all the way", [WARM], scene) == (
+    assert intimate.reads_intimate("We take it all the way", [WARM], scene) == (
         False, "a fight is running")
 
 
@@ -132,13 +133,13 @@ def test_the_owners_soft_beats_were_invisible_to_the_old_vocabulary():
 
 def test_fade_is_unchanged_and_reads_nothing(scene, data):
     """"fade" behaves exactly as before: no decision, no file created, the fade line."""
-    d = intimate.decide("We go all the way", [WARM_BEFORE, WARM], scene, content="fade")
+    d = intimate.decide("We take it all the way", [WARM_BEFORE, WARM], scene, content="fade")
     assert (d.mode, d.fired, d.demonstrations) == ("", False, None)
     assert not intimate.demonstrations_path().exists()
 
 
 def test_explicit_and_detected_and_adults_fires(scene, data):
-    d = intimate.decide("We go all the way", [WARM_BEFORE, WARM], scene, content="explicit")
+    d = intimate.decide("We take it all the way", [WARM_BEFORE, WARM], scene, content="explicit")
     assert d.fired and d.mode == "intimate"
     assert d.as_log()["fired"] is True
 
@@ -163,13 +164,13 @@ def test_a_minor_present_never_gets_the_briefing_and_the_scene_fades(scene, data
     seller = instantiate("guildhand", scene=s, name="apple-seller")
     s.add(seller)
     rec["ref"] = seller.ref
-    d = intimate.decide("We go all the way", [WARM_BEFORE, WARM], s, content="explicit")
+    d = intimate.decide("We take it all the way", [WARM_BEFORE, WARM], s, content="explicit")
     assert d.mode == "fade" and not d.fired and d.demonstrations is None
 
 
 @pytest.mark.parametrize("line, earlier", [
-    ("We go all the way, while the boy sleeps in the next room", [WARM_BEFORE, WARM]),
-    ("We go all the way", [WARM_BEFORE, WARM + " A child is singing in the yard."]),
+    ("We take it all the way, while the boy sleeps in the next room", [WARM_BEFORE, WARM]),
+    ("We take it all the way", [WARM_BEFORE, WARM + " A child is singing in the yard."]),
 ])
 def test_a_child_named_in_the_scene_fades_it(scene, data, line, earlier):
     d = intimate.decide(line, earlier, scene, content="explicit")
@@ -194,7 +195,7 @@ DEMOS = [{"player": "I go on with what we are doing.",
 
 def _prose(scene_mode="", demonstrations=None):
     return prompts.call_prose_messages(
-        "BRIEF", [], "We go all the way", ["Nothing mechanical."],
+        "BRIEF", [], "We take it all the way", ["Nothing mechanical."],
         earlier=[WARM], scene_now_block="SCENE-NOW", scene_mode=scene_mode,
         demonstrations=demonstrations)
 
@@ -563,7 +564,7 @@ def test_an_intimate_beat_through_the_view_is_briefed_injected_and_logged(live, 
                           "DEMO-PASSAGE-TWO: another placeholder.\n", encoding="utf-8")
     beat = ("Mira answers you without a word, and the two of you go on. " * 12
             + "What do you do?")
-    r, seen = _say(monkeypatch, beat, "We go all the way")
+    r, seen = _say(monkeypatch, beat, "We take it all the way")
     prose_call = seen[0]
     assert prose_call[0]["content"].startswith(prompts.INTIMATE_BRIEFING)
     assert "DEMO-PASSAGE-ONE" in json.dumps(prose_call)
@@ -597,7 +598,7 @@ def test_the_scenes_own_sentences_survive_the_checks_on_an_intimate_beat(live, m
     """Through the view: on a briefed beat none of the three fight checks fires on the
     scene's own sentences."""
     cm, c = live
-    r, seen = _say(monkeypatch, SCENE_WORDS, "We go all the way")
+    r, seen = _say(monkeypatch, SCENE_WORDS, "We take it all the way")
     row = _prose_row(cm)
     assert row["intimate"]["fired"] is True
     assert _misreads(row["repairs"]) == []
@@ -629,7 +630,7 @@ def test_an_empty_file_is_logged_and_the_briefing_still_fires(live, monkeypatch,
     _no_shipped(monkeypatch, tmp_path)
     cm, c = live
     beat = "Mira answers you without a word, and the two of you go on. " * 12 + "What?"
-    r, seen = _say(monkeypatch, beat, "We go all the way")
+    r, seen = _say(monkeypatch, beat, "We take it all the way")
     assert seen[0][0]["content"].startswith(prompts.INTIMATE_BRIEFING)
     assert any(row.get("kind") == "intimate" and row.get("note") ==
                "no demonstrations on file" for row in cm.current().turn_log)
@@ -644,7 +645,7 @@ def test_the_minors_guard_after_the_prose_still_runs_on_this_path(live, monkeypa
     beat = ("Mira holds you close, and a boy is watching from the doorway. " * 8
             + "What do you do?")
     assert not narration.intimate(beat)
-    r, seen = _say(monkeypatch, beat, "We go all the way")
+    r, seen = _say(monkeypatch, beat, "We take it all the way")
     assert seen[0][0]["content"].startswith(prompts.INTIMATE_BRIEFING)
     shown = next(b for b in reversed(r.json()["transcript"]) if b.get("who") == "gm")
     assert "boy" not in shown["text"]
@@ -656,7 +657,7 @@ def test_the_intimate_prose_call_has_no_ceiling_and_its_own_budget(live, monkeyp
     of 1,100 instead; the ordinary beat keeps the 1,800 clamp and its 1,400."""
     cm, c = live
     beat = SCENE_WORDS
-    _say(monkeypatch, beat, "We go all the way")
+    _say(monkeypatch, beat, "We take it all the way")
     first = _say.kwargs[0]
     assert "maxLength" not in first["schema"]["properties"]["narration"]
     assert first["num_predict"] == prompts.INTIMATE_NUM_PREDICT == 1100
@@ -672,7 +673,7 @@ def test_a_budget_death_on_an_intimate_beat_ships_its_whole_sentences(live, monk
     cm, c = live
     cut = json.dumps({"narration": SCENE_WORDS.replace(" What do you do?", "")})
     cut = cut[:cut.index("Neither of you") + len("Neither of you is in")]
-    r, seen = _say(monkeypatch, SCENE_WORDS, "We go all the way", first_raw=cut)
+    r, seen = _say(monkeypatch, SCENE_WORDS, "We take it all the way", first_raw=cut)
     row = _prose_row(cm)
     assert any("narration salvaged" in a["note"] for a in row["attempts"])
     shown = next(b for b in reversed(r.json()["transcript"]) if b.get("who") == "gm")
@@ -702,7 +703,7 @@ def test_the_narrator_may_speak_for_the_player_on_an_intimate_beat(live, monkeyp
     sentence, which stands on every other beat (`test_the_relaxation_is_the_intimate_
     beats_alone`)."""
     cm, c = live
-    r, seen = _say(monkeypatch, PC_SPEECH, "We go all the way")
+    r, seen = _say(monkeypatch, PC_SPEECH, "We take it all the way")
     shown = next(b for b in reversed(r.json()["transcript"]) if b.get("who") == "gm")
     assert '"Stay with me tonight," you whisper' in shown["text"]
     row = _prose_row(cm)["intimate"]

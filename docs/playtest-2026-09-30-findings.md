@@ -60,7 +60,7 @@ of about 10% brightness.
   stage-9 door).
 
 **Proficiency.**
-- Sam is a wizard, so most "not proficient" labels are right: the shortbow is martial and
+- Dace is a wizard, so most "not proficient" labels are right: the shortbow is martial and
   the bo staff exotic.
 - But ammunition rows are marked exotic. That is an import artefact, and arrows got an
   attack row at "+20".
@@ -96,7 +96,7 @@ a miss has a 50% chance to destroy it; bows draw as a free action.
 5. Stop the weaponsmith selling siege engines and modern explosives? **Recommended: yes.**
 6. Do E1–E5, D and U now, and drop, off hand and encumbrance later? **Recommended: yes.**
 
-**Aside:** Sam's saved scores are Str 30, Dex 58 and Con 30, and a "Power leaf" buff adds
+**Aside:** Dace's saved scores are Str 30, Dex 58 and Con 30, and a "Power leaf" buff adds
 +26 Str and +26 Con. Worth a look apart from item 2.
 
 ## Item 5: Bluff rolled when nobody lied (four times; the owner saw three)
@@ -110,7 +110,7 @@ at DC 30. It was not the model and not a Bluff declarer.
 | 4 | "I **take the herbs**…" | "produce a herbs you do not have" |
 | 5 | "…I'll **take my payment**…" | "produce a payment…" |
 | 12 | "I'm **a bit of a free spirit**" | `_SELF_CLAIM`: an identity claim |
-| 23 | "I **take the key**…" | the same plan also gave Sam the key |
+| 23 | "I **take the key**…" | the same plan also gave Dace the key |
 
 - `_PRODUCE` (about :3070) accepts bare "take", which is acquisition, not production.
 - "hand" and "hands" match with no subject anchor. Replayed: "my hand on the hilt" and
@@ -120,12 +120,12 @@ at DC 30. It was not the model and not a Bluff declarer.
 - The interpreter had already read `act: take`, and nothing passes that reading in.
 
 **Consequence.** `note_heat` marks the crowd as having heard a "delusion", and the prose
-mocked Sam for boasts he never made (beats 18, 25 and 47).
+mocked Dace for boasts he never made (beats 18, 25 and 47).
 
-**DC 30.** A flat heroic DC, not the listener's Sense Motive. With Sam's Bluff +6 it fails
+**DC 30.** A flat heroic DC, not the listener's Sense Motive. With Dace's Bluff +6 it fails
 by construction.
 
-**Regression?** No. The rules date from 2026-09-18 and 2026-09-22; Sam's lines were simply
+**Regression?** No. The rules date from 2026-09-18 and 2026-09-22; Dace's lines were simply
 the first to trip them.
 
 **Fix (S–M, `gm/judgement.py` plus one call site).**
@@ -165,10 +165,10 @@ the first to trip them.
 ## Item 4: suggestions offer abilities the character lacks
 
 **Cause.**
-- The prose call writes the suggestions. The brief *does* list what Sam can cast; the model
+- The prose call writes the suggestions. The brief *does* list what Dace can cast; the model
   ignored it, because instructions lose.
 - No code checks a suggestion against the sheet.
-- A second live instance is in the save now: "…the hilt of my blade", when Sam has no blade.
+- A second live instance is in the save now: "…the hilt of my blade", when Dace has no blade.
 - Clicking "I use a healing spell…" passes every detector silently.
 - Found alongside: "I cast cure light wounds" resolves to **Light**, by a substring match.
 
@@ -188,13 +188,13 @@ remain.
 
 ## Item 13: the key
 
-**No defect as reported.** Gorm produced the key in prose, "I take the key" gave it to Sam
-through `inject_goods`, and Sam holds it.
+**No defect as reported.** Gorm produced the key in prose, "I take the key" gave it to Dace
+through `inject_goods`, and Dace holds it.
 
 **Found on the same path.**
-- The lead coin Sam pocketed at turn 7 was never recorded, because `inject_goods` bows out
+- The lead coin Dace pocketed at turn 7 was never recorded, because `inject_goods` bows out
   when any `give` is present.
-- The herbs "used" at turn 4 are still in Sam's goods, because `use_item` was refused
+- The herbs "used" at turn 4 are still in Dace's goods, because `use_item` was refused
   before the give landed.
 - The owner question (later): should things an NPC produces in prose become props that NPC
   holds, so taking one is a real transfer? **Recommended: yes, later.**
@@ -202,7 +202,7 @@ through `inject_goods`, and Sam holds it.
 ## Aside: the Power leaf
 
 The owner's homebrew Power leaf (+20 Str, +20 Con) landed as **+26** each (`power-leaf.json`).
-Sam's base scores are the owner's own house rules (point buy and caps off), not a cheat.
+Dace's base scores are the owner's own house rules (point buy and caps off), not a cheat.
 
 ## Item 8: the Clockwork Spy
 
@@ -260,7 +260,7 @@ you get once it's gone, or only an obstacle? **Recommended: a booked find.**
 - The reading was "go the back streets / search the Velvet Veil".
 - `travel` to the Veil was refused, with a hint to `found` it first, and the hint omits
   `parent`.
-- The plan founded it with no parent, so it went **off the gate**, where Sam stood (not the
+- The plan founded it with no parent, so it went **off the gate**, where Dace stood (not the
   outskirts), one hop away.
 
 **Causes.**

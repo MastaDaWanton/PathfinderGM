@@ -124,7 +124,7 @@ def far_ground_put_here(ctx, land, sentence: str) -> set[str]:
 
     `present` in `find` counts the far ring as present everywhere outside, so "boulders
     weathered by the desert sun" passed on the mountain off the road to Grotburrow
-    (sammy.json, beat 71, 2026-10-05: the place's own ground is not desert; the desert is
+    (ilse.json, beat 71, 2026-10-05: the place's own ground is not desert; the desert is
     Vormoor's far ring). A desert in the distance is a view; a desert sun on the stones
     beside the path is a place the party is not in. So a far-ring land word counts as here
     unless the sentence looks out at it ("in the distance", "on the horizon", "beyond").

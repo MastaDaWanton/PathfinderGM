@@ -171,6 +171,12 @@ Response:
 - `need` is the d20 face needed. It is `null` with `impossible` filled in when no face can
   succeed (plan §5.3: no automatic natural 20 on bench checks).
 - `by_tier` runs from 0 to the ceiling.
+- `batches` and `batch_capacity` (2026-11-01): Dry is timed by the batch, not the dose. One
+  batch takes 8 hours however many doses it holds, up to `batch_capacity` (6 per Herbalist
+  level, `content/rules/herbal-methods.json`); `batches` is how many loads the doses take,
+  and `minutes` is 480 times that. Both are 0 for a method timed per dose.
+- Work of a day or more that the pack cannot carry the body through adds a sentence to
+  `problems` and sets `can_roll` false (`play/bench_clock.py`); the roll refuses it too.
 
 ### 3.3 `POST /api/bench/roll`
 
@@ -191,7 +197,11 @@ Response:
 - The materials are **reserved** on success and spent at finish.
 - On a failure the book rule applies at once: miss by 4 or less and nothing is lost; miss by
   5 or more and half is ruined, rounded up. `lost` says what.
-- Time passes either way.
+- Time passes either way. `lived` (2026-11-01) is what the body lived through on that clock
+  (meals, thirst, sleep, fatigue) and who came or went, already written to the transcript as
+  one line and taken off the narrator's queue; empty when there is nothing to tell.
+- Work of a day or more that the pack cannot carry the body through is refused with 409
+  and the reason in `error`, before the die, the spend or the clock.
 - `verdict` has the same shape `/api/roll` returns.
 
 ### 3.4 `POST /api/bench/finish`

@@ -402,3 +402,45 @@ def test_the_panel_says_which_square_to_click_and_shows_no_json(panel):
                        {"op": "attack", "target": "c1", "params": {}}])
     assert r.status_code == 200, r.json()
     assert r.json()["awaiting"], "the strike is waiting on the player's own d20"
+
+
+def test_a_move_and_strike_that_cannot_land_is_refused_before_anything_moves(panel):
+    """Measured on the owner's report of 2026-11-01 (Corvin T., the shrine): the panel sent
+    "move to (5,4); strike giant rot grub" with the grub 25 ft from (5,4). Validation skips
+    reach for a list that moves first, so the move walked and the floor refused the blow
+    after it: the move spent, the blow lost, no warning. Now the door measures the blow
+    from the square the move ends on, by the engine's rule, and refuses the pair with
+    nothing done; and the page is sent the squares that do reach (`attacks.reach`)."""
+    client, cm = panel
+    scene = cm.current().scene
+    start = tuple(scene.positions["pc"])
+    foe = tuple(scene.positions["c1"])
+    # A square on the far side of the player from the thug: farther, never in reach.
+    away = [start[0] - (foe[0] - start[0] > 0) * 2 + (foe[0] - start[0] < 0) * 2,
+            start[1] - (foe[1] - start[1] > 0) * 2 + (foe[1] - start[1] < 0) * 2]
+    if not scene.grid.inside(tuple(away)):
+        pytest.skip("the board puts the player at its edge")
+    state = client.get("/api/state").json()
+    reach = state["attacks"]["reach"]
+    assert "c1" in reach and reach["c1"], "squares the strike reaches the thug from"
+    assert away not in reach["c1"]
+    r = _post(client, [{"op": "move", "params": {"zone": "near", "square": away}},
+                       {"op": "attack", "target": "c1", "params": {}}])
+    assert r.status_code == 400, r.json()
+    said = r.json()["error"]
+    assert f"From square {away[0]},{away[1]}" in said and "Nothing was done" in said
+    assert tuple(cm.current().scene.positions["pc"]) == start, "the move never walked"
+    # A square the page was told reaches him is let through.
+    near = reach["c1"][0]
+    r = _post(client, [{"op": "move", "params": {"zone": "near", "square": near}},
+                       {"op": "attack", "target": "c1", "params": {}}])
+    assert r.status_code == 200, r.json()
+
+
+def test_the_plan_warns_before_commit():
+    """The page half: the staged move and strike are looked up in the engine's squares."""
+    from pagesource import table_source
+
+    src = table_source()
+    assert "function strikeOutOfReach()" in src and "attacks) || {}).reach" in src
+    assert 'class="cb-warn"' in src

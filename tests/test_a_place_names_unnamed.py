@@ -1,7 +1,7 @@
 """Item 11 of docs/playtest-2026-09-30.md: "the stranger Veil" and "the Great the stranger".
 
 Measured:
-  * Sam's save (2026-09-30): the Velvet Veil, a place the player founded, was printed
+  * Dace's save (2026-09-30): the Velvet Veil, a place the player founded, was printed
     "the stranger Veil" twice. `_known_names` held the world's entities and none of the
     engine's own places, so "Velvet" read as invented; `unname_strangers`'s place rule
     needed the preposition directly before the name, so "of the Velvet" was no place.

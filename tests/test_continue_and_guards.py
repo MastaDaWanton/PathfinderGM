@@ -11,7 +11,7 @@ polish rewrite replaced the woman's actions with the timberer's mallet; the esca
 guard cut "She doesn't pull away" as an escape, negated, with nobody held; the phrase
 guards fired on "the woman"/"the girl" in a two-person room. "the Reeve's men" became
 "the the stranger men" because the world says "reeve" in lowercase. And the opening fell
-to the template because the model wrote "Maste" for "Masta".
+to the template because the model wrote "Torve" for "Torvo".
 """
 from __future__ import annotations
 
@@ -154,7 +154,7 @@ def test_a_word_the_world_uses_in_lowercase_is_not_a_name_from_nowhere():
 
 
 def test_the_renamer_minds_the_article_already_in_front():
-    known = {"Vormoor", "Masta"}
+    known = {"Vormoor", "Torvo"}
     text = "Someone is making a scene at the gate, and the Reeve's men are trying to contain it."
     assert narration.unname_strangers(text, known)[0] == \
         "Someone is making a scene at the gate, and the men are trying to contain it."
@@ -168,12 +168,12 @@ def test_the_renamer_minds_the_article_already_in_front():
 def test_a_name_one_letter_off_is_the_real_name_before_the_checks_run():
     from play import opening, opening_prose
 
-    draft = "Maste sits on the step in Vormoor and eats. Vormor is loud. What do you do?"
-    fixed, swaps = opening_prose.repair_near_misses(draft, {"Vormoor"}, "Masta", "Vormoor")
-    assert fixed == "Masta sits on the step in Vormoor and eats. Vormoor is loud. What do you do?"
-    assert swaps == ["Maste -> Masta", "Vormor -> Vormoor"]
+    draft = "Torve sits on the step in Vormoor and eats. Vormor is loud. What do you do?"
+    fixed, swaps = opening_prose.repair_near_misses(draft, {"Vormoor"}, "Torvo", "Vormoor")
+    assert fixed == "Torvo sits on the step in Vormoor and eats. Vormoor is loud. What do you do?"
+    assert swaps == ["Torve -> Torvo", "Vormor -> Vormoor"]
     # A genuine invention is left for the checks to catch.
-    assert opening_prose.repair_near_misses("Kaida waits.", {"Vormoor"}, "Masta")[1] == []
+    assert opening_prose.repair_near_misses("Kaida waits.", {"Vormoor"}, "Torvo")[1] == []
     assert opening._clause("A local reeve confirmed by Kragmoor Horde's central authority.") == \
         "a local reeve confirmed by Kragmoor Horde's central authority"
     assert opening._clause("Khy'vyr-centric clans.") == "Khy'vyr-centric clans"

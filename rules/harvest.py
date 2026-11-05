@@ -1066,7 +1066,11 @@ def take(actor, creature, key: str, roll_total: int, *, now: int, scene=None, di
     margin = int(roll_total) - int(row["dc"])
     out = {"ok": margin >= 0, "margin": margin, "stock": [], "carried": [], "grade": None,
            "lost": "", "deed": None, "salt_spent": 0, "yielded": False, "tells": [],
-           "game": None, "key": key, "name": row["name"], "craft": row["craft"]}
+           "game": None, "key": key, "name": row["name"], "craft": row["craft"],
+           # What became of the part, in one closed word, for the tell the engine builds
+           # (`Engine._op_harvest`): "clean", "rough" (kept, cut roughly), "torn" (a hide
+           # kept a grade worse), "part ruined" (a hide kept in part), "ruined" (nothing).
+           "fate": "clean"}
     who = str(getattr(actor, "name", "") or "You")
     body = str(getattr(creature, "name", "") or "the carcass")
     ruin = margin <= -int(r.get("ruin_margin", 5))
@@ -1090,16 +1094,20 @@ def take(actor, creature, key: str, roll_total: int, *, now: int, scene=None, di
                 lost_units = whole // 2
                 q = q - lost_units * 4
                 grade = int(r.get("ruin_grade", 4))
-                out["lost"] = (f"Missed by {-margin}: the knife went through it and "
-                               f"{lw.units_word(lost_units * 4)} of it is ruined.")
+                out["lost"] = (f"Missed by {-margin}: the knife went through the "
+                               f"{row['name'].lower()}, and {lw.units_word(lost_units * 4)} "
+                               f"of it is ruined.")
+                out["fate"] = "part ruined"
             else:
                 q = 0
                 out["lost"] = f"Missed by {-margin}: the {row['name'].lower()} is ruined."
+                out["fate"] = "ruined"
         else:
             grade = graded(grade, margin)
             if margin < 0:
-                out["lost"] = (f"Missed by {-margin}: it comes off torn, a grade worse than "
-                               f"the knife work.")
+                out["lost"] = (f"Missed by {-margin}: the {row['name'].lower()} comes off "
+                               f"torn, a grade worse than the knife work.")
+                out["fate"] = "torn"
             if margin >= 0 and _yield_roll(actor, dice):
                 q = int(q + math.floor(q * float(r.get("yield_bonus", 0.5))))
                 out["yielded"] = True
@@ -1130,6 +1138,7 @@ def take(actor, creature, key: str, roll_total: int, *, now: int, scene=None, di
     else:
         if ruin:
             out["lost"] = f"Missed by {-margin}: the {row['name'].lower()} is ruined."
+            out["fate"] = "ruined"
         else:
             if row["craft"] == HERBALIST:
                 # An animal part's 48-hour clock starts, and salt it through the one reader
@@ -1141,7 +1150,12 @@ def take(actor, creature, key: str, roll_total: int, *, now: int, scene=None, di
                 actor.carry(row["material"], 1)
             out["carried"] = [{"id": row["material"], "name": row["name"], "count": 1}]
             if margin < 0:
-                out["lost"] = f"Missed by {-margin}: it comes away, but not cleanly."
+                # The part named, never "it": "Missed by 1: it comes away, but not cleanly"
+                # after a pelt and a sinew was told as the leather torn (the 2026-11-05
+                # rerun, "leaving the leather roughly separated from the meat").
+                out["lost"] = (f"Missed by {-margin}: the {row['name'].lower()} comes away, "
+                               f"but not cleanly.")
+                out["fate"] = "rough"
     out["tells"] = [_tell(who, body, row, out)]
     return out
 
@@ -1297,7 +1311,60 @@ def _expose_poison(engine, actor, creature, origin: str, dice) -> dict:
             "tells": [lead] + [o.tell for o in outcomes if getattr(o, "tell", "")]}
 
 
-__all__ = ["DANGER_KINDS", "GENERIC", "PLANS", "SURFACES", "banned", "block_of",
+def take_part(engine, actor, creature, key: str, *, now: int, face: int | None = None,
+              danger_faces: dict | None = None) -> dict:
+    """One part off a carcass, the whole of it: the dangerous body's second rounds at the
+    first cut (`face_danger`), the part's own roll (`take`), the minutes on the clock, and
+    the mastery (`worldclass.award_step`). The one sitting the harvest sheet's Take button
+    (play/harvest_views.py) and a typed "I skin it" (`Engine._op_harvest`) both run, so the
+    two doors cannot drift. A face not given is the engine's d20, shown to the player.
+
+    Returns {"row", "face", "total", "got" (`take`'s answer), "dangers": [...], "award"}.
+    Raises KeyError for a part this carcass has not, ValueError for one already taken."""
+    from . import worldclass
+
+    every = {p["key"]: p for p in parts(creature, actor, now=now, every_craft=True)}
+    row = every.get(key)
+    if row is None:
+        raise KeyError(f"no part {key!r} on this carcass")
+    if row["taken"] is not None:
+        raise ValueError(f"the {row['name']} has already been taken")
+    given = danger_faces or {}
+    dangers_out: list[dict] = []
+    first = not any(not k.startswith("danger:") for k in (creature.harvested or {}))
+    if first:
+        for rnd in danger_rounds(creature):
+            if rnd["faced"]:
+                continue
+            dface = given.get(rnd["kind"])
+            if dface is None:
+                dface = engine.dice.d20(label=f"Harvest: {rnd['words']}",
+                                        visibility="player").faces[0]
+            dtotal = int(dface) + row["bonus"]
+            got = face_danger(engine, actor, creature, rnd["kind"], dtotal, now=now,
+                              dice=engine.dice)
+            dangers_out.append({"kind": rnd["kind"], "words": rnd["words"], "dc": got["dc"],
+                                "face": int(dface), "total": dtotal,
+                                "margin": got["margin"], "exposed": got["exposed"],
+                                "doses": got.get("doses", 0),
+                                "save_dc": got.get("save_dc"), "tells": got["tells"]})
+    if face is None:
+        face = engine.dice.d20(label=f"Harvest: {row['name']}", visibility="player").faces[0]
+    total = int(face) + row["bonus"]
+    got = take(actor, creature, key, total, now=now, scene=engine.scene, dice=engine.dice)
+    engine.scene.advance(row["minutes"])
+    track = worldclass.get(row["craft"])
+    progress = actor.track(row["craft"])
+    award = worldclass.award_step(track, progress, method="harvest",
+                                  ingredient_id=row["material"],
+                                  rarity_rank=worldclass.tier_rank(row["tier"]),
+                                  quality_index=0, success=bool(got["ok"]), name=row["name"],
+                                  count=1, noun="part")
+    return {"row": row, "face": int(face), "total": total, "got": got,
+            "dangers": dangers_out, "award": award, "progress": progress}
+
+
+__all__ = ["take_part","DANGER_KINDS", "GENERIC", "PLANS", "SURFACES", "banned", "block_of",
            "breath", "check_terms", "contact_dice", "creature_kind", "danger_dc",
            "danger_rounds", "dangers", "dc_of", "deed_of", "derive_dangers", "died_at_of",
            "dragon_colour", "face_danger", "freshness", "generic_for", "grade_of", "graded",

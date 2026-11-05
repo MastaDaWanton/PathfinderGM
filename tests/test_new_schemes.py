@@ -120,6 +120,12 @@ def test_the_second_quest_does_not_exist_until_somebody_looks(monkeypatch):
 
 
 def test_the_herb_gets_there_in_time(monkeypatch):
+    """Carried into the sick room, it is not yet given; handed over, it is in time.
+
+    Measured on the owner's 0.2.25 save (2026-11-01): "Get it back to Maren Duskwatch
+    before the fever turns" ticked, and the quest resolved, on walking into the tavern
+    with Marsh-Mallow in the pack — `in-time` read `holds` and `present`, and nothing was
+    ever handed to anybody. It asks for the hand-over now (`event:give($sick, $herb)`)."""
     s, e, pc, inst = _alone(monkeypatch, "the-sickness")
     _wait(e)
     # Foraged, the way `holds` reads it: the satchel, not the crafting shelf. That
@@ -128,6 +134,9 @@ def test_the_herb_gets_there_in_time(monkeypatch):
     _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
     for _ in range(3):
         _wait(e)
+    assert inst.get("outcome") != "in-time", "walking in with it in the pack is not giving it"
+    sick = inst["slots"]["sick"]["ref"]
+    _run(e, "give", {"item": inst["slots"]["herb"]["name"], "to": sick})
     assert inst.get("outcome") == "in-time", inst["fired"]
     healer = s.people[inst["slots"]["healer"]["ref"]]
     assert healer.has_state("attitude.helpful")

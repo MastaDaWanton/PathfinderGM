@@ -114,3 +114,43 @@ def test_a_character_without_the_passive_never_doubles():
     face_to_face(scene)
     _attack(e)
     assert _swings(_attack(e)) == 1
+
+
+def test_the_extra_swing_is_said_once_through_the_players_own_dice():
+    """Measured on the owner's report of 2026-11-01: "Swift Strikes: Corvin T. strikes again
+    at the giant rot grub. Swift Strikes: Corvin T. strikes again at the giant rot grub." on
+    3 of 3 of that turn's blows. The line went in before the first die, guarded only by
+    "no rolls yet"; the player's d20 suspends the attack before its roll is recorded, so
+    the resumed state appended it a second time. Rolled here on the player's own dice,
+    through every suspension, the sentence appears exactly once."""
+    scene, e = _fight()
+    scene.actors["c1"].hp = scene.actors["c1"].hp_max = 200
+    _attack(e)
+    res = e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                             "visibility": "player", "params": {}, "because": "test"}]))
+    guard = 0
+    while res.awaiting and guard < 12:
+        res = e.resume(min(10, int(res.awaiting.get("max", 20))))
+        guard += 1
+    tell = " ".join(o.tell for o in res.outcomes)
+    assert tell.count("Swift Strikes") == 1, tell
+    assert "one more swing" in tell
+
+
+def test_the_extra_swing_is_not_promised_at_a_foe_the_first_blow_dropped():
+    """Said where the extra swing is taken, never before the first die: on the report the
+    line ran ahead of a first blow that left the grub "already down"."""
+    scene, e = _fight()
+    _attack(e)
+    out = None
+    for seed in range(60):
+        foe = scene.actors["c1"]
+        foe.hp = 1
+        foe.remove_condition("dying")
+        foe.remove_condition("unconscious")
+        e.dice = Dice(seed=seed)
+        out = _attack(e)
+        if _swings(out) == 1 and foe.is_down:
+            break
+    assert out is not None and _swings(out) == 1 and scene.actors["c1"].is_down
+    assert "Swift Strikes" not in out.tell, out.tell

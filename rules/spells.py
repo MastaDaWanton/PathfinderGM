@@ -963,7 +963,31 @@ def casting_plan(spell, caster_level: int) -> dict:
         # long it lasts. Shown to the GM instead of guessed at.
         plan["note"] = ("recorded for the GM: applying these needs the spell's duration "
                         "as a number of rounds, which is still prose")
+    plan["missiles"] = missiles_at(getattr(spell, "id", ""), caster_level)
     return plan
+
+
+# Spells whose dice are rolled once per missile, and how many missiles a caster level makes:
+# (at first, one more every N caster levels above 1st, the most). Data, not a branch in the
+# engine: `casting_plan` reports the count as `missiles` and the engine rolls the dice that
+# many times. Magic missile (CRB p.310): "one missile, plus one more for every two caster
+# levels beyond 1st … a maximum of five missiles at 9th level". Until 2026-11-05 the engine
+# rolled one 1d4+1 at every caster level, and the tell never said how many missiles flew:
+# the 2026-11-05 rerun's caster level 1 cast came back "Two darts" and "three glowing bolts"
+# on 3 of 7 runs (and on 7 of 8 re-asks of the recorded slot; 0 of 12 told the count).
+MISSILE_SPELLS: dict[str, tuple[int, int, int]] = {
+    "magic-missile": (1, 2, 5),
+}
+
+
+def missiles_at(spell_id: str, caster_level: int) -> int:
+    """How many missiles this spell makes at this caster level: 0 for a spell whose dice
+    are rolled once, whole (a fireball)."""
+    row = MISSILE_SPELLS.get(str(spell_id or ""))
+    if row is None:
+        return 0
+    first, every, most = row
+    return max(1, min(most, first + max(0, int(caster_level) - 1) // max(1, every)))
 
 
 # --- reading the prose ---------------------------------------------------------------------

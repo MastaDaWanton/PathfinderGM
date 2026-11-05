@@ -212,7 +212,7 @@ def test_a_beat_that_shows_the_deeds_in_its_own_words_costs_no_call(room):
 
 
 def test_a_deed_the_engine_refused_is_owed_as_the_refusal_not_the_deed():
-    """Sam's turn 4: "I take the herbs and use them on him" — the use was refused (he was
+    """Dace's turn 4: "I take the herbs and use them on him" — the use was refused (he was
     not carrying them). The beat owes the refusal; the deed is not written in."""
     raw = json.dumps({"question": False, "actions": [
         {"span": "use them on him", "act": "use", "object": "them", "target": "him"}]})
@@ -222,7 +222,7 @@ def test_a_deed_the_engine_refused_is_owed_as_the_refusal_not_the_deed():
 
 
 def test_a_plan_said_aloud_is_speech_not_deeds():
-    """Sam's turn 12 was one long quotation — "I plan to go outside the city and harvest
+    """Dace's turn 12 was one long quotation — "I plan to go outside the city and harvest
     herbs to sell tinctures" — and the reading made deeds of the plan."""
     line = '"I plan to sell tinctures to those who will buy them."'
     raw = json.dumps({"actions": [{"span": "sell tinctures to those who will buy them",
@@ -232,7 +232,7 @@ def test_a_plan_said_aloud_is_speech_not_deeds():
 
 
 def test_a_question_asked_is_carried_by_the_reply_not_owed_as_a_deed():
-    """Sam's turn 38: "ask for a way to get into The high road" read as `talk` with no
+    """Dace's turn 38: "ask for a way to get into The high road" read as `talk` with no
     `says`; Gorm's answer was the deed on the page."""
     line = "i ask for a way to get into The high road"
     raw = json.dumps({"actions": [{"span": "ask for a way to get into The high road",
@@ -241,7 +241,7 @@ def test_a_question_asked_is_carried_by_the_reply_not_owed_as_a_deed():
 
 
 def test_the_readings_residue_is_not_owed_on_a_turn_that_stays_put():
-    """Sam's turn 10 — "once i clear it i shove it closed" — read as two `other` acts,
+    """Dace's turn 10 — "once i clear it i shove it closed" — read as two `other` acts,
     and the beat wrote both in its own words ("you prize the splinter free", "lean your
     weight into the lid"). Measured: all three `other` deeds the detector flagged on
     turns that stayed put were on the page in other words."""

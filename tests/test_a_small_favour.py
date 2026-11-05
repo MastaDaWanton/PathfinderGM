@@ -163,6 +163,13 @@ def _open_errand(e):
     return _wait(e, DAY)
 
 
+def _take_errand(s, inst):
+    """The player takes the errand on (`cards.take_up`, what `Engine._take_up` writes).
+    The frame needs it since 2026-11-01: guards come for the stranger who TOOK the errand
+    (`guards-arrive`'s `taken(errand)`), never for one who only heard of it."""
+    cards.take_up(s, inst["cards"]["errand"])
+
+
 def _docs():
     return {sid: d for sid, d in schemes.shipped().items() if sid in LINE}
 
@@ -299,6 +306,7 @@ def test_the_honest_path_returning_within_the_hour_fires_nothing():
     s, e, pc = _table()
     _open_errand(e)
     inst = _instance(s)
+    _take_errand(s, inst)
     giver = s.people[inst["slots"]["giver"]["ref"]]
     victim = s.people[inst["slots"]["victim"]["ref"]]
     _travel(e, "the gate")
@@ -319,6 +327,7 @@ def test_the_betrayal_path_the_guards_arrive_and_the_player_is_named():
     s, e, pc = _table()
     _open_errand(e)
     inst = _instance(s)
+    _take_errand(s, inst)
     giver = s.people[inst["slots"]["giver"]["ref"]]
     victim = s.people[inst["slots"]["victim"]["ref"]]
     captain = s.people[inst["slots"]["captain"]["ref"]]
@@ -380,6 +389,7 @@ def test_the_fairness_gate_holds_the_guards_back_without_the_witnesss_word():
     s, e, pc = _table()
     _open_errand(e)
     inst = _instance(s)
+    _take_errand(s, inst)
     pc.remove_effects(match=lambda x: "knows.victim-named" in x.tags)
     _out(e, inst)
     _wait(e, 61)
@@ -392,11 +402,72 @@ def test_the_fairness_gate_holds_the_guards_back_without_the_witnesss_word():
                for sk in inst["skipped"])
 
 
+def test_an_errand_only_heard_of_frames_nobody():
+    """The framed errand. Measured on the owner's 0.2.25 save (2026-11-01): "Fetch
+    Chasmyre Leaf for Kwolla Ashbourne" reached the player twice through a go-between
+    (heard, never taken); a forage said the leaf was "gathered, as Kwolla Ashbourne asked";
+    and on the walk back into the market the guards came, named the player as the stranger
+    asking after the dead man, and a wanted notice followed. Nobody frames a stranger for
+    an errand the stranger never took: `guards-arrive` asks `taken(errand)`.
+
+    The rest of the world's story still moves: the giver hides, the victim dies, and the
+    matter is let drop at the market once the news is in (`moot-untaken`)."""
+    s, e, pc = _table()
+    _open_errand(e)
+    inst = _instance(s)
+    errand = cards.find(s, inst["cards"]["errand"])
+    errand.known = "heard"                     # the go-between's word, twice
+    cards._store(s, errand)
+    victim = s.people[inst["slots"]["victim"]["ref"]]
+    _out(e, inst)
+    _wait(e, 61)
+    schemes.hand_item(s, pc, inst["slots"]["errand"]["name"])
+    _wait(e, 1)
+    _wait(e, 3 * 60)
+    assert victim.has_state("state.down.dead"), "the world's story still moves"
+    _travel(e, "the market")
+    _wait(e, 1)
+    assert "guards-arrive" not in inst["fired"]
+    assert not pc.has_state("knows.betrayed")
+    assert not pc.has_state("state.suspected") and not pc.has_state("state.wanted")
+    assert not any(i["scheme"] == "wanted" for i in s.schemes)
+    assert cards.find(s, inst["cards"]["errand"]).live, "nothing failed that was never theirs"
+
+
+def test_a_failed_errand_is_not_listed_as_finished():
+    """`betrayed` resolves the errand "failed". The owner's 0.2.25 Journal listed "Fetch
+    Chasmyre Leaf" under finished at two objectives of three, the leaf never brought back:
+    `cards.resolve` read every `how` but "dropped" as resolved."""
+    s, e, pc = _table()
+    inst = _betrayed(e, s, pc)
+    assert cards.find(s, inst["cards"]["errand"]).stage == "dropped"
+
+
+def test_once_the_warrant_is_out_the_giver_is_gone_to_the_wild_and_not_found_at_the_lodging():
+    """The ledger's tell says the giver's room is empty, "the house says gone out to"
+    the wild — and until 2026-11-01 she was still hidden at the lodging (`giver-hides`),
+    so on the owner's 0.2.25 save the same turn's Perception "fixed on where Kwolla
+    Ashbourne is standing" and the page read "Your gaze locks onto Kwolla Ashbourne, who
+    stands nearby". The warrant's open now takes her out of hiding and out to the wild,
+    where the next quest ("Search $wild and $road for $giver") looks for her."""
+    s, e, pc = _table()
+    inst = _betrayed(e, s, pc)
+    giver = s.people[inst["slots"]["giver"]["ref"]]
+    q2 = _instance(s, "wanted")
+    assert giver.at == q2["slots"]["wild"]["id"] and not giver.has_state("state.hidden")
+    _travel(e, LODGING_NAME)
+    res = _run(e, "check", {"skill": "perception", "dc": {"band": "average"}})
+    found = [x for o in res.outcomes for x in (o.effects or [])
+             if x.get("kind") == "knows_where" and x.get("of") == giver.ref]
+    assert not found, "Perception found somebody the scheme says has gone"
+
+
 # --- the line after the errand --------------------------------------------------------------
 
 def _betrayed(e, s, pc):
     _open_errand(e)
     inst = _instance(s)
+    _take_errand(s, inst)
     _out(e, inst)
     _wait(e, 61)
     schemes.hand_item(s, pc, inst["slots"]["errand"]["name"])
@@ -487,6 +558,27 @@ def test_justice_lifts_the_wanted_state():
     _travel(e, "the market")
     assert q4["outcome"] == "justice"
     assert not pc.has_state("state.wanted")
+
+
+def test_released_for_want_of_proof_closes_clear_your_name():
+    """The owner's ruling of 2026-11-01, "No proof, released", lets an innocent player who
+    goes quietly walk out of questioning with the frame-up's warrant torn up. Every clue
+    step of "Clear your name" asks `has(pc, state.wanted)`, so before this step the card
+    sat open for good — a quest that could never tick — and "Leave by the road before the
+    watch closes on you" kept telling a free character to run."""
+    s, e, pc = _table()
+    _betrayed(e, s, pc)
+    q2 = _instance(s, "wanted")
+    for _ in range(4):                     # the watch comes, then going quietly
+        _wait(e, 1)
+        if q2["outcome"]:
+            break
+    assert not pc.has_state("state.wanted")
+    assert q2["outcome"] == "released"
+    assert cards.find(s, q2["cards"]["clear"]).stage == "resolved"
+    assert cards.find(s, q2["cards"]["road"]).stage == "dropped"
+    assert pc.has_state(f"state.suspected.{TOWN}"), "let go is not believed"
+    assert not pc.has_state("knows.giver-to-find"), "no clue was found, so no lead either"
 
 
 def test_the_later_schemes_share_the_errands_people():

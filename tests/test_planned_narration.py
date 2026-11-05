@@ -270,7 +270,7 @@ def test_a_fight_declared_and_not_struck_is_not_shown_landing():
     assert "I punch him." not in say and "nobody moves" in say
     struck = Outcome("i1", "attack", tell="Kesst Vayr hits Jarek.")
     say = first_act([struck])
-    assert "doing it and what came of it" in say
+    assert "Show the player doing what the engine decided" in say
 
 
 def test_a_walk_the_engine_did_not_make_is_not_written_as_one():

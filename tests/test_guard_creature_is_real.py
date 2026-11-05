@@ -387,3 +387,43 @@ def test_a_person_and_an_unsized_page_are_never_findings(monkeypatch):
     creature_size._ASKED.clear()
     assert creature_size.find(_size_ctx(e, text, reading)) == []
     assert asked == ["the grioth"]
+
+
+def test_a_size_word_in_the_creatures_own_name_is_never_asked_about(monkeypatch):
+    """Measured on the owner's report of 2026-11-01 (Corvin T., the shrine): "the giant rot
+    grub" is the Bestiary's name for a Small vermin, and the reader read "giant" as a size
+    claim on 15 beats of one fight — each repaired into "the small rot grub". The question
+    now reaches the model with the creature's own name (and its template's) taken out, and
+    asked of "the creature"; the page's own size words still reach it."""
+    from gm import beat_verify
+    from gm.checks import creature_size
+
+    s, e = _forest()
+    grub = instantiate("giant-rot-grub", scene=s, name="giant rot grub")
+    s.add(grub)
+    grub.at = s.at
+    text = ("The giant rot grub lunges forward, its maw dripping. A giant rot grub "
+            "crawls behind it.")
+    reading = stub.read(text, s, engine=e, who={"The giant": grub.ref, "A giant": grub.ref})
+    sent = []
+
+    def one_of(msgs, choices, **kw):
+        sent.append(msgs[-1]["content"])
+        return "not said"
+
+    monkeypatch.setattr(beat_verify, "ENABLED", True)
+    monkeypatch.setattr(beat_verify, "_one_of", one_of)
+    creature_size._ASKED.clear()
+    assert creature_size.find(_size_ctx(e, text, reading)) == []
+    assert sent, "the creature was asked about"
+    passage = sent[0].split("Question:")[0]
+    assert "giant" not in passage.lower() and "rot grub" not in passage.lower(), passage
+    assert "How big do these sentences say the creature" in sent[0]
+    assert "may call it" not in sent[0], "nor in the page words the question names"
+
+    # A real size claim beside the name still reaches the reader.
+    said, name, words = creature_size.unnamed(
+        "The towering giant rot grub looms over you.", "the giant rot grub",
+        ("the towering giant rot grub",), ("giant-rot-grub",))
+    assert said == "The towering the creature looms over you." and name == "the creature"
+    assert words == ("the towering the creature",)

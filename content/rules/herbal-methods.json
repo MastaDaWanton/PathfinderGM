@@ -1,5 +1,5 @@
 {
-  "_note": "The herbalism bench's nine methods (docs/herbalism-revamp-plan.md §6). These are the owner-accepted starting values from 2026-10-02, tunable in play: change a number here and the bench, the card and the price all follow, because nothing in code repeats them. `potency` and `duration` multiply the line's strength at this step; a product row (herbal-products.json) multiplies again for the form it makes, so brew and steep are 1.0 here and the infusion/decoction and tincture/acetum split lives on the product. Mix is `mean`: the weighted mean of its parts, by dose. `minutes_per_dose` is world time per dose made, with no bulk discount (the owner's call: batch size costs time, not difficulty). `inputs_per_dose` is how many of the worked thing one dose takes: Dry and Reduce are the two concentration steps, two in and one out.",
+  "_note": "The herbalism bench's nine methods (docs/herbalism-revamp-plan.md §6). These are the owner-accepted starting values from 2026-10-02, tunable in play: change a number here and the bench, the card and the price all follow, because nothing in code repeats them. `potency` and `duration` are this step's multipliers on the line's strength, combined with what the line carries in by the Core Rulebook's rule for multiplying (each multiplier above 1 adds its value less 1; one below 1 still multiplies; `crafting.combine_multipliers`, owner ruling 2026-11-01: uncapped, but linear rather than compounding); a product row (herbal-products.json) multiplies again for the form it makes, so brew and steep are 1.0 here and the infusion/decoction and tincture/acetum split lives on the product. Mix is `mean`: the weighted mean of its parts, by dose. `minutes_per_dose` is world time per dose made, with no bulk discount (the owner's call: batch size costs time, not difficulty). Dry is the exception (owner ruling 2026-11-01, drying works in batches): it has `minutes_per_batch` instead, one batch taking that long however many doses are on the racks, up to `batch_doses_per_level` times the Herbalist level (Ultimate Wilderness p.152: an herbalist prepares as many doses at once as she has ranks in Profession (herbalist)); more doses than that take another batch. Reduce stays per dose. `inputs_per_dose` is how many of the worked thing one dose takes: Dry and Reduce are the two concentration steps, two in and one out.",
   "order": ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep", "neutralize"],
   "methods": {
     "grind": {
@@ -39,7 +39,8 @@
       "takes": "two of a solid",
       "makes": "one dried, stronger and longer lasting",
       "potency": 1.5, "duration": 1.5,
-      "minutes_per_dose": 480, "inputs_per_dose": 2, "concentrates": true,
+      "minutes_per_batch": 480, "batch_doses_per_level": 6,
+      "inputs_per_dose": 2, "concentrates": true,
       "tuning": {"seconds": 7, "beats": 4,
                  "difficulty": {"default": 0.5, "leaf": 0.4, "flower": 0.45, "root": 0.6,
                                 "bark": 0.55, "organ": 0.7, "gland": 0.7}}

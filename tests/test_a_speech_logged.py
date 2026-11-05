@@ -1,7 +1,7 @@
 """Item 1 of docs/playtest-2026-09-30.md: NPC speech missing from the conversation log.
 
 "not sure if the ratfolk was talking to me but if he was then the conversation wasn't
-stored in the conversation log." Measured over Sam's save: 37 of 43 real NPC lines reached
+stored in the conversation log." Measured over Dace's save: 37 of 43 real NPC lines reached
 the log; 6 did not, at beats 0, 3, 33 and 49. The causes, each held here:
 
   1. the opening threw its speech records away (`opening_prose._ask` lifted the tags and
@@ -58,9 +58,9 @@ BEAT_49 = (
 
 
 @pytest.fixture
-def sam(tmp_path):
+def dace(tmp_path):
     """A campaign with the opening's two people standing by: the cage owner and the
-    beaten fighter, as Sam's save names them."""
+    beaten fighter, as Dace's save names them."""
     from play import campaign as cm
     from rules.bestiary import instantiate
     from rules.sheet import load_pc
@@ -93,18 +93,18 @@ def _people(c, text, said, reading):
                                                attribution=reading))
 
 
-def test_the_openings_untagged_lines_are_the_cage_owners_and_are_logged(sam):
+def test_the_openings_untagged_lines_are_the_cage_owners_and_are_logged(dace):
     """Beat 0: two lines, "'…,' the cage owner says" and its run-on. Neither holds "you",
     so the old reader returned before reading them; now the opening is read too
     (`aftermath.after_opening`), and both are booked and logged."""
     from tests.beat_reader import stub
 
-    c, owner = sam["c"], sam["owner"]
+    c, owner = dace["c"], dace["owner"]
     c.transcript.append({"who": "gm", "kind": "setup", "text": BEAT_0})
     answer = stub.people_answer(BEAT_0, c.scene,
                                 who={"the cage owner": owner, "the cage owner#2": owner,
                                      "the cage owner#3": owner,
-                                     "a fighter": sam["fighter"]},
+                                     "a fighter": dace["fighter"]},
                                 lines={"Went down": (owner, "you"),
                                        "The last one": (owner, "you")})
     aftermath.after_opening(c, chat=stub.chat(answer))
@@ -114,12 +114,12 @@ def test_the_openings_untagged_lines_are_the_cage_owners_and_are_logged(sam):
     assert [r["who"] for r in c.transcript[-1]["said"]] == [owner, owner]
 
 
-def test_the_openings_own_speaker_tags_are_kept(sam, monkeypatch):
+def test_the_openings_own_speaker_tags_are_kept(dace, monkeypatch):
     """The written opening's tags were lifted and thrown away. `_ask` now hands the
     records back, read against the people the opening was written with."""
     from play import opening_prose
 
-    c, owner = sam["c"], sam["owner"]
+    c, owner = dace["c"], dace["owner"]
 
     class _Reply:
         text = json.dumps({"opening": "The cage owner turns. <say who=\"the cage owner\" "
@@ -143,10 +143,10 @@ def test_the_openings_own_speaker_tags_are_kept(sam, monkeypatch):
     assert (entry["who"], entry["src"]) == (owner, "tag")
 
 
-def test_a_line_after_they_lean_in_is_the_cage_owners(sam):
+def test_a_line_after_they_lean_in_is_the_cage_owners(dace):
     """Beat 3: the line stands in its own paragraph after "They lean in slightly…", which
     names nobody. The reader gives it to the cage owner, and it is booked as hers."""
-    c, owner = sam["c"], sam["owner"]
+    c, owner = dace["c"], dace["owner"]
     said: list = []
     reading = _read(c, BEAT_3, who={"The cage owner": owner},
                     lines={"He's still with us": (owner, "you")})
@@ -154,13 +154,13 @@ def test_a_line_after_they_lean_in_is_the_cage_owners(sam):
     assert [(r["who"], r["to"], r["from"]) for r in said] == [(owner, "you", "page")]
 
 
-def test_a_run_on_after_a_tagged_line_is_the_same_speaker(sam):
+def test_a_run_on_after_a_tagged_line_is_the_same_speaker(dace):
     """Beat 49: "'A brothel, eh?'" was tagged to the guard, and his two lines after it in
     the same paragraph were not. The reader gives all three to him; the tagged one keeps
     its tag, the other two are booked from the page."""
     from rules.bestiary import instantiate
 
-    c = sam["c"]
+    c = dace["c"]
     guard = c.scene.add(instantiate("guildhand", scene=c.scene, name="guard")).ref
     said = [{"who": guard, "to": "you", "line": "A brothel, eh?"}]
     reading = _read(c, BEAT_49, said=said, who={"The Ratfolk guard": guard},
@@ -172,9 +172,9 @@ def test_a_run_on_after_a_tagged_line_is_the_same_speaker(sam):
     assert {"kind": "speaker-read", "booked": guard, "lines": 2} in rows
 
 
-def test_in_a_fight_a_board_line_is_still_booked_and_nobody_is_made(sam, monkeypatch):
+def test_in_a_fight_a_board_line_is_still_booked_and_nobody_is_made(dace, monkeypatch):
     """What somebody on the board said is what they said, fight or no fight."""
-    c, owner = sam["c"], sam["owner"]
+    c, owner = dace["c"], dace["owner"]
     monkeypatch.setattr(type(c.scene), "in_encounter", property(lambda self: True))
     said: list = []
     before = set(c.scene.actors)

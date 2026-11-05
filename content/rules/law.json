@@ -1,0 +1,105 @@
+{
+  "_about": [
+    "The town's law after an arrest: what the watch charges, what it takes to talk the charge",
+    "away, what each charge costs, and what a cell takes to get out of. Read by rules/trial.py,",
+    "validated on load (`trial.validate`). Owner ruling 2026-11-01: held, questioned, found",
+    "guilty or not from what the character actually did; a fine and the stolen goods given back,",
+    "or death for murder; a chance to talk at questioning and again before sentence; escape from",
+    "the cell or on the walk to the gallows. Pathfinder 1e has no trial or fine procedure: Ultimate",
+    "Campaign's Table 1-31 lists 'fine' and 'imprisonment' among punishments with no amounts, and",
+    "the GameMastery Guide's settlements give a law modifier and no sentences. So every number",
+    "below is either a book row (cited) or marked HOUSE with the reason."
+  ],
+  "charges": {
+    "murder": {
+      "said": "murder",
+      "gravity": 5,
+      "sentence": "death",
+      "plea": "manslaughter",
+      "note": "The owner's ruling: murder is a death sentence. A plea made commutes it to the blood price of a killing (HOUSE: the plea is a second request, CRB p.93 'other requests might be made')."
+    },
+    "manslaughter": {
+      "said": "a killing",
+      "gravity": 4,
+      "sentence": "fine",
+      "fine_gp": 10,
+      "note": "HOUSE: a blood price, the weregild tradition. One hundred days of a labourer's wage (CRB Table 6-9, untrained hireling 1 sp a day)."
+    },
+    "assault": {
+      "said": "assault",
+      "gravity": 3,
+      "sentence": "fine",
+      "fine_gp": 5,
+      "note": "HOUSE: fifty labourer's days. Skyrim's bounties put assault at 40 against 25 for a pickpocketing (UESP, Skyrim:Crime); Kingdom Come 200 groschen against 60 for a theft (KCD wiki, Crime)."
+    },
+    "theft": {
+      "said": "theft",
+      "gravity": 2,
+      "sentence": "fine",
+      "fine_gp": 1,
+      "goods_times": 2,
+      "goods_times_caught": 4,
+      "note": "Roman law's penalty for theft, Gaius, Institutes III.189-190: double the value of what was taken, fourfold when the thief is caught with it (manifest theft). At least the fine_gp. The goods themselves go back to their owners as well, as Skyrim's evidence chest takes stolen things when a fine is paid (UESP, Skyrim:Jail)."
+    },
+    "trespass": {
+      "said": "breaking into a house",
+      "gravity": 1,
+      "sentence": "fine",
+      "fine_gp": 1,
+      "note": "HOUSE: ten labourer's days."
+    }
+  },
+  "deeds": {
+    "deed.kill.unprovoked": {"charge": "murder", "after": "manslaughter", "report": true},
+    "deed.kill.captive": {"charge": "murder", "report": true},
+    "deed.kill.careless": {"charge": "manslaughter", "report": true},
+    "deed.kill.accident": {"charge": "manslaughter", "report": true},
+    "deed.violence.unprovoked": {"charge": "assault", "report": true},
+    "deed.theft": {"charge": "theft", "report": true},
+    "deed.trespass": {"charge": "trespass", "report": false}
+  },
+  "_deeds_note": "What a row of the deeds record (rules/deeds.py) is charged as. A row is evidence only when somebody saw it (its witnesses); the moral total is never read. `report: false` is a crime whose own door already tells the watch (a break-in, `Engine._witnessed_break_in`). `after` is the charge when the death came after the player's harm rather than by their own act (the row's `manner`): bled out, or fell to somebody else. The owner's rulings of 2026-11-01: a beaten foe killed after the fight (deed.kill.captive) is murder; 'letting someone bleedout or killing someone who attacked you durring combat are not murder and instead manslaughter or assault' - so an unprovoked victim who bleeds out is manslaughter, and an attacker killed in the fight, which the deeds record does not hold (fighting back is no deed), is charged by the watch's own eyes as `self_defence` (rules/trial.py `watch`). Careless or accidental harm short of a death stays uncharged (not answered).",
+  "self_defence": {"charge": "manslaughter", "report": true},
+  "proof": {
+    "accused": {
+      "said": "named in the warrant",
+      "request": "simple aid",
+      "lie": "believable"
+    },
+    "witnessed": {
+      "said": "seen",
+      "request": "dangerous aid",
+      "lie": "unlikely"
+    },
+    "caught": {
+      "said": "caught",
+      "request": "aid that could result in punishment",
+      "lie": "far_fetched"
+    }
+  },
+  "_proof_note": "How hard a charge is to talk away, by the best proof against the player. Diplomacy is Make Request (CRB p.93): the questioner's attitude DC plus the row named here - letting a prisoner go is aid, and letting one go that witnesses swear against or that was caught red-handed could cost the officer their place (HOUSE: which row fits each proof). Bluff is opposed by the questioner's Sense Motive at the book's believability (CRB p.90, rules/bluff.py). Intimidate is the book's 10 + Hit Dice + Wisdom (CRB p.99).",
+  "plea": {
+    "request": "simple aid",
+    "additional": 5,
+    "lie": "believable",
+    "note": "Before sentence the plea is mercy asked of the same officer the same day: Make Request's simple aid, +5 as an additional request (CRB p.93). Made, a death sentence is commuted to the plea charge's fine and a fine is waived; the stolen goods go back either way."
+  },
+  "talk_skills": ["diplomacy", "bluff", "intimidate"],
+  "cell": {
+    "escape artist": {"dc": 30, "said": "squeezes out between the bars of the cell window", "source": "CRB Escape Artist, tight space DC 30"},
+    "disable device": {"dc": 20, "no_tools": 10, "said": "picks the lock of the cell door", "source": "CRB Disable Device, simple lock DC 20; 'If you do not have a set of thieves' tools, these DCs increase by 10'"},
+    "strength": {"dc": 18, "said": "breaks the cell door", "source": "CRB, Environment: Dungeons, Doors table - good wooden door, break DC 16 stuck / 18 locked (d20pfsrd.com/gamemastering/environment/dungeons)"}
+  },
+  "_cell_note": "A town's cell, not a fortress: a good wooden door on a simple lock (HOUSE: which rows). Measured on the owner's report save 2026-11-01 with the strong door and average lock first chosen: Corvin T. (level 2, Str 17, Escape Artist +7, no Disable Device) could not make any of the three on a natural 20, so the cell had no way out but a bribe he could not afford. Baldur's Gate 3 designs an escape into every cell and Divinity: Original Sin 2 leaves a lockpick in each (bg3.wiki, Crime; docs.larian.game) - the cell is a puzzle with a way out. Escape Artist stays the book's tight space, DC 30.",
+  "bribe": {
+    "share": 0.25,
+    "note": "Ultimate Intrigue p.124, Bribery: the bribe's base is the target's CR as the heroic level on Table 14-9 NPC Gear, and '25% or more for simply letting the PCs pass and looking the other way'. The coin is the persuasion here; no Diplomacy is rolled (HOUSE)."
+  },
+  "labour": {
+    "wage_cp": 10,
+    "most_days": 30,
+    "note": "A fine the purse cannot pay is worked off at the gaol at a labourer's day wage (CRB Table 6-9, untrained hireling 1 sp a day), the gaol feeding its labour. HOUSE: never more than thirty days; what is still owed then is written off, as Skyrim caps a jail term at seven days (UESP, Skyrim:Jail) rather than hold a character for a sum they could never pay."
+  },
+  "holds": ["the gaol", "the jail", "the guardhouse", "the barracks", "the courthouse"],
+  "gallows": ["the gallows", "the square", "the market", "the gate"]
+}

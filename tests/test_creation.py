@@ -35,7 +35,9 @@ def test_a_legal_character_builds_and_loads():
     assert problems == []
     actor = from_dict(built["sheet"])
     assert actor.name == "Durga Stonebrow"
-    assert actor.hp == 10 + 1 + 2      # max d10, +Con 16 after the dwarf's +2... 13
+    # max d10, +Con 16 after the dwarf's +2... 13, and the favoured class's hit point
+    # (CRB p.31; the forge's default, 2026-11-01): 14.
+    assert actor.hp == 10 + 1 + 2 + 1
 
 
 def test_racial_modifiers_are_baked_into_the_scores():
@@ -467,8 +469,10 @@ def test_a_blood_bender_gets_the_hit_points_the_class_grants():
                                           skills=[], feats=["toughness"],
                                           paths=["battle blood"]))
     assert problems == [], problems
-    # 2d8 maxed is 16, and the dwarf's Con 16 adds 3.
-    assert built["sheet"]["hp"] == 16 + 3
+    # 2d8 maxed is 16, and the dwarf's Con 16 adds 3 to EACH of the two Hit Dice — it
+    # added 3 once until 2026-11-01, while the sheet said "Con x 2 HD" — and the
+    # favoured class's hit point (CRB p.31) is the forge's default.
+    assert built["sheet"]["hp"] == 16 + 3 * 2 + 1
 
 
 def test_a_class_card_never_reads_d2d8():

@@ -22,6 +22,9 @@ from . import _space
 ORDER = 60
 KINDS = frozenset({"route-not-walked"})
 DOORS = frozenset({"turn", "outcome"})
+# Not on a planned beat (round 2, 2026-11-05): the route is in the travel tell an act
+# slot is told and held to; on the rerun its 2 planned findings rode with the stop's.
+PLANNED_OFF = frozenset({"route-not-walked"})
 
 _ARTICLES = ("the ", "a ", "an ")
 

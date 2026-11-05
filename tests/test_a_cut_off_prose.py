@@ -35,7 +35,7 @@ def test_the_measured_fragment_is_trimmed_not_given_a_full_stop():
 
 
 def test_a_beat_ending_on_a_quoted_question_gets_no_extra_full_stop():
-    """The live check of this fix, 2026-09-30, beat 83 of Sam's save: `ask him, "How much
+    """The live check of this fix, 2026-09-30, beat 83 of Dace's save: `ask him, "How much
     for a drink?". What do you do?` — the stop was added after a question mark."""
     out, _ = narration.ensure_hand_back('You ask him, "How much for a drink?"')
     assert out == 'You ask him, "How much for a drink?" What do you do?'

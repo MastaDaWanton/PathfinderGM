@@ -482,6 +482,16 @@ ATTITUDES: tuple[str, ...] = (
 # refusals, the brief, and the talk panel. A tag on the PERSON, not a flag on the
 # scene, so who is in the conversation is the same question as every other state.
 TALKING = "talk.with-you"
+# A walk a meeting on the way cut short (2026-11-01): the walker still MEANS to get where
+# they were going. Granted by `Engine._op_travel` when a stopping meeting or the watch
+# ends the walk short of its end (the payload: where it was for, where it stopped, who
+# stopped it), lifted by the next walk the walker takes anywhere. Read by the act→op
+# table, so "keep going" and a push past the blockers carry the walk on to where it was
+# for (`acts_to_ops.making_for`). Owner report 2026-11-01, Corvin: a Strength check through
+# the crowd succeeded, then "keep going" and "keep walking" went nowhere, because nothing
+# remembered where the walk had been for.
+MAKING_FOR = "intent.making-for"
+MAKING_FOR_SOURCE = "rule:walk-cut"
 # The forage encounter's stance (TAGS["holding ground"]), named once for its readers.
 HOLDING_GROUND = "state.holding-ground"
 HOLDING_GROUND_KEY = "holding ground"
@@ -541,6 +551,16 @@ CONSTRUCT = "type.construct"
 UNDEAD = "type.undead"
 DESTROYED_AT_ZERO: tuple[str, ...] = (UNDEAD,)
 BROKEN_BELOW_ZERO: tuple[str, ...] = (CONSTRUCT,)
+# The bodies with no hands to clutch a wound and no voice to stop mid-word: the death line
+# a narrator falls back on is chosen by this (`gm/agent.py` `_deaths_from`). Measured on the
+# 2026-11-04 follow-ups bench: "The wolf staggers two steps, hands full of it, and sit down
+# against nothing and are dead" — a humanoid line, with its grammar broken besides.
+BEASTS: tuple[str, ...] = ("type.animal", "type.magical-beast", "type.vermin")
+
+
+def is_beast(actor) -> bool:
+    """Whether this body is a beast's (an animal, a magical beast, vermin), by its type."""
+    return bool(actor is not None and any(actor.has_state(t) for t in BEASTS))
 # The condition key the house rule writes, named once so its writers are not literals.
 BROKEN_KEY = "broken"
 # A construct whose loyalty the player rewrote (`Engine._op_repair`'s claim, the house
@@ -648,6 +668,30 @@ def wanted_tag(location_id) -> str:
 
 def suspected_tag(location_id) -> str:
     return f"{SUSPECTED}.{town_tag(location_id)}"
+
+
+# The watch taking a wanted player in (rules/arrest.py, owner ruling 2026-11-01): a
+# confrontation the player answers on their next batch — fight, run, talk or go quietly.
+# Outside `state.*` on purpose: it stops no action, and every answer is an action.
+ARRESTING = "law.arresting"
+# The watch leaving them be for a while — talked down for the day, or let go to clear the
+# name — per town, as the warrant is.
+STOOD_DOWN = "law.stood-down"
+
+
+def stood_down_tag(location_id) -> str:
+    return f"{STOOD_DOWN}.{town_tag(location_id)}"
+
+
+# Held by the watch (rules/trial.py, owner ruling 2026-11-01): questioned, pleading, in the
+# condemned cell or on the walk to the gallows — the stage is the effect's payload, not a
+# tag of its own, because nothing outside the trial asks which. Outside `state.*` for the
+# arrest's reason: talking, picking a lock and breaking away are all actions it must allow.
+CUSTODY = "law.custody"
+# A watch officer — captain, sergeant, constable — is the law and answers every
+# `has_state(GUARD)` question by the prefix (owner ruling 2026-11-01: "the scheme's
+# captain had no guard tag"). Granted by a document (a scheme slot), never by a name.
+GUARD_OFFICER = f"{GUARD}.officer"
 
 
 def standing_with_the_law(actor, location_id) -> str:

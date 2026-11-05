@@ -282,7 +282,7 @@ def record(actor, tag: str, *, scene=None, minute: int | None = None,
            place: str | None = None, place_name: str | None = None,
            subject: str | None = None, subject_name: str = "", what: str = "",
            how: str = "meant", witnesses: list[str] | None = None,
-           unseen: bool = False) -> dict:
+           unseen: bool = False, manner: str = "") -> dict:
     """Write one deed: the ONE writer of `Actor.deeds`. Returns the `deed` effect record
     the outcome of the act carries, for the history line and the turn log.
 
@@ -325,6 +325,11 @@ def record(actor, tag: str, *, scene=None, minute: int | None = None,
         "subject_name": " ".join(str(subject_name or "").split()),
         "what": " ".join(str(what or "").split()),
         "witnesses": list(witnesses),
+        # How a death came (`_deaths`): "blow" — by the player's own act — or "after": the
+        # victim bled out, or fell to somebody else, after the player's harm. The value is
+        # the row's either way; the watch reads it (rules/trial.py: the owner's ruling of
+        # 2026-11-01, "letting someone bleed out ... not murder"). Absent on other deeds.
+        **({"manner": manner} if manner else {}),
         "origin": f"rule:deeds/{tag}",
     }
     actor.deeds.append(row)
@@ -334,7 +339,11 @@ def record(actor, tag: str, *, scene=None, minute: int | None = None,
     # about. The narrator is not told deeds (the owner's answer 4).
     return {"kind": "deed", "tag": tag, "value": row["value"], "again": again, "how": how,
             "subject": subject, "subject_name": row["subject_name"], "what": row["what"],
-            "said": said_of(row), "total": total(actor), "origin": row["origin"]}
+            "said": said_of(row), "total": total(actor), "origin": row["origin"],
+            # Who saw it, for the watch (rules/trial.py `report`): a crime is evidence only
+            # when somebody saw it. Refs, read by code; the narrator is not told deeds.
+            "witnesses": list(row["witnesses"]),
+            **({"manner": manner} if manner else {})}
 
 
 # --- the carcass (lane C's door) --------------------------------------------------------
@@ -461,12 +470,12 @@ def _recorder(engine, pc, out: list):
     except Exception:
         here = ""
 
-    def rec(tag, subject, *, how="meant", what="", unseen=False, name=None):
+    def rec(tag, subject, *, how="meant", what="", unseen=False, name=None, manner=""):
         a = (getattr(scene, "people", None) or {}).get(subject) if subject else None
         out.append(record(pc, tag, scene=scene, place_name=here, subject=subject,
                           subject_name=name if name is not None else
                           (getattr(a, "name", "") if a is not None else ""),
-                          what=what, how=how, unseen=unseen))
+                          what=what, how=how, unseen=unseen, manner=manner))
     return rec
 
 
@@ -642,12 +651,18 @@ def _deaths(engine, pc, intent, outcome, before_: dict | None) -> list[dict]:
     rec = _recorder(engine, pc, out)
     now = int(getattr(scene, "clock_minutes", 0) or 0)
     struck: dict[str, str] = {}
+    # Who saw each harm: a death that comes after it — bled out once the player had walked
+    # off — was seen by whoever saw the blow, not by whoever stands where the player is
+    # when the body is found dead.
+    saw: dict[str, list] = {}
     for r in of(pc, "deed.violence"):
         ref = r.get("subject")
         if ref and now - int(r.get("minute") or 0) <= DAY:
             how = str(r.get("how") or "meant")
             if ref not in struck or _GRAVITY.get(how, 0) > _GRAVITY.get(struck[ref], 0):
                 struck[ref] = how
+            saw.setdefault(ref, [])
+            saw[ref] = list(dict.fromkeys(saw[ref] + list(r.get("witnesses") or ())))
     if before_ is not None and getattr(intent, "actor", None) == pc.ref \
             and not before_.get("fight"):
         who = before_.get("who") or {}
@@ -663,11 +678,24 @@ def _deaths(engine, pc, intent, outcome, before_: dict | None) -> list[dict]:
                     and ref not in struck and not _killed(pc, ref)):
                 rec("deed.kill.captive", ref)
     people = getattr(scene, "people", None) or {}
+    # Killed by the player's own act in this outcome, or dead since by other means — bled
+    # out, or a guard's sword in the fight the player started. The deed is the same either
+    # way (the paragraph above); the row says which, for the watch.
+    by_blow = ({str(e.get("ref")) for e in outcome.effects or ()
+                if isinstance(e, dict) and e.get("kind") == "condition"
+                and e.get("condition") == "dead"}
+               if getattr(intent, "actor", None) == pc.ref else set())
     for ref, how in struck.items():
         a = people.get(ref)
         if a is None or not a.has_state("state.down.dead") or _killed(pc, ref):
             continue
-        rec(f"deed.kill.{_TAG_HOW[how]}", ref, how=how)
+        manner = "blow" if ref in by_blow else "after"
+        if manner == "after":
+            out.append(record(pc, f"deed.kill.{_TAG_HOW[how]}", scene=scene, subject=ref,
+                              subject_name=getattr(a, "name", ""), how=how, manner=manner,
+                              witnesses=[w for w in saw.get(ref) or () if w != ref]))
+        else:
+            rec(f"deed.kill.{_TAG_HOW[how]}", ref, how=how, manner=manner)
     return out
 
 

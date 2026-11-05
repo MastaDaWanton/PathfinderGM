@@ -516,7 +516,8 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
     return out
 
 
-_BARE_REF = re.compile(r"(?<![\w/])(c\d+|pc)\b(?!\s*[\"':])", re.I)
+# A possessive is a ref too ("c11's blade"); a quote or a colon after it is a label.
+_BARE_REF = re.compile(r"(?<![\w/])(c\d+|pc)\b(?!\s*(?:[\":]|'(?!s\b)))", re.I)
 
 
 def name_refs(text: str, scene) -> str:
@@ -526,16 +527,28 @@ def name_refs(text: str, scene) -> str:
     the protocol's plumbing — they exist so the GM cannot invent people — and a player
     should never see one. Substituting is unambiguous, so it is done rather than argued
     about.
+
+    Everybody the scene holds answers, here or not (`Scene.people`, the store, before the
+    view): an engine line pasted by a backstop can name somebody who has just left, and
+    that ref is no less a person's (2026-11-05). A name put where a sentence starts is
+    capitalised ("You", "The thug").
     """
     if not text or scene is None:
         return text
+    here = getattr(scene, "actors", None) or {}
+    held = getattr(scene, "people", None)
+    held = held if isinstance(held, dict) else {}
 
     def swap(m: re.Match) -> str:
         ref = m.group(1).lower()
-        actor = getattr(scene, "actors", {}).get(ref)
+        actor = here.get(ref) or held.get(ref)
         if actor is None:
             return m.group(0)
-        return "you" if actor.is_pc else actor.name
+        said = "you" if actor.is_pc else actor.name
+        before = m.string[:m.start()].rstrip(" \"'“‘(")
+        if not before or before[-1] in ".!?":
+            said = said[:1].upper() + said[1:]
+        return said
 
     return _BARE_REF.sub(swap, text)
 
@@ -738,6 +751,10 @@ _ABOUT_SOMEBODY = frozenset({
     "mend", "item_damage", "hazard",
     # The employer a job is offered by, taken from or turned down to (rules/jobs.py).
     "job",
+    # Whose grapple is broken, when two hold the player (`Engine._op_escape`).
+    "escape",
+    # The carcass a harvest cuts (`Engine._op_harvest`, 2026-11-01).
+    "harvest",
 })
 
 
@@ -996,24 +1013,75 @@ def leave_before_leaving(raw_intents, player_text: str, scene, frame=None, *,
     other deed is not read here: the reader has no closed slot for parting words, and code
     does not read the words."""
     from . import interpret
-
-    if frame is None:
-        frame = interpret.reading_of(player_text)
-    if not isinstance(raw_intents, list) or scene is None or not isinstance(frame, dict) \
-            or frame.get("error") or getattr(scene, "in_encounter", False):
-        return raw_intents
-    acts = [a.get("act") for a in frame.get("actions") or []
-            if isinstance(a, dict) and interpret.acting(a)]
-    leaving = [k for k, act in enumerate(acts) if act in LEAVING_ACTS]
-    if not leaving or any(act in TALKING_ACTS for act in acts[leaving[0] + 1:]):
-        return raw_intents
+    from rules import states as states_mod
 
     def op(r) -> str:
         return str(r.get("op", "")).lower() if isinstance(r, dict) else ""
 
-    kept = [r for r in raw_intents
-            if not (op(r) == "leave_talk"
-                    and str((r.get("params") or {}).get("do") or "leave").lower() == "leave")]
+    def a_leave(r) -> bool:
+        return op(r) == "leave_talk" \
+            and str((r.get("params") or {}).get("do") or "leave").lower() == "leave"
+
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    actors = getattr(scene, "actors", {}) or {}
+    talking = any(not a.is_pc and a.has_state(states_mod.TALKING) for a in actors.values())
+    # The people a `say` in the plan really reaches: somebody here, or a placeholder an
+    # `introduce` in the same plan brings in. Owner report 2026-11-01 (Corvin, turn 16): "ask
+    # where the smithy is and then go there" — the say's addressee was a placeholder
+    # nobody introduced, emptied later by `settle_placeholders`, so the say opened no
+    # conversation and the leave inserted after it was refused "You are not in
+    # conversation with anybody".
+    introduced = {str(x) for r in raw_intents if op(r) == "introduce"
+                  for x in ((r.get("params") or {}).get("placeholders") or ())}
+
+    def opens_talk(r) -> bool:
+        if op(r) == "greet":
+            return str((r.get("params") or {}).get("who") or "") in actors
+        if op(r) != "say":
+            return False
+        to = (r.get("params") or {}).get("to") or r.get("target")
+        to = to[0] if isinstance(to, list) and to else to
+        to = str(to or "")
+        who = actors.get(to)
+        return (who is not None and not who.is_pc) or to in introduced
+
+    if not talking and not any(opens_talk(r) for r in raw_intents):
+        # Nobody to take leave of: the plan's own leave goes, wherever the turn goes next.
+        # Owner report 2026-11-01 (Corvin, turns 35 and 67): the plan's bare `leave_talk`
+        # survived the early return below and the player read "You are not in
+        # conversation with anybody" — twice in one session.
+        stripped = [r for r in raw_intents if not a_leave(r)]
+        if len(stripped) != len(raw_intents) and notes is not None:
+            notes.append("the plan's leave_talk dropped: nobody is in conversation")
+        return stripped or [{"op": "narrate_only", "because": "nobody to take leave of"}]
+    if frame is None:
+        frame = interpret.reading_of(player_text)
+    if not isinstance(frame, dict) or frame.get("error") \
+            or getattr(scene, "in_encounter", False):
+        return raw_intents
+    acts = [a.get("act") for a in frame.get("actions") or []
+            if isinstance(a, dict) and interpret.acting(a)]
+    have = {op(r) for r in raw_intents}
+    # A `go` ends the talk only when it walks somewhere: a walk the plan carries out of
+    # here. Owner report 2026-11-01 (Corvin): "what is that as I walk next to her" (a `go`
+    # to "next to her", with no walk in the plan) ended the talk with Lila Duskwatch, and
+    # "walk to a herbalist stall" (the walk struck as a walk across the market) ended the
+    # talk with Snik Dunmoor. Walking up to somebody, or across the room, is not walking
+    # off. A `leave`, a `journey` and a `rest` are leavings by what they are.
+    walks = bool(have & (_LEAVING_OPS[1] | {"journey"}))
+    # And the sleep the reading implies: a search for somewhere to sleep that the plan
+    # carries out as a `rest` (owner report 2026-11-01, Corvin, turn 32: "go find a quiet
+    # place to sleep out of the way" was read `search, stealth`, the plan's rest stood,
+    # and it was refused "You are still in conversation with the smith").
+    sleeps = "rest" in have and "rest" not in acts
+    leaving = [k for k, act in enumerate(acts)
+               if (act in LEAVING_ACTS and (act != "go" or walks))
+               or (act == "search" and sleeps)]
+    if not leaving or any(act in TALKING_ACTS for act in acts[leaving[0] + 1:]):
+        return raw_intents
+
+    kept = [r for r in raw_intents if not a_leave(r)]
     at = len(kept)
     for ops in _LEAVING_OPS:
         k = next((k for k, r in enumerate(kept) if op(r) in ops), None)
@@ -1025,12 +1093,8 @@ def leave_before_leaving(raw_intents, player_text: str, scene, frame=None, *,
     later = [r for r in kept[at:] if op(r) in _STILL_TALKING_OPS]
     kept = kept[:at] + later + [r for r in kept[at:] if not any(r is x for x in later)]
     at += len(later)
-    from rules import states as states_mod
-
-    talking = any(not a.is_pc and a.has_state(states_mod.TALKING)
-                  for a in (getattr(scene, "actors", {}) or {}).values())
-    if not talking and not any(op(r) == "say" for r in kept[:at]):
-        return raw_intents
+    if not talking and not any(opens_talk(r) for r in kept[:at]):
+        return kept
     leave = {"op": "leave_talk", "actor": getattr(scene.pc(), "ref", "pc"),
              "params": {"do": "leave"},
              "because": "the player's own deed ends the conversation (ruling 2026-10-17)"}
@@ -1359,7 +1423,7 @@ def _finishable(actor) -> bool:
             and (actor.has_state("state.down") or actor.has_state("state.helpless")))
 
 
-def declare_coup_de_grace(raw_intents, player_text: str, scene):
+def declare_coup_de_grace(raw_intents, player_text: str, scene, reading=None):
     """Finishing words make the blow a coup de grâce; the model does not have to.
 
     Measured 2026-09-27: `is_finishing_blow` recognised "I finish him" and kept the
@@ -1376,6 +1440,12 @@ def declare_coup_de_grace(raw_intents, player_text: str, scene):
     immune to criticals, a sling), so this only ever declares; it never decides.
     """
     if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    # With a reading, the reader's closed `blow` decides (`interpret.BLOWS`, built in
+    # `acts_to_ops.victims` and carried onto the plan by `inject_fight`): the owner's
+    # direction, models read and code validates. This regex is the door only for a turn
+    # with no reading (the reader off, or its call failed), as `purchase_sought` is.
+    if isinstance(reading, dict) and "error" not in reading:
         return raw_intents
     if not is_finishing_blow(player_text, scene):
         return raw_intents
@@ -1634,8 +1704,12 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
              and r.index < len(actions) and interpret.acting(actions[r.index])]
     if not blows:
         return raw_intents
-    if is_finishing_blow(player_text, scene):
-        return raw_intents
+    # No early return on finishing words any more (2026-11-04): it was `is_finishing_blow`,
+    # a regex, standing the reading down — so "I finish him off" in a fight kept whatever
+    # blow the plan wrote, and "I slit his throat", which the regex never knew, was an
+    # ordinary swing. The reading's own `blow` (`interpret.BLOWS`) now decides the coup de
+    # grâce in `acts_to_ops.victims`, and a blow at a body on the floor opens no fight
+    # whichever it is (the engine's battle gate), the reason the bail was written.
     pc = scene.pc() if hasattr(scene, "pc") else None
     if pc is None:
         return raw_intents
@@ -1670,6 +1744,41 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
                                      f"aimed at {victim}, whom the words mean")
                     out[k] = dict(r, actor=pc.ref, target=victim, params=params,
                                   because=built[0]["because"])
+        # The table's coup de grâce rides the plan's own blow at the same body. Measured on
+        # the narration diagnosis bench (2026-11-04): "I finish off the dying bandit with my
+        # longsword" was built `attack, coup_de_grace` (`acts_to_ops.victims`: down, out of
+        # a fight), the plan's own attack at the bandit stood in its place without the
+        # param, and the blow was an ordinary swing — one that can miss on a natural 1,
+        # and on run 1 did not kill. A manoeuvre the plan chose is left alone.
+        finishing = {b["target"] for b in built
+                     if (b.get("params") or {}).get("coup_de_grace")}
+        for k, r in enumerate(out):
+            if mine(r) and str(r.get("target") or "") in finishing \
+                    and not (r.get("params") or {}).get("manoeuvre") \
+                    and not (r.get("params") or {}).get("coup_de_grace"):
+                out[k] = dict(r, params={**(r.get("params") or {}), "coup_de_grace": True})
+                if notes is not None:
+                    notes.append(f"the plan's blow at {r.get('target')} is the coup de "
+                                 f"grâce the reading built")
+        # And the other way: in a fight, a blow the reading built at a body on the floor
+        # WITHOUT the coup de grâce (its `blow` ordinary) stays ordinary, whatever param the
+        # plan wrote. Since the owner's ruling of 2026-11-04 a coup de grâce in a fight
+        # costs the whole round and provokes (`Engine._coup_provokes`); the reader's closed
+        # answer about the player's words decides that, never the planner's guess.
+        plain = {b["target"] for b in built
+                 if not (b.get("params") or {}).get("coup_de_grace")
+                 and getattr(scene, "in_encounter", False)
+                 and actors.get(b["target"]) is not None
+                 and (actors[b["target"]].is_down
+                      or actors[b["target"]].has_state("state.helpless"))}
+        for k, r in enumerate(out):
+            if mine(r) and str(r.get("target") or "") in plain \
+                    and (r.get("params") or {}).get("coup_de_grace"):
+                out[k] = dict(r, params={p: v for p, v in (r.get("params") or {}).items()
+                                         if p != "coup_de_grace"})
+                if notes is not None:
+                    notes.append(f"the plan's coup de grâce at {r.get('target')} is the "
+                                 f"ordinary blow the reading built")
         hit = {str(r.get("target") or "") for r in out if mine(r)}
         for b in built:
             if b["target"] not in hit:
@@ -2507,7 +2616,7 @@ on off up in out over under away back down
 # "fight" and its kin: "I pick a fight with the biggest man in the room" put a "fight" in
 # the goods on every recorded turn that sentence resolved — four in the committed fight
 # recordings (2026-09-25), one in the 2026-09-27 audit ("Kesst Vayr takes fight.").
-# Measured in the masta save (2026-09-18): `goods` held "scene on" ×3 and
+# Measured in the torvo save (2026-09-18): `goods` held "scene on" ×3 and
 # "satisfaction" ×1 — the Continue directive ("I take no action. Carry the scene on…")
 # read by `_ACQUIRES` as "I take … the scene on", and "pay for satisfaction" read as a
 # purchase. Words for what is happening are not things.
@@ -2577,7 +2686,7 @@ def inject_payment(raw_intents, player_text: str, scene) -> list:
 
     Measured in the brothel (2026-09-18): "I pay her ten gold" reached the engine as
     `sell gold_coins_10 to c16` — a sale of a stock item nobody carries — and was refused
-    ("Masta is not carrying gold_coins_10") while the prose took the coin. The purse
+    ("Torvo is not carrying gold_coins_10") while the prose took the coin. The purse
     never moved. Money is a `give` of a denomination (`_op_give` already spends it and
     refuses a purse that cannot cover it). A `sell` or `give` the model wrote for coins
     is turned into that op rather than left to be refused; the amount is the item's own
@@ -2678,7 +2787,7 @@ def inject_improvised(raw_intents, player_text: str, scene) -> list:
     """A thing thrown or swung is an improvised-weapon attack, and the thing is named.
 
     Measured 2026-09-18: "i pick up a chunk of wood and throw it at the man" came back
-    as `give chunk of wood` and a `cast` ("Masta is a blood bending and does not cast
+    as `give chunk of wood` and a `cast` ("Torvo is a blood bending and does not cast
     spells"), then a `use_ability`; the pebble two turns later killed a man as an
     unarmed strike (37 to hit, 21 damage) with no object in the arithmetic at all. The
     Core Rulebook has the rule (`tables.WEAPONS["improvised"]`: -4, 1d4, thrown at
@@ -3625,6 +3734,19 @@ _NOT_A_POSSESSION = frozenset({
     "left", "right", "lead", "reins", "first", "last",
 })
 
+def _not_a_possession(word: str) -> bool:
+    """Whether `word`, or its singular, names the body, a way or a thing never carried.
+
+    By the singular as well, because the list keeps one form of most words and the plural
+    slipped through: measured live 2026-11-01, "I hold out my wrists and go quietly with
+    the guards" — the list had "wrist", not "wrists" — was read as producing a wrists the
+    sheet could not account for, and the stallholder beside the arrest rolled Sense Motive
+    against a Bluff, saw through it and cooled on the player, twice running."""
+    w = word.lower()
+    return (w in _NOT_A_POSSESSION or (w.endswith("s") and w[:-1] in _NOT_A_POSSESSION)
+            or (w.endswith("es") and w[:-2] in _NOT_A_POSSESSION))
+
+
 # Taking something FROM somewhere is acquiring it, not claiming to have had it — and
 # that is an action the engine already has doors for. "I take the bread from the stall"
 # is a `give` or a buy; it is not a man producing bread out of his coat.
@@ -3726,7 +3848,7 @@ def _acquired_words(reading=None, plan=None, pc_ref: str = "pc") -> set[str]:
 
 
 # A weapon's generic words, by what the weapon is. "Blade" is said of a blade: the
-# first cut vouched "weapon", "blade" and "arms" for ANY equipped weapon, so Sam with a
+# first cut vouched "weapon", "blade" and "arms" for ANY equipped weapon, so Dace with a
 # shortbow in hand was offered "I keep my hand on the hilt of my blade" and nothing
 # objected (item 4, 2026-09-30). A bow is a weapon, and is not a blade.
 _BLADE_WORDS = frozenset({"sword", "blade", "dagger", "knife", "rapier", "scimitar", "sabre",
@@ -3845,7 +3967,7 @@ def false_possession(player_text: str, scene, reading=None, plan=None) -> str:
         return ""
     vouched = possession_vocabulary(scene, pc)
     # What this turn ACQUIRES is not a claim to have had it (item 5, turn 23: "I take the
-    # key and walk toward the curtain" — the same plan gave Sam the key, and the room
+    # key and walk toward the curtain" — the same plan gave Dace the key, and the room
     # still rolled a Bluff against him for "producing" it).
     acquired = _acquired_words(reading, plan, pc.ref)
 
@@ -3865,7 +3987,7 @@ def false_possession(player_text: str, scene, reading=None, plan=None) -> str:
         # The head noun is the last word of the phrase — "royal seal", "deed to the
         # mill" — and a claim is false only when NOTHING in it is accounted for. A
         # player who says "my father's sword" with a sword on the sheet has one.
-        if any(w in _NOT_A_POSSESSION for w in words):
+        if any(_not_a_possession(w) for w in words):
             continue
         # And an abstract noun is not a possession either — "I take the chance", "I
         # accept the offer". `_is_a_thing` is this file's own answer to that question,
@@ -4172,7 +4294,7 @@ def inject_false_claim(raw_intents, player_text: str, scene, reading=None) -> li
     p.90), modified by how believable the lie is — "I am a god" is impossible (-20), the
     king's lost heir far-fetched (-10). The listener is `listener_for`; the believability
     is `lie_of`, written on `opposed_by` as `lie` and turned into a number only by the
-    engine (`rules/bluff.py`). Until 2026-09-30 this was a flat DC 30, which Sam's Bluff
+    engine (`rules/bluff.py`). Until 2026-09-30 this was a flat DC 30, which Dace's Bluff
     +6 could not reach: three rolls, three failures, on lines that were not lies.
 
     **Nobody listening, no roll.** An opposed check with no opponent is not a check: the
@@ -4649,7 +4771,7 @@ def _person_gone_to(action, scene) -> str:
     """The ref of the person here a `go` act's PLACE actually names, or "".
 
     Measured live on the lane-B check, 2026-09-30: "I walk over to Quin." was read as
-    `go place: "to Quin"` — a person in the place slot — and the plan walked Sam out of
+    `go place: "to Quin"` — a person in the place slot — and the plan walked Dace out of
     the Velvet Veil to the gate, leaving Quin mid-sentence. A place the town has is a
     place, whoever shares a word with it; only a phrase no place answers to is asked of
     the people here."""
@@ -4791,7 +4913,7 @@ def _closes_on(scene, raw: dict, who) -> bool:
 
     Measured on this lane's live check (2026-09-30): "I walk over to the guard." — the
     refusal named the square beside him, [4, 4]; the retry wrote `move square [0, 0]`,
-    25 ft the OTHER way, and the guard went from near to far while the prose said Sam
+    25 ft the OTHER way, and the guard went from near to far while the prose said Dace
     closed the distance. The square is checked, not trusted: a move that does not end
     beside them is replaced by the one that does."""
     params = raw.get("params") or {}
@@ -5764,10 +5886,23 @@ def inject_loot(raw_intents, player_text: str, scene) -> list:
     # or drop the op entirely when nobody lootable is here.
     out: list = []
     have_loot = False
+    # Somebody a blow earlier in the same plan is aimed at is a body by the time the loot
+    # is resolved, or is refused then in words ("on their feet"). Measured on the owner's
+    # 0.2.25 report (2026-11-01): "punch until she is dead thernm loot her" — she was
+    # standing when the plan was read, so the loot was dropped here "quietly", the punch
+    # killed her, and nothing was taken until the player asked again.
+    struck: set = set()
     for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack" \
+                and r.get("target") in scene.actors:
+            struck.add(r.get("target"))
         if isinstance(r, dict) and str(r.get("op", "")).lower() == "loot":
             params = dict(r.get("params") or {})
             frm = params.get("from_") or params.get("from")
+            if frm in struck:
+                have_loot = True
+                out.append(r)
+                continue
             if frm not in bodies:
                 if not bodies:
                     continue                     # nobody to strip: the op goes, quietly
@@ -6016,7 +6151,7 @@ _VENTURES = re.compile(
 # Item 9, measured on the 2026-09-30 save (turn_log row 102): "I head toward the back
 # streets to find the Velvet Veil." The travel was refused with a hint to found it first —
 # a hint that taught leaving `parent` out — and the plan founded it with none, so the Veil
-# went "off the gate", where Sam stood, and not into the back streets the words named and
+# went "off the gate", where Dace stood, and not into the back streets the words named and
 # the guard had named a turn before ("a place tucked down in the back streets"). The
 # engine's `_parent_place("")` defaults to where the party stands, and no reader took the
 # parent from the words. Evidence, strongest first: the player's own words, then what a
@@ -6625,6 +6760,20 @@ def _content_words(text: str) -> set[str]:
 OWN_WORDS = 0.5
 
 
+def _said_whole(entry: dict) -> dict:
+    """A reported say's words closed as a sentence: the engine's tell runs them straight
+    into its next sentence ("…to the effect that forge me a longsword You are in
+    conversation with the smith", the rerun of 2026-11-05, commission run 2), and the
+    tells check's fallback put that run-on on the page as the engine's own line. Quoted
+    words are left exactly as typed."""
+    params = dict(entry.get("params") or {})
+    words = str(params.get("words") or "").rstrip()
+    if not words or params.get("quoted") or words[-1] in ".!?…\"'”’":
+        return entry
+    params["words"] = words.rstrip(",;:") + "."
+    return dict(entry, params=params)
+
+
 def own_words_only(raw_intents, player_text: str, reading=None, *,
                    notes: list | None = None) -> list:
     """A `say` the player's character makes carries the player's words, or none.
@@ -6651,11 +6800,25 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
         from . import interpret as _interpret
 
         # Words said now, never words the player means to say later ("I head for the
-        # stables to ask about a horse": the asking is intended, `interpret.COMMITS`).
-        says = next((str(a.get("says") or "").strip()
-                     for a in reading.get("actions") or []
-                     if isinstance(a, dict) and _interpret.acting(a)
-                     and str(a.get("says") or "").strip()), "")
+        # stables to ask about a horse": the asking is intended, `interpret.COMMITS`) —
+        # the whole of them, run on through the speech that follows in the same breath
+        # (`interpret.words_said`, round 2: "up to my room" of an invitation to share a bed).
+        says = _interpret.words_said(reading, player_text) or next(
+            (str(a.get("says") or "").strip()
+             for a in reading.get("actions") or []
+             if isinstance(a, dict) and _interpret.acting(a)
+             and str(a.get("says") or "").strip()), "")
+    # How much of a say must be the player's own. Half, as measured below — unless the
+    # reader read the line and found no words said in it at all (no `says` on any act done
+    # now): then nothing in a say can be the player's speech but the line's own words, and
+    # every content word must be found there. Measured on the narration diagnosis bench
+    # (2026-11-04, the commission's "agree" line, run 3): "I agree to his price and pay" was
+    # read `sell` + `give`, no words said, and the PLAN wrote the say "I agree to your price.
+    # Here is the payment." — 2 of its 3 content words the player's, so it passed at half,
+    # and the say slot told the payment as spoken while the engine refused it ("pays nothing
+    # more"). The deed was dressed as speech by the planner, not by the reader.
+    wordless = isinstance(reading, dict) and "error" not in reading and not says
+    need = 1.0 if wordless else OWN_WORDS
     out: list = []
     for entry in raw_intents:
         if not (isinstance(entry, dict) and str(entry.get("op", "")).lower() == "say"
@@ -6665,13 +6828,24 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
         params = dict(entry.get("params") or {})
         words = str(params.get("words") or "").strip()
         theirs = _content_words(words)
-        if words and (not theirs or len(theirs & mine) / len(theirs) >= OWN_WORDS):
-            out.append(entry)
+        if words and (not theirs or len(theirs & mine) / len(theirs) >= need):
+            # Part of what the player said is not what they said: a say whose words are a
+            # piece of the line's words said carries all of them, told once (round 2,
+            # 2026-11-05: the say carried "up to my room" of "…up to my room to share my
+            # bed tonight", and the slot told it as asking for a room).
+            whole = _content_words(says)
+            if says and theirs and theirs < whole and not params.get("quoted"):
+                if notes is not None:
+                    notes.append(f"a say carried part of the line: {words[:80]!r} -> the "
+                                 f"whole {says[:80]!r}")
+                params["words"] = says
+                entry = dict(entry, params=params)
+            out.append(_said_whole(entry))
             continue
         instead = says or spoken(player_text)
         if instead:
             params["words"] = instead
-            out.append(dict(entry, params=params, because="the player said it"))
+            out.append(_said_whole(dict(entry, params=params, because="the player said it")))
             if notes is not None and words:
                 notes.append(f"a say in words the player never wrote: {words[:80]!r} "
                              f"-> the player's own {instead[:80]!r}")
@@ -6922,9 +7096,9 @@ def spell_in_words(text: str):
     name first; None when they name none.
 
     Item 4, measured 2026-09-30: "I cast cure light wounds" resolved to **Light** for
-    Sam, a wizard. The resolver looked only at the spells he could reach and matched by
+    Dace, a wizard. The resolver looked only at the spells he could reach and matched by
     substring, and Light was the only reachable name inside the sentence. Against the
-    whole book, "cure light wounds" is Cure Light Wounds — which Sam cannot cast, and that
+    whole book, "cure light wounds" is Cure Light Wounds — which Dace cannot cast, and that
     is the answer the caller then gives — and a name is matched only on whole words, so
     "lightning" is never Light either."""
     from rules import spells as spells_mod
@@ -8271,7 +8445,7 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
     # crowd saw somebody announce they were a god and nothing happen. The Bluff's
     # verdict, when the engine rolled one, decides whether anybody half-believed it.
     # What the turn handed the player is not a boast about having it (item 5: the crowd
-    # was told Sam "produced a key he did not have" on the turn he was given it).
+    # was told Dace "produced a key he did not have" on the turn he was given it).
     # The gives that landed, as plan-shaped intents: a `give` effect names its taker as
     # `ref` (world state read for world state, as the rest of this function does).
     pc = scene.pc() if hasattr(scene, "pc") else None
@@ -9389,7 +9563,7 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
     here = [a for a in actors.values() if not a.is_pc and _unnamed(a)
             and getattr(a, "true_name", "") and a.true_name != a.name]
     # The BEST match, not every match, and the same rule `examined` uses. Measured live
-    # 2026-09-19 on a copy of the `masta` save: "I turn to the woman in the corner and ask
+    # 2026-09-19 on a copy of the `torvo` save: "I turn to the woman in the corner and ask
     # her what her name is" matched both the woman in the corner and the woman, so two
     # names were offered and the beat ended with a second stranger volunteering hers to
     # nobody. One score short of the top is not who was asked.

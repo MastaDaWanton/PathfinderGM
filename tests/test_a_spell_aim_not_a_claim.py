@@ -47,3 +47,15 @@ def test_a_real_false_possession_still_is_one():
     scene = _bobby()
     assert "crown" in judgement.false_possession("I pull out my crown and show them",
                                                  scene)
+
+
+def test_held_out_wrists_are_the_body_not_a_claim():
+    """Measured live 2026-11-01 on the frame-up arrest: "I hold out my wrists and go
+    quietly with the guards" became a Bluff against the stallholder beside the guards —
+    "wrist" was on the body list, "wrists" was not — and she saw through it and cooled on
+    the player, on both tries. Every plural of a body word is the body."""
+    scene = _bobby()
+    for line in ("I hold out my wrists and go quietly with the guards",
+                 "I hold out my knees", "I show them my hips", "I hold up my elbows"):
+        assert judgement.false_possession(line, scene) == "", line
+        assert judgement.false_claim(line, scene) == "", line

@@ -145,10 +145,12 @@ lethal; `Scene.advance` heals nonlethal 1/hour/level by hour boundaries crossed.
 - `grants` documents for blood spike, coagulator and blood commander paths.
 - Blood Burst's computed save DC; Rupture Self's blood-pool targeting (see the
   path's `needs` map).
-- The coup de grâce's remaining clauses: the attack of opportunity it provokes
-  (only movement provokes anything today — `rules/reactions.py`), the full-round
-  cost as an enforced budget (no op has one), the two-round version against total
-  concealment, and ghost touch against the incorporeal.
+- The coup de grâce's remaining clauses: the two-round version against total
+  concealment, a declared move after it in the same turn (only a 5-foot step is
+  allowed; `_op_move` does not ask `move_spent`), and ghost touch
+  against the incorporeal. (Its attacks of opportunity and full-round cost in a fight
+  are BUILT since 2026-11-04: `Engine._coup_provokes`, `_coup_round_spent`,
+  `_coup_paid`; declared from the reader's closed `blow`, `interpret.BLOWS`.)
 - Critical-hit immunity on ORDINARY attacks: an ooze is critted by a normal swing
   today. `coup_de_grace.crit_immunity` is the reader to reuse.
 
@@ -190,7 +192,9 @@ compiled `rules` — grab/trip/push/pull as free manoeuvres, poison and disease 
 frequency to the printed cure, across `Scene.advance` and a save), paralysis, bleed, burn,
 attach, constrict, ability damage; a swarm's distraction is `_distraction`) — energy drain
 is reported, not applied (negative levels stay `engine=False`), and 358 rider documents are
-`unsupported` with a reason; the grapple MAINTAINED on later turns has no executor; feat actions
+`unsupported` with a reason; the grapple is maintained (`Engine.grapple_turn`, damage only —
+no move/pin/tie-up), escaped (`escape` op and reader act) and ended (`_grapples_settle`,
+`Scene.end_encounter`) since 2026-11-01, tests/test_grapple_held.py; feat actions
 (Cleave, Vital Strike) have no `find_ability` branch; no level-up feat writer exists;
 the claims scrubber let prose describe a struck target after a `cast` that never
 resolved (measured once, before the actor fill); "I set off the trap" came back as

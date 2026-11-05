@@ -69,8 +69,8 @@ shorter than asked.
 
 ## The opening (item 10)
 
-Not a cold load: the model wrote "Maste" for "Masta", the invented-name check counted it
-as a name from outside the material and the who-the-player-is check found no "Masta" —
+Not a cold load: the model wrote "Torve" for "Torvo", the invented-name check counted it
+as a name from outside the material and the who-the-player-is check found no "Torvo" —
 two rejections from one slip, and an 802-character draft fell to the template.
 `opening_prose.repair_near_misses` substitutes a name one letter off (or sharing its
 first four letters within a letter of length) with the real one before the checks run,
@@ -78,7 +78,7 @@ sentence starts included; `opening._clause` lowers a leading article in a splice
 ("keeps to a local reeve", not "keeps to A local reeve"), and only an article — the
 export's own case is otherwise kept.
 
-## Measured live, one replay on a copy of the `masta` save
+## Measured live, one replay on a copy of the `torvo` save
 
 Seven lines: go to the forge and work the bellows; Continue; Continue; the insult;
 Continue; Continue; Continue.

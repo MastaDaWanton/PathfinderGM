@@ -143,6 +143,12 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from gm import deed_reader as deed_reader_mod
 
     monkeypatch.setattr(deed_reader_mod, "ENABLED", False)
+    # And the tells check of planned narration (gm/planned.py `_tells_kept`, the repair gate
+    # `agent.tells_gate`): a read per planned beat and per kept repair, which a test that
+    # turns the read back on to script ITS replies did not order. Measured the day it
+    # landed: the scripted refused-move test had one rewrite reply spent on the gate.
+    # tests/test_narration_faithfulness.py drives it with its own replies.
+    monkeypatch.setenv("PATHFINDER_GM_TELLS_CHECK", "0")
 
 
 @pytest.fixture(autouse=True)

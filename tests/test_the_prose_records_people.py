@@ -75,7 +75,7 @@ def _turn(cm, monkeypatch, beat, said="I look around."):
 
 def test_somebody_the_prose_shows_here_is_a_record_with_a_body(live, monkeypatch):
     """Overturned 2026-10-01 by the owner — "if i can see them they should be in the scene
-    as a fully made person" — after the woman at the top of the stairs in Sam's save stayed
+    as a fully made person" — after the woman at the top of the stairs in Dace's save stayed
     prose and "the woman" was refused as an unknown ref. Seen here and now, she is ONE
     record and ONE body: the record holds her ref and her life, the body wears it
     (tests/test_seen_people.py has the rest)."""

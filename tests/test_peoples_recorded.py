@@ -1,7 +1,7 @@
 """Every minting door records the people a person's face was drawn from (item 10).
 
 Measured on the 2026-09-30 playtest (docs/playtest-2026-09-30-findings.md item 10): **8 of 8
-NPCs in Sam's save were stored `race: "human"`** — the `Actor` default — **with a Ratfolk
+NPCs in Dace's save were stored `race: "human"`** — the `Actor` default — **with a Ratfolk
 face and no `world_people_id`**, the Clockwork Spy (a construct) included in the eight with
 race human. `names.appearance_for` chose the people and only its text was kept; the keeper
 door, `population.embody` and the speaker made real wrote the face and never the people.
@@ -132,7 +132,7 @@ def test_the_rules_race_is_left_alone():
 
 
 def test_an_old_save_gets_the_people_its_face_shows():
-    """8 of 8 on Sam's save: the face is the evidence. Nothing is redrawn."""
+    """8 of 8 on Dace's save: the face is the evidence. Nothing is redrawn."""
     scene = Scene(location_id=LEDGERWARREN)
     scene.add(load_pc("fixtures/pc-kesst.json"))
     face = names.appearance_for(WORLD, LEDGERWARREN, ref="c1")

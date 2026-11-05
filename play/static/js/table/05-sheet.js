@@ -1046,6 +1046,13 @@ function tabClass(s) {
           ${(p.next.said || p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
             (p.next.said || p.next.grants).map(glossify).join(", ")}</b></div>` : ""}
         </div>
+        <fieldset class="lv-favoured" id="lvfavoured">
+          <legend>Favoured class bonus for level ${p.next.level}</legend>
+          <label><input type="radio" name="lvfavoured" value="hp" checked> +1 hit point</label>
+          <label><input type="radio" name="lvfavoured" value="skill"> +1 skill rank</label>
+          <span class="why">CRB p.31: every level in your favoured class gives one or the
+            other.</span>
+        </fieldset>
         <button type="button" class="v2-btn is-go" id="levelup">Take level ${p.next.level}</button>
         <div id="levelerr" class="why" role="status"></div>`
         : `<p class="why">Twentieth level. There is no more table.</p>`}

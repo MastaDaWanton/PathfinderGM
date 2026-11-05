@@ -1,7 +1,7 @@
 """The fight is the engine's, from either side.
 
 The 2026-09-18 play-test (docs/playtest-2026-09-18.md, items 13a, 14, 16, 17, 18, 19),
-measured off the `masta` save: a man drew on the player and lunged — "he lunges, the
+measured off the `torvo` save: a man drew on the player and lunged — "he lunges, the
 blade whistling through the air as he tries to overwhelm your guard" — and the engine
 rolled nothing, because the only door into an encounter from the world's side was the
 model's own `begin_encounter` op. He was never on the board either: introduced as "the

@@ -66,16 +66,26 @@ _CRITERIA = {
     "has": re.compile(r"^(not\s+)?has\((pc|\$\w+),\s*([a-z0-9.\-_$]+)\)$"),
     "since": re.compile(r"^since\((open|campaign|left\(\$\w+\)|[\w-]+)\)\s*>=\s*(\d+)([hd])$"),
     "clock": re.compile(r"^clock\s*>=\s*(\d+)$"),
-    "event": re.compile(r"^event:(\w+)(?:\(\$(\w+)\))?$"),
+    # `event:give($giver, $errand)`: the player handed THAT thing to THAT person this batch.
+    # The second slot came 2026-11-01, when "Get it back to $sick before the fever turns"
+    # ticked on walking into the tavern with the herb in the pack — `holds` and `present`
+    # said the herb and the sick woman were in one room, and nothing was ever handed over.
+    "event": re.compile(r"^event:(\w+)(?:\(\$(\w+)(?:,\s*\$(\w+))?\))?$"),
     "alive": re.compile(r"^(not\s+)?alive\(\$(\w+)\)$"),
     "present": re.compile(r"^(not\s+)?present\(\$(\w+)\)$"),
     "holds": re.compile(r"^(not\s+)?holds\(pc,\s*\$(\w+)\)$"),
+    # `taken(errand)`: the player took on the quest card of that key (`cards.standing` OWN).
+    # A card key, not a slot: what is asked is the player's standing to a card the scheme
+    # opened. Written for the frame (a-small-favour's `guards-arrive`): measured on the
+    # owner's 0.2.25 save, guards came for the stranger "asking after" the victim when
+    # the errand had only reached the player through a go-between and was never taken.
+    "taken": re.compile(r"^(not\s+)?taken\((\w+)\)$"),
 }
 SHAPES = ("at($place)", "left($place)", "arrived($place)", "has(pc, tag)",
           "has($slot, tag)", "has(pc, state.wanted.$town)", "since(open) >= 2h",
           "since(open) >= 2d", "since(left($market)) >= 1h", "clock >= 600",
-          "event:give($slot)", "event:talk($slot)", "alive($slot)", "present($slot)",
-          "holds(pc, $item)")
+          "event:give($slot)", "event:give($slot, $item)", "event:talk($slot)",
+          "alive($slot)", "present($slot)", "holds(pc, $item)", "taken(cardkey)")
 # The events `_events_from` reads out of a tick's outcomes. A criterion naming any other
 # can never hold: `event:talk` was written into the design (docs/design-d-people.md
 # §4.6) before anything emitted it, and the grammar alone would have accepted it and
@@ -88,7 +98,7 @@ HOOK_FIELDS = ("motive", "doing", "withholds")
 # `has`/`holds` only when the subject is the player; `alive`/`present` only beside a
 # place or event criterion (a person's state is the world's to change, not the
 # player's — the fairness critic validated a step keyed on the victim's life alone).
-_PLAYER_CHANGEABLE = ("at", "left", "arrived", "event")
+_PLAYER_CHANGEABLE = ("at", "left", "arrived", "event", "taken")
 # What a scheme may put on or take off a person. The most dangerous edit in the
 # vocabulary is a `state.down` or `recovery.*` grant — a document could kill the
 # player with no hit-point change — so the families are listed, with the fix named.
@@ -202,6 +212,14 @@ def validate(doc: dict) -> list[str]:
                             f"from: 'other-scheme.slot' to share another scheme's.")
         if isinstance(spec, dict) and spec.get("place") and spec["place"] not in PLACE_KINDS:
             problems.append(f"slots.{name}: a place kind is one of {', '.join(PLACE_KINDS)}.")
+        if isinstance(spec, dict) and spec.get("held_by"):
+            holder = slots.get(str(spec["held_by"]).lstrip("$"))
+            if not spec.get("item"):
+                problems.append(f"slots.{name}: held_by is for an item slot — the person "
+                                f"who carries the thing.")
+            elif not (isinstance(holder, dict) and (holder.get("role") or holder.get("from"))):
+                problems.append(f"slots.{name}: held_by names a person slot of this scheme "
+                                f"(a role), e.g. \"held_by\": \"rival\".")
 
     def check_slots(text, at):
         for s in _slots_named(text):
@@ -273,6 +291,7 @@ def validate(doc: dict) -> list[str]:
         if isinstance(g, dict):
             check_digits(g.get("say", ""), f"grants_on_open[{i + 1}].say")
             check_slots(g.get("say", ""), f"grants_on_open[{i + 1}].say")
+            problems.extend(_charge_problems(g, f"grants_on_open[{i + 1}]"))
     for i, act in enumerate(doc.get("on_open") or []):
         if not isinstance(act, dict) or act.get("do") not in ACTIONS:
             problems.append(f"on_open[{i + 1}]: action {act!r} — the vocabulary is {', '.join(ACTIONS)}.")
@@ -304,6 +323,14 @@ def validate(doc: dict) -> list[str]:
             if found[0] == "event" and found[1].group(1) not in EVENTS:
                 problems.append(f"{at}: {c!r} names an event nothing emits; the events are "
                                 f"{', '.join(EVENTS)}.")
+            if found[0] == "taken" and not any(
+                    isinstance(cd, dict) and cd.get("key") == found[1].group(2)
+                    and cd.get("kind") == "quest" for cd in doc.get("cards") or []):
+                problems.append(f"{at}: {c!r} names no quest card of this scheme; taken() "
+                                f"takes a quest card's key ("
+                                + ", ".join(sorted(str(cd.get("key")) for cd in doc.get("cards") or []
+                                                   if isinstance(cd, dict)
+                                                   and cd.get("kind") == "quest")) + ").")
             if found[0] in _PLAYER_CHANGEABLE:
                 changeable = True
             if found[0] in ("has", "holds") and found[1].group(2) == "pc":
@@ -673,6 +700,33 @@ def _item_for(engine, spec: dict, filled: dict) -> dict | None:
     return {"kind": "item", "id": pick.id, "name": pick.name, "biome": biome}
 
 
+def _place_held(engine, slots: dict, filled: dict) -> list[str]:
+    """Put each item slot's thing in the hands of the person slot its `held_by` names, the
+    way a gift or loot would (`hand_item`), once — the slot is marked `placed`. Returns the
+    slot names placed.
+
+    Measured on the owner's 0.2.25 report (2026-11-01): the-lost-thing's Anise was a label
+    and nothing else. The truth card says the rival "took the $lost and is out at $wild
+    with it", but no one carried it: killing and looting the rival gave 6 sp, and the
+    `returned` step (`holds(pc, $lost)`) could never fire. A thing the story says somebody
+    has is on them, so loot, a steal or a hand-over finds it (`_holds` reads the shelf by
+    the slot's name)."""
+    done: list[str] = []
+    for name, spec in (slots or {}).items():
+        if not isinstance(spec, dict) or not spec.get("item") or not spec.get("held_by"):
+            continue
+        slot = filled.get(name) or {}
+        if slot.get("kind") != "item" or slot.get("placed"):
+            continue
+        holder = _who(engine.scene, filled, str(spec["held_by"]))
+        if holder is None or getattr(holder, "is_pc", False):
+            continue
+        hand_item(engine.scene, holder, str(slot.get("name") or ""))
+        slot["placed"] = str(holder.ref)
+        done.append(name)
+    return done
+
+
 def fill_slots(engine, doc: dict) -> dict:
     """Places first (people are put in them), then items (by the wild place's ground),
     then people. Frozen on the instance. A slot written as {"from": "scheme.slot"}
@@ -706,6 +760,7 @@ def fill_slots(engine, doc: dict) -> dict:
             got = _role_for(engine, name, spec, filled, taken)
             if got:
                 filled[name] = got
+    _place_held(engine, slots, filled)
     for name, spec in slots.items():
         if spec.get("faction"):
             world = engine.world
@@ -844,6 +899,23 @@ def _remove(scene, filled: dict, g: dict, inst: dict | None = None) -> int:
     return len(gone)
 
 
+def _charge_problems(g: dict, at: str) -> list[str]:
+    """A warrant a scheme grants may say what it is for (`charge`), which the trial reads
+    (rules/trial.py): one of the law's own charges, and only on a warrant."""
+    if "charge" not in g:
+        return []
+    from . import trial
+
+    kinds = tuple(trial.document()["charges"])
+    if g.get("charge") not in kinds:
+        return [f"{at}.charge: one of {', '.join(kinds)} — what the warrant is for."]
+    if not any(str(t).startswith(("state.wanted", "state.suspected"))
+               for t in g.get("tags") or ()):
+        return [f"{at}.charge: a charge goes on a warrant — grant state.wanted.$town or "
+                f"state.suspected.$town with it."]
+    return []
+
+
 def _grant(scene, filled: dict, g: dict, source: str, inst: dict | None = None) -> None:
     who = _who(scene, filled, str(g.get("to", "pc")))
     if who is None:
@@ -857,9 +929,12 @@ def _grant(scene, filled: dict, g: dict, source: str, inst: dict | None = None) 
     # The effect's name is what the brief will say the player noticed: a `say` in
     # the document's words, else the tag's leaf.
     said = fill_text(str(g.get("say") or ""), filled) if inst is not None or filled else str(g.get("say") or "")
+    # What a warrant is for, when the document says (`charge`): the trial's evidence that
+    # the watch accuses the player of it (rules/trial.py `charges`).
+    payload = {"crime": str(g["charge"])} if g.get("charge") else {}
     who.apply_effect(ActiveEffect(name=said or tags[0].split(".")[-1].replace("-", " "),
                                   kind="situation", key=key, source=source, origin=source,
-                                  duration="until-dismissed", tags=tags))
+                                  duration="until-dismissed", tags=tags, payload=payload))
 
 
 # --- criteria ----------------------------------------------------------------------------------
@@ -888,6 +963,20 @@ def _holds(pc, slot: dict) -> bool:
     return bool(iid) and int(inv.get(iid, 0) or 0) > 0
     return any(str(s.base).lower() == want and s.count > 0 for s in pc.stock.values()) \
         or str(slot.get("id") or "") in (pc.materials if hasattr(pc, "materials") else {})
+
+
+def _item_is(said, slot: dict) -> bool:
+    """Whether the thing a give named is the item slot's thing: its name or its id, with
+    case, hyphens and spaces not counting ("marsh mallow" is the Marsh-Mallow the slot
+    holds as `marsh-mallow`). The give op writes what the plan called it."""
+    if not slot or slot.get("kind", "item") != "item":
+        return False
+
+    def norm(x) -> str:
+        return " ".join(re.sub(r"[-_]+", " ", str(x or "").lower()).split())
+
+    got = norm(said)
+    return bool(got) and got in {norm(slot.get("name")), norm(slot.get("id"))} - {""}
 
 
 def _criterion_holds(engine, inst: dict, doc: dict, text: str, events: list[dict]) -> bool:
@@ -933,19 +1022,32 @@ def _criterion_holds(engine, inst: dict, doc: dict, text: str, events: list[dict
     if kind == "clock":
         return scene.clock_minutes >= int(m.group(1))
     if kind == "event":
-        name, slot = m.group(1), m.group(2)
+        name, slot, thing = m.group(1), m.group(2), m.group(3)
         for e in events:
             if e.get("event") != name:
+                continue
+            # A give is the PLAYER's give: something the world handed the giver (no
+            # `from`), or another person's, is not the player returning anything. An event
+            # with no `from` key at all is an older caller's and is read as before.
+            if name == "give" and "from" in e and pc is not None \
+                    and str(e.get("from") or "") != pc.ref:
+                continue
+            if thing and not _item_is(e.get("item"), filled.get(thing) or {}):
                 continue
             if slot:
                 s = filled.get(slot) or {}
                 if s.get("kind") == "actor" and e.get("to") == s.get("ref"):
                     return True
-                if s.get("kind") == "item" and str(e.get("item", "")).lower() == str(s.get("name", "")).lower():
+                if s.get("kind") == "item" and _item_is(e.get("item"), s):
                     return True
                 continue
             return True
         return False
+    if kind == "taken":
+        neg, key = m.group(1), m.group(2)
+        card = _card(scene, inst, key)
+        v = card is not None and cards_mod.standing(card) == cards_mod.OWN
+        return (not v) if neg else v
     if kind in ("alive", "present"):
         neg, name = m.group(1), m.group(2)
         actor = _who(scene, filled, name)
@@ -990,9 +1092,12 @@ def _events_from(outcomes, pc_ref: str = "") -> list[dict]:
             if op == "travel" or eff.get("kind") == "travel":
                 out.append({"event": "travel"})
             if op == "give" and eff.get("kind") in ("give", "took", "gave", "given", "handed", "bought"):
-                # The give op's effect names the taker as `ref` and the thing as `item`.
-                out.append({"event": "give", "to": eff.get("to") or eff.get("ref"), "item": eff.get("item")})
-            if op == "quest_step":
+                # The give op's effect names the taker as `ref` and the thing as `item`, and
+                # who handed it over as `from` ("" when the world did: a pick-up, a gift
+                # out of the air) — so `event:give` can ask that it was the player's hand.
+                out.append({"event": "give", "to": eff.get("to") or eff.get("ref"),
+                            "item": eff.get("item"), "from": str(eff.get("from") or "")})
+            if op == "quest_step" and not eff.get("engine_owns"):
                 out.append({"event": "objective_done", "card": eff.get("id"), "n": eff.get("objective")})
             if op == "quest":
                 out.append({"event": "quest_taken"})
@@ -1006,7 +1111,7 @@ def _events_from(outcomes, pc_ref: str = "") -> list[dict]:
 # --- actions -----------------------------------------------------------------------------------
 
 def _card(scene, inst: dict, key: str):
-    cid = inst["cards"].get(key)
+    cid = (inst.get("cards") or {}).get(key)
     return cards_mod.find(scene, cid) if cid else None
 
 
@@ -1073,7 +1178,9 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
             cards_mod._store(scene, card)
     elif what == "resolve":
         card = _card(scene, inst, act.get("card", ""))
-        if card is not None:
+        # A card already finished stays finished: a later `moot` would otherwise turn an
+        # errand the player had handed back (`returned`) into one they dropped.
+        if card is not None and card.live:
             inst.setdefault("_resolved_now", []).append(str(act.get("card", "")))
             cards_mod.resolve(scene, card.id, how=str(act.get("how") or "resolved"), turn=turn)
     elif what == "grant":
@@ -1133,7 +1240,14 @@ def _outcome(engine, inst: dict, doc: dict, name: str, turn: int) -> str:
         else:
             cards_mod.resolve(scene, card.id, how=str(out.get("how") or "resolved"), turn=turn)
     # The award pays once: a card the GM's own quest_step already finished has been paid.
-    if out.get("award") and (card is None or was_live):
+    # And only for the player's own matter: a quest they never took on is the world's
+    # story moving, not theirs seen through. Measured on the owner's 0.2.25 save: the
+    # sickness's `in-time` resolved "Bring Snik Dunmoor the Marsh-Mallow" — never heard of,
+    # so its tell was hushed — and the award was still credited, 800 XP out of sight.
+    # Asked before the resolve above changed nothing it reads (`standing` is `known`).
+    theirs = card is None or card.kind not in cards_mod.TASKS \
+        or cards_mod.standing(card) == cards_mod.OWN
+    if out.get("award") and (card is None or was_live) and theirs:
         line = engine.award_story(str(out["award"]), card.title if card else doc.get("title", ""))
         if line:
             lines.append(line.strip())
@@ -1144,6 +1258,14 @@ def _outcome(engine, inst: dict, doc: dict, name: str, turn: int) -> str:
 # --- the tick ---------------------------------------------------------------------------------------
 
 _PROGRESS = ("objective", "reveal_objective")
+
+
+def _rank(step: dict) -> tuple[int, int]:
+    """How a step that holds is weighed against another (`tick`): one keyed on an event of
+    this batch first, then the one with more criteria."""
+    crits = step.get("criteria") or []
+    keyed = any(str(c).strip().startswith("event:") for c in crits)
+    return (1 if keyed else 0, len(crits))
 
 
 def _progress_not_taken(scene, inst: dict, step: dict) -> str:
@@ -1182,6 +1304,36 @@ def _unheard_progress(scene, inst: dict, step: dict) -> bool:
     return card is not None and cards_mod.standing(card) == cards_mod.UNHEARD
 
 
+def _heal_cast_grants(scene, docs: dict) -> None:
+    """A scheme already open in a save gets the grants its document now makes to the
+    people it cast. Measured on the owner's report of 2026-11-01: A Small Favour's captain
+    was cast with no `role.guard` tag, so a wanted player stood beside him for six turns
+    and he never came for them; the document grants `role.guard.officer` now, and a save
+    from before would otherwise keep an untagged captain for ever. Idempotent: `_grant`
+    skips a grant whose record is already on the person. The player's own grants are not
+    replayed — those are story beats, given once."""
+    for inst in scene.schemes:
+        doc = docs.get(str(inst.get("scheme") or ""))
+        # Finished stories too: a captain is still the law after the errand is over.
+        if not doc:
+            continue
+        for g in doc.get("grants_on_open") or []:
+            if not isinstance(g, dict):
+                continue
+            source = f"scheme:{doc['id']}/open"
+            if str(g.get("to", "pc")) != "pc":
+                _grant(scene, inst.get("slots") or {}, g, source, inst)
+            elif g.get("charge"):
+                # A warrant granted before warrants said what they were for: given its
+                # charge, through the applicator (removed and granted again).
+                pc = scene.pc()
+                key = f"{source}:{'+'.join(_tags_of(scene, g, inst))}"
+                old = next((e for e in (pc.effects if pc else ()) if e.key == key), None)
+                if old is not None and not (old.payload or {}).get("crime"):
+                    pc.remove_effects(match=lambda e, o=old: e is o)
+                    _grant(scene, inst.get("slots") or {}, g, source, inst)
+
+
 def tick(engine, outcomes) -> list:
     """Open what should open, then fire the one most specific step that holds, then
     deliver news that has arrived. Returns the outcomes the prose may see."""
@@ -1197,6 +1349,7 @@ def tick(engine, outcomes) -> list:
     if not ENABLED:
         return made
     docs = all_schemes()
+    _heal_cast_grants(scene, docs)
 
     # Opening: shipped and authored schemes that have never opened in this campaign.
     for sid, doc in docs.items():
@@ -1228,6 +1381,11 @@ def tick(engine, outcomes) -> list:
         doc = docs.get(inst["scheme"])
         if doc is None:
             continue
+        # A scheme opened before its item had a holder (every save before 2026-11-01) is
+        # given it now, once (`_place_held` marks the slot): the rival still alive and here
+        # in the world is still the one who has it.
+        if not inst.get("outcome"):
+            _place_held(engine, doc.get("slots") or {}, inst.get("slots") or {})
         # An ended scheme still owes the player what it resolved out of their sight:
         # it keeps ticking, for perceptible steps only, until the banked line and the
         # deferred resolution have landed.
@@ -1268,7 +1426,13 @@ def tick(engine, outcomes) -> list:
                     {"step": st["id"], "clock": scene.clock_minutes,
                      "why": "foreshadowing not on the brief: " + ", ".join(needs)})
                 continue
-            if best is None or len(crits) > len(best.get("criteria") or []):
+            # Most specific first — and a step keyed on something that happened THIS batch
+            # (`event:`) before any keyed on standing state. An event is now or never; the
+            # state will still hold next tick. Found writing `event:give($sick, $herb)`: in
+            # the tavern beside the sick woman, the sickness's four-criterion `seen` would
+            # have outranked the hand-over every time until it fired, and the herb, given,
+            # would have been gone with the quest left open for good.
+            if best is None or _rank(st) > _rank(best):
                 best = st
         if best is not None:
             tell = best.get("tell") or {}
@@ -1384,6 +1548,137 @@ def _news_arrives(engine, inst: dict, item: dict) -> tuple[bool, str]:
     if carrier == "invitation":
         return True, "An invitation reaches you:"
     return False, ""
+
+
+# --- who ticks a scheme's quest, and what is still missing -------------------------------------------
+#
+# A scheme's quest card is the scheme's: its objectives tick when a step's criteria hold,
+# which are things the engine measures (a place reached, a thing held or handed over, a
+# person present). The planner's `quest_step` and the watcher's `objective` are claims
+# about the same objectives (`rules/objectives.py` judges them) and are checked against
+# those same criteria — the one set of predicates, never a second reading of the words.
+
+def card_owner(scene, card_id: str) -> tuple[dict, dict, str] | None:
+    """The scheme instance that opened this card, its document and the card's key in it;
+    None for a card no live document owns (a test's card, a scheme since removed)."""
+    docs = all_schemes()
+    for inst in scene.schemes:
+        for key, cid in (inst.get("cards") or {}).items():
+            if cid == card_id and inst.get("scheme") in docs:
+                return inst, docs[inst["scheme"]], key
+    return None
+
+
+def ticking_steps(doc: dict, key: str, n: int) -> list[dict]:
+    """The steps whose action ticks objective `n` (1-based) of the card `key`."""
+    out = []
+    for st in doc.get("steps") or []:
+        for act in [st.get("action")] + list(st.get("also") or []):
+            if isinstance(act, dict) and act.get("do") == "objective" \
+                    and str(act.get("card") or "") == key and int(act.get("n", 1) or 1) == n:
+                out.append(st)
+                break
+    return out
+
+
+def criteria_hold(engine, inst: dict, doc: dict, step: dict, events) -> bool:
+    return all(_criterion_holds(engine, inst, doc, c, list(events or []))
+               for c in step.get("criteria") or [])
+
+
+def unmet(engine, inst: dict, doc: dict, step: dict, events) -> list[str]:
+    """What still stands between this step and firing, one plain sentence per criterion
+    that does not hold — in the world's words, never a tag: a `has(pc, knows.…)` is said
+    as "that has not come to light yet", because naming the tag would hand the player
+    what their character does not know."""
+    scene = engine.scene
+    pc = scene.pc()
+    me = pc.name if pc is not None else "You"
+    filled = inst.get("slots") or {}
+
+    def name(slot: str, fallback: str = "them") -> str:
+        s = filled.get(slot) or {}
+        return str(s.get("name") or fallback)
+
+    said: list[str] = []
+    for text in step.get("criteria") or []:
+        if _criterion_holds(engine, inst, doc, text, list(events or [])):
+            continue
+        found = _criterion_kind(text)
+        if found is None:
+            continue
+        kind, m = found
+        if kind == "at":
+            line = (f"{me} is still at {name(m.group(2), 'that place')}." if m.group(1)
+                    else f"{me} is not at {name(m.group(2), 'that place')}.")
+        elif kind in ("left", "arrived"):
+            line = (f"{me} has not left {name(m.group(1), 'that place')}." if kind == "left"
+                    else f"{me} has not come to {name(m.group(1), 'that place')}.")
+        elif kind == "holds":
+            line = (f"{me} still carries {name(m.group(2), 'it')}." if m.group(1)
+                    else f"{me} does not carry {name(m.group(2), 'it')}.")
+        elif kind == "present":
+            line = (f"{name(m.group(2))} is here." if m.group(1)
+                    else f"{name(m.group(2))} is not here.")
+        elif kind == "alive":
+            line = (f"{name(m.group(2))} is alive." if m.group(1)
+                    else f"{name(m.group(2))} is dead.")
+        elif kind == "event" and m.group(1) == "give":
+            line = (f"{me} has not handed {name(m.group(3), 'it')} to {name(m.group(2))}."
+                    if m.group(3) else f"{me} has not handed anything to {name(m.group(2))}."
+                    if m.group(2) else f"{me} has not handed anything over.")
+        elif kind == "event" and m.group(1) == "talk":
+            line = f"{me} has not spoken with {name(m.group(2))}."
+        elif kind == "event":
+            line = "That has not happened yet."
+        elif kind == "taken":
+            card = _card(scene, inst, m.group(2))
+            title = card.title if card is not None else "That errand"
+            line = (f"{title} was taken on." if m.group(1)
+                    else f"{title} has not been taken on.")
+        elif kind in ("since", "clock"):
+            line = "Not enough time has passed."
+        else:
+            line = "The matter has not come to that yet."
+        if line not in said:
+            said.append(line)
+    return said
+
+
+# --- a clue is a record, not a thing in the pack ---------------------------------------------------
+#
+# A scheme's clue is a `knows.clue.<leaf>` tag (wanted's witness, ledger and coin), granted
+# by the step whose tell said what was found. The owner's 0.2.25 game: "Examine the coin
+# more closely" at the shrine, the turn after "sewn into the coat is coin struck with a
+# faction's mark", was refused "Corvin T. is not carrying the coin" — true of the pack and
+# wrong as an answer, because the coin was never a thing to carry. Minting it as an item
+# was weighed and refused: a ledger and a witness's word are clues too and neither is a
+# thing, and a scheme handing out items is what the items lane is taking OUT of `give`.
+# So a clue answers a look with its own record — the tell of the step that granted it.
+
+def clue_named(scene, actor, phrase: str) -> dict | None:
+    """The clue this actor holds that the phrase names, by the clue's own leaf ("the
+    coin" is `knows.clue.coin`): `{"leaf", "record", "origin"}`, or None. The record is the
+    granting step's own tell, frozen on the instance when it fired."""
+    if actor is None:
+        return None
+    words = set(re.findall(r"[a-z]+", str(phrase or "").lower()))
+    if not words:
+        return None
+    for eff in getattr(actor, "effects", ()) or ():
+        for tag in eff.tags or ():
+            if not str(tag).startswith("knows.clue."):
+                continue
+            leaf = str(tag).split(".")[-1]
+            if not set(leaf.split("-")) <= words:
+                continue
+            source = str(eff.source or "")           # scheme:<id>/<step>
+            sid, _, step = source.partition(":")[2].partition("/")
+            inst = _find(scene, sid)
+            record = str(((inst or {}).get("fired") or {}).get(step, {}).get("tell") or "")
+            if record:
+                return {"leaf": leaf, "record": record, "origin": source}
+    return None
 
 
 # --- helpers for tests and the bench ----------------------------------------------------------------

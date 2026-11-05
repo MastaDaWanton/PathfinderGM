@@ -88,12 +88,12 @@ def test_thirty_seeds_across_three_worlds_reach_five_towns_and_eight_kinds():
 
 def test_the_name_no_longer_decides_the_start():
     """Item 3, measured: the opening was `1d12` seeded from the slugified character NAME,
-    so "masta" always got the step in the sun and "john" the work yard — across 12,000
+    so one name always got the step in the sun and another the work yard — across 12,000
     names the twelve came up evenly, so it was identity, not weighting. One name over
     fifty story seeds now opens on at least six different starts."""
     world = load_cached(PANGRELLA)
     pc = _pc()
-    pc.name = "masta"
+    pc.name = "torvo"
     got = {openings.choose(world, pc, openings.rng_for(seed, "start"))[1]["id"]
            for seed in range(50)}
     assert len(got) >= 6, got

@@ -330,8 +330,11 @@ GOLD = [
     G("I follow her at a distance.", [A("follow", target="her")], "authored"),
     G("I hide behind the cart and watch who comes out.",
       [A("stealth", place="behind the cart"), A("look", target="who comes out")], "authored"),
-    G("I search the body for coin.", [A("search", object="the body", place=None)], "authored"),
-    G("I loot the dead guard.", [A("take", target="the dead guard")], "authored"),
+    # Relabelled 2026-11-01 with the `loot` act (gm/interpret.py): searching a body for
+    # what it carries is the loot, never a take of the thing "body" (the owner's 0.2.25
+    # report minted `"body": 1` into the pack from "loot the body").
+    G("I search the body for coin.", [A("loot", target="the body")], "authored"),
+    G("I loot the dead guard.", [A("loot", target="the dead guard")], "authored"),
     G("I cast magic missile at the bandit leader.",
       [A("cast", object="magic missile", target="the bandit leader")], "authored"),
     G("I shoot the wolf with my bow.", [A("attack", target="the wolf", object="my bow")], "authored"),

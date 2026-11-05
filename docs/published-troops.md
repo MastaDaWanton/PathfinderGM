@@ -86,7 +86,7 @@ over HTTP:
     ... 30/52 huge      |  8/13 | fallen 5
     ...  9/52 large     |  3/13 | fallen 10
 
-    "Troop, Goblin are all around Masta — no single blow to parry, and no roll to make."
+    "Troop, Goblin are all around Torvo — no single blow to parry, and no roll to make."
 
 The footprint steps down as they die, the crowd attacks without an attack roll, and sneak
 attack is refused against it.

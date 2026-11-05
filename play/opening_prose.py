@@ -502,16 +502,16 @@ def _close(a: str, b: str) -> bool:
 def repair_near_misses(text: str, allowed: set[str], *names: str) -> tuple[str, list[str]]:
     """A name written one letter wrong is the real name, substituted before the checks.
 
-    Measured 2026-09-18 on the `masta` opening: the model wrote "Maste"; the invented-name
+    Measured 2026-09-18 on the `torvo` opening: the model wrote "Torve"; the invented-name
     check counted it as a name from outside the material and the who-the-player-is check
-    found no "Masta" — two rejections from one slip, and an 802-character draft fell to
+    found no "Torvo" — two rejections from one slip, and an 802-character draft fell to
     the template. The player: "very bare and short". Returns (text, swaps)."""
     swaps: list[str] = []
     real = {n for n in list(allowed) + [str(x) for x in names if x] if n and n[:1].isupper()}
     real |= {w for n in real for w in n.split() if w[:1].isupper() and len(w) >= 4}
     if not real or not text:
         return text, swaps
-    # Every capitalised token, sentence starts included — "Maste sits on the step"
+    # Every capitalised token, sentence starts included — "Torve sits on the step"
     # opened the draft, and `invented_names` skips a sentence start on purpose. A
     # token that IS a real name (case-blind) or a common word is left alone.
     from gm.narration import _NOT_A_NAME

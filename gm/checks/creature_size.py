@@ -41,6 +41,8 @@ With the reader off or unread (the suite, a failed call) this member finds nothi
 """
 from __future__ import annotations
 
+import re
+
 from gm.narration import Finding
 
 ORDER = 13
@@ -107,8 +109,45 @@ def contradicts(said: str, record: str) -> bool:
     return a <= man and b <= man and abs(a - b) >= 2
 
 
+# What a creature is called in place of its own name when it is asked about (`unnamed`).
+NEUTRAL = "the creature"
+
+
+def unnamed(passage: str, name: str, words=(), names=()) -> tuple[str, str, tuple]:
+    """The passage, the name asked about and the page's words for it, with the creature's
+    OWN name taken out — its name on the record and its template's — so a size word that is
+    part of what it is called is never read as a claim about its size.
+
+    Measured on the owner's report of 2026-11-01 (Corvin T., the shrine): "the giant rot
+    grub" is the Bestiary's name for a Small vermin, and the reader read "giant" as Huge
+    on 15 beats of one fight; every repair then rewrote the name itself into "the small
+    rot grub". The names are the engine's own strings, replaced literally (longest first,
+    with any article in front), never words read for their meaning — and the question is
+    asked of `NEUTRAL`, which the sentences now use for it."""
+    forms = {" ".join(str(n).replace("-", " ").split()) for n in (name, *names)
+             if str(n or "").strip()}
+    bare = sorted({f[4:] if f.lower().startswith("the ") else f for f in forms}
+                  - {"", "the", "a", "an"}, key=len, reverse=True)
+    if not bare:
+        return passage, name, tuple(words or ())
+    pattern = re.compile(r"\b(?:(?:the|a|an)\s+)?(?:"
+                         + "|".join(re.escape(b) for b in bare) + r")\b", re.I)
+    if not pattern.search(passage) and not any(pattern.search(str(w)) for w in words or ()):
+        return passage, name, tuple(words or ())
+    # A page word that is only a piece of the name ("The giant", the mention finder's
+    # chunk of "The giant rot grub") is the name too, and goes with it.
+    def piece(w: str) -> bool:
+        core = re.sub(r"^(?:the|a|an)\s+", "", " ".join(w.split()), flags=re.I).lower()
+        return bool(core) and any(re.search(r"\b" + re.escape(core) + r"\b", b.lower())
+                                  for b in bare)
+
+    kept = tuple(w for w in (pattern.sub(NEUTRAL, str(w)) for w in words or ())
+                 if w.strip().lower() != NEUTRAL and not piece(w))
+    return pattern.sub(NEUTRAL, passage), NEUTRAL, kept
+
+
 def ask(passage: str, name: str, words=(), *, chat=None, model: str = "", host: str = "",
-        provider: str = "ollama", api_key: str = "") -> str | None:
+        provider: str = "ollama", api_key: str = "", names=()) -> str | None:
     """The one closed question. None when the call fails: unanswered, nothing judged.
     `words`: the page's own words for it (the beat reader's mentions), so "the towering
     figure" is known to be it — probed without them, a passage in the owner's beat's shape,
@@ -116,6 +155,7 @@ def ask(passage: str, name: str, words=(), *, chat=None, model: str = "", host: 
     said" 2 of 2 for "the grioth"."""
     from gm import beat_verify
 
+    passage, name, words = unnamed(passage, name, words, names)
     msgs = [{"role": "system", "content": (
         "You answer one question about a few sentences of a story, from those sentences "
         "alone.")},
@@ -169,6 +209,19 @@ def creatures(ctx) -> list[tuple[str, str, str, list[str], list[str]]]:
     return list(out.values())[:MAX_ASKS]
 
 
+def _own_names(ctx, ref: str, name: str) -> tuple[str, ...]:
+    """The creature's record names — what it is called and the template it was made from
+    (`from_template`, "giant-rot-grub") — for `unnamed`."""
+    scene = ctx.scene
+    who = (getattr(scene, "people", {}) or {}).get(ref) \
+        or (getattr(scene, "actors", {}) or {}).get(ref)
+    names = [name]
+    if who is not None:
+        names += [str(getattr(who, "name", "") or ""),
+                  str(getattr(who, "from_template", "") or "")]
+    return tuple(n for n in names if n)
+
+
 def find(ctx) -> list:
     from gm import beat_verify, narration
 
@@ -182,7 +235,7 @@ def find(ctx) -> list:
         if key not in _ASKED:
             got = ask(" ".join(sentences), called, words, model=route.get("model", ""),
                       host=route.get("host", ""), provider=route.get("provider") or "ollama",
-                      api_key=route.get("api_key", ""))
+                      api_key=route.get("api_key", ""), names=_own_names(ctx, ref, name))
             if got is None:
                 continue
             _ASKED[key] = got
@@ -200,6 +253,7 @@ def find(ctx) -> list:
             f"{called} is {size.title()} by its record and the page makes it {said}: "
             f"{sentences[0][:90]!r}",
             f"{called[:1].upper()}{called[1:]} is {size.title()} — {beside}. Rewrite the "
-            f"words that make it {way} so it is that size; change nothing else.",
+            f"words that make it {way} so it is that size; keep its name, {called}, "
+            f"exactly as it is, and change nothing else.",
             weight=2, sentences=tuple(sentences)))
     return out

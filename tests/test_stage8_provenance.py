@@ -213,7 +213,10 @@ def test_a_synonym_for_the_jar_opens_the_jar_and_two_that_fit_are_a_question():
     res = engine.run(engine.validate([{"op": "use_item", "actor": "pc",
                                        "because": "t", "params": {"item": "my potion"}}]))
     out = next(o for o in res.outcomes if o.op == "use_item")
-    assert out.effects == [] and "Which" in out.tell and "a#1" in out.tell
+    # Both named by their names, never their keys (refs never on the page; the bench of
+    # 2026-11-05 shipped a refusal's "backpack#1"): the question is the player's to answer.
+    assert out.effects == [] and "Which" in out.tell and "a#1" not in out.tell
+    assert "Healing Draught, Greater Healing Draught?" in out.tell
     assert pc.stock["a#1"].count == 1 and pc.stock["b#1"].count == 1
     # And the declarer resolves through the same function.
     raw = judgement.declare_use_item([{"op": "narrate_only"}],

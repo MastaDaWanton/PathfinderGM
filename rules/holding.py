@@ -71,6 +71,85 @@ def key_in(store, name) -> str | None:
     return None
 
 
+# --- a key is bookkeeping, never a word on the page -----------------------------------------
+#
+# The shapes a thing's KEY takes, which no person says (the ruling of 2026-09-28: refs drive
+# the checks, the player never sees them). The engine mints three: `crafting.Stock.id`
+# ("healing-draught#1", "comfrey-poultice#2~1a2b3c4d"), the benches' and the enchanter's shelf
+# keys ("iron-longsword~0f3a9c21be", `blacksmith.stock_key`, `leatherworker.stock_key`,
+# `alchemy_items`, "<key>~<n>"), and a place id ("<loc>~urban:the-smithy", `places`). And the
+# planner writes two of its own in an op's `item` when it copies that shape: "blade-blank-1",
+# "gold_coins_10" (judgement.py's sale of 2026-10-16). Measured on the round-3 bench of
+# 2026-11-05 (the agree line, run 4): "… is not carrying blade-blank-1. They have:
+# backpack#1, …" — a refused sale's tell, pasted on the page whole.
+#
+# Matched only as a whole token, lower case, joined by "-", "_", "#", "~" or ":": English
+# prose has no such token ("half-orc" has no number, no "#" and no "~", and is left).
+KEY_SHAPED = re.compile(
+    r"(?<![\w#~:@'-])("
+    r"[a-z0-9][a-z0-9'-]*(?:#\d+(?:~[0-9a-z]+)?|~[0-9a-z]+(?::@?[a-z0-9][a-z0-9-]*)?)"
+    r"|[a-z][a-z0-9']*(?:[-_][a-z0-9']+)*[-_]\d+"
+    r"|[a-z][a-z0-9]*(?:_[a-z0-9]+)+"
+    r")(?![\w#~:@-])")
+_KEY_TAIL = re.compile(r"(?:#\d+)?(?:~[0-9a-z]+)?$")
+
+
+def key_words(key) -> str:
+    """A key said in words, when nothing carried answers to it: "blade-blank-1" -> "blade
+    blank", "healing-draught#1" -> "healing draught", "<loc>~urban:the-smithy" -> "the
+    smithy". A word that is not key-shaped comes back as it was."""
+    raw = " ".join(str(key or "").split())
+    if not raw or not KEY_SHAPED.fullmatch(raw):
+        return raw
+    if ":" in raw:
+        raw = raw.rsplit(":", 1)[1].lstrip("@")
+    raw = _KEY_TAIL.sub("", raw)
+    raw = re.sub(r"[-_]\d+$", "", raw)
+    return " ".join(raw.replace("_", " ").replace("-", " ").split())
+
+
+def carried_names(actor) -> dict[str, str]:
+    """{key: the thing's own name} for everything an actor holds under a minted key: the
+    stock shelf by key and by `Stock.id`, and crafted records worn by their `id`. The
+    goods are keyed by their names already and are not here."""
+    out: dict[str, str] = {}
+    for key, item in (getattr(actor, "stock", None) or {}).items():
+        name = str(getattr(item, "name", "") or "").strip()
+        if not name:
+            continue
+        out.setdefault(str(key), name)
+        try:
+            iid = str(getattr(item, "id", "") or "")
+        except Exception:  # noqa: BLE001 — an entry whose id cannot be built has its key
+            iid = ""
+        if iid:
+            out.setdefault(iid, name)
+    for rec in (getattr(actor, "worn", None) or {}).values():
+        if isinstance(rec, dict) and rec.get("id") and rec.get("name"):
+            out.setdefault(str(rec["id"]), str(rec["name"]))
+    return out
+
+
+def thing_said(actor, word) -> str:
+    """How a page says the thing an op named: the carried thing's own name when the word
+    is its key ("backpack#1" -> "Backpack"), the key in words when it is key-shaped and
+    nothing carried answers ("blade-blank-1" -> "blade blank"), and otherwise the word as
+    the op wrote it — "sweetspire tea" stays "sweetspire tea"."""
+    raw = " ".join(str(word or "").split())
+    named = carried_names(actor).get(raw)
+    if named:
+        return named
+    return key_words(raw)
+
+
+def carried_list(actor) -> list[str]:
+    """Everything an actor carries on the shelf and in the pack, by name, in key order: the
+    list a refusal prints for the planner ("They have: Backpack, crate"), never the keys."""
+    names = carried_names(actor)
+    shelf = [names.get(k) or key_words(k) for k in sorted(getattr(actor, "stock", None) or {})]
+    return shelf + sorted(getattr(actor, "goods", None) or {})
+
+
 def named_among(store, phrase) -> str | None:
     """The key in `store` whose whole name stands, word for word, in `phrase` — the
     longest such name, so "a red apple" finds "red apple" before "apple". A plural `s` is
@@ -146,7 +225,7 @@ money-bag coinpurse
 _MONEY_WORDS = frozenset("coin coins money cash payment payments pay wages earnings "
                          "takings fee fees silver gold copper".split())
 # A coin qualified by a material no purse counts is a token, not money: the lead coin a
-# cage owner pressed on Sam (2026-09-30) is a thing to keep, not a copper piece.
+# cage owner pressed on Dace (2026-09-30) is a thing to keep, not a copper piece.
 _TOKEN_MATERIALS = frozenset("lead brass iron wooden wood bone clay tin glass stone "
                              "lucky strange foreign ancient old rare gaming".split())
 

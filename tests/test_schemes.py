@@ -233,17 +233,27 @@ def test_news_arrives_as_a_person_or_thing_in_the_scene_and_grants_knows():
 # --- outcomes ------------------------------------------------------------------------------------
 
 def test_returning_the_thing_pays_the_story_award_and_regard_through_the_applicator():
+    """Returned is HANDED back, to a quest the player took on.
+
+    Two measurements on the owner's 0.2.25 save (2026-11-01) changed this test: a
+    return objective ticked on walking in with the thing in the pack (the sickness's
+    `in-time`, the same shape as `returned`'s old `at`/`present`/`holds`), and an
+    outcome paid its award for a quest the player never took (`_outcome`). Carried into
+    the market it is not returned; given to the giver it is."""
     s, e, pc = _table()
     _wait(e, 1)
     inst = _instance(s)
     _heard(s, inst)
+    cards.take_up(s, inst["cards"]["errand"])
     giver = s.people[inst["slots"]["giver"]["ref"]]
     _out(e, inst)
     _wait(e, 1)
     # Take the thing: the test hands it over the way loot or a gift would.
     schemes.hand_item(s, pc, inst["slots"]["lost"]["name"])
     before = pc.xp
-    res = _travel(e, "the market")
+    _travel(e, "the market")
+    assert "returned" not in inst["fired"], "carried into the market is not handed back"
+    res = _run(e, "give", {"item": inst["slots"]["lost"]["name"], "to": giver.ref})
     assert "returned" in inst["fired"] and inst["outcome"] == "returned"
     assert pc.xp > before
     assert giver.has_state("attitude.friendly")

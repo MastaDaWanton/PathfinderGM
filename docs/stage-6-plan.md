@@ -210,7 +210,7 @@ Still open, measured, and belonging to later substages:
   reports only `[('heal', None, None)]`, so nothing says the character came back.
 - **`found.title()` mangles every ability name in its tell** — "Iron Clot (Dr 2/-)".
 - **37 of 49 blood-bending abilities fall through to a database row**: "Blood Spike
-  Projectile is a Control Blood 1 ability of the blood spike path; Masta has reached 0."
+  Projectile is a Control Blood 1 ability of the blood spike path; Torvo has reached 0."
 - **594 spells put the raw `SAVE_DC_FORMULA` placeholder into the cast tell**, and the
   suite cannot see it.
 - **A sixth raw transcript door**: `play/craft_views.py` writes a full dice breakdown

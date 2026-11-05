@@ -387,7 +387,7 @@ CLASS_SCHEMA: list[Section] = [
                        help="The noun for a person of this class, when the class name "
                             "is not one. Most names already are: a Rogue, a Paladin. "
                             "\"Blood Bending\" is not, and the opening read \"You are "
-                            "Masta, a Blood Bending\" until this existed. Defaults to "
+                            "Torvo, a Blood Bending\" until this existed. Defaults to "
                             "the name.",
                        example="Blood Bender"),
             ClassField("summary", "Summary", type="textarea",
@@ -1057,6 +1057,35 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                         f"nonlethal or either. Leave it out for lethal; \"either\" lets "
                         f"the wielder choose with no -4, the way Improved Unarmed "
                         f"Strike does.")
+        # A use with modes (Battle Blood Ki Pool's attack, speed or dodge): the core
+        # classes' `choice` grammar, run by the same executor (`Engine._use_class_ability`,
+        # rules/class_abilities.py). Each mode's `self` is a timed effect on the user; its
+        # modifiers are checked here because nothing else reads them before play.
+        choice = doc.get("choice")
+        if choice is not None:
+            options = (choice.get("options") or {}) if isinstance(choice, dict) else {}
+            if not isinstance(choice, dict) or choice.get("kind") != "mode" \
+                    or not isinstance(options, dict) or not options:
+                problems.append(
+                    f"{gat}.choice: a path document's choice is {{\"kind\": \"mode\", "
+                    f"\"options\": {{<mode>: {{\"self\": {{...}}}}}}}} — at least one mode.")
+            for mode, option in options.items():
+                mat = f"{gat}.choice.options.{mode}"
+                own = (option or {}).get("self") if isinstance(option, dict) else None
+                if not isinstance(own, dict):
+                    problems.append(f"{mat}: each mode says what it does to the user in "
+                                    f"`self` — modifiers and rounds.")
+                    continue
+                if own.get("modifiers") and not own.get("rounds"):
+                    problems.append(f"{mat}.self: timed modifiers need `rounds`, or "
+                                    f"nothing would ever remove them.")
+                for i, spec in enumerate(own.get("modifiers") or []):
+                    if not isinstance(spec, dict) \
+                            or str(spec.get("type", "")) not in _MOD_TYPES + ("speed",) \
+                            or _int(spec.get("amount")) is None:
+                        problems.append(
+                            f"{mat}.self.modifiers[{i}]: a modifier is one of "
+                            f"{', '.join(_MOD_TYPES + ('speed',))} with a numeric amount.")
         standing = any(doc.get(k) for k in ("modifiers", "temp_hp", "weapon",
                                             "tags", "drain", "resist", "dr"))
         # A passive's standing parts never need removing — the ability is never on

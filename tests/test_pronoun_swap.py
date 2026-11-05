@@ -9,7 +9,7 @@ Measured on the scratch saves' shipped beats the same day, the finder itself was
 fault: 12 beats flagged, 11 of them the ±90-character window cutting a word at its edge —
 "the competing cries" read as "he competing", "The ground here" as "The ground he" — on a
 she/her character's opening line. The twelfth was an intimate scene whose five she/her were
-all the partner's, around her "I want more, Sam". After the window takes whole words and a
+all the partner's, around her "I want more, Dace". After the window takes whole words and a
 narration pronoun is not held to a name only said aloud, 0 of the 12 are flagged; the
 made cases below (the original report among them) still are.
 
@@ -34,9 +34,9 @@ OPENING = (
     "The air in the market is thick with the competing cries of hawkers, the smell of fresh "
     "bread, fish, and trodden dung.  You are Kesst Vayr, a Zhilakai with a rapier at your "
     "side and clad in leather. You have come to sell what you carry.")
-# The intimate beat's lines (sam.json, 2026-09-30): every pronoun is the partner's.
+# The intimate beat's lines (dace.json, 2026-09-30): every pronoun is the partner's.
 PARTNER = ("\"More,\" she gasps against your lips, her voice cracked and desperate. \"I want "
-           "more, Sam.\" You grunt in response, your hands gripping her hips. \"Sam...\" she "
+           "more, Dace.\" You grunt in response, your hands gripping her hips. \"Dace...\" she "
            "cries out, her voice a broken plea.")
 REPORT = "One of them spots you and points, exclaiming loudly, 'It's him! Thessaly Corr!'"
 
@@ -51,7 +51,7 @@ def test_a_word_cut_at_the_windows_edge_is_no_pronoun():
 
 
 def test_a_narration_pronoun_beside_a_name_only_said_aloud_is_not_the_players():
-    assert narration.misgendered(PARTNER, "Sam", "he/him") == []
+    assert narration.misgendered(PARTNER, "Dace", "he/him") == []
     assert narration.misgendered("'Sit down, Kesst Vayr,' she says, and pushes the bowl "
                                  "across to you.", "Kesst Vayr", "he/him") == []
     # Said aloud about the player, it is still found — the report that made the finder.

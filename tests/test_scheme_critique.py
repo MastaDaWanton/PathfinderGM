@@ -122,6 +122,9 @@ def test_a_silent_steps_award_is_banked_until_a_perceptible_tell():
 
 def _banked_body(s, e, pc, doc):
     inst = schemes.open_scheme(e, doc)
+    # Taken on: an outcome pays only for the player's own matter since 2026-11-01 (the
+    # owner's save credited 800 XP for a quest never heard of, hushed and paid).
+    cards.take_up(s, inst["cards"]["q"])
     before = pc.xp
     intents = e.validate([{"op": "travel", "actor": "pc", "because": "t", "params": {"place": "the gate"}}], origin="author:test")
     e.run(intents)

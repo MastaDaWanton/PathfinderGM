@@ -98,6 +98,12 @@ def test_typed_smithing_gave_no_item_and_no_mastery(world):
     assert made[-1]["quality"] == "Sound"
     # The tell points to the bench for finer work, and the effect carries which bench.
     assert "forge bench" in out.tell
+    # And says first where the work IS done, and that the bench is not where (the narration
+    # diagnosis bench, 2026-11-04, mechanism 7: a belt cut in the market was told "You work
+    # at the leather bench" — the pointer's bench was the only place the tell named).
+    assert out.tell.startswith(f"{pc.name} does the work right where {pc.name} stands")
+    assert "not at the forge bench" in out.tell
+    assert "Finer work would be done at the forge bench." in out.tell
     assert {"kind": "bench", "bench": "forge"}.items() <= next(
         ef for ef in out.effects if ef.get("kind") == "bench").items()
 

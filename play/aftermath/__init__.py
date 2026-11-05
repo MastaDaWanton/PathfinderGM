@@ -279,7 +279,7 @@ def context(stage: str, door: str, campaign, *, engine=None, text: str = "",
 def _read_opening(campaign, engine, text: str, said: list[dict], chat=None):
     """The opening beat read by the beat reader (gm/beat_reader.py), as a turn's beat is
     read in `GMAgent._groom`: the opening has no agent, so the narrator's own model is
-    asked here. Measured on Sam's save (2026-09-30, item 1): the cage owner's two opening
+    asked here. Measured on Dace's save (2026-09-30, item 1): the cage owner's two opening
     lines — "'Went down in the second and has not got up,' the cage owner says" — never
     reached the conversation log; the patterns that booked them retired with the reader.
     None when the reader is off and no `chat` is given (the suite)."""

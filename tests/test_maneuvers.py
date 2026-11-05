@@ -91,12 +91,40 @@ def test_a_flat_footed_creature_does_not_add_dex_to_cmd(scene):
 
 
 def test_penalties_to_ac_also_apply_to_cmd(scene):
-    """CRB p.199: "Any penalties to a creature's AC also apply to its CMD." Bonuses do
-    not travel the same way, so only the negatives are carried."""
+    """CRB p.199: "Any penalties to a creature's AC also apply to its CMD." Bonuses
+    travel only by the eight named types (the next test)."""
     kesst = scene.pc()
     before = kesst.cmd()
     kesst.add_condition("blinded")          # -2 AC, and loses Dex to AC
     assert kesst.cmd() == before - 2 - 3
+
+
+def test_dodge_deflection_and_the_other_named_ac_bonuses_reach_cmd(scene):
+    """CRB p.199: "A creature can also add any circumstance, deflection, dodge, insight,
+    luck, morale, profane, and sacred bonuses to AC to its CMD." Measured on the owner's
+    report of 2026-11-01: Ansel (paladin 3, Dodge) showed CMD 22 where the book gives 23 —
+    only the `cmd` target was read. Armour, shield and natural armour stay out; the same
+    type twice keeps the better; flat-footed loses the dodge with the Dex."""
+    from rules.activeeffect import ActiveEffect
+
+    kesst = scene.pc()
+    base = kesst.cmd()
+    kesst.feats = list(kesst.feats or []) + ["dodge"]
+    assert kesst.cmd() == base + 1
+    assert kesst.cmd(flat_footed=True) == base - 3        # no Dex, no dodge
+
+    kesst.apply_effect(ActiveEffect(
+        name="shield of faith", kind="buff", source="shield of faith",
+        modifiers=[{"kind": "combat_mod", "target": "ac", "amount": 2,
+                    "bonus_type": "deflection"}]))
+    kesst.apply_effect(ActiveEffect(
+        name="ring of protection", kind="buff", source="ring of protection",
+        modifiers=[{"kind": "combat_mod", "target": "ac", "amount": 1,
+                    "bonus_type": "deflection"}]))
+    assert kesst.cmd() == base + 1 + 2, [(m.source, m.value, m.type)
+                                         for m in kesst.cmd_modifiers()]
+    kesst.armour = "chain shirt"
+    assert kesst.cmd() == base + 1 + 2                    # armour is not in the list
 
 
 def test_tiny_and_smaller_creatures_use_dex_for_cmb():

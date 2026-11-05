@@ -39,8 +39,18 @@ _WORD = re.compile(r"[a-z']+")
 # one end ("..." and "?!" were each split into empty sentences), and the closing quote
 # stays with the sentence it closes — left at the front of the next one, "' The merchant
 # nods" read as speech opening (2026-09-25).
+#
+# Nor does a name's initial, when the sentence plainly goes on: a lone capital's stop
+# followed by a lowercase word or by "'s" ("Mira H. to his execution", "Mira H.'s neck").
+# Measured on the rerun of 2026-11-05: the tells check split "…your promise to accompany
+# Mira H. to his execution." at the initial, cut the first half and left the page opening
+# on "to his execution." (gallows, runs 1 and 4); and the example-cast pass, rejoining
+# "Mira H.'" and "s neck", shipped "around you' s neck". A capital after the stop still
+# ends the sentence ("hits Mira H. Then"), as `destutter` and `pc_to_second_person` read
+# it. Told by the shape of the text, never by a name.
 _SENTENCE = re.compile(
-    r"(?:\b(?:Mr|Mrs|Ms|Dr|St|Mt|Capt|Sgt|Lt|Col|Prof)\.|[^.!?])+"
+    r"(?:\b(?:Mr|Mrs|Ms|Dr|St|Mt|Capt|Sgt|Lt|Col|Prof)\.|\b[A-Z]\.(?=['’]s\b|\s+[a-z])"
+    r"|[^.!?])+"
     r"(?:[.!?]+[\"'”’]?)?")
 
 # Capitalised words that are not names.
@@ -60,7 +70,7 @@ PLACE_NOUNS = frozenset({
     "docks", "quay", "stairs", "landing", "chapel", "abbey", "guildhall", "exchange",
     "cellars", "plaza", "arcade", "colonnade",
     # 2026-09-30, item 11: "the Great Cathedral" (the 2026-09-25 recording) and "the
-    # Velvet Veil" (Sam's save) were each half un-named. Neither word is a surname.
+    # Velvet Veil" (Dace's save) were each half un-named. Neither word is a surname.
     "cathedral", "veil",
 })
 
@@ -213,7 +223,13 @@ _PAREN_NUMBERS = re.compile(r"\s*\((?=[^)]*\d)[^()]*(?:\([^()]*\)[^()]*)*\)")
 _MARGIN = re.compile(r"\s+by \d+(?=[.,:;]|\s|$)")
 # The damage amount in the engine's own phrasing: "for 5 piercing", "for 1 non-lethal
 # bludgeoning", "for 6 fire damage". Engine text, fixed format — not the page's English.
-_AMOUNT = re.compile(r"\s+for \d+(?:\s+(?:non-?lethal|points? of))?(?:\s+[a-z][a-z-]*){0,2}?"
+# Never a price: "buys the lantern for 2 sp" lost its price to this ("sp" is a word of
+# [a-z]), found 2026-11-02 when the tells check (gm/beat_verify.py `tell_premises`) read
+# its premises through `page_line` — a sum the page may and should say ("A price, a count,
+# a line of speech are left", `strip_turn_numbers`), taken off the line meant to tell it.
+_AMOUNT = re.compile(r"\s+for \d+(?!\s+(?:[A-Z][\w'-]*\s+)?(?:cp|sp|gp|pp|copper|silver|gold"
+                     r"|platinum)\b)"
+                     r"(?:\s+(?:non-?lethal|points? of))?(?:\s+[a-z][a-z-]*){0,2}?"
                      r"(?=\s*(?:[.,;:!?]|\(|$))")
 # The miss chance's rule clause in the engine's own phrasing (`Engine._attack`: "<who> finds
 # nothing there — <why>, <n>% miss chance (<roll>)."): the percentage is a number and the
@@ -531,13 +547,29 @@ _NEVER_ENDS_A_SENTENCE = {
 # One period only — "and then... nothing" is deliberate trailing, and eating a dot out
 # of an ellipsis mangles it.
 _STUTTER = re.compile(r"([A-Za-z']+)(?<!\.)\.(?!\.)(\s+)([a-z])")
+# A lone capital after a capitalised word is a name's initial ("Mira H.", "J. R."), and
+# its stop ends nothing. Asked of the text before the capital, where `_STUTTER` starts.
+# The price: "Plan B. then we run" keeps its dropped capital, which reads as a typo,
+# where capitalising an initial's next word breaks every check that runs after this.
+_NAME_BEFORE_INITIAL = re.compile(r"(?<![\w'’])[A-Z][\w'’-]*\.?\s+$")
 
 
 def destutter(text: str) -> str:
-    """Repair the mid-sentence stray period, both ways it happens."""
+    """Repair the mid-sentence stray period, both ways it happens — but never the stop
+    of a name's initial.
+
+    Measured on the tells-check bench, 2026-11-03: the engine's "Mira H. is hanged" left
+    here as "Mira H. Is hanged", and the second-person swap, seeing a capital after the
+    stop, kept it as a sentence end — "the morning air, you. Is hanged", and "You. Is
+    held by the escort" where the check put the engine's own line in a cut slot. Without
+    this step the swap gives "you are hanged". The initial is told by its shape, not by
+    the PC's name: an initialled NPC strands the same way, and no name is passed here."""
     def _fix(m: re.Match) -> str:
         word = m.group(1).lower().lstrip("'")
         if word in _ABBREVIATIONS:
+            return m.group(0)
+        if (len(m.group(1)) == 1 and m.group(1).isupper()
+                and _NAME_BEFORE_INITIAL.search(m.string, 0, m.start())):
             return m.group(0)
         if word in _NEVER_ENDS_A_SENTENCE:
             return f"{m.group(1)}{m.group(2)}{m.group(3)}"
@@ -888,7 +920,7 @@ def put_before_the_hand_back(text: str, line: str) -> str:
 # — the thanks and the smack were never on the page.
 #
 # Measured by hand over every turn whose interpreter reading holds two or more actions
-# (the owner's save sam.json, 24 turns, 58 declared actions; the Bobby playtest, 4 turns,
+# (the owner's save dace.json, 24 turns, 58 declared actions; the Bobby playtest, 4 turns,
 # 8): 14 of the 58 were nowhere in the beat, in 10 of the 24 turns; 0 of Bobby's 8. And of
 # the 5 move turns where the player did something BEFORE setting off, 4 opened at the
 # departure or the arrival and 3 lost the earlier deeds entirely — the arrival block in
@@ -912,13 +944,13 @@ DECLARED_DEEDS = frozenset({"take", "give", "use", "attack", "steal", "consume",
                             "talk", "insult"})
 _MOVE_ACTS = frozenset({"go", "journey", "leave", "follow", "call_on"})
 # Talk whose words are a question or a telling is speech even when the reading kept no
-# `says` ("ask for a way to get into The high road", Sam's turn 38): the reply carries it.
+# `says` ("ask for a way to get into The high road", Dace's turn 38): the reply carries it.
 _SPEECH_VERB = re.compile(r"\b(?:ask|asks|asking|tell|tells|say|says|question|inquire|"
                           r"enquire|request|explain|offer|promise|order|beg|demand|call)\b",
                           re.I)
 _MOVE_OPS = frozenset({"travel", "journey", "call_on"})
 # The engine ops each act is resolved by. When one of them was refused and none resolved,
-# the beat owes the refusal, not the deed (the herbs Sam was "not carrying", turn 4).
+# the beat owes the refusal, not the deed (the herbs Dace was "not carrying", turn 4).
 _ACT_OPS = {"give": ("give",), "take": ("give", "take", "loot"), "attack": ("attack",),
             "use": ("use_item", "use_ability"), "consume": ("use_item", "eat", "drink", "taste"),
             "steal": ("steal",), "insult": ("provoke",)}
@@ -1102,6 +1134,40 @@ def _op_status(outcomes, ops) -> tuple[bool, bool]:
     return resolved, refused
 
 
+# The reading's acts that move a thing or coin between hands (`acts_to_ops.GOODS_ACTS`), and
+# the ops that move it for each. A deed of one of these that the engine moved nothing for is
+# not owed to the page (`moved_nothing`).
+_GOODS_DEED_OPS = {"give": ("give",), "take": ("give", "take", "loot"), "drop": ("give",),
+                   "steal": ("give", "steal"), "sell": ("sell",)}
+
+
+def moved_nothing(reading: dict | None, i: int, act: str, outcomes=()) -> bool:
+    """Whether action `i` of the reading is a deed that hands something over (give, take,
+    drop, steal, sell) for which the engine moved nothing: the reading's table built no op
+    for it (`acts_to_ops.Row`: the thing not carried, nothing named, nothing to sell), no op
+    of its kind resolved this turn, and it is no gesture ("give him a nod", which hands
+    over nothing and is still the player's deed to show).
+
+    Such a deed is never written onto the page as done by the unshown-deed backstop: the
+    page would say a thing changed hands that the engine never moved. Measured on the bench
+    of 2026-11-02 (2 of 3 runs of "I agree to his price and pay" at the smith, no op built
+    for either act) and in the live check of that day: the backstop wrote the player
+    agreeing and paying, "the coins on the smith's bench", on a turn with no payment at all.
+    A payment another op made (the fine at sentence, a commission) is that op's tell to
+    tell. Table rows and outcomes only; no English is read."""
+    if act not in _GOODS_DEED_OPS:
+        return False
+    table = (reading or {}).get("table") or []
+    actions = (reading or {}).get("actions") or []
+    if len(table) != len(actions) or not 0 <= i < len(table):
+        return False
+    row = table[i] if isinstance(table[i], dict) else {}
+    if row.get("act") != act or row.get("built") or row.get("gesture"):
+        return False
+    done, _refused = _op_status(outcomes, _GOODS_DEED_OPS[act])
+    return not done
+
+
 def owed_deeds(reading: dict | None, sentence: str, outcomes=(), *,
                fighting: bool = False) -> list[dict]:
     """The deeds the player declared that the beat owes the page, in the player's order.
@@ -1109,7 +1175,7 @@ def owed_deeds(reading: dict | None, sentence: str, outcomes=(), *,
     Each is the reading's action with `span`, `cues`, `before_move` (True when the turn
     moved the party and the player did this before setting off) and `after_move`. Bounded on purpose:
     no reading, a question asked of the game, words inside the player's quotation marks
-    (a plan said aloud is speech, not a deed — Sam's turn 12), an act the engine refused,
+    (a plan said aloud is speech, not a deed — Dace's turn 12), an act the engine refused,
     an attack while a fight runs or one the dice rolled (the blow's own checks own those),
     and a deed with no words to look for are all left alone."""
     if not isinstance(reading, dict) or reading.get("error") or reading.get("question"):
@@ -1141,6 +1207,8 @@ def owed_deeds(reading: dict | None, sentence: str, outcomes=(), *,
             done, refused = _op_status(outcomes, ops)
             if refused and not done:
                 continue
+        if moved_nothing(reading, i, act, outcomes):
+            continue
         cues = deed_cues(a)
         if not cues:
             continue
@@ -1537,7 +1605,7 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     # Never substitute INSIDE a capitalised noun phrase (2026-09-30, item 11). "the Great
     # Cathedral" with only "Cathedral" flagged shipped as "the Great the stranger" — six
     # copies in the 2026-09-25 recording — and "the Velvet Veil" with only "Velvet"
-    # flagged as "the stranger Veil", twice in Sam's save. The phrase is read whole: led
+    # flagged as "the stranger Veil", twice in Dace's save. The phrase is read whole: led
     # by an article it is a named thing — a building, an inn, an order — and is left as
     # written; led by a title or another name it is one person, and all of it goes.
     phrased: list[tuple[int, int, str, str]] = []
@@ -1843,6 +1911,29 @@ def ensure_hand_back(text: str) -> tuple[str, bool]:
     return f"{said} {HAND_BACK}", True
 
 
+def drop_hand_back(text: str) -> tuple[str, str]:
+    """The beat's closing question taken off, for a beat that hands nothing back: the
+    player's character is dead, and the death screen takes the turn (`views.
+    _the_player_died`). Returns (text, the question removed or "").
+
+    Measured on the final rerun of 2026-11-05: all 7 gallows pages ended "What do you
+    do?" after "You are hanged for murder", the condemned offered a turn he no longer has
+    ("You die for the crime of murder. What do you do?"). `ensure_hand_back` is not asked
+    on such a beat; this takes off one a slot or a free narrator wrote itself.
+
+    Read off the text's shape, never its words: the final sentence when it ends on "?"
+    (`_closing_question`), and never one inside a quotation — a question somebody asks
+    aloud is their line, not the narrator's hand-back."""
+    span = _closing_question(text)
+    if span is None:
+        return text, ""
+    mark = span.end() - 1
+    if any(a <= mark < b for a, b in speech.spans(text)):
+        return text, ""
+    gone = span.group().strip()
+    return " ".join((text[:span.start()] + text[span.end():]).split()), gone
+
+
 # --- prose that contradicts the engine ---------------------------------------------
 #
 # The third law says the narrator is fed tells and nothing else about mechanics. It does
@@ -2071,7 +2162,7 @@ def wrong_hands(text: str, blows: list[dict] | None) -> list[str]:
     """Sentences that put a blow in the player's hands when the engine's tells put it
     in somebody else's.
 
-    Measured 2026-09-18: the tell was "weapon's attack misses Masta" — an NPC's swing —
+    Measured 2026-09-18: the tell was "weapon's attack misses Torvo" — an NPC's swing —
     and the consequence read "Your blade whistles through the air, but the heavy iron
     of the guard's shield…": attacker and defender swapped, because the attacker was
     named after an object and the model read "weapon" as the player's. Agency is a fact
@@ -2879,7 +2970,7 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     body = unquoted(text)
     if pc_name:
         for token in {pc_name, pc_name.split()[0]}:
-            if re.search(rf"\b{re.escape(token)}\b", body):
+            if re.search(name_pattern(token), body):
                 out.findings.append(Finding(
                     "third-person-pc", f"calls the player's character {token!r}",
                     f"You are narrating to the player. Their character is 'you', never "
@@ -3126,7 +3217,8 @@ def misgendered_tokens(text: str, pc_name: str, pronouns: str,
     the scratch saves' shipped beats: 11 of the 12 beats this finder flagged were the
     window's edge cutting a word — "the competing cries" sliced to "he competing", "The
     ground here" to "The ground he" — read as a man's pronoun for a she/her character. (The
-    twelfth was an intimate scene's partner: "'More,' she gasps … 'I want more, Sam.'")"""
+    twelfth was an intimate scene's partner: her own pronouns, around a line of hers that
+    said the player's name aloud.)"""
     family = _pronoun_family(pronouns)
     if not family or not pc_name:
         return []
@@ -3150,7 +3242,9 @@ def misgendered_tokens(text: str, pc_name: str, pronouns: str,
     def spoken(at: int) -> bool:
         return any(qa <= at < qb for qa, qb in quotes)
 
-    pattern = r'\b(?:' + re.escape(pc_name) + '|' + re.escape(first) + r')\b'
+    # One pattern for every reader of the player's name (`name_pattern`): an initialled
+    # name ("Corvin T.") ends on a full stop, which `\b` cannot follow.
+    pattern = name_pattern(pc_name)
     for m in re.finditer(pattern, text, re.I):
         lo = max(0, m.start() - MISGENDER_WINDOW)
         hi = m.end() + MISGENDER_WINDOW
@@ -3165,8 +3259,8 @@ def misgendered_tokens(text: str, pc_name: str, pronouns: str,
                 # it is the speaker's or somebody else's, never the player's. Measured on
                 # the one shipped beat left after the window fix (an intimate scene,
                 # 2026-09-30): every one of its five pronouns was the partner's, around
-                # her "I want more, Sam" and "Sam…", and the reader asked whose they were
-                # copied "Sam" for the vocative two times of two.
+                # two lines of hers that said the player's name aloud, and the reader asked
+                # whose they were copied the spoken name two times of two.
                 if named_aloud and not spoken(w.start()):
                     continue
                 found.setdefault(w.start(), (w.start(), w.end(), w.group(0), lo, hi))
@@ -3528,7 +3622,8 @@ def _shared_with_the_living(said: str, living_words: list[list[str]]) -> bool:
 
 
 def cut_dead_men_walking(text: str, dead_names, fresh=(),
-                         living=(), spare=None) -> tuple[str, list[str]]:
+                         living=(), spare=None, engine_lines=(),
+                         player_names=()) -> tuple[str, list[str]]:
     """Drop sentences where a dead actor gets up and acts.
 
     Measured across a live session: the stranger died in the opening turns, the panel
@@ -3563,6 +3658,22 @@ def cut_dead_men_walking(text: str, dead_names, fresh=(),
     name in this sentence alive" — True keeps the sentence. Measured 2026-09-27
     (docs/wrong-actor.md): two thugs, one dead, and the LIVING thug's groan on his own
     turn was cut because the words "the thug" also named a corpse.
+
+    `engine_lines` are the sentences of this turn's own tells whose actor is alive
+    (`GMAgent._groom` picks them by the outcome's `actor`, a ref): the dead in them are
+    what is worked on, never who works — the engine does not write a corpse acting. And
+    `player_names` open a sentence the way "You" does (`_PLAYER_ACTS`): the engine's own
+    line names the player's character until the groom makes it "you". Measured on the
+    narration diagnosis bench (2026-11-04, mechanism 1): the engine's harvest line stood
+    in for a remade slot — "<the PC> peels the wolf pelt off the wolf. <the PC> cuts
+    the sinew thread from the wolf." — and both were cut as the dead wolf
+    acting; the page kept only "You gain 2 mastery for the work."
+
+    A sentence cut from the middle is cut from its first word, so the sentences either
+    side keep the space between them. `_SENTENCE` carries the whitespace in front of a
+    sentence, and `_without` also eats the space after a span, so the cut glued its
+    neighbours — "for the work.You remain focused", on the same bench (`_cut_sentences`
+    learned the same on 2026-10-17).
     """
     if not text or not dead_names:
         return text or "", []
@@ -3577,6 +3688,8 @@ def cut_dead_men_walking(text: str, dead_names, fresh=(),
     living_words = [str(n).lower().split() for n in living or () if n and str(n).strip()]
     just_died = re.compile("|".join(re.escape(n) for n in fresh if n and len(n) >= 3),
                            re.I) if any(n and len(n) >= 3 for n in fresh) else None
+    told = {" ".join(str(x).split()) for x in engine_lines or () if str(x).strip()}
+    players = [str(n).strip() for n in player_names or () if str(n or "").strip()]
     cut, spans = [], []
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
@@ -3584,8 +3697,11 @@ def cut_dead_men_walking(text: str, dead_names, fresh=(),
                     if not _shared_with_the_living(h.group(0), living_words)), None)
         dying_now = bool(just_died and just_died.search(s)
                          and (felled(s) or _DEATH_LANGUAGE.search(s)))
+        opens = s.strip()
         if hit and not dying_now and not _DEAD_MAY.search(s) \
-                and not _PLAYER_ACTS.match(s.strip()) \
+                and not _PLAYER_ACTS.match(opens) \
+                and not any(opens.startswith(n) for n in players) \
+                and " ".join(opens.split()) not in told \
                 and not (spare and spare(s, hit.group(0))):
             # The quote exemption exists so a living speaker may *mention* the
             # dead — and it let the dead keep talking, measured live: a merchant
@@ -3598,7 +3714,10 @@ def cut_dead_men_walking(text: str, dead_names, fresh=(),
             opener = speech.first_opening(s)
             if opener is None or hit.start() < opener:
                 cut.append(s.strip())
-                spans.append(m.span())
+                # From its first word, unless it opens the text (see the docstring).
+                start = m.start() if m.start() == 0 else \
+                    m.start() + (len(s) - len(s.lstrip()))
+                spans.append((start, m.end()))
     if not cut:
         return text, []
     return _without(text, spans), cut
@@ -4320,6 +4439,37 @@ _DEATHS: dict[str, dict[str, list[str]]] = {
     },
 }
 
+# A beast's death (an animal, a magical beast, vermin: `states.is_beast`, by the creature's
+# type in the engine), by the margin alone: no hands to clutch a wound, no throat that
+# speaks, no knees to kneel on. The humanoid pool wrote "The wolf staggers two steps, hands
+# full of it, and sit down against nothing and are dead" (the 2026-11-04 follow-ups bench).
+# Every line names the beast and says "dead" in the same sentence, for `death_on_the_page`.
+_BEAST_DEATHS: dict[str, list[str]] = {
+    "barely": [
+        "{name} stagger{s} sideways, {poss} legs going out from under {obj}, and drop{s} "
+        "onto {poss} flank; {subj} {does} not rise again, and {is_} dead.",
+        "{name} give{s} one long shudder from nose to tail and fold{s} up where {subj} "
+        "stood; when the shudder stops, {subj} {is_} dead.",
+        "{name} lurch{es} one step with {poss} head sinking and go{es} down hard, and the "
+        "breath runs out of {obj}; {subj} {is_} dead.",
+    ],
+    "ruinous": [
+        "The blow takes {name} full in the body and knocks {obj} off {poss} feet; {subj} "
+        "land{s} dead, one leg kicking once and then still.",
+        "{name} buckle{s} in the middle and go{es} down in a heap, dead before the heap "
+        "has settled.",
+        "Something breaks deep inside {name}, and {subj} collapse{s} all at once, every "
+        "limb slack, dead.",
+    ],
+    "overkill": [
+        "{name} {is_} smashed down and broken open, and what lies there is dead and barely "
+        "the shape of {obj}.",
+        "The blow all but tears {name} apart, and {subj} {is_} dead before the remains "
+        "stop moving.",
+        "{name} {is_} thrown down ruined, dead, and nothing in {obj} moves again.",
+    ],
+}
+
 _DEATH_FAMILIES = ("bludgeoning", "piercing", "slashing", "fire", "cold")
 
 
@@ -4369,35 +4519,59 @@ def least_recently_used(said: dict | None, key: str, size: int) -> int:
     return pick
 
 
-_VERB_AFTER_NAME = re.compile(r"\{name\} (\w+)\{(s|es)\}")
+# A template's slots, in order: a verb suffix agrees with the subject before it.
+_TOKEN = re.compile(r"(\{[A-Za-z_]+\})")
+_VERB_FORMS = {"s": ("s", ""), "es": ("es", ""), "is_": ("is", "are"),
+               "was": ("was", "were"), "has": ("has", "have"), "does": ("does", "do")}
 
 
 def _fill(line: str, name: str, subj: str, obj: str, poss: str) -> str:
     plural = subj == "they"
-    # A verb that follows the NAME agrees with the name, not with the pronoun: "The
-    # warrior takes it … they are on the ground" is a singular they; "The warrior take
-    # it" (measured live 2026-09-18, a promoted man with they/them pronouns) is not.
-    # The templates write `{name} take{s}`; the name-following tokens are rewritten
-    # here to their own number so nobody has to author two of every line.
+    # Every verb agrees with ITS subject — the name or the pronoun, whichever stands
+    # before it in the clause. "The warrior takes it … they are on the ground" is a
+    # singular they; "The warrior take it" (measured live 2026-09-18, a promoted man with
+    # they/them pronouns) is not. That fix rewrote only a verb right after the name, so a
+    # second verb of the same subject took the pronoun's number: "The wolf staggers two
+    # steps, hands full of it, and sit down against nothing and are dead" (the 2026-11-04
+    # follow-ups bench). Walked token by token now: `{name}` and `{subj}` set the subject
+    # (a possessive `{name}'s` does not), and a verb written before its subject ("so
+    # {does} {subj}") takes the one right after it.
     last = (name.split() or [""])[-1]
     name_plural = last.lower().endswith("s") and not last[:1].isupper() and len(last) > 3
-    line = _VERB_AFTER_NAME.sub(
-        lambda m: "{name} " + m.group(1) + ("" if name_plural else m.group(2)), line)
-    line = line.replace("{name} {is_}", "{name} " + ("are" if name_plural else "is"))
     words = {
         "name": name, "subj": subj, "Subj": subj[:1].upper() + subj[1:], "obj": obj,
         "poss": poss,
         "self": {"he": "himself", "she": "herself", "it": "itself"}.get(subj, "themselves"),
-        "is_": "are" if plural else "is", "was": "were" if plural else "was",
-        "has": "have" if plural else "has", "does": "do" if plural else "does",
-        "s": "" if plural else "s", "es": "" if plural else "es",
     }
-    out = line.format(**words)
+    parts = _TOKEN.split(line)
+    number = {"name": name_plural, "subj": plural, "Subj": plural}
+    subject = name_plural
+    out: list[str] = []
+    for k, part in enumerate(parts):
+        key = part[1:-1] if _TOKEN.fullmatch(part) else ""
+        if not key:
+            out.append(part)
+            continue
+        if key in number:
+            if not (key == "name" and parts[k + 1:k + 2] and parts[k + 1].startswith("'s")):
+                subject = number[key]
+            out.append(words[key])
+            continue
+        if key in _VERB_FORMS:
+            many = subject
+            # Inversion: nothing but a space between the verb and a subject after it.
+            after = parts[k + 2][1:-1] if k + 2 < len(parts) else ""
+            if parts[k + 1:k + 2] == [" "] and after in number:
+                many = number[after]
+            out.append(_VERB_FORMS[key][1 if many else 0])
+            continue
+        out.append(words.get(key, part))
+    out_s = "".join(out)
     # A name opens some of these lines mid-way — "…beneath it. {name} look{s}…" — and
     # "the guards" arrives lowercase, so every sentence start is capitalised, not only
     # the first.
-    out = re.sub(r"([.!?]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), out)
-    return out[:1].upper() + out[1:]
+    out_s = re.sub(r"([.!?]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), out_s)
+    return out_s[:1].upper() + out_s[1:]
 
 
 def death_line(death: dict, said: dict | None = None) -> str:
@@ -4415,7 +4589,12 @@ def death_line(death: dict, said: dict | None = None) -> str:
         bucket = "barely"
     elif heft == "one-handed" and bucket == "overkill":
         bucket = "ruinous"
-    pool = _DEATHS[fam][bucket]
+    if death.get("body") == "beast":
+        # A beast's own lines (`_BEAST_DEATHS`), chosen from its type in the engine.
+        fam = "beast"
+        pool = _BEAST_DEATHS[bucket]
+    else:
+        pool = _DEATHS[fam][bucket]
     pick = least_recently_used(said, f"death:{fam}/{bucket}", len(pool))
     # The actor's own pronouns, defaulting neutral — the same courtesy `right_body`
     # already enforces everywhere else in the prose.
@@ -4759,7 +4938,25 @@ _YOU_VERBS = {
     "trips": "trip", "grapples": "grapple", "disarms": "disarm", "overruns": "overrun",
     "repositions": "reposition", "steals": "steal", "drags": "drag", "plays": "play",
     "damages": "damage",
+    # The grapple's own tells (`Engine._escape_from`, `_maintain_grapple`): "You strains
+    # against the giant rot grub's hold" reached the page in the live check, 2026-11-01.
+    "strains": "strain", "breaks": "break",
 }
+
+
+def name_pattern(name: str) -> str:
+    """The regex for a character's whole name or its first word, longer first, ended by
+    "no word character next" rather than `\\b`: an initialled name ends on a full stop
+    ("Corvin T."), and `\\b` after a full stop needs a letter to follow it.
+
+    Measured on the fight bench of 2026-11-03 (1 turn baseline, 3 after): the whole name
+    never matched, the first name did, and the engine's line "Pallo Farrow hits Corvin T.
+    with the mwk guisarme" reached the page as "Pallo Farrow hits you S. With the mwk
+    guisarme" — the stranded initial's stop then read as a sentence end and capitalised."""
+    name = " ".join(str(name or "").split())
+    first = name.split()[0] if name else ""
+    alts = [re.escape(n) for n in dict.fromkeys((name, first)) if n]
+    return r"(?<![\w'’])(?:" + "|".join(alts) + r")(?!\w)"
 
 
 def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
@@ -4780,8 +4977,7 @@ def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
     # curly apostrophe is taken with the straight one for the same beat.
     if not name or not text or first.lower() not in text.lower():
         return text or "", 0
-    pattern = re.compile(
-        rf"\b(?:{re.escape(name)}|{re.escape(first)})(['’]s)?\b")
+    pattern = re.compile(name_pattern(name) + r"(['’]s)?(?!\w)")
     protected = speech.spans(text)
     count = 0
     out = []
@@ -4791,6 +4987,13 @@ def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
             continue
         out.append(text[last:m.start()])
         out.append("your" if m.group(1) else "you")
+        # An initialled name ends on its own full stop ("Corvin T."). Where that stop also
+        # ended the sentence — the end of the text, or a capital after it — the sentence
+        # keeps it: "hits Corvin T. Then" is "hits you. Then".
+        if not m.group(1) and m.group(0).endswith("."):
+            rest = text[m.end():].lstrip()
+            if not rest or rest[:1].isupper():
+                out.append(".")
         last = m.end()
         count += 1
     out.append(text[last:])
@@ -4829,6 +5032,67 @@ def strip_ref_tags(text: str) -> tuple[str, int]:
     """The prose with the brief's "(c4)" tags removed, and how many there were."""
     cleaned, n = _REF_TAG.subn("", text or "")
     return cleaned, n
+
+
+def _starts_a_sentence(text: str, at: int) -> bool:
+    before = text[:at].rstrip(" \"'“‘(")
+    return not before or before[-1] in ".!?"
+
+
+def names_not_keys(text: str, scene) -> tuple[str, list[str]]:
+    """The page with every key the engine keeps said by name: a person's ref ("c11") as
+    their name and the player's as "you" (`judgement.name_refs`, over everybody the scene
+    holds, here or not), the brief's "(c4)" tag gone, and a thing's key
+    (`rules.holding.KEY_SHAPED`: "backpack#1", "iron-longsword~0f3a9c21be", the planner's
+    "blade-blank-1") as the thing's own name when somebody in the scene carries it, else
+    as its words. Returns (text, the keys replaced).
+
+    The ruling of 2026-09-28 — refs drive the checks, the player never sees them — and the
+    last pass of every narrated door (`GMAgent._groom`), beside the numbers': a backstop
+    that pastes an engine line after the first naming pass cannot leave a key behind.
+    Measured on the round-3 bench of 2026-11-05 (agree, run 4): "… is not carrying
+    blade-blank-1. They have: backpack#1, …" on the page, pasted by `beat_verified`'s
+    omission backstop after `name_refs` had run. Tokens matched against the engine's own
+    key shapes and the scene's own records, never a reading of the prose."""
+    from rules import holding
+
+    from . import judgement
+
+    if not text or scene is None:
+        return text or "", []
+    found: list[str] = []
+    text, tagged = strip_ref_tags(text)
+    if tagged:
+        found.append(f"{tagged} ref tag(s)")
+    from collections.abc import Mapping
+
+    people: dict = {}
+    for store in (getattr(scene, "people", None), getattr(scene, "actors", None)):
+        if isinstance(store, Mapping):
+            people.update(store)
+    if holding.KEY_SHAPED.search(text):
+        names: dict[str, str] = {}
+        for actor in people.values():
+            for key, name in holding.carried_names(actor).items():
+                names.setdefault(key, name)
+
+        def swap(m: re.Match) -> str:
+            key = m.group(1)
+            said = names.get(key) or holding.key_words(key)
+            if not said or said == key:
+                return key
+            found.append(key)
+            if _starts_a_sentence(m.string, m.start()):
+                said = said[:1].upper() + said[1:]
+            return said
+
+        text = holding.KEY_SHAPED.sub(swap, text)
+    before = [m.group(1) for m in judgement._BARE_REF.finditer(text)]
+    if before:
+        text = judgement.name_refs(text, scene)
+        after = [m.group(1) for m in judgement._BARE_REF.finditer(text)]
+        found += [r for r in before if r not in after]
+    return text, found
 
 
 def cut_schema_bleed(text: str) -> tuple[str, list[str]]:
@@ -5253,7 +5517,7 @@ def _place_words(wild: bool = True) -> set[str]:
         for label, _about in places_mod._WILD:
             words.add(str(label).lower().removeprefix("the ").strip())
     words.update(str(x).lower().removeprefix("the ").strip()
-                 for x in places_mod.ENTRANCES)
+                 for x in (*places_mod.ENTRANCES, *places_mod._QUARTERS))
     # And the ground a party GOES INTO, which is the other half of the vocabulary the
     # brief teaches: a narrator who writes the player into sewers nobody ventured into
     # has invented a place exactly as surely as one who writes them a gate.
@@ -5311,7 +5575,7 @@ def stands_elsewhere(text: str, here: str = "", places=(), here_is=(),
     **What the place IS is where the player is.** `here_is` is every word for the place
     the party stands in and the places it stands inside (`site_words`): its name, its
     kind, its parents'. `kinds_here` is the kinds of the founded places of this
-    settlement. Measured on the owner's save of 2026-10-01 (sam.json): 17 findings, 13
+    settlement. Measured on the owner's save of 2026-10-01 (dace.json): 17 findings, 13
     of them "there is no tavern in this place at all" with the party in the Velvet Veil
     — founded as a tavern — or in its chamber: "the roar of the tavern", "The tavern is
     quiet around you", "Each street takes you further from the tavern". Every one was

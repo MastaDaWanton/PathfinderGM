@@ -501,6 +501,10 @@ _ALLOWED = {
     "rules/engine.py": {"watches", "before", "read"},     # the one reader site in _drive
     "play/views.py": {"page", "summary"},                 # GET api/deeds
     "rules/harvest.py": {"record", "of_carcass", "never_harvested"},   # lane C's door
+    # The owner's ruling of 2026-11-01: the watch finds the player guilty or not from what
+    # they actually did. The trial reads ROWS somebody witnessed (`of`), as evidence — never
+    # the total, which stays a number on the sheet that nothing weighs.
+    "rules/trial.py": {"of"},
     # A different "deed": a crafting level's milestones (`Track.deeds`).
     "rules/worldclass.py": {".deeds"},
 }

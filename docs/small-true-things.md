@@ -100,7 +100,7 @@ One claim in the play-test record was wrong and is corrected here: the light cro
 **not** absent from `weapons.json`. It ships as `light-crossbow` at 35 gp and is reachable
 under both spellings. The only real blocker was the null price.
 
-## Measured live, five runs on a copy of the `masta` save
+## Measured live, five runs on a copy of the `torvo` save
 
 `/api/say` with "I turn to the woman in the corner and ask her what her name is", into the
 brothel scene the 2026-09-18 session ended in — two women, a stranger, guards, and nobody

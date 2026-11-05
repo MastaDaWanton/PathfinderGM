@@ -80,14 +80,15 @@ LEFT_OUT = (
 
 
 # The kinds of member that go only when "Include the save" is ticked.
-WITH_THE_SAVE = ("save", "corrections")
+WITH_THE_SAVE = ("save", "corrections", "auto-corrections")
 
 
 @dataclass
 class Member:
     name: str        # the path inside the zip
     data: bytes
-    kind: str        # manifest, words, log, turnlog, transcript, save, corrections
+    kind: str        # manifest, words, log, turnlog, transcript, save, corrections,
+                     # auto-corrections
     note: str = ""
 
 
@@ -335,6 +336,19 @@ def members(description: str = "", include_save: bool = True, *,
             out.append(Member("training/corrections.jsonl",
                               _clean(log, secrets).encode("utf-8"), "corrections",
                               "the beats you marked wrong, and what replaced them"))
+        # And the narrator's sentences the tells check caught and remade (the owner,
+        # 2026-11-02: "also log the narration corrections for training"), a file of its
+        # own so the player's marks stay theirs.
+        try:
+            from . import corrections
+
+            auto = corrections.auto_for_report()
+        except Exception:  # noqa: BLE001 — a report never fails over its extras
+            auto = None
+        if auto:
+            out.append(Member("training/auto-corrections.jsonl",
+                              _clean(auto, secrets).encode("utf-8"), "auto-corrections",
+                              "sentences the narration check caught and remade"))
 
     roles = models()
     manifest = {

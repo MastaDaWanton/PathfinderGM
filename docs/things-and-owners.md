@@ -60,7 +60,7 @@ change because the thing changed hands.
 - **Fire from nowhere**: fire damaging a thing with no source in the place or the recent
   beats is a finding, cut as the backstop.
 
-## Measured live, one replay on a copy of the `masta` save
+## Measured live, one replay on a copy of the `torvo` save
 
 Eight lines through `/api/say` and `/api/roll`: stand and stare down; wait for a
 challenger; the insult; strike the weapon and sunder it; pick up a chunk of wood and
@@ -68,9 +68,9 @@ throw it at him; hand the woman ten gold coins; drop the chunk of wood; Continue
 
 | | Result |
 |---|---|
-| Payment | purse 231 → 221 gp; "Masta hands woman 10 × gp"; the beat: "The coins clink as they fall into her palm" |
+| Payment | purse 231 → 221 gp; "Torvo hands woman 10 × gp"; the beat: "The coins clink as they fall into her palm" |
 | Throw | "Attack with chunk of wood" 1d20, "Damage (chunk of wood)" 1d4; hit for 20; "The chunk of wood lies where it fell"; award "for Ashla Ironvale" |
-| Drop | "Masta sets down chunk of wood; it lies here"; ledger: `chunk of wood`, owner pc, at the market |
+| Drop | "Torvo sets down chunk of wood; it lies here"; ledger: `chunk of wood`, owner pc, at the market |
 | Declaring turn | the prose landed the sunder; `swing-not-yet-struck` cut one sentence and the declaration stood — half the landing ("weapon's destruction … empty hands") was outside the vocabulary: widened |
 | Target | the man who squared off was "the brute", not a cast role word, so he was never booked and the sunder went to a resident standing nearby: `brute`, `bruiser`, `ruffian`, `challenger`, `veteran` … are role words now |
 | Continue | "Ashla Ironvale stabilises where they lie"; the wood "remains heavy on the dirt" — the ledger's record, held |

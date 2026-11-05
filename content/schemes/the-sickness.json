@@ -166,10 +166,8 @@
         {
           "id": "in-time",
           "criteria": [
-            "at($lodging)",
-            "present($sick)",
-            "alive($sick)",
-            "holds(pc, $herb)"
+            "event:give($sick, $herb)",
+            "alive($sick)"
           ],
           "action": {
             "do": "objective",
@@ -183,7 +181,28 @@
             }
           ],
           "tell": {
-            "perceptible": "The $herb gets to $lodging while $sick can still take it."
+            "perceptible": "The $herb is in $sick's hands while $sick can still take it."
+          }
+        },
+        {
+          "id": "in-time-by-the-healer",
+          "criteria": [
+            "event:give($healer, $herb)",
+            "alive($sick)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "remedy",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "in-time"
+            }
+          ],
+          "tell": {
+            "perceptible": "$healer takes the $herb for $sick while $sick can still take it."
           }
         },
         {

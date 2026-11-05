@@ -129,7 +129,7 @@ here no longer comes from it.
 
 `tools/beat_reader_bench.py` over `tests/beat_reader/gold.py`: 52 hand-labelled beats —
 25 from the owner's two 2026-10-03 saves (short excerpts), 7 from the Bobby corpus (read
-from disk, never committed), 11 from the committed narrator-audit recordings, 3 of Sam's
+from disk, never committed), 11 from the committed narrator-audit recordings, 3 of Dace's
 2026-10-01 replay cases, the 5 name shapes the retired name patterns were tested on, and
 one synthetic sergeant giving his name. gemma-4-12B heretic
 (Ollama, temperature 0); the regex column is the harvesters as they stood at fceeb44, on

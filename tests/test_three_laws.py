@@ -778,6 +778,18 @@ _READS_MECHANICS = {
         "('Nothing has landed yet'); this keeps the slot's own instruction from "
         "contradicting it. Measured live 2026-10-10: 'show the player doing it' landed "
         "the punch, the truth pass cut it, and the beat lost the declaration.",
+    "gm/planned.py:ask_before_the_deed":
+        "decides only the ORDER of a planned beat's act slots: whether the player's own "
+        "`say` (its `said` effect: who spoke, to whom, the words the engine heard from "
+        "the player's line) is the same span the reader gave a deed, and so is told before "
+        "it. Measured on the 2026-11-05 final rerun: the commission's request told after "
+        "the work it asked for on 7 of 7 runs. Refs and the player's own words; nothing "
+        "read here reaches the narrator — each act still reaches it as its tell.",
+    "gm/agent.py:said_by_its_slot":
+        "decides whether the deeds backstop (a repair that runs AFTER the prose) may write "
+        "a speech deed again: whether a kept act slot carries the player's own `say` tell, "
+        "read off the `said` effect's speaker ref. Round 2's replay: the ask told twice on "
+        "ask-road runs 4 and 7. A ref; nothing read here reaches the narrator.",
     "gm/judgement.py:book_introduced":
         "writes the people an `introduce` made onto scene.cast, the ledger note_cast's "
         "definiteness test reads — engine bookkeeping, not prose. It needs their refs, "

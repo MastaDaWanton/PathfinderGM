@@ -812,6 +812,28 @@ def knows(actor, spell) -> bool:
     return True
 
 
+def castable_now(actor, spell) -> bool:
+    """`knows`, and the spell's level is one this caster can cast TODAY: a slot of that
+    level at their class level (`highest_spell_level`) and the casting score for it
+    (`can_cast_level`).
+
+    `knows` answers "on the list", and for a list caster (cleric, druid, paladin, ranger)
+    that is the whole class list whatever the level — which is right for what a list
+    caster could ever reach, and wrong for "do you cast this". Owner report 2026-11-01
+    (Ansel): a level-3 paladin, who has no spell slot until level 4, copied two potion
+    formulae "from your spellbook". Copying a formula is the wizard's way (CRB, Arcane
+    Magical Writings), and a spell you cannot cast is not one you can write down from
+    understanding."""
+    if not knows(actor, spell):
+        return False
+    level = spell_level_for(actor, spell)
+    if level is None:
+        return False
+    if level > 0 and (level > highest_spell_level(actor) or not slots_for(actor).get(level)):
+        return False
+    return can_cast_level(actor, level)
+
+
 def known_spells(actor, up_to: int | None = None) -> dict[int, list]:
     """Every spell this caster may choose from, by spell level.
 

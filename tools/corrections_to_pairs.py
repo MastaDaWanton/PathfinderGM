@@ -21,6 +21,9 @@ the conversational formats TRL's trainers read (huggingface.co/docs/trl/dataset_
   * `repair.planned.kto.jsonl` — a planned beat's remake is its slots asked again
     (gm/planned.py `remake`): one row per slot call it made, judged by the verdict on the
     remade beat.
+  * `pairs.tells.dpo.jsonl` and `examples.tells.kto.jsonl` — the MACHINE's corrections,
+    from `auto-corrections.jsonl` beside the log when it is there (`convert_auto`): planned
+    slots the tells check caught breaking one of the beat's tells, and their remakes.
 
 `prompt` is the narrator's own messages as they were sent (system, examples, the turn), so
 the model is trained on the exact context it failed in. Completions are written as the
@@ -171,6 +174,55 @@ def convert(records: list[dict], *, plain: bool = False,
             "repair.planned.kto.jsonl": planned_repair}
 
 
+def _slot_completion(raw: str, text: str, plain: bool) -> list[dict]:
+    """A slot call's completion as it answered: its own JSON reply (`{"text": …}`, or a
+    reply slot's `{"words", "manner"}`), else the text in the act slot's shape."""
+    if plain:
+        return [{"role": "assistant", "content": text}]
+    content = str(raw or "").strip() or json.dumps({"text": text}, ensure_ascii=False)
+    return [{"role": "assistant", "content": content}]
+
+
+def convert_auto(records: list[dict], *, plain: bool = False) -> dict[str, list[dict]]:
+    """The machine corrections (`<data>/training/auto-corrections.jsonl`, written by
+    `play/corrections.log_auto` for every planned slot the tells check caught breaking a
+    tell — the owner, 2026-11-02: "also log the narration corrections for training") as
+    two sets of their own, never mixed with the player's:
+
+      * `pairs.tells.dpo.jsonl` — `{prompt, chosen, rejected}`: the slot's own call as it
+        was sent, the remake that passed the check again, and the slot it replaced. Only
+        records labelled `pair`.
+      * `examples.tells.kto.jsonl` — `{prompt, completion, label}`: every rejected slot
+        (false), every passing remake (true), and a remake that failed its re-check (false).
+
+    The prompt is the slot's call WITHOUT the correction appended: the pair teaches what
+    to write the first time. Pure, as `convert` is."""
+    dpo, kto = [], []
+    for rec in records:
+        if rec.get("kind") != "tells-check":
+            continue
+        prompt = rec.get("prompt") or []
+        if not prompt:
+            continue
+        meta = {"id": rec.get("id"), "slot": rec.get("slot"),
+                "narrator_model": rec.get("narrator_model"),
+                "app_version": rec.get("app_version"), "reason": rec.get("reason"),
+                "clashes": rec.get("clashes") or [], "label": rec.get("label")}
+        bad = _slot_completion(rec.get("rejected_raw"), str(rec.get("rejected") or ""),
+                               plain)
+        kto.append({"prompt": prompt, "completion": bad, "label": False,
+                    "meta": {**meta, "which": "rejected"}})
+        if rec.get("remade"):
+            good = _slot_completion(rec.get("remade_raw"), str(rec["remade"]), plain)
+            passed = bool(rec.get("remade_passed"))
+            kto.append({"prompt": prompt, "completion": good, "label": passed,
+                        "meta": {**meta, "which": "remade"}})
+            if rec.get("label") == "pair" and passed:
+                dpo.append({"prompt": prompt, "chosen": good, "rejected": bad,
+                            "meta": meta})
+    return {"pairs.tells.dpo.jsonl": dpo, "examples.tells.kto.jsonl": kto}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("log", nargs="?", help="corrections.jsonl (default: the app's data "
@@ -182,22 +234,34 @@ def main(argv: list[str] | None = None) -> int:
                     help="leave out the versions kept only by the player moving on")
     args = ap.parse_args(argv)
     log = Path(args.log) if args.log else _default_log()
-    if not log.is_file():
+    # The machine's corrections sit beside the player's (`auto-corrections.jsonl`).
+    auto = log.parent / "auto-corrections.jsonl"
+    if not log.is_file() and not auto.is_file():
         print(f"No log at {log}. Mark a beat wrong in the game first.", file=sys.stderr)
         return 1
-    records = _read(log)
     out = Path(args.out) if args.out else log.parent
     out.mkdir(parents=True, exist_ok=True)
-    sets = convert(records, plain=args.plain, explicit_only=args.explicit_only)
-    for name, rows in sets.items():
-        (out / name).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n"
-                                        for r in rows), encoding="utf-8")
-    uncaptured = sum(1 for r in records if not (r.get("input") or {}).get("messages"))
-    print(f"{len(records)} episodes: {len(sets['pairs.dpo.jsonl'])} DPO pairs, "
-          f"{len(sets['examples.kto.jsonl'])} KTO examples, "
-          f"{len(sets['repair.kto.jsonl'])} repair examples, into {out}"
-          + (f" ({uncaptured} episodes had no prompt kept and gave the narrator sets "
-             f"nothing)" if uncaptured else ""))
+
+    def _write(sets: dict) -> None:
+        for name, rows in sets.items():
+            (out / name).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n"
+                                            for r in rows), encoding="utf-8")
+
+    if log.is_file():
+        records = _read(log)
+        sets = convert(records, plain=args.plain, explicit_only=args.explicit_only)
+        _write(sets)
+        uncaptured = sum(1 for r in records if not (r.get("input") or {}).get("messages"))
+        print(f"{len(records)} episodes: {len(sets['pairs.dpo.jsonl'])} DPO pairs, "
+              f"{len(sets['examples.kto.jsonl'])} KTO examples, "
+              f"{len(sets['repair.kto.jsonl'])} repair examples, into {out}"
+              + (f" ({uncaptured} episodes had no prompt kept and gave the narrator sets "
+                 f"nothing)" if uncaptured else ""))
+    if auto.is_file():
+        machine = convert_auto(_read(auto), plain=args.plain)
+        _write(machine)
+        print(f"machine corrections: {len(machine['pairs.tells.dpo.jsonl'])} DPO pairs, "
+              f"{len(machine['examples.tells.kto.jsonl'])} KTO examples, into {out}")
     return 0
 
 

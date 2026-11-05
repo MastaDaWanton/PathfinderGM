@@ -1,6 +1,6 @@
 """Mending a construct, and making it yours: the owner's house rule and the book it departs from.
 
-The owner's report, 2026-10-01, playing Sam (a 1st-level wizard with Knowledge ranks): "I
+The owner's report, 2026-10-01, playing Dace (a 1st-level wizard with Knowledge ranks): "I
 attempt to use my knowledge of engineering and my deft hands to fix the spy in a way that
 makes it recognize me as its owner." The Clockwork Spy lay at -1 hit points. The prose
 described a full repair and a machine recognising its new master; the engine resolved

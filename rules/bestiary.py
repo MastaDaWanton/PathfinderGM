@@ -343,8 +343,23 @@ def _assemble_kit(actor, data: dict, block: dict | None = None) -> None:
     observation — loot, steal, trade — so the transcript can never contradict
     pockets nobody opened, and the watcher has the whole player turn to garnish.
     """
-    if int((data.get("abilities") or {}).get("int", 10) or 10) <= 2:
+    abilities = data.get("abilities") or {}
+    if "int" in abilities and int(abilities.get("int") or 0) <= 2:
         return                                  # animals carry teeth, not coin
+    # A body with no coin of its own: the block's Treasure line says so, or — with no line
+    # at all — it has no mind to want any. Measured on the owner's 0.2.25 report
+    # (2026-11-01): a giant rot grub, Int "—" and "Treasure none", was stripped of 6 sp.
+    # The guard above read a missing `int` as 10 (Int "—" is stored as no key at all: 165
+    # of the 1,417 printed blocks), every block is `kind: npc`, so the derived purse below
+    # fired for every mindless vermin, ooze, construct and undead in the book. The
+    # Bestiary's own rule: "'None' indicates that the creature normally has no treasure
+    # (as is typical for an unintelligent creature that has no real lair...)", and
+    # "incidental" is half treasure "only in its lair" — neither is coin on the body
+    # (Bestiary p.5, "Treasure"). The line is read first because Int "—" alone does not
+    # settle it (a giant spider, Int "—", prints "incidental").
+    no_coin = _carries_no_coin(data, block)
+    if no_coin and "int" not in abilities:
+        return                                  # mindless: nothing in its pockets at all
     # What the book prints it carries, compiled (rules/compile_block.py): its coin and
     # the things in its pack, in place of the purse derived from its XP. The owner's
     # ruling of 2026-10-28: loot is the printed gear. Weapons are already on the sheet
@@ -397,13 +412,24 @@ def _assemble_kit(actor, data: dict, block: dict | None = None) -> None:
     # Not for the app's own people who carry Table 14-9's coin, which is in the purse
     # already; a trade's build (`npc_gear.trade_outfit`) keeps the small derived purse.
     table_coin = bool(((data.get("build") or {}).get("gear") or {}).get("table"))
-    if not wealth and data.get("kind") == "npc" and not table_coin:
+    if not wealth and data.get("kind") == "npc" and not table_coin and not no_coin:
         # Derived, roughly: what defeating them is worth maps to what they carry.
         xp = int(data.get("xp_value", 0) or 0)
         wealth = "2d6 sp" if xp >= 100 else "1d4 sp"
     pockets = [str(p) for p in (data.get("pockets") or kit.get("pockets") or [])]
     if wealth or pockets:
         actor.kit_pending = {"kit": kit_key, "wealth": wealth, "pockets": pockets}
+
+
+def _carries_no_coin(data: dict, block: dict | None) -> bool:
+    """Whether a creature carries no coin on its body: its printed Treasure line is "none"
+    or "incidental" (lair treasure, not pockets), or it prints no line and has no Int
+    (mindless). A hand-written template with no block and an Int of its own carries what
+    it carries."""
+    line = str((block or {}).get("treasure") or data.get("treasure") or "").strip().lower()
+    if line:
+        return line.startswith(("none", "incidental"))
+    return bool(block) and "int" not in (data.get("abilities") or {})
 
 
 def _units(item: dict) -> int:
@@ -1207,7 +1233,7 @@ def is_a_person(template: str) -> bool:
     rule until 2026-10-09: the owner's forage creature, Aelzeldra (a monstrous humanoid),
     arrived faceless as it should and was given a Goblin's body line and her template's
     name as a true name on the next turn, and the narrator, told she was "Goblin: Small, wiry,
-    sharp-toothed", wrote "The Aelzeldra stands there, its small, wiry frame" (sammy.json,
+    sharp-toothed", wrote "The Aelzeldra stands there, its small, wiry frame" (ilse.json,
     the beat after the rest)."""
     # One rule with two names since the two lanes that wrote it met (2026-10-09):
     # `has_a_people` reads an Actor, a block or a template and resolves aliases.

@@ -1,6 +1,6 @@
 """A people the page granted in reply is recorded, and binds the next person made there.
 
-Owner ruling F2 (2026-09-30), measured on Sam's save at turns 22-23: "any human women
+Owner ruling F2 (2026-09-30), measured on Dace's save at turns 22-23: "any human women
 here?" — Gorm, "There is one," — and the chamber's keeper, Quin Nutmeg, was minted two
 turns later with a Ratfolk face. The detection and the record are `rules/granted.py`; this
 step only hands it the beat: the player's own words (the question) and the lines the beat

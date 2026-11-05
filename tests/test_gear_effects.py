@@ -9,7 +9,7 @@ protection from the cold. trail rations reset my hunger, a backpack allows me to
 more than a couple of things / increases my carry weight. ink and paper allow me to write
 notes or draw maps using ink and paper."
 
-Measured before any of this, on a copy of the owner's Sam save: nine of the ten things in
+Measured before any of this, on a copy of the owner's Dace save: nine of the ten things in
 the pack read "for show, no effect in play" on the Equipment tab; `rest` rolled no night
 check at all, so a tent had nothing to lower; nothing in the engine woke anybody fatigued
 for sleeping on the ground, so a bedroll had nothing to spare; eating consumed nothing;

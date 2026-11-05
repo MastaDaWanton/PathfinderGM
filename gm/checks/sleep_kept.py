@@ -1,6 +1,6 @@
 """The player under at the end of the turn stays under on the page.
 
-The survival lane's live run, 2026-10-05: the engine's tell said Sammy "cannot stay awake
+The survival lane's live run, 2026-10-05: the engine's tell said Ilse "cannot stay awake
 any longer and falls asleep where they stand"; the prose already had them waking at
 twilight — "that was a long nap". The narrator ran past the state the tells leave the
 player in, and the next turn opened on a character the page said was awake and the engine

@@ -1,6 +1,6 @@
 """Mending a construct, and claiming it, are rules the engine resolves (house rule).
 
-The owner's report, 2026-10-01, playing Sam (a 1st-level wizard): after a Magic Missile
+The owner's report, 2026-10-01, playing Dace (a 1st-level wizard): after a Magic Missile
 left a Clockwork Spy "unconscious and dying", the player wrote
 
     "I attempt to use my knowledge of engineering and my deft hands to fix the spy in a
@@ -94,7 +94,7 @@ def test_mended_only_to_zero_it_is_still_broken():
 # --- broken, then fixable ---------------------------------------------------------------
 
 def test_the_owners_spy_at_minus_one_is_mended_by_a_knowledge_engineering_check():
-    """The owner's state: the spy at -1 is broken. Sam's Knowledge (engineering) — the
+    """The owner's state: the spy at -1 is broken. Dace's Knowledge (engineering) — the
     better of it and an untrained Craft — makes the check at DC 15 (the spy's crafting DC
     20, less 5); 1d6 per Hit Die comes back through the heal applicator stamped
     `rule:repair-construct`; ten minutes pass; no feat, no coin. Mended above 0 it is no

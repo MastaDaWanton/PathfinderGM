@@ -3089,6 +3089,8 @@ function forgeDefaults(opts) {
     class_choices: {},
     // The homebrew 1st-level ability points (`opts.level_one.points`), by score.
     house_points: {},
+    // The favoured class bonus for 1st level (CRB p.31): "hp" or "skill".
+    favoured_bonus: "hp",
   };
 }
 
@@ -3133,7 +3135,8 @@ function ranksBudget(f, opts) {
   // Asked of the race document's budget, never of its name — `f.race === "human"`
   // was the question here, and a world's own people could never answer it.
   const race = opts.races.find(r => r.id === f.race);
-  return Math.max(1, cls.skill_ranks + intMod) + ((race && race.budget && race.budget.ranks) || 0);
+  return Math.max(1, cls.skill_ranks + intMod) + ((race && race.budget && race.budget.ranks) || 0)
+    + (f.favoured_bonus === "skill" ? 1 : 0);
 }
 
 // The same sum as `creation.build`: one, the race's bonus feats, the class's 1st-level
@@ -3368,6 +3371,16 @@ function paneForgeWho() {
             housePointsPlaced(f) >= opts.level_one.points ? "disabled" : ""}>+</button>
         </div>`).join("")}` : ""}
 
+    <h2 class="sect">Favoured class</h2>
+    <p class="note">Your class is your favoured class. Every level in it gives one of these
+      (CRB p.31); you choose again at each level, on the Class tab.</p>
+    <div class="favoured">
+      <label><input type="radio" name="crfav" data-crfav="hp" ${
+        (f.favoured_bonus || "hp") === "hp" ? "checked" : ""}> +1 hit point</label>
+      <label><input type="radio" name="crfav" data-crfav="skill" ${
+        f.favoured_bonus === "skill" ? "checked" : ""}> +1 skill rank</label>
+    </div>
+
     <h2 class="sect">Skills</h2>
     <div class="budget ${f.skills.length > rb ? "over" : ""}">
       <span>ranks${cls ? ` (${cls.skill_ranks} class${(() => {
@@ -3511,6 +3524,13 @@ document.addEventListener("change", e => {
     return;
   }
 }, true);
+
+// The favoured class bonus for 1st level (CRB p.31): a hit point or a skill rank.
+document.addEventListener("change", e => {
+  if (!FORGE || !e.target.dataset || !e.target.dataset.crfav) return;
+  FORGE.form.favoured_bonus = e.target.dataset.crfav;
+  render();
+});
 
 document.addEventListener("change", e => {
   if (!FORGE || !e.target.dataset || !e.target.dataset.crskill) return;

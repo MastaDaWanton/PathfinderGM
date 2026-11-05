@@ -130,6 +130,12 @@
     var time = c && c.minutes != null ? B.minutes(c.minutes) : "";
     var say = n === 1 ? (time ? "1 dose takes " + time + "." : "") :
       (time ? n + " doses take " + time + " and share one result." : n + " doses share one result.");
+    // Drying is timed by the batch, not the dose (the owner, 2026-11-01): the racks hold
+    // `batch_capacity` doses, and the server's `batches` says how many loads this is.
+    if (c && c.batch_capacity) {
+      say += " The racks dry up to " + c.batch_capacity + " doses a batch" +
+        (c.batches > 1 ? "; this is " + c.batches + " batches." : ".");
+    }
     var keep = document.activeElement && batchRow.contains(document.activeElement) ? document.activeElement.dataset.batch : null;
     batchRow.innerHTML =
       '<div class="tb-row"><label class="tb-label" for="bench-batch">Batch</label>' +

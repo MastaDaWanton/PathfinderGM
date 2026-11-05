@@ -249,8 +249,10 @@ def test_the_players_words_ride_the_say_and_the_offer_is_said_once_by_its_speake
     """Measured: the step's slot carried the player's line ("…declare to the guild clerk that
     you can fight"), the say's slot told it again ("You state your proficiency in combat"),
     and the job's act slot ("The clerk lists two options") stood beside the clerk's own
-    answer listing them. Now the line rides the say, the step is only a step, and the offer
-    is folded into the answer of the one who made it."""
+    answer listing them. Now the say tells the words the engine heard and the line rides
+    no slot (since 2026-11-04: the line's other deeds are other acts' — "I agree to his
+    price and pay" on the say slot wrote the refused payment as made), the step is only a
+    step, and the offer is folded into the answer of the one who made it."""
     s, e, clerk = _hiring_table(worlds)
     offer = _job(e, clerk, "offer", work="fight").outcomes[0]
     offer.intent_id = "i2"
@@ -262,14 +264,13 @@ def test_the_players_words_ride_the_say_and_the_offer_is_said_once_by_its_speake
     line = "I walk up to the guild clerk and tell them I can fight."
     slots = planned.build_plan(e, line, outcomes, last_beat="x")
     facts = [x for x in slots if x["key"].startswith("fact")]
-    with_line = [x for x in facts if line in x["say"]]
-    assert len(with_line) == 1 and "speaks to" in with_line[0]["say"]
+    assert not any(line in x["say"] for x in slots), "one telling: the say's own"
+    said = [x for x in facts if "speaks to" in x["say"]]
+    assert len(said) == 1 and "to the effect that I can fight" in said[0]["say"]
     assert not any("puts work to" in x["say"] for x in facts)
     reply = next(x for x in slots if x["key"] == "reply")
     assert "putting this work to the player now" in reply["say"]
-    # The step before the words: the say's slot is told the walk is written already.
-    assert "already written in its own sentence" in with_line[0]["say"]
     # The re-run's second line, "I ask the clerk what the caravan job pays": the say slot
     # was told to show "what came of it" and wrote the clerk's answer, which the reply then
     # gave again. It shows the asking only; the answer is the reply's.
-    assert "answer is written next, so none of it here" in with_line[0]["say"]
+    assert "answer is written next, so none of it here" in said[0]["say"]

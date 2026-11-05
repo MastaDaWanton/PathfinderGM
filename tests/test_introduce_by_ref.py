@@ -76,7 +76,7 @@ def test_a_ref_that_names_nobody_is_refused_with_the_fix_named(engine):
 
 
 def test_an_old_save_gives_a_ref_named_person_their_words_back(engine):
-    """The damage already saved: Sam's c9 is NAMED "c8" and the Here list printed it
+    """The damage already saved: Dace's c9 is NAMED "c8" and the Here list printed it
     (Lane A, live, 2026-09-30). On load it gets a descriptor: its record's words unless
     they are the ref too, else the work its record rolled (c9's: "ratcatcher"), else its
     block's name unless that is the civilian floor, else "a stranger"."""

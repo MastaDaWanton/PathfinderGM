@@ -26,6 +26,11 @@ from . import _space
 ORDER = 63
 KINDS = frozenset({"road-claimed"})
 DOORS = frozenset({"turn", "outcome"})
+# Not on a planned beat (round 2, 2026-11-05): where the player stands is the engine's
+# tell and the beat reader's, and a planned slot never moves them untold. On the rerun
+# all 4 planned findings were the player ASKING about a road ("You ask the horse dealer
+# what the road to the next town is like"), and 2 of them cut the only sentence of the ask.
+PLANNED_OFF = frozenset({"road-claimed"})
 
 _CLAIM = (r"\b(?:on|along|down|up|onto|take|takes|took|taking|follow|follows|followed|"
           r"following|walk|walks|walked|walking|set(?:s|ting)?\s+(?:out|off)\s+(?:on|along|"

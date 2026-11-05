@@ -94,7 +94,7 @@ its third axis (light: always the plain line; one-handed: never the through-the-
 line); a verb after the NAME agrees with the name, not the pronoun ("The warrior takes
 it … they are on the ground"). The award line names the fallen as people.
 
-## Measured live, three replays on a copy of the `masta` save
+## Measured live, three replays on a copy of the `torvo` save
 
 Through `/api/say` and `/api/roll`, gemma-4-12B heretic, the same six lines each time:
 stand and stare down the meanest man; wait for a challenger; the insult; strike the
@@ -121,7 +121,7 @@ name-agreement tokens; the premature-blow guard; the item-fate line.
   wrong ref (replay 2, "the man in the scarred leather" not on the board → `weary
   porters`). Item 23, group 4.
 - The NPC turn emitted `use_ability intimidation` with no actor and the refusal named the
-  player ("Masta has no ability called intimidation"). NPC-turn actor fill — group 6.
+  player ("Torvo has no ability called intimidation"). NPC-turn actor fill — group 6.
 - "the beast" for the player, "its" for a man: items 13c/12, group 3.
 - `contradicts-the-engine` false positives: "shattered remains of the man's pride" read as
   the massive man hurt; "girls is described as hurt" for a collective name. Group 4.

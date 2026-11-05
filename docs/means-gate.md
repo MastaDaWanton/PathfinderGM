@@ -9,12 +9,12 @@ power to do not just psychic and memory stuff"*.
 
 ## Where it leaked
 
-Reproduced live on a copy of the owner's save (Sammy, a level-1 asura wizard, at the
+Reproduced live on a copy of the owner's save (Ilse, a level-1 asura wizard, at the
 smithy; gemma-4-12B heretic; master content, before this change):
 
 | line | what happened |
 |---|---|
-| "I read the smith's mind" | caught: `refuse_unnamed_power` matched, the engine printed "Sammy has no ability called psychic powers. They can use: nothing yet." (wrong for a wizard with eight spells) |
+| "I read the smith's mind" | caught: `refuse_unnamed_power` matched, the engine printed "Ilse has no ability called psychic powers. They can use: nothing yet." (wrong for a wizard with eight spells) |
 | "I make the smith forget he saw me" | **leaked**: no `_PSYCHIC` pattern lists "forget"; the plan made it Diplomacy against the smith's Perception, and a roll was asked for a memory wipe |
 | "I erase the apprentice's memory of me" | **leaked**: the regex matched and stood down, because the plan had guessed `cast charm-person` (the door stands down for any cast); the engine refused the cast (not prepared); `_players_refusal` dropped it as "an op nobody asked for"; the page wrote "the flicker of recognition of your presence … simply dissolves" |
 | "I make the apprentice remember me as his cousin" | **leaked**: read `claim`, planned as Bluff |
@@ -22,7 +22,7 @@ smithy; gemma-4-12B heretic; master content, before this change):
 
 The regex had not been removed: it was still called on the turn's path. It leaked by its
 gaps (a phrasing list has no end) and by trusting the plan's own guess as the player's
-power. The owner's saves this shell can read (sammy, bobby, bobby-2) hold no such turn.
+power. The owner's saves this shell can read (ilse, bobby, bobby-2) hold no such turn.
 
 ## Prior art
 

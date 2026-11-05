@@ -267,7 +267,7 @@ def test_the_scene_checks_find_each_defect(text, found):
 
     row = {"creature_type": "construct", "subtype": "clockwork"}
     got = craft_views.scene_defects("Dusk falls. " + text, name="Clockwork Spy", row=row,
-                                    known={"Clockwork Spy", "Sam"})
+                                    known={"Clockwork Spy", "Dace"})
     assert any(found in g for g in got), got
 
 

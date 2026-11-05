@@ -162,6 +162,31 @@ def _read_inputs(cid: str) -> dict:
     return data if isinstance(data, dict) and data.get("format") == FORMAT else {}
 
 
+def _input_entry(c, beat_index: int, *, agent, player_input: str, brief: str,
+                 facts) -> dict:
+    """What wrote the beat at `beat_index`, as one record: the input `remember_input` keeps
+    and every machine correction (`log_auto`) carries, so each log line stands alone."""
+    beat = c.transcript[beat_index]
+    intimate = bool(getattr(agent, "_intimate_beat", lambda: False)())
+    return {
+        "beat": beat_index, "fingerprint": _fingerprint(beat.get("text")),
+        "at": _now(),
+        "messages": list(getattr(agent, "last_prose_messages", None) or []),
+        "narrator_model": str(getattr(agent, "last_prose_model", "") or
+                              getattr(agent, "prose_model", "") or ""),
+        "draft": str(getattr(agent, "last_prose_draft", "") or ""),
+        "player_input": str(player_input or ""), "scene_brief": str(brief or ""),
+        "facts": [str(f) for f in (facts or []) if f],
+        "intimate": intimate,
+        # Which narrator wrote the beat (gm/planned.py). A planned beat's `messages`
+        # are the plan as one prompt — the bytes every slot call opens with — and
+        # `slots` every slot call as it was sent, with its reply.
+        "narration": str(getattr(agent, "last_narration", "") or "free"),
+        **({"slots": list(getattr(agent, "last_prose_slots", None) or [])}
+           if getattr(agent, "last_narration", "") == "planned" else {}),
+    }
+
+
 def remember_input(c, beat_index: int, *, agent, player_input: str, brief: str,
                    facts: list[str]) -> None:
     """Keep what wrote the beat at `beat_index`: the prose call's whole messages, the model
@@ -170,25 +195,8 @@ def remember_input(c, beat_index: int, *, agent, player_input: str, brief: str,
     transcript. Never costs the turn: a disk that will not take it loses the input, not
     the beat."""
     try:
-        beat = c.transcript[beat_index]
-        intimate = bool(getattr(agent, "_intimate_beat", lambda: False)())
-        entry = {
-            "beat": beat_index, "fingerprint": _fingerprint(beat.get("text")),
-            "at": _now(),
-            "messages": list(getattr(agent, "last_prose_messages", None) or []),
-            "narrator_model": str(getattr(agent, "last_prose_model", "") or
-                                  getattr(agent, "prose_model", "") or ""),
-            "draft": str(getattr(agent, "last_prose_draft", "") or ""),
-            "player_input": str(player_input or ""), "scene_brief": str(brief or ""),
-            "facts": [str(f) for f in (facts or []) if f],
-            "intimate": intimate,
-            # Which narrator wrote the beat (gm/planned.py). A planned beat's `messages`
-            # are the plan as one prompt — the bytes every slot call opens with — and
-            # `slots` every slot call as it was sent, with its reply.
-            "narration": str(getattr(agent, "last_narration", "") or "free"),
-            **({"slots": list(getattr(agent, "last_prose_slots", None) or [])}
-               if getattr(agent, "last_narration", "") == "planned" else {}),
-        }
+        entry = _input_entry(c, beat_index, agent=agent, player_input=player_input,
+                             brief=brief, facts=facts)
         data = _read_inputs(c.id) or {"format": FORMAT, "campaign": c.id, "beats": {}}
         beats = dict(data.get("beats") or {})
         beats[str(beat_index)] = entry
@@ -719,6 +727,106 @@ def for_report() -> str | None:
                                for ver in rec.get("versions") or []]
         out.append(json.dumps(rec, ensure_ascii=False))
     return "".join(line + "\n" for line in out)
+
+
+# --- the machine's own corrections -----------------------------------------------------
+#
+# The owner, 2026-11-02: "also log the narration corrections for training." Every slot the
+# tells check (gm/planned.py `_tells_kept`) caught breaking one of its beat's tells is a
+# label of the same kind a player's "That's wrong" is — this text is false, here is the
+# fact it breaks — made by a machine, so it is kept in a file of its own and never mixed
+# into the player's log, which is reviewed by correction id. One line per caught slot,
+# appended (no episode to rewrite), each carrying the input that wrote the beat, so it
+# stands alone. Kept to the last `AUTO_KEPT` records: measured on the bench (2026-11-02) a
+# record runs 45-60 KB (the plan, the slot's call and the brief), so ~10 MB at the cap.
+
+AUTO_KEPT = 200
+
+
+def auto_log_path() -> Path:
+    return training_dir() / "auto-corrections.jsonl"
+
+
+def log_auto(c, beat_index: int, *, agent, player_input: str, brief: str,
+             facts) -> int:
+    """Append one record per slot the tells check remade or cut on the beat at
+    `beat_index` (`agent.last_tells_remade`); the count written. A slot whose remake passed
+    the check again is a chosen/rejected pair (`label: "pair"`); one whose remake failed,
+    or was never made, and was cut is `"rejected-only"`. Never costs the turn: a disk that
+    will not take it loses the record, said in the turn log."""
+    remade = list(getattr(agent, "last_tells_remade", None) or [])
+    if not remade:
+        return 0
+    try:
+        entry = _input_entry(c, beat_index, agent=agent, player_input=player_input,
+                             brief=brief, facts=facts)
+        # Every slot's own call repeats the plan: measured on the bench (2026-11-02), a
+        # record carrying them all ran 108-118 KB. The caught slot's call is the record's
+        # `prompt`; the others keep what they wrote and answered, and the plan is `messages`.
+        entry["slots"] = [{k: s[k] for k in ("key", "wrote", "reply", "dropped") if k in s}
+                          for s in entry.get("slots") or [] if isinstance(s, dict)]
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        lines = []
+        for n, r in enumerate(remade):
+            passed = bool(r.get("passed"))
+            lines.append(json.dumps({
+                "format": FORMAT, "kind": "tells-check",
+                "id": f"{c.id}-{beat_index}-{stamp}-{n}-{os.urandom(2).hex()}",
+                "app_version": _app_version(), "campaign": c.id, "beat": beat_index,
+                "at": _now(), "narrator_model": entry["narrator_model"],
+                "narration": entry["narration"], "intimate": entry["intimate"],
+                "input": entry,
+                "slot": r.get("slot"), "prompt": r.get("prompt") or [],
+                "rejected": r.get("rejected") or "", "rejected_raw": r.get("rejected_raw") or "",
+                "clashes": r.get("clashes") or [],
+                "verdict": "contradicts",
+                "reason": "; ".join(f"{x.get('words')!r} cannot be true beside "
+                                    f"{x.get('tell')!r}" for x in r.get("clashes") or []),
+                "remade": r.get("remade") or "", "remade_raw": r.get("remade_raw") or "",
+                "remade_passed": passed, "stood": r.get("stood") or "",
+                **({"remade_broken": r["remade_broken"]} if r.get("remade_broken") else {}),
+                "label": "pair" if passed and r.get("remade") else "rejected-only",
+            }, ensure_ascii=False))
+        path = auto_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write("".join(line + "\n" for line in lines))
+        _trim_auto(path)
+        return len(lines)
+    except Exception as exc:  # noqa: BLE001 — bookkeeping never loses a turn
+        c.turn_log.append({"kind": "auto-correction-lost", "beat": beat_index,
+                           "error": f"{type(exc).__name__}: {str(exc)[:160]}"})
+        return 0
+
+
+def _trim_auto(path: Path) -> None:
+    """Keep the last `AUTO_KEPT` records. Read only once the file could be over: a record
+    is a few KB at least, so a file under `AUTO_KEPT` KB holds fewer records than that."""
+    if path.stat().st_size < AUTO_KEPT * 1024:
+        return
+    records = path.read_text(encoding="utf-8").splitlines()
+    records = [r for r in records if r.strip()]
+    if len(records) > AUTO_KEPT:
+        files.write_text(path, "".join(r + "\n" for r in records[-AUTO_KEPT:]))
+
+
+def auto_for_report() -> str | None:
+    """The machine-corrections log as the report carries it, or None when there is none —
+    an intimate beat's prompt withheld, as `for_report` withholds it."""
+    path = auto_log_path()
+    if not path.is_file():
+        return None
+    out = []
+    for rec in read_log(path):
+        if rec.get("intimate"):
+            rec = dict(rec)
+            rec["input"] = {k: v for k, v in (rec.get("input") or {}).items()
+                            if k not in ("messages", "slots")}
+            rec["prompt"] = []
+            rec["input"]["messages_withheld"] = ("an intimate scene: the table's own "
+                                                 "passages stay on this machine")
+        out.append(json.dumps(rec, ensure_ascii=False))
+    return "".join(line + "\n" for line in out) or None
 
 
 def open_folder() -> str:

@@ -65,7 +65,7 @@ campaign after players objected.
   from inside a brothel on "the current transaction is a private matter" and paid 200 XP;
   such an advance is now logged as refused.
 
-## Measured live, four runs on a copy of the `masta` save
+## Measured live, four runs on a copy of the `torvo` save
 
 `/gm who runs this town?` → `/gm tell me anyway` → the same question again →
 `/cheat I gain 2000 experience`.
@@ -83,7 +83,7 @@ code, the author's number kept, no model call. It did nothing twice on 2026-09-1
 
 ## The two that were still owed, run 2026-09-20 — and the rule that was never in effect
 
-Both were driven on a seeded copy of the `masta` save. The save carries no live card at
+Both were driven on a seeded copy of the `torvo` save. The save carries no live card at
 all, so item 7's situation was built rather than replayed: one open errand card whose
 person is `c19`, "woman in the corner", already in the scene's cast, with `touched` two
 transcript turns back — quiet by the NEW rule (present and since >= 2) and nowhere near

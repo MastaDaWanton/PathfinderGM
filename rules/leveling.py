@@ -264,7 +264,12 @@ def find_ability(actor, wanted: str) -> tuple[str, str, list[dict]]:
                 tier_of[listed.lower()] = int(tier)
         reached = control_blood_for(actor, path)
         for listed, tier in tier_of.items():
-            if listed != want and not listed.startswith(want):
+            # The name with a mode after it — "battle blood ki pool (dodge)" — is that
+            # ability, the mode left for its document's `choice` (`class_abilities._match`
+            # reads it the same way for the core classes).
+            moded = want.startswith(listed) and len(want) > len(listed) \
+                and not want[len(listed)].isalnum()
+            if listed != want and not listed.startswith(want) and not moded:
                 continue
             if tier > reached:
                 return path, listed, []          # theirs eventually, not yet
@@ -931,11 +936,14 @@ def skill_ranks(actor) -> dict:
     per_level = max(1, class_ranks + int_mod) + race_ranks
     ranks = {str(k).lower(): int(v) for k, v in (getattr(actor, "ranks", None) or {}).items()}
     spent = sum(ranks.values())
-    total = per_level * level
+    # And a rank for every level whose favoured class bonus was taken as one (CRB p.31).
+    favoured = sum(1 for b in getattr(actor, "favoured", None) or () if b == "skill")
+    total = per_level * level + favoured
     class_skills = [str(s).lower() for s in actor.class_skills]
     return {
         "owed": max(0, total - spent), "per_level": per_level, "total": total,
         "spent": spent, "max_rank": level, "class_ranks": class_ranks, "int_mod": int_mod,
+        "favoured_ranks": favoured,
         "race_ranks": race_ranks, "class_skills": class_skills,
         "skills": [{"name": s, "rank": ranks.get(s, 0), "class_skill": s in class_skills,
                     "room": max(0, level - ranks.get(s, 0))} for s in sorted(SKILLS)],
@@ -1288,7 +1296,7 @@ def owed_lines(due: dict) -> list[str]:
     return out
 
 
-def level_up(actor, dice=None) -> dict:
+def level_up(actor, dice=None, favoured: str | None = None) -> dict:
     """Raise the character one level and hand back exactly what changed.
 
     Returns a record rather than mutating quietly: every number on this sheet is
@@ -1317,24 +1325,44 @@ def level_up(actor, dice=None) -> dict:
     new_level = int(actor.level or 1) + 1
     gains = gains_at(actor.char_class, new_level)
 
-    from .creation import max_hit_die
+    from .creation import FAVOURED_BONUSES, FAVOURED_DEFAULT, hit_dice_of
 
-    die = max_hit_die(cls.get("hit_die", 8))
-    rolled = (dice.roll(f"1d{die}", label="hit points", visibility="player").total
-              if dice is not None else (die + 1) // 2)
+    favoured = str(favoured or FAVOURED_DEFAULT).strip().lower()
+    if favoured not in FAVOURED_BONUSES:
+        return {"ok": False, "why": f"The favoured class bonus is "
+                                    f"{' or '.join(FAVOURED_BONUSES)}, not {favoured!r}."}
+
+    # Every Hit Die of the level rolled as the die it is, and Constitution on each
+    # (CRB p.30: "add your Constitution modifier to each roll"; Blood Bending gives two a
+    # level, the owner's homebrew four). Measured on the owner's report of 2026-11-01: a
+    # `"4d8"` class rolled ONE d32 at level-up (`max_hit_die` read the notation as its top)
+    # and its four Hit Dice took Constitution once — the base below cancelled the other
+    # three, while the sheet said "Con × 8 HD". Each die is floored at 1 with its
+    # Constitution, because 1e never lets a Hit Die cost you hit points.
+    per = max(1, int(actor.hit_dice_per_level or 1))
+    count, sides, flat = hit_dice_of(cls.get("hit_die", 8), per)
+    notation = f"{count}d{sides}" + (f"{flat:+d}" if flat else "")
+    if dice is not None:
+        roll = dice.roll(notation, label="hit points", visibility="player")
+        faces, rolled = list(roll.faces), roll.total
+    else:
+        faces = [(sides + 1) // 2] * count
+        rolled = sum(faces) + flat
     con = ability_modifier(actor.ability_score("con"))
-    hp = max(1, rolled + con)          # never a level that costs you hit points
+    hp = max(count, sum(max(1, f + con) for f in faces) + flat)
+    if favoured == "hp":
+        hp += 1
 
     before_max = actor.hp_max
     actor.level = new_level
-    # What the level is WORTH is `hp` — the roll plus Constitution, floored at 1,
-    # because 1e never lets a level cost you hit points however wretched your Con.
-    # The store is the rolled base and Constitution's share is derived from the Hit
-    # Dice, so the base takes the difference: a level adds `hp_base` such that the
-    # derived total rises by exactly `hp`. With Con 3 (-4) and a roll of 1 that means
-    # the base gains 5 so the total gains 1 — add `rolled` alone and a bad
-    # Constitution would make levelling up take hit points away.
-    actor.hp_base += hp - con * max(1, int(actor.hit_dice_per_level or 1))
+    actor.favoured = list(actor.favoured or []) + [favoured]
+    # What the level is WORTH is `hp`: the dice plus Constitution on each, floored at 1
+    # a die, plus the favoured class's hit point when that is the bonus taken. The store
+    # is the rolled base; Constitution's share is derived from the Hit Dice (`hp_max`) and
+    # the favoured point from `favoured`, so the base takes the rest — a level adds to
+    # `hp_base` exactly what makes the derived total rise by `hp`. With Con 3 (-4) and a
+    # roll of 1 the base gains 5 so the total gains 1.
+    actor.hp_base += hp - con * per - (1 if favoured == "hp" else 0)
     # Current hit points follow the whole rise of the maximum, not only the roll: a
     # feat that scales with Hit Dice moves it too. Measured live 2026-10-04: a fighter
     # with Toughness reached 4th level at 43 of 44, Toughness's +1 for the fourth Hit Die
@@ -1394,6 +1422,10 @@ def level_up(actor, dice=None) -> dict:
     return {
         "ok": True, "level": new_level, "rolled": rolled, "con": con, "hp": hp,
         "hp_max": actor.hp_max,
+        # The dice as rolled, so the page can land each one, and the favoured class bonus
+        # taken this level ("hp" or "skill", CRB p.31).
+        "hit_dice": notation, "faces": faces, "con_each": con, "favoured": favoured,
+        "die_count": count, "die_sides": sides,
         # Everything the level is worth — base attack, saves, slots, feats, ability
         # points, pool uses and the class's own grants (`gains_at`'s `said`) — and then
         # what it changed and what is left to choose. The line used to print the class

@@ -642,13 +642,13 @@ def unname_on_sight(scene, world, transcript) -> list[tuple[str, str]]:
     unless the name has already reached the page. Returns [(ref, "restored"|"kept")].
 
     Before owner ruling F1 (2026-09-30) every keeper was minted with `name = true_name`
-    (since 2026-09-19). Measured on Sam's save: 4 keepers — Oren Bramble (the master of
+    (since 2026-09-19). Measured on Dace's save: 4 keepers — Oren Bramble (the master of
     the market), Soren Moorcock (the general store), Gorm Vesper and Quin Nutmeg. Oren
     and Soren never appeared in any of the 82 transcript entries; Gorm's and Quin's names
     were on the page (the narrator used them unprompted, from the leaked brief). So:
 
       * a name never on the page is taken back — the panel shows the descriptor, and the
-        name is still theirs to give when asked (2 of 4 on Sam's save);
+        name is still theirs to give when asked (2 of 4 on Dace's save);
       * a name the page has already used is kept: the player has read it, and taking back
         a name the story has said is a contradiction the player sees, which is worse than
         the leak that put it there (2 of 4).

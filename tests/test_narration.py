@@ -1173,7 +1173,7 @@ def test_every_prose_door_goes_through_the_one_pipeline():
     assert src.index("fix_hand_back(") < src.index("ensure_hand_back(")
 
     for fn in (agent_mod.GMAgent.plan_turn, agent_mod.GMAgent.narrate_turn,
-               agent_mod.GMAgent.narrate_outcome, agent_mod.GMAgent.npc_turn):
+               agent_mod.GMAgent._groom_outcome, agent_mod.GMAgent.npc_turn):
         door = inspect.getsource(fn)
         assert "self._groom(" in door, f"{fn.__name__} bypasses the pipeline"
 
@@ -1205,6 +1205,28 @@ def test_a_possible_sentence_end_is_capitalised_rather_than_merged():
         "'And for tanning. Well, you might want'"
     assert narration.destutter("We see strength. And we see. something more.") == \
         "We see strength. And we see. Something more."
+
+
+def test_the_stop_of_a_names_initial_is_not_a_stray_period():
+    """The tells-check bench, 2026-11-03 (planned narration, gemma-4-12B): a PC named
+    "Firstname X." reached the page as "...the morning air, you. Is hanged for murder"
+    and, from the engine's own line in a cut slot, "You. Is held by the escort". This
+    step capitalised the word after the initial's stop, and the second-person swap then
+    read the stop as a sentence end. Run here in the page pass's order: this, then the
+    swap."""
+    for said, want in (
+            ("Under the weight of the morning air, Mira H. is hanged.",
+             "Under the weight of the morning air, you are hanged."),
+            ("Mira H. is held by the escort.", "You are held by the escort.")):
+        assert narration.destutter(said) == said, said
+        assert narration.pc_to_second_person(narration.destutter(said),
+                                             "Mira H.")[0] == want
+    # An initialled NPC, and a chain of initials, keep their stops and their case.
+    for said in ("Tobin Marsh hits Corra V. with the club.",
+                 "The letter is signed J. R. tolland, in a cramped hand."):
+        assert narration.destutter(said) == said, said
+    # A lone capital that follows no name is still a possible sentence end.
+    assert narration.destutter("So do I. then we run.") == "So do I. Then we run."
 
 
 def test_a_deliberate_ellipsis_is_not_a_stutter():

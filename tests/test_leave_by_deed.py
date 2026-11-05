@@ -82,13 +82,25 @@ def test_the_goodbye_is_said_then_the_leave_then_the_sleep():
         ("say", "resolved"), ("leave_talk", "resolved"), ("rest", "resolved")]
 
 
-def test_a_walk_across_the_room_that_was_struck_still_leaves_last():
-    """"go back up to my room" is struck as a walk across the room; with no op to stand
-    before, the leave goes after the words."""
+def test_a_walk_across_the_room_that_was_struck_does_not_take_leave():
+    """Until 2026-11-01 a `go` whose walk was struck as a walk across the room still took
+    leave, last. The owner's report that day (Corvin) measured what that costs: "walk to a
+    herbalist stall" in the market ended the talk with Snik Dunmoor, and "what is that as I
+    walk next to her" ended it with Lila Duskwatch — walking up to somebody, or across the
+    room, is not walking off. A `go` takes leave only when the plan walks out of here; the
+    goodbye line keeps its leave by its sleep (next test)."""
     s, _e, keeper = _inn()
     raw = [{"op": "say", "actor": "pc", "params": {"words": "goodbye", "to": keeper.ref}}]
     read = {"actions": GOODBYE_READ["actions"][:2]}
-    assert _ops(judgement.leave_before_leaving(raw, '', s, read)) == ["say", "leave_talk"]
+    assert _ops(judgement.leave_before_leaving(raw, '', s, read)) == ["say"]
+
+
+def test_the_goodbye_line_with_its_walk_struck_still_leaves_before_the_sleep():
+    s, _e, keeper = _inn()
+    raw = [{"op": "say", "actor": "pc", "params": {"words": "goodbye", "to": keeper.ref}},
+           {"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
+    assert _ops(judgement.leave_before_leaving(raw, '', s, GOODBYE_READ)) == [
+        "say", "leave_talk", "rest"]
 
 
 def test_a_walk_then_words_to_somebody_has_not_taken_leave():

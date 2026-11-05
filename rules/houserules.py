@@ -106,6 +106,10 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             # Only a choice made on purpose is kept; an inherited "free" moves to the new
             # default (`active`).
             "narration": "planned",
+            # Not here: the tells check of planned narration (gm/planned.py `_tells_kept`).
+            # It was a house rule for a day; the owner's ruling of 2026-11-02 is that it is
+            # always on, with no switch (`planned.tells_check_on`). A file that still
+            # carries the key is not read for it.
             # Homebrew level-up grants, asked for 2026-10-04: "1 extra feat and 2 ability
             # points every level, every odd level, or every even level", with the two
             # pickers separate "so i can assign feats to odd levels and ability points to

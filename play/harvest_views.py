@@ -299,39 +299,24 @@ def harvest_take(request):
         return _err("danger_faces must be {kind: face}.")
 
     engine = c.engine()
-    dangers_out = []
-    first = not any(not k.startswith("danger:") for k in (carcass.harvested or {}))
-    if first:
+    # The faces the page sent for the dangerous body's rounds, checked before anything is
+    # rolled — only the rounds this cut will face, as before the shared door.
+    faces: dict = {}
+    if not any(not k.startswith("danger:") for k in (carcass.harvested or {})):
         for rnd in harvest.danger_rounds(carcass):
             if rnd["faced"]:
                 continue
             dface, bad = _face(given.get(rnd["kind"]))
             if bad:
                 return _err(bad)
-            if dface is None:
-                dface = engine.dice.d20(label=f"Harvest: {rnd['words']}",
-                                        visibility="player").faces[0]
-            dtotal = dface + row["bonus"]
-            got = harvest.face_danger(engine, pc, carcass, rnd["kind"], dtotal, now=now,
-                                      dice=engine.dice)
-            dangers_out.append({"kind": rnd["kind"], "words": rnd["words"], "dc": got["dc"],
-                                "face": dface, "total": dtotal, "margin": got["margin"],
-                                "exposed": got["exposed"], "doses": got.get("doses", 0),
-                                "save_dc": got.get("save_dc"),
-                                "tells": got["tells"]})
-    if face is None:
-        face = engine.dice.d20(label=f"Harvest: {row['name']}", visibility="player").faces[0]
-    total = face + row["bonus"]
-    got = harvest.take(pc, carcass, key, total, now=now, scene=c.scene, dice=engine.dice)
-    c.scene.advance(row["minutes"])
-
-    track = worldclass.get(row["craft"])
-    progress = pc.track(row["craft"])
-    award = worldclass.award_step(track, progress, method="harvest",
-                                  ingredient_id=row["material"],
-                                  rarity_rank=worldclass.tier_rank(row["tier"]),
-                                  quality_index=0, success=bool(got["ok"]), name=row["name"],
-                                  count=1, noun="part")
+            if dface is not None:
+                faces[rnd["kind"]] = dface
+    # The one door a part comes off by, shared with a typed "I skin it"
+    # (`harvest.take_part`, `Engine._op_harvest`).
+    done = harvest.take_part(engine, pc, carcass, key, now=now, face=face,
+                             danger_faces=faces)
+    face, total, got = done["face"], done["total"], done["got"]
+    dangers_out, award, progress = done["dangers"], done["award"], done["progress"]
     token = None
     tuning = None
     if got.get("game"):

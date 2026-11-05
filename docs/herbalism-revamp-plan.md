@@ -297,7 +297,7 @@ live in a rule-row file, `content/rules/herbal-methods.json`, never in code.
 | Grind | 1 | any grindable solid | powder; bark, sap or resin become **salve base** | ×1.1 / ×1.0 | 10 min |
 | Mix | 1 | 2+ prepared things | a **Poultice** (ground fresh herb and a binder such as water, bran or moss), a **salve base** blend, or **Salve / Balm / Cream** from a base and infused oil | the weighted mean of its parts | 10 min |
 | Brew | 1 | leaf or flower in water, or root, bark or berry in water | **Infusion** (end product) or **Decoction** (end product) | ×1.0 / ×1.0, or ×1.25 / ×1.25 | 30 min, or 2 h |
-| Dry | 2 | 2 of a solid | 1 dried | ×1.5 / ×1.5 | 8 h (sun or fire) |
+| Dry | 2 | 2 of a solid | 1 dried | ×1.5 / ×1.5 | 8 h **a batch** of up to 6 doses per Herbalist level (§17, 2026-11-01) |
 | Extract | 2 | a part in a shell, gland or pod | the usable part | ×1.0 (but botches lose potency) | 30 min |
 | Infuse (oil) | 2 | dried herb and **1 oil** | **Infused oil** (sellable intermediate) | ×1.25 / ×1.5 | 4 h |
 | Steep | 2 | herb and **alcohol**, or herb and **vinegar** | **Tincture** or **Acetum** | ×1.5 / ×2.0, or ×1.25 / ×1.75 | sets up in 10 min, then ready in **2 weeks** (tincture) or **1 week** (acetum) |
@@ -320,15 +320,18 @@ the day comes. This is the first bench product with a timer. It uses the same fr
 - Mix finishes a topical.
 
 **Bulk.** One roll and one minigame cover the whole stack, and the stack shares one tier. The
-world time is per dose × batch size **(proposed: no discount)**. Missing the d20 by 5 or more
-ruins half the stack's materials, rounded up.
+world time is per dose × batch size **(proposed: no discount)**, except Dry, which is timed by
+the batch (owner ruling 2026-11-01, §17). Missing the d20 by 5 or more ruins half the stack's
+materials, rounded up.
 
 ---
 
 ## 7. Products
 
 The potency of a product is: the ingredient's own potency × each method's multiplier × the
-quality multiplier × the perks.
+quality multiplier × the perks. **Superseded 2026-11-01 (§17):** the multipliers are combined by
+the Core Rulebook's rule for multiplying, each one above 1 adding its value less 1, so a chain
+grows linearly rather than geometrically.
 
 | Product | How it's taken | Action to use **(proposed)** | Keeps **(proposed)** | Can carry routes | Notes |
 |---|---|---|---|---|---|
@@ -691,3 +694,69 @@ The owner also accepted the **(proposed)** numbers as starting values, chiefly:
 - the price ladder in §12.
 
 All of them live in rule rows so they can be tuned in play without a code change.
+
+---
+
+## 17. Owner rulings of 2026-11-01: drying in batches, potency that grows slowly
+
+From Ansel's save (owner report 2026-11-01): Herbalist 8 with nine Quality perks, a
+Caranator Decoction (concentrated twice) carrying potency 33.7147, duration 30.6497 and
+drawback 0.0453, its +2 Will save against charms turned into **+68 for 31 hours**; and his
+drying alone took days, because Dry was 480 minutes a dose.
+
+### 17.1 Drying works in batches
+
+"One batch takes its 8 hours however many doses, up to the bench's space." Dry now has
+`minutes_per_batch` 480 and `batch_doses_per_level` 6 in `content/rules/herbal-methods.json`:
+the racks hold 6 doses per Herbalist level, and more than that takes another batch
+(ceil(doses / capacity) × 480). The capacity grows with skill because Ultimate Wilderness
+p.152 has an herbalist prepare as many doses at once as she has ranks in Profession
+(herbalist); the size per level is ours, chosen so a Herbalist 2's first rack holds the dozen
+doses Ansel dried. Ansel's 24 ground in, 12 dried out was 96 hours and is now 8. Reduce, the
+other concentration step, stays at 60 minutes a dose: the ruling named drying only.
+
+### 17.2 Potency stays uncapped and grows linearly
+
+Cause: every step multiplied what the line carried in by method × form × perk × quality
+(`plan_step`, `strength_at`), so four steps in good hands compounded geometrically. The Core
+Rulebook's rule for multiplying (Getting Started, Common Terms) is the fix: "the multipliers
+are not multiplied by one another... each extra multiple adding 1 less than its value to the
+first multiple"; ×2 twice is ×3. League of Legends dropped compounding cooldown reduction
+for linear Ability Haste in patch 10.23 for the same reason, and Path of Exile adds its
+"increased" modifiers together. `crafting.combine_multipliers` now does this: each multiplier
+above 1, this step's or carried in, adds its value less 1. A multiplier below 1 (Crude hands,
+Neutralize's ×0.9, the drawback softened by good hands) still multiplies; I found no
+Pathfinder rule for stacked fractions, and adding them could take a line to zero. The
+drawback uses the same rule. Its growth with the method and form is now linear, as the
+benefits' is, so at Sound quality harm and benefit still grow together (2.6× each over the
+four steps, where both were 3.87×). Its softening by quality is unchanged. Mix still takes
+the weighted mean of what it carries in. Stock already in a save keeps the numbers baked into
+it; nothing is migrated.
+
+Measured through the real step code (`plan_step` then `make`, on the shipped Caranator, base
++2 Will for 1 hour). Each row works every step at that tier, the ceiling, with no Potency or
+Duration perks. Cells are cumulative potency (Will bonus). Ansel's own tiers, from his
+transcript (grind Fine, dry Flawless +4, brew Flawless +6, reduce Flawless +4), reproduce his
+33.7147 / 30.6497 / 0.0453 to the digit under the old code, which is the check on the method.
+
+| Herbalist / quality ceiling | grind, before | grind, after | grind+dry, before | grind+dry, after | 4-step decoction, before | 4-step decoction, after |
+|---|---|---|---|---|---|---|
+| H1, Fine | 1.265× (+3) | 1.25× (+3) | 2.182× (+5) | 1.90× (+4) | 6.764× (+14) | 3.20× (+7) |
+| H2, Superior | 1.430× (+3) | 1.40× (+3) | 2.788× (+6) | 2.20× (+5) | 11.045× (+23) | 3.80× (+8) |
+| H3, Flawless | 1.650× (+4) | 1.60× (+4) | 3.712× (+8) | 2.60× (+6) | 19.578× (+40) | 4.60× (+10) |
+| H8 + 5 Quality perks, Flawless +5 | 2.200× (+5) | 2.10× (+5) | 6.600× (+14) | 3.60× (+8) | 61.875× (+124) | 6.60× (+14) |
+| H8 + 9 Quality perks, Flawless +9 | 2.640× (+6) | 2.50× (+5) | 9.504× (+20) | 4.40× (+9) | 128.304× (+257) | 8.20× (+17) |
+| Ansel's tiers (Fine, F+4, F+6, F+4) | 1.265× (+3) | 1.25× (+3) | 3.605× (+8) | 2.65× (+6) | **33.715× (+68)** | **5.65× (+12)** |
+
+The 4-step duration goes the same way: Ansel's 31 hours become 6, and at Flawless +9 117
+hours become 9. Herbalists 1 and 2 cannot work every step themselves (Dry and Reduce are
+Herbalist 2), so those rows show what their ceiling tier is worth, not chains they can make
+alone. Still uncapped: each rung past Flawless adds 0.4 to the four-step chain, every time
+(`tests/test_potency_grows_linearly.py`).
+
+Left as it was, and why. The retired chain bench (`crafting.preview`, `herbprep.potency_change`)
+still multiplies, because no click reaches it. Alchemy's `alchemy_items.carried` multiplies
+an intermediate's quality per step in the same way the herb bench used to; that is the
+alchemy lane's to rule on. Reduce keeps its form's multiplier: a decoction reduced is still
+a decoction and earns the decoction's ×1.25 a second time (+0.25 under the new rule). That is
+older than this ruling and not touched here.

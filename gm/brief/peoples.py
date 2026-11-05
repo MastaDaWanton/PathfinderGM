@@ -1,6 +1,6 @@
 """OF WHICH PEOPLE: each present person's people, and what this place has been promised.
 
-Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Sam's save were stored as
+Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Dace's save were stored as
 `race: "human"` with a Ratfolk face and no people. The brief carried the people only as the
 first word of the face ("Ratfolk: …"), which a later beat shortens or drops, and Quin Nutmeg
 was written with human hair and skin and then "rodent-featured eyes". The people is now

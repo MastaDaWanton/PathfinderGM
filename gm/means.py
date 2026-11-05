@@ -362,27 +362,71 @@ def overreach(frame: dict | None, scene, ask=None, claim_ask=None) -> list[dict]
 
 # --- a bare claim, asked what it is ---------------------------------------------------
 INTENDS, SELF, DECLARES = "a plan", "about myself", "declared true"
-CLAIM_KINDS = (INTENDS, SELF, DECLARES)
+# Words the character SAYS (round 2, 2026-11-05): "I swear I never touched her" at the
+# trial was read as a bare claim, and the claim alone ("I never touched her") put to this
+# question came back "declared true" on 7 of 7 runs, so the means gate refused a denial in
+# court as if the player had declared the world so. A denial, an oath or a plea is talk:
+# the dice and the court decide what it does. The question now sees the whole line beside
+# what it states, and a line said aloud is a fourth answer, which `said_aloud` turns back
+# into the talk the reader should have written. The line alone was tried first: "I decide
+# that the smith owes me fifty gold" (a means-corpus REFUSE line) then came back "a plan"
+# on 6 of 6 probes, where the claim alone had been "declared true" 6 of 6 — so the
+# question is asked of both, the line for how it is said, the statement for what.
+SAYS = "said aloud"
+CLAIM_KINDS = (INTENDS, SELF, SAYS, DECLARES)
 
 _CLAIM_SYSTEM = (
     "A player in a role-playing game typed one line that does nothing; it only states "
-    "something. Say which it is: \"" + INTENDS + "\" (what they mean or plan to do "
-    "later), \"" + SELF + "\" (how their character feels, looks, or what they are like), "
-    "or \"" + DECLARES + "\" (a fact about the world, other people, or what the "
-    "character knows or can do, stated as if saying it made it so).")
+    "something. You are shown the line and what it states. Say which it is: \"" + INTENDS
+    + "\" (what they mean or plan to do later), \"" + SELF + "\" (how their character "
+    "feels, looks, or what they are like), \"" + SAYS + "\" (words their character says "
+    "aloud to somebody: an oath, a denial, a plea, a protest), or \"" + DECLARES + "\" (a "
+    "fact about the world, other people, or what the character knows or can do, stated as "
+    "if saying it made it so).")
 
+# (the line, what it states, the kind). None is a probe line or a means-corpus line.
 _CLAIM_DEMOS = [
-    ("I mean to be on the first boat out tomorrow.", INTENDS),
-    ("I'm soaked through and miserable.", SELF),
-    ("The harbourmaster has always been in my debt.", DECLARES),
-    ("I already know which warehouse the smugglers use.", DECLARES),
+    ("I mean to be on the first boat out tomorrow.",
+     "I mean to be on the first boat out tomorrow", INTENDS),
+    ("I'm soaked through and miserable.", "I'm soaked through and miserable", SELF),
+    ("I give the abbot my word the reliquary was empty when I came.",
+     "the reliquary was empty when I came", SAYS),
+    ("The harbourmaster has always been in my debt.",
+     "The harbourmaster has always been in my debt", DECLARES),
+    ("I already know which warehouse the smugglers use.",
+     "I already know which warehouse the smugglers use", DECLARES),
 ]
 
 
-def claim_kind(claim: str, *, chat=None, model: str = "", host: str = "",
-               provider: str = "ollama", api_key: str = "") -> str:
+def _claim_ask(line: str, stated: str) -> str:
+    return f"The line: {line}\nWhat it states: {stated}"
+
+
+def said_aloud(frame: dict | None, sentence: str, ask=None) -> dict | None:
+    """A reading of nothing but a claim, asked once what the claim is (`claim_kind`, with
+    the whole line): said aloud, it becomes the `talk` it is — the claim its words — so the
+    turn speaks them and the means gate has nothing to refuse. The answer is kept on the
+    frame (`claim_kind`) so the gate does not ask twice. Code acts on a closed answer; no
+    English is read here. `ask` None (the suite) leaves the frame as it is."""
+    if ask is None or not isinstance(frame, dict) or frame.get("error") \
+            or frame.get("question") or frame.get("actions") or not frame.get("claims"):
+        return frame
+    claim = str(frame["claims"][0])
+    kind = ask(claim, sentence=sentence)
+    frame["claim_kind"] = kind
+    if kind == SAYS:
+        frame["actions"] = [{"span": claim, "commit": "done", "act": "talk", "says": claim,
+                             "means": ORDINARY}]
+        frame["claims"] = [str(c) for c in frame["claims"][1:]]
+        frame["said_not_claimed"] = claim
+    return frame
+
+
+def claim_kind(claim: str, *, sentence: str = "", chat=None, model: str = "",
+               host: str = "", provider: str = "ollama", api_key: str = "") -> str:
     """One of `CLAIM_KINDS`; DECLARES when the call fails (refused: the safe direction —
-    the refusal names what to try instead)."""
+    the refusal names what to try instead). `sentence`, the player's whole line, is shown
+    beside the claim when given: the claim alone loses the "I swear" that makes it speech."""
     import json
 
     if chat is None:
@@ -398,10 +442,10 @@ def claim_kind(claim: str, *, chat=None, model: str = "", host: str = "",
         model, host = cfg["model"], cfg["host"]
         provider, api_key = cfg.get("provider", "ollama"), cfg.get("api_key", "")
     msgs = [{"role": "system", "content": _CLAIM_SYSTEM}]
-    for said, kind in _CLAIM_DEMOS:
-        msgs += [{"role": "user", "content": said},
+    for said, stated, kind in _CLAIM_DEMOS:
+        msgs += [{"role": "user", "content": _claim_ask(said, stated)},
                  {"role": "assistant", "content": json.dumps({"kind": kind})}]
-    msgs.append({"role": "user", "content": str(claim)})
+    msgs.append({"role": "user", "content": _claim_ask(str(sentence or claim), str(claim))})
     schema = {"type": "object", "properties": {"kind": {"type": "string",
                                                         "enum": list(CLAIM_KINDS)}},
               "required": ["kind"]}

@@ -258,7 +258,7 @@ def is_ammunition(key: str) -> bool:
     The CRB's Ammunition rows and the later books' firearm and siege ammunition, by the
     section the import filed them under — plus anything the overlay names a round of a
     family (`ammo_of`). The import gave all 72 of them `prof: exotic` and a sheet attack
-    row, so a quiver of arrows was "+20 to hit, damage ''" on Sam's sheet."""
+    row, so a quiver of arrows was "+20 to hit, damage ''" on Dace's sheet."""
     k = key_for(key)
     if not k:
         return False

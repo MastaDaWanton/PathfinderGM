@@ -148,8 +148,9 @@ each keeps what it said, with what closed it (checked against the code 2026-10-0
   apply through the one applicator, with the rule or the scheme named as the origin.
 - **The town beyond gate, price and guards.** No innkeeper turns the wanted away, no
   card opens on the visible side ("the guards say ..."), the brief does not tell the
-  narrator the character is wanted, and the watch does not come looking; time does not
-  soften wanted to suspected. Each is a reader to add, none needs a new store.
+  narrator the character is wanted; time does not soften wanted to suspected. Each is a
+  reader to add, none needs a new store. (A guard who SEES the wanted now comes for them:
+  "Reader four" below. The watch still does not go looking where it cannot see.)
 - **Bounty hunters outside the town** (Skyrim above 1,000 gold) — refused for now: the
   state is per town on purpose, and a hunter on the road is a scheme, not a reader.
 
@@ -160,3 +161,88 @@ A wanted character who holds `knows.way-past-gate` — a witness's smuggler's do
 scheme's reward, anything granted through the applicator — may take the open road
 (a travel by biome off urban ground). The gate itself stays shut to them: the way
 past the watch is not the arch. `tests/test_a_small_favour.py` drives it.
+
+
+## Reader four: the arrest (added 2026-11-01)
+
+The owner's ruling that day: guards who see a wanted person move to arrest them. Measured
+on the report that asked for it (Corvin, turns 56-61): wanted in Reedsink, the player stood
+beside the captain and two guards for six turns and nothing happened. `rules/arrest.py`
+holds the design and the research (Skyrim, Oblivion, Kingdom Come, Baldur's Gate 3; 1e has
+no arrest procedure, only Diplomacy and Bluff). In short:
+
+- At the end of a batch out of a fight, a `role.guard` here who can see the player
+  (`awareness.sees`) begins the arrest: `law.arresting` on the player, one effect, with the
+  tell naming the four answers.
+- The player's next batch answers it: a blow opens a fight the law joins
+  (`_law_joins`); being somewhere else is running — away, warrant standing, the next guard
+  tries again; a Diplomacy or Bluff check made stands the watch down for the day
+  (`law.stood-down.<town>`), missed, they take you; anything else is going quietly.
+- ~~**Taken is provisional and the owner's call**~~: held through the night and released at
+  morning for want of proof. **Replaced** the same day by the trial, below.
+
+Tests: `tests/test_arrest.py`. ~~The scheme's captain carries no `role.guard` tag~~ —
+**closed**: the owner's ruling 2026-11-01 ("officers arrest too"). A Small Favour grants its
+captain `role.guard.officer`, which answers `has_state("role.guard")` by the prefix, and a
+save opened before that heals on the next scheme tick (`schemes._heal_cast_grants`).
+
+
+## The trial (added 2026-11-01)
+
+The owner's ruling: "you are held questioned and if found guilty charged appropriately, with
+murder being a death sentence. you should always have to ability to talk your way out of
+things. but if you cant then either you pay your fine and have stolen goods confiscated or
+worst case are executed. or you can escape from your cell or during the walk to your
+execution." `rules/trial.py` holds the design and the research; every number is a row of
+`content/rules/law.json`, cited or marked HOUSE.
+
+**Writer two: a crime somebody saw** (`trial.report`, after the deeds reader in
+`Engine._drive`). A deed row the law charges (`law.json` `deeds`) with a witness in town:
+a guard who saw it, or a killing anybody saw, is a warrant at once; anything else is
+suspected the first time and wanted the next (the break-in's ladder). The warrant carries
+what it is for in its payload (`crime`), as the break-in's and A Small Favour's (`charge` in
+the scheme grant) now do.
+
+**Custody** (`law.custody`, one effect, the stage in its payload):
+
+| stage | the player's next batch | the batch's end |
+|---|---|---|
+| questioning | Diplomacy (attitude DC + Make Request's row for the proof), Bluff (vs Sense Motive at the proof's believability) or Intimidate (10 + HD + Wis) | made: charges dropped (Intimidate: let go, warrant standing); missed or silent: guilty, or let go for want of proof |
+| plea | the same three, mercy: simple aid +5 for a second request | sentence: death → commuted to the blood price if made; a fine → waived if made |
+| condemned | Disable Device (simple lock 20, +10 no tools), Escape Artist (bars 30), Strength (good wooden door 18), a bribe (Ultimate Intrigue: 25% of Table 14-9) | escaped: free, wanted; else dawn and the walk |
+| walk | escape (Escape Artist or CMB vs the escort's best CMD) then a run (a walk while still held is refused: measured live, "I go to the gallows" planned as a travel to the gate was rolled as a dash and freed the man), or a fight | broke away: free, wanted; else hanged (`Actor.die`) and the death screen |
+
+A fine is paid from the purse; what it cannot pay is worked off at a labourer's wage (1 sp a
+day), at most thirty days. The stolen goods go back to their owners, every warrant of the
+town is lifted and the judged deeds are never charged again. Beaten by the law where
+wanted is being taken in (`play/downed.py` → `trial.beaten`); beaten on the walk, the end.
+
+Tests: `tests/test_trial.py`, one per half of the ruling.
+
+**The owner's answers (2026-11-01, second round).**
+
+- *Killings.* "be sure that letting someone bleedout or killing someone who attacked you
+  durring combat are not murder and instead manslaughter or assault". So:
+
+  | what happened | charge |
+  |---|---|
+  | a beaten foe killed after the fight (`deed.kill.captive`) | murder |
+  | somebody who raised no hand, struck dead by the player's own act (`deed.kill.unprovoked`, manner `blow`) | murder |
+  | the same victim dead after the player's harm — bled out, or another hand (manner `after`) | manslaughter |
+  | an attacker killed in the fight (no deed row: the watch's own eyes, `trial.watch`) | manslaughter |
+  | an attacker the player dropped dying who bled out within a day | manslaughter |
+  | careless or accidental kill | manslaughter |
+  | striking somebody who raised no hand, no death | assault |
+  | fighting off an attacker, no death | uncharged |
+
+  The blow that killed merges into the killing (one charge, its assault judged with it),
+  and a death that comes after the blow keeps the witnesses who saw the blow. A
+  guard-witnessed self-defence kill is a warrant for manslaughter: 10 gp, talk at the
+  "caught" row (+15), the plea waives it.
+- *No proof, released.* An accusation with no witnessed deed and no stolen goods behind it
+  — A Small Favour's frame-up — falls at questioning: "The accusation of murder falls for
+  want of proof", its warrant lifted; with nothing else charged the player walks out and
+  every warrant of the town goes. Consequence: that scheme's clue steps need the warrant,
+  so its "Clear your name" card can no longer tick once the frame-up has fallen.
+- Fines, the 30-day labour cap and the bribe stand as built. Careless harm short of a death
+  stays uncharged (unanswered). Help from outside the cell is not built.

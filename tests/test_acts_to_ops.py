@@ -321,6 +321,30 @@ def test_it_is_the_thing_the_sentence_already_named():
         ("lantern", "pc"), ("lantern", _ref(scene, "the boy"))]
 
 
+def test_a_thing_snatched_and_pocketed_is_taken_once():
+    """Live on the integration build (2026-11-01, the theft scenario): "I snatch the silver
+    bracelet from her tray and pocket it" read `steal: the silver bracelet` then
+    `take: it`, and BOTH built a give of the bracelet. The engine told the theft, then
+    "already carries the silver bracelet, and none lies here: nothing more is picked up",
+    and the narrator, shown both tells, wrote the bracelet still on the tray. One thing
+    snatched and pocketed is taken once; a second, named thing is still its own take."""
+    scene = _scene("the jeweller")
+    jeweller = scene.actors[_ref(scene, "the jeweller")]
+    jeweller.goods = {"silver bracelet": 1, "copper ring": 1}
+    rows, raw = _turn(scene, "I snatch the silver bracelet from the jeweller's tray and "
+                             "pocket it",
+                      _frame({"act": "steal", "object": "the silver bracelet",
+                              "target": "the jeweller's tray"},
+                             {"act": "take", "object": "it"}))
+    assert [g["params"]["item"] for g in _gives(raw)] == ["silver bracelet"]
+    assert rows[1].note == "silver bracelet is already taken"
+    _, raw = _turn(scene, "I take the silver bracelet and the copper ring from the jeweller",
+                   _frame({"act": "take", "object": "the silver bracelet",
+                           "target": "the jeweller"},
+                          {"act": "take", "object": "the copper ring"}))
+    assert [g["params"]["item"] for g in _gives(raw)] == ["silver bracelet", "copper ring"]
+
+
 def test_a_thing_set_down_and_left_behind_is_set_down_once():
     """The items save's last line, read live on 2026-10-03: "I also drop the Brunt of the
     weight on the ground and leave it behind" came back `drop: the Brunt of the weight`,
@@ -462,13 +486,21 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
         # asked for, which the engine reads (tests/test_requests_and_rewards.py). And
         # `craft` and `work` on a craft alone (2026-10-28, tests/test_typed_crafting.py).
         # And `pace` and `diversion` on a stealth alone (2026-10-30,
-        # tests/test_hidden_state_followups.py).
+        # tests/test_hidden_state_followups.py). And `until` on a wait and a rest
+        # (2026-11-01, tests/test_wait_until.py).
+        # tests/test_grapple_held.py).
         assert set(alt["properties"]) == {"span", "commit", "act", "power", "means",
                                           *interpret.ACT_SLOTS[act],
                                           *(["asks_for"] if act == "request" else []),
                                           *(["craft", "work"] if act == "craft" else []),
                                           *(["pace", "diversion"] if act == "stealth"
-                                            else [])}
+                                            else []),
+                                          *(["until"] if act in ("wait", "rest")
+                                            else []),
+                                          *(["way"] if act == "escape" else []),
+                                          # And `blow` on an attack (2026-11-04,
+                                          # tests/test_narration_followups.py).
+                                          *(["blow"] if act == "attack" else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 

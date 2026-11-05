@@ -142,6 +142,10 @@ def deeds_of(reading: dict | None, sentence: str, outcomes=(), *,
             done, refused = narration._op_status(outcomes, ops)
             if refused and not done:
                 continue
+        # A hand-over the engine moved nothing for is not written as done by the backstop
+        # (`narration.moved_nothing`): it would be a payment or a gift the engine never made.
+        if narration.moved_nothing(reading, i, act, outcomes):
+            continue
         span = str(a.get("span") or "").strip()
         if not span or not re.search(r"[A-Za-z]", span):
             continue
@@ -261,7 +265,7 @@ def about_the_player(written: str, narration: str, player_line: str = "",
 
 # --- the player still under at the end of the turn -----------------------------------------
 #
-# The survival lane's live run, 2026-10-05: the engine's tell said Sammy "cannot stay awake
+# The survival lane's live run, 2026-10-05: the engine's tell said Ilse "cannot stay awake
 # any longer and falls asleep where they stand", and the prose already had them waking at
 # twilight — "that was a long nap". The page ran past the state the engine left the player
 # in. One closed question, the same shape as the deeds: which sentence, if any, has the

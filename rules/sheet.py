@@ -366,6 +366,11 @@ def pronouns_for_gender(gender: str) -> str:
 # is destroyed, and a corpse that is also "broken: inert, but not destroyed" lies twice.
 _DOWN_THE_LADDER = ("dying", "stable", "unconscious", "disabled", "broken")
 
+# The bonus types to AC that also count toward CMD, in the book's own list (CRB p.199,
+# Combat Maneuver Defense). Armour, shield, natural armour and size are NOT in it.
+CMD_FROM_AC = frozenset({"circumstance", "deflection", "dodge", "insight", "luck",
+                         "morale", "profane", "sacred"})
+
 
 @dataclass
 class Actor:
@@ -393,6 +398,11 @@ class Actor:
     natural_armour: int = 0
     weapons: list[str] = field(default_factory=list)
     equipped: str | None = None
+    # The favoured class bonus each level in it was taken as — "hp" or "skill", one entry
+    # a level (CRB p.31, "Favored Class"). Written by the forge and by `leveling.level_up`;
+    # read by `favoured_hp` and by the skill budget (`leveling.skill_ranks`). A sheet from
+    # before 2026-11-01 has none, and none is invented for it.
+    favoured: list[str] = field(default_factory=list)
 
     # Hit points as ROLLED — every hit die taken, before Constitution says what they
     # are worth. `hp_max` is derived from this and the current Con modifier, and is a
@@ -2793,9 +2803,36 @@ class Actor:
         penalty = water_mod.attack_penalty(row, str(weapon.get("type") or ""))
         return Modifier(penalty, "the water") if penalty else None
 
-    def _condition_mods(self, field_name: str) -> list[Modifier]:
+    @property
+    def held_in_grapple(self) -> bool:
+        """Whether somebody else holds this creature in a grapple it did not start — the
+        one held, who may break it (`escape`), not the holder, who keeps it. Asked of the
+        vocabulary and the condition's own holder (`payload.by`, `payload.grappler`)."""
+        from . import states
+
+        for e in self.effects:
+            if e.kind != "condition" or not (e.payload or {}).get("by"):
+                continue
+            if (e.payload or {}).get("grappler") == self.ref:
+                continue
+            if any(states.matches(str(t), "state.held.grappled")
+                   or states.matches(str(t), "state.held.pinned") for t in e.tags or ()):
+                return True
+        return False
+
+    def _condition_mods(self, field_name: str, but: str = "") -> list[Modifier]:
+        """The condition rows' terms for one number. `but` is a tag query whose conditions
+        are left out — the grappled row's -2 on a check "made to grapple or escape a
+        grapple" (CRB, Grappled), asked of the vocabulary, never of the row's name."""
+        from . import states
+
         out = []
-        for c in self.conditions:
+        for e in self.effects:
+            if e.kind != "condition":
+                continue
+            if but and any(states.matches(str(t), but) for t in e.tags or ()):
+                continue
+            c = Condition(key=e.key, rounds_left=e.rounds_left, source=e.source)
             v = c.data.get(field_name)
             if isinstance(v, int) and v:
                 out.append(Modifier(v, c.name.lower()))
@@ -3811,13 +3848,20 @@ class Actor:
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
         """How many attacks, at which iteration index. Iteratives are the exact kind of
         bookkeeping this app exists to carry."""
+        # A timed extra swing laid by an ability (`combat_mod` on `extra_attacks`, typed so
+        # two of one kind give one): Battle Blood Ki Pool's "make 1 extra attack at highest
+        # bonus" (content/classes/blood-bending.json), one more swing at iteration 0 on the
+        # attack it is spent on — standard or full — and gone with the effect.
+        bonus = [0] * max(0, sum(m.value for m in stack(
+            self._buff_mods("combat_mod", "extra_attacks"))))
         if not full_attack:
-            return [0]
+            return [0] + bonus
         printed = self.weapon(weapon_key).get("stat_block")
         if printed:
             from . import statblock_attacks
 
-            return statblock_attacks.swings({"bonuses": printed["bonuses"], "count": 1})
+            return statblock_attacks.swings({"bonuses": printed["bonuses"], "count": 1}) \
+                + bonus
         # Speed (CRB): "when making a full-attack action, the wielder of a speed weapon may
         # make one extra attack with it. The attack uses the wielder's full base attack
         # bonus" — so the extra is one more swing at iteration 0, never a sixth
@@ -3826,8 +3870,8 @@ class Actor:
         # not two, the day haste has a document in the group.
         extra = [0] * int(self.weapon(weapon_key).get("extra_attacks", 0) or 0)
         if self.flat_attack is not None:
-            return [0] + extra
-        return list(range(len(iterative_attacks(self.bab)))) + extra
+            return [0] + extra + bonus
+        return list(range(len(iterative_attacks(self.bab)))) + extra + bonus
 
     def attack_plan(self, weapon_key: str | None = None,
                     full_attack: bool = False) -> list[tuple[str, int]]:
@@ -4131,7 +4175,12 @@ class Actor:
             if size_mod:
                 mods.append(Modifier(size_mod, f"{self.size} size"))
 
-        mods.extend(self._condition_mods("attack"))
+        # "A grappled creature takes a -2 penalty on all attack rolls and combat maneuver
+        # checks, except those made to grapple or escape a grapple" (CRB, Grappled): the
+        # maintaining check and the escape (`Engine._op_escape`) read the grapple's own
+        # name here, and the grappled row's -2 stays off them.
+        mods.extend(self._condition_mods(
+            "attack", but="state.held.grappled" if maneuver in ("grapple", "escape") else ""))
         # The one funnel, which this list alone never read — the same gap
         # damage_modifiers had: a `combat_mod` aimed at cmb was in the authoring
         # vocabulary, validated, saved, and absent from every manoeuvre roll. The
@@ -4160,6 +4209,23 @@ class Actor:
 
         # "Any penalties to a creature's AC also apply to its CMD."
         mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
+        # And the bonuses the book names: "A creature can also add any circumstance,
+        # deflection, dodge, insight, luck, morale, profane, and sacred bonuses to AC to
+        # its CMD" (CRB p.199, Combat Maneuver Defense; legacy.aonprd.com/coreRulebook/
+        # combat.html). Until 2026-11-01 only the `cmd` target was read, so Ansel's Dodge
+        # feat raised his AC and not his CMD: the sheet said 22 where the book says 23.
+        # Asked of the same channels `ac_modifiers` reads, typed, so `stack` keeps the
+        # best of each named type and a ring's deflection is counted once. A printed CMD
+        # already carries the block's own gear and feats, so only what is laid on it
+        # since (a spell, a potion) is added there; dodge goes with Dex when it is lost.
+        loses = flat_footed or self.loses_dex_to_ac
+        if self.flat_cmd is not None:
+            source = list(self._buff_mods("combat_mod", "ac"))
+        else:
+            source = list(self.ac_modifiers(flat_footed=flat_footed))
+        mods.extend(m for m in source
+                    if m.value > 0 and (m.type or "") in CMD_FROM_AC
+                    and not (loses and m.type == "dodge"))
         # 1e grants Improved <manoeuvre> to CMD as well as CMB; the old branch gave
         # CMB alone, and the document says both.
         mods.extend(self._buff_mods("combat_mod", "cmd",
@@ -5786,7 +5852,15 @@ class Actor:
         `set_hp_max` can subtract exactly what the read added. Stacked by type like
         every other channel: two untyped Toughness-shaped terms add, two enhancement
         ones take the best."""
-        return sum(m.value for m in stack(self._buff_mods("combat_mod", "hp_max")))
+        return (sum(m.value for m in stack(self._buff_mods("combat_mod", "hp_max")))
+                + self.favoured_hp)
+
+    @property
+    def favoured_hp(self) -> int:
+        """The favoured class bonus taken in hit points: one for every level the player
+        chose "hp" for (CRB p.31, `favoured`). Read here, beside the feat channel, so
+        `set_hp_max` takes out exactly what the read adds."""
+        return sum(1 for b in self.favoured or () if b == "hp")
 
     def hp_max_modifiers(self) -> list["Modifier"]:
         """What the maximum is made of, itemised the way AC is.
@@ -5800,6 +5874,8 @@ class Actor:
         if con:
             mods.append(Modifier(con, f"Con × {max(1, self.hit_dice)} HD"))
         mods.extend(stack(self._buff_mods("combat_mod", "hp_max")))
+        if self.favoured_hp:
+            mods.append(Modifier(self.favoured_hp, "favoured class"))
         return mods
 
     @property
@@ -6078,7 +6154,7 @@ class Actor:
         #
         # Every night used to count as eight hours here, so exhaustion only ever became
         # fatigue. Measured on the owner's 0.2.21 report (2026-10-27): exhausted by 21
-        # hours at the herb bench, Jason slept fifteen hours in his bedroll and woke
+        # hours at the herb bench, Ansel slept fifteen hours in his bedroll and woke
         # "fatigued (slept off exhaustion)"; every beat after said "your limbs heavy and
         # your movements sluggish", and nothing on the page said why.
         fatigue = {"lifted": [], "left": "", "why": ""}
@@ -7720,6 +7796,7 @@ def to_dict(actor: Actor) -> dict:
         "ability_damage": dict(actor.ability_damage),
         "ability_drain": dict(actor.ability_drain),
         "hit_dice_per_level": actor.hit_dice_per_level,
+        **({"favoured": list(actor.favoured)} if actor.favoured else {}),
         "overrides": dict(actor.overrides),
         "gear": {k: {"name": i.name, "material": i.material, "hardness": i.hardness,
                      "hp": i.hp, "hp_max": i.hp_max} for k, i in actor.gear.items()},
@@ -8332,6 +8409,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},
         hit_dice_per_level=int(data.get("hit_dice_per_level", 1) or 1),
+        favoured=[str(b).strip().lower() for b in data.get("favoured") or ()
+                  if str(b).strip().lower() in ("hp", "skill")],
         overrides=_overrides(data.get("overrides") or {}),
         gear={k: Item(name=v.get("name", k), material=v.get("material", ""),
                       hardness=v.get("hardness"), hp=v.get("hp"),
@@ -8441,7 +8520,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         a.vulnerabilities = vulnerabilities
         a.reductions = [_reduction(r) for r in (data.get("reductions") or [])]
     # Ammunition written onto the weapons list by a save from before 2026-09-30 (the smith
-    # delivered "Arrows (20)" as a weapon, and Sam carried `arrows-20` there): moved into
+    # delivered "Arrows (20)" as a weapon, and Dace carried `arrows-20` there): moved into
     # `goods` as the rounds it is, once, so the bow can spend them and the sheet stops
     # offering a quiver as a thing to swing (E3). Idempotent — a migrated save has none.
     from . import weapons as weapons_mod
@@ -8460,7 +8539,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # the effects (a wild shape's jaws are an effect's) and before `validate`, which would
     # otherwise refuse the whole sheet. The jaws are the race document's, read live
     # (`_race_doc`), so when that document cannot be read the bite goes with it — law 2's
-    # rule for a removed source. Measured 2026-10-29: the owner's Sammy (asura wizard 2,
+    # rule for a removed source. Measured 2026-10-29: the owner's Ilse (asura wizard 2,
     # 410 turns) equipped "bite" from a bench race in homebrew/races/asura.json; loaded
     # anywhere that file was not — a reported save, a deleted or edited bench race — the
     # roster said "the sheet cannot be read" and the game could not be played. The names
@@ -8527,7 +8606,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # 8. `to_dict` writes the marker; its absence means the old convention, and the
     # holder finally receives what the feat always promised. Absent is not empty.
     if "hp_channels" not in data:
-        total += a._feat_hp()
+        # The feat channel only: a sheet that carries `favoured` (the forge's, before its
+        # first save) wrote its total with the favoured point already in it.
+        total += a._feat_hp() - a.favoured_hp
     a.set_hp_max(total)
     _bind_targets(a)
     a.take_up_printed_arms()
@@ -8583,7 +8664,8 @@ def validate(actor: Actor) -> None:
 
         per_level = max(1, cls["skill_ranks"] + ability_modifier(actor.abilities.get("int", 10)))
         per_level += races_mod.budget(actor.race, "ranks")
-        allowed = per_level * actor.level
+        # And the favoured class bonus's ranks (CRB p.31), one a level taken as "skill".
+        allowed = per_level * actor.level + sum(1 for b in actor.favoured if b == "skill")
         spent = sum(actor.ranks.values())
         if spent > allowed:
             raise IllegalSheet(

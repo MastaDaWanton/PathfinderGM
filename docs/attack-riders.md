@@ -188,11 +188,17 @@ carried now.
   `negative_level` type records the decision not to apply seven of them. The rider asks
   the immunity and reports. Applying negative levels whole is its own piece of work, and
   so is the drainer's 5 temporary hit points.
-- **Maintaining a grapple.** The hold is won on the hit, and constrict and blood drain fire
-  once. Blood drain fires on that hit, where the UMR says "at the end of its turn". On
-  later turns, grab's "each grapple combat maneuver check it succeeds at ... automatically
-  deals the damage" has no executor. Nor does the -20 hold that keeps the creature itself
-  ungrappled.
+- **Maintaining a grapple — BUILT 2026-11-01** (fix/combat-grapple-abilities). The grab
+  writes the hold onto the held one's condition (`hold_weapon`, `hold_bonus`, `hold_then`);
+  on the holder's later turns `Engine.grapple_turn` rolls the maintaining check (CMB +5,
+  the grab's +4, against CMD) and a kept hold deals the seizing attack's damage, or the
+  constrict in its place; a failed check ends it. The held one breaks it with `escape`
+  (CMB or Escape Artist against the holder's CMD), and `_grapples_settle` / `Scene.
+  end_encounter` end it when the holder is down, dead, gone or moved apart, or the fight
+  ends (tests/test_grapple_held.py). Still not done: blood drain fires on the winning hit,
+  where the UMR says "at the end of its turn"; the -20 hold that keeps the creature itself
+  ungrappled; and the maintaining check's other options (move, pin, tie up) — a kept hold
+  always deals damage.
 - **CMB.** A creature's manoeuvre uses `flat_attack`, as every stat-block manoeuvre always
   has. The printed CMB ("CMB +6 (+10 grapple)") is stripped at import.
 - **A poison dose on a made weapon** ("mwk kukri (1d4 plus poison)", 30). The dose is in

@@ -85,6 +85,25 @@ def _words(text: str) -> set[str]:
             if len(w) > 2 and w not in _NOT_A_NAME}
 
 
+def _one(word: str) -> str:
+    """A word as one of its kind: "guardsmen" is "guardsman", "guards" "guard", "ladies"
+    "lady". Owner report 2026-11-01 (Corvin, turn 59): "Address the guardsmen directly" did
+    not find the guardsman standing there — the finder matched exact words, so a plural
+    named nobody, and a second guardsman was introduced beside the first. Only the
+    regular endings of English nouns, applied to both sides of the comparison."""
+    if len(word) > 4 and word.endswith("men"):
+        return word[:-3] + "man"
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith(("ss", "us", "is")):
+        return word[:-1]
+    return word
+
+
+def _ones(words: set[str]) -> set[str]:
+    return {_one(w) for w in words}
+
+
 def _role_of(entity) -> str:
     facts = dict(getattr(entity, "facts", {}) or {})
     return str(facts.get("Role") or "")
@@ -203,7 +222,7 @@ def in_the_room(scene, phrase: str) -> str:
         for w in keepers.trade_words(a, getattr(scene, "founded", ()) or ()):
             trade |= _words(w)
         by_trade = bool(trade) and want <= trade
-        shared = len(want & owns)
+        shared = max(len(want & owns), len(_ones(want) & _ones(owns)))
         if by_trade:
             shared = max(shared, len(want))
         if not shared:
@@ -238,6 +257,63 @@ def _is_description(shown: str, true: str) -> bool:
     true name and opens in lower case ("the stranger sharing the step")."""
     shown = str(shown or "").strip()
     return bool(shown) and shown != str(true or "").strip() and shown[:1].islower()
+
+
+def _whole_name_hits(scene, said: list[str]) -> list[str]:
+    """The refs of everybody the scene holds (here or not, never the player) whose shown
+    or true name the words say whole, in order."""
+    out = []
+    for ref, a in (getattr(scene, "people", {}) or {}).items():
+        if getattr(a, "is_pc", False):
+            continue
+        names = [str(getattr(a, "name", "") or ""), str(getattr(a, "true_name", "") or "")]
+        if any(n.strip() and _says_whole(said, n) for n in names):
+            out.append(ref)
+    return out
+
+
+def held_by_whole_name(scene, phrase: str) -> str:
+    """The ref of the one person the scene holds whom the phrase names by their whole
+    name, or "" — none, or two of the same name. Never by a shared word: two Ashbournes
+    are two people."""
+    said = [w for w in _WORDS.findall(head_phrase(phrase).lower())
+            if len(w) > 2 and w not in _NOT_A_NAME]
+    hits = _whole_name_hits(scene, said) if scene is not None and said else []
+    return hits[0] if len(hits) == 1 else ""
+
+
+def elsewhere_by_name(scene, said: list[str], location_id: str | None, world) -> dict | None:
+    """Somebody the scene holds but who is not here, named whole by `said` (the phrase's
+    name words): `{"scope", "who", "ref", "where", "line"}`, or None. Not where they stand
+    — only the town when it is this one and they are in its streets, as the world's own
+    answer says it; a person out past the walls is "not here", because where a person has
+    gone is for the player to find out, not for a lookup to hand them."""
+    from . import places as places_mod
+
+    if scene is None or not said:
+        return None
+    here = getattr(scene, "actors", {}) or {}
+    hits = _whole_name_hits(scene, said)
+    if len(hits) != 1 or hits[0] in here:
+        return None
+    ref = hits[0]
+    a = scene.people[ref]
+    at = str(getattr(a, "at", "") or "")
+    town = None
+    try:
+        town = world.get(location_id) if world is not None and location_id else None
+    except Exception:
+        town = None
+    town_name = str(getattr(town, "name", "") or "")
+    in_town = (bool(at) and places_mod.location_of(at) == (location_id or "")
+               and places_mod.terrain_of(at) == places_mod.URBAN)
+    if in_town and town_name:
+        line = (f"{a.name}, is in {town_name} but not in this room. Nobody of that "
+                f"description is standing here.")
+    else:
+        line = f"{a.name}, is not here."
+    return {"scope": ELSEWHERE, "who": str(a.name), "ref": ref,
+            "where": town_name if in_town else "", "line": line}
 
 
 def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
@@ -291,6 +367,20 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
                     "line": population.seen_line(pop.people[0], scene, world)}
         # Not a question the world can answer. Left alone on purpose.
         return {**out, "scope": "", "line": ""}
+    whom = head_phrase(phrase)
+    said = [w for w in _WORDS.findall(whom.lower()) if len(w) > 2 and w not in _NOT_A_NAME]
+    # The people this campaign holds, wherever they stand, before the world's roll of
+    # names — and only by the whole name. Measured on the owner's 0.2.25 save: "Search the
+    # marsh and the edge for Kwolla Ashbourne" answered "Glib Ashbourne, fleet pilot, is in
+    # Reedsink but not in this room" twice, because the world was asked first and a single
+    # shared word ("Ashbourne") matched the first CHARACTER it met. Kwolla was in the
+    # scene's own store the whole time. Only when the people finder has no answer of its
+    # own: one it found elsewhere knows more than this does ("gone home for the night",
+    # `population.seen_line`), measured by tests/test_residency.py when this ran first.
+    known = (elsewhere_by_name(scene, said, location_id, world)
+             if pop.scope not in (population.ELSEWHERE, population.AMBIGUOUS) else None)
+    if known is not None:
+        return {**out, **known}
     if world is None:
         return {**out, "scope": "", "line": ""}
 
@@ -304,13 +394,14 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
     # The world is asked for whom the phrase names, not for the people its clause
     # mentions: "the girl that the watchman described" matched every CHARACTER whose Role
     # says watchman, and answered that one was elsewhere.
-    whom = head_phrase(phrase)
     found = [e for e in getattr(world, "entities", {}).values()
              if getattr(e, "kind", "") == "CHARACTER" and matches(e, whom)]
     if found:
-        # The one here in town first, because "not in this room" is a shorter walk than
-        # "in another city" and the player will want the nearer answer.
-        found.sort(key=lambda e: getattr(e, "parent_id", "") != (location_id or ""))
+        # A whole name said beats a word of one, as in the room (`in_the_room`); then the
+        # one here in town, because "not in this room" is a shorter walk than "in another
+        # city" and the player will want the nearer answer.
+        found.sort(key=lambda e: (not _says_whole(said, str(getattr(e, "name", "") or "")),
+                                  getattr(e, "parent_id", "") != (location_id or "")))
         who = found[0]
         where = ""
         try:

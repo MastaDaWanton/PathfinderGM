@@ -34,6 +34,7 @@ from django.views.decorators.http import require_GET, require_POST
 from rules import crafting, worldclass
 from rules import leatherworker as lw
 
+from . import bench_clock
 from . import campaign as campaign_mod
 from .apiutil import read_body, read_int
 
@@ -804,6 +805,11 @@ def leather_roll(request):
                     f"{plan.impossible}.")
     if not plan.can_roll:
         return _err("Nothing on the bench to work.")
+    # Before the die, the rent and the clock: work the pack cannot carry the body
+    # through is refused in words, and nothing has happened (`bench_clock`).
+    said = bench_clock.refusal(c, pc, plan.minutes)
+    if said:
+        return _err(said, 409)
 
     engine = c.engine()
     label = f"Leatherworking: {plan.method.title()}"
@@ -824,13 +830,13 @@ def leather_roll(request):
             pc.purse = purse
             paid.append({"cp": rent, "for": "the yard's hours",
                          "to": (where.get("tannery") or {}).get("keeper")})
-    c.scene.advance(plan.minutes)
+    lived = bench_clock.pass_time(c, engine, pc, plan.minutes, "at the leather bench")
     roll = {"face": face, "faces": [face], "bonus": plan.bonus, "total": total,
             "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms}
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": face,
                        "word": "Success" if success else "Failure"},
-           "lost": [], "minutes": plan.minutes, "rent": paid}
+           "lost": [], "minutes": plan.minutes, "rent": paid, "lived": lived}
     line = ""
     if success:
         token = secrets.token_urlsafe(16)

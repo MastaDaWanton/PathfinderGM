@@ -440,7 +440,7 @@ def _sleeper(monkeypatch, answer, *, asleep=True):
 
 
 def test_a_player_the_engine_put_to_sleep_does_not_wake_on_the_page(monkeypatch):
-    """The survival lane's live run, 2026-10-05: the tell said Sammy "cannot stay awake any
+    """The survival lane's live run, 2026-10-05: the tell said Ilse "cannot stay awake any
     longer and falls asleep where they stand"; the prose had them waking at twilight —
     "that was a long nap". The waking sentence is found and the beat cut from it."""
     check, ctx, seen = _sleeper(monkeypatch, 2)

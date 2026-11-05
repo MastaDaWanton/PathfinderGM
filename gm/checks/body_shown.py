@@ -35,7 +35,7 @@ its own prose (D4 — the death line taught itself to the model four times runni
 Not in a fight: a fight's wounds are the blows' tells, and its beats are short. Not on an
 NPC's turn or an outcome line: the player's body is the player's beat.
 
-"many feet" (sammy.json, beat 71, a Kasatha) is a body-PLAN contradiction this module does
+"many feet" (ilse.json, beat 71, a Kasatha) is a body-PLAN contradiction this module does
 not judge: the race document's body line is in the brief (`races.body_line`) and nothing
 checks the page against it yet.
 """

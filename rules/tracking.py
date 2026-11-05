@@ -146,7 +146,16 @@ def quarry_of(scene, phrase: str, world=None) -> dict | None:
     except Exception:  # noqa: BLE001 — a phrase the finder cannot read is nobody it holds
         return None
     if found.scope not in (population.HERE, population.ELSEWHERE) or len(found.people) != 1:
-        return None
+        # A person the scene holds by their whole name, wherever they stand — a scheme's
+        # cast never passes through the prose finder's rings. Measured on the owner's
+        # 0.2.25 save: "Search the marsh and the edge for Kwolla Ashbourne" tracked with
+        # `held: null` and told "nothing that has passed here is Kwolla Ashbourne" of a
+        # woman the engine held at the marsh (`scope.held_by_whole_name`).
+        from . import scope
+
+        ref = scope.held_by_whole_name(scene, phrase)
+        body = (getattr(scene, "people", {}) or {}).get(ref) if ref else None
+        return {"ref": ref, "name": body.name} if body is not None else None
     ref = str(found.people[0].get("ref") or "")
     body = (getattr(scene, "people", {}) or {}).get(ref)
     if not ref or body is None or body.is_pc:
