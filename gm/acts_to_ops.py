@@ -1478,10 +1478,17 @@ def _nowhere(row: Row, a: dict, scene, places) -> None:
     bare `narrate_only`, and the page said "You remain in the market" — a beat in which
     nothing happened and nothing said why. Not for a fixture of the room the party stands
     in ("the counter", "the far corner": `judgement._FIXTURES`, the closed list the
-    within-scene rule reads), which is a walk across the room."""
+    within-scene rule reads), which is a walk across the room.
+
+    Nor for any move inside the place (`interpret.within_place`: the reader's closed
+    `within_place`, else the part of the room before "of"). The live check of 2026-11-07:
+    "I run to the other side of the room and begin cooking dinner" was refused here as
+    nowhere known — the old test read only the phrase's last word, "room" — and the beat
+    then said "You move toward the hearth … You remain where you are". Moving about the
+    place you are in is free (the turn-budget ruling, 2026-11-06), never travel."""
     from rules import places as places_mod
 
-    from . import interpret, judgement
+    from . import interpret
 
     place = " ".join(str(a.get("place") or "").split())
     if not place or row.ops or row.intents or a.get("here"):
@@ -1490,10 +1497,11 @@ def _nowhere(row: Row, a: dict, scene, places) -> None:
         return
     if interpret._outward(place) or interpret._road_to(place, scene):
         return
+    if interpret.within_place(a, places, str(getattr(scene, "at", "") or "")):
+        row.note = row.note or "a move inside the place: no travel"
+        return
     words = place.lower().replace("’", "'").split()
     head = (words or [""])[-1].strip(".,;!?")
-    if head in set(judgement._FIXTURES.split("|")):
-        return
     # The player's own ("my room", "our camp") is where they keep things, not a place the
     # town is asked to have: the rest at the inn and the camp answer those.
     if words[0] in ("my", "our"):

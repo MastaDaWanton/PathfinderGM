@@ -2050,12 +2050,30 @@ def engine_line(tells) -> str:
     person; the groom's un-naming and second-person steps run over it as over everything
     else, so the player's name becomes "you" there, once, for every narrator. The XP line
     goes, as the tells check's own premises drop it (`beat_verify.tell_premises`): the
-    replay of the rerun put "You gain 100 XP for the intimidate check." on a page."""
+    replay of the rerun put "You gain 100 XP for the intimidate check." on a page.
+
+    Each tell opens a sentence, so its first letter is a capital. The live check of
+    2026-11-07: "I mutter "fool" and walk out" — a repair cut the whole of the provoke's
+    slot, this line stood in for it at the head of the beat, and the page opened "the
+    potboy cools: has no time for you." in lower case, because the tell begins with the
+    potboy's name as the scene holds it ("the potboy"). Only the first letter of each
+    tell: a capital after every full stop would make "Mira H. goes" "Mira H. Goes"."""
     from .beat_verify import _XP_LINE
 
     lines = (_XP_LINE.sub("", _BRACKETED.sub("", narration_mod.page_line(t)))
              for t in tells or () if t)
-    return " ".join(" ".join(x.split()) for x in lines if x.strip()).strip()
+    return " ".join(_opens_a_sentence(" ".join(x.split())) for x in lines
+                    if x.strip()).strip()
+
+
+def _opens_a_sentence(line: str) -> str:
+    """The line with its first letter a capital, past any opening quotation mark."""
+    for i, ch in enumerate(line):
+        if ch.isalpha():
+            return line[:i] + ch.upper() + line[i + 1:]
+        if ch not in "\"'“‘([":
+            return line
+    return line
 
 
 def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,

@@ -289,14 +289,25 @@ def within_budget(parts: list[str], actions: list[dict], cost) -> tuple | None:
 
     `actions` is the reader's frame in the order of doing, `cost(action)` its cost
     (`interpret.cost_of`, with the scene). Each action is placed at the clauses its span
-    lies across (`clauses_of`). The cut falls on a clause boundary only — the words are
-    never split inside a clause — and only when a deed the reader read lies wholly after
-    it, so nothing is put back that the reader did not read as a deed. Any action that
-    cannot be placed, and a cost not in the four, leave the line whole: the turn as it
-    was before the budget, never a guess. Inform's chain runs commands one at a time
-    (gm/sequence.py's docstring); this decides how many of them are this turn's."""
-    if len(parts) < 2:
-        return None
+    lies across (`clauses_of`). The cut falls between clauses, or — when the first deed
+    left over shares a clause with the last deed done — inside that clause, at the start
+    of the left-over deed's own span (`_split_at_span`), and only when a deed the reader
+    read lies wholly after it, so nothing is put back that the reader did not read as a
+    deed. Any action that cannot be placed, and a cost not in the four, leave the line
+    whole: the turn as it was before the budget, never a guess. Inform's chain runs
+    commands one at a time (gm/sequence.py's docstring); this decides how many of them are
+    this turn's.
+
+    The cut inside a clause, measured in the live check of 2026-11-07: `clauses` joins
+    only where a verb it knows starts, so "drink the ale and wipe my mouth", "read the note
+    and burn it" and "take the knife, pocket the ring" were one clause each, and a third
+    quick deed sharing a clause with the second ran with it — "I light the lamp, read the
+    note and burn it" burned the note, and "I look around, take the knife, pocket the ring
+    and leave" pocketed the ring and walked Kesst to the town gate. The reader already
+    marks where each deed's words are (`span`); a list of verbs long enough to split every
+    line would be a regex deciding what a sentence means, which this project does not
+    add. The returned clauses are the line's own words, cut at a word's start: the pen
+    gets back exactly what the player wrote from that deed on."""
     placed = []
     for a in actions or ():
         c = cost(a)
@@ -305,27 +316,95 @@ def within_budget(parts: list[str], actions: list[dict], cost) -> tuple | None:
             if c == "free":
                 continue
             return None
-        placed.append((c, min(where), max(where)))
+        placed.append((c, min(where), max(where), a))
 
-    quick, done_to, cut, why = 0, -1, None, ""
-    for c, first, last in placed:
+    quick, done_to, cut, why, stop = 0, -1, None, "", None
+    for k, (c, first, last, _a) in enumerate(placed):
         if c == "quick":
             if quick == QUICK_PER_TURN:
-                cut, why = first, "quick"
+                cut, why, stop = first, "quick", k
                 break
             quick += 1
         elif c not in ("free", "takes_time", "addresses"):
             return None
         done_to = max(done_to, last)
         if c in ("takes_time", "addresses"):
-            cut, why = done_to + 1, c
+            cut, why, stop = done_to + 1, c, k + 1
             break
-    # A deed that shares a clause with one already done cannot be held back alone.
+    if stop is None or stop >= len(placed):
+        return None
+    # The first deed left over shares a clause with one done: cut inside it, at its span.
+    if placed[stop][1] <= done_to:
+        split = _split_at_span(parts, placed, stop, done_to)
+        if split is not None:
+            return split[0], split[1], why
+    # Else between clauses, as before: never a deed held back from a clause it shares.
     if cut is None or cut <= done_to or cut >= len(parts):
         return None
-    if not any(first >= cut for _c, first, _l in placed):
+    if not any(first >= cut for _c, first, _l, _a in placed):
         return None
     return parts[:cut], parts[cut:], why
+
+
+def _span_at(span, clause: str, after: int = 0) -> tuple[int, int] | None:
+    """Where a span's words stand in a clause, word for word (as `said_in` compares, case
+    and punctuation aside): `(start, end)` in the clause's characters, the first match
+    starting at or after `after`, or None."""
+    want = [w.lower() for w in re.findall(r"[\w']+", str(span or ""))]
+    words = [(m.start(), m.end(), m.group(0).lower())
+             for m in re.finditer(r"[\w']+", clause)]
+    n = len(want)
+    if not n:
+        return None
+    for i in range(len(words) - n + 1):
+        if words[i][0] >= after and [w for _s, _e, w in words[i:i + n]] == want:
+            return words[i][0], words[i + n - 1][1]
+    return None
+
+
+# What joined the head of a cut clause to the deed cut off it: "read the note and | burn
+# it", "take the knife, | pocket the ring". Only the joins `_JOIN` and `_THEN` split at.
+_TRAILING_JOIN = re.compile(r"(?:[\s,;]+(?:and\s+then|and|then))*[\s,;]*$", re.I)
+
+
+def _split_at_span(parts: list[str], placed: list, stop: int, at: int):
+    """`(now, later)`: the clauses with clause `at` cut at the start of deed `stop`'s span,
+    or None when that cannot be done cleanly — the left-over deed or a done one in that
+    clause runs across clauses or is not found word for word, a done deed's words run past
+    the cut, a later deed's start before it, the cut falls inside a quotation, or either
+    side is left with no words. None leaves the cut to the clause boundaries."""
+    from . import speech
+
+    clause = parts[at]
+    if placed[stop][1] != at or placed[stop][2] != at:
+        return None
+    end = 0
+    for k in range(stop):
+        _c, first, last, a = placed[k]
+        if last < at:
+            continue
+        if first != at or last != at:
+            return None
+        got = _span_at(a.get("span"), clause, end)
+        if got is None:
+            return None
+        end = got[1]
+    got = _span_at(placed[stop][3].get("span"), clause, end)
+    if got is None:
+        return None
+    cut = got[0]
+    for _c, first, last, a in placed[stop + 1:]:
+        if first == last == at:
+            later = _span_at(a.get("span"), clause)
+            if later is not None and later[0] < cut:
+                return None
+    if any(a < cut < b for a, b in speech.spans(clause)):
+        return None
+    head = _TRAILING_JOIN.sub("", clause[:cut])
+    tail = clause[cut:].strip()
+    if not _tidy(head) or not _tidy(tail) or not re.search(r"\w", head):
+        return None
+    return parts[:at] + [head], [tail] + parts[at + 1:]
 
 
 def only_going(clause: str) -> bool:

@@ -334,10 +334,10 @@ def test_the_cost_is_kept_only_when_it_says_something():
     assert "cost" not in frame["actions"][0] and "take.cost='ages'" in dropped
 
 
-def test_the_cut_falls_only_between_clauses():
-    """A deed that shares a clause with one already done cannot be held back alone, and a
-    line whose later clauses hold no deed the reader read is not cut: nothing comes back
-    to the pen that the reader did not read as a deed."""
+def test_the_cut_puts_back_only_deeds_the_reader_read():
+    """A line whose later clauses hold no deed the reader read is not cut: nothing comes
+    back to the pen that the reader did not read as a deed. And a deed the reader placed
+    nowhere in the words leaves the line whole, as before the budget."""
     parts = ["I take the cup and the plate", "take the knife"]
     # Three takes, two of them in the first clause: the third sits alone and waits.
     got = sequence.within_budget(parts, [
@@ -353,6 +353,99 @@ def test_the_cut_falls_only_between_clauses():
                                   [_act("rummage everywhere", "search"),
                                    _act("take the key", "take")],
                                   interpret.cost_of) is None
+
+
+# The live check of 2026-11-07: the reader's readings of three lines, copied from its record
+# (check2.json, outside the repo). `clauses` kept "drink the ale and wipe my mouth", "read
+# the note and burn it" and "take the knife, pocket the ring" as one clause each.
+LAMP = "I light the lamp, read the note and burn it"
+LAMP_READ = [_act("light the lamp", "use"), _act("read the note", "look"),
+             _act("burn it", "other")]
+RING = "I look around, take the knife, pocket the ring and leave"
+RING_READ = [_act("look around", "look"), _act("take the knife", "take"),
+             _act("pocket the ring", "take"), _act("leave", "leave")]
+BOWL = "I pick up the bowl, eat the stew, drink the ale and wipe my mouth"
+BOWL_READ = [_act("pick up the bowl", "take"), _act("eat the stew", "consume"),
+             _act("drink the ale", "consume"), _act("wipe my mouth", "other")]
+
+
+def test_the_budget_cuts_inside_a_clause_at_the_readers_own_span():
+    """The live check of 2026-11-07. "I light the lamp, read the note and burn it" splits
+    into "I light the lamp" and "read the note and burn it" ("burn" is no verb the joins
+    know), so the third quick deed shared a clause with the second and the note was burned
+    in the same turn; "I look around, take the knife, pocket the ring and leave" ran whole
+    and walked Kesst to the town gate. The cut now falls at the start of the first deed
+    left over, at its span: the pen gets the player's own words from there on."""
+    got = sequence.within_budget(sequence.clauses(LAMP), LAMP_READ, interpret.cost_of)
+    assert got is not None
+    now, later, why = got
+    assert sequence.joined(now) == "I light the lamp. I read the note."
+    assert later == ["burn it"] and why == "quick"
+    got = sequence.within_budget(sequence.clauses(RING), RING_READ, interpret.cost_of)
+    assert got is not None
+    now, later, why = got
+    assert sequence.joined(now) == "I look around. I take the knife."
+    assert later == ["pocket the ring", "leave"] and why == "quick"
+
+
+def test_pick_up_is_a_quick_deed_so_the_stew_is_the_second():
+    """The live check expected the bowl line cut "after the ale"; the rule says otherwise.
+    Picking up the bowl is quick (a take), eating the stew is the second quick deed, and
+    the turn ends there — drinking the ale and wiping the mouth wait, whole."""
+    now, later, why = sequence.within_budget(sequence.clauses(BOWL), BOWL_READ,
+                                             interpret.cost_of)
+    assert sequence.joined(now) == "I pick up the bowl. I eat the stew."
+    assert sequence.joined(later) == "I drink the ale and wipe my mouth."
+
+
+def test_a_cut_inside_a_clause_is_never_a_guess():
+    """Where the words cannot be cut cleanly the line is cut between clauses, or not at
+    all, exactly as before: a done deed whose words run past the left-over deed's start,
+    a left-over deed the words do not hold word for word, a cut inside a quotation."""
+    # The left-over deed's words are not in the clause: no cut inside it.
+    assert sequence.within_budget(["I take the cup, take the plate and pocket the ring"], [
+        _act("take the cup", "take"), _act("take the plate", "take"),
+        _act("slip the ring away", "take")], interpret.cost_of) is None
+    # Never mid-word, never garbled: the two sides are the clause's own words.
+    now, later, _why = sequence.within_budget(
+        ["I take the cup, take the plate and pocket the ring"],
+        [_act("take the cup", "take"), _act("take the plate", "take"),
+         _act("POCKET the ring!", "take")], interpret.cost_of)
+    assert now == ["I take the cup, take the plate"] and later == ["pocket the ring"]
+    # Inside a quotation the words are speech, not where a deed starts.
+    assert sequence.within_budget(['I say "take the cup, take the plate, burn it" twice'], [
+        _act("take the cup", "take"), _act("take the plate", "take"),
+        _act("burn it", "other")], interpret.cost_of) is None
+
+
+def test_the_ring_line_through_the_server_keeps_pocketing_for_the_pen(room):
+    """The live line through `/api/say`: the planner is asked for the look and the knife
+    only, handed the reading of those two deeds, and "I pocket the ring. I leave." comes
+    back to the pen — Kesst does not walk to the gate on the same turn."""
+    _read(RING, *RING_READ)
+    r = _say(RING)
+    assert r.status_code == 200, r.content[:300]
+    (plan,) = room["plans"]
+    assert plan["text"] == "I look around. I take the knife."
+    assert [a["span"] for a in plan["reading"]["actions"]] == ["look around",
+                                                               "take the knife"]
+    left = r.json()["unfinished"]
+    assert left["text"] == "I pocket the ring. I leave."
+    assert left["why"] == "A turn holds two quick deeds."
+
+
+def test_one_clause_of_three_deeds_is_cut_too(room):
+    """The joins split only where a verb they know starts, so a line can be one clause
+    holding three quick deeds; it is read too, and cut at the reader's spans."""
+    line = "I take the cup, pocket the ring, sip the wine"
+    assert sequence.clauses(line) == ["I take the cup, pocket the ring, sip the wine"]
+    _read(line, _act("take the cup", "take"), _act("pocket the ring", "take"),
+          _act("sip the wine", "consume"))
+    r = _say(line)
+    assert r.status_code == 200, r.content[:300]
+    (plan,) = room["plans"]
+    assert plan["text"] == "I take the cup, pocket the ring."
+    assert r.json()["unfinished"]["text"] == "I sip the wine."
 
 
 def test_a_lower_case_i_comes_back_as_i():

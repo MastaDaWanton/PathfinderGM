@@ -3184,8 +3184,8 @@ def _within_the_budget(c, text: str, claim: str, beat: dict):
     takes time or on words to somebody here who would answer (docs/turn-budget-and-
     fixtures-plan.md). What each deed costs is the reader's closed answer
     (`interpret.cost_of`, checked against the engine), never a regex; where the line is
-    cut is `sequence.within_budget`. A line of one clause, a line the reader could not
-    read, and a line whose deeds all fit run whole, exactly as before.
+    cut is `sequence.within_budget`. A line the reader could not read, and a line whose
+    deeds all fit, run whole, exactly as before.
 
     The reader is asked once, here, for the whole line, and its reading — cut to the
     deeds done now — is handed on to the planner (`interpret.hand_on`), so a budgeted
@@ -3195,7 +3195,11 @@ def _within_the_budget(c, text: str, claim: str, beat: dict):
     from gm import interpret, sequence
 
     parts = sequence.clauses(text)
-    if len(parts) < 2:
+    # One clause is read too: the joins split only where a verb they know starts, so "I
+    # take the knife, pocket the ring, sip the wine" is one clause holding three deeds,
+    # cut at the reader's own spans (`sequence.within_budget`, the live check of
+    # 2026-11-07). The reading is handed on, so this costs no second reader call.
+    if not parts:
         return _plan_and_run(c, text, (), claim)
     if interpret.ENABLED:
         try:
@@ -3213,6 +3217,8 @@ def _within_the_budget(c, text: str, claim: str, beat: dict):
         run_text, run_frame = text, frame
     else:
         now, later, why = cut
+        # The clauses as cut: a cut inside a clause made two of one.
+        parts = now + later
         run_text = sequence.joined(now)
         # This beat is the words done now; the rest get their own line when they run.
         beat["text"] = run_text

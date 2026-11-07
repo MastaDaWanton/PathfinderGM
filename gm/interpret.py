@@ -290,6 +290,70 @@ def cost_of(action: dict, scene=None) -> str:
     return cost
 
 
+def said_to_nobody(frame: dict | None, scene=None) -> bool:
+    """Whether the reading's words are all said to nobody who would answer: it read speech
+    done now, no `insult` among it, and every spoken action costs `free` (`cost_of`, the
+    reader's closed answer checked against who is here). False with no reading — the turn
+    is then as it always was.
+
+    Measured in the live check of 2026-11-07: "I mutter "fool" and walk out" was read
+    `talk, says: fool, cost: free` with no target, and `judgement.inject_provoke` — which
+    reads an insulting word in the quotation — still provoked the potboy, the only person
+    standing there, and his regard fell for a word muttered to nobody. The reader already
+    said whom the words were for; a provocation needs somebody they were said to."""
+    if not isinstance(frame, dict) or frame.get("error"):
+        return False
+    spoken = [a for a in frame.get("actions") or ()
+              if isinstance(a, dict) and acting(a) and a.get("act") in _SPOKEN_ACTS]
+    if not spoken or any(a.get("act") == "insult" for a in spoken):
+        return False
+    return all(cost_of(a, scene) == "free" for a in spoken)
+
+
+# A move inside the place the party stands in, not a walk anywhere else: the reader's
+# closed `within_place` on a `go` (the per-act schema holds it), and, when the reading has
+# none or says false, the place phrase's own head noun from a CLOSED list of the parts and
+# fixtures of a room (`judgement._FIXTURES`, the within-scene rule's list, and the few it
+# lacks). Measured in the live check of 2026-11-07: "I run to the other side of the room and
+# begin cooking dinner…" was read `go: the other side of the room`, which no place is
+# called, and the walk-to-nowhere answer (`acts_to_ops._nowhere`) refused it as "You don't
+# know of anywhere called "the other side of the room" here" — then the beat said "You move
+# toward the hearth … You remain where you are". The old check read only the LAST word
+# ("room"); the part of the room is the word before "of" ("side"). No model is asked to
+# decide it and no sentence is parsed: a closed field, then a closed noun list.
+_ROOM_EXTRA = frozenset({"fire", "fireside", "stair", "stairs", "staircase", "seat",
+                         "nook", "alcove", "rear"})
+
+
+def within_place(action: dict, places=(), here: str = "") -> bool:
+    """Whether a `go` moves inside the place the party is in (see `_ROOM_EXTRA`'s note):
+    the reader said so, or the phrase's head — its last word, or the word before its first
+    "of" when what follows is no other place the town has — is a part or fixture of a
+    room."""
+    from rules import places as places_mod
+
+    from . import judgement
+
+    if not isinstance(action, dict) or action.get("act") != "go":
+        return False
+    if action.get("within_place") is True:
+        return True
+    words = " ".join(str(action.get("place") or "").lower().replace("’", "'").split())
+    words = [w.strip(".,;!?") for w in words.split()]
+    if not words:
+        return False
+    parts = set(judgement._FIXTURES.split("|")) | _ROOM_EXTRA
+    if words[-1] in parts:
+        return True
+    if "of" in words[1:]:
+        at = words.index("of", 1)
+        rest = " ".join(words[at + 1:])
+        other = places_mod.find(places, rest) if places and rest else None
+        if words[at - 1] in parts and (other is None or getattr(other, "id", "") == here):
+            return True
+    return False
+
+
 def _answers(action: dict, scene) -> bool:
     """Whether somebody here would answer this action: the person its target names, when
     the words name one standing here (`acts_to_ops.person`) — and then only if they are up
@@ -366,7 +430,9 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
 
 _WHAT_EACH_IS = """\
 go        walk somewhere within reach (a place in town, the crossroads, the fields, into
-          the trees, back to the gate); walking OUT INTO somewhere named is go, not leave
+          the trees, back to the gate); walking OUT INTO somewhere named is go, not leave.
+          `within_place` is true for a move inside the place you are in (across the
+          room, to the hearth, a corner, the bar, the window), false for anywhere else
 journey   take the road or a ship to another town
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
@@ -613,9 +679,16 @@ _DEMOS = [
     # owner's example, a test line or a labelled line.
     ("I cross to the hearth and set a pot of stew on to simmer for supper.",
      {"question": False, "claims": [], "actions": [
-         {"span": "cross to the hearth", "place": "the hearth", "act": "go"},
+         {"span": "cross to the hearth", "place": "the hearth", "within_place": True,
+          "act": "go"},
          {"span": "set a pot of stew on to simmer for supper", "object": "a pot of stew",
           "cost": "takes_time", "act": "other"}]}),
+    # A move inside the place named by a part of the room rather than a thing in it
+    # (`within_place`, the live check of 2026-11-07). Not a test line.
+    ("I shoulder through the crowd to the far end of the bar.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "shoulder through the crowd to the far end of the bar",
+          "place": "the far end of the bar", "within_place": True, "act": "go"}]}),
     ("I pick up the lantern, light it and peer down the stairwell.",
      {"question": False, "claims": [], "actions": [
          {"span": "pick up the lantern", "object": "the lantern", "act": "take"},
@@ -1058,6 +1131,10 @@ def per_act_schema() -> dict:
                  # Whether a blow is the killing stroke (`BLOWS`), after the words.
                  **({"blow": {"type": "string", "enum": list(BLOWS)}}
                     if act == "attack" else {}),
+                 # Whether a walk stays inside the place (`within_place`), after the
+                 # place's own words, as `until` follows the time's: a closed answer the
+                 # walk-to-nowhere refusal reads (`acts_to_ops._nowhere`), never English.
+                 **({"within_place": {"type": "boolean"}} if act == "go" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -1109,7 +1186,9 @@ def _demo_reply(frame: dict) -> str:
                      **({"way": a.get("way") or ESCAPE_WAYS[0]}
                         if a["act"] == "escape" else {}),
                      **({"blow": a.get("blow") or BLOWS[0]}
-                        if a["act"] == "attack" else {}), **cost, **means})
+                        if a["act"] == "attack" else {}),
+                     **({"within_place": bool(a.get("within_place"))}
+                        if a["act"] == "go" else {}), **cost, **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -1248,6 +1327,10 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             blow = str(a.get("blow") or "").strip().lower()
             if blow in BLOWS and blow != BLOWS[0]:
                 kept["blow"] = blow
+        if kept["act"] == "go" and a.get("within_place") is True:
+            # A walk inside the place (`within_place`): kept only when it says so, as
+            # `blow` is. Only the boolean itself: a hosted provider's "yes" is not it.
+            kept["within_place"] = True
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is

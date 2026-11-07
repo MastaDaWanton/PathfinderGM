@@ -501,7 +501,10 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
                                           *(["way"] if act == "escape" else []),
                                           # And `blow` on an attack (2026-11-04,
                                           # tests/test_narration_followups.py).
-                                          *(["blow"] if act == "attack" else [])}
+                                          *(["blow"] if act == "attack" else []),
+                                          # And `within_place` on a go (2026-11-07,
+                                          # tests/test_live_check_2026_11_07.py).
+                                          *(["within_place"] if act == "go" else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 
