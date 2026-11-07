@@ -810,7 +810,10 @@ def run_checks(http: Http, repo: Path) -> None:
     # shape: the player's line landed, a GM beat followed it, and nothing was granted
     # (the PC still has no pools, no buffs, no conditions from a gift nobody has).
     state = j(body)
-    tail = state.get("transcript") or []
+    # The GM's own table talk (`who: "table"`, play/table_talk.py, 0.2.27) may follow the
+    # beat over a refusal; it is commentary, not the beat, so it is set aside here. Found by
+    # this check on the 0.2.27 build: the last entry was the GM's line, the beat before it.
+    tail = [b for b in (state.get("transcript") or []) if b.get("who") != "table"]
     pc_state = state.get("pc") or {}
     opened = (s == 200 and len(tail) >= 2
               and tail[-2].get("who") == "player" and tail[-1].get("who") == "gm"
