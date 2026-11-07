@@ -217,9 +217,30 @@ JOBS = {
     "natural": "The die did something special. React to it, briefly.",
     "foe_down": "Someone they fought is down. React to it, briefly.",
     "fight_ends": "The fight is over. A short reaction.",
-    "quiet": "Nothing big happened. If there is nothing worth saying across the table, "
-             "answer with just - (a dash). Never repeat what the story already said.",
+    # Only "always" asks on a quiet turn, and the owner's first test of it (2026-11-07,
+    # the dance with the wagon master) got the dash: the GM "chose silence" on the one
+    # setting that promises a line every turn. So a quiet turn is a short line, never none.
+    "quiet": "Nothing big happened. Say one short thing a GM would say across the table "
+             "now: a reaction to what they did, or a question back to them about what "
+             "they do next. Never repeat what the story already said.",
 }
+
+
+def _mend_ask(why: str) -> str:
+    """The one narrow request that can mend a dropped line, or "" (CLAUDE.md: detect, then
+    repair only what was found). Measured 2026-11-07 on the owner's first packaged game:
+    the welcome said "English" (a language, not a person), was dropped whole, and a new
+    campaign opened with no GM at all. One more ask, naming the fault; still faulty, it
+    is dropped."""
+    if why.startswith("a name the moment never used: "):
+        word = why.split(": ", 1)[1]
+        return (f'Say it again without the word "{word}", and name nobody and nothing '
+                f"that is not given above.")
+    if why == "a number":
+        return "Say it again with no numbers in it at all."
+    if why == "too long":
+        return "Say it again, shorter."
+    return ""
 # Which job a turn with several moments gets: the one a GM would speak to first.
 JOB_ORDER = ("refused", "you_down", "bend", "fight_starts", "critical", "natural",
              "foe_down", "fight_ends")
@@ -499,6 +520,15 @@ def after_the_beat(c, agent, resolution) -> None:
             line, why = "", "chose silence"
         else:
             line, why = check(said, allowed, recent)
+            mend = _mend_ask(why) if not line else ""
+            if mend:
+                remade = True
+                try:
+                    said = ask(msgs + [{"role": "assistant", "content": said},
+                                       {"role": "user", "content": mend}])
+                except ModelUnavailable:
+                    said = ""
+                line, why = check(said, allowed, recent) if said else ("", why)
             if line and echoes(line, beat):
                 line, why = "", "says the story again"
             if line and job == "refused" and not gives_the_reason(line, facts):
@@ -596,20 +626,34 @@ def introduction(c, agent=None) -> None:
                                      never=v["never"],
                                      gestures=_gesture_rule(True).replace(
                                          "- You may open", "You may open"))
-        try:
-            reply = client.chat(
-                [{"role": "system", "content": system},
-                 {"role": "user", "content": f"THE TABLE:\n{table}\n\nTHE TIPS:\n{tips}"}],
-                agent.prose_model, agent.prose_host, as_json=False, think=False,
+        msgs = [{"role": "system", "content": system},
+                {"role": "user", "content": f"THE TABLE:\n{table}\n\nTHE TIPS:\n{tips}"}]
+
+        def ask(messages) -> str:
+            return str(getattr(client.chat(
+                messages, agent.prose_model, agent.prose_host, as_json=False, think=False,
                 temperature=0.7, num_predict=260, provider=agent.prose_provider,
-                api_key=agent.prose_key)
+                api_key=agent.prose_key), "text", "") or "")
+
+        try:
+            said = ask(msgs)
         except ModelUnavailable as exc:
             _log(c, {"intro": True, "said": "", "dropped": f"no model: {exc}"})
             return
         allowed = " ".join([table, tips, v["name"]])
-        line, why = check(str(getattr(reply, "text", "") or ""), allowed, [],
-                          digits="none", max_words=140, sentences=6)
-        _log(c, {"intro": True, "said": line, "dropped": why, "voice": v["id"]})
+        line, why = check(said, allowed, [], digits="none", max_words=140, sentences=6)
+        mend = _mend_ask(why) if not line else ""
+        if mend:
+            try:
+                said = ask(msgs + [{"role": "assistant", "content": said},
+                                   {"role": "user", "content": mend}])
+            except ModelUnavailable:
+                said = ""
+            if said:
+                line, why = check(said, allowed, [], digits="none", max_words=140,
+                                  sentences=6)
+        _log(c, {"intro": True, "said": line, "dropped": why, "voice": v["id"],
+                 "remade": bool(mend)})
         if line:
             c.transcript.append({"who": "table", "kind": "table", "text": line,
                                  "voice": v["id"], "voice_name": v["name"],

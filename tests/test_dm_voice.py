@@ -378,8 +378,11 @@ def test_each_request_and_each_example_carries_its_job():
     assert msgs[-1]["content"].startswith("YOUR JOB: " + tt.JOBS["refused"])
     shown = [m["content"] for m in msgs if m["role"] == "user"][:-1]
     assert all(s.startswith("YOUR JOB: ") for s in shown)
-    # A quiet turn is demonstrated as silence, so silence is a thing the model can do.
-    assert any(ex["said"] == tt.SILENCE for ex in tt.voice()["examples"])
+    # A quiet turn is a short line, never silence: on "always", the owner's first packaged
+    # game (2026-11-07) got the dash the quiet example demonstrated, and no GM at all.
+    quiet = [ex for ex in tt.voice()["examples"] if ex.get("kind") == "quiet"]
+    assert quiet and all(ex["said"] != tt.SILENCE for ex in quiet)
+    assert "dash" not in tt.JOBS["quiet"]
 
 
 def test_a_refusal_line_that_never_says_why_is_asked_again_for_the_reason(camp, monkeypatch):
@@ -493,3 +496,30 @@ def test_a_new_story_is_opened_with_the_welcome_after_the_opening_beat():
              for n in ast.walk(fn) if isinstance(n, ast.Call)]
     line = {name: ln for ln, name in calls}
     assert line["_after_the_opening"] < line["introduction"]
+
+
+
+# --- mend, don't drop (the owner's first packaged game, 2026-11-07) ----------------------
+
+def test_a_welcome_tripping_a_check_is_asked_again_once_and_kept(camp, monkeypatch):
+    """The welcome said "English" and was dropped whole, so a new campaign opened with no
+    GM at all. Now the fault is named and asked for once more."""
+    houserules.set_active({"table_talk": "big"})
+    pc = camp.scene.pc().name
+    asked = _scripted(monkeypatch, f"Welcome, {pc}. In plain English: talk to me.",
+                      f"Welcome, {pc}. Talk to me the way you would at a table.")
+    tt.introduction(camp, _agent())
+    welcomes = [b for b in camp.transcript if b.get("welcome")]
+    assert len(asked) == 2 and '"English"' in asked[1][-1]["content"]
+    assert len(welcomes) == 1 and "English" not in welcomes[0]["text"]
+
+
+def test_table_talk_tripping_a_check_is_mended_once(camp, monkeypatch):
+    houserules.set_active({"table_talk": "always"})
+    asked = _scripted(monkeypatch, "Bold, very bold, like Zarnak himself.",
+                      "Bold. Now let's see what you do next.")
+    plain = SimpleNamespace(outcomes=[Outcome("i1", "move", actor=_pc_ref(camp),
+                                              tell="You cross to the bar.")])
+    tt.after_the_beat(camp, _agent(), plain)
+    assert len(asked) == 2
+    assert camp.transcript[-1]["text"] == "Bold. Now let's see what you do next."

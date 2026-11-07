@@ -41,7 +41,7 @@
         {
           "kind": "quiet",
           "moment": "What happened: You cross the market to a bench and sit down.",
-          "said": "-"
+          "said": "A breather. I like it. So, what's catching your eye?"
         }
       ],
       "ooc_examples": [
@@ -95,7 +95,7 @@
         {
           "kind": "quiet",
           "moment": "What happened: You cross the market to a bench and sit down.",
-          "said": "-"
+          "said": "You sit. The market carries on without you. What now?"
         }
       ],
       "ooc_examples": [
@@ -149,7 +149,7 @@
         {
           "kind": "quiet",
           "moment": "What happened: You cross the market to a bench and sit down.",
-          "said": "-"
+          "said": "A moment's rest is never wasted. Take your time; what would you like to do next?"
         }
       ],
       "ooc_examples": [
@@ -203,7 +203,7 @@
         {
           "kind": "quiet",
           "moment": "What happened: You cross the market to a bench and sit down.",
-          "said": "-"
+          "said": "Rest while you can. It never lasts."
         }
       ],
       "ooc_examples": [
