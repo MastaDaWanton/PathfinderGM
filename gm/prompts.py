@@ -3995,12 +3995,18 @@ deciding it here: nothing you say in this answer changes the game.
 
 def out_of_character_messages(briefing_scene: str, question: str,
                               found: str = "", notes: str = "",
-                              record: str = "") -> list[dict]:
+                              record: str = "", voice: str = "") -> list[dict]:
     """The `/gm` question the engine could not answer from its own books.
 
-    Deliberately given the brief and nothing else — no history, no examples. The
-    examples teach the model to write scenes, which is the one thing this call must not
-    do, and the history is the fiction, which is what the player has stepped out of.
+    Deliberately given the brief and nothing else — no history, no scene examples. The
+    narrator's examples teach the model to write scenes, which is the one thing this call
+    must not do, and the history is the fiction, which is what the player has stepped
+    out of.
+
+    `voice` is who is answering (play/table_talk.py `ooc_voice_block`): the table's GM
+    personality and its own out-of-character answers as examples. Those are answers, not
+    scenes, so they teach the register this call wants. The owner, 2026-11-05: the
+    plain-prose answers "did not feel like asking your GM".
 
     `notes` (the GM's notes on where the party stands) and `record` (what the world's
     own record says about what was asked) go in the USER message after the question,
@@ -4020,7 +4026,8 @@ def out_of_character_messages(briefing_scene: str, question: str,
                 "tag like c1). These are your own notes: say \"my notes\", not \"the "
                 "information provided\". Where they do not cover the question, say so "
                 "plainly rather than filling it in.")
-    return [{"role": "system", "content": OUT_OF_CHARACTER + "\n\n" + facts},
+    system = OUT_OF_CHARACTER + ("\n\n" + voice if voice else "") + "\n\n" + facts
+    return [{"role": "system", "content": system},
             {"role": "user", "content": ask}]
 
 

@@ -89,6 +89,30 @@
   }
   .beat.aside::first-letter { font: inherit; float: none; color: inherit; }
   .beat.player.aside { color: #7f8f86; font-style: normal; }
+  /* The GM at the table (play/table_talk.py): the person behind the screen, not the
+     world and not the machine. Warmer than the monospace record, plainer than the
+     story — no drop cap, no ink bleed of a passage — and edged in the candle's own
+     ember, so it reads as somebody leaning over the table. Their actions in
+     [brackets] are stage directions, dimmed and set in italic. */
+  .beat.attable, .beat.aside.attable {
+    font-family: inherit; font-size: .94em; line-height: 1.6; font-style: normal;
+    color: #cdb98e; background: rgba(0, 0, 0, .18);
+    border-left: 2px solid rgba(var(--ember), .55); border-radius: 2px;
+    padding: 8px 12px 9px; margin: 6px auto 18px;
+  }
+  .beat.attable::first-letter { font: inherit; float: none; color: inherit; padding: 0; }
+  .beat.attable .gesture { font-style: italic; opacity: .72; }
+  .beat.attable .tabletag {
+    display: block; margin-bottom: 2px; font: 600 10.5px/1.3 var(--display, inherit);
+    letter-spacing: .08em; text-transform: uppercase; color: #8f7d5c; font-style: normal;
+  }
+  .gmrecord { max-width: 58ch; margin: -12px auto 18px; color: #8fa197; }
+  .gmrecord summary { cursor: pointer; font-size: 12px; letter-spacing: .04em; }
+  .gmrecord pre {
+    white-space: pre-wrap; margin: 6px 0 0;
+    font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    background: rgba(0,0,0,.24); border-left: 2px solid #3c4b43; padding: 8px 10px;
+  }
   /* The illuminated capital: each of the GM's scene passages opens the way a
      grimoire page does. Consequences stay plain — they are the engine's voice. */
   .beat.setup::first-letter {
@@ -761,12 +785,47 @@
   #combatbar .cb-acts button { padding: 8px 14px; font-size: 13px; }
   #combatbar .cb-acts .go { border-color: var(--brew-dim); color: var(--brew); }
   #cb-plan:empty { display: none; }
+  /* A plan step, numbered in the order Commit turn posts it (the owner, 2026-11-06: "so i
+     can attack and then move after"). The chip drags (pointer events, so a finger on the
+     LAN phone drags it too: touch-action none keeps the page from scrolling instead);
+     the label removes the step, as the whole chip did; the arrows move it a place. The
+     look is the old chip's: dashed gold, red only over what removes. */
   .cb-step {
-    padding: 4px 10px; border-radius: 2px; font-size: 12.5px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 6px 4px 8px; border-radius: 2px; font-size: 12.5px; cursor: grab;
     border: 1px dashed var(--gold-dim); color: var(--gold); background: rgba(0,0,0,.3);
+    touch-action: none; user-select: none; -webkit-user-select: none;
   }
-  .cb-step:hover { border-color: var(--alarm); color: #d9a49c; }
-  /* A staged strike that will not reach from the staged square (strikeOutOfReach). */
+  .cb-step .cb-num { color: var(--accent); font: 400 11px/1 var(--display);
+    font-variant-numeric: tabular-nums; padding-right: 6px;
+    border-right: 1px solid rgba(122,101,67,.55); }
+  /* Not the cold-iron button: these sit inside the chip and read as its text. The page's
+     button hover and focus rules out-rank a bare reset, so each is answered here. */
+  .cb-step button { all: unset; box-sizing: border-box; cursor: pointer; color: inherit;
+    font: inherit; border-radius: 2px; }
+  .cb-step button::after { content: none; }
+  .cb-step button:hover, .cb-step button:focus-visible { box-shadow: none; }
+  .cb-step .cb-what:hover { color: #d9a49c; }
+  .cb-step:has(.cb-what:hover) { border-color: var(--alarm); }
+  .cb-step .cb-ord { display: inline-flex; gap: 2px; }
+  .cb-step .cb-ord button { min-width: 20px; min-height: 20px; text-align: center;
+    font: 400 15px/20px var(--body); color: var(--gold); }
+  .cb-step .cb-ord button:hover:not(:disabled) { color: #f4e6c0;
+    background: rgba(201,168,106,.12); }
+  .cb-step .cb-ord button:disabled { opacity: .3; cursor: default; }
+  .cb-step button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  /* A finger needs more than twenty pixels to hit an arrow. */
+  @media (pointer: coarse) {
+    .cb-step .cb-ord button { min-width: 32px; min-height: 32px; line-height: 32px; }
+  }
+  .cb-step.is-dragging { position: relative; z-index: 2; cursor: grabbing;
+    border-style: solid; border-color: var(--accent);
+    box-shadow: 0 6px 18px rgba(0,0,0,.6); }
+  .cb-step.drop-before { box-shadow: -4px 0 0 -1px var(--accent); }
+  .cb-step.drop-after { box-shadow: 4px 0 0 -1px var(--accent); }
+  /* A staged strike that will not reach from the square it is struck from
+     (strikeOutOfReach), and the quiet notes on the plan's order: a swift or free after the
+     blow (declaredAfterTheBlow), a walk after a full-round action (wholeRoundAndMove). */
   .cb-warn { flex-basis: 100%; font-size: 12.5px; color: #d9a49c; }
   .cb-menu { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .cb-menu button { padding: 6px 11px; font-size: 12.5px; }

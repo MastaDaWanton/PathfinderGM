@@ -78,6 +78,23 @@ TOPICS = {
         r"\b(?:quests?|objectives?|my tasks?|what am i (?:supposed|meant) to (?:do|be doing)|"
         r"what (?:jobs?|tasks?|work) (?:do|have) i|open (?:jobs|tasks)|"
         r"what have i (?:agreed|promised) to do)\b", re.I),
+    # Whether the work was paid, and what is owed. The owner's save of 2026-11-05: "/gm have
+    # I been paid already?" matched no topic, went to the model, and came back "Not quite
+    # yet!" for a week worked and paid in full — the purse held the 2 gold 1 silver. Phrases,
+    # never the bare "paid" or "pay": "the paid guard" and "pay attention" are not this.
+    "pay": re.compile(
+        r"\b(?:(?:have|has|had) (?:i|we) (?:been|got(?:ten)?|gotten) paid|"
+        r"(?:did|do|will|when (?:do|will)|have) (?:i|we) (?:get|got) paid|"
+        r"(?:was|were|am|are) (?:i|we) (?:being |ever )?paid|"
+        r"(?:been|get|got|getting) paid|paid (?:yet|already|in full|for (?:the|my|that) "
+        r"(?:job|work|week|guarding))|"
+        r"what (?:am i|are we) (?:owed|due)|what (?:do|does) (?:\w+ ){0,3}owe (?:me|us)|"
+        r"(?:who|anyone|anybody|somebody) owes? (?:me|us)|"
+        r"my (?:wages?|pay|earnings|payment)|the (?:wages?|pay|payment) (?:for|from) |"
+        r"is (?:the|my|that) (?:job|work|quest|week|contract) (?:done|over|finished|"
+        r"complete|completed)|"
+        r"(?:have|did|had) (?:i|we) (?:complete|completed|finish|finished|done|do|did) "
+        r"(?:the|my|that|this) (?:quest|job|work|week|contract))", re.I),
     "time": re.compile(
         r"\b(?:what time|time is it|how late|what (?:day|hour) is it|the (?:world )?clock|"
         r"what day|how long (?:has it been|have i been here|since))\b", re.I),
@@ -245,14 +262,84 @@ def _quests(c, engine) -> list[str]:
     # never a scheme's quest they have not heard of.
     live = [q for q in quests if q.live
             and cards_mod.standing(q) in (cards_mod.OWN, cards_mod.OFFERED)]
-    if not live:
+    # And the ones the player saw to their end. On the owner's save of 2026-11-05 "/gm have i
+    # completed the quest" answered "none open" for a guard week worked and paid: true, and
+    # it hid the one thing asked about.
+    done = [q for q in quests if not q.live and cards_mod.standing(q) == cards_mod.OWN]
+    if not live and not done:
         return ["QUESTS: none open."]
-    out = ["QUESTS:"]
+    out = ["QUESTS:"] if live else ["QUESTS: none open."]
     for q in live:
         offered = cards_mod.standing(q) == cards_mod.OFFERED
         out.append(f"  {q.title} — {'offered, not taken up' if offered else q.stage}")
         for i, o in enumerate(q.objectives):
             out.append(f"    [{'x' if o.get('done') else ' '}] {o.get('text', '')}")
+    for q in done[-FINISHED_SHOWN:]:
+        out.append(f"  finished: {q.title} — {_how_it_ended(c, engine, q)}")
+    return out
+
+
+# How many finished quests and jobs the answer lists, newest last.
+FINISHED_SHOWN = 6
+
+
+def _coins(c, engine, cp: int) -> str:
+    """A sum in this world's coin, as the sheet and the tells name it (`goods.coins_here`,
+    the one source; the coin-names ruling of 2026-10-17)."""
+    from rules import goods
+
+    world = getattr(engine, "world", None) or getattr(c, "world", None)
+    return goods.purse_line(goods.coins_for(max(0, int(cp or 0))),
+                            goods.coins_here(world, c.scene))
+
+
+def _how_it_ended(c, engine, card) -> str:
+    """A finished quest or job in a few words, read off its record: "worked and paid 2 gold
+    pieces, 1 silver piece", "let go after three days, paid …", "done", "let go"."""
+    from rules import jobs as jobs_mod
+
+    j = card.job or {}
+    if card.kind == "job" and j.get("state") == "paid":
+        return f"worked and paid {_coins(c, engine, j.get('paid_cp', 0))}"
+    if card.kind == "job" and j.get("state") == "lapsed":
+        paid = int(j.get("paid_cp", 0) or 0)
+        if not paid:
+            return "lapsed, nothing paid"
+        worked = int(j.get("days_worked", 0) or 0)
+        return (f"let go after {jobs_mod.days_said(worked)}, paid "
+                f"{_coins(c, engine, paid)} for them")
+    return "done" if card.stage == "resolved" else "let go"
+
+
+def _pay(c, engine) -> list[str]:
+    """Whether the work was paid, from the job cards and the purse: what is owed and what
+    has been paid, never the model's guess (the owner's save of 2026-11-05: "Not quite
+    yet!" for a week paid in full)."""
+    jobs = [q for q in cards_mod.tasks(c.scene) if q.kind == "job"
+            and cards_mod.standing(q) in (cards_mod.OWN, cards_mod.OFFERED)]
+    out = ["PAY:"]
+    for q in jobs:
+        j = q.job or {}
+        state = j.get("state")
+        if state in ("paid", "lapsed"):
+            out.append(f"  {q.title} — {_how_it_ended(c, engine, q)}. Nothing more is owed "
+                       f"for it.")
+        elif cards_mod.standing(q) == cards_mod.OFFERED:
+            out.append(f"  {q.title} — offered, not taken up"
+                       + (f": {q.reward}" if q.reward else "") + ".")
+        elif q.live:
+            out.append(f"  {q.title} — taken, not yet done: nothing is paid until the end"
+                       + (f" ({q.reward})" if q.reward else "") + ".")
+        else:
+            out.append(f"  {q.title} — let go, unpaid.")
+    if len(out) == 1:
+        out.append("  no work taken or offered: the engine holds no wage owed to you.")
+    pc = c.scene.pc()
+    if pc is not None:
+        from rules import goods
+
+        world = getattr(engine, "world", None) or getattr(c, "world", None)
+        out.append(f"  purse: {goods.purse_line(pc.purse, goods.coins_here(world, c.scene))}")
     return out
 
 
@@ -302,7 +389,7 @@ def _machine(c) -> list[str]:
 
 _SECTIONS = {
     "where": _where, "who": _who, "me": _me, "carrying": _carrying,
-    "quests": _quests, "time": _time, "last": _last,
+    "quests": _quests, "pay": _pay, "time": _time, "last": _last,
 }
 
 

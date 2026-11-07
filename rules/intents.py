@@ -672,7 +672,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # people"). `who` is a ref or the words the player used; `visit` false only asks where
     # they live. The engine decides whether the party knows the way, whether anybody is
     # in, and whether the door opens — from the person's day and their regard.
-    "call_on": (("who",), ("visit",), "hidden"),
+    # `together` (code only: `acts_to_ops._home_together`): the person is standing here and
+    # the party goes home WITH them — they lead, and the door is theirs to open.
+    "call_on": (("who",), ("visit", "together"), "hidden"),
     # Forcing a house door or picking its lock (PF1e: Strength against the door's break
     # DC, Disable Device against the lock). `who` is whose house, or empty for the one
     # house off the street the party stands in; `how` is "force" or "pick". The player
@@ -781,7 +783,7 @@ PARAM_ALIASES = {
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
 CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
-                              "ends_when", "pace", "diversion", "past"})
+                              "ends_when", "pace", "diversion", "past", "together"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
@@ -1709,6 +1711,8 @@ def _check_params(intent: Intent, index: int) -> None:
             raise IntentError("call_on: who is the person whose home the party goes to",
                               "schema", index)
         p["visit"] = str(p.get("visit", True)).strip().lower() not in ("false", "0", "no")
+        if "together" in p:
+            p["together"] = str(p.get("together")).strip().lower() in ("true", "1", "yes")
 
     elif op == "break_in":
         p["who"] = " ".join(str(p.get("who") or "").replace("_", " ").split())[:80]

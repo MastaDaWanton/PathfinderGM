@@ -222,6 +222,89 @@ ACTING = frozenset({"done", "tried"})
 # whether a power named is held (`means.held_power`) — a closed vocabulary, never English.
 MEANS = ("ordinary", "power", "beyond")
 
+# What each action COSTS in the turn (2026-11-06, docs/turn-budget-and-fixtures-plan.md).
+# The owner's ruling that day: a line may hold several deeds outside a fight, "but once a
+# limit of actions has been hit the world doesnt stand still it moves as well". The budget
+# he set:
+#   free        moving about the place you are in; words said to nobody who would answer
+#   quick       a moment's deed — take, give, open, eat, look — and a turn holds two
+#   takes_time  a deed that takes a while (cook, craft, search a room, rest): the turn ends
+#   addresses   speaking to somebody here who would answer (ask, offer, threaten, insult):
+#               the turn ends, so they reply first
+# The reader answers which (an enum the sampler holds), as it answers `commit` and
+# `means`; never a word list in code (the owner's direction of 2026-10-03). The runner
+# that spends it is `sequence.within_budget`, called from play/views.py.
+COSTS = ("free", "quick", "takes_time", "addresses")
+# The cost when the reading names none — a reading from before 2026-11-06, a remembered
+# frame, a hosted provider that does not hold the enum — and the cost every demonstration
+# teaches unless it says otherwise. Keyed on the closed act, never on words. A `go` is
+# free whether it crosses the room or the town (the reader's `go` is "somewhere within
+# reach"); a `journey` is days on the road. A blow is `addresses`: the one struck answers,
+# in a fight of their own (fights keep their own action economy, and the budget is not
+# spent inside one). `call_on` is the visit, answered at the door.
+ACT_COSTS: dict[str, str] = {
+    "go": "free", "leave": "free", "seek": "free", "follow": "free", "stealth": "free",
+    "claim": "free",
+    "look": "quick", "take": "quick", "give": "quick", "drop": "quick", "consume": "quick",
+    "use": "quick", "steal": "quick", "cast": "quick", "break_in": "quick",
+    "athletics": "quick", "exert": "quick", "escape": "quick", "rise": "quick",
+    "other": "quick",
+    "journey": "takes_time", "search": "takes_time", "track": "takes_time",
+    "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
+    "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
+    "talk": "addresses", "insult": "addresses", "request": "addresses", "buy": "addresses",
+    "sell": "addresses", "commission": "addresses", "call_on": "addresses",
+    "attack": "addresses",
+}
+# The engine's own facts about time, which overrule the reader in code: these acts' ops
+# happen at once (a hand-over, a bite, a draw), so a reading of `takes_time` on one is
+# quick; and these always run on the clock (a work on the bench, a night's sleep, the
+# road), so a reading of free or quick on one takes time.
+INSTANT_ACTS = frozenset({"take", "give", "drop", "consume", "use", "steal"})
+TIMED_ACTS = frozenset({"craft", "rest", "journey"})
+# Words said to nobody who could answer are free, not a deed ("I mutter a curse").
+_SPOKEN_ACTS = frozenset({"talk", "insult"})
+
+
+def cost_of(action: dict, scene=None) -> str:
+    """What this action of a reading spends of the turn's budget (`COSTS`).
+
+    The reader's own answer when it gave one in the enum, else the act's (`ACT_COSTS`);
+    then the engine's facts: an act whose op is instant is never `takes_time`, one that
+    always runs on the clock is never less; and `addresses` needs somebody here who could
+    answer (`_answers`) — said to nobody, words are free and any other deed is quick. A
+    plan, a purpose or a question (`COMMITS`) does nothing this turn, so it costs nothing.
+    `call_on` is answered at the door of a house elsewhere, so nobody here need answer."""
+    if not isinstance(action, dict) or not acting(action):
+        return "free"
+    act = str(action.get("act") or "other")
+    said = str(action.get("cost") or "")
+    cost = said if said in COSTS else ACT_COSTS.get(act, "quick")
+    if cost == "takes_time" and act in INSTANT_ACTS:
+        cost = "quick"
+    elif cost in ("free", "quick") and act in TIMED_ACTS:
+        cost = "takes_time"
+    if cost == "addresses" and scene is not None and act != "call_on" \
+            and not _answers(action, scene):
+        cost = "free" if act in _SPOKEN_ACTS else "quick"
+    return cost
+
+
+def _answers(action: dict, scene) -> bool:
+    """Whether somebody here would answer this action: the person its target names, when
+    the words name one standing here (`acts_to_ops.person`) — and then only if they are up
+    and not helpless — else anybody up and seen here (`acts_to_ops._standing_here`). The
+    engine's state, never the words' meaning."""
+    from . import acts_to_ops
+
+    words = action.get("target")
+    if words:
+        ref = acts_to_ops.person(scene, words)
+        actor = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
+        if actor is not None:
+            return not actor.is_down and not actor.is_helpless
+    return bool(acts_to_ops._standing_here(scene))
+
 
 UNTIL_ACTS = frozenset({"wait", "rest"})
 
@@ -356,7 +439,14 @@ Each action also says by what MEANS it is done:
 ordinary  anything a person could try with their body, voice, skill and what they carry
 power     a spell, ability, trait, feat or magic item the sentence names; copy its name
           into `power`
-beyond    something no ordinary person can do, with no power named for it"""
+beyond    something no ordinary person can do, with no power named for it
+
+And what it COSTS of the player's turn:
+free        moving about where you are; words said to nobody who would answer
+quick       a moment's deed: take, give, open, eat, drink, look, draw, drop
+takes_time  a deed that takes a while: cook, craft, search a room, rest, any long task
+addresses   asking, offering, buying from, threatening, insulting or striking somebody
+            here who will answer"""
 
 _DEMOS = [
     ("I head down to the docks and ask a fisherman what he caught today.",
@@ -515,6 +605,41 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "buy the old soldier a pint", "target": "the old soldier",
           "object": "a pint", "act": "give"}]}),
+    # What each deed costs of the turn (`COSTS`, the owner's ruling 2026-11-06). Every
+    # demonstration teaches its act's cost (`ACT_COSTS`, written by `_demo_reply`); these
+    # are the ones the act alone does not settle: a task that takes a while under `other`,
+    # three moments' deeds in a row, words said to nobody, and an order beside a gift (and
+    # the killing strokes below are quick: the one struck cannot answer). None is the
+    # owner's example, a test line or a labelled line.
+    ("I cross to the hearth and set a pot of stew on to simmer for supper.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "cross to the hearth", "place": "the hearth", "act": "go"},
+         {"span": "set a pot of stew on to simmer for supper", "object": "a pot of stew",
+          "cost": "takes_time", "act": "other"}]}),
+    ("I pick up the lantern, light it and peer down the stairwell.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "pick up the lantern", "object": "the lantern", "act": "take"},
+         {"span": "light it", "object": "it", "act": "use"},
+         {"span": "peer down the stairwell", "object": "the stairwell", "act": "look"}]}),
+    ("I turn the whole loft over looking for the missing ledger.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "turn the whole loft over looking for the missing ledger",
+          "object": "the missing ledger", "place": "the whole loft", "act": "search"}]}),
+    ("I darn the hole in my stocking by the fire.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "darn the hole in my stocking by the fire",
+          "object": "the hole in my stocking", "place": "the fire", "cost": "takes_time",
+          "act": "other"}]}),
+    ("I mutter a curse under my breath.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "mutter a curse under my breath", "says": "a curse", "cost": "free",
+          "act": "talk"}]}),
+    ("I warn the stable boy off the grey mare and toss him a copper.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "warn the stable boy off the grey mare", "target": "the stable boy",
+          "says": "off the grey mare", "act": "talk"},
+         {"span": "toss him a copper", "target": "him", "object": "a copper",
+          "act": "give"}]}),
     # --- 2026-10-03: the reader now carries the turn (docs/structured-turn.md) ----------
     # Each from a measured systematic miss on the first 60 labelled lines — never a line
     # of the labelled set itself, and none from the 160 held out. Demonstrations, not
@@ -779,7 +904,7 @@ _DEMOS = [
     ("I finish off the jackal and go through its pack.",
      {"question": False, "claims": [], "actions": [
          {"span": "finish off the jackal", "target": "the jackal", "blow": "finishing",
-          "act": "attack"},
+          "cost": "quick", "act": "attack"},
          {"span": "go through its pack", "target": "its pack", "act": "loot"}]}),
     # The killing stroke and an ordinary blow meant to kill (2026-11-04, `blow`): finishing
     # is the stroke at somebody who cannot fight back, never the wish to kill a foe who
@@ -787,7 +912,8 @@ _DEMOS = [
     ("I kneel and slit the bound smuggler's throat.",
      {"question": False, "claims": [], "actions": [
          {"span": "kneel and slit the bound smuggler's throat",
-          "target": "the bound smuggler", "blow": "finishing", "act": "attack"}]}),
+          "target": "the bound smuggler", "blow": "finishing", "cost": "quick",
+          "act": "attack"}]}),
     ("I swing my axe to kill the charging boar.",
      {"question": False, "claims": [], "actions": [
          {"span": "swing my axe to kill the charging boar", "target": "the charging boar",
@@ -870,13 +996,15 @@ def schema() -> dict:
                                    **{s: slot for s in SLOTS},
                                    "power": slot,
                                    "means": {"type": "string", "enum": list(MEANS)},
-                                   "act": {"type": "string", "enum": list(ACTS)}},
+                                   "act": {"type": "string", "enum": list(ACTS)},
+                                   "cost": {"type": "string", "enum": list(COSTS)}},
                     # Every slot required (null allowed). Measured 2026-09-27 on the
                     # labelled set: with the slots optional, the constrained sampler
                     # wrote `span` and `act` and nothing else on 220 of 220 lines —
                     # slot recall 0.0 — because an optional property is one the grammar
-                    # lets it skip. The commitment is required for the same reason.
-                    "required": ["span", "commit", *SLOTS, "power", "means", "act"],
+                    # lets it skip. The commitment is required for the same reason, and
+                    # the cost: Ollama holds required properties and enums, nothing more.
+                    "required": ["span", "commit", *SLOTS, "power", "means", "act", "cost"],
                 },
             },
             "claims": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
@@ -934,6 +1062,11 @@ def per_act_schema() -> dict:
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
                  # evidence already chosen — the deed reader's order.
+                 # What it costs of the turn (`COSTS`), with the deed and its words
+                 # already written; the same in every alternative, so it chooses no act,
+                 # and required, so the sampler cannot skip it. Before the means, which
+                 # stays last (tests/test_means_gate.py).
+                 "cost": {"type": "string", "enum": list(COSTS)},
                  "power": slot,
                  "means": {"type": "string", "enum": list(MEANS)}}
         alts.append({"type": "object", "properties": props, "required": list(props),
@@ -954,9 +1087,12 @@ def _demo_reply(frame: dict) -> str:
     for a in frame.get("actions") or []:
         commit = a.get("commit") or "done"
         means = {"power": a.get("power"), "means": a.get("means") or "ordinary"}
+        # The act's cost unless the demonstration names its own (`ACT_COSTS`), so every
+        # demonstration teaches one.
+        cost = {"cost": a.get("cost") or ACT_COSTS[a["act"]]}
         if SCHEMA != "per_act":
             acts.append({"span": a.get("span", ""), "commit": commit,
-                         **{s: a.get(s) for s in SLOTS}, **means, "act": a["act"]})
+                         **{s: a.get(s) for s in SLOTS}, **means, "act": a["act"], **cost})
             continue
         acts.append({"span": a.get("span", ""), "commit": commit, "act": a["act"],
                      **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())},
@@ -973,7 +1109,7 @@ def _demo_reply(frame: dict) -> str:
                      **({"way": a.get("way") or ESCAPE_WAYS[0]}
                         if a["act"] == "escape" else {}),
                      **({"blow": a.get("blow") or BLOWS[0]}
-                        if a["act"] == "attack" else {}), **means})
+                        if a["act"] == "attack" else {}), **cost, **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -1120,6 +1256,17 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
         means = str(a.get("means") or "ordinary")
         if means in MEANS and means != "ordinary":
             kept["means"] = means
+        # What it costs of the turn (`COSTS`): the enum's, kept only when it differs from
+        # the act's own (`ACT_COSTS`), as `commit` and `means` are kept only when they say
+        # something — after the act is settled, since a request or a craft outside its
+        # enum became talk or other above. Outside the enum it is dropped and said, and
+        # `cost_of` answers from the act.
+        cost = str(a.get("cost") or "").strip().lower()
+        if cost in COSTS:
+            if cost != ACT_COSTS.get(kept["act"]):
+                kept["cost"] = cost
+        elif cost:
+            dropped.append(f"{kept['act']}.cost={a.get('cost')!r}")
         power = str(a.get("power") or "").strip()
         if power and power.lower() not in _NULL_WORDS:
             if _within(power, sentence):
@@ -1167,7 +1314,7 @@ def merge_repeats(actions: list[dict], dropped: list[str] | None = None) -> list
                 and any(a.get(s) for s in SLOTS) and not any(
                     prev.get(s) and a.get(s) and prev[s].lower() != a[s].lower()
                     for s in SLOTS):
-            for s in (*SLOTS, "power"):
+            for s in (*SLOTS, "power", "cost"):
                 if a.get(s) and not prev.get(s):
                     prev[s] = a[s]
             if dropped is not None:
@@ -1643,6 +1790,74 @@ def confirm_job(span: str, employer: str, jobs=(), *,
             "job": job if job in titles else NOT_SAID}
 
 
+# --- whether the player's words have somebody come along, asked --------------------------
+#
+# The owner's save of 2026-11-05 (turn_log row 7): "Accept the terms of the work", to Vyrnys,
+# who had just offered a week of guard work. The reader read one `other`, and the table built
+# the job (`acts_to_ops.jobs_spoken`). The plan ALSO wrote `{"op": "company", "params":
+# {"who": "c2"}}` — the prompt's own example, word for word, with no actor and no `because`
+# (gm/prompts.py teaches company for "a friend, a guide, a hired sword", and c2 was Vyrnys).
+# The engine refused it, Vyrnys being indifferent ("Talk them round first — that is a
+# Diplomacy check"), and the planned narrator wrote "Vyrnys remains unmoved by your words"
+# on a turn where the player had simply taken a job.
+#
+# Somebody coming along is the player's to ask for, in their own words, and the reader has
+# no act for it: a `talk`, a `request`, or an `other`. So a plan's `company` is asked ONE
+# question, only when the plan wrote one (`acts_to_ops.company_asked`): do these words have
+# this person come along, send them away, or neither. Demonstrations written for this, in no
+# world's words; none is a probed line, and the owner's line is not among them.
+COMPANY_ANSWERS = ("has them come along", "sends them away", "something else")
+_COMPANY_DEMOS = [
+    ("ask Tamsin to come with me to the ford", "Tamsin", "has them come along"),
+    ("say \"Pack your things, you're coming with us\"", "the guide", "has them come along"),
+    ("tell him he's welcome to travel with us", "the old tinker", "has them come along"),
+    ("hire the sellsword to watch my back on the road", "the sellsword",
+     "has them come along"),
+    ("tell her to go home, we part ways here", "the guide", "sends them away"),
+    ("take the foreman's job guarding the warehouse", "the foreman", "something else"),
+    ("agree to the reeve's terms for the week", "the reeve", "something else"),
+    ("ask her what the road ahead is like", "the guide", "something else"),
+    ("thank him for the bread", "the baker", "something else"),
+]
+
+
+def company_messages(span: str, who: str) -> list[dict]:
+    system = ("In a role-playing game the player's character says or does something near "
+              "another person. Answer from the words alone: do they have that person come "
+              "along with the character from now on (asked to come, invited, hired to go "
+              "with them, or told yes when the person offered to come), send that person "
+              "away (part company, tell them to go), or something else? Taking work FROM "
+              "somebody, agreeing to their terms, or talking with them is something else.")
+    out = [{"role": "system", "content": system}]
+    for said, person_, answer in _COMPANY_DEMOS:
+        out.append({"role": "user", "content": f"The person: {person_}\nThe words: {said}"})
+        out.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    out.append({"role": "user", "content": f"The person: {who}\nThe words: {span}"})
+    return out
+
+
+def confirm_company(span: str, who: str, *, model: str | None = None) -> str:
+    """One of `COMPANY_ANSWERS`; "" when the call fails (the caller then judges the plan's
+    company by the reading's acts alone, `acts_to_ops.company_asked`)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object", "properties": {"answer": {
+        "type": "string", "enum": list(COMPANY_ANSWERS)}}, "required": ["answer"]}
+    try:
+        reply = client.chat(company_messages(span, who), model or cfg["model"],
+                            cfg["host"], as_json=True, think=False, temperature=0.0,
+                            num_predict=20, provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = str((reply.json() or {}).get("answer") or "")
+    except Exception:  # noqa: BLE001
+        return ""
+    return got if got in COMPANY_ANSWERS else ""
+
+
 # --- who a blow lands on, asked ---------------------------------------------------------
 #
 # The owner, 2026-10-09: "if i say I attack the closest person or i go on a rampage or i
@@ -1768,6 +1983,24 @@ def remember(text: str, frame: dict | None) -> None:
 
 def reading_of(text: str) -> dict | None:
     return _READINGS.get(_key(text))
+
+
+# A reading made before the planner was asked, handed on to it once: the turn budget
+# (play/views.py `_within_the_budget`) reads the whole line to find where the turn ends,
+# and the planner is then handed that reading — cut to the deeds done now — instead of
+# asking the reader a second time. Taken once and gone, so it never outlives its turn.
+_HANDED: dict[str, dict] = {}
+
+
+def hand_on(text: str, frame: dict | None) -> None:
+    _HANDED.clear()
+    if frame is not None:
+        _HANDED[_key(text)] = frame
+
+
+def handed(text: str) -> dict | None:
+    """The reading handed on for this sentence, taken (a second ask answers None)."""
+    return _HANDED.pop(_key(text), None)
 
 
 def _road_to(phrase, scene) -> bool:

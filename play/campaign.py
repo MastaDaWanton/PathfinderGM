@@ -1315,6 +1315,16 @@ def open_the_story(c, written: bool = True) -> None:
     _bind_background(c)
     _open_with(c, opening_text(c, written=written))
     _after_the_opening(c)
+    # The GM's welcome under the opening, once (owner, 2026-11-06), only when the opening
+    # really was written by the model. A template opening (`floor`: the written opening is
+    # switched off, or the model failed) is the no-model path, and so is no welcome:
+    # asking anyway made a model call, and left two keys on the scene, in every start the
+    # suite makes with the written opening off (test_e_magic_attach counts the calls).
+    beat = next((b for b in reversed(c.transcript) if b.get("opening")), None)
+    if written and beat is not None and not beat["opening"].get("floor"):
+        from . import table_talk
+
+        table_talk.introduction(c)
 
 
 def _bind_background(c, acquaint: bool = True) -> list[dict]:

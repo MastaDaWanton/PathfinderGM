@@ -2154,6 +2154,7 @@ function paneSettings() {
     <div id="modelerr"></div>
     </section>
     ${narrationPanel()}
+    ${gmPanel()}
     ${soundPanel()}
     ${reportSlot()}
     </div>`;
@@ -2201,6 +2202,43 @@ function narrationPanel() {
         <em>${em}</em>
       </button>`).join("")}</div>
     <div id="ruleserr"></div>`);
+}
+
+/* The GM at the table (owner, 2026-11-05; play/table_talk.py): how often the person behind
+   the screen talks across it, and which personality they have. Two house rules, drawn
+   beside the narrator's switch for the same reason it is here: flipped between two beats
+   without leaving the game. `narrationPanel` reads RULES; this one waits for it. */
+const TABLE_TALK_MODES = [
+  ["off", "Off",
+   "The story only. The GM answers /gm questions, but never describes what they are doing."],
+  ["big", "Big moments",
+   "A line from the GM when it matters: a refusal, a natural 20 or 1, a critical, someone down, a fight starting or ending, a bonus for a clever move."],
+  ["always", "Always",
+   "A line from the GM after every turn. The most like a real table, and a little slower."],
+];
+
+function gmPanel() {
+  if (!RULES) return "";
+  const mode = RULES.rules.table_talk || "big";
+  const voice = RULES.rules.dm_voice || "gleeful";
+  return setGroup("set-gm", "Your GM at the table", `
+    <p class="note">The GM's own voice, out of character, in its own style under the story,
+      with what they do at the table in [brackets]. It sees only what you have seen, so it
+      can't give a secret away. Changes from the next beat.</p>
+    <div class="cards narrcards">${TABLE_TALK_MODES.map(([v, label, em]) => `
+      <button class="card pick ${mode === v ? "on" : ""}" data-hbtabletalk="${v}"
+              aria-pressed="${mode === v}">
+        <h3>${label}</h3>
+        <em>${em}</em>
+      </button>`).join("")}</div>
+    <h3 class="subsect">Which GM</h3>
+    <p class="note">Also the voice that answers your /gm questions.</p>
+    <div class="cards narrcards">${(RULES.dm_voices || []).map(d => `
+      <button class="card pick ${voice === d.id ? "on" : ""}" data-hbdmvoice="${esc(d.id)}"
+              aria-pressed="${voice === d.id}">
+        <h3>${esc(d.name)}</h3>
+        <em>${esc(d.blurb)}</em>
+      </button>`).join("")}</div>`);
 }
 
 /* --- Playing from a phone -------------------------------------------------------
@@ -3955,6 +3993,10 @@ document.addEventListener("click", async e => {
   if (cont) { await setHouseRule({ content: RULES.rules.content === "explicit" ? "fade" : "explicit" }); return; }
   const narr = e.target.closest("[data-hbnarration]");
   if (narr) { await setHouseRule({ narration: narr.dataset.hbnarration }); return; }
+  const talk = e.target.closest("[data-hbtabletalk]");
+  if (talk) { await setHouseRule({ table_talk: talk.dataset.hbtabletalk }); return; }
+  const dmv = e.target.closest("[data-hbdmvoice]");
+  if (dmv) { await setHouseRule({ dm_voice: dmv.dataset.hbdmvoice }); return; }
   const imp = e.target.closest("[data-importraces]");
   if (imp) {
     imp.disabled = true;

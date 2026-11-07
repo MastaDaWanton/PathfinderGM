@@ -182,6 +182,10 @@ def as_sentence(clause: str) -> str:
     c = _tidy(clause)
     if not c:
         return ""
+    # A player's lower-case "i" is still "I": the owner's own line of 2026-11-06 ("…then i
+    # serve the food i made to everyone") came back to the pen as "I i serve the food".
+    if re.match(r"^i\b", c):
+        c = "I" + c[1:]
     if not re.match(r"^(?:I\b|I'|\"|“)", c):
         m = _GERUND.match(c)
         if m:
@@ -239,6 +243,89 @@ def cast_clause(parts: list[str], spell_name: str, quiet=None) -> int | None:
             if quiet(p):
                 return i
     return None
+
+
+def _words(text) -> str:
+    return " " + " ".join(re.findall(r"[\w']+", str(text or "").lower())) + " "
+
+
+def said_in(span, text) -> bool:
+    """Whether the span's words are in the text, word for word."""
+    s = _words(span)
+    return bool(s.strip()) and s in _words(text)
+
+
+def clauses_of(span, parts: list[str]) -> list[int]:
+    """The clauses an action's span lies across: each clause inside the span, or the one
+    the span lies inside, word for word. Several when the reader read one deed where the
+    joins cut two ("take a lantern off the shelf and pay the keeper for it" is one sale)."""
+    s = _words(span)
+    if not s.strip():
+        return []
+    out = []
+    for i, p in enumerate(parts):
+        w = _words(p)
+        if w.strip() and (w in s or s in w):
+            out.append(i)
+    return out
+
+
+# The quick deeds a turn holds (the owner's ruling of 2026-11-06: "up to two").
+QUICK_PER_TURN = 2
+
+
+def within_budget(parts: list[str], actions: list[dict], cost) -> tuple | None:
+    """Where the turn's budget ends a line of several clauses: `(now, later, why)`, the
+    clauses done this turn and the ones left for the pen, or None when the whole line
+    runs as it always did.
+
+    The owner's ruling, 2026-11-06: outside a fight a line may hold several deeds, but
+    "once a limit of actions has been hit the world doesnt stand still it moves as well".
+    Moving about is free; a turn holds up to two quick deeds; the turn ends at once after a
+    deed that takes time, or after words to somebody here who would answer, so they reply
+    first. His example: "I run to the other side of the room and begin cooking dinner then
+    i serve the food i made to everyone" runs (free), starts the cooking (takes time: the
+    turn ends there), and "serve the food" goes back to the pen.
+
+    `actions` is the reader's frame in the order of doing, `cost(action)` its cost
+    (`interpret.cost_of`, with the scene). Each action is placed at the clauses its span
+    lies across (`clauses_of`). The cut falls on a clause boundary only — the words are
+    never split inside a clause — and only when a deed the reader read lies wholly after
+    it, so nothing is put back that the reader did not read as a deed. Any action that
+    cannot be placed, and a cost not in the four, leave the line whole: the turn as it
+    was before the budget, never a guess. Inform's chain runs commands one at a time
+    (gm/sequence.py's docstring); this decides how many of them are this turn's."""
+    if len(parts) < 2:
+        return None
+    placed = []
+    for a in actions or ():
+        c = cost(a)
+        where = clauses_of(a.get("span"), parts)
+        if not where:
+            if c == "free":
+                continue
+            return None
+        placed.append((c, min(where), max(where)))
+
+    quick, done_to, cut, why = 0, -1, None, ""
+    for c, first, last in placed:
+        if c == "quick":
+            if quick == QUICK_PER_TURN:
+                cut, why = first, "quick"
+                break
+            quick += 1
+        elif c not in ("free", "takes_time", "addresses"):
+            return None
+        done_to = max(done_to, last)
+        if c in ("takes_time", "addresses"):
+            cut, why = done_to + 1, c
+            break
+    # A deed that shares a clause with one already done cannot be held back alone.
+    if cut is None or cut <= done_to or cut >= len(parts):
+        return None
+    if not any(first >= cut for _c, first, _l in placed):
+        return None
+    return parts[:cut], parts[cut:], why
 
 
 def only_going(clause: str) -> bool:

@@ -2298,6 +2298,14 @@ def _anything_into(facts: Facts, ref: str) -> bool:
             got = e.get("to") if "to" in e else e.get("ref")
             if got == ref and any(k in e for k in ("item", "items", "goods", "purse")):
                 return True
+            # A wage paid for work (`Engine._op_work`'s `earned`) is coin into their hands
+            # too. It carries no `purse`, so on the owner's save of 2026-11-05 the guard
+            # week paid 2 gold 1 silver and this answered "nothing came in": "take the
+            # week's work from Vyrnys" was judged a gift the engine never made, and the
+            # repair put "Vyrnys takes the week's work from you" on the page.
+            if got == ref and e.get("kind") == "earned" \
+                    and int(e.get("paid_cp", 0) or 0) > 0:
+                return True
     return False
 def _parts_with_unlisted(facts: Facts, frm: str, things_moved) -> bool:
     """Whether a thing the engine has no name for, put down by `frm`, is judged at all:

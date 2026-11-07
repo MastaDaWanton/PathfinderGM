@@ -75,6 +75,10 @@ class Row:
     intents: list[dict] = field(default_factory=list)  # ops built here, whole
     missing: str = ""                                   # what the words named and is not here
     note: str = ""                                      # why nothing was built, for the log
+    # A walk to a place the engine cannot find: the printable answer `nowhere_to_go` gives
+    # when the plan moves nobody either. Not `missing`, which the brief states as "nothing
+    # is made to fill it" — the plan may still found the place (places are creatable).
+    nowhere: str = ""
     thing: str = ""                                     # a goods row's object, resolved
     commit: str = "done"                                # interpret.COMMITS
     weapon: str = ""                                    # a blow's weapon, resolved (`weapons`)
@@ -95,6 +99,8 @@ class Row:
             out["missing"] = self.missing
         if self.note:
             out["note"] = self.note
+        if self.nowhere:
+            out["nowhere"] = self.nowhere
         if self.gesture:
             out["gesture"] = True
         return out
@@ -758,11 +764,16 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
     gone: list[str] = []
     approached = ""
     bought = sold_not_asked(frame, scene)
+    # "I follow her to her rooms": the walk is done now, with the person followed
+    # (`_walk_rides_the_follow`, row 56 of the owner's 2026-11-05 save).
+    led = _walk_rides_the_follow(frame, scene)
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
         row = Row(index=i, act=act, commit=str(a.get("commit") or "done"))
         if i in bought:
             row.note = bought[i]
+        if a.get("commit_was"):
+            row.note = f"done now: it rides on the follow ({a['commit_was']} as read)"
         if not interpret.acting(a):
             # Intended or asked about: context for the plan (`interpret.brief_lines` says
             # so), never an op. Round 1's replay sold the crate a turn early on "I take
@@ -842,7 +853,25 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act == "go" and not a.get("place") and not row.ops and pc is not None:
                 _carry_on(row, scene, pc)
             elif act == "go" and a.get("place") and not row.ops and pc is not None:
-                _to_the_town(row, str(a["place"]), scene, places, pc)
+                # Somebody's home, with them standing here: the walk there together
+                # (`_home_together`) — else the town named whole, else nowhere known.
+                from rules import places as places_mod
+
+                home = (_dwelling_owner(a["place"], scene, led)
+                        if not places or places_mod.find(places, a["place"]) is None else "")
+                if home:
+                    _home_together(row, home, scene, pc)
+                else:
+                    _to_the_town(row, str(a["place"]), scene, places, pc)
+                    _nowhere(row, a, scene, places)
+            if act == "call_on" and pc is not None:
+                # The reader's own call on a person who is standing here is the same walk
+                # home together; their door would refuse them ("is here, with you").
+                said = " ".join(str(a.get("target") or "").split())
+                ref = (_by_pronoun(scene, said, led) if said.lower() in _PRONOUNS
+                       else person(scene, said))
+                if ref:
+                    _home_together(row, ref, scene, pc)
             if act in ("go", "seek") and a.get("object") and pc is not None:
                 _carry(row, frame, i, scene, pc, recent)
                 coming += [str(t["params"]["item"]) for t in row.intents]
@@ -1311,6 +1340,201 @@ def _to_the_town(row: Row, phrase: str, scene, places, pc) -> None:
     row.intents.append({"op": "travel", "actor": pc.ref, "params": {"place": target.name},
                         "because": f"to {target.name}, where {phrase} is from here"})
     row.note = f"{phrase}: {target.name} from here"
+
+
+# --- going home with somebody standing here ---------------------------------------------
+#
+# Measured on the owner's save of 2026-11-05 (Pangrella, the market; turn_log rows 47-69).
+# Ariniel Thorne, helpful, stood beside the player. "I follow Ariniel Thorne to her private
+# quarters" was read `follow: Ariniel Thorne` and `go, commit: intended, place: her private
+# quarters`; the table built nothing ("intended, not done this turn: no op"), the plan
+# walked a square toward her, and three more tries ended "You remain in the market".
+# The engine had no route at all: `call_on` refuses a person who is here ("there is no
+# need to go to their door"), and no place is called "her private quarters".
+#
+# The reader's closed answer carries the parts: the act (`go`, `call_on`, `follow`) and the
+# person (`follow`'s target, or the possessor in the place slot, resolved by `person` —
+# the engine's people, never a guess). What it does not carry is that the place is a
+# DWELLING; the slot is free text. So the one judgement left to code is a closed noun list,
+# asked of the place slot's head word only — the same shape as `interpret._OUTWARD_WORDS`,
+# a vocabulary rather than a reading of the sentence. The closed reader answer that would
+# retire it (a `home_of` field on the go act, or a demonstration reading "I follow Mara to
+# her house" as `follow` + `call_on`) is a reader-prompt change, measurable only live.
+DWELLINGS = frozenset({
+    "house", "home", "quarters", "rooms", "room", "lodgings", "lodging", "cottage", "hovel",
+    "hut", "cabin", "chambers", "chamber", "bedroom", "bedchamber", "apartment",
+    "apartments", "flat", "place", "dwelling", "residence", "abode", "digs"})
+_POSSESSIVE = frozenset({"her", "his", "their"})
+
+
+def _dwelling_owner(place, scene, led: str = "") -> str:
+    """The ref of the person here whose home the place slot names, or "".
+
+    The head word (the slot's last) is a dwelling noun (`DWELLINGS`), and the owner is the
+    possessor before it — "her", "his", "their" (the person `led` when the same sentence
+    follows somebody, else the pronoun through `person`), or a name with "'s" — or, with
+    no possessor and an article, the person the sentence follows ("I follow Mara to the
+    house"). "the quarters" alone, with nobody followed, names nobody's."""
+    words = " ".join(str(place or "").lower().replace("’", "'").split()).split()
+    if not words or words[-1].strip(".,;!?") not in DWELLINGS:
+        return ""
+    first = words[0]
+    if first in _POSSESSIVE:
+        return _by_pronoun(scene, first, led)
+    owner = []
+    for w in words[:-1]:
+        owner.append(w)
+        if w.endswith("'s") or w.endswith("s'"):
+            said = " ".join(owner)
+            said = said[:-2] if said.endswith("'s") else said[:-1]
+            return person(scene, said)
+    if led and first in ("the", "a"):
+        return led
+    return ""
+
+
+def _by_pronoun(scene, pronoun: str, led: str = "") -> str:
+    """Whose home "her", "his" or "their" means, from the engine's state: the person the
+    same sentence follows; else the one person the player is dealing with (`addressed`),
+    when the pronoun fits them. Never just any woman here: "I go to her house" after
+    asking where the bread seller lives means the bread seller, whose door `call_on`'s own
+    pronoun rule finds (`Engine._callee`), not a stranger standing beside the player."""
+    if led:
+        return led
+    ref = addressed(scene)
+    who = (getattr(scene, "actors", {}) or {}).get(ref)
+    if who is None or pronoun.lower() not in _pronoun_forms(getattr(who, "pronouns", "")):
+        return ""
+    # Not when the character knows somebody's home and not this person's: the pronoun may
+    # be that somebody's, as the engine's own finder reads it (`Engine._callee`), so the
+    # plain call decides. Asked as a prefix of the tag vocabulary (law one).
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is not None and pc.has_state("knows.home"):
+        from rules import population
+
+        try:
+            rec = population.of_ref(scene, ref)
+        except Exception:  # noqa: BLE001 — a scene without a population answers no
+            rec = None
+        keys = {ref, str(getattr(who, "world_entity_id", "") or ""),
+                str((rec or {}).get("id") or "")} - {""}
+        if not any(pc.has_state(f"knows.home.{k}") for k in keys):
+            return ""
+    return ref
+
+
+def _followed_here(frame: dict | None, scene) -> str:
+    """The ref of the person here a `follow` act done or tried now follows, or ""."""
+    from . import interpret
+
+    for a in (frame or {}).get("actions") or []:
+        if isinstance(a, dict) and a.get("act") == "follow" and interpret.acting(a):
+            ref = person(scene, a.get("target"))
+            if ref:
+                return ref
+    return ""
+
+
+def _walk_rides_the_follow(frame: dict | None, scene) -> str:
+    """A walk the reading marked intended, in a sentence that follows somebody standing
+    here now, is done now: "I follow Ariniel Thorne to her private quarters" is one deed
+    with its destination, not a follow and a plan. Row 56 of the owner's save (2026-11-05)
+    came back `follow` (done) and `go, commit: intended`; the table's "intended, not done
+    this turn" rule dropped the go and the turn moved nobody. Structure only: the
+    reading's acts and commits, and `person` over the engine's people. The go's commit is
+    rewritten on the frame, so every later reader (`ops_for`, `supported`, the brief)
+    sees one answer. Returns the followed ref, "" when nobody here is followed."""
+    led = _followed_here(frame, scene)
+    if not led:
+        return ""
+    for a in (frame or {}).get("actions") or []:
+        if isinstance(a, dict) and a.get("act") == "go" and a.get("place") \
+                and str(a.get("commit") or "done") == "intended":
+            a["commit"] = "done"
+            a["commit_was"] = "intended"
+    return led
+
+
+def _home_together(row: Row, ref: str, scene, pc) -> None:
+    """The walk home with the person here, built whole: `call_on` with `together`, which
+    the engine answers from their attitude and makes their house if it has none
+    (`Engine._home_together`)."""
+    who = (getattr(scene, "actors", {}) or {}).get(ref)
+    if who is None or who.is_pc:
+        return
+    row.intents.append({"op": "call_on", "actor": pc.ref,
+                        "params": {"who": ref, "together": True},
+                        "because": f"the player goes home with {who.name}"})
+    row.ops = []
+    row.note = f"home with {who.name}, who is here"
+
+
+def _nowhere(row: Row, a: dict, scene, places) -> None:
+    """A walk to a place the engine cannot find, with nothing built for it, records the
+    printable answer (`nowhere_to_go` prints it when the plan moves nobody either).
+
+    Row 69 of the owner's save (2026-11-05): "Continue walking toward the quarters" was
+    read `go: the quarters`; no place is called that, no op was owed, the plan wrote a
+    bare `narrate_only`, and the page said "You remain in the market" — a beat in which
+    nothing happened and nothing said why. Not for a fixture of the room the party stands
+    in ("the counter", "the far corner": `judgement._FIXTURES`, the closed list the
+    within-scene rule reads), which is a walk across the room."""
+    from rules import places as places_mod
+
+    from . import interpret, judgement
+
+    place = " ".join(str(a.get("place") or "").split())
+    if not place or row.ops or row.intents or a.get("here"):
+        return
+    if places and places_mod.find(places, place) is not None:
+        return
+    if interpret._outward(place) or interpret._road_to(place, scene):
+        return
+    words = place.lower().replace("’", "'").split()
+    head = (words or [""])[-1].strip(".,;!?")
+    if head in set(judgement._FIXTURES.split("|")):
+        return
+    # The player's own ("my room", "our camp") is where they keep things, not a place the
+    # town is asked to have: the rest at the inn and the camp answer those.
+    if words[0] in ("my", "our"):
+        return
+    # Somebody's home by its owner ("her house", "the baker's rooms") is the knock's to
+    # answer (`call_on`, whose own finder reads the pronoun), never "anywhere" unknown.
+    if head in DWELLINGS and (words[0] in _POSSESSIVE
+                              or any(w.endswith(("'s", "s'")) for w in words[:-1])):
+        return
+    row.nowhere = "You don't know of anywhere called \"" + place + "\" here."
+
+
+def nowhere_to_go(raw, rows: list[Row], *, notes: list | None = None) -> list:
+    """The plan, with the engine's answer to a walk that went nowhere.
+
+    A go row the table found no place for (`_nowhere`), on a plan of nothing but
+    `narrate_only` — no travel, found, move, word or roll of anybody's — gets its
+    sentence on `narrate_only`'s `not_here`, which the engine prints as a refusal
+    (`Engine._op_narrate_only`): 'You don't know of anywhere called "the quarters" here.'
+    Refuse gracefully: never a raise, and never a narrated nothing. A plan that founds the
+    place, or walks anywhere, is left alone: places are creatable in play (ruling
+    2026-10-03), and the plan's `found` is one of their doors."""
+    said = [r.nowhere for r in rows if getattr(r, "nowhere", "")]
+    if not said or not isinstance(raw, list):
+        return raw
+    # Only a turn that is otherwise nothing: a plan that walks, founds, speaks, rests or
+    # rolls anything has done something, and "go back up to my room and sleep" at the inn
+    # is the sleep (the leave-by-deed turns, docs/conversation.md).
+    if any(_op(r) != "narrate_only" for r in raw):
+        return raw
+    if any(isinstance(r, dict) and (r.get("params") or {}).get("not_here") for r in raw):
+        return raw
+    out = [dict(r) if isinstance(r, dict) else r for r in raw]
+    if notes is not None:
+        notes.append(f"a walk to nowhere the engine holds: {said[0]}")
+    for r in out:
+        if _op(r) == "narrate_only":
+            r["params"] = dict(r.get("params") or {}, not_here=said[0])
+            return out
+    return out + [{"op": "narrate_only", "because": "the player walked to nowhere known",
+                   "params": {"not_here": said[0]}}]
 
 
 def _effort_check(r, pc) -> bool:
@@ -2246,6 +2470,11 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # A job the table built (`jobs_spoken`) is the turn's word on the work: the plan's own
     # week of `work`, or a `quest` it wrote for the same job, would work it or take it twice.
     jobbing = any(b.get("op") == "job" for b in built)
+    # And the person the job is with: the plan's `company` of them is not what taking,
+    # offering or turning down their work is. The owner's save of 2026-11-05 (row 7):
+    # "Accept the terms of the work" to Vyrnys built the job, and the plan's `company c2`
+    # beside it was refused as indifferent into "Vyrnys remains unmoved by your words".
+    employers = {str(b.get("target") or "") for b in built if b.get("op") == "job"} - {""}
     making = any(b.get("op") == "make" for b in built)
     # A grapple broken (`_escape`) is the turn's word on it: the plan's own Escape Artist
     # check, its grapple at the holder or its own escape would roll a second time for the
@@ -2265,6 +2494,12 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # A walk the table carried on (`_carry_on`) is the turn's walk: the plan's own travel
     # beside it would walk twice, or somewhere else.
     carrying_on = any(b.get("op") == "travel" for b in built)
+    # A walk home with the person here (`_home_together`) is the turn's walk: the plan's
+    # own travel, found or call beside it would walk elsewhere, mint a second house, or
+    # knock at a door the person is standing beside (row 56/62 of the owner's 2026-11-05
+    # save planned travels to "the private quarters" and a `found` of a tavern for it).
+    going_home = any(b.get("op") == "call_on" and (b.get("params") or {}).get("together")
+                     for b in built)
     # A commission the table built is the turn's word on that keeper's price: the plan's own
     # `haggle` at them (the counter's Profession roll) becomes the commission's Diplomacy
     # haggle instead (rules/commission.py `_haggle`, owner ruling 2026-11-01). Measured live
@@ -2335,9 +2570,18 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's job")
             continue
+        if op == "company" and _company_who(scene, r) in employers:
+            if notes is not None:
+                notes.append("the plan's company dropped: the reading's job is the turn's "
+                             "word on the employer")
+            continue
         if carrying_on and op == "travel":
             if notes is not None:
                 notes.append("the plan's travel replaced by the walk carried on")
+            continue
+        if going_home and op in ("travel", "found", "venture", "call_on"):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the walk home together")
             continue
         if journeying and op == "travel":
             if notes is not None:
@@ -2561,6 +2805,101 @@ def unasked_travel(raw, frame: dict | None, scene=None, places=(), *,
     if len(out) != len(raw) and notes is not None:
         notes.append("the plan's walk struck: no deed of the player's asked for it"
                      + (f" (a search reaches {', '.join(sorted(nearby))})" if nearby else ""))
+    return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
+def _company_who(scene, r) -> str:
+    """The ref a `company` op's `who` names: a ref however decorated, else the one person
+    here of that exact name (the engine's own fallback in `Engine._op_company`)."""
+    from rules import intents as intents_mod
+
+    want = str(((r or {}).get("params") or {}).get("who") or "").strip()
+    actors = getattr(scene, "actors", {}) or {}
+    ref = intents_mod.normalise_ref(want) if want else ""
+    if ref and ref in actors:
+        return str(ref)
+    named = [k for k, a in actors.items()
+             if not a.is_pc and " ".join(str(a.name).lower().split()) == want.lower()]
+    return named[0] if len(named) == 1 else str(ref or want)
+
+
+# The acts a player has somebody come along in, or sends them away in: words said, a
+# request, anything else (`take_ups`' agreeing acts), and a walk or a journey made with
+# them. Only words said or asked stand behind a company by structure alone, when the
+# question is not asked or its call fails: an `other` or a walk needs the question's yes.
+_COMPANY_ACTS = frozenset({"talk", "request", "other", "go", "journey"})
+_COMPANY_SPOKEN = frozenset({"talk", "request"})
+_COMPANY_DOES = {"join": "has them come along", "leave": "sends them away"}
+
+
+def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
+                  notes: list | None = None) -> list:
+    """A plan's `company` stands only where the player's own words have that person come
+    along — or, for `do: leave`, send them away. Otherwise it is struck, silently: the
+    plan's invention, never the player's refusal to hear.
+
+    The owner's save of 2026-11-05 (turn_log row 7): "Accept the terms of the work" to
+    Vyrnys, read as one `other`. The table built the job; the plan also wrote `company
+    who=c2`, the prompt's own example with no actor and no `because`. The engine refused it
+    — "Vyrnys is indifferent towards you and does not walk out of here at your word. Talk
+    them round first" — and the planned narrator wrote "Vyrnys remains unmoved by your
+    words … You must find a way to convince them", on a turn the player took a job.
+
+    Why not code-only, as `job` is (`intents.CODE_ONLY_OPS`): the reader has no act for
+    "come with me" — it is a `talk` or a `request` — so the plan is still the only door a
+    real invitation comes in by, and companions are recruited by spoken words (the owner's
+    rulings: companions obey in character; Diplomacy requests). So the plan proposes and
+    the reading confirms: detected in code (the plan wrote a company; an act done now that
+    words could carry it), then ONE closed question per such act
+    (`interpret.confirm_company`), asked only on a turn whose plan wrote one. With no
+    question (`ask` None: the suite, the reader off) or a failed call, a `talk` or a
+    `request` done now stands behind it by structure, as before; an `other` does not.
+    `asked` memoises the answers across the plan's attempts. With no reading the plan
+    stands alone, as at every door of this table."""
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
+        return raw
+    if not any(_op(r) == "company" for r in raw):
+        return raw
+    acting = [a for a in frame.get("actions") or [] if interpret.acting(a)
+              and str(a.get("act") or "") in _COMPANY_ACTS]
+    spoken = any(str(a.get("act") or "") in _COMPANY_SPOKEN for a in acting)
+    memo = asked if asked is not None else {}
+    actors = getattr(scene, "actors", {}) or {}
+    out: list = []
+    for r in raw:
+        if _op(r) != "company":
+            out.append(r)
+            continue
+        do = str(((r or {}).get("params") or {}).get("do") or "join").strip().lower()
+        ref = _company_who(scene, r)
+        who = getattr(actors.get(ref), "name", "") or ref
+        want = _COMPANY_DOES.get(do)
+        stands = False
+        if want is not None and acting:
+            answers = []
+            if ask is not None:
+                for a in acting:
+                    key = (str(a.get("span") or ""), who)
+                    if key not in memo:
+                        memo[key] = ask(key[0], who) or ""
+                    answers.append(memo[key])
+            if any(answers):
+                stands = want in answers
+            else:
+                # Not asked, or every call failed: the words said carry it, as before.
+                stands = spoken
+        elif want is None:
+            # A `do` the engine does not know is its own printed refusal, with the fix
+            # named (`Engine._op_company`); not this door's to judge.
+            stands = True
+        if stands:
+            out.append(r)
+            continue
+        if notes is not None:
+            notes.append(f"the plan's company of {who} struck: the player's words did not "
+                         f"ask for it")
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
 
 

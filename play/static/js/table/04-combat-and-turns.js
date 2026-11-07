@@ -6,6 +6,7 @@
 // engine path as a spoken turn, and the NPCs answer through the machinery that already
 // existed. Buttons for the mechanical; the say box for everything else.
 const COMBAT = { target: null, move: null, standard: null, swift: null, frees: [],
+                 order: [],                  // the staged steps' keys, as Commit posts them
                  aim: null, picked: null };  // aim: a flask waiting for its square
 
 function actionKind(text) {
@@ -51,7 +52,7 @@ function renderCombat(s) {
   const on = s.scene && s.scene.in_encounter && !s.scene.pc_down;
   bar.hidden = !on;
   if (!on) { COMBAT.target = COMBAT.move = COMBAT.standard = COMBAT.swift = null;
-             COMBAT.frees = []; COMBAT.aim = COMBAT.picked = null; return; }
+             COMBAT.frees = []; COMBAT.order = []; COMBAT.aim = COMBAT.picked = null; return; }
 
   $("#cb-round").textContent = `Round ${s.scene.round || 1}`;
   const up = s.scene.turn_ref === (s.pc && s.pc.ref || "pc");
@@ -88,27 +89,144 @@ function renderCombat(s) {
   renderPlan();
 }
 
+// --- the plan, in the order the player chose ---------------------------------------------
+// The owner, 2026-11-06: "when setting up a turn in combat I can only move before I attack
+// I should be able to drag or move the order of things before I commit the turn so i can
+// attack and then move after." Commit turn posted move, swift, frees, standard whatever
+// the player meant. The Core Rulebook ("Action Types") lets a move action come before or
+// after the standard action, so the plan is now an ORDER: `COMBAT.order` holds the staged
+// steps' keys ("move", "swift", "free:<i>", "standard"), Commit turn posts in it, and the
+// chips show it numbered. A step staged without being placed joins where it always went
+// (STEP_RANK, below), so a player who never reorders posts exactly what was posted before.
+//
+// Reordered three ways: a drag (pointer events, so a finger on the phone at the LAN table
+// drags as a mouse does; HTML5 drag-and-drop never fires on touch), and the earlier/later
+// arrows on each chip, which are buttons — keyboard, screen reader, and any hand the drag
+// does not suit.
+const STEP_RANK = { move: 0, swift: 1, free: 2, standard: 3 };
+
+function stepRank(key) {
+  return key.startsWith("free:") ? STEP_RANK.free + Number(key.slice(5)) / 1000
+                                 : STEP_RANK[key];
+}
+
+function stagedSteps() {
+  const keys = [];
+  if (COMBAT.move) keys.push("move");
+  if (COMBAT.swift) keys.push("swift");
+  COMBAT.frees.forEach((_, i) => keys.push(`free:${i}`));
+  if (COMBAT.standard) keys.push("standard");
+  return keys;
+}
+
+// The order, reconciled with what is staged: a key whose step is gone drops out, and a
+// step nobody placed goes in front of the first step that ranks after it by default —
+// a swift staged into "strike, then move" lands before the strike, where a smite belongs.
+// Called on every read, so a step set straight on COMBAT (a spell picked, a square
+// clicked) is in the order before anything posts it.
+function planOrder() {
+  const staged = stagedSteps();
+  const order = [];
+  for (const k of COMBAT.order || []) if (staged.includes(k) && !order.includes(k)) order.push(k);
+  for (const k of staged) {
+    if (order.includes(k)) continue;
+    const at = order.findIndex(o => stepRank(o) > stepRank(k));
+    order.splice(at < 0 ? order.length : at, 0, k);
+  }
+  COMBAT.order = order;
+  return order;
+}
+
+// What one step is: its chip, its words for the transcript, and the ops it posts.
+function stepOf(key) {
+  if (key === "move") {
+    const [x, y] = COMBAT.move;
+    return { label: `Move to ${x},${y}`, said: `move to (${x},${y})`,
+             actions: [{ op: "move", params: { zone: "near", square: COMBAT.move } }] };
+  }
+  if (key === "standard") {
+    return { label: COMBAT.standard.label, said: COMBAT.standard.label.toLowerCase(),
+             actions: COMBAT.standard.actions };
+  }
+  const name = key === "swift" ? COMBAT.swift : COMBAT.frees[Number(key.slice(5))];
+  const kind = key === "swift" ? "Swift" : "Free";
+  return { label: `${kind}: ${name}`, said: `${kind.toLowerCase()}: ${name}`, name,
+           actions: [{ op: "use_ability", params: { ability: name },
+                       target: abilityTarget(name) }] };
+}
+
+// Move a step to position `to` of the order.
+function placeStep(key, to) {
+  const order = planOrder().filter(k => k !== key);
+  if (order.length === COMBAT.order.length) return;  // not staged
+  order.splice(Math.max(0, Math.min(order.length, to)), 0, key);
+  COMBAT.order = order;
+}
+
+function nudgeStep(key, by) {
+  const at = planOrder().indexOf(key);
+  if (at >= 0) placeStep(key, at + by);
+}
+
+// A step taken off the plan, and out of the order with it. The frees are a list, so the
+// keys of the ones after a removed free close up behind it.
+function unplanStep(key) {
+  if (key === "move") COMBAT.move = null;
+  // The cast's "On yourself instead" line goes with the cast it was about.
+  else if (key === "standard") { COMBAT.standard = null; combatMenu(""); }
+  else if (key === "swift") COMBAT.swift = null;
+  else if (key.startsWith("free:")) {
+    const gone = Number(key.slice(5));
+    COMBAT.frees.splice(gone, 1);
+    COMBAT.order = (COMBAT.order || []).filter(k => k !== key).map(k => {
+      const n = k.startsWith("free:") ? Number(k.slice(5)) : -1;
+      return n > gone ? `free:${n - 1}` : k;
+    });
+    return;
+  }
+  COMBAT.order = (COMBAT.order || []).filter(k => k !== key);
+}
+
 function renderPlan() {
-  const bits = [];
-  if (COMBAT.move) bits.push(`<span class="cb-step" data-unplan="move"
-    title="Remove">Move to ${COMBAT.move.join(",")}</span>`);
-  if (COMBAT.standard) bits.push(`<span class="cb-step" data-unplan="standard"
-    title="Remove">${esc(COMBAT.standard.label)}</span>`);
-  if (COMBAT.swift) bits.push(`<span class="cb-step" data-unplan="swift"
-    title="Remove">Swift: ${esc(COMBAT.swift)}</span>`);
-  COMBAT.frees.forEach((f, i) => bits.push(`<span class="cb-step" data-unplan="free:${i}"
-    title="Remove">Free: ${esc(f)}</span>`));
+  const order = planOrder();
+  const n = order.length;
+  const bits = order.map((key, i) => {
+    const s = stepOf(key);
+    const label = esc(s.label);
+    const arrows = n > 1 ? `<span class="cb-ord">
+      <button type="button" data-steporder="${key}:-1" aria-label="Earlier: ${label}"
+        title="Earlier"${i === 0 ? " disabled" : ""}>&lsaquo;</button>
+      <button type="button" data-steporder="${key}:1" aria-label="Later: ${label}"
+        title="Later"${i === n - 1 ? " disabled" : ""}>&rsaquo;</button></span>` : "";
+    return `<span class="cb-step" data-step="${key}" role="group"
+      aria-label="Step ${i + 1} of ${n}: ${label}"><b class="cb-num" aria-hidden="true">${
+      i + 1}</b><button type="button" class="cb-what" data-unplan="${key}"
+      title="Remove" aria-label="Remove ${label}">${label}</button>${arrows}</span>`;
+  });
   const far = strikeOutOfReach();
   if (far) bits.push(`<span class="cb-warn" role="alert">${esc(far)}</span>`);
+  // Quiet: said, never blocking. The player may mean it.
+  for (const w of [declaredAfterTheBlow(order), wholeRoundAndMove(order)]) {
+    if (w) bits.push(`<span class="cb-warn">${esc(w)}</span>`);
+  }
   $("#cb-plan").innerHTML = bits.join("");
 }
 
+// Where the player's character stands now, [x, y], or null off the map.
+function pcSquare() {
+  const me = ((STATE && STATE.scene && STATE.scene.actors) || []).find(a => a.is_pc);
+  return me && me.at ? [me.at[0], me.at[1]] : null;
+}
+
 // A move and a melee strike staged together, where the strike will not reach from the
-// square the move ends on. The squares are the engine's (`_reach_from`, play/views.py,
-// measured by `position.out_of_reach_from`); the page only looks the square up. Measured
-// on the owner's report of 2026-11-01: "move to (5,4); strike giant rot grub" walked and
-// then lost the blow, the grub 25 ft from (5,4), with nothing said before the commit.
-// The server refuses the same pair (`_strike_out_of_reach`); this says it while planning.
+// square the player is on WHEN it is struck: the move's end square when the move comes
+// first, the square they stand on now when the strike does (the order is theirs since
+// 2026-11-06). The squares are the engine's (`_reach_from`, play/views.py, measured by
+// `position.out_of_reach_from`, and including the square stood on); the page only looks
+// the square up. Measured on the owner's report of 2026-11-01: "move to (5,4); strike
+// giant rot grub" walked and then lost the blow, the grub 25 ft from (5,4), with nothing
+// said before the commit. The server refuses the same pair in either order
+// (`_strike_out_of_reach`); this says it while planning.
 function strikeOutOfReach() {
   if (!COMBAT.move || !COMBAT.standard) return "";
   const blow = (COMBAT.standard.actions || []).find(a => a.op === "attack" && a.target);
@@ -116,12 +234,142 @@ function strikeOutOfReach() {
   const reach = ((STATE && STATE.attacks) || {}).reach || {};
   const squares = reach[blow.target];
   if (!squares) return "";
-  const [x, y] = COMBAT.move;
+  const order = planOrder();
+  const moveFirst = order.indexOf("move") < order.indexOf("standard");
+  const from = moveFirst ? COMBAT.move : pcSquare();
+  if (!from) return "";
+  const [x, y] = from;
   if (squares.some(s => s[0] === x && s[1] === y)) return "";
   const f = (STATE.scene.actors || []).find(a => a.ref === blow.target);
-  return `From ${x},${y} the strike will not reach ${f ? f.name : "them"}: pick a square ` +
-    `beside them, or strike without moving.`;
+  const who = f ? f.name : "them";
+  return moveFirst
+    ? `From ${x},${y} the strike will not reach ${who}: pick a square beside them, or ` +
+      `strike without moving.`
+    : `The strike comes before the move, and from where you stand (${x},${y}) it will ` +
+      `not reach ${who}: put the move first, or strike from beside them.`;
 }
+
+// A swift or free action ordered after the blow it may have been meant for. A rage, a
+// smite or a stunning fist is declared before the blow it changes (measured live
+// 2026-10-05: a rage sent after the strike rolled the swing without it), and that is why
+// the default order puts them first. Said, not blocked: a ki dodge after the swing is a
+// fine turn. A stance already held is not warned about — using it after the blow ends it.
+function declaredAfterTheBlow(order) {
+  const at = order.indexOf("standard");
+  if (at < 0 || !(COMBAT.standard.actions || []).some(a => a.op === "attack")) return "";
+  const late = order.slice(at + 1).filter(k => k === "swift" || k.startsWith("free:"))
+    .map(k => stepOf(k).name).filter(name => {
+      const a = abilityEntry(name);
+      return !(a && a.toggle && a.active);
+    });
+  if (!late.length) return "";
+  const names = late.length > 1
+    ? `${late.slice(0, -1).join(", ")} and ${late[late.length - 1]}` : late[0];
+  return `${names} ${late.length > 1 ? "come" : "comes"} after the attack, so ${
+    late.length > 1 ? "they" : "it"} will not change it. Put ${
+    late.length > 1 ? "them" : "it"} first if ${late.length > 1 ? "they are" : "it is"} ` +
+    `for this attack.`;
+}
+
+// What takes the whole round, read off the ops a standard step posts the way the server
+// reads them (`_move_after_full_round`): a coup de grâce, putting out the flames, or a
+// full attack (two blows or more, or a swing at a later iterative).
+function wholeRound(step) {
+  const acts = (step && step.actions) || [];
+  if (acts.some(a => a.op === "attack" && a.params && a.params.coup_de_grace)) {
+    return "A coup de grâce";
+  }
+  if (acts.some(a => a.op === "extinguish")) return "Putting out the flames";
+  const blows = acts.filter(a => a.op === "attack");
+  if (blows.length >= 2 || blows.some(a => Number((a.params || {}).iteration) >= 1)) {
+    return "A full attack";
+  }
+  return "";
+}
+
+// A full-round action and a move longer than a 5-foot step, planned together. "The only
+// movement you can take during a full attack is a 5-foot step" (Core Rulebook, Full
+// Attack). After the full-round action the server refuses the walk; a coup de grâce after
+// a move is refused by the engine (`_coup_round_spent`). A move before a full attack is
+// left as the engine has always run it, so nothing is said of that order.
+function wholeRoundAndMove(order) {
+  const what = wholeRound(COMBAT.standard);
+  if (!what || !COMBAT.move) return "";
+  const here = pcSquare();
+  if (here && Math.max(Math.abs(here[0] - COMBAT.move[0]),
+                       Math.abs(here[1] - COMBAT.move[1])) <= 1) return "";
+  if (order.indexOf("move") > order.indexOf("standard")) {
+    return `${what} takes the whole round, and after it only a 5-foot step is left: ` +
+      `the move will be refused. Step one square instead.`;
+  }
+  return what === "A coup de grâce"
+    ? `A coup de grâce takes the whole round: after a move it will be refused.` : "";
+}
+
+// --- dragging a step -------------------------------------------------------------------
+// Pointer events rather than HTML5 drag-and-drop, so one path serves a mouse and a finger.
+// The drag starts after the pointer has travelled a few pixels (a press that does not
+// move is still a click: the chip's label removes the step, its arrows nudge it), and
+// `.cb-step` carries `touch-action: none` so a finger on a chip drags it instead of
+// scrolling the page. Where it lands is worked out from the other chips' boxes in
+// reading order, which also holds when the row wraps onto a second line on a phone.
+let STEP_DRAG = null;
+let STEP_DRAG_ENDED = 0;
+
+function stepDropIndex(x, y) {
+  const others = [...$("#cb-plan").querySelectorAll(".cb-step[data-step]")]
+    .filter(c => c.dataset.step !== STEP_DRAG.key);
+  let at = 0;
+  for (const c of others) {
+    const r = c.getBoundingClientRect();
+    if (y > r.bottom || (y >= r.top && x > r.left + r.width / 2)) at += 1;
+  }
+  return { at, others };
+}
+
+function markStepDrop(at, others) {
+  others.forEach(c => c.classList.remove("drop-before", "drop-after"));
+  if (at < others.length) others[at].classList.add("drop-before");
+  else if (others.length) others[others.length - 1].classList.add("drop-after");
+}
+
+document.addEventListener("pointerdown", e => {
+  const chip = e.target.closest && e.target.closest("#cb-plan .cb-step[data-step]");
+  if (!chip || e.button !== 0 || e.target.closest("[data-steporder]")) return;
+  if (planOrder().length < 2) return;
+  STEP_DRAG = { key: chip.dataset.step, el: chip, id: e.pointerId,
+                x: e.clientX, y: e.clientY, on: false };
+});
+
+document.addEventListener("pointermove", e => {
+  if (!STEP_DRAG || e.pointerId !== STEP_DRAG.id) return;
+  const dx = e.clientX - STEP_DRAG.x, dy = e.clientY - STEP_DRAG.y;
+  if (!STEP_DRAG.on) {
+    if (Math.hypot(dx, dy) < 6) return;
+    STEP_DRAG.on = true;
+    try { STEP_DRAG.el.setPointerCapture(e.pointerId); } catch { /* already released */ }
+    STEP_DRAG.el.classList.add("is-dragging");
+  }
+  e.preventDefault();
+  STEP_DRAG.el.style.transform = `translate(${dx}px, ${dy}px)`;
+  const { at, others } = stepDropIndex(e.clientX, e.clientY);
+  markStepDrop(at, others);
+});
+
+function endStepDrag(e, drop) {
+  if (!STEP_DRAG || e.pointerId !== STEP_DRAG.id) return;
+  const was = STEP_DRAG;
+  if (was.on) {
+    if (drop) placeStep(was.key, stepDropIndex(e.clientX, e.clientY).at);
+    STEP_DRAG_ENDED = Date.now();
+    STEP_DRAG = null;
+    renderPlan();
+    return;
+  }
+  STEP_DRAG = null;
+}
+document.addEventListener("pointerup", e => endStepDrag(e, true));
+document.addEventListener("pointercancel", e => endStepDrag(e, false));
 
 function targetName() {
   const f = (STATE.scene.actors || []).find(a => a.ref === COMBAT.target);
@@ -285,27 +533,19 @@ function attackSounds(before, after, wait) {
 async function commitTurn(endOnly) {
   const actions = [];
   const said = [];
-  if (COMBAT.move) {
-    actions.push({ op: "move", params: { zone: "near", square: COMBAT.move } });
-    said.push(`move to (${COMBAT.move.join(",")})`);
-  }
-  // The swift and free actions BEFORE the standard one. Measured live 2026-10-05: "Free:
-  // Rage" and "Strike the thug" committed together sent the strike first, so the swing
-  // was rolled without the rage it was declared with — and a smite (swift) landed after
-  // the blow it was meant for. A rage, a smite or a stunning fist is declared before the
-  // blow it changes; the panel cannot ask which, so it takes the order that table play does.
-  if (COMBAT.swift) {
-    actions.push({ op: "use_ability",
-                   params: { ability: COMBAT.swift }, target: abilityTarget(COMBAT.swift) });
-    said.push(`swift: ${COMBAT.swift}`);
-  }
-  for (const f of COMBAT.frees) {
-    actions.push({ op: "use_ability", params: { ability: f }, target: abilityTarget(f) });
-    said.push(`free: ${f}`);
-  }
-  if (COMBAT.standard) {
-    actions.push(...COMBAT.standard.actions);
-    said.push(COMBAT.standard.label.toLowerCase());
+  // In the order the player set (`planOrder`, the owner's 2026-11-06 request: "so i can
+  // attack and then move after"); the server runs the ops as posted. Left alone, the
+  // order is the one this always posted — move, then the swift and free actions, then the
+  // standard one. Measured live 2026-10-05: "Free: Rage" and "Strike the thug" committed
+  // together sent the strike first, so the swing was rolled without the rage it was
+  // declared with — and a smite (swift) landed after the blow it was meant for. A rage, a
+  // smite or a stunning fist is declared before the blow it changes, so that is where
+  // they go by default, and the plan says so when one is dragged after the blow
+  // (`declaredAfterTheBlow`).
+  for (const key of planOrder()) {
+    const step = stepOf(key);
+    actions.push(...step.actions);
+    said.push(step.said);
   }
   // Commit turn with nothing planned is not a pass. It posted an empty list with
   // `end_turn`, the same request End turn makes, so the turn went to the other side with
@@ -336,7 +576,7 @@ async function commitTurn(endOnly) {
       seen_round: (STATE && STATE.scene && STATE.scene.round) || null,
     });
     COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
-    COMBAT.aim = COMBAT.picked = null;
+    COMBAT.order = []; COMBAT.aim = COMBAT.picked = null;
     combatMenu("");
     render(d);
     attackSounds(logBefore, d && d.log, null);
@@ -374,16 +614,25 @@ document.addEventListener("click", async e => {
     COMBAT.standard = castStep(c, c.self, castDef.dataset.castdef === "on");
     renderPlan(); castMenu(COMBAT.standard.cast); return;
   }
-  const un = t.closest("[data-unplan]");
-  if (un) {
-    const what = un.dataset.unplan;
-    if (what === "move") COMBAT.move = null;
-    // The cast's "On yourself instead" line goes with the cast it was about.
-    else if (what === "standard") { COMBAT.standard = null; combatMenu(""); }
-    else if (what === "swift") COMBAT.swift = null;
-    else if (what.startsWith("free:")) COMBAT.frees.splice(Number(what.slice(5)), 1);
-    renderPlan(); return;
+  // The click a drag of a plan chip ends on is the drop, not a press of what lay under it.
+  if (Date.now() - STEP_DRAG_ENDED < 400 && t.closest("#cb-plan")) return;
+  const nudge = t.closest("[data-steporder]");
+  if (nudge) {
+    const spec = nudge.dataset.steporder;
+    const key = spec.slice(0, spec.lastIndexOf(":"));
+    const by = Number(spec.slice(spec.lastIndexOf(":") + 1));
+    nudgeStep(key, by);
+    renderPlan();
+    // The redraw replaced the button that had focus: keep a keyboard player on the step
+    // they are moving, on the same arrow while it can still go that way.
+    const plan = $("#cb-plan");
+    const again = plan.querySelector(`[data-steporder="${key}:${by}"]:not(:disabled)`)
+      || plan.querySelector(`[data-steporder="${key}:${-by}"]`);
+    if (again) again.focus();
+    return;
   }
+  const un = t.closest("[data-unplan]");
+  if (un) { unplanStep(un.dataset.unplan); renderPlan(); return; }
   const lvl = t.closest("[data-maplevel]");
   if (lvl) { MAP_LEVEL = Number(lvl.dataset.maplevel); renderMap(STATE); return; }
   const vw = t.closest("[data-mapview]");
@@ -589,7 +838,7 @@ document.addEventListener("click", async e => {
   if (t.closest("#cb-clear")) {
     const aiming = !!COMBAT.aim;
     COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
-    COMBAT.aim = COMBAT.picked = null;
+    COMBAT.order = []; COMBAT.aim = COMBAT.picked = null;
     combatMenu(""); renderPlan();
     if (aiming) renderMap(STATE);
     return;

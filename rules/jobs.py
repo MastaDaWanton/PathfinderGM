@@ -153,6 +153,88 @@ def mark(scene, card_id: str, state: str) -> None:
         cards_mod._store(scene, card)
 
 
+def close(engine, card_id: str, state: str, *, paid_cp: int = 0,
+          days: int | None = None) -> None:
+    """A job the player took comes to its end — `paid` or `lapsed` — and its card says so:
+    the state, what was paid, the days worked, the minute it was settled, and what came of
+    it as the card's newest fact (`outcome_line`).
+
+    The owner's save of 2026-11-05: the week's guard work for Vyrnys was worked and paid
+    (the purse held the 2 gold 1 silver), and the card's facts still said only the offer —
+    "… all of it paid at the end of the week." Every reader of the card (the brief, the
+    plan, the clerk's reply) read a job still to be worked, and the clerk then made up "the
+    record for the northern gate is incomplete" when the player came to collect."""
+    from . import cards as cards_mod
+
+    card = cards_mod.find(engine.scene, card_id)
+    if card is None or card.kind != "job":
+        return
+    card.job["state"] = state
+    card.job["paid_cp"] = int(paid_cp or 0)
+    if days is not None:
+        card.job["days_worked"] = int(days)
+    card.job["settled"] = int(getattr(engine.scene, "clock_minutes", 0) or 0)
+    fact = outcome_line(engine, card)
+    if fact and fact not in card.facts:
+        card.facts = (list(card.facts) + [fact])[-cards_mod.FACT_CAP:]
+    cards_mod._store(engine.scene, card)
+
+
+def settled(card) -> bool:
+    """Whether a job the player took has come to its end, paid or lapsed (`close`)."""
+    return (card.job or {}).get("state") in ("paid", "lapsed")
+
+
+def days_said(n: int) -> str:
+    """"a day", "seven days": a number word, never a digit. A tell's "for 7 days" is taken
+    off whole by the page line (`narration.page_line`, whose damage-amount rule lifts "for"
+    and a number), so the week a job took never reached the planned narrator's tells check
+    — "Kesst Vayr works as a guard in Pangrella (…)", on the owner's save of 2026-11-05."""
+    from .geography import _count_words
+
+    if int(n or 0) <= 0:
+        return "less than a day"        # a body that gave out before the first day's end
+    return _count_words(int(n), "day")
+
+
+def outcome_line(engine, card) -> str:
+    """What came of a job the player took, as one fact for its card, or "" while it is not
+    settled. Said in the past, with the sum paid in this world's coin and the days in words
+    (`days_said`): the card is read by the brief, the plan and the employer's reply, and a
+    week said as "7 days" in a line that also offers the work reads as one still to come."""
+    j = card.job or {}
+    state = j.get("state")
+    if state not in ("paid", "lapsed"):
+        return ""
+    scene = engine.scene
+    pc = scene.pc()
+    who = getattr(pc, "name", "") or "The player"
+    paid = int(j.get("paid_cp", 0) or 0)
+    coins = coin_words(engine, paid)
+    if j.get("work") == "escort":
+        to = (j.get("route") or {}).get("to_name", "the far town")
+        master = _name(scene, (j.get("counterpart") or {}).get("master", ""),
+                       "the caravan master")
+        if state == "lapsed":
+            return (f"{who} did not go with the wagons to {to}: the job was lost, and "
+                    f"nothing was paid.")
+        if not paid:
+            return (f"{who} saw the wagons safe to {to}, and there was nobody to pay what "
+                    f"was agreed.")
+        short = paid < total_cp(card)
+        return (f"{who} saw the wagons safe to {to}, and {master} paid {who} {coins} at "
+                f"the end of the road" + (", short of what was agreed." if short else "."))
+    employer = _name(scene, j.get("employer", ""), "the employer")
+    if state == "paid":
+        return (f"{who} worked the whole week for {employer} and was paid {coins} at the "
+                f"end of it. The job is done and settled; nothing more is owed.")
+    worked = int(j.get("days_worked", 0) or 0)
+    if not worked:
+        return f"{who} gave out on the first day of the week's work for {employer}, unpaid."
+    return (f"{who} worked {days_said(worked)} of the week for {employer} before giving "
+            f"out, was paid {coins} for them, and the rest of the week was let go.")
+
+
 def _coins(engine):
     from . import goods
 
@@ -471,8 +553,15 @@ def slot_facts(engine, ref: str) -> str:
 
     rows = [facts_line(engine, c) for c in held_by(engine.scene, ref)
             if cards_mod.standing(c) != cards_mod.UNHEARD]
+    # And the work they gave the player that is over, as it ended (`outcome_line`): who
+    # hired the player knows whether the week was worked and paid. On the owner's save of
+    # 2026-11-05 a finished job left the employer holding nothing, so "I am here to collect
+    # my money" was answered with "the record for the northern gate is incomplete".
+    rows += [outcome_line(engine, c) for c in jobs(engine.scene)
+             if c.giver == ref and not c.live and settled(c)
+             and cards_mod.standing(c) == cards_mod.OWN]
     # One job a line: the read-back numbers them (`beat_verify.invented_job_sentence`).
-    return "\n".join(rows)
+    return "\n".join(r for r in rows if r)
 
 
 # --- offering, choosing, taking -----------------------------------------------------------
@@ -865,6 +954,9 @@ def settle(engine) -> list:
                             f"hear that {pc.name} did not come.")
                 # Opens a sentence: "the guild clerk cools" was told lower-case, live.
                 tell += f" {_cap(said)}" if said else ""
+                # And the card says so: the same `close` as the week's work, so a lapsed
+                # escort's card does not read as the offer it was.
+                close(engine, card.id, "lapsed")
                 out.append(Outcome(intent_id="", op="job", tell=tell, because="the job",
                                    effects=[fx]))
             else:
@@ -888,6 +980,7 @@ def settle(engine) -> list:
             else:
                 paid = 0
             cards_mod.objective_done(scene, card.id, 2, turn=turn)
+            close(engine, card.id, "paid", paid_cp=paid)
             p = pay_of(card)
             tell = (f"The wagons are in at {route.get('to_name')}. "
                     + (f"{_cap(master.name)} pays {pc.name} {coin_words(engine, paid)} for the "

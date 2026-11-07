@@ -757,6 +757,12 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
 const said = s => esc(s)
   .replace(/&quot;([^]*?)&quot;/g, '<q class="said">&quot;$1&quot;</q>')
   .replace(/\*([^*\n]+)\*/g, '<em class="did">$1</em>');
+// The GM's own words at the table (play/table_talk.py): what they DO, in square brackets,
+// is a stage direction, drawn as one, brackets and all — the owner wrote them that way
+// ("[I knock my knuckles against the table]") and the brackets are what say "the GM, not
+// the world".
+const tableSaid = s => said(s)
+  .replace(/\[([^\]\n]{1,200})\]/g, '<span class="gesture">[$1]</span>');
 const sign = n => (n >= 0 ? "+" : "") + n;
 const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
 

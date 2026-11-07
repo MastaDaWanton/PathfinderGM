@@ -5282,7 +5282,12 @@ class Engine:
                 went = next((e for e in (outcome.effects or [])
                              if e.get("kind") == "call_on" and e.get("go")), None)
                 if went is not None and went["go"] != self.scene.at:
-                    queue.insert(0, {"op": "travel", "params": {"place": went["go"]},
+                    # Gone home together (`_home_together`): they walk in beside the
+                    # party, as anybody named in a travel's `with` does.
+                    queue.insert(0, {"op": "travel",
+                                     "params": {"place": went["go"],
+                                                **({"with": list(went["with"])}
+                                                   if went.get("with") else {})},
                                      "because": "calling on them"})
             # A trail followed (`_op_track` with `follow`): the walk to where its maker is
             # now, next in the queue, through the one door a walk goes by.
@@ -6603,6 +6608,9 @@ class Engine:
         if isinstance(callee, str):
             return self._refuse(intent, callee)
         body = callee["body"]
+        if intent.params.get("together") and body is not None \
+                and body.ref in self.scene.actors:
+            return self._home_together(intent, callee, body)
         if intent.params.get("visit", True) and body is not None and body.ref in self.scene.actors:
             return self._refuse(intent, residency.sentence(
                 f"{body.name} is here, with you; there is no need to go to their door."))
@@ -6632,6 +6640,64 @@ class Engine:
             self._let_in.add(house.id)
         return Outcome(intent_id=intent.id, op="call_on", effects=effects,
                        tell=" ".join(b for b in bits if b), because=intent.because)
+
+    def _home_together(self, intent: Intent, callee, body) -> Outcome:
+        """The party goes home WITH somebody standing here: they lead, and the door is
+        theirs to open.
+
+        Measured on the owner's save of 2026-11-05 (Pangrella, the market): Ariniel Thorne,
+        helpful, stood beside the player, and four turns of "I follow her to her private
+        quarters" moved nobody. The plain call refused her ("is here, with you; there is no
+        need to go to their door"), the plan's travel had no such place to go to, and the
+        page said "You remain in the market". Going home with a person is the knock's own
+        two gates with the person present to answer them: their house is made the first
+        time it is needed (`_home_of`, residency's door), and whether they take you is the
+        attitude track's `COMES_ALONG` step — the step `_op_company` asks, because walking
+        somewhere with you is the first of 1e's friendly "offer limited help" — or a
+        standing welcome (`bond.welcome.<key>`, let in as a friend before). Below it they
+        refuse, with the fix named as `_op_company` names it: talk them round, Diplomacy.
+        They walk in with the party through the travel's own `with` (`run` queues it)."""
+        from . import attitude as attitude_mod
+        from . import population
+        from .activeeffect import ActiveEffect
+
+        pc = self.scene.pc()
+        if body.is_down:
+            return self._refuse(intent, f"{body.name} is not going anywhere: they are down.")
+        if not self._lives_here(callee):
+            line = (population.seen_line(callee["rec"], self.scene, self.world)
+                    if callee["rec"] else f"{body.name} does not live in this town.")
+            return self._refuse(intent, line + " They keep no house in this town.")
+        mood = attitude_mod.of(body)
+        step = attitude_mod.step_of(mood)
+        welcome = (pc is not None and pc.has_state(f"bond.welcome.{callee['key']}")
+                   and step > attitude_mod.step_of(attitude_mod.HOSTILE))
+        if step < attitude_mod.step_of(attitude_mod.COMES_ALONG) and not welcome:
+            return self._refuse(
+                intent, f"{body.name} is {mood} towards you and will not take you to their "
+                        f"home. Talk them round first — that is a Diplomacy check against "
+                        f"them.")
+        house = self._home_of(callee)
+        if house is None:
+            return self._refuse(intent, "There is no street here with room for a house.")
+        # Shown the way is knowing it: a later call finds the door without asking around.
+        tag = f"knows.home.{callee['key']}"
+        if pc is not None and not pc.has_state(tag):
+            pc.apply_effect(ActiveEffect(
+                name=f"knows where {callee['name']} lives", kind="knowledge",
+                key=f"knows-home:{callee['key']}", source=f"home:{callee['key']}",
+                origin="shown the way", duration="until-dismissed", tags=(tag,)))
+        self._let_in.add(house.id)
+        street = (f", off {self._place_name(house.parent)}" if house.parent else "")
+        if self.scene.at == house.id:
+            tell = f"You are at {house.name} with {body.name} already."
+        else:
+            tell = f"{body.name} leads you to {house.name}{street}, and lets you in."
+        return Outcome(intent_id=intent.id, op="call_on",
+                       effects=[{"kind": "call_on", "who": callee["key"], "house": house.id,
+                                 "street": house.parent, "let_in": True, "go": house.id,
+                                 "with": [body.ref], "together": True}],
+                       tell=tell, because=intent.because)
 
     def _at_their_door(self, intent, place: str):
         """None when the party may walk in; a refusal carrying the knock when not.
@@ -11792,9 +11858,14 @@ class Engine:
             per_day = int(pay["per_day_cp"])
             days = int(pay.get("days") or days)
             employer = self.scene.people.get(job_card.giver)
+            # In words: this sits outside any bracket in the tell now (below), and "1.5 times"
+            # is a number for the page to copy. `haggled_times` gives only these four.
+            times = float(pay.get("times", 1) or 1)
+            more = {1.5: "half as much again as", 2.0: "twice", 2.5: "two and a half times",
+                    3.0: "three times"}.get(times, "more than")
             how = (f"the wage agreed with {employer.name if employer else 'the guild'}: "
-                   + (f"{float(pay['times']):g} times a hireling's day wage, asked for"
-                      if float(pay.get("times", 1) or 1) > 1 else "a hireling's day wage"))
+                   + (f"{more} a hireling's day wage, asked for" if times > 1
+                      else "a hireling's day wage"))
             verdict = "success"
         elif offer["proficiency"] == "untrained":
             per_day = int(offer["pay_cp"]["untrained"])
@@ -11825,16 +11896,48 @@ class Engine:
             pc.purse = goods.credit(pc.purse, paid)
         coins = self._coins_here()
         as_ = f" as a {trade}" if trade else ""
-        tell = (f"{pc.name} works{as_} in {town} for {days_done} "
-                f"day{'s' if days_done != 1 else ''} ({how}). ")
-        if verdict == "critical failure":
-            tell += "It goes badly enough that the work ends after the first day, unpaid."
+        # The days in words and the pay outside any bracket: the page line every narrator's
+        # tells pass through (`narration.page_line`) takes off "for 7 days" (its damage-amount
+        # rule: "for" and a number) and every bracket with a digit in it. On the owner's save
+        # of 2026-11-05 the guard week's tell reached the planned narrator as "Kesst Vayr works
+        # as a guard in Pangrella (…). The pay is … in all." — no week, nobody paid — and the
+        # page said "securing your role as a guard for the next seven days".
+        in_hand = goods.purse_line(pc.purse, coins)
+        each = goods.purse_line(goods.coins_for(per_day), coins)
+        earned = goods.purse_line(goods.coins_for(paid), coins)
+        if job_card is not None:
+            # The week is worked and over before the tell is read: said so, and the payment
+            # said as a deed of the employer's, at the end of the week. The day's wage and
+            # the week's sum in the offer's own shape ("which is … for the whole week",
+            # `jobs.facts_line`): two sums side by side were read as one added to the other
+            # on 2026-10-27.
+            boss = employer.name if employer else "the guild"
+            if days_done >= days:
+                tell = (f"{pc.name} works the whole week{as_} in {town}, "
+                        f"{jobs_mod.days_said(days_done)} of it, at {how}. The week is over "
+                        f"now. At the end of it {boss} pays {pc.name} the week's wage as "
+                        f"agreed: {each} a day, which is {earned} for the whole week. "
+                        f"{pc.name} now has {in_hand} in hand.")
+            elif days_done:
+                tell = (f"{pc.name} works {jobs_mod.days_said(days_done)} of the week{as_} in "
+                        f"{town}, at {how}, and then the body gives out and the rest of the "
+                        f"week is let go. {_sentence(boss)} pays {pc.name} {earned} for the "
+                        f"days worked. {pc.name} now has {in_hand} in hand.")
+            else:
+                tell = (f"{pc.name} starts the week's work{as_} in {town} and the body gives "
+                        f"out before the first day is done: nothing is paid, and the week "
+                        f"is let go.")
         else:
-            tell += (f"The pay is {goods.purse_line(goods.coins_for(per_day), coins)} a day,"
-                     f" {goods.purse_line(goods.coins_for(paid), coins)} in all "
-                     f"({goods.purse_line(pc.purse, coins)} in hand).")
-        if days_done < days and verdict != "critical failure":
-            tell += f" The body gave out before the {days} days were done."
+            tell = (f"{pc.name} works{as_} in {town} for {jobs_mod.days_said(days_done)} "
+                    f"({how}). ")
+            if verdict == "critical failure":
+                tell += "It goes badly enough that the work ends after the first day, unpaid."
+            else:
+                tell += (f"The pay is {each} a day, {earned} in all, and {pc.name} has "
+                         f"{in_hand} in hand.")
+            if days_done < days and verdict != "critical failure":
+                tell += (f" The body gave out before the {jobs_mod.days_said(days)} were "
+                         f"done.")
         if body:
             tell += f" The days cost them: {body}."
         if parted:
@@ -11850,14 +11953,17 @@ class Engine:
             # The week worked to its end is the job done and paid; a body that gave out
             # part-way was paid its days, and the rest of the week is let go.
             turn = int(getattr(self, "turn", 0) or 0)
-            jobs_mod.mark(self.scene, job_card.id,
-                          "paid" if days_done >= days else "lapsed")
+            ended = "paid" if days_done >= days else "lapsed"
+            # `close` writes what came of it onto the card as well as the state: the card
+            # kept only the offer on the owner's save of 2026-11-05 (rules/jobs.py `close`).
+            jobs_mod.close(self, job_card.id, ended, paid_cp=paid, days=days_done)
             if days_done >= days:
                 cards_mod.objective_done(self.scene, job_card.id, 0, turn=turn)
                 cards_mod.objective_done(self.scene, job_card.id, 1, turn=turn)
             else:
                 cards_mod.resolve(self.scene, job_card.id, how="dropped", turn=turn)
-            effects.append({"kind": "job", "id": job_card.id, "state": "paid",
+            # The record says how it ended: a week let go part-way was recorded "paid".
+            effects.append({"kind": "job", "id": job_card.id, "state": ended,
                             "paid_cp": paid, "origin": origin})
         return Outcome(intent_id=intent.id, op="work", rolls=[roll] if roll else [],
                        dc=(dc_mod.ResolvedDC(value=offer["dc"], band=None).as_dict()
@@ -11984,7 +12090,10 @@ class Engine:
                                       because=intent.because), partial)
         import dataclasses
 
-        took = f"{pc.name} takes the week's work from {who}."
+        # Agreed to, never "takes … from": on the owner's save of 2026-11-05 "takes the week's
+        # work from Vyrnys" was copied into the beat and read back as a thing handed over
+        # (beat-hands-over), and the repair wrote "Vyrnys takes the week's work from you".
+        took = f"{pc.name} agrees to work the week for {who}."
         # The outcome's record of the take-up, ahead of the work's own: a new outcome, not
         # an edit of any actor's effect store.
         return dataclasses.replace(worked, tell=f"{took} {worked.tell}",

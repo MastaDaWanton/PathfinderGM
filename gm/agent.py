@@ -342,7 +342,14 @@ class GMAgent:
         from . import acts_to_ops, interpret
 
         self.reading = None
-        if interpret.ENABLED:
+        # A reading the turn budget already made of this line, cut to the deeds done now
+        # (`interpret.hand_on`): the planner reads it, and the reader is not asked twice.
+        handed = interpret.handed(player_input)
+        if handed is not None:
+            self.reading = handed
+            if "error" not in handed:
+                interpret.remember(player_input, handed)
+        elif interpret.ENABLED:
             try:
                 self.reading = interpret.interpret(player_input)
                 interpret.remember(player_input, self.reading)
@@ -596,6 +603,9 @@ class GMAgent:
         # salvages instead of retrying forever (docs/turn-pipeline-2026-10-03.md).
         repeat_told = False
         tried = 0
+        # The reader's answers about a plan's `company` (`acts_to_ops.company_asked`), kept
+        # across attempts: the same words about the same person are asked once a turn.
+        company_answers: dict = {}
 
         # A model that could not be reached is not asked again this turn. Measured
         # 2026-09-25: a `ModelUnavailable` inside this loop — a timeout, Ollama restarting
@@ -792,6 +802,15 @@ class GMAgent:
                 # phrasing per live bug (docs/structured-turn.md).
                 raw = acts_to_ops.apply(raw, self.rows, read_ok, self.engine.scene,
                                         notes=own_words)
+                # And somebody comes along only on the player's own word: a plan's
+                # `company` no deed of the reading asks for is struck, never refused onto
+                # the page ("Vyrnys remains unmoved…" on a job taken, the owner's save of
+                # 2026-11-05, row 7). One closed question per deed, only when the plan
+                # wrote one (`acts_to_ops.company_asked`).
+                raw = acts_to_ops.company_asked(
+                    raw, read_ok, self.engine.scene,
+                    ask=interpret.confirm_company if interpret.ENABLED else None,
+                    asked=company_answers, notes=own_words)
                 # The model's own coin op as a give of a denomination, and its sell
                 # pointed at the jar's id: the PLAN's shapes straightened, no words read.
                 raw = judgement.inject_payment(raw, player_input, self.engine.scene)
@@ -968,6 +987,11 @@ class GMAgent:
                 # because it reads the player's own sentence and competes with nothing.
                 raw = judgement.answer_the_absent(raw, player_input, self.engine.scene,
                                                   self.world)
+                # And a walk to a place the engine cannot find, on a plan that moves
+                # nobody, is the engine's printed answer — never a narrated nothing
+                # (`acts_to_ops.nowhere_to_go`; the owner's 2026-11-05 save, row 69:
+                # "Continue walking toward the quarters" → "You remain in the market").
+                raw = acts_to_ops.nowhere_to_go(raw, self.rows, notes=own_words)
                 # Last of all: a say in the player's character's mouth carries the
                 # player's words or none (item 6) — after every injector that can add one.
                 raw = judgement.own_words_only(

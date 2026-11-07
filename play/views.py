@@ -26,7 +26,7 @@ from rules.intents import IntentError
 from . import campaign as campaign_mod
 from . import concurrency
 from .apiutil import read_body, read_int
-from . import downed, gm_answers, player_input, roster
+from . import downed, gm_answers, player_input, roster, table_talk
 from . import history as history_mod
 
 
@@ -510,31 +510,53 @@ def _attack_slots(pc) -> dict:
 
 def _strike_out_of_reach(scene, pc, raw: list) -> str:
     """The sentence that refuses a panel turn whose melee blow cannot reach from the square
-    its move ends on, or "" — measured by `position.out_of_reach_from`, the engine's rule."""
+    its move ends on, or "" — measured by `position.out_of_reach_from`, the engine's rule.
+
+    The order is the player's since 2026-11-06 (the owner: "so i can attack and then move
+    after"), so a blow is measured from the square the player will be on WHEN it is struck:
+    the end of the last move before it, or — for a blow ordered before the move — where
+    they stand now. Out of reach there, the engine would close the distance itself (a move
+    action) and then walk the declared move as a second one: a standard action and two
+    moves. Refused the same way, with nothing done. A blow with no move anywhere in the
+    list is left to the engine, which closes the distance when one move reaches."""
     from rules import position as position_mod
 
+    here = scene.positions.get(pc.ref) if scene.has_grid else None
+    walks = [i for i, r in enumerate(raw) if r.get("op") == "move"
+             and isinstance((r.get("params") or {}).get("square"), (list, tuple))]
     square = None
-    for r in raw:
+    for i, r in enumerate(raw):
         if r.get("op") == "move":
             sq = (r.get("params") or {}).get("square")
             if isinstance(sq, (list, tuple)) and len(sq) >= 2:
                 square = sq
             continue
-        if r.get("op") != "attack" or square is None:
+        if r.get("op") != "attack":
             continue
+        before_the_move = square is None
+        if before_the_move and (here is None or not any(j > i for j in walks)):
+            continue
+        frm = here if before_the_move else square
         foe = scene.actors.get(str(r.get("target") or ""))
         if foe is None:
             continue
         p = r.get("params") or {}
         weapon = str(p.get("weapon") or pc.equipped or "unarmed")
         try:
-            miss = position_mod.out_of_reach_from(scene, pc, foe, weapon, square,
+            miss = position_mod.out_of_reach_from(scene, pc, foe, weapon, frm,
                                                   manoeuvre=str(p.get("manoeuvre") or ""))
         except Exception:  # noqa: BLE001 — what cannot be measured is left to the engine
             miss = None
         if miss is None:
             continue
-        x, y = int(square[0]), int(square[1])
+        x, y = int(frm[0]), int(frm[1])
+        if before_the_move:
+            why = (f"too close for a reach weapon, which strikes from {miss.reach} ft"
+                   if miss.too_close else f"and you reach {miss.reach} ft")
+            return (f"The strike comes before the move, so it is struck from where you "
+                    f"stand (square {x},{y}), where {foe.name} is {miss.feet} ft away, "
+                    f"{why}. Nothing was done: put the move first, or strike from where "
+                    f"the blow lands and then move.")
         if miss.too_close:
             return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away — too "
                     f"close for a reach weapon, which strikes from {miss.reach} ft. Nothing "
@@ -542,6 +564,67 @@ def _strike_out_of_reach(scene, pc, raw: list) -> str:
         return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away, and you "
                 f"reach {miss.reach} ft — the blow could not land. Nothing was done: pick a "
                 f"square beside them, or strike without moving.")
+    return ""
+
+
+def _move_after_full_round(scene, pc, raw: list) -> str:
+    """The sentence that refuses a panel turn walking further than a 5-foot step AFTER a
+    full-round action, or "".
+
+    Core Rulebook, Full Attack: "the only movement you can take during a full attack is a
+    5-foot step"; a coup de grâce (p.197) and putting out clinging fire are full-round
+    actions too. The panel posted the move first until 2026-11-06, so this list never came
+    from it; once the player orders the plan ("so i can attack and then move after"), a
+    full attack followed by a walk would have run whole — the move op does not ask what
+    the round has spent (rules/coup_de_grace.py records that as not built). Refused at the
+    door, before anything is rolled, the way `_strike_out_of_reach` refuses.
+
+    A full attack is read off the ops the panel posts for one: two or more blows, or a
+    swing at a later iterative. A Blood Bond full attack whose every swing after the first
+    is an ability reads as one blow and is not caught. The other order — a move, then a full
+    attack — is left as the engine already rules it (a coup de grâce after a move is
+    refused there, `_coup_round_spent`)."""
+    from rules import grid as grid_mod
+
+    here = scene.positions.get(pc.ref) if scene.has_grid else None
+    if here is None:
+        return ""
+    here = (int(here[0]), int(here[1]))
+    blows, whole = 0, ""
+    for r in raw:
+        op, p = r.get("op"), (r.get("params") or {})
+        if op == "attack" and not p.get("reaction"):
+            if p.get("coup_de_grace"):
+                whole = whole or "coup"
+                continue
+            blows += 1
+            try:
+                later = int(p.get("iteration") or 0) >= 1
+            except (TypeError, ValueError):
+                later = False
+            if blows >= 2 or later:
+                whole = whole or "full attack"
+        elif op == "extinguish":
+            whole = whole or "flames"
+        elif op == "move":
+            sq = p.get("square")
+            if not (isinstance(sq, (list, tuple)) and len(sq) >= 2):
+                continue
+            to = (int(sq[0]), int(sq[1]))
+            feet = grid_mod.distance(here, to)
+            if whole and feet > grid_mod.SQUARE_FT:
+                what, fix = {
+                    "full attack": ("A full attack", "make it a single Strike, or step "
+                                                     "one square"),
+                    "coup": ("A coup de grâce", "step one square, or leave the move for "
+                                               "your next turn"),
+                    "flames": ("Putting out the flames", "step one square, or leave the "
+                                                         "move for your next turn"),
+                }[whole]
+                return (f"{what} takes the whole round, and after it the only movement "
+                        f"left is a 5-foot step; square {to[0]},{to[1]} is {feet} ft away. "
+                        f"Nothing was done: {fix}.")
+            here = to
     return ""
 
 
@@ -3076,7 +3159,84 @@ def say(request):
     c.transcript.append(beat)
     if place is not None:
         return _the_way_there(c, place, text, typed, acting, claim, beat)
+    # The turn's budget (owner's ruling 2026-11-06): the player's own words, nothing
+    # attached, and outside a fight — a fight keeps its own action economy.
+    if typed and not carry_on and not acting and not c.scene.in_encounter:
+        return _within_the_budget(c, text, claim, beat)
     return _keep_the_spell(c, acting, _plan_and_run(c, text, acting, claim, attached))
+
+
+# Why the rest of the line waits, by what ended the turn (`sequence.within_budget`).
+_BUDGET_WHY = {
+    "quick": "A turn holds two quick deeds.",
+    "takes_time": "The turn ends on a deed that takes time.",
+    "addresses": "The turn ends there, so they can answer.",
+}
+
+
+def _within_the_budget(c, text: str, claim: str, beat: dict):
+    """A line of several deeds, run as far as one turn's budget goes; the rest back to
+    the pen, unchanged in shape (`_unfinished`, "Not yet done: …").
+
+    The owner's ruling, 2026-11-06: multi-step plans are fine outside a fight, but "once
+    a limit of actions has been hit the world doesnt stand still it moves as well".
+    Moving about is free, a turn holds two quick deeds, and it ends at once on a deed that
+    takes time or on words to somebody here who would answer (docs/turn-budget-and-
+    fixtures-plan.md). What each deed costs is the reader's closed answer
+    (`interpret.cost_of`, checked against the engine), never a regex; where the line is
+    cut is `sequence.within_budget`. A line of one clause, a line the reader could not
+    read, and a line whose deeds all fit run whole, exactly as before.
+
+    The reader is asked once, here, for the whole line, and its reading — cut to the
+    deeds done now — is handed on to the planner (`interpret.hand_on`), so a budgeted
+    line costs no second reader call. The deeds after the cut are planned on a later
+    turn, from the pen, as `_toward` plans the words after a move: "the meaning of the
+    noun phrase depends on where the player is by then" (DM4 §34)."""
+    from gm import interpret, sequence
+
+    parts = sequence.clauses(text)
+    if len(parts) < 2:
+        return _plan_and_run(c, text, (), claim)
+    if interpret.ENABLED:
+        try:
+            frame = interpret.interpret(text)
+        except Exception as exc:  # noqa: BLE001 — never a reason to lose the turn
+            frame = {"error": str(exc)[:200]}
+    else:
+        frame = interpret.reading_of(text)
+    read_ok = frame if isinstance(frame, dict) and "error" not in frame else None
+    cut = None
+    if read_ok is not None:
+        cut = sequence.within_budget(parts, list(read_ok.get("actions") or []),
+                                     lambda a: interpret.cost_of(a, c.scene))
+    if cut is None:
+        run_text, run_frame = text, frame
+    else:
+        now, later, why = cut
+        run_text = sequence.joined(now)
+        # This beat is the words done now; the rest get their own line when they run.
+        beat["text"] = run_text
+
+        def done_now(a) -> bool:
+            where = sequence.clauses_of(a.get("span"), parts)
+            return max(where) < len(now) if where else sequence.said_in(a.get("span"),
+                                                                       run_text)
+
+        run_frame = dict(read_ok,
+                         actions=[dict(a) for a in read_ok.get("actions") or []
+                                  if done_now(a)],
+                         claims=[w for w in read_ok.get("claims") or []
+                                 if sequence.said_in(w, run_text)])
+    interpret.hand_on(run_text, run_frame)
+    try:
+        resp = _plan_and_run(c, run_text, (), claim)
+    finally:
+        # Taken by the planner; gone either way, so it never reaches another turn.
+        interpret.handed(run_text)
+    if cut is None or getattr(resp, "status_code", 0) != 200:
+        return resp
+    return _unfinished(c, resp, later, keep_chip=False, arrived=False,
+                       why=_BUDGET_WHY.get(why, ""))
 
 
 def _gone_since_narrated(c) -> list[str]:
@@ -3357,7 +3517,8 @@ def combat_act(request):
     # this is the door's own answer, in the engine's measurement, so a stale page cannot
     # spend the move and lose the blow (the owner's report of 2026-11-01: "move to (5,4);
     # strike giant rot grub", 25 ft from (5,4), the move walked and the blow refused).
-    stop = _strike_out_of_reach(scene, pc, raw)
+    # And the order the player chose (2026-11-06): a walk after a full-round action.
+    stop = _strike_out_of_reach(scene, pc, raw) or _move_after_full_round(scene, pc, raw)
     if stop:
         return JsonResponse({"error": stop}, status=400)
 
@@ -3972,9 +4133,13 @@ def _gm_answer(c, question: str, shown: str):
         # they should be able to ask anything, so the question goes to the GM — clearly
         # labelled, because the one thing that must never blur is which answers are
         # facts and which are somebody's reading of them.
-        text = _ask_the_gm(c, engine, question)
-
-    c.transcript.append({"who": "gm", "kind": "aside", "text": text})
+        entry = {"who": "gm", "kind": "aside", "text": _ask_the_gm(c, engine, question),
+                 "voiced": True, "voice_name": table_talk.voice()["name"]}
+    else:
+        # The engine's own answer, said in the GM's voice and held to the record, with
+        # the record itself one click below it (play/table_talk.py `voiced_record`).
+        entry = table_talk.voiced_record(c, question, text)
+    c.transcript.append(entry)
     c.save()
     return JsonResponse(_state(c))
 
@@ -4114,7 +4279,12 @@ def _ask_the_gm(c, engine, question: str) -> str:
     for h in hits:
         kept += [k for k, _t in gm_search.withheld_from(h.facts or {}, allow)]
     withheld_note = ""
-    if kept and gm_search.HIDDEN not in allow:
+    # Only when the question was about the world: a named thing found (`hits`) or the place
+    # itself (`here`). Measured on the owner's game of 2026-11-05: "/gm have I been paid
+    # already?" got the town's notes as default grounding, so the town's withheld facts
+    # tacked "Some of what the town keeps, your character has not learned" onto an answer
+    # about the player's own wages.
+    if kept and gm_search.HIDDEN not in allow and (hits or here):
         said_mem["gm:withheld"] = sorted(set(kept))
         said_mem["gm:withheld_question"] = question
         if _hr.knowledge_offer():
@@ -4128,7 +4298,8 @@ def _ask_the_gm(c, engine, question: str) -> str:
     try:
         reply = client.chat(
             prompts.out_of_character_messages(brief, question, found,
-                                              notes=notes, record=record),
+                                              notes=notes, record=record,
+                                              voice=table_talk.ooc_voice_block()),
             agent.prose_model, agent.prose_host, as_json=False, think=False,
             temperature=0.4, num_predict=380, provider=agent.prose_provider,
             api_key=agent.prose_key)
@@ -4141,6 +4312,10 @@ def _ask_the_gm(c, engine, question: str) -> str:
                 f"{exc}\nIt can always answer these from its own state: "
                 + ", ".join(sorted(gm_answers.TOPICS)) + ".")
     said = _name_the_refs(" ".join(str(getattr(reply, "text", "") or "").split()), c.scene)
+    if _hr.table_talk() == "off":
+        # The table that turned the GM's table talk off asked for no model describing its
+        # own body, here too (play/table_talk.py).
+        said = table_talk.strip_gestures(said)
     if not said:
         return ("The engine has nothing filed under that, and the GM had nothing to "
                 "say either. It can always answer these from its own state: "
@@ -4151,7 +4326,10 @@ def _ask_the_gm(c, engine, question: str) -> str:
     used = _sources_used(hits, said)
     sourced = ("\n  — from the world's record: "
                + "; ".join(f"{h.name} ({h.kind})" for h in used)) if used else ""
-    return "The GM, out of character:\n  " + said + sourced + withheld_note
+    # No "The GM, out of character:" prefix since the GM has a voice (2026-11-05): the page
+    # labels the aside itself (`voiced`, 02-state.js), and the label in the text read like a
+    # form, the opposite of asking your GM.
+    return said + sourced + withheld_note
 
 
 def _cheat(c, wish: str, shown: str):
@@ -4947,6 +5125,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # live 2026-11-01: "Corvin T. is hanged for murder. Corvin T. is dead." and the page went
     # on offering "What do you do?"; only the NEXT line reached the death screen.
     _the_player_died(c)
+    # The GM's own voice under the beat (owner, 2026-11-05), when the table's house rule
+    # asks for it: fed only the PC's outcomes as the player saw them, never added to the
+    # history, and silent on any failure (play/table_talk.py).
+    table_talk.after_the_beat(c, agent, resolution)
     if plan is not None:
         c.last_intent_signature = judgement._signature(plan.intents)
     c.save()

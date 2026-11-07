@@ -539,6 +539,8 @@ def house_rules(request):
     from gm import intimate
     from rules import races as races_mod
 
+    from . import table_talk
+
     return JsonResponse({"rules": houserules.active(),
                          "tiers": houserules.POINT_BUY_TIERS,
                          "caps": houserules.ABILITY_CAPS,
@@ -546,7 +548,10 @@ def house_rules(request):
                          # Where the table writes its intimate-scene passages, shown on
                          # the content card. Named, not created: the file is made the
                          # first time a scene needs it (gm/intimate.py).
-                         "intimate_examples": str(intimate.demonstrations_path())})
+                         "intimate_examples": str(intimate.demonstrations_path()),
+                         # The GM personalities Settings offers (play/table_talk.py), by
+                         # the names and one-line sketches their file gives them.
+                         "dm_voices": table_talk.voice_cards()})
 
 
 @require_POST

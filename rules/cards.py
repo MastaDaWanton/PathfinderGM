@@ -440,6 +440,22 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
         return []
     actors = getattr(scene, "actors", {}) or {}
     touched: list[str] = []
+    # A job settled this batch (`jobs.close`, an effect `{"kind": "job", "state": "paid" |
+    # "lapsed"}`) is stamped with THIS turn, so it lingers in the brief as every resolved
+    # card does (`active`, `LINGER_TURNS`). The engine resolves it with turn 0 — it does
+    # not know the transcript's turn — so on the owner's save of 2026-11-05 the finished
+    # guard week had `resolved_turn` 0 and left the brief at once.
+    settled = {str(e.get("id")) for o in outcomes or []
+               for e in (getattr(o, "effects", None) or [])
+               if isinstance(e, dict) and e.get("kind") == "job"
+               and e.get("state") in ("paid", "lapsed")}
+    stamped = False
+    for card in cards:
+        if card.id in settled and not card.live and card.resolved_turn < int(turn):
+            card.resolved_turn = int(turn)
+            stamped = True
+    if stamped:
+        save(scene, cards)
     for o in outcomes or []:
         tell = " ".join(str(getattr(o, "tell", "") or "").split())
         if not tell or len(tell) < 12:
@@ -477,6 +493,27 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
 
 # --- what the model is shown -------------------------------------------------------------------
 
+# How long a settled job stays in front of the model while its employer stands with the
+# player (`_settled_with_them_here`): a day of the world's clock. Ours; no source gives one.
+# The owner's save of 2026-11-05 came back to collect two player turns after the week, which
+# `LINGER_TURNS` (three transcript entries, about one player turn) had already let go of.
+SETTLED_JOB_MINUTES = 24 * 60
+
+
+def _settled_with_them_here(card: Card, here: set, now: int) -> bool:
+    """A job the player took and saw to its end (paid or lapsed, `jobs.close`), whose
+    employer is in the scene, within `SETTLED_JOB_MINUTES` of its settling: the brief keeps
+    it, so the one the player goes back to — to collect, to ask — answers from what was
+    settled rather than making a record up ("the record for the northern gate is
+    incomplete", the clerk, on that save)."""
+    j = card.job or {}
+    # `settled` is written by `jobs.close` only: a card from before it carries no outcome
+    # fact to show, and is left to the ordinary linger.
+    return (card.kind == "job" and j.get("state") in ("paid", "lapsed")
+            and "settled" in j and standing(card) == OWN and card.giver in here
+            and now - int(j["settled"] or 0) <= SETTLED_JOB_MINUTES)
+
+
 def active(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = False,
            budget: int = BUDGET_CHARS) -> list[Card]:
     """The cards in front of the model this turn, most relevant first, within budget.
@@ -492,9 +529,13 @@ def active(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fal
     here = str(getattr(scene, "at", "") or "")
     window = " ".join((recent or [])[-SCAN_BEATS:])
     scored: list[tuple[tuple, Card]] = []
+    people_here = set(getattr(scene, "actors", {}) or {})
+    now = int(getattr(scene, "clock_minutes", 0) or 0)
     for c in cards:
         if c.stage in ("resolved", "dropped"):
-            if c.stage == "resolved" and turn - c.resolved_turn <= LINGER_TURNS:
+            if _settled_with_them_here(c, people_here, now):
+                scored.append(((2, 0, -c.touched), c))
+            elif c.stage == "resolved" and turn - c.resolved_turn <= LINGER_TURNS:
                 scored.append(((3, 0, c.touched), c))
             continue
         pinned = c.always_on or (c.place and c.place == here)
@@ -554,6 +595,10 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
                             "nobody has asked it of them, and it is not theirs): ",
                      UNHEARD: "NOT YET PUT TO THE PLAYER (the GM's alone; the player has "
                               "never heard of it, and it is nobody's goal of theirs): "}[stands]
+            if stands == OWN and c.kind == "job" and not c.live:
+                # Not "TAKEN ON" for a job that is over: beside the offer's own line ("…
+                # paid at the end of the week") it read as work still to do.
+                label = "JOB, FINISHED: " if c.stage == "resolved" else "JOB, LET GO: "
             head = head.replace("  * ", "  * " + label, 1)
         lines.append(head + ".")
         if c.kind in TASKS:

@@ -149,7 +149,10 @@ def test_the_rules_endpoint_round_trips(client):
                           "bonus_feats": "off", "bonus_ability_points": "off",
                           # The narrator switch (2026-10-10), Planned by default
                           # since 2026-10-18 (gm/planned.py; the blind fight bench).
-                          "narration": "planned"}
+                          "narration": "planned",
+                          # The GM at the table (2026-11-05, play/table_talk.py): a
+                          # line on the big moments, in the owner's own voice.
+                          "table_talk": "big", "dm_voice": "gleeful"}
     assert d["tiers"][-2]["points"] == 100 and d["tiers"][-1]["points"] == 0   # Unlimited last
     assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40, 0]   # Unlimited last
 
@@ -165,7 +168,8 @@ def test_the_rules_endpoint_round_trips(client):
                           # scene turning to intimacy fades unless the table says so.
                           "knowledge_offer": False, "content": "fade",
                           "bonus_feats": "off", "bonus_ability_points": "off",
-                          "narration": "planned", "narration_chosen": False}
+                          "narration": "planned", "narration_chosen": False,
+                          "table_talk": "big", "dm_voice": "gleeful"}
 
     # The race tier and the Core-seven switch come back too. Measured 2026-09-07: the
     # 20 and 40 RP buttons on the Rulesets bench could be pressed and never held,
@@ -351,7 +355,7 @@ def test_no_rule_can_be_written_that_active_refuses_to_read(isolated):
               "pronoun_sets": ["ze/hir"], "core_races": False, "race_rp": 40,
               "gm_view": True, "knowledge_offer": True, "content": "explicit",
               "bonus_feats": "odd", "bonus_ability_points": "even",
-              "narration": "free"}
+              "narration": "free", "table_talk": "always", "dm_voice": "grim"}
     assert set(others) == set(houserules.DEFAULTS), (
         "a house rule exists with no round-trip value here; add one")
     for key, value in others.items():

@@ -260,9 +260,23 @@ function render(s, hold) {
     return b.kind === "benchline" && door ? ` <button type="button"
       class="v2-btn is-quiet is-small benchdoor" ${door[0]}>${esc(door[1])}</button>` : "";
   };
+  // The GM at the table (play/table_talk.py): table talk under a beat (`who: "table"`) and a
+  // `/gm` answer said in the GM's voice (`voiced`) are drawn as the person behind the
+  // screen, their own actions in [brackets] set apart (06 `tableSaid`). A voiced answer read
+  // off the engine carries its `record`, one click below it — open when the record is a
+  // list the GM only handed over. Neither is a `.beat` of its own: the book finds beat i as
+  // the i-th `.beat` (15-book.js `storyTopOf`).
+  const atTable = b => b.who === "table" || (b.who === "gm" && b.kind === "aside" && b.voiced);
+  const tableTag = b => atTable(b)
+    ? `<span class="tabletag">${esc(b.voice_name ? `${b.voice_name} GM` : "GM")}${
+        b.who === "table" ? "" : ", out of character"}</span>` : "";
+  const record = b => b.record ? `<details class="gmrecord"${b.open ? " open" : ""}>
+      <summary>The record</summary><pre>${esc(b.record)}</pre></details>` : "";
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
-      i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}${benchDoor(b)}</p>${
+      atTable(b) ? " attable" : ""}${
+      i >= seen ? " fresh" : ""}">${tableTag(b)}${chips(b)}${
+      atTable(b) ? tableSaid(b.text) : said(b.text)}${benchDoor(b)}</p>${record(b)}${
       b.who === "gm" && b.kind === "setup" ? `<div class="beatfix" data-beat="${i}"></div>` : ""}`
   ).join("");
   window._beatsSeen = s.transcript.length;

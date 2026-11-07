@@ -117,7 +117,26 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             # never instead of it: the general feat at odd levels and the +1 every fourth
             # level still come (`leveling.owed`).
             "bonus_feats": "off",
-            "bonus_ability_points": "off"}
+            "bonus_ability_points": "off",
+            # The GM's own voice at the table (owner, 2026-11-05): a line or two of table
+            # talk after a beat, out of character, with the GM's own actions in square
+            # brackets — "like you are actually playing with someone". "off", "big" (only
+            # on the moments a real table reacts to: a refusal, a natural 20 or 1, a
+            # critical, somebody down, a fight starting or ending, a bonus or penalty for
+            # how it was done) or "always". Off also keeps the bracketed actions out of
+            # `/gm` answers, for a table that finds a model describing its own body odd.
+            # play/table_talk.py.
+            "table_talk": "big",
+            # Which GM is talking: one of DM_VOICES, each a personality in
+            # content/style/dm-voices.json. "gleeful" is the owner's own.
+            "dm_voice": "gleeful"}
+
+# How often the GM talks across the table (`table_talk` above). The server refuses anything else.
+TABLE_TALK_MODES = ("off", "big", "always")
+# The GM personalities a table may pick. The ids of content/style/dm-voices.json, said here
+# so the rules file needs no content to validate a setting; tests/test_dm_voice.py holds the
+# two lists equal.
+DM_VOICES = ("gleeful", "dry", "warm", "grim")
 
 # How the narrator writes a beat: as it likes ("free"), or slot by slot from the engine's
 # plan ("planned", gm/planned.py). The server refuses anything else.
@@ -208,6 +227,14 @@ def active() -> dict:
             rhythm = str(raw.get(key, "") or "").strip().lower()
             if rhythm in LEVEL_RHYTHMS:
                 out[key] = rhythm
+        # The GM's table talk and voice, named here for the same reason again: a key this
+        # whitelist leaves out is a switch that can be pressed and never holds.
+        said = str(raw.get("table_talk", "") or "").strip().lower()
+        if said in TABLE_TALK_MODES:
+            out["table_talk"] = said
+        said = str(raw.get("dm_voice", "") or "").strip().lower()
+        if said in DM_VOICES:
+            out["dm_voice"] = said
         # Re-read the same way it is written. `set_active` validated these on the way in,
         # and a key this function does not name is silently dropped — which is the point
         # of the whitelist and was why a saved set came back as the defaults.
@@ -257,6 +284,20 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
         else:
             current["narration"] = want
             current["narration_chosen"] = True
+    if "table_talk" in updates:
+        want = str(updates["table_talk"] or "").strip().lower()
+        if want not in TABLE_TALK_MODES:
+            problems.append(f"{updates['table_talk']!r} is not a table talk setting; it is "
+                            + ", ".join(repr(m) for m in TABLE_TALK_MODES) + ".")
+        else:
+            current["table_talk"] = want
+    if "dm_voice" in updates:
+        want = str(updates["dm_voice"] or "").strip().lower()
+        if want not in DM_VOICES:
+            problems.append(f"{updates['dm_voice']!r} is not a GM voice; it is one of "
+                            + ", ".join(repr(v) for v in DM_VOICES) + ".")
+        else:
+            current["dm_voice"] = want
     for key, what in (("bonus_feats", "bonus feat"),
                       ("bonus_ability_points", "bonus ability point")):
         if key not in updates:
@@ -336,6 +377,19 @@ def narration() -> str:
     beat, so a change in Settings holds from the next one."""
     said = str(active().get("narration", "planned") or "planned")
     return said if said in NARRATION_MODES else "planned"
+
+
+def table_talk() -> str:
+    """"off", "big" or "always": when the GM talks across the table (play/table_talk.py).
+    Read on every beat, so a change in Settings holds from the next one."""
+    said = str(active().get("table_talk", "big") or "big")
+    return said if said in TABLE_TALK_MODES else "big"
+
+
+def dm_voice() -> str:
+    """Which GM personality is talking: one of DM_VOICES."""
+    said = str(active().get("dm_voice", "gleeful") or "gleeful")
+    return said if said in DM_VOICES else "gleeful"
 
 
 def qualifies(rhythm: str, level: int) -> bool:

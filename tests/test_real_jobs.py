@@ -325,7 +325,9 @@ def test_the_guard_week_is_the_work_op_at_the_jobs_wage(worlds):
     before = goods.in_copper(s.pc().purse)
     res = _job(e, clerk, "accept")
     out = res.outcomes[0]
-    assert out.op == "work" and "takes the week's work" in out.tell
+    # The take-up said as agreeing to the work, never as taking a thing from somebody
+    # (tests/test_job_worked_and_paid_is_told.py, the beat-hands-over of 2026-11-05).
+    assert out.op == "work" and f"agrees to work the week for {clerk.name}" in out.tell
     card = cards.find(s, week.id)
     paid = goods.in_copper(s.pc().purse) - before
     assert paid == wage * 7 and card.job["state"] == "paid" and card.stage == "resolved"

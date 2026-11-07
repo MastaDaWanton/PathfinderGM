@@ -488,8 +488,9 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
         # And `pace` and `diversion` on a stealth alone (2026-10-30,
         # tests/test_hidden_state_followups.py). And `until` on a wait and a rest
         # (2026-11-01, tests/test_wait_until.py).
-        # tests/test_grapple_held.py).
-        assert set(alt["properties"]) == {"span", "commit", "act", "power", "means",
+        # tests/test_grapple_held.py). And `cost` on every act (2026-11-06, the turn's
+        # budget, tests/test_turn_budget.py).
+        assert set(alt["properties"]) == {"span", "commit", "act", "power", "means", "cost",
                                           *interpret.ACT_SLOTS[act],
                                           *(["asks_for"] if act == "request" else []),
                                           *(["craft", "work"] if act == "craft" else []),
