@@ -185,37 +185,6 @@ def test_no_extracted_line_is_a_paragraph(shelf):
             assert len(e.text) <= effects.CARD_CHARS + 1, (ing.name, e.text)
 
 
-def test_nothing_extracted_still_leaves_the_prose(shelf):
-    from rules import crafting
-
-    silent = next(i for i in shelf.values()
-                  if i.forageable and not effects.extract(i.text))
-    described = crafting.descriptions([silent])
-    assert described and described[0]["text"] == silent.text
-
-
-def test_the_potency_multiplier_is_not_stamped_on_every_line(shelf):
-    """It is one property of the result, stated once beside the rarity and the DC.
-    Repeating "[x0.80 from the chain]" on each effect was noise on every card."""
-    from rules import crafting
-    from rules.crafting import Chain
-
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["mix"], ["leechwort", "comfrey"]))
-    assert r.potency == pytest.approx(0.80)
-    assert not any("from the chain" in e for e in r.effects)
-
-
-def test_an_effect_says_which_ingredient_it_came_from(shelf):
-    from rules import crafting
-    from rules.crafting import Chain
-
-    r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["grind"], ["leechwort"]))
-    assert all(e.startswith("Leechwort: ") for e in r.effects)
-
-
-
 # --- the state vocabulary (docs/states-effects-tells.md, stage 1) -------------------------
 
 def test_every_shipped_condition_speaks_the_vocabulary():

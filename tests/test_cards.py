@@ -144,7 +144,7 @@ def test_cards_ride_the_brief_and_survive_a_save(tmp_path):
 
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
-        c = cm.current("cards-test", reset=True)
+        c = cm.current("cards-test")
         opened = cards.load(c.scene)
         assert any(k.id == "opening" for k in opened)
         assert any(k.is_("situation.strain") for k in opened), [k.id for k in opened]

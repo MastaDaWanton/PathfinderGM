@@ -1,32 +1,20 @@
-"""One interface, five crafts.
+"""One table, five crafts.
 
 Every track module — `crafting` for herbalism, then `blacksmith`, `leatherworker`,
-`alchemist`, `enchanter` and the enchanter's second, book-faithful `magicitem` mode —
-was written to the same public surface on purpose: `TRACK_ID`, `CraftError`, `Chain`,
-`chain_from_body`, `preview` returning problems before anything is rolled, and a
-`Result` whose `as_dict` carries the same keys. Each of the four books says the same
-thing in its integration notes: *the routing table does not exist yet*.
+`alchemist` and `enchanter` — answers to the world class's own id. This is the table
+that maps one to the other, so the acquisition hub, the market and the shelves can ask
+"whose materials are these" without an `if herbalism` growing a branch per craft, and a
+sixth craft is a module plus one line here rather than an edit to every view.
 
-This is that table. It exists so the bench view can say "preview this chain" without an
-`if herbalism` growing a branch per craft, and so a sixth craft is a module plus one
-line here rather than an edit to every view.
-
-Two deliberate accommodations, both because uniformity was asked of modules that were
-written in parallel by different hands:
-
-  Optional fields are read with `getattr` and a default. Herbalism's `Result` carries
-  `concentrating` and `consumes_raw` because two doses make one of the next band; a
-  forge has no such notion, and demanding the field of it would be the routing table
-  dictating semantics to the crafts rather than serving them.
-
-  Extra keyword arguments are filtered against each `preview`'s real signature. The
-  herbalist's pot cares what the world clock says (hides and herbs spoil); a binding
-  circle cares whether it is night; a forge cares about neither. Passing everything to
-  everyone would make each module carry parameters it has no use for.
+It used to route the old /craft/ page's chains as well (`chain_from_body`, `preview`,
+`result_field`, the `MOVED` refusals and the enchanter's "By the book" mode). Every craft
+moved to its own step bench at the table between 2026-10-02 and 2026-10-08, the page's
+tabs became doors, and the routes those chains served were deleted on 2026-11-08 (audit
+finding #20): nothing a player could click reached them, and the forge's chain skipped
+rent and let natural 1s and 20s decide, against the live forge's rule.
 """
 from __future__ import annotations
 
-import inspect
 from importlib import import_module
 
 # Track id -> module path. The id is the world class's own id, so a bench, a character's
@@ -39,169 +27,19 @@ BENCHES: dict[str, str] = {
     "enchanter": "rules.enchanter",
 }
 
-# Modes that sit beside a track rather than being one: the enchanter's second tab is
-# Pathfinder's own magic-item creation, running on the same world class and level but a
-# different rulebook. Keyed by mode id, valued by (track it belongs to, module).
-MODES: dict[str, tuple[str, str]] = {
-    "magic-item": ("enchanter", "rules.magicitem"),
-}
-
 
 class UnknownBench(KeyError):
     pass
 
 
-def module_for(track_id: str, mode: str = ""):
-    """The module that owns this bench. `mode` selects a secondary tab if there is one.
-
-    A mode whose module has not been written yet raises `UnknownBench` rather than
-    ImportError, so a half-built tab is refused the same way an unknown one is instead
-    of 500ing at the player.
-    """
+def module_for(track_id: str):
+    """The module that owns this craft's materials and checks."""
     key = (track_id or "").strip().lower()
-    if mode:
-        found = MODES.get(mode.strip().lower())
-        if not found or found[0] != key:
-            raise UnknownBench(f"no {mode!r} bench for {track_id!r}")
-        try:
-            return import_module(found[1])
-        except ImportError as exc:            # pragma: no cover - guard, not a path
-            raise UnknownBench(f"{mode!r} is declared but not built: {exc}") from exc
     path = BENCHES.get(key)
     if path is None:
         raise UnknownBench(
             f"no bench for {track_id!r}. Known: {', '.join(sorted(BENCHES))}")
     return import_module(path)
-
-
-def modes_for(track_id: str) -> list[dict]:
-    """The secondary tabs this track offers, for the page to draw."""
-    key = (track_id or "").strip().lower()
-    out = []
-    for mode_id, (owner, path) in MODES.items():
-        if owner != key:
-            continue
-        try:
-            mod = import_module(path)
-        except ImportError:
-            continue
-        out.append({"id": mode_id,
-                    "name": getattr(mod, "MODE_NAME", mode_id.replace("-", " ").title()),
-                    "blurb": getattr(mod, "MODE_BLURB", "")})
-    return out
-
-
-def supports(track_id: str, mode: str = "") -> bool:
-    """Whether this bench can actually preview a chain yet.
-
-    Asked before the page offers a craft button, because "the module exists" and "the
-    module can take a chain" were briefly different things while the five were being
-    written, and a button that 500s is worse than one that is honestly greyed.
-    """
-    try:
-        mod = module_for(track_id, mode)
-    except UnknownBench:
-        return False
-    return hasattr(mod, "preview") and hasattr(mod, "chain_from_body")
-
-
-# What is being made, as each bench happens to spell it. The forge reads `base` or
-# `item`, the tannery `product` or `pattern`, the enchanter `item`, herbalism `base` —
-# four benches, four vocabularies for one question, which is the same drift that left
-# `requires` and `needs` disagreeing about excursion gates.
-#
-# The page copes by sending the value under all four names at once. That works and is
-# one bench away from not working, and it means anything else driving these endpoints —
-# a test, a tool, a future mobile client — has to know the whole list. Normalised here
-# instead, so a bench may keep its own word and callers only need one.
-SHAPE_ALIASES = ("base", "item", "product", "pattern", "shape", "shaping", "base_item")
-
-
-def shape_of(body: dict) -> str:
-    """The thing being made, whichever of its names the caller used."""
-    for key in SHAPE_ALIASES:
-        said = str((body or {}).get(key) or "").strip()
-        if said:
-            return said
-    return ""
-
-
-def with_shape(body: dict) -> dict:
-    """The body with every alias filled in, so each bench finds its own spelling."""
-    said = shape_of(body)
-    if not said:
-        return dict(body or {})
-    return dict(body or {}, **{k: said for k in SHAPE_ALIASES})
-
-
-class MovedBench(UnknownBench):
-    """A craft whose chains are worked at another bench now. Herbalism moved to the
-    table's step bench on 2026-10-02 (play/bench_views.py); its old chain reader is kept
-    as a library, and this table refuses to route a chain to it rather than quietly
-    running the retired rules."""
-
-
-MOVED: dict[str, str] = {
-    "herbalist": ("Herbalism works one step at a time at the table's bench now. "
-                  "The chain bench no longer takes herbalism."),
-    # The enchanting revamp (docs/enchanting-revamp-plan.md, 2026-10-05): the circle is its
-    # own bench (play/enchant_views.py), prepare, attune and bind on a real vessel. The old
-    # chain's methods (scribe, seal, imbue, empower) are gone from the track, and the chain
-    # could never enchant from this page anyway: it sent the Shaping text as the item and
-    # refused every essence binding "not masterwork" (plan §1, measured on e028885). The
-    # "By the book" mode is a separate tab, left to the UI wave (U7) to retire.
-    "enchanter": ("Enchanting is worked at the circle at the table now, one step at a "
-                  "time: prepare, attune, bind. The chain bench no longer takes it."),
-    # The alchemy revamp (docs/alchemy-revamp-plan.md §15.4, owner Q9.1, 2026-10-06): the
-    # bench is its own (play/alchemy_views.py), one step at a time. The old chain read an
-    # exact material set and method sequence, scaled nothing it previewed into the stock
-    # (inv §0.1) and inferred drink, throw or coat from what happened to be harmful, which
-    # made the sunrod a blade coating; its methods (seal, precipitate, stabilize,
-    # catalyze) are gone from the track.
-    "alchemist": ("Alchemy is worked at the bench at the table now, one step at a time: "
-                  "dissolve, react, bottle. The chain bench no longer takes it."),
-}
-
-
-def _not_moved(track_id: str, mode: str = "") -> None:
-    key = (track_id or "").strip().lower()
-    if not mode and key in MOVED:
-        raise MovedBench(MOVED[key])
-
-
-def chain_from_body(track_id: str, body: dict, mode: str = ""):
-    _not_moved(track_id, mode)
-    mod = module_for(track_id, mode)
-    if hasattr(mod, "chain_from_body"):
-        return mod.chain_from_body(with_shape(body))
-    raise UnknownBench(f"{track_id} cannot read a chain from the bench yet")
-
-
-def preview(track_id: str, level: int, chain, mode: str = "", **kw):
-    """Preview a chain at whichever bench owns it.
-
-    Keyword arguments are filtered to what this module's `preview` actually accepts —
-    see the module docstring. `track_id` is passed positionally only to herbalism,
-    whose signature predates the table and takes it first.
-    """
-    _not_moved(track_id, mode)
-    mod = module_for(track_id, mode)
-    fn = mod.preview
-    params = inspect.signature(fn).parameters
-    passable = {k: v for k, v in kw.items() if k in params}
-    if "track_id" in params:                       # rules.crafting.preview
-        return fn(track_id, level, chain, **passable)
-    return fn(level, chain, **passable)
-
-
-def result_field(result, name: str, default=None):
-    """One field off any craft's Result, present or not.
-
-    The bench reads eight fields off a Result and only six are universal. Rather than
-    make every module declare a `concentrating` it has no opinion about, the reader
-    supplies the default — the routing table accommodating the crafts, not the reverse.
-    """
-    return getattr(result, name, default)
 
 
 def glyphs() -> dict[str, dict[str, str]]:

@@ -414,3 +414,50 @@ def test_asking_after_somebody_known_spawns_nobody_new():
                  "I talk to the woman selling bread."):
         out = judgement.inject_company([{"op": "narrate_only"}], said, s, WORLD)
         assert not any(i.get("op") == "spawn" for i in out), (said, out)
+
+
+def test_a_traveller_keeps_travelling_past_a_year_and_the_save_stays_small():
+    """Audit 2026-11-07 #10. A route was capped at MOST_STOPS = 400 entries and each hop
+    writes two, so travellers froze: measured on Aurvantis, messengers stopped around day
+    395 ("left X 105 days ago, on the road") and carters around day 570, while each stored
+    route grew to 10-23 KB by day 365. Entries that ended more than a day before the
+    asking are dropped and counted, so the walk goes on, and the count keeps every roll's
+    position — a road asked about daily is the same road as one walked in one go."""
+    s, _ = _engine()
+    rec = _person(s, "a messenger with a satchel", "messenger")
+    t0 = s.clock_minutes
+
+    # Past the old cap in one asking: the road still reaches the day asked about.
+    far = t0 + 500 * DAY
+    stops = residency.route(dict(rec), far, WORLD)
+    assert stops[-1]["to"] >= far, (len(stops), (far - stops[-1]["to"]) // DAY)
+
+    # Asked every day for sixty days, as the clock does, against one walk of sixty days.
+    whole = residency.route(dict(rec), t0 + 60 * DAY, WORLD)
+    daily = dict(rec)
+    for day in range(1, 61):
+        residency.route(daily, t0 + day * DAY, WORLD)
+    kept = daily["route"]
+    assert len(kept) < 12, len(kept)
+    assert daily["route_dropped"] + len(kept) == len(whole)
+    assert kept == whole[-len(kept):]
+
+
+def test_an_old_save_with_a_frozen_route_moves_again(monkeypatch):
+    """A save written before #10 carries the 400 entries the old cap left and no
+    `route_dropped`. It loads as it is; the next asking prunes it, walks on, and lands
+    on the very road an uncapped walk would have taken."""
+    s, _ = _engine()
+    rec = _person(s, "a messenger with a satchel", "messenger")
+    t0 = s.clock_minutes
+    monkeypatch.setattr(residency, "MOST_STOPS", 10 ** 6)       # an uncapped walk
+    uncapped = residency.route(dict(rec), t0 + 500 * DAY, WORLD)
+    monkeypatch.undo()
+    assert len(uncapped) > residency.MOST_STOPS, len(uncapped)
+
+    old = dict(rec, route=uncapped[:residency.MOST_STOPS])    # what the old cap stored
+    frozen_at = old["route"][-1]["to"]
+    stops = residency.route(old, t0 + 500 * DAY, WORLD)
+    assert stops[-1]["to"] >= t0 + 500 * DAY > frozen_at
+    assert old["route_dropped"] > 0 and len(old["route"]) < residency.MOST_STOPS
+    assert old["route"] == uncapped[old["route_dropped"]:]

@@ -358,9 +358,16 @@ def test_the_rarer_the_plant_the_smaller_the_patch(forager):
 def test_eating_resets_the_hunger_clock_and_only_that(wood):
     """"I eat from my rations and drink from my waterskin" reached the engine as
     narrate_only in both playtest sessions, so the hunger and thirst clocks could run out
-    but never be answered. Now they are ops."""
+    but never be answered. Now they are ops.
+
+    Out of the pack since 2026-11-07: this test pinned a bare "eat" that fed the forager
+    from nothing (ponytail audit; the owner's ruling of 2026-10-09, "Food is never free").
+    Unnamed, the meal is the pack's first food."""
+    from rules.crafting import Stock
+
     s, engine = wood
     pc = s.pc()
+    pc.add_stock(Stock(base="trail rations", craft=""), 2)
     pc.fed_minutes = pc.watered_minutes = pc.awake_minutes = 600
 
     r = engine.run(engine.validate([{"op": "eat"}]))
@@ -368,14 +375,37 @@ def test_eating_resets_the_hunger_clock_and_only_that(wood):
     assert pc.watered_minutes == 600, "a meal is not a drink"
     assert pc.awake_minutes == 600, "a meal is not a nap"
     assert "eats" in r.outcomes[0].tell
+    assert pc.stock["trail-rations#1"].count == 1
 
 
 def test_drinking_resets_thirst(wood):
+    """From the waterskin (since 2026-11-07; it reset thirst from nothing before), which
+    is left in the pack empty."""
     s, engine = wood
     pc = s.pc()
+    pc.goods["waterskin"] = 1
     pc.watered_minutes = 900
     engine.run(engine.validate([{"op": "drink"}]))
     assert pc.watered_minutes == 0
+    assert "waterskin" not in pc.goods and pc.goods.get("empty waterskin") == 1
+
+
+def test_a_bare_eat_or_drink_with_nothing_carried_is_refused(wood):
+    """Ponytail audit 2026-11-07 (smaller findings): a bare "eat" or "drink" reset hunger
+    or thirst from nothing — on the open road, with an empty pack. The owner had listed
+    "`_op_drink` free" among the survival problems to fix, and ruled 2026-10-09 that food
+    is never free and water is free only at a settlement's own well. Refused, with the
+    reason named, and the clocks keep running."""
+    s, engine = wood
+    pc = s.pc()
+    pc.stock = {k: v for k, v in pc.stock.items() if "ration" not in k}
+    pc.goods = {k: v for k, v in pc.goods.items() if "waterskin" not in k}
+    pc.fed_minutes = pc.watered_minutes = 900
+    eat = engine.run(engine.validate([{"op": "eat"}])).outcomes[0]
+    drink = engine.run(engine.validate([{"op": "drink"}])).outcomes[0]
+    assert eat.status == "refused" and "nothing to eat" in eat.tell, eat.tell
+    assert drink.status == "refused" and "no water" in drink.tell, drink.tell
+    assert pc.fed_minutes == 900 and pc.watered_minutes == 900
 
 
 def test_a_nights_rest_still_resets_the_awake_clock_but_not_the_stomach(wood):
@@ -391,3 +421,26 @@ def test_a_nights_rest_still_resets_the_awake_clock_but_not_the_stomach(wood):
     assert pc.awake_minutes == 0
     assert pc.fed_minutes == 1200
     assert s.clock_minutes - before == 8 * 60, "a night is eight hours, not twenty minutes"
+
+
+def test_a_clock_step_asks_each_body_if_it_is_dead_without_reading_its_feats(monkeypatch):
+    """Audit 2026-11-07, "every clock step walks every body ever seen": `Scene.advance`
+    charges every body the campaign holds, and `charge` opened with
+    `has_state("state.down.dead")`, which on a living body falls through to the standing
+    tags — feats and class options, ~1.4 ms a body. Measured with 300 bodies: 302 ms a
+    ten-minute step before, 72 ms after. Death is a condition, an effect; the effects'
+    tags answer it. The dead still keep no clock."""
+    from rules.bestiary import instantiate
+    from rules.sheet import Actor
+
+    def no(self, *a, **k):
+        raise AssertionError("the standing tags were read for a clock step")
+
+    living = instantiate("commoner-level-1", Dice(seed=1))
+    dead = instantiate("commoner-level-1", Dice(seed=2))
+    dead.die("test")
+    before = dead.fed_minutes
+    monkeypatch.setattr(Actor, "standing_tags", no)
+    survival.charge(living, 60, roll=False)
+    survival.charge(dead, 60, roll=False)
+    assert living.fed_minutes >= 60 and dead.fed_minutes == before

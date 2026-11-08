@@ -100,3 +100,57 @@ def test_the_generated_towns_are_not_redrawn():
     drawn from — has no house row, so no existing town changes."""
     assert "house" not in places.KINDS
     assert not any(row[0] == "the house" for row in places.SETTLEMENT_PLACES)
+
+
+def _graft_before_2026_11_08(base, founded, at=""):
+    """`places.with_founded` as it stood, kept to hold the rewrite to the same answer."""
+    from dataclasses import replace
+
+    minted = [p if isinstance(p, places.Place) else places.from_dict(p) for p in founded]
+    out = {p.id: p for p in base}
+    changed = True
+    while changed:
+        changed = False
+        for m in minted:
+            if m.id in out:
+                continue
+            if (m.parent in out) or (at and (m.id == at or str(at).startswith(m.id + "/"))):
+                out[m.id] = m
+                changed = True
+    result = {}
+    for pid, p in out.items():
+        exits = list(p.exits)
+        for q in out.values():
+            if q.parent == pid and q.id != pid and q.id not in exits:
+                exits.append(q.id)
+        if p.parent and p.parent in out and p.parent not in exits:
+            exits.append(p.parent)
+        result[pid] = replace(p, exits=tuple(exits))
+    return tuple(result.values())
+
+
+def test_grafting_founded_places_is_not_quadratic_and_gives_the_same_answer():
+    """Audit 2026-11-07: `with_founded` wired exits by asking, for every grafted place,
+    every other grafted place whether it was a child — |places|² comparisons, on a call
+    `Engine.places()` makes many times a turn. Measured on this set before the fix: 0.11 s a
+    call at 1,200 founded rooms and 0.62 s at 3,000; 0.07 s at 3,000 after. The children
+    are indexed once now; the places, their order and their exits are exactly what the
+    old loop gave."""
+    import time
+
+    base = (places.Place(id="town:square", name="the square", terrain="urban"),
+            places.Place(id="town:gate", name="the gate", terrain="urban",
+                         exits=("town:square",)))
+    founded, parents = [], ["town:square", "town:gate"]
+    for n in range(3000):
+        pid = f"town:house-{n}"
+        founded.append({"id": pid, "name": f"house {n}", "terrain": "urban",
+                        "parent": parents[n % len(parents)], "kind": "house"})
+        parents.append(pid)
+    founded.append({"id": "elsewhere:hut", "name": "a hut", "parent": "elsewhere:x"})
+    assert places.with_founded(base, founded) == _graft_before_2026_11_08(base, founded)
+    assert places.with_founded(base, founded, at="elsewhere:hut") == \
+        _graft_before_2026_11_08(base, founded, at="elsewhere:hut")
+    t = time.perf_counter()
+    places.with_founded(base, founded)
+    assert time.perf_counter() - t < 0.3

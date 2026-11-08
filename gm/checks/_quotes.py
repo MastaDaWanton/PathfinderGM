@@ -135,23 +135,6 @@ def pc_lines(text: str, said=(), pc_name: str = "", pc_ref: str = "pc"
     return out
 
 
-def page_speaker_head(blank: str, qa: int, qb: int) -> str:
-    """The head word of the person the narration makes the speaker of the quotation at
-    [qa, qb) — a description's head noun ("man" for "the man in the heavy coat") — or ""
-    when the page names nobody or only by a proper name. The clause's own subject first;
-    for a pronoun or no clause, the nearest person the narration described before it."""
-    from gm.checks._people import _PERSON, head_of
-
-    subj = clause(blank, qa, qb)
-    if subj and subj.split()[0].lower() not in ("he", "she", "they"):
-        head = head_of(subj).lower()
-        return head if head in _PERSON else ""
-    alt = "|".join(sorted(_PERSON, key=len, reverse=True))
-    found = list(re.finditer(r"\b(?:the|a|an|this|that)\s+(?:[a-z'’-]+\s+){0,3}?(" + alt
-                             + r")\b(?!-)", blank[:qa], re.I))
-    return found[-1].group(1).lower() if found else ""
-
-
 def _tail(blank: str, qb: int) -> str:
     """The narration after a quotation, up to its sentence's end."""
     tail = blank[qb:]

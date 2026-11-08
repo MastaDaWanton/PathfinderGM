@@ -89,6 +89,15 @@ Ids are unique within a world, not across worlds. Key your own storage on
   headings.
 - A `PEOPLE` is an ethnic group, not a place: it may span several nations or belong to
   none.
+- **Text is never null.** Every entity has a non-empty `id` and `name`; `kind`, `summary`,
+  `path`, every chronology text field (`name`, `summary`, `scope`, `background`,
+  `aftermath`), every `name` in `figures[]`, `factions[]` and `unwritten[]`, and the
+  `world` block's `name` and `secret` are strings — write `""` for what is not filled,
+  not `null`. Only the fields documented as nullable (`parent_id`, `year`, a figure's or
+  route's `entity_id`/endpoint ids, `scale`) may be `null`. Pathfinder GM reads a stray
+  null as empty and skips an entity with no id (audit 2026-11-07 #11: one `"name": null`
+  once imported fine and crashed every turn), but an empty name is still a person or
+  place the game cannot call by name.
 
 ## `chronology[]`
 

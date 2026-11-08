@@ -486,3 +486,20 @@ def test_every_shipped_scheme_is_reachable_under_the_cap():
         gates[sid] = since[0]
     assert len(set(gates.values())) == len(gates), (
         f"two fresh schemes open on the same tick and will fight over the cast: {gates}")
+
+
+def test_a_skipped_step_is_logged_once_not_once_a_tick():
+    """Audit 2026-11-07: a step held back for want of its foreshadowing appended a
+    `skipped` row on EVERY tick it stayed held, and the instance is saved — so a twist
+    waiting out a long campaign grew the save by a row a tick, forever. One row per step
+    and reason, carrying when it was first and last held back."""
+    s, e, pc = _table()
+    _wait(e, 1)
+    inst = _instance(s)
+    pc.remove_effects(match=lambda x: "knows.giver-hides-something" in x.tags)
+    _out(e, inst)
+    for _ in range(6):
+        _wait(e, 30)
+    rows = [sk for sk in inst.get("skipped", []) if sk["step"] == "twist"]
+    assert len(rows) == 1, len(rows)
+    assert rows[0]["last"] > rows[0]["clock"]

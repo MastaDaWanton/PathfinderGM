@@ -1422,9 +1422,18 @@ def tick(engine, outcomes) -> list:
                 continue
             needs = [t for t in st.get("fairness") or [] if not pc.has_state(t)]
             if needs:
-                inst.setdefault("skipped", []).append(
-                    {"step": st["id"], "clock": scene.clock_minutes,
-                     "why": "foreshadowing not on the brief: " + ", ".join(needs)})
+                # One row per step and reason, its `last` moved on: appended every tick,
+                # a twist held back for a long campaign grew the save by a row a tick
+                # (audit 2026-11-07). `clock` stays when it was first held back.
+                why = "foreshadowing not on the brief: " + ", ".join(needs)
+                log = inst.setdefault("skipped", [])
+                row = next((r for r in log if r.get("step") == st["id"]
+                            and r.get("why") == why), None)
+                if row is None:
+                    log.append({"step": st["id"], "clock": scene.clock_minutes,
+                                "last": scene.clock_minutes, "why": why})
+                else:
+                    row["last"] = scene.clock_minutes
                 continue
             # Most specific first — and a step keyed on something that happened THIS batch
             # (`event:`) before any keyed on standing state. An event is now or never; the

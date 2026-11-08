@@ -24,6 +24,35 @@ from . import mentions as mentions_mod
 from . import speech as speech_mod
 
 
+def surfaces_a_stall(method):
+    """A narrator's whole beat ends in `client.ModelStalled` when any model call inside it
+    met a wedged Ollama, whatever that call did with the failure.
+
+    Ponytail audit 2026-11-07, finding #6: a beat makes dozens of calls — the draft, its
+    retries, a read-back per question, the second reads — and each catches its own failure
+    on its own terms ("a failed read must never lose the turn"). A stall swallowed there
+    left the player reading a half-groomed beat and never the restart sentence, and an
+    unanswered second read answers yes (`beat_verify.ask`), so every later finding was
+    cut. Re-raising at each site was rejected as the only shape here: it holds for the
+    sites somebody remembered, and the next read-back added forgets it. The client
+    remembers the stall (`client.stalled_since`), every later call to that host is refused
+    in milliseconds, and the beat is given up here, once; the view renders the engine's
+    own lines and says why (`play.views._finish`)."""
+    import functools
+    import time as _time
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        started = _time.monotonic()
+        got = method(self, *args, **kwargs)
+        stall = client.stalled_since(started, (getattr(self, "host", ""),
+                                               getattr(self, "prose_host", "")))
+        if stall is not None:
+            raise stall
+        return got
+    return wrapper
+
+
 @dataclass
 class Attempt:
     """One model call, kept for the log. Play that cannot be audited cannot be
@@ -353,6 +382,10 @@ class GMAgent:
             try:
                 self.reading = interpret.interpret(player_input)
                 interpret.remember(player_input, self.reading)
+            except client.ModelStalled:
+                # A wedged Ollama is not read past (ponytail audit #6): the planner would
+                # only stall on it too, and the player is told to restart it now.
+                raise
             except Exception as exc:  # noqa: BLE001 — never a reason to lose the turn
                 self.reading = {"error": str(exc)[:200]}
         else:
@@ -2286,9 +2319,13 @@ class GMAgent:
         attribution = self.attribution
         # A broken construct (the owner's house rule, 2026-10-01) is as inert as a corpse:
         # at exactly 0 hp the "hp < 0" test missed it, and a replay's broken spy tilted its
-        # head and glowed on the page.
+        # head and glowed on the page. And below 0 is dying, not dead (CRB p.191): the
+        # `hp < 0` half cut a dying bandit's groan as a dead man acting (ponytail audit
+        # #18). One predicate for every site here, `states.lifeless`.
+        from rules import states as states_mod
+
         dead_refs = {r for r, a in self.engine.scene.actors.items()
-                     if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead") or a.has_state("state.down.broken"))}
+                     if not a.is_pc and states_mod.lifeless(a)}
 
         def _alive(sentence: str, words: str) -> bool:
             ref = attribution.who(sentence, words)
@@ -2304,14 +2341,14 @@ class GMAgent:
         # Constitution-drained corpse at full hit points, which `hp <= 0` cannot see,
         # and which went on acting in every paragraph for the rest of the session.
         dead = [a.name for r, a in self.engine.scene.actors.items()
-                if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead") or a.has_state("state.down.broken"))]
+                if not a.is_pc and states_mod.lifeless(a)]
         # Whoever died THIS turn keeps their killing sentence (see the function): the
         # cut used to delete "the sailor crumples to the deck" as a dead man acting,
         # which is how every one-punch kill ended in the same appended template.
         # And the living beside them: a name the dead share with somebody standing is not
         # a corpse acting (two "thug"s, one dead — the 2026-09-27 fight audit).
         living = [a.name for a in self.engine.scene.actors.values()
-                  if not a.is_pc and not (a.hp < 0 or a.has_state("state.down.dead") or a.has_state("state.down.broken"))]
+                  if not a.is_pc and not states_mod.lifeless(a)]
         # The engine's own lines this turn, by an actor still alive: a corpse in them is
         # worked on, never working (the harvest line cut as the wolf acting, 2026-11-04).
         # By the outcome's `actor` ref — the role the record holds, never the words.
@@ -4223,6 +4260,7 @@ class GMAgent:
                                + (f" — page: {'; '.join(notes)}" if notes else ""))
         return text, attempt, calls, slots_now
 
+    @surfaces_a_stall
     def narrate_turn(self, outcomes: list, player_input: str, brief: str,
                      earlier: list[str] | None = None, *,
                      scene_now: str = "",
@@ -4499,6 +4537,11 @@ class GMAgent:
                 # there should be 3 options".
                 self.last_suggestions = _suggestions(data)
             except Exception as exc:
+                # A wedged Ollama ends the beat here (ponytail audit #6): the spare, the
+                # retries and every read-back after would only meet it again, and the
+                # player is owed the restart sentence (`surfaces_a_stall`).
+                if isinstance(exc, client.ModelStalled):
+                    raise
                 # The reply itself, and the real elapsed time. The turn log's own
                 # comment records learning this once — "the attempts were unpacked
                 # into `_` and dropped, so the one diagnosable artefact never
@@ -4575,6 +4618,8 @@ class GMAgent:
                     if text2 and lost2:
                         best_lost = (text2, lost2)
                 except Exception as exc:
+                    if isinstance(exc, client.ModelStalled):
+                        raise
                     attempts.append(Attempt("prose", 0.0, model,
                                             note=f"retry failed: {str(exc)[:100]}"))
             if declined or lost:
@@ -4863,6 +4908,7 @@ class GMAgent:
         raw = "\n".join(str(c.get("raw") or "") for c in beat.calls)
         return beat.text, seconds, beat.model, raw, list(beat.notes)
 
+    @surfaces_a_stall
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str,
                         rewrite: bool = True, acting: str = "",
                         manner: str = "", last_beat: str = "") -> tuple[str, Attempt]:

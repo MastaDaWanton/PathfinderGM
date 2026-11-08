@@ -3310,11 +3310,6 @@ def pronoun_neutral(token: str, owns: bool | None = None) -> str:
     return pronoun_swap("they/them", token.lower(), owns)
 
 
-def pronoun_is_ambiguous(pronouns: str, token: str) -> bool:
-    return isinstance(PRONOUN_SWAP.get(_pronoun_family(pronouns), {}).get(token.lower()),
-                      tuple)
-
-
 # --- the player's character, given the wrong body -------------------------------------
 #
 # Pronouns were never going to reach this and could not have. Measured in play: a
@@ -3338,22 +3333,6 @@ _MALE_BODY = (r"beards?|bearded|stubble|moustaches?|mustaches?|whiskers|sideburn
 _FEMALE_BODY = (r"breasts?|bosom|cleavage|womb|uterus|vulva|vagina|ovaries"
                 r"|nipples? swell")
 _WRONG_BODY = {"woman": _MALE_BODY, "man": _FEMALE_BODY}
-
-# How far after "your" the part may sit. "the surface of your pectoralis major muscles"
-# is four words; a whole clause is too far and starts collecting other people's bodies.
-# Punctuation is excluded so the window cannot cross into the next sentence.
-_BODY_GAP = 40
-
-# "your" and "my", because the player's body gets described in both. Measured, the turn
-# after the second-person case was fixed: asked to describe her chest aloud, the model
-# put the whole description in her own mouth — "'My chest is. muscular, with well-defined
-# pectoralis muscles that curve outward from the center of my body.'" — and a check
-# reading only `your` saw nothing at all in it.
-#
-# `my` needs a speaker, though. An NPC saying "my beard" is describing their own face and
-# is nobody's business but theirs, so a first-person possessive only counts when the
-# player is the one talking.
-_OWNS = r"your|my"
 
 # How far back to look for who is speaking. Wide enough to reach past "You take a deep
 # breath and begin to describe your chest, speaking in a low, matter-of-fact tone." and

@@ -353,25 +353,6 @@ def test_two_characters_of_the_same_name_do_not_collide(tmp_path):
         assert roster.load(a.id) and roster.load(b.id)
 
 
-def test_starting_again_retires_the_character_it_replaces(tmp_path):
-    """Every `?new=1` used to leave another living copy on the roster — three identical
-    Kessts, all alive, none being played. The dead are kept because they are a record;
-    an abandoned character is not the same thing."""
-    from play import campaign as cm
-
-    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
-        cm._LIVE.clear()
-        first = cm.current("retire-test")
-        first_id = first.character_id
-        assert roster.load(first_id).status == roster.ALIVE
-
-        cm.current("retire-test", reset=True)
-        assert roster.load(first_id).status == roster.RETIRED
-
-        living = [e for e in roster.everyone() if e.status == roster.ALIVE]
-        assert len(living) == 1
-
-
 def test_the_roster_keeps_the_sheet_current(tmp_path):
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         pc = load_pc("fixtures/pc-kesst.json")

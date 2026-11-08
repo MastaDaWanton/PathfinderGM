@@ -158,6 +158,20 @@ class PlanFailed(RuntimeError):
     """A slot call failed or came back empty. The beat goes to the free narrator."""
 
 
+class SlotMalformed(ValueError):
+    """A slot's reply that is not the object its schema asks for, with the reply kept.
+
+    Ponytail audit 2026-11-07 (smaller finding): `call_slot` returned `reply, reply.json()`
+    in one expression, so a reply that would not parse raised before the caller held it,
+    and the call was logged with `raw: ""` — the one artefact that says what the model
+    wrote, lost. A reply that parsed to a list or a string reached `realise` and died on
+    `.get` outside every `try`, logged nowhere."""
+
+    def __init__(self, why: str, reply):
+        super().__init__(why)
+        self.reply = reply
+
+
 @dataclass
 class Planned:
     """One planned beat: the page, and everything that wrote it."""
@@ -349,8 +363,12 @@ def present(engine) -> list[dict]:
         # "dead" here until 2026-11-04, beside the blow's own "down", and the diagnosis's
         # "I finish off the dying bandit" was scored as an invented kill on 4 of 7 runs
         # (the player's line and the severity wording carried it too: see `_SEVERITY`).
-        dead = a.has_state("state.down.dead")
-        if dead:
+        # A broken construct is as inert as the dead (`states.lifeless`, ponytail audit
+        # #18), and was called "dying" here below 0: it never bleeds and never dies of it.
+        dead = states_mod.lifeless(a)
+        if a.has_state("state.down.broken"):
+            what.append("broken, on the ground")
+        elif a.has_state("state.down.dead"):
             what.append("dead")
         elif a.hp < 0:
             what.append("dying, on the ground")
@@ -1979,6 +1997,7 @@ def _tells_kept(out: Planned, who, faith, tells, lift=None, refused=(),
             except Exception as exc:  # noqa: BLE001 — unremade: the cut below stands in
                 if isinstance(exc, client.ModelStalled):
                     raise
+                raw = raw or _raw_of(exc)
                 out.calls.append({"key": s["key"], "messages": msgs, "raw": raw,
                                   "seconds": round(time.monotonic() - started, 1),
                                   "model": who[0],
@@ -2211,7 +2230,23 @@ def call_slot(s: dict, messages: list[dict], who: tuple, *, suggest: bool = Fals
                         schema=slot_schema(s.get("max") or 0, suggest=suggest,
                                            reply=s["key"] == "reply" and bool(s.get("speaker")),
                                            not_manner=s.get("not_manner") or ()))
-    return reply, reply.json()
+    try:
+        data = reply.json()
+        if not isinstance(data, dict):
+            raise ValueError(f"the reply is a {type(data).__name__}, not an object")
+    except ValueError as exc:
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            'planned slot "%s": a malformed reply from %s (%s): %r', s.get("key"),
+            getattr(reply, "model", "") or model, exc, str(reply.text or "")[:300])
+        raise SlotMalformed(str(exc), reply) from exc
+    return reply, data
+
+
+def _raw_of(exc) -> str:
+    """The reply a failed slot call still holds (`SlotMalformed`), or ""."""
+    return str(getattr(getattr(exc, "reply", None), "text", "") or "")
 
 
 def _ask(out: Planned, plan, slots, i, written, who, *, suggest: bool = False,
@@ -2225,7 +2260,7 @@ def _ask(out: Planned, plan, slots, i, written, who, *, suggest: bool = False,
         reply, data = call_slot(s, messages, who, suggest=suggest)
     except Exception as exc:
         out.calls.append({"key": s["key"], "messages": messages,
-                          "raw": getattr(reply, "text", "") or "",
+                          "raw": getattr(reply, "text", "") or _raw_of(exc),
                           "seconds": round(time.monotonic() - started, 1), "model": model,
                           "note": f"failed: {type(exc).__name__}: {str(exc)[:160]}"})
         if isinstance(exc, client.ModelStalled):

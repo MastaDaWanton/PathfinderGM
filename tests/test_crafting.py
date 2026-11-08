@@ -13,14 +13,12 @@ apply are re-pinned against the step bench in tests/test_bench_api.py.
 from __future__ import annotations
 
 import json
-import re
 
 import pytest
 from django.test import Client, override_settings
 
 from play import craft_views
 from rules import crafting, herbprep, ingredients
-from rules.crafting import Chain
 from rules.sheet import load_pc
 
 
@@ -110,91 +108,8 @@ def test_a_crafter_sees_only_their_own_tier_and_below(shelf):
 
 # --- chains -------------------------------------------------------------------------------
 
-def test_a_simple_chain_previews(fixture_herbs):
-    """Re-pinned 2026-10-02 because the herb data changed: Woundwort's bleed reduction
-    became a typed Heal bonus that potency scales, and Comfrey gained two more heals.
-    Testwort and Testfrey, fixtures of the two herbs as they were, keep the chain's card
-    pinned line for line."""
-    r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["grind", "brew"], ["testwort", "testfrey"]))
-    assert not r.problems
-    assert r.stages == 2 and r.tier == "common"
-    # The mechanic, not the paragraph: Woundwort's bleed reduction and now its authored
-    # heal — "way too many useless herbs" gave every benefit-less herb a runnable one —
-    # and Comfrey's healing.
-    assert r.effects == ["Testwort: Bleeding damage 20% less",
-                         "Testwort: Heals 1d4 hit points",
-                         "Testfrey: Heals 1-4 hit points"]
-    assert len(r.described) == 2
-
 
 # --- benefit, harm, and the line between them ------------------------------------------------
-
-def test_harm_is_a_drawback_rather_than_an_effect(fixture_herbs):
-    """From the bench, before: Dragon Flower's Effects panel listed "-2 actions while in
-    the area", "+5 save vs poison", "1d6 Constitution damage", "Fortitude DC 25" and
-    "Causes nauseated" as five undifferentiated bullets, and Drawbacks said one boilerplate
-    sentence that named nothing. 99 of the corpus's 178 effects were filed that way.
-
-    Re-pinned 2026-10-02 because the herb data changed: the real flower's bonuses are
-    typed and potency-scaled now and its nausea states its rounds. Testflower, a fixture
-    of its old five specs, keeps the sort pinned line for line."""
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["testflower"]))
-    assert r.effects == ["Testflower: +5 save vs poison for 10 rounds"]
-    assert r.drawbacks == [
-        "Testflower: Fortitude DC 25 or 1d6 Constitution damage, causes nauseated",
-        "Testflower: -2 actions while in the area for 1d4 weeks",
-    ]
-
-
-def test_the_save_reads_as_the_gate_for_the_harm_it_governs(fixture_herbs):
-    """"Fortitude DC 25" was its own bullet, so nothing on the card said which of the four
-    other lines it applied to. Grouped by the ingredient the effects were read out of,
-    which is the only thing that ties them together.
-
-    Re-pinned 2026-10-02 because the herb data changed: the real flower's nausea now
-    states its rounds. Testflower, a fixture of its old specs, keeps the lines exact."""
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["testflower"]))
-    assert len(r.poisons) == 1
-    assert r.poisons[0]["source"] == "Testflower"
-    assert r.poisons[0]["save_line"] == "Fortitude DC 25"
-    assert r.poisons[0]["lines"] == ["1d6 Constitution damage", "Causes nauseated"]
-
-
-def test_two_poisonous_ingredients_stay_two_poisons():
-    """A pot holding Dragon Flower and Skull Orchid is two poisons with two different
-    saves, not one heap of damage under whichever DC came first."""
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["dragon-flower", "skull-orchid"]))
-    assert [(p["source"], p["save_line"]) for p in r.poisons] == \
-        [("Dragon Flower", "Fortitude DC 25"), ("Skull Orchid", "DC 17")]
-
-
-def test_an_ingredient_that_is_only_dangerous_to_handle_is_named():
-    """30 of the corpus's ingredients are marked risky and extract no harmful mechanic at
-    all, because the danger is in the harvesting. The warning stays — but it says which
-    ingredient it is about, instead of the one sentence that used to be the whole panel
-    however many poisons were in the pot.
-
-    The example was Basilisk Eye until 2026-10-06, when the alchemist's basilisk-eye gland
-    was merged into it (alchemy plan §5.7) and it gained a harmful `external` trait, so it
-    is no longer only dangerous to handle; Cockatrice Beak still is."""
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["cockatrice-beak"]))
-    assert any("Untreated hazardous components: Cockatrice Beak." in d
-               for d in r.drawbacks)
-
-
-def test_a_crafting_dc_restated_in_the_prose_does_not_become_a_poison():
-    """41 of the corpus's 59 save gates gate nothing: they are the entry's own crafting DC,
-    written at the end of its description ("Cave Star ... DC: 10.") and picked up by the
-    extractor's bare-DC fallback. Filing every gate under Drawbacks would have put 41
-    poisons on the shelf that poison nobody."""
-    r = crafting.preview("herbalist", 3, Chain("herbalist", ["grind"], ["cave-star"]))
-    assert r.poisons == []
-    assert r.drawbacks == []
 
 
 def test_a_card_line_and_its_mechanic_come_from_one_walk(shelf):
@@ -205,58 +120,6 @@ def test_a_card_line_and_its_mechanic_come_from_one_walk(shelf):
     for ing in shelf.values():
         assert [line for line, _ in ing.pairs] == ing.lines
         assert [spec for _, spec in ing.pairs if spec] == ing.specs
-
-
-def test_a_method_you_have_not_learned_is_named_with_the_level_that_grants_it():
-    """Re-pinned 2026-10-02 on Neutralize: the test used Distill, which the owner retired.
-    The defect is the same: a locked method must say which level opens it."""
-    r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["neutralize"], ["woundwort"]))
-    assert any(re.search(r"Neutralize is learned at Herbalist \d", p) for p in r.problems)
-
-
-def test_material_above_your_tier_is_refused_by_name():
-    r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["grind"], ["phoenix-feather"]))
-    assert any("Phoenix Feather" in p and "legendary" in p for p in r.problems)
-
-
-def test_the_result_is_as_rare_as_its_rarest_component():
-    """A common chain with one legendary petal in it is a legendary brew, which is also
-    what gates who can make it."""
-    r = crafting.preview("herbalist", 5,
-                         Chain("herbalist", ["grind"], ["woundwort", "phoenix-feather"]))
-    assert r.tier == "legendary"
-
-
-def test_a_finishing_method_has_to_come_last():
-    """You brew the mixture; you do not grind the tea."""
-    r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["brew", "grind"], ["woundwort"]))
-    assert any("finishes a chain" in p for p in r.problems)
-
-
-def test_an_empty_pot_says_so_rather_than_erroring():
-    """Preview never raises for a chain that is merely bad — the page has to be able to
-    grey the button and say why."""
-    r = crafting.preview("herbalist", 1, Chain("herbalist", ["grind"], []))
-    assert "Nothing in the pot." in r.problems
-    assert r.chance == 0
-
-
-def test_an_authored_dc_beats_a_derived_one():
-    """31 ingredients carry their own crafting DC. An authored number beats a tier
-    lookup every time."""
-    r = crafting.preview("herbalist", 5, Chain("herbalist", ["grind"], ["cotsbalm"]))
-    assert ingredients.get("cotsbalm").craft_dc == 35
-    assert r.dc == 35
-
-
-def test_no_craft_is_ever_certain():
-    """Clamped to 5-95 rather than allowed to reach 100: a natural 1 fails, so the number
-    on the button must never claim otherwise."""
-    r = crafting.preview("herbalist", 5, Chain("herbalist", ["grind"], ["barley"]))
-    assert 5 <= r.chance <= 95
 
 
 # --- through the page ---------------------------------------------------------------------
@@ -330,18 +193,6 @@ def _tea(concentration=1, tier="common", potency=1.0, count=1):
                           effects=["stops bleeding"])
 
 
-def test_a_crafted_input_brings_its_potency_into_a_new_compound():
-    """A compound made from a doubled tea is stronger than one made from a plain one."""
-    stock = {"woundwort-tea#2": _tea(concentration=2, tier="uncommon", potency=2.0)}
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["mix"], ["comfrey"],
-                               stock_used={"woundwort-tea#2": 1}),
-                         stock=stock)
-    assert not r.problems
-    assert r.potency == pytest.approx(0.80 * 2.0)
-    assert r.tier == "uncommon"          # as rare as its rarest component
-
-
 def test_stock_survives_a_save():
     from rules.sheet import from_dict, load_pc, to_dict
 
@@ -388,41 +239,6 @@ def _herb(source_id, **flags):
     return dataclasses.replace(ingredients.all_ingredients()[source_id], **flags)
 
 
-def test_choosing_brew_marks_what_has_to_be_ground_first():
-    """The exact case the report names, at the point the page asks the question: a method
-    picked, nothing in the pot yet."""
-    horn = _herb("chimera-horn", brew_raw=False)
-    assert "ground" in crafting.prep_problem(horn, ["brew"])
-
-
-def test_adding_the_grind_clears_the_mark():
-    """A refusal has to be a statement about the chain, not about the ingredient. If
-    grinding first did not clear it, the mark would be telling the player to give up on a
-    herb that is perfectly usable."""
-    horn = _herb("chimera-horn", brew_raw=False)
-    assert crafting.prep_problem(horn, ["grind", "brew"]) == ""
-
-
-def test_a_step_an_ingredient_has_no_use_for_is_not_a_refusal():
-    """Neutralising a pot of eight herbs when one is volatile is the whole point; the
-    other seven must not come back marked for having sat through it."""
-    plain = _herb("woundwort", volatile=False)
-    assert crafting.prep_problem(plain, ["neutralize", "brew"]) == ""
-
-
-def test_a_volatile_herb_is_marked_until_it_is_neutralised():
-    volatile = _herb("dragon-flower", volatile=True, needs_extraction=False)
-    assert "volatile" in crafting.prep_problem(volatile, ["grind"])
-    assert crafting.prep_problem(volatile, ["neutralize", "grind"]) == ""
-
-
-def test_the_reason_carries_no_name_prefix():
-    """It is drawn on the jar, which is already wearing the name. `_preparation_problems`
-    adds the name back for the problems panel, where eight herbs are listed together."""
-    horn = _herb("chimera-horn", brew_raw=False)
-    assert not crafting.prep_problem(horn, ["brew"]).startswith(horn.name)
-
-
 # --- the craft is a check, rolled where you can see it ---------------------------------
 #
 # "instead of a percentage chance and a blind roll just roll a d100 on screen or even
@@ -464,22 +280,6 @@ def test_the_terms_are_itemised_not_just_summed():
     assert any("Herbalist 4" in x for x in labels)
     assert any("half character level" in x for x in labels)
     assert any("Wisdom" in x for x in labels)
-
-
-def test_the_preview_carries_the_check_to_the_bench():
-    """The page draws `d20+11 vs DC 20` on the button from these, so they have to survive
-    the trip rather than only the percentage they imply."""
-    r = crafting.preview("herbalist", 4,
-                         Chain(track="herbalist", methods=["brew"],
-                               ingredient_ids=["woundwort"]),
-                         satchel={"woundwort": 5}, carrier=_crafter())
-    assert r.bonus == 11 and r.dc > 0
-    assert r.as_dict()["bonus"] == 11 and r.as_dict()["terms"]
-
-
-def test_the_chance_is_derived_from_the_check_rather_than_being_the_mechanic():
-    """It is a label now. d20+11 against DC 20 needs a 9: twelve faces of twenty, 60%."""
-    assert crafting._chance(20, 11) == 60
 
 
 # --- what you made is in your inventory, and you can use it ----------------------------

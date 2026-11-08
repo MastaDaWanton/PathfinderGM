@@ -178,6 +178,9 @@ def _the_model_gate_is_open_unless_a_test_shuts_it(monkeypatch):
     # answered from the last test's.
     monkeypatch.setattr(gm_client, "_tags_cache", {})
     monkeypatch.setattr(gm_client, "_said_missing", set())
+    # And a stalled host is remembered for a minute (`client._stalls`): one test's stall
+    # must not refuse the next test's call.
+    monkeypatch.setattr(gm_client, "_stalls", {})
 
 
 # --- the three fixtures pytest-django used to lend -----------------------------------------

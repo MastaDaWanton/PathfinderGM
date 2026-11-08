@@ -112,20 +112,14 @@ def test_an_old_spell_potion_keeps_its_spell_and_caster_level_exactly(how):
 def test_an_old_potion_loaded_from_a_save_still_stands_in_for_its_spell_at_the_enchanter():
     """Plan §18.3: load an old save and spend its potion at the enchanter. The stock key the
     old save wrote is kept (the circle names the potion by it), and the converted record still
-    answers `holds_spell`, so the enchanter's stand-in finds it."""
-    from rules import magicitem as mi
-
+    answers `holds_spell`, so the enchanter's stand-in finds it. (The "By the book" chain
+    that also spent it was deleted on 2026-11-08, audit finding #20.)"""
     d = old("potion:oil-of-keen-edge")
     d["count"] = 2
     pc = from_dict(saved_with({d["id"]: d}), ref="pc")
     st = pc.stock[d["id"]]
     assert isinstance(st, items.AlchemyStock)
     assert enchanter._spells_held(pc) == {"keen-edge": d["id"]}
-    sword = {"masterwork": True, "kind": "weapon", "weapon": "longsword"}
-    keen = mi.Chain(material_ids=["mi-keen"], enhancement=1, item="longsword")
-    bare = mi.preview(10, keen, item=sword)
-    held = mi.preview(10, keen, stock={d["id"]: st}, item=sword)
-    assert held.consumes == {d["id"]: 1} and held.dc == bare.dc - 5
 
 
 def test_an_old_brimstone_sealed_flask_is_the_books_alchemists_fire_and_is_thrown():

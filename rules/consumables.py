@@ -349,8 +349,8 @@ def scaled_bonus(amount, potency: float) -> int:
     aside): the owner's homebrew leaf says +20 Str and +20 Con, the brewed tea's card
     printed "+20 Strength", and drinking it landed +26 — a herbalist's brew is potency
     1.30 (brew +25%, +5% per herbalist level) and this rule applied it, while the card
-    was rendered from the unscaled spec. The card now asks this function too
-    (`crafting.sift(potency=...)`), so the number on the jar is the number that lands.
+    was rendered from the unscaled spec. The card asked this function too, so the
+    number on the jar is the number that lands.
     """
     try:
         amount = int(str(amount if amount is not None else 0).strip() or 0)

@@ -268,19 +268,6 @@ def test_homebrew_hide_layers_over_the_shipped_set(tmp_path, monkeypatch):
 
 # --- the old chain, retired -------------------------------------------------------------------
 
-def test_the_chain_bench_refuses_and_says_where_the_bench_went():
-    """The old chain ran the five-level rules the owner retired: a red dragonhide suit at
-    DC 38, every input spent on a failure, Harden refused without a wax. It refuses now in
-    words; an unknown pattern is still refused by name with the patterns it knows."""
-    with pytest.raises(lw.CraftError) as why:
-        lw.preview(1, lw.chain_from_body({"methods": ["flense"], "materials": ["deer-hide"],
-                                          "product": "cloak"}))
-    assert "at the table now" in str(why.value)
-    with pytest.raises(lw.CraftError) as why:
-        lw.preview(1, lw.Chain(methods=["cut"], material_ids=["deer-hide"],
-                               product="codpiece"))
-    assert "satchel" in str(why.value) and "cloak" in str(why.value)
-
 
 # --- icons and the shelf ------------------------------------------------------------------------
 

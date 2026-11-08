@@ -341,8 +341,8 @@ def test_foraging_fills_the_satchel(client):
 def test_crafting_spends_what_was_foraged(client):
     """The loop, closed: nothing can be brewed that was not first picked.
 
-    On the herbalism bench at the table since 2026-10-02 (the old /api/craft/do answers
-    herbalism with "it is at the table now"): a herb nobody carries is not on the satchel
+    On the herbalism bench at the table since 2026-10-02 (the old chain bench's
+    /api/craft/do was deleted on 2026-11-08): a herb nobody carries is not on the satchel
     at all, and one carried is spent when the brew is finished."""
     from play import campaign as cm
 

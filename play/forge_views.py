@@ -1009,7 +1009,7 @@ def forge_assay(request):
     if c.scene.in_encounter:
         return _err("You are in a fight. The assay waits until it is over.", 409)
     kn = bs._lane("knowledge")
-    if kn is None or not hasattr(kn, "assay"):
+    if not hasattr(kn, "assay"):
         return _err("Assaying is not available in this build yet.", 501)
     body = read_body(request)
     mid = str(body.get("material") or "").strip().lower()
@@ -1110,7 +1110,7 @@ def forge_ledger(request):
     if refused:
         return refused
     kn = bs._lane("knowledge")
-    if kn is None or not hasattr(kn, "ledger"):
+    if not hasattr(kn, "ledger"):
         return _err("The smith's ledger is not available in this build yet.", 501)
     # The tanner's materials are the Tanner's ledger's (play/leather_views.py
     # `leather_ledger`, lane U5's MaterialLedger on the "leatherworker" track). Measured
@@ -1128,7 +1128,7 @@ def forge_ledger(request):
 
 def _tanners(kn, m) -> bool:
     """Whether this material answers to the leatherworker's rows (`knowledge.craft_of`)."""
-    if kn is None or not hasattr(kn, "craft_of"):
+    if not hasattr(kn, "craft_of"):
         return False
     try:
         return kn.craft_of(m.doc) == getattr(kn, "LEATHERWORKER", "leatherworker")
@@ -1174,25 +1174,24 @@ def forge_material(request, material_id: str):
             # smith for it, and says where to ask instead.
             "smiths_here": [] if _not_the_smiths(kn, m) else smiths_here(c, pc),
             "ask_elsewhere": _not_the_smiths(kn, m)}
-    if kn is not None:
-        try:
-            card["properties"] = list(kn.properties(pc, m.doc))
-            card["assay_dc"] = int(kn.assay_dc(m.doc, pc))
-        except Exception:      # noqa: BLE001 - the card shows what it can
-            pass
-        try:
-            rules = kn.lore(kn.BLACKSMITH)["assay"]
-            card["assay_minutes"] = int(rules["minutes"])
-            card["assay_cost"] = kn.assay_cost(m.doc)
-            # `assay_danger` only when the metal's own effect says what testing does (lane
-            # U5's contract, 44-forge-ledger.js `needsConfirm`): absent, the card falls back
-            # on `reactive` and warns in general words, so a reactive metal whose effect is
-            # not yet written (null skymetal, until lane H adds §13.2's recoil) still asks first.
-            found = kn.danger_of(m.doc)
-            if found and _danger_words(found[1]):
-                card["assay_danger"] = _danger_words(found[1])
-        except Exception:      # noqa: BLE001
-            pass
+    try:
+        card["properties"] = list(kn.properties(pc, m.doc))
+        card["assay_dc"] = int(kn.assay_dc(m.doc, pc))
+    except Exception:      # noqa: BLE001 - the card shows what it can
+        pass
+    try:
+        rules = kn.lore(kn.BLACKSMITH)["assay"]
+        card["assay_minutes"] = int(rules["minutes"])
+        card["assay_cost"] = kn.assay_cost(m.doc)
+        # `assay_danger` only when the metal's own effect says what testing does (lane
+        # U5's contract, 44-forge-ledger.js `needsConfirm`): absent, the card falls back
+        # on `reactive` and warns in general words, so a reactive metal whose effect is
+        # not yet written (null skymetal, until lane H adds §13.2's recoil) still asks first.
+        found = kn.danger_of(m.doc)
+        if found and _danger_words(found[1]):
+            card["assay_danger"] = _danger_words(found[1])
+    except Exception:      # noqa: BLE001
+        pass
     return JsonResponse(card)
 
 
@@ -1220,7 +1219,7 @@ def _not_the_smiths(kn, m) -> str:
     2026-10-08): this route always used the smith's rows whatever was asked about, so a
     blacksmith took the smith's price, taught deer hide from the smith's lesson table and
     paid Blacksmith mastery for it."""
-    if kn is None or not hasattr(kn, "craft_of"):
+    if not hasattr(kn, "craft_of"):
         return ""
     try:
         craft = kn.craft_of(m.doc)
@@ -1240,7 +1239,7 @@ def smiths_here(c, pc) -> list[dict]:
     bench's `teachers_here` for the forge). Named, never reffed on the page; the ref is
     what the browser posts back."""
     kn = bs._lane("knowledge")
-    if kn is None or not hasattr(kn, "teaches"):
+    if not hasattr(kn, "teaches"):
         return []
     from rules import population
 
@@ -1272,7 +1271,7 @@ def forge_ask(request):
     if refused:
         return refused
     kn = bs._lane("knowledge")
-    if kn is None or not hasattr(kn, "lesson_order"):
+    if not hasattr(kn, "lesson_order"):
         return _err("Asking a smith is not available in this build yet.", 501)
     body = read_body(request)
     m = bs.metal(str(body.get("material") or "").strip().lower())

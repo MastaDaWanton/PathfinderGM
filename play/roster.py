@@ -205,11 +205,19 @@ def enrol(actor: Actor, campaign_id: str = "", world_source: str = "") -> Entry:
     return entry
 
 
+def _taken(character_id: str) -> bool:
+    """A character id is also the campaign's file name (`begin_with` names one for the
+    other), so an id is taken when EITHER file exists. Asking only `characters/` let a
+    new "Slice" write over the starter's `campaigns/slice.json` (audit 2026-11-07 #8)."""
+    return (path_for(character_id).exists()
+            or files.child(Path(settings.CAMPAIGN_DIR), character_id).exists())
+
+
 def unique_id(base: str) -> str:
-    if not path_for(base).exists():
+    if not _taken(base):
         return base
     n = 2
-    while path_for(f"{base}-{n}").exists():
+    while _taken(f"{base}-{n}"):
         n += 1
     return f"{base}-{n}"
 

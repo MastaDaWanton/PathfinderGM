@@ -975,8 +975,16 @@ def casting_plan(spell, caster_level: int) -> dict:
 # rolled one 1d4+1 at every caster level, and the tell never said how many missiles flew:
 # the 2026-11-05 rerun's caster level 1 cast came back "Two darts" and "three glowing bolts"
 # on 3 of 7 runs (and on 7 of 8 re-asks of the recorded slot; 0 of 12 told the count).
-MISSILE_SPELLS: dict[str, tuple[int, int, int]] = {
+#
+# A fourth number, when present, is the caster level the count starts from. Scorching ray
+# (CRB): "one ray, plus one additional ray for every four levels beyond 3rd (to a maximum of
+# three rays at 11th level). Each ray requires a ranged touch attack to hit and deals 4d6
+# points of fire damage." Measured on 0.2.26 (audit #28): at caster level 11 it hit for one
+# 4d6 with no roll at all. Each ray's touch attack is the engine's (`Engine._op_cast`), asked
+# because the spell is a ray (`casting.touch_attack`), not because of this row.
+MISSILE_SPELLS: dict[str, tuple[int, ...]] = {
     "magic-missile": (1, 2, 5),
+    "scorching-ray": (1, 4, 3, 3),
 }
 
 
@@ -986,8 +994,158 @@ def missiles_at(spell_id: str, caster_level: int) -> int:
     row = MISSILE_SPELLS.get(str(spell_id or ""))
     if row is None:
         return 0
-    first, every, most = row
-    return max(1, min(most, first + max(0, int(caster_level) - 1) // max(1, every)))
+    first, every, most = row[:3]
+    start = row[3] if len(row) > 3 else 1
+    return max(1, min(most, first + max(0, int(caster_level) - start) // max(1, every)))
+
+
+# --- who a spell can take hold of --------------------------------------------------------------
+#
+# The power words decide by the target's CURRENT hit points (CRB, checked on aonprd
+# 2026-11-08). Each row is (most hit points, what): "die", "permanent", or (dice, unit) for how
+# long. Over the last row's number the creature is unaffected. Measured on 0.2.26 (audit #21):
+# power word kill left a 250-hp thug dead, and power word stun lasted for ever at any hit
+# points — the condition was laid with no limit and no end. Data, not a branch per spell.
+HP_TIERS: dict[str, tuple[tuple[int, object], ...]] = {
+    # "Any creature that currently has 101 or more hit points is unaffected."
+    "power-word-kill": ((100, "die"),),
+    # 50 or less 4d4 rounds; 51-100 2d4 rounds; 101-150 1d4 rounds; 151 or more unaffected.
+    "power-word-stun": ((50, ("4d4", "round")), (100, ("2d4", "round")),
+                        (150, ("1d4", "round"))),
+    # 50 or less permanent; 51-100 1d4+1 minutes; 101-200 1d4+1 rounds; 201 or more
+    # unaffected.
+    "power-word-blind": ((50, "permanent"), (100, ("1d4+1", "minute")),
+                         (200, ("1d4+1", "round"))),
+}
+
+
+def save_key(save: str) -> str:
+    """"fort", "ref" or "will" for a save however a document spells it ("Fortitude")."""
+    s = str(save or "").strip().lower()[:4]
+    return {"fort": "fort", "refl": "ref", "ref": "ref", "will": "will"}.get(s, s)
+
+
+def hp_tier(spell_id: str, hp: int):
+    """What a power word does to a creature at `hp`: a row's "what", None when over the
+    table (unaffected), or "" for a spell with no table."""
+    rows = HP_TIERS.get(str(spell_id or ""))
+    if rows is None:
+        return ""
+    for most, what in rows:
+        if int(hp) <= most:
+            return what
+    return None
+
+
+# Spells that take hold of a number of Hit Dice of creatures, the fewest first (CRB, Sleep:
+# "4 HD of creatures ... Creatures with the fewest HD are affected first ... Hit Dice that are
+# not sufficient to affect a creature are wasted"; Deep Slumber: "10 HD of creatures").
+HD_POOL: dict[str, int] = {"sleep": 4, "deep-slumber": 10}
+
+_HD_CAP = re.compile(r"\bwith (\d+) (?:HD|Hit Dice) or (?:less|fewer)\b", re.I)
+_TYPE_WORDS = ("monstrous humanoid", "magical beast", "aberration", "animal", "construct",
+               "dragon", "fey", "humanoid", "ooze", "outsider", "plant", "undead", "vermin")
+
+
+def spared_by(spell, target, hit_dice: int) -> str:
+    """Why this spell's target line keeps `target` out of it, as the end of a sentence
+    ("is no humanoid"), or "". Read off the spell's own `targets` line: "creature, humanoid
+    with 4 HD or less (1)" (daze), "creature, living with 5 HD or less" (cause fear).
+
+    A creature that carries no `type.*` tag at all — a player, a hand-made townsperson, a
+    thug — is a person and answers to "humanoid"; the world owns its own peoples
+    (docs: the-world-owns-its-own-races), so their type is never second-guessed here. Only a
+    creature typed otherwise (a wolf is `type.animal`) is spared by the type."""
+    line = str(getattr(spell, "targets", "") or "").lower()
+    if not line:
+        return ""
+    m = _HD_CAP.search(line)
+    if m and int(hit_dice) > int(m.group(1)):
+        return f"has {hit_dice} Hit Dice, more than {m.group(1)}"
+    undead = target.has_state("type.undead")
+    if re.search(r"\bliving\b", line) and (undead or target.has_state("type.construct")):
+        return "is not a living creature"
+    from .sheet import _is_of_kind
+
+    typed = target.has_state("type")
+    rest = line
+    for word in _TYPE_WORDS:
+        if re.search(rf"\b{word}\b", rest):
+            if typed and not _is_of_kind(target, "type", word):
+                return f"is no {word}"
+            # "monstrous humanoid" must not also be read as "humanoid".
+            rest = re.sub(rf"\b{word}\b", "", rest)
+            break
+    return ""
+
+
+# --- positive and negative energy --------------------------------------------------------------
+#
+# The cure spells channel positive energy and the inflict spells negative, and the undead are
+# the other way round (CRB, Cure Light Wounds: "Since undead are powered by negative energy,
+# this spell deals damage to them instead of curing their wounds. An undead creature can apply
+# spell resistance, and can attempt a Will save to take half damage"; Inflict Light Wounds:
+# "this spell cures such a creature of a like amount of damage, rather than harming it").
+# Measured on 0.2.26 (audit #29): cure light wounds took a zombie from 6 to 12 hp. Channel
+# energy already turned on the undead through its document's `healed_instead`.
+#
+# Detected from the spell itself, never from its name: a `damage` spec of the energy, or the
+# description's own sentence ("channel positive energy", "deals damage to undead", "cures such
+# a creature"), followed down a "functions like" chain — cure moderate wounds "functions like
+# cure light wounds" and says nothing else. A spell whose text says it has "no effect on
+# undead" (regenerate, reviving finale) has no energy to turn.
+_POSITIVE_TEXT = re.compile(
+    r"\bchannel(?:s|ing)? positive energy\b|\bdeals? damage to (?:them|undead)\b"
+    r"|\bharmed by positive energy\b|\binstead acts like harm\b", re.I)
+_NEGATIVE_TEXT = re.compile(
+    r"\bchannel(?:s|ing)? negative energy\b|\bcures? (?:such a creature|undead)\b"
+    r"|\binstead acts like heal\b", re.I)
+_SPARES_UNDEAD = re.compile(r"\bno effect on (?:undead|nonliving)", re.I)
+
+
+def energy_of(spell, _depth: int = 0) -> str:
+    """"positive", "negative" or "" — the energy this spell's hit points come from."""
+    if spell is None or _depth > 4:
+        return ""
+    text = str(getattr(spell, "description", "") or "")
+    if _SPARES_UNDEAD.search(text):
+        return ""
+
+    def walk(specs) -> str:
+        for spec in specs or ():
+            if not isinstance(spec, dict):
+                continue
+            dtype = str(spec.get("damage_type") or "")
+            if spec.get("type") == "damage" and dtype in ("positive", "negative"):
+                return dtype
+            for key in ("on_failure", "on_success"):
+                got = walk(spec.get(key))
+                if got:
+                    return got
+        return ""
+
+    found = walk(getattr(spell, "effects", None))
+    if found:
+        return found
+    if _NEGATIVE_TEXT.search(text):
+        return "negative"
+    if _POSITIVE_TEXT.search(text):
+        return "positive"
+    parent = functions_as({"description": text}, set(all_spells()))
+    if parent and parent != getattr(spell, "id", ""):
+        try:
+            return energy_of(get(parent), _depth + 1)
+        except KeyError:
+            return ""
+    return ""
+
+
+def turns_on_undead(spell, kind: str) -> bool:
+    """Whether this spell's `kind` ("heal" or "damage") is the other one against the undead:
+    a positive-energy cure hurts them, a negative-energy wound mends them."""
+    energy = energy_of(spell)
+    return (kind == "heal" and energy == "positive") or \
+        (kind == "damage" and energy == "negative")
 
 
 # --- reading the prose ---------------------------------------------------------------------

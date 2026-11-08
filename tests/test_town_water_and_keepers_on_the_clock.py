@@ -420,3 +420,16 @@ def test_a_scene_with_no_engine_moves_its_clock_as_before():
     s.add(_pc())
     out = s.advance(9 * HOUR)
     assert out["moved"] == [] and s._comings_said == []
+
+
+def test_a_drink_with_an_empty_pack_is_taken_at_the_well():
+    """The same ruling for the `drink` op (ponytail audit 2026-11-07, smaller findings: a
+    bare drink reset thirst from nothing anywhere). In the market with an empty pack the
+    drink is the well's, said; out on the approach there is none, and it is refused."""
+    s, e, _ = _in_vormoor(10 * HOUR, water=20 * HOUR)
+    out = e.run(e.validate([{"op": "drink", "actor": "pc", "because": "t"}])).outcomes[0]
+    assert out.tell.startswith("Kesst Vayr drinks at the well."), out.tell
+    assert s.pc().watered_minutes == 0
+    s, e, _ = _in_vormoor(10 * HOUR, place="the approach", water=20 * HOUR)
+    out = e.run(e.validate([{"op": "drink", "actor": "pc", "because": "t"}])).outcomes[0]
+    assert out.status == "refused" and s.pc().watered_minutes == 20 * HOUR, out.tell

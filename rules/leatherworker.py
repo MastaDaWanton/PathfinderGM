@@ -77,12 +77,12 @@ TRACK_ID = "leatherworker"
 
 
 def _lane(name: str):
-    """A sibling lane's module, or None while it is not merged (contracts §1). Imported on
-    each call, so a test can stand a fake in `sys.modules` (the forge's `_lane`)."""
-    try:
-        return importlib.import_module(f"rules.{name}")
-    except ImportError:
-        return None
+    """A sibling module, imported on each call so a test can stand a fake in `sys.modules`.
+
+    It returned None while a sibling lane was not merged yet, and every caller carried a
+    fallback for that tree. Every lane merged in October; the fallbacks were deleted on
+    2026-11-08 (audit, "dead 'not merged yet' fallbacks in the craft modules")."""
+    return importlib.import_module(f"rules.{name}")
 
 
 # One glyph per material kind, for the shelf. A hide must never render as a herb — that
@@ -337,20 +337,11 @@ def check_terms(actor, level: int) -> list[dict]:
     than summed because "+9" says nothing and "Leatherworker 2, half level +3, Int +2"
     says which to improve.
     """
-    track_level = max(0, int(level or 0))
-    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
-    intelligence = int(actor.ability_mod("int")) if actor is not None else 0
+    # Tanning and leatherwork are Craft (leather), and this game keeps one Craft.
     from . import tradecraft
 
-    return [
-        {"label": f"Leatherworker {track_level}", "value": track_level},
-        # Half level, rounded down, as every half-level term in 1e rounds.
-        {"label": f"half character level ({char_level})", "value": char_level // 2},
-        {"label": "Intelligence", "value": intelligence},
-        # Half the Craft ranks: tanning and leatherwork are Craft (leather), and this
-        # game keeps one Craft (option A, 2026-10-07; `tradecraft.bench_terms`).
-        *tradecraft.bench_terms(actor, "leatherworker"),
-    ]
+    return tradecraft.bench_check_terms(actor, level, track=TRACK_ID, name="Leatherworker",
+                                        ability="int")
 
 
 def check_bonus(actor, level: int) -> int:
@@ -380,11 +371,8 @@ def material(mid: str) -> dict | None:
     mid = str(mid or "").strip().lower()
     if not mid:
         return None
-    mats = _lane("materials")
-    if mats is None:
-        return None
     try:
-        return mats.get(mid)
+        return _lane("materials").get(mid)
     except Exception:          # noqa: BLE001 - a bad document is "no such material"
         return None
 
@@ -431,13 +419,12 @@ def tannage_kind(tannin_id: str) -> str:
 
 
 def _is_salt(doc: dict | None) -> bool:
-    mats = _lane("materials")
-    if mats is not None and hasattr(mats, "is_salt") and doc is not None:
-        try:
-            return bool(mats.is_salt(doc))
-        except Exception:      # noqa: BLE001
-            return False
-    return bool(doc and (doc.get("id") == "curing-salt" or doc.get("salt") is True))
+    if doc is None:
+        return False
+    try:
+        return bool(_lane("materials").is_salt(doc))
+    except Exception:          # noqa: BLE001
+        return False
 
 
 def _grip_capable(doc: dict | None) -> bool:
@@ -752,8 +739,7 @@ def freshness(h: Hide, now: int) -> dict:
     weeks, after which it runs again. Tanned work never spoils. Lane C serves the same
     question for its harvest sheet as `harvest.freshness`; asked there first when it
     exists, so the two can never disagree."""
-    harvest = _lane("harvest")
-    fn = getattr(harvest, "freshness", None) if harvest is not None else None
+    fn = getattr(_lane("harvest"), "freshness", None)
     if callable(fn):
         try:
             got = fn(record_of_hide(h), now)
@@ -881,13 +867,11 @@ def _consumable_form(doc: dict) -> str:
 def _leather_relevant(doc: dict | None) -> bool:
     if not doc:
         return False
-    mats = _lane("materials")
-    if mats is not None and hasattr(mats, "is_leather"):
-        try:
-            if mats.is_leather(doc):
-                return True
-        except Exception:      # noqa: BLE001
-            pass
+    try:
+        if _lane("materials").is_leather(doc):
+            return True
+    except Exception:          # noqa: BLE001
+        pass
     return str(doc.get("kind") or "") in ("hide",) or _is_salt(doc)
 
 
@@ -953,10 +937,10 @@ def piece_view(p: Piece, actor=None, now: int = 0) -> dict:
     §4), the units in words, the grade, the clock and the badges. The page computes no
     number."""
     doc = p.doc or {}
-    mats = _lane("materials")
     colour = str(doc.get("color") or "")
-    if not colour and mats is not None:
-        colour = str((getattr(mats, "KIND_COLOUR", {}) or {}).get(doc.get("kind"), ""))
+    if not colour:
+        colour = str((getattr(_lane("materials"), "KIND_COLOUR", {}) or {})
+                     .get(doc.get("kind"), ""))
     d = {"key": p.key, "name": p.name, "material": p.material, "form": p.form,
          "group": GROUPS.get(p.form, "Other"), "count": p.count, "tier": p.tier,
          "rank": p.rank, "kind": p.kind,
@@ -1002,11 +986,10 @@ def _badges(h: Hide, fresh: dict) -> list[str]:
 
 
 def _unknown(actor, doc: dict | None) -> int:
-    kn = _lane("knowledge")
-    if kn is None or actor is None or not doc:
+    if actor is None or not doc:
         return 0
     try:
-        keys = list(kn.property_keys(doc))
+        keys = list(_lane("knowledge").property_keys(doc))
     except Exception:          # noqa: BLE001
         return 0
     entry = (getattr(actor, "herb_known", None) or {}).get(str(doc.get("id") or "")) or {}
@@ -1023,12 +1006,8 @@ def where_here(scene, actor, known=()) -> dict:
     """Lane G's `places.leather_bench_here`: {"at": "tannery" | "field" | None, "tannery",
     "field_kit", "tiers", "vats"}. Read from the scene's coordinate and the pack, never the
     player's words (plan §10)."""
-    places = _lane("places")
-    fn = getattr(places, "leather_bench_here", None) if places is not None else None
-    if fn is None:
-        return dict(_NOWHERE)
     try:
-        got = dict(fn(scene, actor, known) or {})
+        got = dict(_lane("places").leather_bench_here(scene, actor, known) or {})
     except Exception:          # noqa: BLE001 - a place we cannot read is no bench
         return dict(_NOWHERE)
     got["tiers"] = tuple(got.get("tiers") or ())
@@ -1040,11 +1019,9 @@ def rent_cp(scene, where: dict, minutes: int, known=()) -> int:
     at your own tannery. Charged at the roll, beside the one clock door, as the forge's."""
     if not (where or {}).get("tannery") or minutes <= 0:
         return 0
-    market = _lane("market")
-    fn = getattr(market, "tannery_rent", None) if market is not None else None
-    if fn is None:
-        return 0
-    return max(0, int(fn(scene, minutes / 60, known)))
+    from . import market
+
+    return max(0, int(market.tannery_rent(scene, minutes / 60, known)))
 
 
 def vat_rent_cp(scene, where: dict, wait_minutes: int, vats: int, known=()) -> int:
@@ -1053,22 +1030,15 @@ def vat_rent_cp(scene, where: dict, wait_minutes: int, vats: int, known=()) -> i
     the bill")."""
     if not (where or {}).get("tannery") or wait_minutes <= 0 or vats <= 0:
         return 0
-    market = _lane("market")
-    fn = getattr(market, "vat_rent", None) if market is not None else None
-    if fn is None:
-        return 0
-    return max(0, int(fn(scene, wait_minutes / 1440, vats, known)))
+    from . import market
+
+    return max(0, int(market.vat_rent(scene, wait_minutes / 1440, vats, known)))
 
 
 def vats_for(quarters_total: int) -> int:
     """How many vats a batch fills (lane G's `places.vats_for`). The count is shown and
     priced, never a gate (no vat cap, the lead's ruling of 2026-10-08)."""
-    places = _lane("places")
-    fn = getattr(places, "vats_for", None) if places is not None else None
-    units = int(quarters_total) / 4
-    if fn is not None:
-        return int(fn(units))
-    return int(math.ceil(units / 4)) if units > 0 else 0
+    return int(_lane("places").vats_for(int(quarters_total) / 4))
 
 
 def methods_view(level: int, where: dict | None = None) -> list[dict]:
@@ -2112,9 +2082,7 @@ def land(actor, plan: LeatherPlan, made: list[tuple], *, now: int,
         # section (inprogress.begin).
         st = to_stock(thing)
         st.count = int(n)
-        key = stock_key(thing)
-        while key in (actor.stock or {}):
-            key += "+"
+        key = inprogress.fresh_key(actor, stock_key(thing))
         actor.stock[key] = st
         tannery = where.get("tannery") or {}
         at_tannery = plan.wait_where == "tannery" and tannery.get("place")
@@ -2312,9 +2280,9 @@ def pay_grade(actor, p: Piece, now: int = 0) -> list[dict]:
 def working_keys(doc: dict) -> list[str]:
     """The knowledge keys of a material's working traits, revealed by working it (plan
     §16: "working a hide reveals its working traits")."""
-    kn = _lane("knowledge")
-    if kn is None or not doc:
+    if not doc:
         return []
+    kn = _lane("knowledge")
     fn = getattr(kn, "working_keys", None)
     if fn is not None:
         try:
@@ -2327,13 +2295,7 @@ def working_keys(doc: dict) -> list[str]:
 
 def reveal(actor, material_id: str, keys, how: str) -> list[str]:
     """Record keys as known; returns the new ones (one store, `Actor.herb_known`)."""
-    kn = _lane("knowledge")
-    fn = getattr(kn, "reveal", None) if kn is not None else None
-    if fn is None:
-        from . import herbknowledge
-
-        fn = herbknowledge.reveal
-    return list(fn(actor, material_id, list(keys), how) or [])
+    return list(_lane("knowledge").reveal(actor, material_id, list(keys), how) or [])
 
 
 # =============================================================================================
@@ -2546,49 +2508,6 @@ def obtainable(obtain_kind: str, *, biome=None, creature=None) -> list[Material]
     return sorted(pool, key=lambda m: (m.price_gp or 0, m.name))
 
 
-# --- the old chain, retired ------------------------------------------------------------------
-
-MOVED_WORDS = ("Leatherworking is worked at the bench at the table now, one step at a time: "
-               "salt, flense, tan, cut, stitch, harden, assemble. The chain bench no longer "
-               "takes it.")
-
-
-class CraftError(ValueError):
-    """A step that cannot be described at all (kept for the routing table's shape)."""
-
-
-@dataclass
-class Chain:
-    methods: list = field(default_factory=list)
-    material_ids: list = field(default_factory=list)
-    product: str = "satchel"
-    name: str = ""
-
-
-def chain_from_body(body: dict) -> Chain:
-    """The old chain's reader, kept so `benches.supports` stays honest."""
-    body = body or {}
-    raw = body.get("materials")
-    if raw is None:
-        raw = body.get("material_ids") or []
-    return Chain(methods=[str(m).strip().lower() for m in body.get("methods") or []],
-                 material_ids=[str(m).strip().lower() for m in raw if str(m).strip()],
-                 product=str(body.get("product") or body.get("pattern") or "satchel")
-                 .strip().lower(),
-                 name=str(body.get("name") or "").strip())
-
-
-def preview(level: int, chain: Chain, stock: dict | None = None, actor=None):
-    """Refuses: the chain bench retired for leatherworking. A pattern it never knew is
-    refused by name with the ones it does (the old contract the /craft/ page still reads);
-    any real one says where the bench went."""
-    product = str(getattr(chain, "product", "") or "").strip().lower()
-    if product and product not in PRODUCTS:
-        raise CraftError(f"no product pattern {product!r}. Known: "
-                         f"{', '.join(sorted(PRODUCTS))}.")
-    raise CraftError(MOVED_WORDS)
-
-
 # --- settling a step (shared by the bench and a typed line) ------------------------------
 #
 # Lifted out of play/leather_views.py on 2026-10-28 for the engine's `make` op
@@ -2682,7 +2601,7 @@ def settle_made(actor, progress, plan: LeatherPlan, tier: int, consumes, *, now:
     kn = _lane("knowledge")
     for mid in used:
         doc = material(mid)
-        if doc is None or kn is None:
+        if doc is None:
             continue
         try:
             keys = working_keys(doc)
@@ -2700,14 +2619,14 @@ def settle_made(actor, progress, plan: LeatherPlan, tier: int, consumes, *, now:
             "discoveries": discoveries}
 
 
-__all__ = ["ACQUISITION", "CUT_PIECES", "Chain", "CraftError", "FORMS", "FRESH_HOURS", "Hide",
+__all__ = ["ACQUISITION", "CUT_PIECES", "FORMS", "FRESH_HOURS", "Hide",
            "KIND_GLYPH", "LeatherPlan", "METHODS", "METHOD_GLYPH", "METHOD_SLOTS", "Material",
            "OPTIONAL", "PRODUCTS", "Piece", "TRACK_ID", "band_for", "bench_rules",
-           "chain_from_body", "check_bonus", "check_terms", "failure_losses", "fit_reason",
+           "check_bonus", "check_terms", "failure_losses", "fit_reason",
            "fits_for", "freshness", "from_dict", "get", "grade_cap", "grade_source",
            "hide_name", "hides_from", "kit_terms", "land", "make", "make_hide", "materials",
            "method_level", "method_row", "methods_view", "obtainable", "pay_grade",
-           "piece_view", "plan_step", "preview", "product_dc", "product_units",
+           "piece_view", "plan_step", "product_dc", "product_units",
            "products_view", "put_hide", "rack", "record_of_hide", "rent_cp", "reveal",
            "spend", "tan_wait", "tuning_for", "units_of_size", "vat_rent_cp", "where_here",
            "working_keys"]

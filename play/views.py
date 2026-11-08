@@ -1225,6 +1225,26 @@ def game_revision(request):
     return response
 
 
+# Said under a turn the engine already resolved when the narrator met a wedged Ollama
+# (`gm.agent.surfaces_a_stall`). Not the client's own sentence: that one ends "send your
+# line again. Your turn has not been lost", which is true before the engine moves and
+# would, sent again here, do the deed twice.
+STALLED_AFTER_THE_TURN = (
+    "The narrator stopped answering, so this turn is told in the engine's own lines. This "
+    "is Ollama, not your game: quit Ollama from its tray icon and start it again before "
+    "your next line.")
+
+
+def _note_stall(agent, exc) -> None:
+    """Remember on the turn's agent that the narrator met a wedged Ollama, for `_finish`'s
+    reply. Before 2026-11-08 a stall here rendered the raw tells and said nothing, under
+    Free and Planned narration both (ponytail audit #6)."""
+    from gm.client import ModelStalled
+
+    if isinstance(exc, ModelStalled):
+        agent.stalled = STALLED_AFTER_THE_TURN
+
+
 def _model_down(exc: ModelUnavailable) -> JsonResponse:
     """The model could not be reached: 503 with its sentence, and for a model that has
     stopped answering (`gm.client.ModelStalled`) the flag that puts "Make a report" beside
@@ -4678,7 +4698,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 # Where the engine carried the scene after the last narrated beat (the
                 # downed door), shown as where it stands now (docs/narrator-after-defeat.md).
                 since=narration_mod.since_narrated(c.transcript))
-        except ModelUnavailable:
+        except ModelUnavailable as exc:
+            _note_stall(agent, exc)
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first
         # the plan wrote none, and the page showed no options at all.
@@ -5084,9 +5105,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     elif outcomes:
         try:
             text, attempt = agent.narrate_outcome(narration, outcomes, player_input)
-        except ModelUnavailable:
+        except ModelUnavailable as exc:
             # The tell renders raw and play continues. The narrator is a garnish on a
             # game that works without it.
+            _note_stall(agent, exc)
             text, attempt = "", None
         if not text:
             pc = c.scene.pc()
@@ -5142,6 +5164,9 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # thread and snapshots only — this call never blocks the response, and the model's
     # answer lands through `watcher.drain` on a later request, staleness-checked.
     watcher.kick(c)
+    if getattr(agent, "stalled", ""):
+        # The page shows it as it shows a stall before the turn, "Make a report" beside.
+        return JsonResponse({**_state(c), "stalled": agent.stalled})
     return JsonResponse(_state(c))
 
 
@@ -5882,7 +5907,8 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                         op=plan.intents[0].op if plan.intents else "", whole=True)
                     entry["repairs"] += notes
                 ours = list(getattr(agent, "last_added", None) or [])
-            except ModelUnavailable:
+            except ModelUnavailable as exc:
+                _note_stall(agent, exc)
                 text = ""
             fell_back = not text
             if fell_back:
@@ -6647,32 +6673,21 @@ def _counter_refusal(c, pc, merchant=None):
         f"Clear your name, or trade somewhere the watch is not looking.")}, status=409)
 
 
-def _stall_of(c, counter=None) -> tuple[str, str, int]:
-    """Which shop, on which day. Read the same way `craft_views` reads it, so a stall's
-    money and its stock agree about where and when this is.
+def _stall_of(c, counter=None, merchant=None, stall: str = "") -> tuple[str, str, int]:
+    """Which shop, on which day: the place, `market.stall_of`'s key, and the in-game day
+    (`day_of`, the clock in 24-hour windows), so the same vendor's stock holds for the day.
 
-    A present merchant names the stall, so two different vendors in one town are two
-    different shelves and two different tills — and the same vendor's stock holds for
-    the in-game day (`day_of` is the clock in 24-hour windows), which is the persistence
-    the table asked for.
-
-    One of a market's counters (I2) is keyed by its kind, `market:<counter>` — the shelf
-    and the till are the counter's (Morrowind's per-merchant gold), and the engine's
-    `buy` reads the same key to know which counter it is standing at. The stables are
-    keyed `stables` for the same reason.
+    The key is the one every door uses — typed `buy`, `sell` and `haggle`, and the
+    commission's haggle (audit #13) — so the panel's shelf, till and haggle are the ones the
+    words reach. One of a market's counters (I2) is keyed by its kind, `market:<counter>`;
+    the stables `stables`; anywhere else the merchant's name.
     """
     from rules import market
 
-    here = (str(c.scene.location_id or "nowhere"), "", market.day_of(c.scene.clock_minutes))
-    if counter is not None:
-        return here[0], counter.kind, here[2]
-    kind = market.counter_kind_here(c.scene)
-    if market.is_counter_kind(kind):
-        return here[0], kind, here[2]
-    merchant = _merchant_here(c.scene)
-    stall = re.sub(r"[^a-z0-9]+", "-", str(merchant.name).lower()).strip("-") \
-        if merchant else "market"
-    return here[0], stall, here[2]
+    return (str(c.scene.location_id or "nowhere"),
+            market.stall_of(c.scene, merchant,
+                            counter.kind if counter is not None else str(stall or "")),
+            market.day_of(c.scene.clock_minutes))
 
 
 def _craft_material(item) -> bool:
@@ -6823,9 +6838,7 @@ def trade(request):
     if refusal:
         return refusal
 
-    place, stall, day = _stall_of(c, counter)
-    if counter is None:
-        stall = str(body.get("stall") or stall)
+    place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     kind = counter.kind if counter is not None else market.counter_kind_here(c.scene, stall)
     tier = str(body.get("tier") or market.DEFAULT_STALL_TIER)
     if market.is_counter_kind(kind):
@@ -6931,10 +6944,9 @@ def trade_do(request):
     if op not in ("sell", "buy"):
         return JsonResponse({"error": "sell or buy"}, status=400)
 
-    place, stall, day = _stall_of(c, counter)
+    place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     params = {"item": str(body.get("item", "")).strip().lower(),
-              "count": read_int(body, "count", 1, lo=1, hi=999),
-              "stall": stall if counter is not None else str(body.get("stall") or stall)}
+              "count": read_int(body, "count", 1, lo=1, hi=999), "stall": stall}
     # At a market's counter the keeper is named, so the tell says who was paid — never
     # the master, who sells nothing (I2).
     if counter is not None:

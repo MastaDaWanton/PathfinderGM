@@ -722,6 +722,20 @@ def lasts(actor, minutes: int, biome: str = "", water: str = "") -> tuple[int, s
     return best, why
 
 
+def _dead(actor) -> bool:
+    """`has_state("state.down.dead")`, asked of the effects' own tags only.
+
+    Death is a condition, so an effect, never a standing tag; but `has_state` walks the
+    standing tags too when the effects say no — a feat and class-option read that took
+    ~1.4 ms a body (measured 2026-11-08, mostly the class catalogue's homebrew check).
+    `Scene.advance` charges EVERY body the campaign holds on every clock step, so with
+    300 bodies this one question was 0.41 of a 0.61 s ten-minute step (audit 2026-11-07:
+    "every clock step walks every body ever seen")."""
+    from . import states
+
+    return any(states.matches(t, "state.down.dead") for e in actor.effects for t in e.tags)
+
+
 def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = None,
            roll: bool = True, live: bool = False, water: str = "") -> Toll:
     """Spend `minutes` of a body's time, and roll every check those minutes owe.
@@ -745,7 +759,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
     """
     toll = Toll()
     minutes = max(0, int(minutes))
-    if not minutes or actor.has_state("state.down.dead"):
+    if not minutes or _dead(actor):
         return toll
     if not roll or dice is None:
         actor.awake_minutes = int(actor.awake_minutes) + minutes

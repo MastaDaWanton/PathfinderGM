@@ -481,7 +481,7 @@ def _mark_known(pc, mid: str) -> bool:
     property (plan §14.6, §16), so the page names one only once it is known."""
     kn = lw._lane("knowledge")
     doc = lw.material(mid)
-    if pc is None or kn is None or doc is None:
+    if pc is None or doc is None:
         return False
     try:
         return any(k.startswith("k") for k in kn.known_keys(pc, doc))
@@ -518,7 +518,7 @@ def _creature_unknown(pieces: dict | None, pc) -> set[str]:
             continue
         creature = str(piece["creature"])
         known = False
-        if kn is not None and hasattr(kn, "knows_creature"):
+        if hasattr(kn, "knows_creature"):
             try:
                 known = kn.knows_creature(pc, str(piece.get("material") or ""), creature)
             except Exception:  # noqa: BLE001 - unknown is the safe answer
@@ -1090,7 +1090,7 @@ def leather_grade(request):
     if c.scene.in_encounter:
         return _err("You are in a fight. Grading waits until it is over.", 409)
     kn = lw._lane("knowledge")
-    if kn is None or not hasattr(kn, "assay"):
+    if not hasattr(kn, "assay"):
         return _err("Grading is not available in this build yet.", 501)
     body = read_body(request)
     mid = str(body.get("material") or "").strip().lower()
@@ -1212,7 +1212,7 @@ def leather_perks(request):
 def _is_leather(doc) -> bool:
     mats = lw._lane("materials")
     try:
-        return bool(mats is not None and mats.is_leather(doc))
+        return bool(mats.is_leather(doc))
     except Exception:      # noqa: BLE001
         return False
 
@@ -1225,7 +1225,7 @@ def leather_ledger(request):
     if refused:
         return refused
     kn = lw._lane("knowledge")
-    if kn is None or not hasattr(kn, "ledger"):
+    if not hasattr(kn, "ledger"):
         return _err("The tanner's ledger is not available in this build yet.", 501)
     rows = []
     for row in kn.ledger(pc) or []:
@@ -1268,12 +1268,11 @@ def leather_material(request, material_id: str):
             else "one measure",
             "not_yet": list(doc.get("not_yet") or []),
             "unknown": lw._unknown(pc, doc)}
-    if kn is not None:
-        try:
-            card["properties"] = list(kn.properties(pc, doc))
-            card["grade_dc"] = int(kn.assay_dc(doc, pc))
-        except Exception:      # noqa: BLE001 - the card shows what it can
-            pass
+    try:
+        card["properties"] = list(kn.properties(pc, doc))
+        card["grade_dc"] = int(kn.assay_dc(doc, pc))
+    except Exception:      # noqa: BLE001 - the card shows what it can
+        pass
     # An unknown row says only that it is unknown. Measured 2026-10-08 by lane U5: each
     # unknown row went out with its `group`, and its key's letter (a0, t0) named the group
     # too, so the page held which list a property was in before any Grade; alchemy's U1
@@ -1304,7 +1303,7 @@ def _craft(kn) -> str | None:
     them, and then the routes below say so rather than teach with the smith's rows — the
     forge's teacher route reads only the smith's (`forge_views.forge_ask`), which is what
     lane F found taught deer hide at the forge."""
-    craft = getattr(kn, "LEATHERWORKER", None) if kn is not None else None
+    craft = getattr(kn, "LEATHERWORKER", None)
     if not craft:
         return None
     try:

@@ -230,3 +230,48 @@ def test_every_condition_is_a_key_of_the_tag_vocabulary(cond):
 
     assert cond in states.TAGS
     assert states.tags_for(cond)[0].startswith("state.")
+
+
+def test_one_failed_side_question_keeps_the_rest_of_the_read():
+    """Ponytail audit 2026-11-07 (smaller finding): the side questions shared the first
+    call's `try`, so a bodies question that failed set `error`, and every caller threw the
+    whole read away — the harm the first call had read included. Now the failed question
+    is named in `missed`, and the first call's claims stand."""
+    text = "Your blade opens her arm. She staggers back. What do you do?"
+    first = {"player_ends_at": {"place": "the market", "quote": ""}, "changed_hands": [],
+             "trades": [], "arrived": [], "left": [], "time_of_day": [],
+             "harmed": [{"who": "c4", "how": "wounded", "quote": "Your blade opens her arm"}]}
+
+    def chat(messages, *a, **k):
+        if "conditions" in k["schema"]["properties"]:
+            raise TimeoutError("the bodies question timed out")
+        return _reply(first)
+
+    reading = bv.read(text, facts(), chat=chat, model="m")
+    assert reading.error == ""
+    # Read, and judged by `validate` as any claim is (a harm on a beat whose one blow
+    # missed is set aside there): what matters is that it was not thrown away unread.
+    assert [c.category for c in reading.claims + reading.dropped] == ["harm"]
+    assert reading.missed and reading.missed[0].startswith("bodies: TimeoutError")
+    assert reading.as_log()["missed"] == reading.missed
+
+
+def test_a_read_with_a_question_missed_is_not_cached_as_whole():
+    """`read_beat` keeps claims by sentence; a partial answer is used and not kept, so the
+    next ask reads those sentences again."""
+    text = "Your blade opens her arm. She staggers back. What do you do?"
+    first = {"harmed": [{"who": "c4", "how": "wounded", "quote": "Your blade opens her arm"}]}
+    calls = []
+
+    def chat(messages, *a, **k):
+        calls.append(1)
+        if "conditions" in k["schema"]["properties"]:
+            raise TimeoutError("timed out")
+        return _reply(first)
+
+    bv.clear_cache()
+    f = facts()
+    bv.read_beat(text, f, chat=chat, model="m")
+    before = len(calls)
+    bv.read_beat(text, f, chat=chat, model="m")
+    assert len(calls) > before

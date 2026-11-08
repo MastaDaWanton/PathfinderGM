@@ -55,7 +55,7 @@ from .bestiary import printed_alignment
 from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
-from .sheet import (DYING_STABILISES, MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _said_rounds,
+from .sheet import (MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _mean_amount, _said_rounds,
                     _when_holds,
                     attacker_traits, current_moment, situated)
 from .tables import (
@@ -2069,6 +2069,17 @@ class Scene:
                 continue
             for said in finish_uses.battle_over(who):
                 self.log.append({"op": "finish-spent", "tell": said, "ref": ref})
+            # What comes back once a fight is over: a pool that refreshes on
+            # `encounter.end` (Rapid Coagulation, "once per combat"). `resources.REFRESH`
+            # named the event and nothing raised it, so a pool spent in one fight stayed
+            # spent until a night's rest (audit, magic: "once-per-combat pools never
+            # refill"). Here for the reason above: the one door.
+            back = who.refresh_pools("encounter.end")
+            if back:
+                self.log.append({"op": "pool-refilled", "ref": ref, "pools": back,
+                                 "tell": f"{who.name}'s {_and_list(back)} "
+                                         f"{'comes' if len(back) == 1 else 'come'} back "
+                                         f"with the fight over."})
         # A grapple is a fight's: when the fight ends, the holds made in it end with it.
         # Measured on the owner's report of 2026-11-01: the giant rot grub, dying, kept the
         # player grappled after the fight was over — its condition's only tags were
@@ -2885,6 +2896,11 @@ class BloodPool:
 
 
 # --- The engine ---------------------------------------------------------------------
+
+
+# A full night's rest taken in the last day (`Engine._slept_a_night`, audit #35). Asked by
+# prefix like every state; the effect carrying it says when the night ended.
+REST_TAKEN = "rest.full-night"
 
 class Engine:
     def __init__(self, scene: Scene, dice: Dice | None = None, world=None):
@@ -6085,7 +6101,7 @@ class Engine:
         a disarmed thug's sap was a free action with a thug standing over it.
         """
         params = raw.get("params") or {}
-        if params.get("from_") or params.get("price"):
+        if params.get("from_"):
             return []
         taker = params.get("to") or raw.get("target") or raw.get("actor")
         rec = self.scene.prop_on_the_ground(str(params.get("item", "")))
@@ -7924,23 +7940,29 @@ class Engine:
         #                     a failed save."
         #
         # Both clauses of the armour and helpless restrictions live in
-        # `classfeatures.evades`, so this reads one answer.
-        from . import classfeatures
-
-        evasion = classfeatures.evades(actor) if save == "ref" else ""
+        # `classfeatures.evades`, and the rule itself in `_evasion` — the cast's own save
+        # loop reads the same one (audit #33: it did not, and a rogue took 6 of a 12-point
+        # fireball she saved against).
         halves_on_success = str(
             (intent.params.get("on_success") or {}).get("damage") or "").strip().lower() == "half"
+        # The energy is the failure branch's: a success branch reading "half" carries no
+        # type of its own. Measured on 0.2.26 (audit #30): against fire resistance 10, a
+        # made save for half of 4d6 fire landed 6 untyped, unresisted — more than the failed
+        # save's 2.
+        dtype = branch.get("type") or (intent.params.get("on_failure") or {}).get(
+            "type") or "untyped"
         dmg = branch.get("damage")
-        if dmg and evasion and halves_on_success and verdict == "success":
+        share, evaded = self._evasion(actor, save, halves_on_success,
+                                      verdict == "success") if dmg else ("", "")
+        if share == "none":
             # Nothing at all, and the tell says which rule did it so the narrator can
             # write somebody diving clear rather than a number being skipped.
-            tell_bits.append(f"{actor.name} takes nothing: they got clear of it entirely.")
+            tell_bits.append(evaded)
             dmg = None
-        elif dmg and evasion == "improved" and halves_on_success and verdict == "failure":
+        elif share == "half":
             base = str(dmg)
             dmg_roll = self.dice.roll(base, label="damage", visibility="hidden")
-            hit = self._apply_damage(actor, max(0, dmg_roll.total // 2),
-                                     branch.get("type", "untyped"))
+            hit = self._apply_damage(actor, max(0, dmg_roll.total // 2), dtype)
             effects.append(hit)
             tell_bits.append(
                 f"{actor.name} takes {hit['amount']} ({hit['type']}, halved — they got "
@@ -7955,7 +7977,7 @@ class Engine:
                 if base:
                     dmg_roll = self.dice.roll(str(base), label="damage", visibility="hidden")
                     amount = max(0, dmg_roll.total // 2)
-                    hit = self._apply_damage(actor, amount, branch.get("type", "untyped"))
+                    hit = self._apply_damage(actor, amount, dtype)
                     effects.append(hit)
                     tell_bits.append(
                         f"{actor.name} takes {hit['amount']} ({hit['type']}, halved)"
@@ -7963,8 +7985,7 @@ class Engine:
                     )
             else:
                 dmg_roll = self.dice.roll(str(dmg), label="damage", visibility="hidden")
-                hit = self._apply_damage(actor, dmg_roll.total,
-                                         branch.get("type", "untyped"))
+                hit = self._apply_damage(actor, dmg_roll.total, dtype)
                 effects.append(hit)
                 tell_bits.append(
                     f"{actor.name} takes {hit['amount']} {hit['type']} damage"
@@ -7994,6 +8015,35 @@ class Engine:
             tell=" ".join(tell_bits) + self._hp_state_tell(crossed),
             because=intent.because,
         )
+
+    @staticmethod
+    def _evasion(actor: Actor, save: str, halves_on_success: bool,
+                 saved: bool) -> tuple[str, str]:
+        """What evasion makes of a save's damage: ("none", tell), ("half", tell) or
+        ("", "") for the ordinary share. The one reader for the `save` op and the cast's
+        save loop (audit #33: the cast never asked, and a rogue who made the Reflex save
+        against a 12-point fireball took 6).
+
+          evasion           "If she makes a successful Reflex saving throw against an
+                            attack that normally deals half damage on a successful save,
+                            she instead takes no damage."
+          improved evasion  "...she still takes no damage on a successful Reflex saving
+                            throw ... henceforth she takes only half damage on a failed
+                            save."
+
+        Only a Reflex save, and only against what halves on a success — the caller knows
+        that; nothing else can tell a fireball from a flat Reflex save against a closing
+        door. The armour and helpless clauses are `classfeatures.evades`'s."""
+        from . import classfeatures
+
+        if save != "ref" or not halves_on_success:
+            return "", ""
+        evasion = classfeatures.evades(actor)
+        if evasion and saved:
+            return "none", f"{actor.name} takes nothing: they got clear of it entirely."
+        if evasion == "improved" and not saved:
+            return "half", f"{actor.name} takes half: they got part of the way clear."
+        return "", ""
 
     # attack -------------------------------------------------------------------------------
 
@@ -11098,19 +11148,14 @@ class Engine:
             healed = target.heal(amount)
         nl_healed = nl_before - target.nonlethal
         temp_banked = sum(p.amount for p in target.temp_pools) - temp_before
-        # The dying stop dying when they are back above zero; nothing else clears it.
-        # `dead` is deliberately outside this family — resurrection is the only caller
-        # entitled to remove it, and one shared list either breaks that or lets cure
-        # light wounds raise a corpse.
-        lifted = target.clear_states("recovery.hit-points") if target.hp > 0 else []
-        # ...unless the non-lethal still has them down. A cure cannot take off what thirst
-        # or hunger holds (CRB p.444), so the hit points it raises may still sit under
-        # the non-lethal — and a sweep that woke them anyway would be the cure healing
-        # the withheld damage by another name. The ladder is asked again, and what it
-        # puts back was never lifted.
-        if lifted:
-            again = target.apply_nonlethal_state()
-            lifted = [k for k in lifted if k not in again]
+        # The dying stop dying: back to 0 or above they wake (disabled at exactly 0), and
+        # any healing below it stabilises them (`Actor.after_healing`, the one rule; it
+        # was `hp > 0` here until 2026-11-08). `dead` is deliberately outside the family it
+        # sweeps — resurrection is the only caller entitled to remove it, and one shared
+        # list either breaks that or lets cure light wounds raise a corpse. What the
+        # non-lethal still holds them down with — a cure cannot take off what thirst or
+        # hunger holds (CRB p.444) — the ladder puts back, and it was never lifted.
+        lifted, written = target.after_healing(healed)
         held = survival.unmended(target, amount, nl_before)
 
         # The tell owns everything the cure did. "Already unhurt" used to be the whole
@@ -11154,6 +11199,9 @@ class Engine:
             back = sorted(lifted, key=lambda k: (order.index(k) if k in order else 9, k))
             tell += (f" {target.name} is no longer "
                      f"{' and '.join(back)}.")
+        crossed = [{"ref": target.ref, "kind": "condition", "condition": k,
+                    "from": "hit points"} for k in written]
+        tell += self._hp_state_tell(crossed)
 
         return Outcome(
             intent_id=intent.id, op="heal", rolls=[roll] if roll else [],
@@ -11163,7 +11211,7 @@ class Engine:
                       "origin": intent.origin}
                      | ({"nonlethal_withheld": target.withheld_nonlethal()} if held else {})]
                     + [{"ref": target.ref, "kind": "condition", "condition": k,
-                        "ends": True} for k in lifted],
+                        "ends": True} for k in lifted] + crossed,
             tell=tell,
             because=intent.because,
         )
@@ -11434,6 +11482,14 @@ class Engine:
             effects.append({"ref": target.ref, "kind": "condition", "condition": c,
                             "from": f"{ABILITY_FULL[ab]} 0"})
             bits.append(f"{target.name} is {c}.")
+        # The hit points the lost Constitution carried away cross the thresholds like
+        # any blow's (ponytail audit #2): Kesst at 1 hit point, Con 12 to 6, lay at a
+        # negative total wide awake, because only a score of 0 was ever asked.
+        crossed = self._hp_state_effects(target)
+        effects.extend(crossed)
+        said = self._hp_state_tell(crossed).strip()
+        if said:
+            bits.append(said)
         return Outcome(
             intent_id=intent.id, op="ability_damage", rolls=[roll] if roll else [],
             effects=effects, tell=" ".join(bits), because=intent.because,
@@ -11756,6 +11812,48 @@ class Engine:
                                  "places": where, "origin": "rule:trade-question"}],
                        tell=tell, because=intent.because)
 
+    def _stall_here(self, intent: Intent, ref, want: str = "") -> str:
+        """The shop this trade is at, by the one rule every door keys it with
+        (`market.stall_of`, audit #13): the seller, buyer or keeper named, else whoever
+        keeps a counter where the party stands, else the stall the intent named.
+
+        At a market with counters and nobody named, the counter the trade panel would open
+        on (`views._counter_pick`): the one whose keeper the player is talking with, else
+        the one that sells the thing asked for, else the general store. Typed trade there
+        keyed a whole-market shelf no panel ever showed."""
+        from . import keepers as keepers_mod
+        from . import market as market_mod
+
+        stall = str(intent.params.get("stall") or "")
+        keeper = self.scene.actors.get(ref) if ref else None
+        if keeper is None:
+            here = keepers_mod.keeper_in(self.scene, str(self.scene.at or ""))
+            if here is not None and here.ref in self.scene.actors                     and keepers_mod.keeps_a_counter(here):
+                keeper = here
+        at = str(self.scene.at or "")
+        if keeper is None and not market_mod.is_counter_kind(stall) and at                 and market_mod.is_market(at, getattr(self.scene, "founded", None) or ()):
+            world = getattr(self, "world", None)
+            try:
+                loc = world.get(str(self.scene.location_id)) if world is not None else None
+            except Exception:  # noqa: BLE001 - a world that cannot answer is a town
+                loc = None
+            choices = market_mod.counters(loc if loc is not None
+                                          else self.scene.location_id)
+            ids = {x.id: x for x in choices}
+            chosen = next((ids[cid] for a in self.scene.actors.values()
+                           for cid in [keepers_mod.counter_of(
+                               str(getattr(a, "world_entity_id", "") or ""))]
+                           if cid in ids and a.has_state(states.TALKING)), None)
+            if chosen is None and want:
+                chosen, _ = market_mod.counter_for_want(
+                    want, choices, str(self.scene.location_id or "nowhere"),
+                    market_mod.day_of(self.scene.clock_minutes), self.scene.market_taken,
+                    scale=market_mod.scale_here(world, self.scene.location_id))
+            chosen = chosen or ids.get("general")
+            if chosen is not None:
+                stall = chosen.kind
+        return market_mod.stall_of(self.scene, keeper, stall)
+
     def _op_haggle(self, intent: Intent, partial: dict) -> Outcome:
         """Profession against the keeper's Sense Motive (Ultimate Campaign's bargaining,
         Profession standing for Bluff — the owner's option B). Beaten, the counter's
@@ -11771,7 +11869,7 @@ class Engine:
             return self._refuse(intent, "There is nobody behind a counter here to "
                                         "haggle with.")
         place = str(self.scene.location_id or "nowhere")
-        stall = str(intent.params.get("stall") or keeper.ref)
+        stall = self._stall_here(intent, keeper.ref)
         day = market_mod.day_of(self.scene.clock_minutes)
         key = tradecraft.dealing_key("haggle", actor.ref, place, stall, day)
         if key in self.scene.dealings:
@@ -12665,7 +12763,6 @@ class Engine:
 
     def _resolve_dying(self, a: Actor) -> list[str]:
         """One dying creature's story ends off-screen: stable, or gone."""
-        floor = a.death_floor()
         if states.destroyed_at_zero(a):
             # An undead creature saved "dying" before 2026-10-01 does not bleed and does
             # not stabilise: it was destroyed when it reached 0.
@@ -12676,20 +12773,19 @@ class Engine:
             # there, inert, until somebody mends it — or it was past the floor already.
             a.apply_hp_state()
             return [f"{a.name} " + (_DESTROYED_SAID if a.is_dead else _BROKEN_SAID) + "."]
-        if a.has_state(DYING_STABILISES):
-            # Diehard: stable without the roll, off-screen as on (`Actor.bleed_out`).
-            a.bleed_out(self.dice)
-        while a.hp > floor and a.has_condition("dying"):
-            if self.dice.roll("1d100", label="stabilise",
-                              visibility="hidden").total <= 10:
-                a.remove_condition("dying")
-                a.add_condition("stable", source="luck")
-                break
-            a.hp -= 1
+        # Round by round by the rule the scene's own rounds use (`Actor.bleed_out`: the
+        # Constitution check, a natural 20, the point lost only on a failure; Diehard's
+        # automatic stabilising). This rolled a flat 10% on a d100 until 2026-11-08
+        # (ponytail audit #14), 3.5's rule for a body nobody tends, which the CRB does
+        # not have: a Con 10 NPC at -1 stabilises half the time on screen and did one
+        # time in ten off it, so companions and prisoners left behind nearly all died.
+        # Each round either stabilises them or costs a point, so the floor ends it.
+        while a.bleed_out(self.dice) and a.has_state("state.down.dying"):
+            pass
         a.apply_hp_state()
         return [f"{a.name} "
                 + ("stabilises where they lie."
-                   if a.has_condition("stable")
+                   if a.has_state("state.down.stable")
                    else "has bled out where they fell.")]
 
     def _stays_in_the_world(self, actor) -> bool:
@@ -15076,7 +15172,8 @@ class Engine:
             taken.append(f"{n} {coin}")
         body.purse = {}
         for iid, n in dict(body.inventory).items():
-            looter.carry(iid, n)
+            # With its age, or from now: carried with no clock it never spoiled.
+            looter.carry_from(body, iid, n, int(self.scene.clock_minutes))
             taken.append(f"{n}x {iid}")
         body.inventory = {}
         for sid, stock in dict(body.stock).items():
@@ -17333,29 +17430,26 @@ class Engine:
         start of the affected creature's turn ... stopped with a successful DC 15 Heal
         skill check or through the application of any magical healing" (Bleed UMR): the
         `bleed` condition with its per-round damage, run by the one periodic executor,
-        the shape wounding's bleed and the demon-ichor flask already take. "Bleed damage
-        does not stack": a second bleed replaces the first only when it is worse."""
+        the shape wounding's bleed and the demon-ichor flask already take. "Bleed effects
+        do not stack ... take the worse effect" (CRB Appendix 2): a bleed no worse than
+        the one already running is said and not laid, and a worse one is laid beside it,
+        the executor running only the worst (`Actor.running_bleeds`)."""
         if states.immune_to(defender, "bleed", "bleed") or defender.has_state("immune.bleed"):
             return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
                                 "rider": "bleed", "origin": origin},
                      "tell": f"{defender.name} does not bleed; the wound stays shut."}]
         amount = str(rule.get("amount") or "1")
-
-        def mean(dice: str) -> float:
-            m = re.fullmatch(r"(\d+)d(\d+)([+-]\d+)?", dice.replace(" ", ""))
-            if m:
-                return int(m.group(1)) * (int(m.group(2)) + 1) / 2 + int(m.group(3) or 0)
-            return float(dice) if dice.isdigit() else 1.0
-
-        worse = [e for e in defender.effects if e.key == "bleed"
-                 and any(mean(str(p.get("damage") or "1")) >= mean(amount)
-                         for p in e.periodic)]
-        if worse:
+        # Judged against the bleed that RUNS, a wounding blade's hits together, and not
+        # against each bleed one at a time — which stripped three 1-point wounding bleeds
+        # (3 a round) off for a 1d4 claw (2.5), and replaced every other bleed in the
+        # stripping, so the answer depended on which landed first (ponytail audit).
+        running = max((g["mean"] for g in defender.running_bleeds()
+                       if g["type"] == "untyped"), default=0.0)
+        if running >= _mean_amount(amount):
             return [{"effect": {"ref": defender.ref, "kind": "rider", "rider": "bleed",
                                 "stacked": False, "origin": origin},
                      "tell": f"{actor.name} opens another wound on {defender.name}; it "
                              f"bleeds no worse than it already does."}]
-        defender.remove_effects(kind="condition", match=lambda e: e.key == "bleed")
         defender.apply_effect(ActiveEffect(
             name="Bleed", kind="condition", key="bleed", source=f"{actor.name}'s bleed",
             origin=origin, tags=states.tags_for("bleed"),
@@ -18277,8 +18371,11 @@ class Engine:
                     payload={"stopped_by": str(r.get("stopped_by") or "")},
                     periodic=[{"per": "round", "damage": amount,
                                "damage_type": "untyped"}]))
-                total = sum(int(p.get("damage", 0) or 0) for e in who.effects
-                            if e.key == "bleed" for p in e.periodic)
+                # What now runs, by the one rule (`Actor.running_bleeds`): a sum over
+                # every bleed here read a creature's bleed as wounding's, and raised on
+                # a dice string ("1d6") it could not add.
+                total = next((g["said"] for g in who.running_bleeds()
+                              if g["type"] == "untyped"), str(amount))
                 out.append({"effect": {"ref": who.ref, "kind": "condition",
                                        "condition": "bleed", "from": what,
                                        "origin": origin, "per_round": total},
@@ -18295,32 +18392,44 @@ class Engine:
         return out
 
     def _magic_gate(self, actor: Actor, defender: Actor, gate: dict, what: str,
-                    origin: str) -> list[dict]:
-        """One rider's saving throw and what failing it costs (thundering, disruption)."""
-        save = str(gate.get("target") or "fort").lower()[:4]
-        save = {"fortitude": "fort", "reflex": "ref"}.get(save, save)
+                    origin: str, *, dc: int | None = None, rounds: int | None = None,
+                    saved: bool | None = None, descriptors=()) -> list[dict]:
+        """One rider's saving throw and what failing it costs (thundering, disruption).
+
+        Also the executor for a SPELL's save-or-suffer rider since 2026-11-08 (audit #36,
+        `_gate_rider`): the cast passes its real `dc` (the document's is the formula
+        "10 + spell level + casting ability modifier", which no int() reads), its
+        `rounds` for a branch that names no length of its own (hold person's paralysis
+        lasts the spell), the `saved` answer the cast's own stage already rolled (so a
+        player rolls their own save and nothing here rolls twice), and the spell's
+        `descriptors` for the condition op's immunity check (a mind-affecting sleep on an
+        undead body). A made save may still land a success branch's condition when that
+        branch carries its own duration."""
+        from . import spells as spells_mod_
+
+        save = spells_mod_.save_key(str(gate.get("target") or "fort"))
         if save not in SAVES:
             return []
-        try:
-            dc = int(gate.get("dc"))
-        except (TypeError, ValueError):
-            return []
-        roll = self.dice.d20(defender.save_modifiers(save),
-                             label=f"{SAVES[save]} save against the {what}",
-                             visibility="hidden")
-        nat = natural_said(roll, dc)
-        said = f"{nat}, " if nat else ""
-        if d20_succeeds(roll, dc):
-            return [{"effect": {"ref": defender.ref, "kind": "save", "save": save,
-                                "saved": True, "origin": origin},
-                     "tell": f"{defender.name} makes the {SAVES[save]} save against the "
-                             f"{what} ({said}{roll.total} against DC {dc})."}]
-        out = [{"effect": {"ref": defender.ref, "kind": "save", "save": save,
-                           "saved": False, "origin": origin},
-                "tell": f"{defender.name} fails the {SAVES[save]} save against the {what} "
-                        f"({said}{roll.total} against DC {dc})."}]
-        for branch in gate.get("on_failure") or ():
-            if not isinstance(branch, dict):
+        if dc is None:
+            try:
+                dc = int(gate.get("dc"))
+            except (TypeError, ValueError):
+                return []
+        out: list[dict] = []
+        if saved is None:
+            roll = self.dice.d20(defender.save_modifiers(save),
+                                 label=f"{SAVES[save]} save against the {what}",
+                                 visibility="hidden")
+            nat = natural_said(roll, dc)
+            said = f"{nat}, " if nat else ""
+            saved = d20_succeeds(roll, dc)
+            out.append({"effect": {"ref": defender.ref, "kind": "save", "save": save,
+                                   "saved": bool(saved), "origin": origin},
+                        "tell": f"{defender.name} {'makes' if saved else 'fails'} the "
+                                f"{SAVES[save]} save against the {what} "
+                                f"({said}{roll.total} against DC {dc})."})
+        for branch in gate.get("on_success" if saved else "on_failure") or ():
+            if not isinstance(branch, dict) or not self._gate_applies(branch, bool(saved)):
                 continue
             kind = str(branch.get("type") or "")
             if kind == "slay":
@@ -18333,6 +18442,10 @@ class Engine:
                 if isinstance(dur, dict) and dur.get("amount"):
                     params["duration"] = {"amount": dur["amount"],
                                           "unit": dur.get("unit", "round")}
+                elif rounds:
+                    params["duration"] = {"amount": int(rounds), "unit": "round"}
+                if descriptors:
+                    params["descriptors"] = list(descriptors)
                 res = self.run(self.validate([{
                     "op": "condition", "visibility": "hidden", "because": f"the {what}",
                     "params": params}], origin=origin, origin_name=what))
@@ -19185,6 +19298,25 @@ class Engine:
             if refused:
                 return self._refuse(intent, refused)
 
+        if use.spell is not None and how != "throw":
+            # A spell potion with no documents of its own: the spell's (plan §11.3),
+            # `spells.effects_at` at the potion's caster level, the drinker its target —
+            # "The drinker of a potion is both the effective target and the caster of the
+            # effect" (CRB, potions); a potion of a harmful spell holds its drinker. Not
+            # the cast door: that door applies a spell's dice, its save and its AC, and
+            # tells the GM the rest (bless's +1, a potion of bull's strength's +4), where a
+            # potion's whole document must land.
+            #
+            # Read before the dose is spent: a potion whose spell the bench does not have
+            # is refused with nothing drunk. It was refused AFTER `held.count -= 1`, so the
+            # refusal ate the potion (ponytail audit 2026-11-07, smaller findings).
+            try:
+                consumables.spell_intents(use.spell, target, intent.because
+                                          or f"{use.item}, drunk", self.dice, use=use)
+            except KeyError:
+                return self._refuse(intent, f"{use.item} holds a spell the Spells bench "
+                                            f"does not have ({use.spell.get('spell')}).")
+
         # The dose is spent whichever way it was used, and spent before the effects
         # resolve. A poison that kills the drinker mid-resolution has still been drunk.
         held.count -= 1
@@ -19221,21 +19353,6 @@ class Engine:
             return Outcome(intent_id=intent.id, op="use_item", effects=effects,
                            tell=f"{actor.name} throws {use.item}{at}.",
                            because=intent.because)
-
-        if use.spell is not None:
-            # A spell potion with no documents of its own: the spell's (plan §11.3),
-            # `spells.effects_at` at the potion's caster level, the drinker its target —
-            # "The drinker of a potion is both the effective target and the caster of the
-            # effect" (CRB, potions); a potion of a harmful spell holds its drinker. Not
-            # the cast door: that door applies a spell's dice, its save and its AC, and
-            # tells the GM the rest (bless's +1, a potion of bull's strength's +4), where a
-            # potion's whole document must land.
-            try:
-                consumables.spell_intents(use.spell, target, intent.because
-                                          or f"{use.item}, drunk", self.dice, use=use)
-            except KeyError:
-                return self._refuse(intent, f"{use.item} holds a spell the Spells bench "
-                                            f"does not have ({use.spell.get('spell')}).")
 
         cloud_tells = [self._lay_cloud(spec, self.scene.positions.get(actor.ref), actor,
                                        use.item) for spec in use.clouds]
@@ -19371,7 +19488,7 @@ class Engine:
         # `craft_views` reads them, so a stall's money and its stock agree about which
         # shop on which day this is.
         place = str(self.scene.location_id or "nowhere")
-        stall = str(intent.params.get("stall") or buyer or "market")
+        stall = self._stall_here(intent, buyer)
         day = market_mod.day_of(self.scene.clock_minutes)
 
         # The seller's standing with this town's law moves the price (docs/wanted.md):
@@ -19455,7 +19572,7 @@ class Engine:
             return self._refuse(intent, shut)
         who = buyer.name if buyer is not None else "the stallholder"
         place = str(self.scene.location_id or "nowhere")
-        stall = str(intent.params.get("stall") or buyer_ref or "market")
+        stall = self._stall_here(intent, buyer_ref)
         day = market_mod.day_of(self.scene.clock_minutes)
 
         asking = round(pricing.what_a_shop_pays_for_goods(key, seller=actor, town=place)
@@ -19549,7 +19666,7 @@ class Engine:
                and keepers_mod.keeps_a_counter(here_keeper) else "the stallholder")
 
         place = str(self.scene.location_id or "nowhere")
-        stall = str(intent.params.get("stall") or seller or "market")
+        stall = self._stall_here(intent, seller, want=item_id)
         day = market_mod.day_of(self.scene.clock_minutes)
 
         # The stall names the counter when it is one of a market's (`market:armorer`, I2):
@@ -19575,6 +19692,13 @@ class Engine:
             return self._refuse(
                 intent, f"{who} has no {item_id} on the counter today. On the counter: "
                         f"{near or 'nothing'}.")
+        # The day's draw puts ONE of each thing on the shelf (`market.stock` samples
+        # without repeats), so a thing that is not a staple is sold one at a time.
+        # Measured 2026-11-07 (audit #17): three of the single drawn ring bought three
+        # rings, up to the trade window's 999.
+        only_one = ""
+        if count > 1 and not getattr(found, "staple", False):
+            count, only_one = 1, " It was the only one on the counter."
 
         # A counter talked round today sells for less (`_op_haggle`, the owner's option
         # B): the price the shelf shows, moved by the percentage the haggle won.
@@ -19618,7 +19742,8 @@ class Engine:
                  + (f"{goods.measure(count * per, found.unit)} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
                  + (f", {haggled}% off for the haggle" if haggled else "")
-                 + f". ({goods.purse_line(actor.purse, coins)} left.)" + arrived_tell,
+                 + f". ({goods.purse_line(actor.purse, coins)} left.)" + only_one
+                 + arrived_tell,
             because=intent.because,
         )
 
@@ -19716,7 +19841,9 @@ class Engine:
         if item:
             source = {"pool": "", "key": "", "cost": 0, "level": level}
         else:
-            source = (state or {}).get("source") or casting.cast_source(actor, spell) or {
+            # A converted cure pays with the slot of the spell it is cast in place of
+            # (`casting.conversion_source`), never with a slot of the cure's own level.
+            source = (state or {}).get("source") or casting.cast_source(actor, spell)                 or casting.conversion_source(actor, spell) or {
                 "pool": "" if casting.at_will(level) else casting.slot_pool(level),
                 "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
         level = int(source.get("level", level))
@@ -19787,6 +19914,14 @@ class Engine:
                     caught = [actor.ref]
             objects = areas.objects_caught(self.scene, area, spell)
             harm = attitude_mod.harm_of(spell, cl)
+            # A cure aimed at the undead is an attack on them (audit #29): it opens the
+            # fight and moves attitude as any harmful spell does.
+            if not harm and plan["kind"] == "heal" and dice \
+                    and spells_mod.turns_on_undead(spell, "heal") \
+                    and any(r in self.scene.actors
+                            and self.scene.actors[r].has_state(states.UNDEAD)
+                            for r in caught):
+                harm = "harm"
             harms = bool(harm)
             foes = [r for r in caught if r in self.scene.actors
                     and self._against(actor, self.scene.actors[r])]
@@ -19846,7 +19981,7 @@ class Engine:
                     # Spontaneous conversion: the cure is cast and the prepared spell that
                     # paid for it is gone. Said out loud, because a player whose shield of
                     # faith silently vanished would be right to call it a bug.
-                    given = casting.sacrifice_for(actor, level)
+                    given = source.get("sacrifice") or casting.sacrifice_for(actor, level)
                     if given:
                         casting.unprepare(actor, given, 1)
                         try:
@@ -19978,8 +20113,18 @@ class Engine:
         # the popups. A creature that resists is struck from `live`, so neither the
         # damage nor a rider reaches it. "Harmless" spells are not checked: the book lets
         # a creature lower its SR for them, and a cure resisted by an ally is no rule.
-        if spell.sr is True and "harmless" not in sr.lower():
+        # Positive and negative energy against the undead (audit #29; `spells.turns_on_
+        # undead`): a cure hurts a zombie and an inflict mends it. Channel energy already
+        # did this through its document's `healed_instead`; the cast loop asked nothing.
+        # Worked out here, before spell resistance, because a turned cure is resisted:
+        # "An undead creature can apply spell resistance" (CRB, Cure Light Wounds).
+        turns = bool(dice) and spells_mod.turns_on_undead(spell, plan["kind"])
+        turned = {r for r in live if turns and self.scene.actors[r].has_state(states.UNDEAD)}
+        harmless = "harmless" in sr.lower()
+        if spell.sr is True and (not harmless or (turned and plan["kind"] == "heal")):
             for ref in live:
+                if harmless and ref not in turned:
+                    continue
                 self._resists(intent, actor, self.scene.actors[ref], spell, cl, partial,
                               state)
             resisted = {r for r, beat in (state.get("sr") or {}).items() if not beat}
@@ -19991,11 +20136,53 @@ class Engine:
         # +3 against metal was read by nothing. The caster's roll, once per target, kept in
         # the state across the popup; a miss is struck from `live`, so neither the dice nor
         # a rider reaches it.
-        touch = casting.touch_attack(spell)
-        if touch is not None:
+        #
+        # Since 2026-11-08 the document is one of three ways in (`casting.touch_attack`): a
+        # ray is a ranged touch on whoever it is aimed at, a harmful touch spell a melee
+        # touch on a foe (a willing subject is touched without one), and a cure turned on
+        # the undead (`turned`, below) a melee touch on that foe. Before, only shocking
+        # grasp rolled: scorching ray, disintegrate and inflict wounds never missed (audit
+        # #28). A ray spell of several rays rolls one touch per RAY, dealt out over the
+        # targets as magic missile's missiles are (`_missiles_split`), and a missed ray's
+        # share of the dice lands nowhere.
+        touch = casting.touch_attack(spell, cl)
+        turned = {r for r in turned if r in live}
+        reach_touch = str(spell.range or "").strip().lower().startswith("touch")
+        per_ray = (touch is not None and str(touch.get("touch") or "") == "ranged"
+                   and missiles >= 1 and bool(live))
+
+        def touch_for(ref: str) -> dict | None:
+            who = self.scene.actors[ref]
+            if who is actor:
+                return None
+            foe = self._against(actor, who)
+            if touch is not None and (str(touch.get("touch") or "melee") == "ranged"
+                                      or foe or not touch.get("derived")):
+                return touch
+            if ref in turned and foe and reach_touch and plan["kind"] == "heal":
+                return {"type": "touch_attack", "touch": "melee", "derived": True}
+            return None
+
+        if per_ray:
+            order = state.setdefault("ray_order", list(live))
+            for k in range(missiles):
+                ref = order[k % len(order)]
+                self._touches(intent, actor, self.scene.actors[ref], spell, touch, partial,
+                              state, key=f"{ref}#{k + 1}",
+                              which=(f", ray {k + 1} of {missiles}" if missiles > 1
+                                     else ""))
+            hits = state.get("touch") or {}
+            landed = {k.split("#", 1)[0] for k, hit in hits.items() if hit}
+            missed = {r for r in order if r not in landed}
+            if missed:
+                live = [r for r in live if r not in missed]
+                cast_effect["missed"] = sorted(missed)
+        else:
             for ref in list(live):
-                self._touches(intent, actor, self.scene.actors[ref], spell, touch,
-                              partial, state)
+                doc = touch_for(ref)
+                if doc is not None:
+                    self._touches(intent, actor, self.scene.actors[ref], spell, doc,
+                                  partial, state)
             missed = {r for r, hit in (state.get("touch") or {}).items() if not hit}
             if missed:
                 live = [r for r in live if r not in missed]
@@ -20013,8 +20200,17 @@ class Engine:
                 # Each missile its own share of the faces, and the missiles dealt out over
                 # the targets in turn (CRB p.310: "you can target a single creature or
                 # several creatures"), kept in the state across a save's popup.
-                state["missiles"] = _missiles_split(self.dice, one_missile, roll.faces,
-                                                    missiles, live)
+                if per_ray:
+                    # Dealt over the targets the rays were aimed at, in the order their
+                    # touches were rolled, and kept only where the ray's touch landed.
+                    hits = state.get("touch") or {}
+                    state["missiles"] = [
+                        m for m in _missiles_split(self.dice, one_missile, roll.faces,
+                                                   missiles, state["ray_order"])
+                        if hits.get(f"{m['ref']}#{m['n']}")]
+                else:
+                    state["missiles"] = _missiles_split(self.dice, one_missile,
+                                                        roll.faces, missiles, live)
 
         rolled = int(state.get("rolled", 0))
         per_target = state.get("missiles")
@@ -20033,36 +20229,38 @@ class Engine:
                     continue
                 amount = sum(m["amount"] for m in mine)
 
-            if plan["save"]:
-                # An unreliable cloak lending this save its bonus is used by it: rolled
-                # once per target, kept in the cast's state across the popup.
-                guts = state.setdefault("save_gutter", {})
-                if target.ref not in guts:
-                    gut = self._save_gutters(target)
-                    guts[target.ref] = {"origins": gut["origins"]}
-                    state["rolls"].extend(gut["rolls"])
-                    state["tells"].extend(gut["tells"])
-                with self._guttered(guts[target.ref]["origins"]):
-                    save_mods = target.save_modifiers(plan["save"], {"against": "spell"})
-                # Rolled by whoever is saving, not by the caster — which is what lets a
-                # PC roll their own save against a spell and keeps every NPC's save with
-                # the engine, through the one rule `_force_visibility` states.
-                save_roll = self._roll_or_suspend_stage(
-                    # Against a spell: null skymetal armour's +2 resistance "on saves against
-                    # spells" is a `when: {"against": "spell"}` term, asked of this.
-                    intent, target, save_mods,
-                    f"{SAVES[plan['save']]} save against {spell.name}", dc,
-                    partial, state, "1d20", state_key="cast_state",
-                )
-                state["rolls"].append(save_roll.as_dict())
-                saved = d20_succeeds(save_roll, dc)
-                self._judge(save_roll, saved)
-                # Half from full without parsing a tell: the saved flag only. The DC and
-                # total live on the save's Roll, under its own visibility (§1.6 E12).
-                state["effects"].append({"kind": "save", "ref": target.ref,
-                                         "save": plan["save"], "saved": bool(saved)})
-                effect = plan["save_effect"]
-                if saved and effect == "negates":
+            # What the spell is to THIS target: a cure turned on the undead is positive
+            # damage with a Will save for half ("can attempt a Will save to take half
+            # damage", CRB Cure Light Wounds), and an inflict is healing with no save to
+            # make — a zombie does not resist being mended.
+            kind, save_kind, save_effect = plan["kind"], plan["save"], plan["save_effect"]
+            dtype = plan["damage_type"]
+            if target.ref in turned:
+                if kind == "heal":
+                    kind, save_kind, save_effect, dtype = "damage", "will", "half", "positive"
+                else:
+                    kind, save_kind = "heal", ""
+                # Once, though a save's popup brings this target round the loop again.
+                told = state.setdefault("turned_told", [])
+                if target.ref not in told:
+                    told.append(target.ref)
+                    state["tells"].append(
+                        f"{target.name} is undead: {spell.name}'s "
+                        + ("positive energy harms it." if kind == "damage"
+                           else "negative energy mends it."))
+
+            if save_kind:
+                saved, save_roll = self._cast_save(intent, target, save_kind, dc, spell,
+                                                   partial, state)
+                effect = save_effect
+                # Evasion first: it overrules the ordinary share either way (`_evasion`,
+                # the one reader `_op_save` shares).
+                share, evaded = self._evasion(target, save_kind, effect == "half", saved)
+                if share == "none":
+                    amount = 0
+                elif share == "half":
+                    amount = max(0, amount // 2)
+                elif saved and effect == "negates":
                     amount = 0
                 elif saved and effect == "half":
                     # Half of the total that was actually rolled, not a second roll of
@@ -20079,14 +20277,16 @@ class Engine:
                     amount = 0
                 state["tells"].append(
                     f"{target.name} {'makes' if saved else 'fails'} the "
-                    f"{SAVES[plan['save']]} save ("
+                    f"{SAVES[save_kind]} save ("
                     + (f"{natural_said(save_roll, dc)}, " if natural_said(save_roll, dc)
                        else "")
                     + f"{save_roll.total} against DC {dc})"
                     + (f"; what a partial save leaves is in {spell.name}'s text."
-                       if saved and plan["save_effect"] == "partial" else "."))
+                       if saved and save_effect == "partial" else "."))
+                if evaded:
+                    state["tells"].append(evaded)
 
-            if plan["kind"] == "heal":
+            if kind == "heal":
                 had = target.nonlethal
                 healed = target.heal(amount)
                 state["effects"].append({
@@ -20111,7 +20311,7 @@ class Engine:
                         f"crowd: it finds no one target among them and is wasted.")
                     state["i"] += 1
                     continue
-                hit = self._apply_damage(target, amount, plan["damage_type"],
+                hit = self._apply_damage(target, amount, dtype,
                                          traits=("area",) if plan.get("area") else (),
                                          lethality=plan["lethality"])
                 hit["origin"] = item["origin"] if item else f"spell:{spell.id}"
@@ -20133,18 +20333,27 @@ class Engine:
                 shares = ([m["amount"] for m in mine] if per_target is not None
                           else [int(hit.get("amount") or 0)])
                 count = len(per_target or ())
+                noun = "missile"
+                if state.get("ray_order"):
+                    noun, count = "ray", missiles
                 for k, share in enumerate(shares):
                     which = ("" if per_target is None else
-                             ", its one missile" if count == 1 else
-                             f", missile {mine[k]['n']} of {count}")
+                             f", its one {noun}" if count == 1 else
+                             f", {noun} {mine[k]['n']} of {count}")
                     state.setdefault("blows", []).append({
                         "result": "hit", "ref": target.ref,
                         "weapon": f"{spell.name}{which}",
-                        "type": str(plan.get("damage_type") or ""),
+                        "type": str(dtype or ""),
                         "nonlethal": plan.get("lethality") == "nonlethal",
                         "critical": False,
                         "severity": blow_severity(int(share), hp_max), "left": left})
             state["i"] += 1
+
+        # The riders' own saving throws, before anything is laid (audit #21, #36): hold
+        # person's Will save, or the save a spell's own condition is negated by. Rolled
+        # here, inside the stage machine, so a player rolls their own and a popup brings
+        # the cast back without running a rider twice; the riders read the answers.
+        self._rider_saves(intent, actor, spell, plan, cl, dc, live, partial, state)
 
         effects = [cast_effect] + list(state["effects"])
         crossed = []
@@ -20156,7 +20365,9 @@ class Engine:
         if dice and "rolled" in state and per_target is not None:
             tells.append(_missiles_said(per_target, self.scene, str(plan.get("damage_type")
                                                                      or ""), cl, dice,
-                                        int(state.get("rolled", 0))))
+                                        int(state.get("rolled", 0)),
+                                        **({"noun": "ray", "made": missiles}
+                                           if state.get("ray_order") else {})))
         elif dice and "rolled" in state:
             tells.append(f"{dice} — {state.get('rolled', 0)}.")
         tells.extend(state["tells"])
@@ -20192,6 +20403,9 @@ class Engine:
         cast_ctx = self._cast_context(actor, spell, cl, level, dc, live, plan, intent)
         if item:
             cast_ctx["origin"] = item["origin"]
+        cast_ctx.update({"saved": {k: bool(v["saved"])
+                                   for k, v in (state.get("saved") or {}).items()},
+                         "spared": dict(state.get("spared") or {})})
         ran, said = self._run_specs(plan["riders"], cast_ctx)
         effects.extend(ran)
         tells.extend(said)
@@ -20217,6 +20431,44 @@ class Engine:
             effects=effects, tell=" ".join(tells), because=intent.because,
             blows=list(state.get("blows") or []),
         )
+
+    def _cast_save(self, intent: Intent, target: Actor, save: str, dc: int, spell,
+                   partial: dict, state: dict) -> tuple[bool, Roll]:
+        """`target`'s saving throw against this cast: (saved, roll), rolled once per target
+        and save and kept in `state["saved"]` across the popups. The one copy for the
+        damage loop and the riders' gate (`_rider_saves`), so a hold person's Will save is
+        made exactly as a fireball's Reflex save is.
+
+        Rolled by whoever is saving, not by the caster — which is what lets a PC roll their
+        own save against a spell and keeps every NPC's save with the engine, through the
+        one rule `_force_visibility` states. Against a spell: null skymetal armour's +2
+        resistance "on saves against spells" is a `when: {"against": "spell"}` term."""
+        done = state.setdefault("saved", {})
+        key = f"{save}:{target.ref}"
+        if key in done:
+            return bool(done[key]["saved"]), _roll_from_dict(done[key]["roll"])
+        # An unreliable cloak lending this save its bonus is used by it: rolled once per
+        # target, kept in the cast's state across the popup.
+        guts = state.setdefault("save_gutter", {})
+        if target.ref not in guts:
+            gut = self._save_gutters(target)
+            guts[target.ref] = {"origins": gut["origins"]}
+            state["rolls"].extend(gut["rolls"])
+            state["tells"].extend(gut["tells"])
+        with self._guttered(guts[target.ref]["origins"]):
+            save_mods = target.save_modifiers(save, {"against": "spell"})
+        roll = self._roll_or_suspend_stage(
+            intent, target, save_mods, f"{SAVES[save]} save against {spell.name}", dc,
+            partial, state, "1d20", state_key="cast_state")
+        state["rolls"].append(roll.as_dict())
+        saved = d20_succeeds(roll, dc)
+        self._judge(roll, saved)
+        # Half from full without parsing a tell: the saved flag only. The DC and total live
+        # on the save's Roll, under its own visibility (§1.6 E12).
+        state["effects"].append({"kind": "save", "ref": target.ref, "save": save,
+                                 "saved": bool(saved)})
+        done[key] = {"saved": bool(saved), "roll": roll.as_dict()}
+        return saved, roll
 
     # --- where a cast went (rules/areas.py does the geometry) ---------------------------
 
@@ -20277,19 +20529,21 @@ class Engine:
         return not beat
 
     def _touches(self, intent: Intent, actor: Actor, target: Actor, spell, touch: dict,
-                 partial: dict, state: dict) -> bool:
+                 partial: dict, state: dict, key: str = "", which: str = "") -> bool:
         """Whether a touch spell's attack reaches `target` (CRB, Aiming a Spell: a touch
         attack against touch AC), rolled once per target and kept in `state["touch"]`, as
         `_resists` keeps the spell resistance check. The spell's own terms ride on it
         (`casting.touch_terms`: shocking grasp's +3 against metal). Touching yourself
-        needs no roll."""
+        needs no roll. `key` keeps one roll per RAY of a several-ray spell ("c1#2"), and
+        `which` names that ray in the label and the tell."""
         from .dice import stack as _stack
 
         done = state.setdefault("touch", {})
-        if target.ref in done:
-            return bool(done[target.ref])
+        key = key or target.ref
+        if key in done:
+            return bool(done[key])
         if target is actor:
-            done[target.ref] = True
+            done[key] = True
             return True
         ranged = str(touch.get("touch") or "melee") == "ranged"
         mods = _stack(self._touch_mods(actor, target, ranged)
@@ -20298,7 +20552,7 @@ class Engine:
                              or self._unseen_attacker(target, actor), attacker=actor)
         kind = "ranged" if ranged else "melee"
         roll = self._roll_or_suspend_stage(
-            intent, actor, mods, f"{spell.name}: {kind} touch attack on {target.name}", ac,
+            intent, actor, mods, f"{spell.name}{which}: {kind} touch attack on {target.name}", ac,
             partial, state, "1d20", state_key="cast_state")
         state["rolls"].append(roll.as_dict())
         hit = d20_succeeds(roll, ac)
@@ -20319,12 +20573,13 @@ class Engine:
                     hit = False
                     hidden_by = f" — {why}, {chance}% miss chance ({miss.total})"
         self._judge(roll, hit)
-        done[target.ref] = hit
+        done[key] = hit
         nat = natural_said(roll, ac)
         against = [m.value for m in mods if m.source == "against metal"]
         metal = f", {against[0]:+d} against metal" if against else ""
         state["tells"].append(
-            f"{actor.name}'s {kind} touch {'reaches' if hit else 'misses'} {target.name} "
+            f"{actor.name}'s {kind} touch{which + ',' if which else ''} "
+            f"{'reaches' if hit else 'misses'} {target.name} "
             f"({nat + ', ' if nat else ''}{roll.total} against touch AC {ac}{metal})"
             + hidden_by + ("." if hit else f": {spell.name} touches nobody."))
         return hit
@@ -20583,6 +20838,14 @@ class Engine:
             # `spells.roll_duration` on why the deterministic reader stayed deterministic.
             "rounds": spells_mod.roll_duration(spell, cl, self.dice),
             "source": spell.name, "dc": dc, "origin": f"spell:{spell.id}",
+            # The spell itself, for the riders that ask what its own lines say: its id
+            # (the power words' hit-point table, `spells.HP_TIERS`), its printed saving
+            # throw and duration, and its descriptors (a mind-affecting immunity).
+            "spell_id": spell.id, "spell_save": str(spell.save or ""),
+            "spell_save_effect": str(spell.save_effect or ""),
+            "spell_harmless": bool(spell.save_harmless),
+            "instant": str((spell.duration_value or {}).get("kind") or "") == "instantaneous",
+            "descriptors": list(spell.descriptors or ()),
             # Whether a cast at nobody lands on the caster: a personal or touch spell
             # (mage armor, shield) said without a target means the caster.
             "self_ok": bool(re.match(r"\s*(personal|touch|you)\b",
@@ -20617,11 +20880,13 @@ class Engine:
                  # is rolled before the dice (`_touches`) and does nothing as a rider; it is
                  # listed so the cast does not also print it for the GM as unexecuted.
                  "metal_temperature", "rust", "touch_attack",
-                 # A condition the spell itself lays, with no save between — the four
-                 # invisibility spells (2026-10-30), the only top-level `apply_condition`
-                 # specs in the corpus; every other condition sits in a save gate, which
-                 # keeps the path it had. `_lay_condition`.
-                 "apply_condition")
+                 # A condition the spell itself lays — the four invisibility spells
+                 # (2026-10-30) and, since 2026-11-08, whatever else `_condition_term`
+                 # can lay honestly (audit #21). `_lay_condition`.
+                 "apply_condition",
+                 # A save-or-suffer rider (hold person, sleep): rendered and never run
+                 # until 2026-11-08 (audit #36). `_gate_rider`.
+                 "save_gate")
 
     def _executes(self, spec: dict) -> bool:
         # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
@@ -20651,6 +20916,48 @@ class Engine:
             tells.extend(said)
         return effects, tells
 
+    # The conditions whose own rule ends them, so an instantaneous spell may lay them with
+    # no clock: fatigue and exhaustion end "after 8 hours of complete rest" (CRB,
+    # Conditions), and stable ends when the creature is healed or hurt. Every other
+    # condition laid by an instantaneous spell has its length in the spell's text, and
+    # laying it with no clock was how mudball blinded for ever (audit #21).
+    _ENDS_BY_ITS_OWN_RULE = ("fatigued", "exhausted", "stable")
+
+    def _condition_term(self, spec: dict, ctx: dict) -> tuple[bool, int | None, str]:
+        """Whether a spell's own `apply_condition` may be laid, and for how many rounds:
+        (lay, rounds, why-not). Audit #21: `_lay_condition` was written for the four
+        invisibility spells and 32 spells came through it — power word kill past its
+        hit-point cap, mudball blind for ever with no save. It lays now only what it can
+        lay honestly:
+
+          * the save: none or harmless (no save to make), or "negates" — rolled per target
+            by `_rider_saves` before anything lands. A partial or half save leaves what it
+            leaves in the spell's text, so it is told, not laid;
+          * the length: the spec's own duration, else the cast's rounds (the invisibility
+            documents carry `ends_when` besides), else — for an instantaneous spell — a
+            condition whose own rule ends it (`_ENDS_BY_ITS_OWN_RULE`). Anything else is
+            told for the GM, as `_grant_ac` tells an AC bonus with no rounds.
+
+        The power words' hit-point table (`spells.HP_TIERS`) is asked by `_lay_condition`
+        before this, and decides their length itself."""
+        key = str(spec.get("target") or "").strip().lower()
+        save = str(ctx.get("spell_save") or "")
+        effect = str(ctx.get("spell_save_effect") or "")
+        if save and not ctx.get("spell_harmless") and effect not in ("", "none", "negates"):
+            return False, None, (f"what a {effect} save leaves is in "
+                                 f"{ctx.get('source') or 'the spell'}'s text, so it is told "
+                                 f"rather than applied")
+        own = spec.get("duration")
+        if isinstance(own, dict) and own.get("amount") \
+                and str(own.get("unit") or "round") in ("round", "minute", "hour", "day"):
+            return True, self._duration_rounds(own), ""
+        if ctx.get("rounds"):
+            return True, int(ctx["rounds"]), ""
+        if ctx.get("instant") and key in self._ENDS_BY_ITS_OWN_RULE:
+            return True, None, ""
+        return False, None, ("its duration is not a number of rounds, so it is told rather "
+                             "than applied")
+
     def _lay_condition(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A condition the spell lays on everyone it reached, for its own duration, through
         the `condition` op stamped `spell:<id>` — and with its document's `ends_when`.
@@ -20658,14 +20965,30 @@ class Engine:
         Invisibility's mechanics were narrative only until 2026-10-30, under a note that
         "the vocabulary has no 'invisible' condition" (it has had one since stage 3,
         `states.TAGS["invisible"]`): measured with probe p4, a wizard cast invisibility on
-        herself and nothing about her changed."""
+        herself and nothing about her changed.
+
+        Since 2026-11-08 (audit #21) it lays only what `_condition_term` allows, skips a
+        target the spell's target line spares or who made the save (`_rider_saves`), and a
+        power word reads its hit-point table (`spells.HP_TIERS`): over the cap nothing
+        happens, a kill goes through `Actor.die`, and the rest last the table's dice."""
+        from . import effectspec as fx
+
         key = str(spec.get("target") or "").strip().lower()
         if not key:
             return [], []
         who = list(ctx.get("targets") or [])
         if not who and ctx.get("self_ok"):
             who = [ctx["caster"]]
-        fx: list[dict] = []
+        tiers = spells_mod.HP_TIERS.get(str(ctx.get("spell_id") or ""))
+        ok, rounds, why = (True, None, "") if tiers else self._condition_term(spec, ctx)
+        if not ok:
+            return [], [f"{fx.render(spec)} — {why}."]
+        save = str(ctx.get("spell_save") or "")
+        needs_save = bool(save) and not ctx.get("spell_harmless") \
+            and str(ctx.get("spell_save_effect") or "") == "negates"
+        saved = ctx.get("saved") or {}
+        spared = ctx.get("spared") or {}
+        fx_out: list[dict] = []
         said: list[str] = []
         ends = spec.get("ends_when") if isinstance(spec.get("ends_when"), dict) else {}
         # One invisibility shared by several (mass invisibility, invisibility sphere;
@@ -20681,23 +21004,168 @@ class Engine:
             shared = {"group": f"{ctx.get('origin') or 'spell'}@{ctx.get('caster')}:"
                                f"{self.scene.clock_minutes}:{self.scene.round}",
                       "recipient": recipient}
+        source = str(ctx.get("source") or "the spell")
         for ref in who:
-            if ref not in self.scene.actors:
+            if ref not in self.scene.actors or ref in spared:
                 continue
+            target = self.scene.actors[ref]
+            if needs_save and ref != ctx.get("caster") \
+                    and saved.get(f"{spells_mod.save_key(save)}:{ref}", True):
+                continue                       # made the save (or none was rolled)
+            lasts = rounds
+            if tiers:
+                what = spells_mod.hp_tier(str(ctx.get("spell_id")), target.hp)
+                if what is None:
+                    fx_out.append({"ref": ref, "kind": "unaffected", "hp": target.hp,
+                                   "origin": str(ctx.get("origin") or "")})
+                    said.append(f"{target.name} has {target.hp} hit points, too many: "
+                                f"{source} leaves them unaffected.")
+                    continue
+                if what == "die":
+                    if target.die(source):
+                        fx_out.append({"ref": ref, "kind": "condition", "condition": "dead",
+                                       "from": source,
+                                       "origin": str(ctx.get("origin") or "")})
+                        said.append(f"{source} kills {target.name}.")
+                    continue
+                if what == "permanent":
+                    lasts = None
+                else:
+                    dice, unit = what
+                    lasts = self._duration_rounds({"amount": dice, "unit": unit})
             params: dict = {"condition": key, "to": ref}
-            if ctx.get("rounds"):
-                params["duration"] = {"amount": int(ctx["rounds"]), "unit": "round"}
+            if lasts:
+                params["duration"] = {"amount": int(lasts), "unit": "round"}
+            if ctx.get("descriptors"):
+                params["descriptors"] = list(ctx["descriptors"])
             if ends.get("acts") or shared:
                 params["ends_when"] = _shared_ends({**ends, **shared})
             res = self.run(self.validate([{
                 "op": "condition", "actor": ctx.get("caster"), "visibility": "hidden",
-                "because": str(ctx.get("source") or "the spell"), "params": params}],
-                origin=str(ctx.get("origin") or ""), origin_name=str(ctx.get("source") or "")))
+                "because": source, "params": params}],
+                origin=str(ctx.get("origin") or ""), origin_name=source))
             for o in res.outcomes:
-                fx.extend(o.effects or [])
+                fx_out.extend(o.effects or [])
                 if o.tell:
                     said.append(o.tell)
-        return fx, said
+        return fx_out, said
+
+    def _rider_saves(self, intent: Intent, actor: Actor, spell, plan: dict, cl: int,
+                     dc: int, live: list[str], partial: dict, state: dict) -> None:
+        """Who the riders cannot take hold of, and every saving throw they call for,
+        decided before any rider runs and kept in the state (`spared`, `saved`).
+
+        Two kinds of rider ask (audit #21, #36): a top-level `save_gate` — hold person,
+        sleep, charm person and about 165 more, which were rendered for the narrator and
+        never run, while the slot was spent and the target's attitude worsened — and the
+        spell's own `apply_condition` under a printed "negates" save. One save per target
+        per kind, through `_cast_save`, the copy the damage loop uses; a save that loop
+        already rolled is not rolled again.
+
+        Spared first, by the spell's own lines (`spells.spared_by`: daze's "humanoid with
+        4 HD or less", hold person's "humanoid") and its pool of Hit Dice (`spells.HD_POOL`,
+        sleep's 4 HD, fewest first) — a spared creature makes no save and is told why."""
+        from . import class_abilities as ca
+
+        riders = [r for r in plan.get("riders") or () if isinstance(r, dict)
+                  and spells_mod._is_the_spells_own(r)]
+        gates = [r for r in riders if str(r.get("type") or "") == "save_gate"]
+        ctx = {"spell_save": str(spell.save or ""),
+               "spell_save_effect": str(spell.save_effect or ""),
+               "spell_harmless": bool(spell.save_harmless), "source": spell.name,
+               "rounds": spells_mod.duration_rounds(spell, cl),
+               "instant": str((spell.duration_value or {}).get("kind") or "")
+               == "instantaneous"}
+        lays = [r for r in riders if str(r.get("type") or "") == "apply_condition"
+                and (spells_mod.HP_TIERS.get(spell.id) or self._condition_term(r, ctx)[0])]
+        if not gates and not lays:
+            return
+        others = [r for r in live if r != actor.ref and r in self.scene.actors]
+        if "spared" not in state:
+            spared: dict[str, str] = {}
+            for ref in others:
+                who = self.scene.actors[ref]
+                why = spells_mod.spared_by(spell, who, ca.hit_dice_of(who))
+                if why:
+                    spared[ref] = why
+            pool = spells_mod.HD_POOL.get(spell.id)
+            if pool:
+                left = pool
+                for ref in sorted((r for r in others if r not in spared),
+                                  key=lambda r: ca.hit_dice_of(self.scene.actors[r])):
+                    hd = ca.hit_dice_of(self.scene.actors[ref])
+                    if hd <= left:
+                        left -= hd
+                    else:
+                        spared[ref] = (f"has {hd} Hit Dice, more than the {left} of "
+                                       f"{spell.name}'s {pool} left")
+            state["spared"] = spared
+            for ref, why in spared.items():
+                state["tells"].append(f"{self.scene.actors[ref].name} {why}: {spell.name} "
+                                      f"has no hold on them.")
+        kinds: list[str] = []
+        for g in gates:
+            kinds.append(spells_mod.save_key(str(g.get("target") or "")))
+        if lays and ctx["spell_save"] and not ctx["spell_harmless"] \
+                and ctx["spell_save_effect"] == "negates":
+            kinds.append(spells_mod.save_key(ctx["spell_save"]))
+        for save in dict.fromkeys(k for k in kinds if k in SAVES):
+            for ref in others:
+                if ref in state["spared"]:
+                    continue
+                target = self.scene.actors[ref]
+                first = f"{save}:{ref}" not in (state.get("saved") or {})
+                saved, roll = self._cast_save(intent, target, save, dc, spell, partial,
+                                              state)
+                if first:
+                    nat = natural_said(roll, dc)
+                    state["tells"].append(
+                        f"{target.name} {'makes' if saved else 'fails'} the {SAVES[save]} "
+                        f"save ({nat + ', ' if nat else ''}{roll.total} against DC {dc}).")
+
+    def _gate_rider(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell's top-level `save_gate` rider, run once per target through the one
+        executor item riders use (`_magic_gate`), with the cast's real DC and rounds and
+        the save `_rider_saves` already rolled (audit #36). A branch the engine cannot
+        apply — charm person's whole effect is prose — is told for the failed target
+        only, never for one who saved."""
+        from . import effectspec as fx
+
+        caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+        save = spells_mod.save_key(str(spec.get("target") or ""))
+        saved = ctx.get("saved") or {}
+        spared = ctx.get("spared") or {}
+        source = str(ctx.get("source") or "the spell")
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in ctx.get("targets") or ():
+            target = self.scene.actors.get(ref)
+            if target is None or ref in spared or ref == ctx.get("caster"):
+                continue
+            made = saved.get(f"{save}:{ref}")
+            if made is None:
+                continue
+            for got in self._magic_gate(caster, target, spec, source,
+                                        str(ctx.get("origin") or ""), dc=ctx.get("dc"),
+                                        rounds=ctx.get("rounds"), saved=made,
+                                        descriptors=ctx.get("descriptors") or ()):
+                effects.append(got["effect"])
+                if got.get("tell"):
+                    tells.append(got["tell"])
+            for b in spec.get("on_success" if made else "on_failure") or ():
+                if isinstance(b, dict) and not self._gate_applies(b, made):
+                    tells.append(f"On {target.name}: {fx.render(b)}.")
+        return effects, tells
+
+    @staticmethod
+    def _gate_applies(branch: dict, saved: bool) -> bool:
+        """Whether `_magic_gate` applies this branch: a failure's condition or slaying, or
+        a success's condition with a duration of its own."""
+        kind = str(branch.get("type") or "")
+        if not saved:
+            return kind in ("apply_condition", "slay")
+        dur = branch.get("duration")
+        return kind == "apply_condition" and isinstance(dur, dict) and bool(dur.get("amount"))
 
     def _run_one(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         kind = str(spec.get("type", ""))
@@ -20723,6 +21191,8 @@ class Engine:
             return self._metal_temperature(spec, ctx)
         if kind == "apply_condition":
             return self._lay_condition(spec, ctx)
+        if kind == "save_gate":
+            return self._gate_rider(spec, ctx)
         if kind == "rust":
             return self._rust(spec, ctx)
         if kind == "touch_attack":
@@ -21448,6 +21918,8 @@ class Engine:
                 for_a_person=f"{spell.name} is not prepared. Prepare it in the Spells tab "
                              f"first.",
             )
+        if source is None and may_convert:
+            source = casting.conversion_source(actor, spell)
         paying = (source or {}).get("pool") or casting.slot_pool(level)
         cost = max(1, int((source or {}).get("cost", 1) or 1))
         if not casting.at_will(level) and casting.pool_left(actor, paying) < cost:
@@ -23227,6 +23699,15 @@ class Engine:
         pc = self.scene.pc()
         if pc is None:
             return self._refuse(intent, "There is nobody here to award experience to.")
+        # The author's hand only (`/cheat`, origin `author:cheat`). Measured 2026-11-07
+        # (audit #22): the op sat in every turn's op list, and a plain plan
+        # `{"op": "xp", "params": {"amount": 50000}}` printed "You gain 50,000 XP...
+        # Enough to advance" — a model authoring a number (law 3). Experience the story
+        # pays comes from the engine's own doors (`award_xp`: fights, quests, the
+        # watcher's story award), never from a plan.
+        if not str(getattr(intent, "origin", "") or "").startswith("author:"):
+            return self._refuse(intent, "Experience is the engine's to award, for a fight "
+                                        "won or a matter settled; nothing is awarded.")
         try:
             amount = int(intent.params.get("amount") or 0)
         except (TypeError, ValueError):
@@ -23779,9 +24260,13 @@ class Engine:
         the world: `to` alone is a gain, `from_` alone is a loss.
 
         Money is the same event again — a denomination is just an item whose name the
-        world happens to have opinions about — so `price` is paid out of the receiver's
-        purse in the same breath, and a purse that cannot cover it refuses the sale
-        rather than going negative where nobody would notice.
+        world happens to have opinions about.
+
+        A give carries no price: `buy` and `sell` own prices (audit #24, 2026-11-07). The
+        give's `price` was taken from the buyer before the engine knew anything would
+        move — a refused give still charged 7 gp — the seller was never credited, a
+        300 gp sword the giver never had was handed over for 1 cp, and "1.5 gp" read as
+        15 gp. The validator refuses one with the trade ops named (`intents.parse`).
         """
         item = str(intent.params.get("item", "")).strip()
         if not item:
@@ -23817,7 +24302,7 @@ class Engine:
         # and carried on the outcome so the log sees it. Nothing in the fiction is
         # claimed by it — the narrator gets no number.
         a_gift = (taker is not None and not taker.is_pc and giver is not None
-                  and giver.is_pc and not intent.params.get("price"))
+                  and giver.is_pc)
         # Handing it over or setting it down is putting it down: a specific cursed item
         # held or worn will not go (`_clinging`, lane F's `curses.clings`).
         if giver is not None:
@@ -23832,8 +24317,17 @@ class Engine:
         # it". A bulk phrase means the whole carry: with a giver, everything they
         # hold moves; without one, there is nothing to move and the turn says so
         # instead of inventing an object called stuff.
-        if re.search(r"\b(stuff|everything|belongings|wares|inventory|"
-                     r"all (?:of )?(?:it|his|her|their|the) ?\w*)\b", item, re.I):
+        #
+        # Measured 2026-11-07 (audit #23): an `all (the|his|...) <word>` alternative
+        # here matched "all the apples" and took a guildhand's whole pack and 30 gp
+        # with no `stolen` flag, and a drop with no taker ran `store.clear()` — 50 gp,
+        # a rope and a lantern gone, nothing on the ground. So: the bulk words alone;
+        # a whole carry is never TAKEN from a living person who is not the one
+        # handing it over (a trade is `buy`'s, a take names its one thing, and that
+        # take keeps its own theft rule); a companion's pack is the party's, as it
+        # is for one thing; and a drop with nobody to take it lays each thing on the
+        # ground, as one dropped thing is laid (`_lay_down`).
+        if re.search(r"\b(stuff|everything|belongings|wares|inventory)\b", item, re.I):
             # A giver only the actor implied is not a whole pack offered up: "the
             # merchant's stuff" with the player acting was never the player's own.
             if giver is None or (inferred and giver.is_pc):
@@ -23842,15 +24336,23 @@ class Engine:
                     tell=(f"{item!r} is a word, not a thing. Name the item, or "
                           f"loot a body, or trade at the stall."),
                     because=intent.because)
+            acting = str(intent.actor or (pc.ref if pc is not None else ""))
+            if (not giver.is_dead and giver.ref != acting
+                    and not giver.has_state(states.TRAVELS_WITH_YOU)):
+                return self._refuse(
+                    intent, f"{giver.name} does not hand over everything they carry. Buy "
+                            f"what you want from them, or name the one thing to take.")
             from .bestiary import collapse_kit
             collapse_kit(giver)
             taken: list[str] = []
             for store in (giver.goods, giver.inventory):
                 for thing, n in list(store.items()):
-                    if taker is not None:
-                        tgt = (taker.goods if store is giver.goods
-                               else taker.inventory)
-                        tgt[thing] = tgt.get(thing, 0) + n
+                    if taker is not None and store is giver.inventory:
+                        taker.carry_from(giver, thing, n, int(self.scene.clock_minutes))
+                    elif taker is not None:
+                        taker.goods[thing] = taker.goods.get(thing, 0) + n
+                    else:
+                        self._lay_down(giver, thing)
                     taken.append(f"{n} × {thing}" if n != 1 else str(thing))
                 store.clear()
             # The shelf too, as the loot moves it: a kit's things are filed there since
@@ -23859,13 +24361,26 @@ class Engine:
             for sid, st in list(giver.stock.items()):
                 if taker is not None:
                     taker.add_stock(st, st.count)
+                else:
+                    self._lay_down(giver, st.name)
                 taken.append(f"{st.count} × {st.name}" if st.count != 1 else st.name)
             giver.stock = {}
             for coin, n in list(giver.purse.items()):
                 if taker is not None:
                     taker.purse[coin] = taker.purse.get(coin, 0) + n
+                elif n:
+                    self._lay_coin(giver, coin, n)
                 taken.append(f"{n} {coin}")
             giver.purse = {}
+            if taker is None:
+                return Outcome(
+                    intent_id=intent.id, op="give",
+                    effects=[{"ref": giver.ref, "kind": "set_down", "from": giver.ref,
+                              "items": taken}],
+                    tell=(f"{giver.name} sets down everything they carry; it lies here: "
+                          + (", ".join(taken) if taken else "nothing at all — "
+                             "their hands are empty") + "."),
+                    because=intent.because)
             return Outcome(
                 intent_id=intent.id, op="give",
                 effects=[{"ref": getattr(taker, "ref", ""), "kind": "took",
@@ -23885,26 +24400,6 @@ class Engine:
         # worth is the whole question and only the records can answer it.
         if not denom and holding.is_money(item):
             return self._give_money(intent, item, taker, giver, source)
-
-        paid = ""
-        price = intent.params.get("price")
-        if price and taker is not None:
-            want = goods.coin_named(str(price).split()[-1], coins) or "gp"
-            try:
-                number = int(re.sub(r"\D", "", str(price)) or 0)
-            except ValueError:
-                number = 0
-            cost_cp = number * dict(goods.DENOMINATIONS).get(want, 100)
-            purse, enough = goods.spend(taker.purse, cost_cp)
-            if not enough:
-                return Outcome(
-                    intent_id=intent.id, op="give", effects=[],
-                    tell=(f"{taker.name} cannot afford {item}: "
-                          f"{goods.purse_line(taker.purse, coins)} against {price}."),
-                    because=intent.because,
-                )
-            taker.purse = purse
-            paid = f" for {price}"
 
         moved = 0
         note = ""
@@ -23929,7 +24424,7 @@ class Engine:
         # model): "I take an apple from the fruit seller without paying" was planned
         # `give item=apple from_=c1 to=pc`, read here as a hand-over, and the tell said
         # "the fruit seller hands Kesst Vayr apple" — a theft filed as a gift, with nothing
-        # marked stolen. A price is consent; so is the holder being the one who acts
+        # marked stolen. The holder being the one who acts is consent
         # (`acts_to_ops.confirm_takes` writes a thing the player was OFFERED that way);
         # a companion's pack is the party's. Coin keeps its own door (a number, never a
         # props record).
@@ -23937,7 +24432,6 @@ class Engine:
         taking = (giver is not None and not inferred and not giver.is_pc
                   and taker is not None and taker is not giver and taker.ref == acting
                   and giver.ref != acting and source is None and not denom
-                  and not intent.params.get("price")
                   and not giver.has_state(states.TRAVELS_WITH_YOU))
         if taking:
             # What they actually carry, and nothing else: a take from a person never comes
@@ -23961,8 +24455,7 @@ class Engine:
             found = self._holder_of(item, taker)
             if found is not None:
                 giver, item = found
-                # Paid for is handed over: a price is the holder's consent.
-                taken_from = None if intent.params.get("price") else giver
+                taken_from = giver
         # The dead hand nothing over and own nothing any more: taking from a body is the
         # loot op's rule (no owner kept), said as a body's — never "the dead thug hands
         # Kesst Vayr a sap", which is what a `from_` naming a corpse read as before.
@@ -24091,8 +24584,7 @@ class Engine:
             # thing it can be that the taker already has is answered before the ground is
             # searched — a grant the narration described is the grant, whatever lies here.
             picking = (taker is not None and not denom and str(taker.ref) == acting
-                       and not str(getattr(intent, "origin", "") or "")
-                       and not intent.params.get("price"))
+                       and not str(getattr(intent, "origin", "") or ""))
             if picking and self._grant_named(item, taker) is not None:
                 return self._already_carried(intent, taker, item)
             # Unless it is lying right here with a record: then THAT thing is picked
@@ -24216,9 +24708,11 @@ class Engine:
                     # because `goods` answers "what am I carrying", but the satchel
                     # answers that for ingredients — and one herb in two lists is two
                     # counts that drift the first time the pot spends from one.
-                    taker.carry(herb.id, moved, at_minute=self.scene.clock_minutes)
+                    # With the giver's pick-time: the handover reset it to now, so a
+                    # part two days from rotting came back fresh (`carry_from`).
+                    taker.carry_from(giver, herb.id, moved, int(self.scene.clock_minutes))
                     return self._gave(intent, taker, giver, herb.name,
-                                      moved, paid, denom)
+                                      moved, denom)
 
                 kind = goods.kind_of(item)
                 if kind == "ammunition":
@@ -24263,34 +24757,22 @@ class Engine:
             tell = f"{taker.name} takes {self._the(what)} from {looted.name}'s body."
         elif giver is not None and taker is not None:
             how = "handed"
-            tell = f"{giver.name} hands {taker.name} {what}{paid}."
+            tell = f"{giver.name} hands {taker.name} {what}."
         elif taker is not None and note.startswith("back up"):
             tell = f"{taker.name} takes {self._the(what)} {note}."
         elif taker is not None:
             tell = (f"{taker.name} takes {self._the(what) if moved == 1 else what}"
-                    f"{paid}{note}.")
+                    f"{note}.")
         elif giver is not None:
             how = "set_down"
             tell = f"{giver.name} parts with {what}."
             # Dropped, not vanished: the thing lies here with its record, the
             # giver's still (Inform: a dropped thing lands on the room's floor).
             if moved and not denom:
-                rec = self.scene.prop_named(item)
-                self.scene.place_prop(item, owner=(rec or {}).get("owner") or giver.ref,
-                                      from_=(rec or {}).get("from_", ""),
-                                      state=(rec or {}).get("state", "intact"),
-                                      turn=int(self.scene.clock_minutes))
+                self._lay_down(giver, item)
                 tell = f"{giver.name} sets down {what}; it lies here."
             elif moved and denom:
-                # Coin set down is a pile on the floor holding its amount — Circle's
-                # money object — and picking it up again is the number again. It
-                # used to vanish: the purse went down and nothing lay anywhere.
-                pile = self.scene.place_prop(f"{giver.name}'s {goods.METALS[denom]} coins",
-                                             owner=giver.ref, state="intact",
-                                             turn=int(self.scene.clock_minutes))
-                pile["kind"] = "coins"
-                box = holding.contents(pile)
-                box["purse"][denom] = int(box["purse"].get(denom, 0)) + moved
+                self._lay_coin(giver, denom, moved)
                 tell = (f"{giver.name} sets down "
                         f"{goods.purse_line({denom: moved}, coins)}; the coin lies here.")
         else:
@@ -24309,11 +24791,16 @@ class Engine:
                     "to": (taker.ref if taker is not None else ""),
                     "purse": dict(taker.purse) if taker else {},
                     "goods": dict(taker.goods) if taker else {}}]
-        if a_gift and moved:
+        from . import attitude as attitude_mod
+
+        # Counted against the same daily budget as talk (`attitude.talked_today`, three a
+        # person a day). Measured 2026-11-07 (audit #40): nineteen 1 cp gifts took a
+        # stranger from indifferent (35) to devoted (92) in one afternoon — the regard
+        # ladder bought for pocket change, which the talk cap exists to prevent.
+        if a_gift and moved and attitude_mod.talked_today(
+                taker, int(self.scene.clock_minutes) // (24 * 60)):
             # Only once something actually changed hands. The narrator hears a step
             # crossed in words, or nothing; the log sees the numbers.
-            from . import attitude as attitude_mod
-
             before, after = attitude_mod.nudge_regard(taker, attitude_mod.REGARD_GIFT,
                                                       "a gift")
             effects.append({"kind": "regard", "ref": taker.ref, "from": before,
@@ -24485,6 +24972,21 @@ class Engine:
         # unconscious. An ability that deals damage could not kill anybody, and the
         # non-lethal cost could not knock its own user out either.
         hurt: list[str] = []
+        origin = f"ability:{path}/{found}"
+        harmed: list[dict] = []
+        # The battle gate, as every other harm keeps it (audit #39): first violence opens
+        # the fight and never resolves it. Measured on 0.2.26: Blood Javelin killed a thug
+        # outside any fight — no encounter, no attitude change, no damage record, no
+        # interception — because the twelve abilities with no `grants` document took this
+        # loop, which called `take_damage` directly. `_ability_gate` is the one copy the
+        # documented abilities use.
+        harms = intent.params.get("to") and target is not actor and any(
+            s.get("type") == "damage" and s.get("lethality") != "nonlethal"
+            and not s.get("inactive") for s in effects)
+        if harms and self._against(actor, target):
+            gated = self._ability_gate(intent, actor, found.title(), [target])
+            if gated is not None:
+                return gated
         for spec in effects:
             if spec.get("inactive"):
                 continue
@@ -24507,9 +25009,15 @@ class Engine:
                 roll = self.dice.roll(str(spec.get("dice", "0")), label=found,
                                       visibility="player")
                 rolls.append(roll)
-                target.take_damage(roll.total, spec.get("damage_type", "untyped"))
+                # Through the one funnel: resistance, damage reduction, temporary hit
+                # points and interception, with the ability's provenance on the record.
+                hit = self._apply_damage(target, max(0, roll.total),
+                                         str(spec.get("damage_type") or "untyped"))
+                hit["origin"] = origin
+                harmed.append(hit)
                 hurt.append(target.ref)
-                done.append(f"{roll.total} damage to {target.name}")
+                done.append(f"{hit['amount']} {hit['type']} damage to {target.name}"
+                            + (f" ({hit['note']})" if hit.get("note") else ""))
             elif kind == "heal":
                 roll = self.dice.roll(str(spec["dice"]), label=found,
                                       visibility="player")
@@ -24560,14 +25068,24 @@ class Engine:
         if done:
             bits.append("The engine resolves: " + "; ".join(done) + ".")
         bits.extend(held_back)
+        # What the harm does to how they feel: the rule the sword and the spell share.
+        if harmed and target is not actor:
+            from . import attitude as attitude_mod
+
+            felt = attitude_mod.harmed(self, target, actor, origin)
+            if felt:
+                harmed.append(felt)
+                line = attitude_mod.harm_said(felt, target.name)
+                if line:
+                    bits.append(line)
         if narrated:
             bits.append(f"{len(narrated)} part(s) of it are yours to narrate.")
         return Outcome(
             intent_id=intent.id, op="use_ability", rolls=rolls,
             effects=[{"ref": actor.ref, "kind": "use_ability", "ability": found,
                       "path": path, "resolved": len(done), "narrated": len(narrated),
-                      "origin": f"ability:{path}/{found}"}]
-                    + crossed,
+                      "origin": origin}]
+                    + harmed + crossed,
             tell=" ".join(bits) + self._hp_state_tell(crossed),
             because=intent.because,
         )
@@ -24929,7 +25447,21 @@ class Engine:
                     failed = not made
                     if made and saving.get("success", "negates") == "negates":
                         continue
-                    if made and share is not None:
+                    # Evasion, by the one reader the save op and the cast share
+                    # (`_evasion`): a breath weapon or an elemental blast is "an attack
+                    # that normally deals half damage on a successful save" too.
+                    ev, ev_said = self._evasion(
+                        other, sv, share is not None
+                        and saving.get("success", "negates") == "half"
+                        and (doc.get("roll_as") or spec.get("as") or "heal") == "damage",
+                        made)
+                    if ev == "none":
+                        tells.append(ev_said)
+                        continue
+                    if ev == "half":
+                        share = share // 2
+                        tells.append(ev_said)
+                    elif made and share is not None:
                         share = share // 2
                 landed.append(other)
                 if share is not None:
@@ -24972,14 +25504,18 @@ class Engine:
                                          f"{other.name} was already unhurt.")
                         if held:
                             tells.append(held)
-                        # Back above 0, the dying and the unconscious wake — the same
-                        # sweep the `heal` op makes, by the one family that says so —
-                        # unless the non-lethal still has them down (`_op_heal`).
-                        woke = other.clear_states("recovery.hit-points") if other.hp > 0 \
-                            else []
-                        if woke:
-                            again = other.apply_nonlethal_state()
-                            woke = [k for k in woke if k not in again]
+                        # The dying and the unconscious come back by the rule the `heal`
+                        # op asks (`Actor.after_healing`): awake at 0 or above, stable
+                        # below it — unless the non-lethal still has them down.
+                        woke, written = other.after_healing(healed)
+                        if written:
+                            crossed = [{"ref": other.ref, "kind": "condition",
+                                        "condition": k, "from": "hit points",
+                                        "origin": origin} for k in written]
+                            records.extend(crossed)
+                            said = self._hp_state_tell(crossed).strip()
+                            if said:
+                                tells.append(said)
                         if woke:
                             records.append({"ref": other.ref, "kind": "condition_removed",
                                             "conditions": woke, "origin": origin})
@@ -26293,7 +26829,29 @@ class Engine:
             because=intent.because,
         )
 
-    def _gave(self, intent, taker, giver, what, moved, paid, denom) -> Outcome:
+    def _lay_down(self, giver, item: str) -> dict:
+        """A thing set down by `giver` lies here with its record, the giver's still
+        (Inform: a dropped thing lands on the room's floor). The one door for a single
+        drop and a whole carry set down (`_op_give`)."""
+        rec = self.scene.prop_named(item)
+        return self.scene.place_prop(item, owner=(rec or {}).get("owner") or giver.ref,
+                                     from_=(rec or {}).get("from_", ""),
+                                     state=(rec or {}).get("state", "intact"),
+                                     turn=int(self.scene.clock_minutes))
+
+    def _lay_coin(self, giver, denom: str, n: int) -> dict:
+        """Coin set down is a pile on the floor holding its amount — Circle's money
+        object — and picking it up again is the number again. It used to vanish: the
+        purse went down and nothing lay anywhere."""
+        pile = self.scene.place_prop(f"{giver.name}'s {goods.METALS[denom]} coins",
+                                     owner=giver.ref, state="intact",
+                                     turn=int(self.scene.clock_minutes))
+        pile["kind"] = "coins"
+        box = holding.contents(pile)
+        box["purse"][denom] = int(box["purse"].get(denom, 0)) + int(n)
+        return pile
+
+    def _gave(self, intent, taker, giver, what, moved, denom) -> Outcome:
         """The outcome for a handover that has already been applied.
 
         Shared because an ingredient returns early — it goes to the satchel and must
@@ -26302,9 +26860,9 @@ class Engine:
         """
         thing = f"{moved} × {what}" if moved != 1 else what
         if giver is not None and taker is not None:
-            tell = f"{giver.name} hands {taker.name} {thing}{paid}."
+            tell = f"{giver.name} hands {taker.name} {thing}."
         elif taker is not None:
-            tell = f"{taker.name} takes {thing}{paid}."
+            tell = f"{taker.name} takes {thing}."
         else:
             tell = f"{thing} changes hands."
         return Outcome(
@@ -26388,6 +26946,20 @@ class Engine:
             # Woken when they said, short of the book's eight hours: the hours pass and
             # the ground has its say, and nothing a full night gives is given.
             return self._with_bill(self._short_night(intent, actor, camp), bill)
+        # One full night a day (audit #35). Natural healing is "a full night's rest (8
+        # hours of sleep or more)" and a caster's slots come back with "8 hours" of sleep
+        # and a day's preparation (CRB, Natural Healing; Preparing Wizard Spells) — a day's
+        # worth, once a day. Measured on 0.2.26: three rests in 30 hours at level 1 healed
+        # 2, 3 and 4 hp and refilled every slot three times. A night begun less than
+        # REST_GAP_MINUTES after the last full one ended — inside the same 24 hours — is
+        # slept down the short night's path: the hours pass, nothing heals or comes back.
+        since = self._since_last_night(actor) if kind == "night" else None
+        if since is not None:
+            return self._with_bill(self._short_night(
+                intent, actor, camp,
+                why=(f"{actor.name} already had a full night's rest "
+                     f"{sky.span_words(max(1, since))} ago: one full night a day, so "
+                     f"nothing heals and nothing is recovered.")), bill)
 
         # The whole night through one door (`Actor.sleep_through`), shared with the sleep
         # a body drops into when it will not be refused any longer (`survival._wake`):
@@ -26414,6 +26986,8 @@ class Engine:
         # A night slept is a wait the player chose: the people with them go about their day.
         ended = before_ended + self.scene.advance(minutes, charge_body=False,
                                                   waited=True)["ended"]
+        if result["hours"]:
+            self._slept_a_night(actor)
 
         bits = kept_awake + [f"{actor.name} rests for {hours} hours"
                              + (f", {camp['until']}." if camp["until"] else ".")]
@@ -26721,7 +27295,32 @@ class Engine:
                       "origin": "rule:night-check"}] + fx,
             tell=" ".join(b for b in bits if b), because=intent.because)
 
-    def _short_night(self, intent: Intent, actor, camp: dict) -> Outcome:
+    # How long after a full night ends before the next one is a full night again: sixteen
+    # hours, so a night's eight and the waking day between make the book's 24 (audit #35).
+    REST_GAP_MINUTES = 16 * 60
+
+    def _slept_a_night(self, actor) -> None:
+        """Mark the full night just ended, through the one applicator: an ActiveEffect on
+        the clock for `REST_GAP_MINUTES`, its tag asked by `_since_last_night`. Refreshed,
+        never stacked, by the next full night."""
+        rounds = self.REST_GAP_MINUTES * self.scene.ROUNDS_PER_MINUTE
+        actor.apply_effect(ActiveEffect(
+            name="a full night's rest", kind="situation", key="rested-tonight",
+            source="rule:rest", origin="rule:rest", duration="rounds", rounds_left=rounds,
+            tags=(REST_TAKEN,), stacking="refresh",
+            payload={"ended_at": int(self.scene.clock_minutes or 0)}))
+
+    def _since_last_night(self, actor) -> int | None:
+        """Minutes since `actor`'s last full night ended, while it still counts against
+        another (`_slept_a_night`); None when a night now would be a full one."""
+        if not actor.has_state(REST_TAKEN):
+            return None
+        mark = next((e for e in actor.effects
+                     if REST_TAKEN in (e.tags or ())), None)
+        ended = int(((mark.payload if mark else None) or {}).get("ended_at", 0) or 0)
+        return max(0, int(self.scene.clock_minutes or 0) - ended)
+
+    def _short_night(self, intent: Intent, actor, camp: dict, why: str = "") -> Outcome:
         """A sleep the player ended before eight hours ("until dawn" said at one in the
         morning): the hours pass, slept — the awake clock resets after six, as any sleep's
         does (`survival.sleep`) — and the ground has its say over them, but none of a full
@@ -26734,7 +27333,10 @@ class Engine:
         survival.sleep(actor, minutes=camp["minutes"])
         ended = self.scene.advance(camp["minutes"], charge_body=False, waited=True)["ended"]
         fx, rolls, said = self._camp_morning(actor, camp, hours)
-        bits = [f"{actor.name} sleeps {sky.span_words(camp['minutes'])}, {camp['until']}: "
+        bits = [f"{actor.name} sleeps {sky.span_words(camp['minutes'])}"
+                + (f", {camp['until']}" if camp["until"] else "") + ". " + why
+                if why else
+                f"{actor.name} sleeps {sky.span_words(camp['minutes'])}, {camp['until']}: "
                 f"short of a full night's rest (8 hours of sleep), so nothing heals and "
                 f"nothing is recovered."] + said
         if camp["night"] is not None:
@@ -26934,13 +27536,27 @@ class Engine:
         return tell[:1].upper() + tell[1:], effects
 
     def _op_eat(self, intent: Intent, partial: dict) -> Outcome:
-        """A meal. Resets the hunger clock and nothing else — food is not medicine."""
+        """A meal. Resets the hunger clock and nothing else — food is not medicine.
+
+        Always out of the pack. A bare "eat" with no item named fed the character for
+        nothing (ponytail audit 2026-11-07, smaller findings; the owner had listed it
+        among the survival problems to fix), against the owner's own ruling of
+        2026-10-09: "Food is never free: a town feeds nobody" (docs/places-and-races-for-
+        world-bible.md). Unnamed, it is whatever a pack is provisioned with first
+        (`gear.food`: trail rations, then by name); nothing carried, it is refused."""
         from . import survival
 
         from . import gear as gear_mod
 
         actor = self._eater(intent)
         said = str(intent.params.get("item") or "").strip()
+        if not said:
+            first = gear_mod.food(actor)
+            if first is None:
+                return self._refuse(
+                    intent, f"{actor.name} has nothing to eat: nothing in the pack is "
+                            f"food. A meal is bought, foraged or carried.")
+            said = str(first["id"])
         if said:
             # Out of the pack (the owner, 2026-10-01: "trail rations reset my hunger").
             # The thing must be carried and must be food by its gear row; one is spent.
@@ -26966,25 +27582,39 @@ class Engine:
                       + _also(survival.released_said(actor, "hunger", freed))),
                 because=intent.because,
             )
-        freed = survival.eat(actor)
-        return Outcome(
-            intent_id=intent.id, op="eat",
-            effects=[{"ref": actor.ref, "kind": "eat"}]
-                    + self._released(actor, "hunger", freed),
-            tell=f"{actor.name} eats." + _also(survival.released_said(actor, "hunger", freed)),
-            because=intent.because,
-        )
 
     def _op_drink(self, intent: Intent, partial: dict) -> Outcome:
+        """Water: out of the pack (a waterskin's draught, `gear.provide`), else the
+        settlement's own well or cistern, free (`water_at_hand`; the owner's ruling of
+        2026-10-09: the pack first, the well "when their pack runs dry"), else refused.
+
+        It used to reset thirst from nothing at all — "drinks." on the open road with an
+        empty pack (ponytail audit 2026-11-07, smaller findings; the owner had listed
+        "`_op_drink` free" among the survival problems to fix)."""
+        from . import gear as gear_mod
         from . import survival
 
         actor = self._eater(intent)
+        # One draught: the smallest whole unit the pack's water comes in.
+        spent = gear_mod.provide(actor, "water", 1e-6)
+        well = "" if spent else self.water_at_hand()
+        if not spent and not well:
+            return self._refuse(
+                intent, f"{actor.name} has no water to drink: the pack holds none, and "
+                        f"there is no well here.")
         freed = survival.drink(actor)
+        if spent:
+            what = spent[0]
+            effects = [{"ref": actor.ref, "kind": "drink", "item": what["name"],
+                        "spent": int(what["count"]), "origin": f"item:{what['item']}"}]
+            tell = f"{actor.name} drinks from the {what['name']}."
+        else:
+            effects = [{"ref": actor.ref, "kind": "drink", "at": well}]
+            tell = f"{actor.name} drinks at {well}."
         return Outcome(
             intent_id=intent.id, op="drink",
-            effects=[{"ref": actor.ref, "kind": "drink"}]
-                    + self._released(actor, "thirst", freed),
-            tell=f"{actor.name} drinks." + _also(survival.released_said(actor, "thirst", freed)),
+            effects=effects + self._released(actor, "thirst", freed),
+            tell=tell + _also(survival.released_said(actor, "thirst", freed)),
             because=intent.because,
         )
 
@@ -27728,10 +28358,7 @@ class Engine:
         }
 
     def _hp_state_effects(self, target: Actor) -> list[dict]:
-        return [
-            {"ref": target.ref, "kind": "condition", "condition": c, "from": "hit points"}
-            for c in target.apply_hp_state()
-        ]
+        return target.hp_state_records()
 
     # What each hit-point state sounds like, said once. The narrator is fed tells and
     # nothing else about mechanics, and until this existed the tell for a killing blow
@@ -27832,11 +28459,26 @@ def _missiles_split(dice, one: str, faces: list, count: int, targets: list) -> l
 
 
 def _missiles_said(missiles: list[dict], scene, dtype: str, cl: int, dice: str,
-                   rolled: int) -> str:
+                   rolled: int, noun: str = "missile", made: int | None = None) -> str:
     """"One missile of force flies, the only one a caster of level 1 makes: it strikes the
-    robber for 3 (1d4+1 — 3)." The count first, then each missile and what it struck."""
-    total = len(missiles)
+    robber for 3 (1d4+1 — 3)." The count first, then each missile and what it struck.
+
+    A ray spell (`noun` "ray") passes how many rays it `made`: a ray whose touch missed is
+    not in `missiles` (its miss is told by the touch), so the count is the spell's, and
+    the ones listed are the ones that struck."""
+    total = len(missiles) if made is None else int(made)
     kind = f" of {dtype}" if dtype and dtype != "untyped" else ""
+    if noun != "missile":
+        plural = f"{noun}s"
+        struck = ", ".join(
+            f"the {_ORDINALS.get(m['n'], str(m['n']))} strikes "
+            f"{(scene.actors.get(m['ref']).name if scene.actors.get(m['ref']) else 'nobody')}"
+            f" for {m['amount']}" for m in missiles)
+        head = (f"One {noun}{kind} flies, the only one a caster of level {cl} makes"
+                if total == 1 else
+                f"{_COUNT_WORDS.get(total, str(total)).capitalize()} {plural}{kind} fly, as "
+                f"many as a caster of level {cl} makes")
+        return f"{head}: {struck or 'none of them strikes'} ({dice} — {rolled})."
 
     def name(ref) -> str:
         who = scene.actors.get(ref)
@@ -28218,6 +28860,9 @@ _STATE_SAID = {
     "dying": "{name} is dying",
     "unconscious": "{name} is unconscious",
     "disabled": "{name} is disabled: still standing, but any real effort now costs blood",
+    # Written by healing that leaves a body below 0 (`Actor.after_healing`): the book's
+    # "becomes stable and stops losing hit points", and still out cold.
+    "stable": "{name} is stable: no longer bleeding, but still unconscious",
     # The owner's house rule (2026-10-01): a construct at 0 to -10. The clause says the
     # half the player can act on — it is not gone, and it can be mended.
     "broken": "{name} is broken: inert, but not destroyed",

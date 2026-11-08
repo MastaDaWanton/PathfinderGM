@@ -26,6 +26,7 @@ so yesterday's sales stop mattering on their own.
 from __future__ import annotations
 
 import random
+import re
 
 # The engine's rarity ladder, thinnest at the top. Anything a bench does not tier is
 # treated as common, which is the only safe direction: a material with no rarity should
@@ -288,7 +289,7 @@ def counter_kind_here(scene, stall: str = "") -> str:
     """What kind of counter the party is standing at, for what it stocks.
 
     One of the market's own counters when the stall says so (`market:armorer` — the
-    trade panel keys its stall by the counter, `views._stall_of`); else the kind of the
+    trade panel keys its stall by the counter, `stall_of`); else the kind of the
     place whose keeper is here (`keepers.kind_of`), else a market — a peddler in the
     street sells what a market does."""
     from . import keepers
@@ -299,6 +300,36 @@ def counter_kind_here(scene, stall: str = "") -> str:
     if at and keepers.keeper_in(scene, at) is not None:
         return keepers.kind_of(at, getattr(scene, "founded", None) or ())
     return "market"
+
+
+def stall_of(scene, keeper=None, stall: str = "") -> str:
+    """The one key a shop's shelf, till and haggle are kept under, whichever door asks.
+
+    Measured 2026-11-07 (audit #13): the trade panel keyed a stall by its counter or the
+    keeper's name, typed trade by the seller's ref or "market", the haggle by the keeper's
+    ref and the commission by the keeper's ref again — so a ring on the panel was "not on
+    the counter" when asked for in words, the tills were separate, and a haggle lost at
+    one door was tried again at another. Every door now asks this.
+
+    In order: one of a market's counters (`market:armorer`, the stables) named outright,
+    or the counter the keeper stands behind (`keepers.counter_of`); the counter kind of
+    the place the party stands in; the keeper's name, so two vendors in one town are two
+    shelves; the stall a caller named when nobody keeps one here; else the open market.
+    A name and not a ref: refs are per scene, and a ref a later scene re-uses would hand
+    a stranger the first vendor's shelf."""
+    from . import keepers
+
+    if is_counter_kind(stall):
+        return str(stall).lower()
+    counter = keepers.counter_of(getattr(keeper, "world_entity_id", "") or "")
+    if counter:
+        return COUNTER_PREFIX + counter
+    kind = counter_kind_here(scene)
+    if is_counter_kind(kind):
+        return kind
+    if keeper is not None:
+        return re.sub(r"[^a-z0-9]+", "-", str(keeper.name).lower()).strip("-") or "market"
+    return str(stall or "market")
 
 
 def on_sale(place: str, stall: str, day: int, taken: dict | None = None,

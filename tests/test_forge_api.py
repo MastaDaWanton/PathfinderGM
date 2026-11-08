@@ -294,15 +294,6 @@ def test_assay_takes_a_sliver_and_pays_for_what_it_teaches(forge):
     assert none.status_code == 409 and "no Mithral" in none.json()["error"]
 
 
-def test_assay_says_plainly_when_lane_e_is_missing(forge, monkeypatch):
-    """A half-built feature is refused honestly rather than 500ing (benches.supports
-    learned the same): no knowledge module, a 501 with a sentence."""
-    monkeypatch.setitem(sys.modules, "rules.knowledge", None)
-    _carry(iron=1)
-    r = post(forge, "/api/forge/assay", {"material": "iron"})
-    assert r.status_code == 501
-
-
 def test_perks_are_the_forges_four(forge):
     """Plan §4.2: an endless Blacksmith picks from potency, hardening, quality and yield.
     The Herbalist's duration is refused; a good pick comes back as the track."""

@@ -633,6 +633,20 @@ def breaks_below_zero(actor) -> bool:
     return bool(actor is not None and any(actor.has_state(t) for t in BROKEN_BELOW_ZERO))
 
 
+def lifeless(actor) -> bool:
+    """Whether this body can do nothing at all on the page: dead, or a construct broken
+    by the house rule (as inert as a corpse until mended). The one answer the narration
+    asks when it cuts a dead man walking or names who lies dead.
+
+    Never "below 0 hit points": that is dying (CRB p.191: between -1 and minus the
+    Constitution score a character is dying, not dead), and a dying bandit may groan and
+    clutch his side. Until 2026-11-08 "dead" was three things in narration (ponytail
+    audit #18): `GMAgent._groom` counted `hp < 0`, the read back left out broken
+    constructs, and the plan called a broken construct dying."""
+    return bool(actor is not None and (actor.has_state("state.down.dead")
+                                       or actor.has_state("state.down.broken")))
+
+
 def believes_claim_tag(kind: str) -> str:
     return f"{BELIEVES_CLAIM}.{kind}"
 

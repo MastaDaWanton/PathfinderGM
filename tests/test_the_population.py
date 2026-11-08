@@ -193,3 +193,16 @@ def test_the_openings_company_is_not_booked_a_second_time(tmp_path):
     assert booked == []
     judgement.promote_cast(c.scene, booked, beat="", world=c.world)
     assert len(c.scene.actors) == before
+
+
+def test_a_plural_in_men_finds_the_man():
+    """Audit 2026-11-07: the population finder's stemmer cut "-s" and "-es" but left
+    "-men" alone, so "watchmen" never met "watchman": asking after "the watchmen at the
+    gate" of a watchman noted there found nobody. `scope._one` already turned "guardsmen"
+    into "guardsman" (owner report 2026-11-01); the finder now does the same."""
+    assert population._stem("watchmen") == population._stem("watchman")
+    assert population._stem("women") == population._stem("woman")
+    s = _scene()
+    rec = population.note(s, "watchman at the gate")
+    found = population.find(s, "the watchmen at the gate", log_miss=False)
+    assert found.people == [rec], found

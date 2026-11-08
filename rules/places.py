@@ -1669,12 +1669,21 @@ def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place,
             changed = True
     # Exits both ways between a minted place and its parent, and between a minted
     # place's own children and it; the derived set's exits are left as they were.
+    # The children indexed once, in the set's own order: asking every place of every
+    # other was |places|² on a call `Engine.places()` makes many times a turn — 0.62 s a
+    # call at 3,000 founded rooms (audit 2026-11-07).
+    kids: dict[str, list[str]] = {}
+    for q in out.values():
+        if q.parent != q.id:
+            kids.setdefault(q.parent, []).append(q.id)
     result: dict[str, Place] = {}
     for pid, p in out.items():
         exits = list(p.exits)
-        for q in out.values():
-            if q.parent == pid and q.id != pid and q.id not in exits:
-                exits.append(q.id)
+        have = set(exits)
+        for qid in kids.get(pid, ()):
+            if qid not in have:
+                exits.append(qid)
+                have.add(qid)
         if p.parent and p.parent in out and p.parent not in exits:
             exits.append(p.parent)
         # Only the exits change. This rebuilt the Place field by field and dropped

@@ -12,7 +12,6 @@ rather than crashing the front page or silently vanishing from it.
 from __future__ import annotations
 
 import json
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -136,16 +135,6 @@ def world(world_id: str):
     return load_cached(Path(card.source))
 
 
-def import_world(source: Path) -> WorldCard:
-    """Copy an export onto the shelf. Validated before it lands, so a file that cannot be
-    read is refused at the point the user can still do something about it."""
-    source = Path(source)
-    load_cached(source)                      # raises if it is not a world we can read
-    target = user_dir() / source.name
-    shutil.copy(source, target)
-    return _card(target, shipped=False)
-
-
 # A World Bible export of Kaelinora is 1.6 MB. The ceiling is generous rather than tight
 # because the cost of refusing somebody's real world is worse than the cost of writing a
 # large file, but it is not absent: without one, the upload is a way to fill the disk.
@@ -201,16 +190,13 @@ def import_upload(filename: str, data: bytes) -> WorldCard:
 
 # --- what has been played ------------------------------------------------------------------
 
-def campaigns_in(world_id: str) -> list[dict]:
-    """Games running in this world.
+def _saves() -> list[tuple[str, Path, dict]]:
+    """(world id, path, parsed save) for every campaign save, each read once.
 
-    Read off the campaign saves rather than an index, because an index is a second thing
-    to keep true and this one would be wrong the first time somebody deleted a save by
-    hand — which is a supported thing to do, the saves being plain files on purpose.
+    The front page used to read them once PER WORLD (`recent_characters` called
+    `campaigns_in` for every card, and each call parsed every save) — with three worlds,
+    three full parses of files that run to megabytes in a long game (audit 2026-11-07).
     """
-    from . import campaign as cm
-    from . import roster
-
     out = []
     d = Path(settings.CAMPAIGN_DIR)
     if not d.is_dir():
@@ -221,7 +207,24 @@ def campaigns_in(world_id: str) -> list[dict]:
         except Exception as exc:
             files.unreadable(path, exc)
             continue
-        if Path(str(data.get("world_source", ""))).stem != world_id:
+        if isinstance(data, dict):
+            out.append((Path(str(data.get("world_source", ""))).stem, path, data))
+    return out
+
+
+def campaigns_in(world_id: str, saves: list | None = None) -> list[dict]:
+    """Games running in this world. `saves` is `_saves()` when the caller has read them.
+
+    Read off the campaign saves rather than an index, because an index is a second thing
+    to keep true and this one would be wrong the first time somebody deleted a save by
+    hand — which is a supported thing to do, the saves being plain files on purpose.
+    """
+    from . import campaign as cm
+    from . import roster
+
+    out = []
+    for wid, path, data in (_saves() if saves is None else saves):
+        if wid != world_id:
             continue
         # `people` from a version-2 save, `actors` from a version-1 one — the same two
         # keys `Campaign.load` reads, for the same reason.
@@ -245,11 +248,14 @@ def campaigns_in(world_id: str) -> list[dict]:
     return out
 
 
-def characters_in(world_id: str) -> list[dict]:
-    """Everyone on the roster whose game is in this world."""
+def characters_in(world_id: str, campaigns: list | None = None) -> list[dict]:
+    """Everyone on the roster whose game is in this world. `campaigns` is
+    `campaigns_in(world_id)` when the caller already has it."""
     from . import roster
 
-    by_campaign = {c["character_id"]: c for c in campaigns_in(world_id)}
+    if campaigns is None:
+        campaigns = campaigns_in(world_id)
+    by_campaign = {c["character_id"]: c for c in campaigns}
     out = []
     for entry in roster.everyone():
         if entry.id not in by_campaign:
@@ -271,11 +277,11 @@ def recent_characters(limit: int = 12) -> list[dict]:
     from . import campaign as cm
     from . import roster
 
+    names = {card.id: card.name for card in worlds()}
     where: dict[str, str] = {}
-    for card in worlds():
-        for c in campaigns_in(card.id):
-            if c["character_id"]:
-                where[c["character_id"]] = card.name
+    for wid, _path, data in _saves():
+        if data.get("character_id") and wid in names:
+            where[data["character_id"]] = names[wid]
 
     active = cm.active_id()
     out = []

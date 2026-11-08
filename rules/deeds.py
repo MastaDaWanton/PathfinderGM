@@ -585,8 +585,7 @@ def _acts(engine, pc, intent, outcome, before_: dict) -> list[dict]:
             if prop and prop.get("stolen") and prop.get("owner") == taker \
                     and prop.get("held_by") == taker:
                 rec("deed.restitution", taker, what=_thing(e))
-            elif str(e.get("item") or "") in coins and b["poor"] \
-                    and not (intent.params or {}).get("price"):
+            elif str(e.get("item") or "") in coins and b["poor"]:
                 rec("deed.charity.alms", taker, what=_thing(e))
 
     if not mine:

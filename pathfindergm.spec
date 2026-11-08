@@ -61,9 +61,12 @@ CONTENT_DIRS = [
 datas = [(f"content/{name}", f"content/{name}") for name in CONTENT_DIRS]
 
 datas += [
-    # The world that ships so a fresh install has something to play, plus the three
-    # pregenerated PCs `roster.pregens()` globs for.
-    ("fixtures", "fixtures"),
+    # The worlds that ship so a fresh install has something to play (`library.worlds()`
+    # globs `*-campaign.json`), plus the pregenerated PCs `roster.pregens()` globs for.
+    # By pattern, not the whole folder: the two `.sqlite3` twins (3 MB) and the synthetic
+    # test world are read by tests and nothing at runtime (audit 2026-11-07).
+    ("fixtures/*-campaign.json", "fixtures"),
+    ("fixtures/pc-*.json", "fixtures"),
     # Templates and static are found by Django's app-directories finders, which look
     # under `play.__path__` — `_MEIPASS/play` in the bundle. Mirroring the layout is what
     # makes `{% static %}` and `{% extends %}` resolve without a settings change.

@@ -201,19 +201,3 @@ def test_homebrew_materials_layer_over_shipped(tmp_path, monkeypatch):
     loaded = en.materials()
     assert loaded["flaming-essence"].name == "Balefire Essence"
     assert loaded["flaming-essence"].effects
-
-
-# --- the old chain, retired --------------------------------------------------------------------
-
-def test_the_old_chain_is_refused_with_where_enchanting_is_done_now():
-    """Plan §1, measured on e028885: the /craft/ chain sent the Shaping text as the item
-    and refused every essence binding "not masterwork"; its methods are gone from the
-    track. `benches.MOVED` refuses it in words, as it does herbalism's, while
-    `benches.supports` still answers for every track (the craft page asks it)."""
-    from rules import benches
-
-    assert benches.supports("enchanter")
-    with pytest.raises(benches.MovedBench) as err:
-        benches.preview("enchanter", 1, en.Chain(methods=["attune"]))
-    assert "circle at the table" in str(err.value)
-    assert en.preview(1, en.Chain()).problems == [en.MOVED_WORDS]

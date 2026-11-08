@@ -21,7 +21,7 @@ import json
 from gm import ledger as ledger_mod
 from rules import spells as _spells_mod
 from rules import states
-from rules.intents import AMOUNT_OPS, CODE_ONLY_OPS, OPS as _OPS
+from rules.intents import AMOUNT_OPS, AUTHOR_ONLY_OPS, CODE_ONLY_OPS, OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
 
 # One example per shape the GM actually needs. Demonstration, not description — and the
@@ -3816,7 +3816,8 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                    "enum": (sorted(ops) if ops else
                             list(_FIGHT_OPS) if fighting else
                             sorted(op for op in _OPS if op not in AMOUNT_OPS
-                                   and op not in CODE_ONLY_OPS))},
+                                   and op not in CODE_ONLY_OPS
+                                   and op not in AUTHOR_ONLY_OPS))},
             "actor": ({"type": "string", "enum": list(refs)} if refs
                       else {"type": "string"}),
             "target": ({"type": "string", "enum": list(refs)} if refs

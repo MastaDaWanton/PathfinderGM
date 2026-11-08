@@ -233,6 +233,52 @@ def _find(actor, key: str):
     return key, stock.get(key)
 
 
+def fresh_key(actor, key: str) -> str:
+    """`key` if the shelf has nothing under it, else `key~2`, `key~3`...: where a thing that
+    must not stack with its twin is filed. The one numbering for every craft's "its own
+    entry" (the alchemist's and the tanner's waiting work used to append `+`, the
+    enchanter's split `~n`)."""
+    stock = getattr(actor, "stock", None) or {}
+    if key not in stock:
+        return key
+    n = 2
+    while f"{key}~{n}" in stock:
+        n += 1
+    return f"{key}~{n}"
+
+
+def set_apart(actor, stock_key: str, count: int = 1) -> str:
+    """`count` of a stack moved onto its own shelf key, which is returned; the stack's own
+    key when it holds no more than that.
+
+    `begin` puts a whole entry into progress, so work on some of a stack splits it off
+    first. Measured 2026-11-07 (audit #12): a commissioned dagger stacked onto the
+    identical dagger collected the day before and `begin` locked both ("still finishing");
+    with the first one still uncollected, `begin` refused the new one after the fee was
+    taken. The split-off copy carries no block of its twin's: the work on it is its own.
+    Moved here from the enchanter's `_split_one`, which the alchemist's and tanner's
+    benches had each rewritten as an append-`+` loop."""
+    key, st = _find(actor, stock_key)
+    if st is None:
+        return key
+    n = max(1, int(count or 1))
+    have = int(getattr(st, "count", 1) or 1)
+    if have <= n:
+        return key
+    one = copy.deepcopy(st)
+    one.count = n
+    st.count = have - n
+    rec = getattr(one, "record", None)
+    if isinstance(rec, dict):
+        rec["count"] = n
+        if isinstance(getattr(st, "record", None), dict):
+            st.record["count"] = st.count
+    _lift(one)
+    new = fresh_key(actor, key)
+    actor.stock[new] = one
+    return new
+
+
 def begin(actor, stock_key: str, *, craft: str, minutes: int, now: int, label: str,
           where: str = "carried", where_name: str = "", doing: str = "",
           result: dict | None = None) -> dict:

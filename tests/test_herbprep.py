@@ -50,11 +50,9 @@ def test_the_whole_chain_for_the_worst_case():
     """A shelled, volatile herb that cannot be brewed raw: extract, neutralise, grind,
     and only then does the pot accept it."""
     worst = prep(needs_extraction=True, volatile=True, brew_raw=False)
-    state = "raw"
-    for step in ("extract", "neutralise", "grind"):
+    for step, state in (("extract", "raw"), ("neutralise", "extracted"),
+                        ("grind", "neutralised")):
         assert H.can(step, worst, state)[0], (step, state)
-        state = H.after(step, state)
-    assert state == "ground"
     assert H.can("brew", worst, "ground")[0]
 
 
@@ -80,33 +78,6 @@ def test_one_that_cannot_says_to_grind_it_first():
 def test_a_herb_that_cannot_be_ground_at_all():
     ok, why = H.can("grind", prep(can_grind=False), "raw")
     assert not ok and "cannot be ground" in why
-
-
-# --- potency -----------------------------------------------------------------------------
-
-def test_grinding_and_brewing_both_raise_potency():
-    """"grinding and brewing should both increase potency"."""
-    assert H.potency_change("grind") > 0
-    assert H.potency_change("brew") > 0
-
-
-def test_the_increase_goes_up_with_the_herbalist():
-    """"the increases in potency should go up with herbalist lvl" — a master gets more
-    out of the same leaf, which is what levelling a craft is for."""
-    novice = H.potency_change("grind", 0)
-    master = H.potency_change("grind", 10)
-    assert master > novice
-    assert H.potency_change("brew", 5) > H.potency_change("brew", 1)
-
-
-def test_preserving_costs_potency():
-    """"preservation should lower potency" — the price of not losing the material."""
-    assert H.potency_change("preserve") < 0
-
-
-def test_a_step_that_does_nothing_to_potency_says_zero():
-    assert H.potency_change("extract") == 0
-    assert H.potency_change("neutralise") == 0
 
 
 # --- the clock ---------------------------------------------------------------------------
@@ -154,35 +125,6 @@ def test_flags_read_from_yes_and_no_as_well_as_booleans():
     """The editor stores choices as strings, and the loader must not care."""
     got = H.Prep.of({"kind": "herb", "volatile": "yes", "brew_raw": "no"})
     assert got.volatile and not got.brew_raw
-
-
-# --- infusions ---------------------------------------------------------------------------
-
-def test_an_infusion_needs_a_crafted_tincture_to_go_into():
-    """"Infusions are only possible on already crafted tinctures"."""
-    ok, why = H.can_infuse({"kind": "herb"}, {"kind": "herb"})
-    assert not ok and "already been crafted" in why
-    assert H.can_infuse({"kind": "tincture", "crafted": True}, {"kind": "herb"})[0]
-
-
-def test_a_raw_herb_may_be_infused_only_if_it_could_be_brewed_raw():
-    """"raw herbs as long as the raw herbs could be brewed raw"."""
-    base = {"kind": "tincture", "crafted": True}
-    assert H.can_infuse(base, {"brew_raw": True}, "raw")[0]
-    ok, why = H.can_infuse(base, {"brew_raw": False}, "raw")
-    assert not ok and "brewed raw" in why
-
-
-def test_grinding_it_first_makes_it_infusable_anyway():
-    base = {"kind": "tincture", "crafted": True}
-    assert H.can_infuse(base, {"brew_raw": False}, "ground")[0]
-
-
-def test_a_volatile_herb_still_has_to_come_out_of_its_shell():
-    """"some herbs that are volitile need extraction"."""
-    base = {"kind": "tincture", "crafted": True}
-    ok, why = H.can_infuse(base, {"needs_extraction": True, "volatile": True}, "raw")
-    assert not ok and "extracted" in why
 
 
 # --- and it reaches the ingredient editor ------------------------------------------------
@@ -298,126 +240,6 @@ def test_the_shipped_corpus_is_untouched_by_tagging():
         "preparation flags belong in the overlay, not in the shipped file"
 
 
-# --- and the bench enforces it (2026-08-23) ------------------------------------------
-
-class FakeHerb:
-    """An ingredient with flags chosen by the test rather than by the corpus.
-
-    The tagged flags live in the *homebrew overlay*, in the player's own data
-    directory — so a test that reached for "Hydra Gall is volatile" would be asserting
-    something about whoever ran it. It passed on this machine and would fail on a fresh
-    clone, which is the worst kind of green.
-    """
-    def __init__(self, name, **flags):
-        self.id = name.lower().replace(" ", "-")
-        self.name = name
-        self.kind = flags.pop("kind", "herb")
-        self.tier = "common"
-        self.rank = 1
-        self.risky = False
-        self.effects = []
-        self.text = ""
-        for k, v in flags.items():
-            setattr(self, k, v)
-
-
-def _problems(methods, *herbs):
-    from rules.crafting import _preparation_problems
-
-    return _preparation_problems(list(herbs), methods)
-
-
-def test_a_shelled_herb_cannot_simply_be_ground():
-    """The pot has to be told to open it first, and the refusal names the ingredient
-    and the rule rather than only saying no."""
-    got = _problems(["grind"], FakeHerb("Hydra Gall", needs_extraction=True))
-    assert any("Hydra Gall" in p and "extracted" in p for p in got)
-
-
-def test_extracting_first_makes_the_same_chain_legal():
-    """The state is carried through the chain, which is the whole point: checking each
-    step against the raw ingredient would refuse a chain that extracts and then works."""
-    assert _problems(["extract", "brew"],
-                     FakeHerb("Hydra Gall", needs_extraction=True)) == []
-
-
-def test_a_volatile_herb_will_not_be_ground_until_it_is_neutralised():
-    volatile = FakeHerb("Henbane", volatile=True)
-    got = _problems(["grind"], volatile)
-    assert any("Henbane" in p and "neutralise" in p for p in got)
-    assert _problems(["neutralize", "grind"], volatile) == []
-
-
-def test_a_step_an_ingredient_has_no_use_for_is_not_an_error():
-    """Neutralising a pot of eight herbs because one is volatile is the point; the
-    other seven are not spoiled by sitting through it."""
-    got = _problems(["neutralize", "brew"],
-                    FakeHerb("Henbane", volatile=True), FakeHerb("Acacia"))
-    assert got == []
-
-
-def test_only_the_ingredient_at_fault_is_named():
-    got = _problems(["grind"], FakeHerb("Acacia"),
-                    FakeHerb("Hydra Gall", needs_extraction=True))
-    assert any("Hydra Gall" in p for p in got)
-    assert not any("Acacia" in p for p in got)
-
-
-def test_one_that_cannot_be_brewed_raw_is_refused_until_it_is_ground():
-    dry = FakeHerb("Coldwood", brew_raw=False)
-    assert any("ground" in p for p in _problems(["brew"], dry))
-    assert _problems(["grind", "brew"], dry) == []
-
-
-def test_grinding_and_brewing_pay_more_in_better_hands():
-    """The per-level term reaches the bench: the same chain is worth more to a master.
-    `herbprep` holds the numbers so the two cannot disagree about what a grind is."""
-    from rules import crafting
-
-    def potency(level):
-        return crafting.preview(
-            "herbalist", level,
-            crafting.Chain(track="herbalist", methods=["brew"],
-                           ingredient_ids=["acacia"]),
-            satchel={"acacia": 9}).potency
-
-    assert potency(5) > potency(1) > 1.0
-
-
-def test_spoiled_material_is_refused_rather_than_quietly_weakened():
-    """"all animal parts need preserved within 48 hours for they become garbage" —
-    and garbage in a pot is not a worse potion, it is not a potion."""
-    from rules import crafting
-    from rules.sheet import load_pc
-
-    pc = load_pc("fixtures/pc-kesst.json")
-    pc.carry("wyrmfang-venom", 3, at_minute=0)
-    got = crafting.preview(
-        "herbalist", 3,
-        crafting.Chain(track="herbalist", methods=["brew"],
-                       ingredient_ids=["wyrmfang-venom"]),
-        satchel=dict(pc.inventory), carrier=pc, now_minute=49 * 60)
-    assert any("spoiled" in p for p in got.problems), got.problems
-
-
-def test_salt_carried_at_the_time_keeps_it():
-    from rules import crafting
-    from rules.sheet import load_pc
-
-    pc = load_pc("fixtures/pc-kesst.json")
-    # Curing salt by id, a measure an animal part (owner, 2026-10-08: "salt costs salt";
-    # this pinned "rock salt" in the goods, a name fragment, salting three for nothing).
-    pc.inventory["curing-salt"] = 3
-    pc.carry("wyrmfang-venom", 3, at_minute=0)      # salted on the way in
-    assert "curing-salt" not in pc.inventory        # three parts, three measures
-    got = crafting.preview(
-        "herbalist", 3,
-        crafting.Chain(track="herbalist", methods=["brew"],
-                       ingredient_ids=["wyrmfang-venom"]),
-        satchel=dict(pc.inventory), carrier=pc, now_minute=1000 * 60)
-    assert not any("spoiled" in p for p in got.problems), got.problems
-
-
 def test_a_plant_keeps_a_week_where_a_gland_keeps_two_days():
     from rules.sheet import load_pc
 
@@ -442,66 +264,6 @@ def test_material_carried_before_the_clock_existed_is_treated_as_fresh():
     pc.inventory["wyrmfang-venom"] = 2          # no timestamp, as an old save has none
     spoiled, _ = pc.freshness("wyrmfang-venom", 9999 * 60, H.Prep(animal=True))
     assert spoiled is False
-
-
-# --- infusion is the only way to combine a tincture (2026-08-23) ----------------------
-
-def _pot(methods, stock_names=(), raw=(), level=5):
-    """A chain over named jars and raw ingredients, without touching the corpus."""
-    from rules import crafting
-
-    stock = {}
-    for name in stock_names:
-        s = crafting.Stock(base=name, tier="common", count=9)
-        stock[s.id] = s
-    chain = crafting.Chain(track="herbalist", methods=list(methods),
-                           ingredient_ids=list(raw),
-                           stock_used={sid: 1 for sid in stock})
-    return crafting.preview("herbalist", level, chain, stock=stock,
-                            satchel={i: 9 for i in raw})
-
-
-def test_a_tincture_will_not_take_a_herb_without_an_infusion():
-    """"Infusions should be the only way to combine tinctures with other things.\""""
-    got = _pot(["mix"], stock_names=["Mad Cap Tincture"], raw=["acacia"])
-    assert any("only take" in p and "infusion" in p for p in got.problems), got.problems
-
-
-def test_two_tinctures_will_not_combine_without_one_either():
-    got = _pot(["mix"], stock_names=["Mad Cap Tincture", "Ice Lotus Tincture"])
-    assert any("infusion" in p for p in got.problems), got.problems
-
-
-def test_infusing_is_what_makes_it_legal():
-    got = _pot(["infuse"], stock_names=["Mad Cap Tincture"], raw=["acacia"])
-    assert not any("infusion" in p for p in got.problems), got.problems
-
-
-def test_a_jar_that_is_not_a_tincture_is_not_restricted():
-    """A tea and a herb in the same pot is an ordinary compound, which is most of what
-    the bench does; the rule is about tinctures alone."""
-    got = _pot(["mix"], stock_names=["Woundwort Tea"], raw=["acacia"])
-    assert not any("infusion" in p for p in got.problems), got.problems
-
-
-def test_a_raw_herb_that_cannot_be_brewed_raw_cannot_be_infused_raw():
-    """"raw herbs as long as the raw herbs could be brewed raw" — the same question
-    asked twice, so the same flag answers it."""
-    from rules.crafting import _infusion_additions
-
-    dry = FakeHerb("Coldwood", brew_raw=False)
-    assert any("brewed raw" in p for p in _infusion_additions([dry], [], ["infuse"]))
-    # Grinding it in the same chain answers the objection.
-    assert _infusion_additions([dry], [], ["grind", "infuse"]) == []
-
-
-def test_a_volatile_shelled_herb_needs_opening_before_it_is_infused():
-    """"some herbs that are volitile need extraction.\""""
-    from rules.crafting import _infusion_additions
-
-    sealed = FakeHerb("Salamander Gland", needs_extraction=True, volatile=True)
-    assert any("extracted" in p for p in _infusion_additions([sealed], [], ["infuse"]))
-    assert _infusion_additions([sealed], [], ["extract", "infuse"]) == []
 
 
 # --- a herb the GM hands over gets the same clock (2026-08-23) ------------------------
@@ -607,7 +369,6 @@ def test_drying_is_a_step_and_leaves_it_dried():
     """Dry is the step bench's solid concentration (plan §5.3). Something still in its
     shell is opened first, as for every other step."""
     assert H.can("dry", prep()) == (True, "")
-    assert H.after("dry", "raw") == "dried"
     ok, why = H.can("dry", prep(needs_extraction=True))
     assert not ok and "extracted" in why
 
@@ -627,3 +388,42 @@ def test_the_reasons_the_bench_prints_carry_no_em_dash():
                H.preserve_automatically(type("Bare", (), {"goods": {}, "inventory": {}})(),
                                         prep(animal=True))[2]]
     assert all(r and "—" not in r for r in reasons), reasons
+
+
+def test_a_herb_handed_over_keeps_its_age():
+    """Ponytail audit 2026-11-07 (smaller findings): the handover carried a herb with the
+    clock reset to the minute it changed hands, so a gland picked 40 hours before was
+    fresh for another 48 in the next pair of hands — the spoilage rule dodged by passing
+    it to a friend. The giver's pick-time travels with it (`Actor.carry_from`)."""
+    from rules.bestiary import instantiate
+
+    eng = _scene_at(minute=600)
+    friend = instantiate("guildhand", scene=eng.scene, name="Drenn")
+    eng.scene.add(friend)
+    friend.carry("wyrmfang-venom", 1, at_minute=600)
+    eng.scene.clock_minutes = 600 + 40 * 60
+    eng.run(eng.validate([{"op": "give", "actor": friend.ref, "because": "t",
+                           "params": {"item": "wyrmfang venom", "to": "pc"}}]))
+    pc = eng.scene.pc()
+    assert pc.inventory.get("wyrmfang-venom") == 1
+    assert pc.picked_at.get("wyrmfang-venom") == 600
+    assert pc.freshness("wyrmfang-venom", 600 + 49 * 60, H.Prep(animal=True))[0] is True
+
+
+def test_a_looted_herb_starts_its_clock_at_the_loot():
+    """Ponytail audit 2026-11-07: a body's satchel went into the looter's with no clock at
+    all, which `freshness` reads as never spoiling — looted animal parts kept forever.
+    Taken with the body's own pick-time, or from the minute of the loot when it has none."""
+    from rules.bestiary import instantiate
+
+    eng = _scene_at(minute=600)
+    body = instantiate("thug", scene=eng.scene, name="the poacher")
+    eng.scene.add(body)
+    body.inventory["wyrmfang-venom"] = 1
+    body.hp = -13
+    eng.run(eng.validate([{"op": "loot", "actor": "pc", "because": "t",
+                           "params": {"from": body.ref}}]))
+    pc = eng.scene.pc()
+    assert pc.inventory.get("wyrmfang-venom") == 1
+    assert pc.picked_at.get("wyrmfang-venom") == 600
+    assert pc.freshness("wyrmfang-venom", 600 + 49 * 60, H.Prep(animal=True))[0] is True

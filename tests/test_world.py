@@ -255,3 +255,35 @@ def test_two_writes_in_one_clock_tick_do_not_serve_stale_content(tmp_path):
     os.utime(p, ns=(stamp, stamp))          # the same tick, on purpose
     with pytest.raises(Exception):
         load_cached(p)
+
+
+def test_a_null_in_the_export_is_read_as_empty_not_as_none(tmp_path):
+    """Audit 2026-11-07 #11. The loader read `e.get("name", "")`, which hands back None
+    for an explicit `"name": null` — the default only covers a MISSING key. Such a file
+    imported fine, then `by_name` and `events_touching` (run every turn) raised
+    AttributeError on `None.lower()`, so a partial World Bible export broke the game one
+    page later with no hint why. Every text field, the `world` block, and the name rows
+    the un-namer reads (unwritten, factions, chronology figures) now read null as empty.
+    """
+    raw = json.loads(open(EXPORT, encoding="utf-8").read())
+    first = raw["entities"][0]
+    first.update(name=None, kind=None, summary=None, path=None, facts=None, scale=None)
+    raw["entities"].append({"id": "nobody", "name": "Nobody", "facts": {"Role": None},
+                            "sections": [{"title": None, "paragraphs": None}]})
+    raw["chronology"][0].update(name=None, summary=None, scope=None, background=None,
+                                aftermath=None, figures=[{"name": None}])
+    raw["unwritten"].append({"name": None})
+    raw["factions"].append({"name": None})
+    raw["world"] = None
+    p = tmp_path / "partial.json"
+    p.write_text(json.dumps(raw), encoding="utf-8")
+
+    w = load(p)
+    assert w.name == "partial" and w.secret == ""
+    assert w.get(first["id"]).name == ""
+    assert w.by_name("Pangrella", kind="CITY").id == PANGRELLA_TOWN
+    assert isinstance(w.events_touching(PANGRELLA_TOWN), list)
+    assert w.is_unwritten("Somewhere") is False
+    assert w.get("nobody").fact("Role") == "" and w.get("nobody").prose == ""
+    assert all(isinstance(f["name"], str) for c in w.chronology for f in c.figures)
+    assert all(isinstance(f["name"], str) for f in w.factions + w.unwritten)

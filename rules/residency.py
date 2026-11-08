@@ -104,9 +104,10 @@ _TRAVELLER_PLACE = {
     "messenger": ("gate", MARKET), "sailor": ("docks", "gate"), "soldier": ("gate", MARKET),
     "pilgrim": (TEMPLE, "gate"),
 }
-# How far a traveller's roads are walked ahead in one asking. A campaign of a year with a
-# road every three days is ~120 stops; the cap is the paranoia NetHack's catch-up clamps
-# with, not a limit anybody should meet.
+# The most route entries a traveller holds at once. It used to end the walk, and was met:
+# a hop writes two entries and a messenger hops daily, so messengers froze around day
+# 395 and carters around day 570 (audit 2026-11-07 #10). It now only triggers a prune of
+# the entries behind the asking (`_prune`); the walk itself always reaches `until`.
 MOST_STOPS = 400
 
 # Places this settlement has, by what they are for. Matched on the place's own name,
@@ -383,9 +384,19 @@ def route(rec: dict, until: int, world) -> list[dict]:
     {"road": [from, to], "from": minute, "to": minute} for the road between. Extended
     lazily and kept on the record — "store what was rolled" — so a later asking reads it
     and a reload never re-walks it.
+
+    Entries that ended more than a day before `until` are dropped as the walk goes
+    (`_prune`), and `route_dropped` counts them: every roll is seeded by the entry's
+    position in the whole walk, so the count keeps a road asked about daily identical
+    to one walked in one go. A save from before the count reads it as 0, which is true
+    of its unpruned route.
     """
     loc, _place, t0 = _anchor(rec)
-    kept = rec.get("route") or []
+    kept = list(rec.get("route") or [])
+    # Only meaningful beside the route it counts: several places drop "route" to re-walk
+    # from a new anchor (`observe`, the test helpers) and leave this key behind.
+    dropped = int(rec.get("route_dropped") or 0) if kept else 0
+    kept, dropped = _prune(kept, dropped, until)
     work = str((rec.get("life") or {}).get("work") or "")
     lo, hi = STAYS.get(work, (1, 3))
     transient = mobility_of(rec) == "transient"
@@ -399,13 +410,18 @@ def route(rec: dict, until: int, world) -> list[dict]:
             stay = lo + (hi - lo) * _rng(rec.get("id"), "stay", 0, t0).random()
             left = _rng(rec.get("id"), "left", t0).random()
             kept = [{"at": loc, "from": t0, "to": t0 + int(stay * left * DAY)}]
-    while kept[-1]["to"] < until and len(kept) < MOST_STOPS:
+    while kept[-1]["to"] < until:
+        if len(kept) >= MOST_STOPS:
+            before = len(kept)
+            kept, dropped = _prune(kept, dropped, until)
+            if len(kept) >= before:
+                break    # nothing behind the asking to drop: the old paranoia stands
         last = kept[-1]
         if "gone" in last:
             break
         if "road" in last:
             here = last["road"][1]
-            n = len(kept)
+            n = dropped + len(kept)
             days = 1 if transient else lo + (hi - lo) * _rng(rec.get("id"), "stay", n, here).random()
             kept.append({"at": here, "from": last["to"], "to": last["to"] + int(days * DAY)})
             if transient:
@@ -413,7 +429,7 @@ def route(rec: dict, until: int, world) -> list[dict]:
             continue
         here = last["at"]
         came = next((e["road"][0] for e in reversed(kept) if "road" in e), "")
-        leg = _next_leg(rec, here, came, len(kept), world)
+        leg = _next_leg(rec, here, came, dropped + len(kept), world)
         if leg is None:
             # No road out that they would take: they stay, a day at a time.
             kept[-1] = {**last, "to": last["to"] + DAY}
@@ -424,7 +440,25 @@ def route(rec: dict, until: int, world) -> list[dict]:
     # put; that guess is answered and never stored, or it would outlive the asking.
     if world is not None:
         rec["route"] = kept
+        if dropped:
+            rec["route_dropped"] = dropped
+        else:
+            rec.pop("route_dropped", None)
     return kept
+
+
+def _prune(kept: list[dict], dropped: int, until: int) -> tuple[list[dict], int]:
+    """Drop the entries that ended more than a day before `until`, counting them.
+
+    The last two always stay: the walk extends from the last, and a stay reads the road
+    that brought them (`came`) from the one before it — a stay always follows a road —
+    so keeping both leaves every later roll exactly as it was.
+    """
+    cut = 0
+    limit = max(0, len(kept) - 2)
+    while cut < limit and kept[cut]["to"] < until - DAY:
+        cut += 1
+    return (kept[cut:], dropped + cut) if cut else (kept, dropped)
 
 
 # --- the answer --------------------------------------------------------------------------

@@ -142,7 +142,7 @@
       "book": "First aid for the dying, treating wounds, poison and disease, and long-term care.",
       "uses": [
         {"text": "First aid: a Heal check on someone dying, DC 15. Make it and they stop dying.",
-         "file": "rules/firstaid.py", "find": "patient.add_condition(\"stable\", source=\"first aid\")"}
+         "file": "rules/firstaid.py", "find": "patient.stabilise(\"first aid\")"}
       ],
       "not_yet": "Stopping bleeding, long-term care while resting, and treating poison or disease."
     },

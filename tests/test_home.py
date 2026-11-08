@@ -318,7 +318,7 @@ def test_the_page_carries_everything_it_draws(client):
 
 # --- importing a world -----------------------------------------------------------------
 #
-# "need an import world button". `library.import_world` existed and took a filesystem
+# "need an import world button". `library.import_world` (since removed) took a filesystem
 # path, which is no use to a packaged app with no terminal: a player who has just exported
 # a world from World Bible has a file in Downloads, not a path they want to type.
 
@@ -534,3 +534,36 @@ def test_a_save_anchored_in_a_dead_pyinstaller_temp_dir_still_loads():
     assert _portable_world_source(r"C:\Users\nobody\AppData\Local\PathfinderGM\worlds\w.json") \
         == r"C:\Users\nobody\AppData\Local\PathfinderGM\worlds\w.json"
     assert _resolve_world_source("fixtures/pangrella-campaign.json").exists()
+
+
+def test_the_front_page_reads_each_save_once_not_once_per_world(tmp_path, monkeypatch):
+    """Audit 2026-11-07: `recent_characters` called `campaigns_in` for every world on
+    the shelf, and each call parsed every save in the folder — with the three shipped
+    worlds and four saves, twelve full JSON parses of campaign files that run to
+    megabytes in a long game. Each save is now read once per asking."""
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        d = tmp_path / "campaigns"
+        d.mkdir(parents=True)
+        cards = library.worlds()
+        assert len(cards) >= 2
+        for n in range(4):
+            (d / f"game-{n}.json").write_text(json.dumps(
+                {"id": f"game-{n}", "world_source": cards[n % len(cards)].source,
+                 "character_id": f"who-{n}"}), encoding="utf-8")
+        reads = []
+        real = library.json.loads
+        # Counted by content, because `library.json` is the json module itself: only a
+        # campaign save's text carries `world_source`.
+
+        def counting(s, *a, **k):
+            if '"world_source"' in str(s):
+                reads.append(1)
+            return real(s, *a, **k)
+
+        monkeypatch.setattr(library.json, "loads", counting)
+        library.recent_characters()
+        assert len(reads) == 4, len(reads)
+        # The world page too: its games and its people from one reading.
+        reads.clear()
+        assert Client().get(f"/api/world/{cards[0].id}").status_code == 200
+        assert len(reads) == 4, len(reads)

@@ -258,7 +258,10 @@ def run(engine, intent, partial: dict | None = None):
     now = int(scene.clock_minutes or 0)
     held = []
     for e in made:
-        key = str(e.get("stock") or "")
+        # The keeper's piece on its own key: it stacks onto an identical one the player
+        # already owns (`blacksmith.put`), and `begin` would lock the pair, or refuse after
+        # the fee, when the first is still being finished (audit #12).
+        key = inprogress.set_apart(pc, str(e.get("stock") or ""), int(e.get("count") or 1))
         got = inprogress.begin(pc, key, craft=CRAFT_ID, minutes=max(1, minutes), now=now,
                                label=f"{keeper.name} finishing {e.get('item')}",
                                where=f"place:{scene.at}", where_name=where_name,
@@ -501,10 +504,14 @@ def _haggle(engine, intent, pc, keeper, partial):
     scene = engine.scene
     place = str(scene.location_id or "nowhere")
     day = market_mod.day_of(scene.clock_minutes)
-    won = _haggled_with(scene, pc.ref, place, keeper.ref, day)
+    # The counter's own key (`market.stall_of`, audit #13): this keyed the keeper's ref
+    # while the counter keyed its stall, so a haggle lost at the counter was asked again
+    # here and won.
+    stall = market_mod.stall_of(scene, keeper)
+    won = tradecraft.haggled(scene, pc.ref, place, stall, day)
     if not intent.params.get("haggle"):
         return won, "", []
-    key = tradecraft.dealing_key("haggle", pc.ref, place, keeper.ref, day)
+    key = tradecraft.dealing_key("haggle", pc.ref, place, stall, day)
     if key in scene.dealings or won:
         return won, (f"{keeper.name} has already been haggled with today and holds to "
                      f"{won}% off. " if won else
@@ -530,21 +537,6 @@ def _haggle(engine, intent, pc, keeper, partial):
         said = (f"{pc.name} haggles: Diplomacy {roll.total} against DC {value}, and "
                 f"{keeper.name} will not come down. ")
     return pct, said, [roll]
-
-
-def _haggled_with(scene, ref: str, place: str, keeper_ref: str, day: int) -> int:
-    """The percentage this person won off this keeper today, whichever counter key the
-    haggle was written under (the trade panel writes a stall, the commission the keeper)."""
-    best = 0
-    for key, rec in (getattr(scene, "dealings", None) or {}).items():
-        parts = str(key).split("|")
-        if len(parts) < 5 or parts[0] != "haggle" or parts[1] != ref:
-            continue
-        if parts[2] != place or parts[-1] != str(day):
-            continue
-        if parts[3] == keeper_ref or (rec or {}).get("keeper") == keeper_ref:
-            best = max(best, int((rec or {}).get("percent", 0) or 0))
-    return best
 
 
 def _undercut(cp: int, percent: int) -> int:

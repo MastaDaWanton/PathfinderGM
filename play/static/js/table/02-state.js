@@ -225,6 +225,10 @@ function render(s, hold) {
     document.title = "Pathfinder GM" + (s.world ? " — " + s.world : "");
   }
   renderCombat(s);
+  // The narrator met a wedged Ollama after the engine had resolved the turn
+  // (play/views.py `_finish`): the turn is on the page in the engine's own lines, and the
+  // restart sentence sits beside it as a stall before the turn does.
+  if (s && s.stalled && typeof showStalled === "function") showStalled(s.stalled);
   // The soundtrack follows the fight (music.js): battle while the scene is in an
   // encounter, the calm playlist once it has stayed over a few seconds.
   if (window.Music) {

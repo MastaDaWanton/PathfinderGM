@@ -959,9 +959,8 @@
      "target": "Concentrate for 1 round to swap to a different domain of your deity. This provokes attacks of opportunity, costs 10 minutes of the spell's remaining duration, ends every ongoing effect of the domain you are leaving, and cannot be done with under 10 minutes left."
     },
     {
-     "type": "apply_condition",
-     "target": "stunned",
-     "note": "Only if you blatantly violate your deity's precepts while the spell is running: invoke deity ends at once and you are stunned for a number of rounds equal to your Hit Dice."
+     "type": "narrative",
+     "target": "Only if you blatantly violate your deity's precepts while the spell is running: invoke deity ends at once and you are stunned for a number of rounds equal to your Hit Dice."
     }
    ],
    "duration": {

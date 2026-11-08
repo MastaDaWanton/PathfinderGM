@@ -90,12 +90,36 @@ def test_the_spec_ships_the_other_things_read_off_resource_root():
     the Open Game Content, so a build without it must not be distributed at all.
     """
     text = SPEC.read_text(encoding="utf-8")
-    for needed in ('("fixtures", "fixtures")',
+    for needed in ('("fixtures/*-campaign.json", "fixtures")',
+                   '("fixtures/pc-*.json", "fixtures")',
                    '("play/templates", "play/templates")',
                    '("play/static", "play/static")',
                    '("OGL.txt", ".")',
                    '("OGL-NOTICE.md", ".")'):
         assert needed in text, f"pathfindergm.spec does not bundle {needed}"
+
+
+def test_the_spec_ships_only_the_fixtures_the_app_reads():
+    """Audit 2026-11-07: the spec bundled `fixtures/` whole, so every installer carried
+    the two `.sqlite3` exports (3.06 MB) and the synthetic test world, which only the
+    suite reads. The spec now names the two patterns the app globs at runtime; each must
+    match a file (PyInstaller fails the build on a pattern that matches nothing), and
+    together they must cover the shelf's worlds and the pregens."""
+    from play import library
+
+    text = SPEC.read_text(encoding="utf-8")
+    assert '("fixtures", "fixtures")' not in text
+    shipped = {p.name for pat in ("*-campaign.json", "pc-*.json")
+               for p in (ROOT / "fixtures").glob(pat)}
+    assert {p.name for p in (ROOT / "fixtures").glob("pc-*.json")} <= shipped
+    assert {Path(c.source).name for c in library.worlds() if c.shipped} <= shipped
+    assert all(any((ROOT / "fixtures").glob(pat)) for pat in ("*-campaign.json", "pc-*.json"))
+    assert not {n for n in shipped if n.endswith(".sqlite3")}
+    # Nothing the app runs opens a fixture outside those two patterns.
+    for src in ("play", "rules", "gm", "pathfindergm", "world"):
+        for py in (ROOT / src).rglob("*.py"):
+            body = py.read_text(encoding="utf-8")
+            assert "campaign.sqlite3" not in body and "synthetic-world" not in body, py
 
 
 def test_the_spec_names_the_entry_point_that_exists():
@@ -250,16 +274,14 @@ def test_every_registry_shipped_loader_actually_returns_content():
 
 
 def test_every_bench_module_imports():
-    """`rules/benches.py` routes five crafts and one mode by dotted string, and
-    `module_for` converts an ImportError into `UnknownBench` — so a craft missing from
-    the bundle reads as "that bench is not built yet" rather than as a broken build.
+    """`rules/benches.py` routes five crafts by dotted string, so a craft missing from the
+    bundle is found only when something asks for it. (Its one mode, the magic-item chain,
+    was deleted with the chain bench on 2026-11-08, audit finding #20.)
     """
     from rules import benches
 
     for track, module_name in benches.BENCHES.items():
         assert import_module(module_name), track
-    for mode, (_owner, module_name) in benches.MODES.items():
-        assert import_module(module_name), mode
 
 
 def test_the_craft_page_materials_modules_import():
@@ -596,6 +618,21 @@ def test_the_heartbeat_stays_out_of_the_request_log():
     assert quiet.filter(logging.LogRecord("django.server", logging.INFO, __file__, 1,
                                           "Broken pipe from ('127.0.0.1', 49967)",
                                           None, None))
+
+
+def test_the_second_device_poll_stays_out_of_the_request_log():
+    """Audit 2026-11-07: the table asks `/api/revision` every three seconds
+    (`checkTheOtherDevice` in js/table/02-state.js) — 28,800 lines a day, six times the
+    heartbeat the filter above was written for, and every one of them reached the log."""
+    import logging
+
+    from pathfindergm.liveness import QuietHeartbeat
+
+    poll = logging.LogRecord("django.server", logging.INFO, __file__, 1, '"%s" %s %s',
+                             ('GET /api/revision HTTP/1.1', '200', '15'), None)
+    assert not QuietHeartbeat().filter(poll)
+    js = Path(settings.BASE_DIR, "play", "static", "js", "table", "02-state.js")
+    assert 'fetch("/api/revision"' in js.read_text(encoding="utf-8")
 
 
 def test_an_abandoned_server_still_exits_cleanly():

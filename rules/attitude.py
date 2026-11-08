@@ -263,7 +263,9 @@ def talked_today(actor, day: int) -> bool:
     """Record one exchange today; True if it still counts towards regard.
 
     The cap is per person per day — three exchanges — so a conversation is worth
-    having and cannot be farmed by saying "hello" thirty times."""
+    having and cannot be farmed by saying "hello" thirty times. A gift is an exchange
+    too (`Engine._op_give`, audit #40): one budget, so a purse of coppers cannot buy what
+    talk is capped at."""
     e = _regard_effect(actor)
     payload = dict(getattr(e, "payload", None) or {}) if e is not None else {}
     if int(payload.get("day", -1)) != int(day):

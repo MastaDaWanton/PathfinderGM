@@ -87,3 +87,22 @@ def test_death_is_a_debt_not_a_wall(tmp_path, settings, monkeypatch, client):
     # Raising the living is refused, not crashed.
     again = client.post("/api/resurrect", data="{}", content_type="application/json")
     assert again.status_code == 409
+
+
+def test_a_new_character_never_takes_a_campaign_file_already_on_disk(tmp_path, settings):
+    """Audit 2026-11-07 #8: `unique_id` asked only `characters/` whether a name was free.
+    The starter's game is `campaigns/slice.json` with no roster file beside it, so a new
+    character named "Slice" was given the id `slice`, and `begin_with` then wrote their
+    fresh campaign over the starter's — recoverable only from backups that rotate out
+    after three saves. The id is taken when either file exists."""
+    from play import roster
+
+    settings.CAMPAIGN_DIR = str(tmp_path / "campaigns")
+    (tmp_path / "campaigns").mkdir()
+    (tmp_path / "campaigns" / "slice.json").write_text("{}", encoding="utf-8")
+
+    assert roster.unique_id("slice") == "slice-2"
+    assert roster.unique_id("kesst") == "kesst"
+    # Both doors count at once: slice-2 has a character file, so the next is slice-3.
+    roster.path_for("slice-2").write_text("{}", encoding="utf-8")
+    assert roster.unique_id("slice") == "slice-3"

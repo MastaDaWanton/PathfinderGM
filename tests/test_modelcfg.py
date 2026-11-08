@@ -169,3 +169,48 @@ def test_the_hosted_client_refuses_to_call_without_a_key():
         chat([{"role": "user", "content": "hi"}], "gpt-4o",
              "https://api.openai.com/v1", provider="openai", api_key="")
     assert "needs an API key" in str(e.value)
+
+
+# --- a hand-edited file -------------------------------------------------------------
+# Audit 2026-11-07 #9. Placeholder key strings only: no test here prints or copies a real
+# key, and the assertions compare against the placeholders, never echo them.
+
+def _hand_edited(isolated, raw: bytes):
+    (isolated / "models.json").write_bytes(raw)
+    return isolated / "models.json"
+
+
+def test_a_byte_order_mark_does_not_hide_the_saved_keys(isolated):
+    """Notepad's "UTF-8 with BOM" put three bytes before the `{`. `_stored()` read with
+    plain utf-8, the parse failed, every read answered `{}`: Settings showed no keys and
+    the next Save wrote that emptiness over the file. Read with utf-8-sig, the keys and
+    roles are simply there."""
+    body = {"keys": {"groq": "placeholder-groq-0000"},
+            "roles": {"narrator": {"provider": "groq", "model": "m"}}}
+    _hand_edited(isolated, b"\xef\xbb\xbf" + json.dumps(body).encode("utf-8"))
+    assert modelcfg.masked()["groq"]["set"] is True
+    assert modelcfg.roles()["narrator"]["provider"] == "groq"
+    # And a Save keeps the key it never saw.
+    assert modelcfg.save({"prose": {"provider": "ollama", "model": "qwen3:8b"}}) == []
+    assert modelcfg.keys().get("groq") == "placeholder-groq-0000"
+
+
+def test_a_file_that_will_not_parse_is_never_saved_over(isolated, caplog):
+    """The other half of #9: any read failure became `{}`, and `save()` merged into it,
+    so a stray comma lost every key and role on the next Save. A file that exists and
+    does not parse now refuses the save, names the file, and is left byte for byte."""
+    raw = b'{"keys": {"groq": "placeholder-groq-0000",}}'
+    p = _hand_edited(isolated, raw)
+    with caplog.at_level("WARNING", logger="pathfindergm"):
+        problems = modelcfg.save({"prose": {"provider": "ollama", "model": "qwen3:8b"}})
+    assert problems and "models.json" in problems[0]
+    assert p.read_bytes() == raw
+    assert any("models.json" in r.getMessage() for r in caplog.records)
+    # The log names the file; it never carries what was in it.
+    assert not any("placeholder" in r.getMessage() for r in caplog.records)
+
+
+def test_a_missing_file_still_saves(isolated):
+    """Absent is not unreadable: a fresh install has no models.json and must save."""
+    assert not (isolated / "models.json").exists()
+    assert modelcfg.save({"prose": {"provider": "ollama", "model": "qwen3:8b"}}) == []

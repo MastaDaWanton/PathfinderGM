@@ -251,7 +251,7 @@ functional dependence relation to the preceding Offer" (Bunt's annotation guidel
   - `intended`: a purpose clause, "I'm going to…", "I want to…", a conditional;
   - `asked`: asked about, not done.
 - **Only `done` and `tried` move the engine.** This applies to `ops_for`, `supported`,
-  `gets_nothing`/`hands_nothing`, the table, `apply`, `go_to_heard_place`, the words of
+  `gets_nothing`/`PARTING_ACTS`, the table, `apply`, `go_to_heard_place`, the words of
   `own_words_only` and the false-claim reader. The brief shows the planner the other two
   as context ("INTENDED, not done this turn: no op for it").
 - **A sale tried is an offer, never a sale, at a counter too.** Only an agreement closes

@@ -596,6 +596,10 @@ def _stem(w: str) -> str:
         return _IRREGULAR[w]
     if w.endswith("'s"):
         w = w[:-2]
+    # "watchmen" is "watchman": the rule `scope._one` already applies ("guardsmen", owner
+    # report 2026-11-01). Without it here a plural in -men named nobody (audit 2026-11-07).
+    if len(w) > 4 and w.endswith("men"):
+        w = w[:-3] + "man"
     if len(w) > 5 and w.endswith("ing"):
         w = w[:-3]
     elif len(w) > 4 and w.endswith("ed"):

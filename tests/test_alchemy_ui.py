@@ -193,7 +193,8 @@ def test_no_alchemy_string_carries_an_em_or_en_dash():
     """UI plan §8 and §14: zero em-dashes and en-dashes in this lane's files, comments
     included, in the #alchemy layer's markup and in the old tab's card."""
     craft = _src(CRAFT)
-    card = craft[craft.index("function renderAlchemyMoved()"):craft.index("function renderBench()")]
+    start = craft.index("function renderAlchemyMoved()")
+    card = craft[start:craft.index("document.addEventListener(", start)]
     html = _src(TABLE)
     layer = html[html.index('<div id="alchemy"'):html.index('<div id="veil">')]
     for name, text in [(p.name, _src(p)) for p in OURS + [CSS]] + [
@@ -255,7 +256,8 @@ def test_the_old_alchemy_tab_is_a_card_that_opens_the_bench():
     sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
     assert 'if (CRAFT === "alchemy") { renderAlchemyMoved(); return; }' in sel
     assert 'CRAFT === "alchemy";' in sel.replace("\n", " ").replace("    ", " ") or 'CRAFT === "alchemy"' in sel
-    card = src[src.index("function renderAlchemyMoved()"):src.index("function renderBench()")]
+    start = src.index("function renderAlchemyMoved()")
+    card = src[start:src.index("document.addEventListener(", start)]
     assert 'href="/play/#alchemy"' in card and "Open the alchemy bench" in card
     assert 'location.hash === "#alchemy"' in _src(SHELL)
 

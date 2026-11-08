@@ -800,14 +800,3 @@ def test_no_bench_endpoint_answers_a_bad_body_with_a_traceback(bench, url):
     for body in HOSTILE:
         r = bench.post(url, data=json.dumps(body), content_type="application/json")
         assert r.status_code < 500, (url, body, r.content)
-
-
-# --- the old page ---------------------------------------------------------------------------
-
-def test_the_old_page_refuses_herbalism_chains_in_words(bench):
-    """Herbalism's chain path retired from /craft/ (plan §9): its endpoints answer 409
-    with a sentence saying where the bench went, rather than running the retired rules."""
-    for url in ("/api/craft/preview", "/api/craft/do", "/api/craft/recipes"):
-        d = _post(bench, url, {"craft": "herbalism", "name": "x",
-                               "ingredients": ["mint"], "methods": ["grind"]}, 409)
-        assert "at the table now" in d["error"] and d["moved"]

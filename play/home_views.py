@@ -99,10 +99,11 @@ def world_detail(request, world_id: str):
         card = library.get(world_id)
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
+    games = library.campaigns_in(world_id)
     return JsonResponse({
         "world": card.as_dict(),
-        "campaigns": library.campaigns_in(world_id),
-        "characters": library.characters_in(world_id),
+        "campaigns": games,
+        "characters": library.characters_in(world_id, games),
         "pregens": roster.pregens(),
     })
 

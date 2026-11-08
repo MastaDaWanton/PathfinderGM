@@ -344,9 +344,8 @@
      "target": "charm effects"
     },
     {
-     "type": "apply_condition",
-     "target": "fatigued",
-     "note": "when the spell's duration ends, not while it lasts"
+     "type": "narrative",
+     "target": "When the spell's duration ends, each subject becomes fatigued; not while it lasts."
     }
    ],
    "duration": {

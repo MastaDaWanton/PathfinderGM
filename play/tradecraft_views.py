@@ -50,9 +50,7 @@ def _haggle_target(c, body) -> tuple[dict | None, JsonResponse | None]:
     refusal = views._counter_refusal(c, pc, merchant)
     if refusal:
         return None, refusal
-    _place, stall, _day = views._stall_of(c, counter)
-    if counter is None:
-        stall = str(body.get("stall") or stall)
+    _place, stall, _day = views._stall_of(c, counter, merchant, str(body.get("stall") or ""))
     return {"target": merchant.ref, "params": {"stall": stall},
             "label": f"I haggle with {merchant.name}"}, None
 

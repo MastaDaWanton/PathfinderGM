@@ -57,16 +57,15 @@ as at the herb and forge benches.
 **Lane F (curses, identify, unbind's knowledge)** merged into build/enchanting after this
 lane branched. Its API (contracts §7, as F built it: `curses.roll/describe/lift/lift_dc/
 clings`, `knowledge.read/apply_danger/attuned/bound/identify/unbind/item_card/
-knows_recipe/learn_recipe`) is called through `_lane_fn` with F's own signatures wherever
-it exists; the "lane F seam" section's stubs answer only on a tree without it, marked
-`"stub": True`. A stub's flawed binding records `{"d100", "cl", "pending"}`; F's records
-the book's row. Neither reaches the page while the curse is unknown.
+knows_recipe/learn_recipe`) is called with F's own signatures. A flawed binding records
+the book's row, which never reaches the page while the curse is unknown. (The stubs kept
+for a tree without F were deleted on 2026-11-08.)
 
 **The old shelf library** (the bottom of the file): `Material`, `materials()`, `get`,
 `KIND_GLYPH`, `ACQUISITION` and `obtainable` still serve the `/craft/` page's shelf and the
-acquisition hub (rules/benches.py). The old chain (`Chain`, `preview`) cannot run on the new
-track (its scribe, seal, imbue and empower are gone), so `rules/benches.MOVED` refuses it in
-words, as it does herbalism's, and the stubs here only keep `benches.supports` honest.
+acquisition hub (rules/benches.py). The old chain (`Chain`, `preview`) could not run on the
+new track (its scribe, seal, imbue and empower are gone) and was deleted on 2026-11-08 (audit
+finding #20).
 """
 from __future__ import annotations
 
@@ -84,18 +83,12 @@ TRACK_ID = "enchanter"
 
 
 def _lane(name: str):
-    """A sibling lane's module, or None while it is not merged. Imported on each call, so a
-    test can stand a fake in `sys.modules` (the forge's `_lane`)."""
-    try:
-        return importlib.import_module(f"rules.{name}")
-    except ImportError:
-        return None
+    """A sibling module, imported on each call so a test can stand a fake in `sys.modules`.
 
-
-def _lane_fn(module: str, fn: str):
-    mod = _lane(module)
-    got = getattr(mod, fn, None) if mod is not None else None
-    return got if callable(got) else None
+    It returned None while a sibling lane was not merged yet, and every caller carried a
+    stub for that tree. Every lane merged in October; the stubs were deleted on 2026-11-08
+    (audit, "dead 'not merged yet' fallbacks in the craft modules")."""
+    return importlib.import_module(f"rules.{name}")
 
 
 # =============================================================================================
@@ -172,19 +165,13 @@ def _base_int(actor) -> int:
 def check_terms(actor, level: int) -> list[dict]:
     """d20 + Enchanter level + half character level + Intelligence, itemised (plan §4.3).
     The Intelligence term is the character's own (`_base_int`): nothing worn reaches it."""
-    track_level = max(0, int(level or 0))
-    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor is not None else 1
-    intel = (_base_int(actor) - 10) // 2
+    # Half the Craft ranks ride last (option A, 2026-10-07; `tradecraft.bench_terms`).
+    # Ranks are the character's own count, so the no-feedback rule above still holds.
     from . import tradecraft
 
-    return [
-        {"label": f"Enchanter {track_level}", "value": track_level},
-        {"label": f"half character level ({char_level})", "value": char_level // 2},
-        {"label": "Intelligence", "value": intel},
-        # Half the Craft ranks (option A, 2026-10-07; `tradecraft.bench_terms`). Ranks
-        # are the character's own count, so the no-feedback rule above still holds.
-        *tradecraft.bench_terms(actor, "enchanter"),
-    ]
+    return tradecraft.bench_check_terms(actor, level, track=TRACK_ID, name="Enchanter",
+                                        ability="int",
+                                        ability_mod=(_base_int(actor) - 10) // 2)
 
 
 def check_bonus(actor, level: int) -> int:
@@ -209,8 +196,6 @@ def sanctum_here(scene, actor, known=()) -> dict | None:
     if scene is None:
         return None
     places = _lane("places")
-    if places is None or not hasattr(places, "_place_at"):
-        return None
     try:
         place = places._place_at(scene, known)
     except Exception:  # noqa: BLE001 - a place we cannot read is no sanctum
@@ -785,16 +770,12 @@ def item_card(record: dict) -> dict:
     known: the binding's house top-ups at their quality, and each power's uses left today.
     Without F, the bench's own card (`_own_card`), held to the same rule."""
     mine = _own_card(record)
-    fn = _lane_fn("knowledge", "item_card")
-    if fn is None:
-        card = mine
+    card = dict(_lane("knowledge").item_card(record) or {})
+    if card.get("identified"):
+        card["house"] = mine.get("house", [])
+        card["uses"] = mine.get("powers", [])
     else:
-        card = dict(fn(record) or {})
-        if card.get("identified"):
-            card["house"] = mine.get("house", [])
-            card["uses"] = mine.get("powers", [])
-        else:
-            card.setdefault("summary", mine.get("summary"))
+        card.setdefault("summary", mine.get("summary"))
     # An item converted from an old save that never named a choice (bane's foe) asks it
     # here, on its own card, for as long as it is unanswered (plan §19, lane H): the
     # one-time notice can be dismissed, the question cannot be lost.
@@ -1915,34 +1896,12 @@ def _stock_of(actor, key: str):
     return (getattr(actor, "stock", {}) or {}).get(k)
 
 
-def _split_one(actor, key: str) -> str:
-    """One of a stack, split off under its own key so a layer or a circle goes on one item
-    and not on every identical sword in the pile."""
-    k = key[6:] if key.startswith("stock:") else key
-    st = actor.stock[k]
-    if int(getattr(st, "count", 1) or 1) <= 1:
-        return k
-    one = copy.deepcopy(st)
-    one.count = 1
-    st.count = int(st.count) - 1
-    rec = getattr(one, "record", None)
-    if isinstance(rec, dict):
-        rec["count"] = 1
-        if isinstance(getattr(st, "record", None), dict):
-            st.record["count"] = st.count
-    n = 2
-    while f"{k}~{n}" in actor.stock:
-        n += 1
-    actor.stock[f"{k}~{n}"] = one
-    return f"{k}~{n}"
-
-
 def finish(actor, progress, plan: StepPlan, tier: int, *, engine=None, now: int = 0,
            flawed: bool = False) -> dict:
     """Land a step whose roll succeeded (or a Bind that took, flawed): spend, make, pay.
 
     Returns {"products", "lines", "levelled", "discoveries", "said", "work"}."""
-    from . import magic_layer
+    from . import inprogress, magic_layer
 
     track = wc.get(TRACK_ID)
     lines: list[dict] = []
@@ -1976,7 +1935,7 @@ def finish(actor, progress, plan: StepPlan, tier: int, *, engine=None, now: int 
     v = plan.vessel
     if plan.method == "prepare" and v is not None:
         spend(actor, plan.consumes)          # chalk or salt, ink, treatment, the focus set
-        key = _make_blank(actor, v.blank) if v.blank else _split_one(actor, v.key)
+        key = _make_blank(actor, v.blank) if v.blank else inprogress.set_apart(actor, v.key, 1)
         st = actor.stock[key]
         m = _magic_of_stock(st)
         line = next((c for c in plan.circle if c.kind in ("chalk", "salt")), None)
@@ -2233,35 +2192,26 @@ def _register() -> None:
 # =============================================================================================
 # The lane F seam (contracts §7). Lane F (rules/curses.py, the enchanter half of
 # rules/knowledge.py) merged into build/enchanting on 2026-10-05, after this lane branched.
-# Each function below calls F's API with F's own signature when it is there, and otherwise
-# does the least that keeps the bench honest, marked `"stub": True` in what it returns.
+# Each function below calls F's API with F's own signature. Each also carried a stub for a
+# tree without F, marked `"stub": True`; F is on every tree, and the stubs were deleted on
+# 2026-11-08.
 # =============================================================================================
 
 def roll_curse(engine, record: dict, layer_plan: dict, adds: dict | None = None) -> dict:
     """A flawed binding's curse: `curses.roll(dice, record, dict(plan, adds=adds))` (lane
-    F; `adds` lets a completely-different curse substitute like for like). STUB without
-    F: the engine's hidden d100 and the item's caster level, `{"d100", "cl", "pending"}`,
-    no row, so nothing is applied (`magic_layer._apply_curse` asks F) and F can read the
-    row off the roll already made. Either way it never reaches the page."""
-    fn = _lane_fn("curses", "roll")
+    F; `adds` lets a completely-different curse substitute like for like). It never
+    reaches the page. No dice (a rules test with no engine), no curse rolled."""
     dice = getattr(engine, "dice", None)
-    if fn is not None and dice is not None:
-        return dict(fn(dice, record, dict(layer_plan or {}, adds=copy.deepcopy(adds or {})))
-                    or {})
-    face = 0
-    if dice is not None:
-        face = int(dice.roll("1d100", label="Enchanting: the flaw", visibility="hidden").total)
-    return {"d100": face, "cl": int((layer_plan or {}).get("caster_level", 0) or 0),
-            "pending": "rules/curses.py"}
+    if dice is None:
+        return {}
+    return dict(_lane("curses").roll(dice, record,
+                                     dict(layer_plan or {}, adds=copy.deepcopy(adds or {})))
+                or {})
 
 
 def curse_words(curse: dict) -> str:
-    """`curses.describe` (lane F). STUB: a curse lane F has not read says only that it is
-    there. Asked only once the curse is known."""
-    fn = _lane_fn("curses", "describe")
-    if fn is not None:
-        return str(fn(curse) or "")
-    return "A curse, not yet read."
+    """`curses.describe` (lane F). Asked only once the curse is known."""
+    return str(_lane("curses").describe(curse) or "")
 
 
 def cleanse_dc(record: dict) -> int:
@@ -2270,9 +2220,8 @@ def cleanse_dc(record: dict) -> int:
     from . import magic_layer
 
     m = magic_layer.magic_of(record)
-    fn = _lane_fn("curses", "lift_dc")
-    if fn is not None and isinstance(m.get("curse"), dict):
-        return int(fn(m["curse"]))
+    if isinstance(m.get("curse"), dict):
+        return int(_lane("curses").lift_dc(m["curse"]))
     return int(_n("cleanse_dc_base", 10)) + magic_layer.caster_level(
         m, magic_layer.vessel_kind(record))
 
@@ -2282,55 +2231,30 @@ def lift_curse(record: dict) -> dict:
     knowing the item is clean. The book's remove curse is also the only way to put down an
     item that clings ("can only be discarded after ... remove curse", CRB Cursed Items):
     `curses.clings` answers False once it is lifted."""
-    fn = _lane_fn("curses", "lift")
-    if fn is not None:
-        return dict(fn(record))
-    rec = copy.deepcopy(dict(record or {}))
-    m = dict(rec.get("magic") or {})
-    m["curse"] = None
-    m["known"] = dict(m.get("known") or {}, curse=True)
-    rec["magic"] = m
-    return rec
+    return dict(_lane("curses").lift(record))
 
 
 def clings(record: dict) -> bool:
-    fn = _lane_fn("curses", "clings")
-    return bool(fn(record)) if fn is not None else False
+    return bool(_lane("curses").clings(record))
 
 
 def recipe_known(actor, recipe_id: str) -> bool:
-    fn = _lane_fn("knowledge", "knows_recipe")
-    if fn is not None:
-        return bool(fn(actor, str(recipe_id)))
-    entry = (getattr(actor, "herb_known", None) or {}).get(str(recipe_id))
-    return isinstance(entry, dict) and "recipe" in (entry.get("keys") or ())
+    return bool(_lane("knowledge").knows_recipe(actor, str(recipe_id)))
 
 
 def learn_recipe(actor, recipe_id: str, how: str) -> bool:
-    fn = _lane_fn("knowledge", "learn_recipe")
-    if fn is not None:
-        return bool(fn(actor, str(recipe_id), how))
-    from . import knowledge
-
-    return bool(knowledge.reveal(actor, str(recipe_id), ["recipe"], how))
+    return bool(_lane("knowledge").learn_recipe(actor, str(recipe_id), how))
 
 
 def learn_attuned(actor, essence_id: str, *, clock: int) -> list[str]:
     """Seating an essence shows its polarity and phase (plan §12.3): `knowledge.attuned`
-    (lane F), else the bench writes the two keys itself."""
-    fn = _lane_fn("knowledge", "attuned")
-    if fn is not None:
-        return list(fn(actor, essence_id, clock=clock) or [])
-    return reveal_traits(actor, essence_id, ["polarity", "phase"],
-                         f"attuned it, day {int(clock) // 1440 + 1}")
+    (lane F)."""
+    return list(_lane("knowledge").attuned(actor, essence_id, clock=clock) or [])
 
 
 def learn_bound(actor, essence_id: str, *, clock: int) -> list[str]:
-    """Binding an essence shows what it grants: `knowledge.bound` (lane F), else the key."""
-    fn = _lane_fn("knowledge", "bound")
-    if fn is not None:
-        return list(fn(actor, essence_id, clock=clock) or [])
-    return reveal_traits(actor, essence_id, ["grants"], f"bound it, day {int(clock) // 1440 + 1}")
+    """Binding an essence shows what it grants: `knowledge.bound` (lane F)."""
+    return list(_lane("knowledge").bound(actor, essence_id, clock=clock) or [])
 
 
 def _unknown_traits(actor, essence_id: str) -> int:
@@ -2370,40 +2294,19 @@ def read_essence(actor, essence_id: str, total: int, *, clock: int) -> dict:
     """A Read on a total already rolled: `knowledge.read(actor, id, total, clock=)` (lane F:
     DC 10 + 5 a rarity band, the herb rule's one benefit and one drawback, and a volatile
     phial's danger named for `apply_danger`). Either way the keys in `revealed` are NEW
-    and already written to the store. STUB without F: the next unknown trait, no DC; a
-    volatile essence's danger named and not applied."""
-    fn = _lane_fn("knowledge", "read")
-    if fn is not None:
-        got = fn(actor, essence_id, total, clock=clock)
-        if isinstance(got, dict) and "revealed" in got:
-            return got
-    from . import materials
-
-    doc = _essence_docs().get(str(essence_id)) or {}
-    have = set(known_traits(actor, essence_id))
-    nxt = next((k for k in materials.essence_traits(doc) if k not in have), None)
-    new = reveal_traits(actor, essence_id, [nxt] if nxt else [],
-                        f"read, day {int(clock) // 1440 + 1}")
-    danger = None
-    if any(w.get("trait") == "volatile" for w in doc.get("working") or ()):
-        danger = next((dict(e) for e in doc.get("house") or () if materials.is_negative(e)),
-                      None)
-    return {"revealed": new, "success": True, "dc": None,
-            "cost": {"phial": float(_n("read_pinch", 0.1))},
-            "minutes": int((method_row("read") or {}).get("minutes", 10)), "danger": danger,
-            "stub": True}
+    and already written to the store."""
+    return dict(_lane("knowledge").read(actor, essence_id, total, clock=clock))
 
 
 def apply_read_danger(engine, actor, essence_id: str, danger: dict | None) -> list:
     """A volatile phial bites whoever handles it, whatever the roll: `knowledge.apply_danger`
-    (lane F) runs it through the one applicator with its tell (laws 2 and 3). Without F
-    nothing is applied, and the response says so (`danger_applied: false`)."""
-    fn = _lane_fn("knowledge", "apply_danger")
-    if fn is None or not danger or engine is None:
+    (lane F) runs it through the one applicator with its tell (laws 2 and 3)."""
+    if not danger or engine is None:
         return []
     doc = _essence_docs().get(str(essence_id)) or {}
-    return list(fn(engine, actor, essence_id, danger,
-                   because=f"reading {doc.get('name') or essence_id}") or [])
+    return list(_lane("knowledge").apply_danger(
+        engine, actor, essence_id, danger,
+        because=f"reading {doc.get('name') or essence_id}") or [])
 
 
 def trait_words(doc: dict, key: str) -> str:
@@ -2432,84 +2335,19 @@ def trait_words(doc: dict, key: str) -> str:
 
 
 def identify_item(actor, record: dict, total: int, *, day: int) -> dict:
-    """Lane F's `knowledge.identify`. STUB (plan §12.1, the book's Spellcraft rule): DC 15 +
-    the item's caster level; beat it to learn the intent (and the recipe, if it was one),
-    by 10 to see the curse too; once per item per day, a second try that day returns the
-    first answer. Writes `magic.known` on the record handed in; the caller stores it.
-
-    With lane F: `knowledge.identify(actor, record, total, day=)`, handed the bench's own
-    record dict (its `magic` written in place, then stored by the caller), so the caster
-    level is read off a record that says what gear it is: a forge item kept as a plain
-    shelf entry has no record of its own for F to read."""
-    fn = _lane_fn("knowledge", "identify")
-    if fn is not None:
-        got = fn(actor, record, total, day=day)
-        if isinstance(got, dict) and "result" in got:
-            return got
-    from . import magic_layer
-
-    m = magic_layer.magic_of(record)
-    known = dict(m.get("known") or {})
-    dc = int(_n("identify_dc_base", 15)) + magic_layer.caster_level(
-        m, magic_layer.vessel_kind(record))
-    tried = known.get("identified") or {}
-    if int(tried.get("day", -1)) == int(day):
-        return {"result": tried.get("result", "fail"), "learned": [], "recipe": None,
-                "dc": dc, "again_on_day": int(day) + 1, "repeat": True, "stub": True}
-    if total >= dc + 10:
-        result = "curse"
-    elif total >= dc:
-        result = "intent"
-    else:
-        result = "fail"
-    learned, recipe = [], None
-    if result != "fail":
-        known["intent"] = True
-        learned = [e.get("id") for e in m["properties"] + m["flat"]]
-        for p in m["powers"]:
-            recipe = str(p.get("recipe") or "") or recipe
-    if result == "curse":
-        known["curse"] = True
-    known["identified"] = {"day": int(day), "result": result}
-    m["known"] = known
-    record["magic"] = m
-    return {"result": result, "learned": learned, "recipe": recipe, "dc": dc,
-            "again_on_day": int(day) + 1, "stub": True}
+    """Lane F's `knowledge.identify(actor, record, total, day=)` (plan §12.1, the book's
+    Spellcraft rule), handed the bench's own record dict (its `magic` written in place, then
+    stored by the caller), so the caster level is read off a record that says what gear it
+    is: a forge item kept as a plain shelf entry has no record of its own for F to read."""
+    return dict(_lane("knowledge").identify(actor, record, total, day=day))
 
 
 def unbind_learn(actor, record: dict, *, now: int) -> dict:
     """What an Unbind that succeeded teaches and gives back: `knowledge.unbind(actor,
     record, clock=)` (lane F; no roll of its own, the bench's roll is the Unbind) →
     {"record": stripped, "learned", "types", "recipe", "recipes", "motes",
-    "residue": {"arcane-residue": n}}. STUB without F, the same shape: the property TYPES
-    (never their size: "the magnitude is irrelevant", Skyrim, plan §12.3), the recipes
-    learned, a quarter of the layer's motes as residue, rounded down (owner, round 4)."""
-    fn = _lane_fn("knowledge", "unbind")
-    if fn is not None:
-        got = fn(actor, record, clock=now)
-        if isinstance(got, dict) and "learned" in got:
-            return got
-    from . import magic_layer
-
-    m = magic_layer.magic_of(record)
-    gear = magic_layer.vessel_kind(record)
-    types = (["enhancement"] if m["enhancement"] and gear in magic_layer.ARMS else []) + \
-        list(dict.fromkeys(str(e.get("id")) for e in m["properties"] + m["flat"]
-                           if e.get("id")))
-    recipes = [str(p.get("recipe")) for p in m["powers"] if p.get("recipe")]
-    day = int(now) // 1440 + 1
-    recipe = None
-    for rid in recipes:
-        if learn_recipe(actor, rid, f"unbound, day {day}") and recipe is None:
-            recipe = rid
-    price = magic_layer.market_price(m, gear, str(record.get("slot") or ""))
-    motes = int(math.ceil(price * magic_layer.MAKING_FRACTION / magic_layer.GP_PER_MOTE
-                          - 1e-9))
-    residue = int(math.floor(motes * float(_n("residue_fraction", 0.25)) + 1e-9))
-    stripped, _ = magic_layer.strip(record)
-    return {"record": stripped, "learned": types, "types": types, "recipe": recipe,
-            "recipes": recipes, "motes": motes,
-            "residue": {str(_n("residue_id", "arcane-residue")): residue}, "stub": True}
+    "residue": {"arcane-residue": n}}."""
+    return dict(_lane("knowledge").unbind(actor, record, clock=now))
 
 
 # =============================================================================================
@@ -3078,9 +2916,6 @@ def conversion_seen(actor, key: str) -> None:
 # The old shelf library: the /craft/ page's catalogue and the acquisition hub
 # =============================================================================================
 
-class CraftError(ValueError):
-    """Kept for the routing table's shape (rules/benches.py)."""
-
 
 @dataclass
 class Material:
@@ -3216,57 +3051,6 @@ def get(material_id: str) -> Material:
     return m
 
 
-# The old chain, refused by `rules/benches.MOVED`: these exist so `benches.supports` keeps
-# answering for every track, and say the same thing if anything calls them directly.
-MOVED_WORDS = ("Enchanting is worked at the circle at the table now, one step at a time: "
-               "prepare, attune, bind.")
-
-
-@dataclass
-class Chain:
-    methods: list[str] = field(default_factory=list)
-    material_ids: list[str] = field(default_factory=list)
-    item: str = ""
-    name: str = ""
-
-    @property
-    def stages(self) -> int:
-        return len(self.methods)
-
-
-def chain_from_body(body: dict) -> Chain:
-    body = dict(body or {})
-
-    def as_list(value):
-        if isinstance(value, str):
-            return [p.strip().lower() for p in value.split(",") if p.strip()]
-        return [str(v).strip().lower() for v in (value or [])]
-
-    return Chain(methods=as_list(body.get("methods")),
-                 material_ids=as_list(body.get("materials", body.get("material_ids"))),
-                 item=str(body.get("item", "") or "").strip(),
-                 name=str(body.get("name", "") or "").strip())
-
-
-@dataclass
-class Result:
-    name: str = ""
-    tier: str = "common"
-    rank: int = 1
-    stages: int = 0
-    dc: int = 0
-    problems: list[str] = field(default_factory=list)
-
-    def as_dict(self) -> dict:
-        return {"name": self.name, "tier": self.tier, "rank": self.rank,
-                "stages": self.stages, "dc": self.dc, "problems": list(self.problems)}
-
-
-def preview(level: int, chain: Chain, **_kw) -> Result:
-    return Result(name=chain.name or chain.item, stages=chain.stages,
-                  problems=[MOVED_WORDS])
-
-
 # One glyph per material kind, the Enchanter's reserved pool (rules/benches.glyphs asserts
 # no two crafts share one).
 KIND_GLYPH: dict[str, str] = {
@@ -3330,12 +3114,12 @@ def obtainable(obtain_kind: str, *, biome: str | None = None,
 
 _register()
 
-__all__ = ["ACQUISITION", "BLANKS", "Chain", "CraftError", "KIND_GLYPH", "MIGRATION_STAMP",
+__all__ = ["ACQUISITION", "BLANKS", "KIND_GLYPH", "MIGRATION_STAMP",
            "Material", "answer_pending", "answer_question", "conversion_seen", "conversions",
            "is_old_enchanted", "migrate_old_record", "pending_of", "undo_migration",
            "Phial", "StepPlan", "TRACK_ID", "Vessel", "bench_rules", "bound_name",
-           "chain_from_body", "check_bonus", "check_terms", "circle_items", "finish",
+           "check_bonus", "check_terms", "circle_items", "finish",
            "from_dict", "get", "identify_item", "item_card", "materials", "methods_view",
-           "miss", "obtainable", "phials", "plan_step", "preview", "read_essence",
+           "miss", "obtainable", "phials", "plan_step", "read_essence",
            "reveal_traits", "roll_curse", "shelf", "spend", "tuning_for", "unbind_learn",
            "verdict_of", "vessels", "where_here"]

@@ -166,7 +166,7 @@ from the player to nobody — to the floor — and replaces whatever give the pl
 
 **Figures of speech.** `_NOT_A_THING` gains brunt, wink, smile, nod and the other faces
 and gestures; `_is_a_thing` reads the head before "of". A hand-over the reading never read
-(`interpret.hands_nothing`) of a thing the player does not carry is not planned; a carried
+(`interpret.PARTING_ACTS`, read in `acts_to_ops`) of a thing the player does not carry is not planned; a carried
 thing's hand-over still stands, which keeps the 2026-09-27 ruling in `test_pick_a_fight`.
 
 **Nothing moved, nothing remembered.** A give from somebody who does not have the thing
@@ -187,8 +187,8 @@ minted; "…and walk off" walked Kesst out of town.
 
 - **The one acting is the taker.** A `give` with `from_` a person, made by the one who
   ends up holding it, is a take (`Engine._op_give`'s `taking`): the owner is kept and
-  `stolen` set, as the holder search already did. A price is consent; so is the holder
-  being the actor (Inform's giving action, the rule above read the other way); a
+  `stolen` set, as the holder search already did. A sale is `buy`'s (a give carried a
+  `price` as consent until 2026-11-07, audit #24); the holder being the actor is consent (Inform's giving action, the rule above read the other way); a
   companion's pack is the party's. The dead own nothing: taken from a body, it is the loot
   op's rule, told as "from the dead thug's body".
 - **What they carry, never a new thing.** A take from a person resolves against that

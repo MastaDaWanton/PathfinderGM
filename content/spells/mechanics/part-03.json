@@ -1246,6 +1246,7 @@
     {
      "type": "apply_condition",
      "target": "fatigued",
+     "duration": {"kind": "fixed", "amount": 1, "unit": "round"},
      "note": "1 round, immediately after the boosted roll"
     }
    ],
@@ -1298,6 +1299,7 @@
     {
      "type": "apply_condition",
      "target": "dazed",
+     "duration": {"kind": "fixed", "amount": 1, "unit": "round"},
      "note": "1 round, immediately after the boosted roll"
     }
    ],

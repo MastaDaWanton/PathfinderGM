@@ -321,12 +321,3 @@ def test_no_enchant_response_carries_an_unknown_curse(circle):
     assert stored["curse"]["id"] == "curse:opposite"      # still there, only unseen
 
 
-def test_the_old_craft_chain_is_refused_in_words(circle):
-    """The `/craft/` chain could not enchant (plan §1) and its methods are gone from the
-    track: it is refused with the sentence that says where enchanting is done now, as
-    herbalism's was."""
-    from rules import benches
-
-    with pytest.raises(benches.MovedBench) as err:
-        benches.chain_from_body("enchanter", {"methods": "attune,bind"})
-    assert "circle at the table" in str(err.value)

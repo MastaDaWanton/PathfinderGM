@@ -33,7 +33,7 @@ def test_every_minute_of_the_day_has_exactly_one_phase():
 
 def test_the_turning_points_sit_on_the_engines_own_dawn_and_dusk():
     """The engine's dawn is 06:00 (a night's rest runs to it) and night is 18:00-06:00
-    (`craft_views._is_night`). A phase table typed in by hand could put dawn somewhere the
+    (the survival rules' window). A phase table typed in by hand could put dawn somewhere the
     rest of the app does not: here each turning point is two hours centred on its moment,
     built from the one constant pair."""
     assert (sky.DAWN_MINUTE, sky.DUSK_MINUTE) == (6 * 60, 18 * 60)
@@ -43,21 +43,6 @@ def test_the_turning_points_sit_on_the_engines_own_dawn_and_dusk():
     assert at(18) == "dusk" and at(17) == "dusk" and at(19) == "night"
     assert at(0) == "midnight" and at(23) == "midnight" and at(1) == "night"
     assert at(7) == "morning" and at(10, 59) == "morning"
-
-
-def test_the_night_phases_agree_with_the_benches_night():
-    """`craft_views._is_night` is the binding circle's night (dusk to dawn). Every minute it
-    calls night must be dusk, night, midnight or dawn here, never morning or noon."""
-    from play.craft_views import _is_night
-
-    class _C:
-        class scene:
-            clock_minutes = 0
-
-    for m in range(0, DAY, 5):
-        _C.scene.clock_minutes = m
-        if _is_night(_C):
-            assert sky.phase_at(m)["phase"] in ("dusk", "night", "midnight", "dawn"), m
 
 
 def test_no_phase_names_an_hour_the_narrator_check_would_call_false():

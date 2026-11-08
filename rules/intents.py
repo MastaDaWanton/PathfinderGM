@@ -686,7 +686,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # attached: `to` is who gains it, `from_` who loses it, and either may be absent
     # when the other end is the world. `item` is any name at all — see rules/goods.py on
     # why an unknown item is carried rather than refused.
-    "give": (("item",), ("count", "to", "from_", "price", "unit"), "hidden"),
+    "give": (("item",), ("count", "to", "from_", "unit"), "hidden"),
     # Putting on what you are carrying. Armour and shields change the AC the engine
     # computes; a weapon becomes the one in your hand. Refused for anything you do not
     # actually have, so the sheet can never claim protection nobody bought.
@@ -764,7 +764,6 @@ PARAM_ALIASES = {
     "recipient": "to",
     "quantity": "count",
     "amount_of": "count",
-    "cost": "price",
 }
 
 # Params the GM keeps supplying that the *engine* owns. docs/intent-protocol.md §1 is
@@ -796,6 +795,11 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "
 # `craft` itself, from code.
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest"})
+# Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
+# turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
+# and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a
+# plan could award itself 50,000 XP.
+AUTHOR_ONLY_OPS = frozenset({"xp"})
 JOB_DOES = ("offer", "accept", "decline")
 
 ENGINE_OWNED_PARAMS = {
@@ -967,8 +971,13 @@ def is_null(value) -> bool:
 # (lane C3's report, 2026-10-07). Every other op's `roll` is engine-owned and popped.
 # `defensively` is the cast's (2026-10-09): read at last by the concentration check, and
 # "false" written as a word must not cost a caster a spell.
+# `coup_de_grace`, `search` and `diversion` joined 2026-11-08 (ponytail audit #5):
+# `"coup_de_grace": "false"` parsed as True, an automatic crit and a save-or-die against
+# a helpless target. `follow`, `deliberate` and `immersed` are read the same way.
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
-                         "thrown", "quoted", "own", "roll", "defensively", "aid", "past"})
+                         "thrown", "quoted", "own", "roll", "defensively", "aid", "past",
+                         "coup_de_grace", "search", "diversion", "follow", "deliberate",
+                         "immersed"})
 
 
 def _flag(value) -> bool:
@@ -1168,6 +1177,15 @@ def parse(raw: dict, index: int = 0) -> Intent:
             f"instead: use_item item=<id> for a jar, cast spell=<id> for a spell, "
             f"use_ability ability=<name> for a power.", "schema", index)
 
+    if op == "give" and {"price", "cost"} & set(params):
+        # A give carries no price (audit #24, 2026-11-07): the price was taken before
+        # anything moved, the seller was never paid, and a model priced a 300 gp sword at
+        # a copper. A sale is the trade ops', which price it from the tables.
+        raise IntentError(
+            "give: a give has no price. Buying from somebody is buy item=<thing> "
+            "from_=<seller>; selling is sell item=<thing> to=<buyer>; the engine prices "
+            "both. Coin handed over on its own is give item=<coin> count=<n>.",
+            "schema", index)
     unknown = set(params) - set(required) - set(optional)
     # The door and the knock are the engine's to decide, and a model that writes the
     # outcome in ("success": true) is ignored, not refused. Measured live 2026-09-27:
@@ -1315,7 +1333,7 @@ def _check_params(intent: Intent, index: int) -> None:
                 f"dc and keep the target.", "legality", index)
         # A search: Perception against whatever is hidden here, at the hiding's own DC —
         # the engine's (`Engine._search`, rules/awareness.py), so a band is refused.
-        search = bool(p.get("search"))
+        search = p.get("search")
         if search and p.get("skill") != "perception":
             raise IntentError("check: only perception searches. Drop search, or make the "
                               "skill perception.", "schema", index)
@@ -1327,7 +1345,7 @@ def _check_params(intent: Intent, index: int) -> None:
                 p.get("pace") and p.get("skill") != "stealth"):
             raise IntentError('check: pace is "half" or "full", and only on a stealth '
                               "check.", "schema", index)
-        diversion = bool(p.get("diversion"))
+        diversion = p.get("diversion")
         if diversion and p.get("skill") != "bluff":
             raise IntentError("check: a diversion is a bluff. Make the skill bluff, or "
                               "drop diversion.", "schema", index)
@@ -1382,9 +1400,7 @@ def _check_params(intent: Intent, index: int) -> None:
             )
         if w:
             p["weapon"] = str(w).strip().lower()
-        p["full_attack"] = bool(p.get("full_attack", False))
-        if "coup_de_grace" in p:
-            p["coup_de_grace"] = bool(p["coup_de_grace"])
+        p.setdefault("full_attack", False)
         man = p.get("manoeuvre")
         if man:
             key = str(man).strip().lower()

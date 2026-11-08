@@ -46,14 +46,15 @@ WIRING = {
         "/api/wear", "[data-wear]",                     # wearing what you crafted
     ],
     "/craft/": [
-        "/api/craft/preview", "/api/craft/do", "/api/forage",
-        "dice3d.js", "showRoll",
-        "batch",                                        # the batch count
-        "stationTip", "method_help",                    # the station tooltips
-        "adoptGlyphs",                                  # per-craft icons
-        # The secondary rulebook row (renderModes) retired with enchanting's move to the
-        # circle at the table (lane U1, 2026-10-06); its tab is the card that opens it.
+        # Every tab is a door to its bench at the table. The old chain bench's shelf,
+        # chain, preview, batch Craft and station tooltips went with its routes on
+        # 2026-11-08 (audit finding #20); no tab could reach them.
+        'closest("[data-craft]")',
+        "renderHerbalismMoved", "/play/#bench",
+        "renderForgeMoved", "/play/#forge",
         "renderEnchantMoved", "/play/#enchant",
+        "renderAlchemyMoved", "/play/#alchemy",
+        "renderLeatherMoved", "/play/#leather",
     ],
     "/": [
         "/api/worlds/import", "#worldfile",             # the import button

@@ -268,7 +268,7 @@ GUEST_WRITES = frozenset({
     "/api/say", "/api/talk", "/api/cast", "/api/roll", "/api/roll/face",
     "/api/combat/act", "/api/use", "/api/write", "/api/wear", "/api/trade", "/api/trade/do",
     "/api/travel", "/api/craftaction", "/api/craft/actions", "/api/craft/excursion",
-    "/api/craft/do", "/api/craft/preview", "/api/craft/recipes", "/api/craft/ingredients",
+    "/api/craft/ingredients",
     "/api/forage", "/api/forage/table", "/api/level-up", "/api/slots",
     "/api/spells/prepare", "/api/spells/learn", "/api/spells/swap",
     # The Class tab's owed picks: the same footing as the spells owed above.

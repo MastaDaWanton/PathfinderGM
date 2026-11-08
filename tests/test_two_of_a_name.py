@@ -182,7 +182,10 @@ def test_through_the_groom_the_living_thug_keeps_his_turn():
     dead = s.add(instantiate("thug", scene=s, name="thug"))
     alive = s.add(instantiate("thug", scene=s, name="thug"))
     alive.name = "thug"                      # the twins an old save holds
+    # Dead by the engine's tag, not by "below 0" (which is dying, CRB p.191): until
+    # 2026-11-08 this test set hp = -6 and -3 and called them dead (ponytail audit #18).
     dead.hp = -6
+    dead.die("test")
     gm = GMAgent(_World(), Engine(s, Dice(seed=1)))
     out, repairs, _ = gm._groom(GROAN, hand_back=False, claims=False, rewrite=False,
                                 acting="thug")
@@ -190,6 +193,7 @@ def test_through_the_groom_the_living_thug_keeps_his_turn():
     assert not any("dead stayed dead" in r for r in repairs), repairs
 
     alive.hp = -3
+    alive.die("test")
     out, repairs, _ = gm._groom(GROAN, hand_back=False, claims=False, rewrite=False)
     assert "rattling groan" not in out
     assert any("dead stayed dead" in r for r in repairs), repairs

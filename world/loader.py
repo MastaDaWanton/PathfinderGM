@@ -59,11 +59,12 @@ class Entity:
     @property
     def prose(self) -> str:
         return "\n\n".join(
-            p for s in self.sections for p in s.get("paragraphs", [])
+            str(p) for s in self.sections for p in (s.get("paragraphs") or []) if p
         )
 
     def fact(self, key: str, default: str = "") -> str:
-        return self.facts.get(key, default)
+        got = self.facts.get(key)
+        return default if got is None else got
 
 
 @dataclass(frozen=True)
@@ -209,6 +210,24 @@ class World:
         return any(u["name"].lower() == name.strip().lower() for u in self.unwritten)
 
 
+def _text(d: dict, key: str, default: str = "") -> str:
+    """A text field of the export, null read as `default`.
+
+    `d.get(key, "")` covers a MISSING key and hands back None for an explicit null, and
+    a World Bible export writes null for what it has not filled (docs/from-world-bible.md).
+    Audit 2026-11-07 #11: one `"name": null` imported fine and then crashed `by_name`
+    and `events_touching` on every turn.
+    """
+    got = d.get(key)
+    return default if got is None else str(got)
+
+
+def _named_rows(rows) -> list[dict]:
+    """Rows somebody reads `row["name"]` off (unwritten, factions, chronology figures):
+    objects only, each with a string name. Copied, never mutated in place."""
+    return [{**r, "name": _text(r, "name")} for r in (rows or []) if isinstance(r, dict)]
+
+
 def load(path: str | Path) -> World:
     path = Path(path)
     with path.open(encoding="utf-8") as fh:
@@ -225,19 +244,24 @@ def load(path: str | Path) -> World:
         )
 
     entities = {}
-    for e in raw.get("entities", []):
-        entities[e["id"]] = Entity(
-            id=e["id"],
-            kind=e.get("kind", ""),
-            name=e.get("name", ""),
-            summary=e.get("summary", ""),
-            parent_id=e.get("parent_id"),
-            path=e.get("path", ""),
-            facts=e.get("facts") or {},
-            sections=e.get("sections") or [],
+    for e in raw.get("entities") or []:
+        # An entry with no id is nothing any other row can reference; skipped rather
+        # than allowed to take the whole import down with a KeyError.
+        if not isinstance(e, dict) or not e.get("id"):
+            continue
+        facts = e.get("facts") if isinstance(e.get("facts"), dict) else {}
+        entities[str(e["id"])] = Entity(
+            id=str(e["id"]),
+            kind=_text(e, "kind"),
+            name=_text(e, "name"),
+            summary=_text(e, "summary"),
+            parent_id=e.get("parent_id") or None,
+            path=_text(e, "path"),
+            facts={str(k): v for k, v in facts.items() if v is not None},
+            sections=[s for s in (e.get("sections") or []) if isinstance(s, dict)],
             links=e.get("links") or [],
-            trade=e.get("trade") or {},
-            scale=e.get("scale"),
+            trade=e.get("trade") if isinstance(e.get("trade"), dict) else {},
+            scale=None if e.get("scale") is None else str(e["scale"]),
         )
 
     # `play.places[]` (schema 1.3), filed under the settlement each one names as its
@@ -257,30 +281,31 @@ def load(path: str | Path) -> World:
 
     chronology = [
         Event(
-            name=c.get("name", ""),
+            name=_text(c, "name"),
             year=c.get("year"),
-            summary=c.get("summary", ""),
-            scope=c.get("scope", ""),
-            background=c.get("background", ""),
+            summary=_text(c, "summary"),
+            scope=_text(c, "scope"),
+            background=_text(c, "background"),
             moments=c.get("moments") or [],
-            aftermath=c.get("aftermath", ""),
-            figures=c.get("figures") or [],
-            entity_ids=c.get("entity_ids") or [],
+            aftermath=_text(c, "aftermath"),
+            figures=_named_rows(c.get("figures")),
+            entity_ids=[str(i) for i in (c.get("entity_ids") or []) if i],
         )
-        for c in raw.get("chronology", [])
+        for c in raw.get("chronology") or [] if isinstance(c, dict)
     ]
 
-    world_block = raw.get("world", {})
+    world_block = raw.get("world") if isinstance(raw.get("world"), dict) else {}
+    premise = world_block.get("premise")
     return World(
-        name=world_block.get("name", path.stem),
-        premise=world_block.get("premise") or {},
-        secret=world_block.get("secret", ""),
+        name=_text(world_block, "name") or path.stem,
+        premise=premise if isinstance(premise, dict) else {},
+        secret=_text(world_block, "secret"),
         entities=entities,
         chronology=chronology,
-        trade_routes=raw.get("trade_routes") or [],
-        factions=raw.get("factions") or [],
-        unwritten=raw.get("unwritten") or [],
-        play=raw.get("play") or {},
+        trade_routes=[r for r in (raw.get("trade_routes") or []) if isinstance(r, dict)],
+        factions=_named_rows(raw.get("factions")),
+        unwritten=_named_rows(raw.get("unwritten")),
+        play=raw.get("play") if isinstance(raw.get("play"), dict) else {},
         source=path,
     )
 

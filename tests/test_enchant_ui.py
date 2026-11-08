@@ -164,7 +164,7 @@ def test_no_circle_string_carries_an_em_or_en_dash():
     """UI plan §8 and the design skill's §9.G: zero em-dashes and en-dashes in this lane's
     files, comments included, in the #enchant layer's markup and in the old tab's card."""
     craft = _src(CRAFT)
-    card = craft[craft.index("function renderEnchantMoved()"):craft.index("function renderLoading()")]
+    card = craft[craft.index("function renderEnchantMoved()"):craft.index("function renderLeatherMoved()")]
     html = _src(TABLE)
     layer = html[html.index('<div id="enchant"'):html.index('<div id="veil">')]
     for name, text in [(p.name, _src(p)) for p in OURS + [CSS]] + [
@@ -285,7 +285,7 @@ def test_the_old_enchanting_tab_is_a_card_that_opens_the_circle():
     src = _src(CRAFT)
     sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
     assert 'if (CRAFT === "enchanting") { renderEnchantMoved(); return; }' in sel
-    card = src[src.index("function renderEnchantMoved()"):src.index("function renderLoading()")]
+    card = src[src.index("function renderEnchantMoved()"):src.index("function renderLeatherMoved()")]
     assert 'href="/play/#enchant"' in card and "Open the circle" in card
     # The circle opens itself from that hash on load.
     assert 'location.hash === "#enchant"' in _src(SHELL)

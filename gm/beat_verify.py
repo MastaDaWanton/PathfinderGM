@@ -341,11 +341,14 @@ class Reading:
     error: str = ""
     raw: str = ""
     model: str = ""
+    # The side questions that failed, each named (`read`): the reading stands without them.
+    missed: list[str] = field(default_factory=list)
 
     def as_log(self) -> dict:
         return {"kind": "beat-verify", "claims": [c.as_dict() for c in self.claims],
                 "dropped": [c.as_dict() for c in self.dropped], "seconds": self.seconds,
-                "model": self.model, **({"error": self.error} if self.error else {})}
+                "model": self.model, **({"error": self.error} if self.error else {}),
+                **({"missed": list(self.missed)} if self.missed else {})}
 
 
 # --- the engine's side -----------------------------------------------------------------
@@ -406,7 +409,8 @@ def facts_from(ctx) -> Facts:
 
     people = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
-        dead = bool(getattr(a, "hp", 1) < 0 or a.has_state("state.down.dead"))
+        # Dead or broken, never "below 0", which is dying (`states.lifeless`, audit #18).
+        dead = states.lifeless(a)
         # Asked by tag (law one), never by a condition string: a homebrew hold that tags
         # itself `state.held.grappled` is grappled to this as much as the book's is.
         holds = tuple(k for k in CONDITIONS if a.has_state(states.tags_for(k)[0]))
@@ -2096,7 +2100,16 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
 def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
          provider: str = "ollama", api_key: str = "", num_predict: int = 700) -> Reading:
     """One call: the page read back as claims, validated. Never raises — a failed call
-    is a reading with `error` set and no claims, and the turn goes on."""
+    is a reading with `error` set and no claims, and the turn goes on.
+
+    The side questions (a fight's bodies, the setting, the blows, the eyes, what was made,
+    the attempts) each stand alone: one that fails is named in `missed`, and the first
+    call's claims and every other side answer are kept. Until 2026-11-08 they shared the
+    first call's `try`, so one failed side question set `error` and every caller threw the
+    whole reading away (ponytail audit, smaller finding). Every side category is judged
+    only where a claim is present (`diff`'s contradictions; the omissions read the first
+    call's trades and hand-overs alone), so an unanswered one costs findings, never a
+    false one."""
     result = Reading(model=model)
     if not str(text or "").strip():
         return result
@@ -2108,118 +2121,79 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
     if bare_template(model):
         msgs = _raw_prompt(msgs)
     started = time.monotonic()
+
+    def side(what: str, msgs: list, schema_: dict, budget: int = 300) -> dict | None:
+        """One side question's answer, or None (named in `missed`) when it failed."""
+        if bare_template(model):
+            msgs = _raw_prompt(msgs)
+        try:
+            got = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                       num_predict=budget, provider=provider, api_key=api_key,
+                       schema=schema_)
+            result.raw += "\n" + got.text
+            got_json = got.json() or {}
+        except Exception as exc:  # noqa: BLE001 — this question unanswered, the rest stand
+            result.missed.append(f"{what}: {type(exc).__name__}: {str(exc)[:100]}")
+            return None
+        return got_json if isinstance(got_json, dict) else {}
+
     try:
         reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
                      num_predict=num_predict, provider=provider, api_key=api_key,
                      schema=schema(facts))
         result.raw = reply.text
         answer = reply.json()
-        if facts.bodies:
-            # The second question of a fight's beat, in a call of its own (see
-            # `_BODIES_SYSTEM` for why it is not a slot of the first).
-            msgs = bodies_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            more = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                        num_predict=300, provider=provider, api_key=api_key,
-                        schema=bodies_schema(facts))
-            result.raw += "\n" + more.text
-            answer = dict(answer or {}, conditions=(more.json() or {}).get("conditions")
-                          or [])
-        if SETTING_ALONE and facts.settings:
-            # The kind of place, in a call of its own (`_SETTING_SYSTEM`), on every beat
-            # whose place the engine can name the kinds of — and on no other, since an
-            # unjudgeable answer is a call for nothing.
-            msgs = setting_messages(text)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            where = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                         num_predict=300, provider=provider, api_key=api_key,
-                         schema=setting_schema())
-            result.raw += "\n" + where.text
-            answer = dict(answer or {}, setting=(where.json() or {}).get("setting") or [])
-        if SWING_ALONE and facts.swings:
-            # What the player's blows were struck with, in a call of its own, on a beat
-            # where the player struck and on no other (`_SWING_SYSTEM`).
-            msgs = swing_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            swung = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                         num_predict=300, provider=provider, api_key=api_key,
-                         schema=swing_schema(facts))
-            result.raw += "\n" + swung.text
-            answer = dict(answer or {},
-                          struck_with=(swung.json() or {}).get("struck_with") or [])
-        if facts.foe_blows:
-            # What the creature's blows were struck with, on its own turn, in a call of
-            # its own (`_FOE_SWING_SYSTEM`).
-            msgs = foe_swing_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            theirs = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                          num_predict=300, provider=provider, api_key=api_key,
-                          schema=foe_swing_schema(facts))
-            result.raw += "\n" + theirs.text
-            answer = dict(answer or {}, foe_struck_with=(theirs.json() or {}).get(
-                "foe_struck_with") or [])
-        if facts.at_you:
-            # Who strikes at the player on the player's own beat, in a call of its own
-            # (`_AT_YOU_SYSTEM`).
-            msgs = at_you_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            hit = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                       num_predict=300, provider=provider, api_key=api_key,
-                       schema=at_you_schema(facts))
-            result.raw += "\n" + hit.text
-            answer = dict(answer or {}, at_you=(hit.json() or {}).get("at_you") or [])
-        if facts.aimed:
-            # Who strikes at whom on a creature's turn, in a call of its own
-            # (`_AIMED_SYSTEM`).
-            msgs = aimed_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            whom = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                        num_predict=300, provider=provider, api_key=api_key,
-                        schema=aimed_schema(facts))
-            result.raw += "\n" + whom.text
-            answer = dict(answer or {}, aimed_at=(whom.json() or {}).get("aimed_at") or [])
-        if facts.unseen:
-            # Who the page shows looking or aiming at a player they cannot see, in a call
-            # of its own (`_UNSEEN_SYSTEM`).
-            msgs = unseen_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            eyes = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                        num_predict=300, provider=provider, api_key=api_key,
-                        schema=unseen_schema(facts))
-            result.raw += "\n" + eyes.text
-            answer = dict(answer or {}, unseen_at_you=(eyes.json() or {}).get(
-                "unseen_at_you") or [])
-        if crafted(facts):
-            # What the page says the player made, on a typed craft's beat (`_MADE_SYSTEM`).
-            msgs = made_messages(text, facts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            mk = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                      num_predict=300, provider=provider, api_key=api_key,
-                      schema=made_schema(facts))
-            result.raw += "\n" + mk.text
-            answer = dict(answer or {}, made=(mk.json() or {}).get("made") or [])
-        claims = claims_of(answer, facts)
-        attempts = attempts_of(facts)
-        if attempts:
-            # The third question, on a beat where a check or a save was settled, in a call
-            # of its own (see `_ATTEMPTS_SYSTEM`'s block and docs/beat-verify.md for the
-            # measurement of folding it into the first).
-            msgs = attempts_messages(text, facts, attempts)
-            if bare_template(model):
-                msgs = _raw_prompt(msgs)
-            more = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
-                        num_predict=80 + 60 * len(attempts), provider=provider,
-                        api_key=api_key, schema=attempts_schema(attempts))
-            result.raw += "\n" + more.text
-            claims += attempt_claims(more.json() or {}, attempts)
+    except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
+        result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
+        result.seconds = round(time.monotonic() - started, 2)
+        return result
+    answer = answer if isinstance(answer, dict) else {}
+    # Each side question in a call of its own, for the reason its system block gives:
+    # `_BODIES_SYSTEM` (the second question of a fight's beat), `_SETTING_SYSTEM` (the
+    # kind of place, only where the engine can name the kinds), `_SWING_SYSTEM` (the
+    # player's blows, on a beat where the player struck), `_FOE_SWING_SYSTEM` (the
+    # creature's, on its own turn), `_AT_YOU_SYSTEM` (who strikes at the player on the
+    # player's beat), `_AIMED_SYSTEM` (who strikes at whom on a creature's turn),
+    # `_UNSEEN_SYSTEM` (who looks or aims at a player they cannot see) and `_MADE_SYSTEM`
+    # (what the page says the player made, on a typed craft's beat).
+    asked = []
+    if facts.bodies:
+        asked.append(("bodies", bodies_messages(text, facts), bodies_schema(facts),
+                      "conditions"))
+    if SETTING_ALONE and facts.settings:
+        asked.append(("setting", setting_messages(text), setting_schema(), "setting"))
+    if SWING_ALONE and facts.swings:
+        asked.append(("swing", swing_messages(text, facts), swing_schema(facts),
+                      "struck_with"))
+    if facts.foe_blows:
+        asked.append(("foe swing", foe_swing_messages(text, facts),
+                      foe_swing_schema(facts), "foe_struck_with"))
+    if facts.at_you:
+        asked.append(("at you", at_you_messages(text, facts), at_you_schema(facts),
+                      "at_you"))
+    if facts.aimed:
+        asked.append(("aimed", aimed_messages(text, facts), aimed_schema(facts),
+                      "aimed_at"))
+    if facts.unseen:
+        asked.append(("unseen", unseen_messages(text, facts), unseen_schema(facts),
+                      "unseen_at_you"))
+    if crafted(facts):
+        asked.append(("made", made_messages(text, facts), made_schema(facts), "made"))
+    for what, side_msgs, side_schema, key in asked:
+        got = side(what, side_msgs, side_schema)
+        if got is not None:
+            answer = dict(answer, **{key: got.get(key) or []})
+    claims = claims_of(answer, facts)
+    attempts = attempts_of(facts)
+    if attempts:
+        # The third question, on a beat where a check or a save was settled, in a call
+        # of its own (see `_ATTEMPTS_SYSTEM`'s block and docs/beat-verify.md for the
+        # measurement of folding it into the first).
+        got = side("attempts", attempts_messages(text, facts, attempts),
+                   attempts_schema(attempts), budget=80 + 60 * len(attempts))
+        if got is not None:
+            claims += attempt_claims(got, attempts)
+    try:
         result.claims, result.dropped = validate(claims, text, facts)
     except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
@@ -3997,8 +3971,10 @@ def read_beat(text: str, facts: Facts, **kw) -> Reading:
     if new:
         fresh = read(" ".join(new), facts, **kw)
         result.seconds, result.raw, result.error = fresh.seconds, fresh.raw, fresh.error
-        result.dropped = fresh.dropped
-        if not fresh.error:
+        result.dropped, result.missed = fresh.dropped, fresh.missed
+        # A reading with a side question unanswered is used, and not kept: the next ask
+        # reads those sentences again rather than holding them to a partial answer.
+        if not fresh.error and not fresh.missed:
             for s in new:
                 held[_skey(s)] = []
             for c in fresh.claims:

@@ -302,7 +302,9 @@ def test_ruling_an_offered_commission_is_haggled_with_diplomacy(world):
 
 def test_ruling_a_counter_haggle_won_today_holds_for_the_commission(world):
     """The trade panel's Haggle (Profession, the owner's option B) writes the day's
-    percent with this keeper; the commission bill reads the same record."""
+    percent with this keeper; the commission bill reads the same record — under the one
+    key every door keeps a shop by (`market.stall_of`, audit #13), where this test once
+    wrote an arbitrary "stall-1" that a search by keeper ref had to find."""
     e, pc = _engine(world, carry=(("iron", 1), ("charcoal", 1), ("ash-haft", 2)))
     _blank(e, pc)
     smith, _ = _smith(e)
@@ -310,8 +312,8 @@ def test_ruling_a_counter_haggle_won_today_holds_for_the_commission(world):
 
     day = market.day_of(e.scene.clock_minutes)
     e.scene.dealings[tradecraft.dealing_key("haggle", pc.ref, e.scene.location_id,
-                                            "stall-1", day)] = {"percent": 20,
-                                                                "keeper": smith.ref}
+                                            market.stall_of(e.scene, smith), day)] = {
+        "percent": 20, "keeper": smith.ref}
     out = _commission(e, smith)
     eff = out.effects[0]
     assert eff["cp"] == commission._undercut(eff["listed_cp"], 20), eff
@@ -375,3 +377,72 @@ def test_ruling_the_plans_diplomacy_at_the_keeper_is_the_commissions_haggle(worl
     assert [c["target"] for c in checks] == ["c-somebody-else"], out
     com = next(r for r in out if r["op"] == "commission")
     assert com["params"].get("haggle") is True
+
+
+@pytest.mark.parametrize("collected", [True, False])
+def test_a_second_commission_holds_only_the_new_piece(world, monkeypatch, collected):
+    """Audit #12, measured on 0.2.26: the keeper's dagger stacked onto the identical dagger
+    the player already owned (`blacksmith.put`), and `inprogress.begin` locked the whole
+    stack — yesterday's collected dagger became "still finishing". With the first job not
+    yet collected, `begin` refused the new one after the fee had been taken: paid for
+    nothing. The new piece is split onto its own key first (`inprogress.set_apart`)."""
+    from rules import goods
+
+    e, pc = _engine(world, carry=(("iron", 2), ("charcoal", 2), ("ash-haft", 4)))
+    monkeypatch.setattr(commission, "keeper_roll",
+                        lambda engine, keeper, step: _Face(int(step.dc) + 2)(engine, keeper,
+                                                                             step))
+    _blank(e, pc)
+    smith, smithy = _smith(e)
+    level = pc.track("blacksmith").level
+    first = _commission(e, smith)
+    assert first.status == "resolved", first.tell
+    if collected:
+        e.scene.clock_minutes += first.effects[0]["minutes"]
+        (key,) = [k for k, st in pc.stock.items() if st.name == "Iron Dagger"]
+        assert inprogress.collect(pc, key, now=e.scene.clock_minutes,
+                                  here=smithy.id)["ok"]
+    _make(e, "blacksmith", "a dagger", faces=(15, 1))
+    # The record carries the forging track's level, and making the second blank raised it:
+    # put back, the keeper's second dagger is the first one's exact twin, which stacks.
+    pc.track("blacksmith").level = level
+    purse = goods.in_copper(pc.purse)
+    second = _commission(e, smith)
+    assert second.status == "resolved", second.tell
+    assert second.effects[0]["items"] == ["Iron Dagger"], second.tell
+    assert goods.in_copper(pc.purse) == purse - second.effects[0]["cp"]
+    now = e.scene.clock_minutes
+    daggers = _named(pc, "Iron Dagger")
+    assert sum(int(d.count) for d in daggers) == 2
+    held = [d for d in daggers if inprogress.work_of(d, now) is not None]
+    free = [d for d in daggers if inprogress.work_of(d, now) is None]
+    if collected:
+        assert len(held) == 1 and held[0].count == 1, "the owned dagger was locked too"
+        assert len(free) == 1 and free[0].count == 1
+    else:
+        assert len(held) == 2 and all(d.count == 1 for d in held)
+
+
+def test_a_haggle_lost_at_the_counter_holds_for_the_commission(world):
+    """Audit #13: the trade panel's Haggle keyed the day's record by the keeper's name
+    (the stall the panel sends), the commission by the keeper's ref, and the commission
+    only looked for a WON haggle across keys — so a haggle lost at the counter was asked
+    again through the commission, and rolled. Once a day with a keeper, win or lose."""
+    import re
+
+    e, pc = _engine(world, carry=(("iron", 1), ("charcoal", 1), ("ash-haft", 2)))
+    _blank(e, pc)
+    smith, _ = _smith(e)
+    from rules import market, tradecraft
+
+    # What the panel's Haggle (`/api/tradeskill`, the engine's `haggle` with the panel's
+    # stall) writes when the keeper is not moved: the day's record, at no percent.
+    stall = re.sub(r"[^a-z0-9]+", "-", smith.name.lower()).strip("-")
+    e.scene.dealings[tradecraft.dealing_key(
+        "haggle", pc.ref, e.scene.location_id, stall,
+        market.day_of(e.scene.clock_minutes))] = {"percent": 0, "keeper": smith.ref}
+    again = e.run(e.validate([{"op": "commission", "actor": "pc", "because": "t",
+                               "params": {"who": smith.ref, "item": "the dagger",
+                                          "haggle": True}}]))
+    assert not again.awaiting, "the lost haggle was rolled again at the commission"
+    assert "already been haggled" in again.outcomes[0].tell

@@ -33,22 +33,6 @@ def client(tmp_path):
         cm._LIVE.clear()
 
 
-def test_every_craft_can_take_a_chain():
-    """`supports` is what the page asks before offering a Craft button. All five must
-    answer yes, or a discipline is a tab that cannot be used."""
-    missing = [t for t in benches.BENCHES if not benches.supports(t)]
-    assert missing == []
-
-
-def test_the_secondary_mode_is_reachable():
-    """Enchanting has two rulebooks — its own essence system and Pathfinder's +1
-    ladder. The second is a mode on the same track, not a sixth craft."""
-    modes = [m["id"] for m in benches.modes_for("enchanter")]
-    assert "magic-item" in modes
-    assert benches.supports("enchanter", "magic-item")
-    assert benches.modes_for("blacksmith") == []
-
-
 def test_no_two_crafts_share_an_icon():
     """"the icons are distinct for each world class (hides should not have the same
     icon as herbs or ores)" — the shelf had one glyph map with four herb kinds in it,
@@ -257,34 +241,6 @@ def test_something_that_is_not_worn_refuses_with_the_reason(client):
     assert "not something you wear" in r.json()["error"]
 
 
-def test_a_forge_chain_spends_what_it_names(client):
-    """Measured at the bench with a real click: a Steel Longsword chain rolled 10+2
-    against DC 14, spoiled, awarded its mishap mastery — and reported `spent: {}`. The
-    four newer crafts put raw material in `consumes`, and `_one_craft` only asked the
-    crafted-jar shelf, so a forge chain could be attempted forever on the same four bars
-    of steel. Failure has to cost the inputs; that is the rule failure is *for*."""
-    from play import campaign as cm
-
-    c = cm.current()
-    pc = c.scene.pc()
-    pc.carry("steel", 3)
-    pc.carry("charcoal", 3)
-    c.save()
-    before = dict(cm.current().scene.pc().inventory)
-
-    r = client.post("/api/craft/do", data=json.dumps({
-        "craft": "blacksmithing", "materials": ["steel", "charcoal"],
-        "ingredients": ["steel", "charcoal"], "methods": ["smelt", "forge"],
-        "base": "longsword", "stock": {}, "batch": 1,
-    }), content_type="application/json")
-    assert r.status_code == 200, r.content[:300]
-
-    after = dict(cm.current().scene.pc().inventory)
-    assert after.get("steel", 0) == before.get("steel", 0) - 1, "the steel was not spent"
-    assert after.get("charcoal", 0) == before.get("charcoal", 0) - 1
-    assert r.json()["spent"], "the craft reported spending nothing"
-
-
 def test_every_bench_says_what_it_shapes(client):
     """"Forging needs a shape: say what is being made" was a refusal with nowhere on the
     page to answer it. A craft that shapes things offers its list; one that names its
@@ -315,57 +271,12 @@ def test_every_station_has_an_icon_of_its_own(client):
         assert len(set(glyphs.values())) == len(glyphs), f"{track} reuses an icon"
 
 
-def test_one_word_for_what_is_being_made():
-    """Four benches, four spellings: the forge reads `base` or `item`, the tannery
-    `product` or `pattern`, the enchanter `item`, herbalism `base`. The craft page copes
-    by sending the value under all four names at once, which works and is one bench away
-    from not working — and it means anything else driving these endpoints has to know
-    the whole list.
-
-    Same drift as `requires` versus `needs` on the excursion gates."""
-    assert benches.shape_of({"base": "dagger"}) == "dagger"
-    assert benches.shape_of({"pattern": "satchel"}) == "satchel"
-    assert benches.shape_of({"shaping": "cloak"}) == "cloak"
-    assert benches.shape_of({}) == ""
-    filled = benches.with_shape({"shaping": "dagger"})
-    for alias in benches.SHAPE_ALIASES:
-        assert filled[alias] == "dagger"
-    # Nothing said stays nothing said: a bench that needs no shape must not be handed one.
-    assert benches.with_shape({"craft": "herbalism"}) == {"craft": "herbalism"}
-
-
-def test_a_shape_the_bench_does_not_make_is_refused_by_name(client):
-    """Before the aliases were normalised, a tannery simply never saw the word the player
-    typed: `shaping` matched none of its keys, so asking for a dagger silently produced a
-    satchel. It now answers with the patterns it does know.
-
-    Re-pinned by leather lane U7 (2026-10-08): the /craft/ page no longer takes a leather
-    chain at all (the route answers the `moved` sentence, below), so the shape refusal is
-    read where it still lives, the routing table's own preview (rules/leatherworker.py
-    `preview`, lane E), through the same alias normalising."""
-    from rules.leatherworker import CraftError
-
-    chain = benches.chain_from_body("leatherworker", {"methods": ["skin", "cure"],
-                                                      "shaping": "dagger"})
-    with pytest.raises(CraftError) as why:
-        benches.preview("leatherworker", 1, chain)
-    assert "satchel" in str(why.value), str(why.value)
-
-
-def test_the_old_page_refuses_a_leather_chain_and_says_where_the_bench_went(client):
-    """Leatherworking UI plan §13: the chain bench retires for leather. Before, the
+def test_the_leather_track_state_says_where_the_bench_went(client):
+    """Leatherworking UI plan §13: the chain bench retired for leather. Before, the
     Leatherworking tab drew the whole 127-material shelf as emoji tiles and a batch Craft
-    that spent every input on any failure (leatherworking inventory §1). Its preview, craft
-    and recipe routes now answer 409 with the moved sentence, as herbalism's do, and the
-    track state carries it for the page."""
-    body = {"craft": "leatherworking", "ingredients": ["deer-hide"],
-            "materials": ["deer-hide"], "methods": ["tan"], "shaping": "satchel"}
-    for route in ("/api/craft/preview", "/api/craft/do", "/api/craft/recipes"):
-        r = client.post(route, data=json.dumps(dict(body, name="x")),
-                        content_type="application/json")
-        assert r.status_code == 409, (route, r.content[:200])
-        assert r.json()["moved"] is True
-        assert r.json()["error"].startswith("Leatherworking is at the table now"), r.json()
+    that spent every input on any failure (leatherworking inventory §1). The chain's routes
+    were deleted on 2026-11-08 (audit finding #20); the track state still carries the moved
+    sentence."""
     d = client.get("/api/craft/ingredients?craft=leatherworking").json()
     assert d["track"]["moved"].startswith("Leatherworking is at the table now")
 
@@ -380,7 +291,6 @@ def test_the_old_leatherworking_tab_is_a_card_that_opens_the_bench():
            / "craft.html").read_text(encoding="utf-8")
     sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
     assert 'if (CRAFT === "leatherworking") { renderLeatherMoved(); return; }' in sel
-    assert 'CRAFT === "leatherworking";' in sel
     card = src[src.index("function renderLeatherMoved()"):src.index("function renderAlchemyMoved()")]
     assert 'href="/play/#leather"' in card and "Open the leather bench" in card
     assert "Leatherworking is at the table now" in card
@@ -388,19 +298,6 @@ def test_the_old_leatherworking_tab_is_a_card_that_opens_the_bench():
 
 
 # --- herbalism moved to the table's step bench (2026-10-02) ---------------------------
-
-def test_the_routing_table_refuses_a_herbalism_chain_with_the_reason():
-    """The retired chain rules are kept as a library (`crafting.preview`), and a routing
-    table that still sent herbalism chains to them would run rules the owner retired. It
-    refuses instead, saying where the bench went; the four other crafts route as before."""
-    from rules.crafting import Chain
-
-    with pytest.raises(benches.MovedBench) as why:
-        benches.preview("herbalist", 1, Chain("herbalist", ["grind"], ["woundwort"]))
-    assert "at the table's bench" in str(why.value)
-    with pytest.raises(benches.MovedBench):
-        benches.chain_from_body("herbalist", {"methods": ["grind"]})
-    assert benches.chain_from_body("blacksmith", {"methods": ["smelt"]}) is not None
 
 
 def test_the_step_bench_methods_and_reagents_have_icons_of_their_own():

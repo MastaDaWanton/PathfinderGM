@@ -56,10 +56,19 @@ def test_negative_con_is_dead(kesst):
 
 # --- Bleeding out ------------------------------------------------------------------
 
+class _Fails(Dice):
+    """Every stabilise check a natural 1. The point is lost only on a failed check (CRB:
+    "If the character fails this check, he loses 1 hit point"); until 2026-11-08 it came
+    off before the roll, and this test passed on any seed."""
+
+    def d20(self, modifiers=None, label="", **kw):
+        return self.given(1, modifiers or [], label=label)
+
+
 def test_a_dying_character_loses_a_hit_point_a_round(kesst):
     kesst.hp = -2
     kesst.apply_hp_state()
-    kesst.bleed_out(Dice(seed=1))
+    kesst.bleed_out(_Fails(seed=1))
     assert kesst.hp == -3
 
 
@@ -127,6 +136,9 @@ def test_the_round_tick_bleeds_the_dying(kesst):
     kesst.hp = -2
     kesst.apply_hp_state()
     before = kesst.hp
+    # Every check failed, so every round costs her the point: on a made check she would
+    # stabilise at no cost (CRB), and seed 11 makes one on the first round.
+    scene._dice = _Fails(seed=11)
 
     # `bleeding` is overwritten on every round wrap, so collect it as it happens rather
     # than reading it at the end — she may have stabilised by then, and an empty report

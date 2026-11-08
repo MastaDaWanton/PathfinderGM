@@ -1890,7 +1890,7 @@ def test_the_opening_is_in_the_models_history_not_only_on_the_page(tmp_path):
 
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
-        c = cm.current("history-seed", reset=True)
+        c = cm.current("history-seed")
         opening = c.transcript[0]["text"]
         assert any(h["role"] == "assistant" and h["content"] == opening for h in c.history)
         # And it comes AFTER the private note, so the note still reads as the GM's own.

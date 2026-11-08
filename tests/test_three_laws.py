@@ -217,13 +217,17 @@ _LITERAL_KEY_SITES = {
     # 36 since 2026-09-27: apply_nonlethal_state lifts the knockout it wrote when the
     # nonlethal heals back to exactly the hit points (staggered, awake) — the writer
     # undoing its own write, found when nonlethal first healed by the hour.
-    "rules/sheet.py": (32,"apply_hp_state, apply_nonlethal_state, bleed_out, the "
+    # 30 since 2026-11-08: Constitution 0 writes `dead` through `die()` instead of its
+    # own pair of lines, and bleed_out's dying-to-stable pair moved into `stabilise`.
+    "rules/sheet.py": (30,"apply_hp_state, apply_nonlethal_state, stabilise, the "
                            "ability-zero states and rest's exhausted-to-fatigued "
                            "downgrade — the writers of the 1e ladders themselves; "
                            "rest asks state.impaired.* since 2026-10-27"),
-    "rules/engine.py": (11, "the dying/stable resolution, flat-footed and stunned as "
-                            "combat rules, grappled as a maneuver result, and dead as "
-                            "'this square holds a corpse'"),
+    # 7 since 2026-11-08: the off-screen dying resolution rolls `bleed_out` and asks
+    # the vocabulary, instead of writing its own dying/stable rungs on a d100.
+    "rules/engine.py": (7, "dying asked by the round's own rules, flat-footed and "
+                           "stunned as combat rules, grappled as a maneuver result, and "
+                           "dead as 'this square holds a corpse'"),
     "play/downed.py": (6, "the four rungs of the hit-point ladder, read where "
                           "apply_hp_state wrote them; the fifth rung asks the "
                           "vocabulary"),
@@ -232,11 +236,8 @@ _LITERAL_KEY_SITES = {
     # and the collapse into sleep as `unconscious`).
     "rules/survival.py": (4, "the fatigue ladder: going without sleep escalates "
                              "fatigued to exhausted to asleep where they fall"),
-    # 2026-09-28 (Lane C): first aid writes the rung the rulebook names — dying off,
-    # stable on — exactly as `bleed_out` does when the patient manages it alone. Its
-    # question ("is this one dying?") asks the vocabulary.
-    "rules/firstaid.py": (2, "first aid's DC 15 Heal check writing the 1e rung: dying "
-                             "lifted, stable written"),
+    # rules/firstaid.py left the list 2026-11-08: first aid writes its rung through
+    # `Actor.stabilise`, the one writer `bleed_out` and healing share.
     "play/views.py": (3, "resurrection naming `dead` (the only caller entitled to "
                          "remove it), the life-debt it charges for, and the stance "
                          "toggle whose key comes from a class document"),
@@ -710,6 +711,12 @@ def test_an_ability_that_deals_damage_can_kill():
     thug = instantiate("thug", scene=scene, name="the thug")
     scene.add(thug)
     engine = Engine(scene, Dice(seed=3))
+    # Inside a fight: since 2026-11-08 (audit #39) a first harmful use outside one opens
+    # the encounter and resolves nothing — the battle gate's law — so the blow that kills
+    # is the one struck once the fight is running.
+    scene.initiative = [("pc", 20), ("c1", 10)]
+    scene.sides = {"pc": ["pc"], "them": ["c1"]}
+    scene.round, scene.turn = 1, 0
 
     got = engine.run(engine.validate(
         [{"op": "use_ability", "actor": "pc", "because": "she strikes",

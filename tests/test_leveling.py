@@ -630,6 +630,12 @@ def _table(level=5, paths=("blood spike", "coagulator")):
     scene.positions["pc"] = (2, 2)
     scene.add(instantiate("thug", scene=scene, name="the bravo"))
     scene.positions["c1"] = (4, 2)
+    # A fight already running: since 2026-11-08 (audit #39) a first harmful use outside
+    # one opens the encounter and resolves nothing, the battle gate's law, and these tests
+    # measure what the ability does.
+    scene.initiative = [("pc", 20), ("c1", 10)]
+    scene.sides = {"pc": ["pc"], "them": ["c1"]}
+    scene.round, scene.turn = 1, 0
     return Engine(scene, Dice(seed=6)), pc
 
 

@@ -234,3 +234,31 @@ def test_the_bench_says_where_the_creatures_came_from(client):
 def test_hand_written_npcs_are_labelled_on_the_bench(client):
     d = client.get("/api/bench/creatures").json()
     assert any(r["kind"] == "hand-written" for r in d["rows"])
+
+
+def test_one_malformed_homebrew_entry_never_takes_the_bestiary_down(tmp_path, caplog):
+    """Audit 2026-11-07 #19. `{"creatures": ["wolf"]}` — a bare string where a block
+    belongs — raised AttributeError outside any `try` while the catalogue was built, so
+    `_IMPORTED` stayed unset and every later `lookup` and `instantiate` raised: nothing
+    in the game could spawn. A homebrew build that `people_block` choked on with anything
+    but ValueError/KeyError did the same. The bad entry is skipped and named in the log;
+    its good neighbours and the whole printed bestiary still load."""
+    import json
+
+    home = tmp_path / "homebrew"
+    (home / "creatures").mkdir(parents=True)
+    (home / "npc-builds").mkdir(parents=True)
+    (home / "creatures" / "odd.json").write_text(json.dumps(
+        {"creatures": ["wolf", None, {"id": "hb-marsh-thing", "name": "Marsh Thing",
+                                      "cr": "1", "hp": 9}]}), encoding="utf-8")
+    (home / "npc-builds" / "odd.json").write_text(json.dumps(
+        {"builds": ["just a name", {"id": "hb-broken", "class": "warrior", "race": "human",
+                               "level": 1, "skills": 5}]}),
+        encoding="utf-8")
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"), \
+            caplog.at_level("WARNING", logger="pathfindergm"):
+        assert bestiary.lookup("ogre") is not None
+        assert bestiary.lookup("hb-marsh-thing")["name"] == "Marsh Thing"
+        assert bestiary.instantiate("ogre", Dice(seed=1)).hp_max == 30
+    said = " ".join(r.getMessage() for r in caplog.records)
+    assert "odd.json" in said

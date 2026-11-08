@@ -573,6 +573,33 @@ GEAR: dict[str, dict] = {
 _GEAR_NAMES = frozenset(str(v["name"]).lower() for v in GEAR.values())
 
 
+def unit_price(name: str) -> float | None:
+    """What ONE of a bought plain thing's shelf units is listed at, in gold: the general
+    store's and the stables' tack rows, by key or by the name the shelf gives it, with
+    the purchase's price divided by its measure. None for a thing neither lists.
+
+    A purchase lands on the shelf counted in its measure (`deliver`: "one purchase of rope
+    is fifty feet"), so one of what the shelf holds is a foot, not the coil. The shelf row
+    carries no price of its own (`crafting.Stock` has no field for one), and the sell-back
+    fell through to the tier ladder: measured 2026-11-07 (audit #1), 1 gp of hemp rope sold
+    back for 9.50 gp, a 1 cp torch for 19 cp, and 11 of 41 plain goods for more than cost.
+    Looked up by name rather than stamped on at purchase so a save from before this sells
+    at the book's price too."""
+    low = " ".join(str(name or "").split()).lower()
+    if not low:
+        return None
+    from . import market
+
+    rows = list(GEAR.items()) + [
+        (str(r.get("key") or ""), r)
+        for r in (market.lines_doc().get("stables") or {}).get("tack") or []]
+    for key, row in rows:
+        if low in (str(key).lower(), str(row.get("name", "")).lower()):
+            cost = float(row.get("cost_gp") or 0)
+            return cost / max(1, int(row.get("per", 1) or 1)) if cost > 0 else None
+    return None
+
+
 # --- goods on a counter ---------------------------------------------------------------------
 #
 # A shop's shelf was drawn only from the crafting benches' materials, so a market stall

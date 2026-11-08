@@ -1,28 +1,19 @@
-"""Blacksmithing: the forge's rules, in two halves.
+"""Blacksmithing: the forge's rules.
 
-**The step bench** (the second half of this file, docs/blacksmithing-revamp-plan.md §4,
-§7, §10, §11 and docs/blacksmithing-contracts.md §7). Herbalism's revamp, mirrored: one
-method at a time, each its own d20 Craft roll, then an always-played minigame whose 0..1
-score the server turns into a quality tier under the smith's ceiling. Every step puts a
-real thing on the shelf: ore smelts to an ingot, ingots alloy to a named bar, a bar is
-forged into a blank or plate, the blank is quenched, tempered, folded and honed, and
-Assemble joins head, haft and fittings (or body, fastenings and lining) into the crafted
-record of contracts §4, whose numbers lane B's `forge_items.build` computes on read.
+**The step bench** (docs/blacksmithing-revamp-plan.md §4, §7, §10, §11 and
+docs/blacksmithing-contracts.md §7). Herbalism's revamp, mirrored: one method at a time,
+each its own d20 Craft roll, then an always-played minigame whose 0..1 score the server
+turns into a quality tier under the smith's ceiling. Every step puts a real thing on the
+shelf: ore smelts to an ingot, ingots alloy to a named bar, a bar is forged into a blank or
+plate, the blank is quenched, tempered, folded and honed, and Assemble joins head, haft
+and fittings (or body, fastenings and lining) into the crafted record of contracts §4,
+whose numbers lane B's `forge_items.build` computes on read.
 
-**The chain library** (the first half). The old one-shot chain (`Chain`, `preview`) that
-the `/craft/` tab still drives until wave 2 retires it (contracts §1, U7). Kept working
-against the new three-level track; draw, polish, rivet and flux-as-a-method are gone from
-it, as from the track (plan §4.1).
-
-The naming mirrors `crafting.py` deliberately — `TRACK_ID`, `CraftError`, `Chain`,
-`preview`, `plan_step`, `make`, `failure_losses` — so a dispatch layer can route a craft
-to whichever module owns the track without either module knowing about the other.
-
-One rule is stated here because the source documents state percentages without one:
-
-  Costs and penalties round **down**, benefits round **up**. A character is never
-  surprised in the direction that hurts them — a mithral longsword at half of 4 lb is
-  2 lb, and half of 5 lb is 2 lb too, because weight is a cost.
+Above it sit the materials catalogue, the acquisition hub's excursions, the base-item
+lookup and the smith's check. The old one-shot chain (`Chain`, `preview`) that the
+`/craft/` tab drove was deleted on 2026-11-08 (audit finding #20): the tab had become a
+door to this bench on 2026-10-04, and the chain's route still answered, rent-free, with
+natural 1s and 20s deciding, against this bench's rule.
 """
 from __future__ import annotations
 
@@ -33,53 +24,11 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import effectspec
 from . import worldclass as wc
 from pathfindergm import files
 
 TRACK_ID = "blacksmith"
 
-# Methods that burn fuel. A chain that lights no fire needs none: riveting a grip onto a
-# finished blade is cold work.
-FUEL_BURNING = ("smelt", "forge")
-
-# Smelting past this rank needs a fuel of at least `HOT_FUEL_RANK`: adamantine does not
-# melt over charcoal. Rank 3 is "rare", so the skymetals (exotic and up) are the ones
-# gated — which is the whole point of dragonfire coal existing as an entry.
-HOT_METAL_RANK = 4
-HOT_FUEL_RANK = 3
-
-# Flux is no longer a method (plan §2, "Flux becomes an ingredient of Smelt"): a flux in
-# a charge that is smelted cleans the *metal*, not the smith. The harm it strips is the
-# harm carried by ore-kind materials, and a metal that sickens whoever works it (fever skymetal)
-# stays risky however much flux goes in the melt.
-CLEANSED_BY = "smelt"
-
-# The method that has to come last if it is used at all: a treatment goes on the
-# finished piece. (Polish was this until 2026-10-03, when it merged into Hone.)
-FINISHING = ("finish",)
-
-# Each method's prerequisite, which must appear *earlier in the same chain*. This is the
-# physical grammar of the forge — you cannot quench what was never forged — and it is
-# what makes a chain an ordered list rather than a bag of verbs. Draw and polish left
-# with the 2026-10-03 ruling, and their rows with them.
-AFTER = {
-    "quench": "forge",
-    "temper": "quench",   # tempering is letting quenched steel back down
-    "fold": "forge",
-    "hone": "forge",
-    "alloy": "smelt",     # alloying happens in the melt, so something must be molten
-}
-
-# Sentences for the refusals above, written once so the bench and the tests cannot
-# disagree about the wording. {m} is the method, {need} its prerequisite.
-_AFTER_WHY = {
-    "quench": "You cannot quench what was never forged — quench follows forge.",
-    "temper": "Tempering lets quenched steel back down — temper follows quench.",
-    "fold": "Folding doubles hot metal over itself — fold follows forge.",
-    "hone": "Honing grinds a forged edge — hone follows forge.",
-    "alloy": "Alloying happens in the melt — alloy follows smelt.",
-}
 
 # Metals that refuse the crucible. What makes them what they are does not survive being
 # melted into something else — cold iron alloyed is only iron. Data-adjacent but kept in
@@ -91,12 +40,6 @@ SOLITARY = frozenset({
     "ghost-skymetal", "ghost-skymetal-ore", "time-skymetal", "time-skymetal-ore",
 })
 
-# A novel alloy is a discovery: melting two *different* metals of the same tier yields a
-# metal one band rarer (mixing can beat purity, OSRS Giants' Foundry). It was once the
-# Blacksmith 4 route to the level-5 deed; the deed went with the 2026-10-03 ruling, so the
-# step is now simply a reward, and the output is gated by the smith's level like any
-# other metal (a legendary melt needs Blacksmith 3).
-ALLOY_RARITY_STEP = 1
 
 # Material kinds that count as metal for alloying and for "is there anything to work".
 METAL_KINDS = ("ore", "metal", "alloy")
@@ -115,16 +58,6 @@ KIND_GLYPH: dict[str, str] = {
     "fitting": "🔩",      # what gets riveted on
     "treatment": "🛠️",    # what is done to the finished surface
 }
-
-
-def round_cost(x: float) -> int:
-    """Costs and penalties round down — the direction that favours the character."""
-    return int(math.floor(x))
-
-
-def round_benefit(x: float) -> int:
-    """Benefits round up, so 80% of a 1-point bonus is 1 rather than a silent 0."""
-    return int(math.ceil(x))
 
 
 class CraftError(ValueError):
@@ -431,177 +364,12 @@ def base_item(ref: str) -> dict | None:
     return None
 
 
-# --- chains --------------------------------------------------------------------------------
+# --- the check -----------------------------------------------------------------------------
 
-@dataclass
-class Chain:
-    """One piece of forge work: methods in order, materials in the charge, and the base
-    item being made. `base` names a weapon id or an armour key — the shape of the thing;
-    the materials are what it is made *of*."""
-    track: str
-    methods: list[str] = field(default_factory=list)
-    material_ids: list[str] = field(default_factory=list)
-    base: str = ""
-    name: str = ""
-
-    @property
-    def stages(self) -> int:
-        return len(self.methods)
-
-
-def chain_from_body(body: dict) -> Chain:
-    """The bench's POST JSON as a Chain.
-
-    Tolerant by design: a missing key is an empty chain, not an error, because this is
-    the first thing that touches user input and `preview` is already the place that says
-    what is wrong with a chain in sentences. A parser that raises here would turn "you
-    have not chosen a method yet" into a 500.
-
-    `base` is accepted under three names because three things can send it — the chain
-    builder posts `base`, an item page posts `item`, and the weapons picker posts
-    `weapon`. Reading only one of them is the shape of bug that makes a form submit
-    silently do nothing.
-    """
-    body = body if isinstance(body, dict) else {}
-
-    def _list(key: str) -> list[str]:
-        value = body.get(key)
-        if isinstance(value, str):
-            # A comma-joined string is what a plain HTML form sends when JavaScript is
-            # off, and dropping it would make the bench work only with scripting.
-            return [p.strip() for p in value.split(",") if p.strip()]
-        if isinstance(value, (list, tuple)):
-            return [str(p).strip() for p in value if str(p).strip()]
-        return []
-
-    base = ""
-    for key in ("base", "item", "weapon", "armour"):
-        if str(body.get(key) or "").strip():
-            base = str(body[key]).strip()
-            break
-
-    return Chain(
-        track=TRACK_ID,
-        methods=migrate_methods(_list("methods")),
-        material_ids=_list("materials") or _list("material_ids"),
-        base=base,
-        name=str(body.get("name") or "").strip(),
-    )
-
-
-def stock_from_body(body: dict) -> dict[str, int]:
-    """What the bench says the smith is carrying, as {material id: count}.
-
-    Separate from the chain because it is a fact about the character rather than about
-    the work, and `preview` takes it separately for the same reason: passing None means
-    "assume they have it", which every rules test wants and no live bench does.
-    """
-    raw = (body or {}).get("stock")
-    if not isinstance(raw, dict):
-        return {}
-    out: dict[str, int] = {}
-    for key, value in raw.items():
-        try:
-            n = int(value)
-        except (TypeError, ValueError):
-            continue
-        if n > 0:
-            out[str(key).strip().lower()] = n
-    return out
-
-
-# The quality ladder, decided by which methods the chain contains. Masterwork is the
-# book's own rule made procedural: Craft says a masterwork component is its own DC-20
-# piece of work, and here that work is named — the steel must be tempered and the
-# working edge honed. Fine is the honest step between: one of the two, not both.
-#
-# The shaping methods were originally required for masterwork as well, and that was
-# measured to be a dead end. `rules/enchanter.py` gates every binding on a masterwork
-# vessel at Enchanter *1* — "Commission one from the smith" — while fold and draw were
-# Blacksmith 4, so the whole enchanting economy sat behind 140 MP of a track the
-# enchanter may never have taken. Masterwork is professional work in 1e, not legendary
-# work: DC 20, purchasable in any city. Under the 2026-10-03 track temper and hone are
-# Blacksmith 2, so masterwork is reachable there.
+# Masterwork is the book's own rule: Craft says a masterwork component is its own DC-20
+# piece of work (CRB, Craft). The step bench raises a masterwork step to it, through
+# `bench_rules()["masterwork_dc"]` when the rule file names one.
 MASTERWORK_DC = 20
-
-SHAPING = ("fold",)
-FINISHING_QUALITY = ("hone",)
-
-
-def quality_of(methods: list[str]) -> str:
-    tempered = "temper" in methods
-    finished = any(m in FINISHING_QUALITY for m in methods)
-    if tempered and finished:
-        return "masterwork"
-    if tempered or finished:
-        return "fine"
-    return "plain"
-
-
-# What each quality writes on the finished piece. Masterwork is PF1e's rule verbatim: a
-# masterwork weapon adds +1 enhancement on attack rolls (not damage), and masterwork
-# armour lessens its check penalty by 1. The armour half is narrative because ACP is not
-# in the effect vocabulary; the note says exactly what the GM applies.
-def _quality_specs(quality: str, family: str) -> list[dict]:
-    if quality != "masterwork":
-        return []
-    if family == "armour":
-        return [{"type": "narrative",
-                 "target": "Masterwork: armour check penalty is lessened by 1"}]
-    return [{"type": "combat_mod", "amount": 1, "bonus_type": "enhancement",
-             "target": "attack", "note": "(masterwork)"}]
-
-
-@dataclass
-class Result:
-    """What the chain would make. Same contract as `crafting.Result`: `problems` empty
-    means the work can be attempted; nothing here rolls anything."""
-    name: str
-    tier: str
-    rank: int
-    quality: str
-    stages: int
-    dc: int
-    risky: bool
-    weight_lb: int | None
-    base: dict | None
-    effects: list[str]
-    specs: list[dict]
-    removed: list[str] = field(default_factory=list)
-    problems: list[str] = field(default_factory=list)
-    consumes: dict[str, int] = field(default_factory=dict)
-    # What the successful craft puts in the player's pack. The whole point of the
-    # contract: a forged sword that cannot be wielded is a paragraph, which is what
-    # every crafted item was before `specs` reached the engine.
-    output: dict | None = None
-    # The crafter's own bonus on this chain and what it is made of. Empty when no actor
-    # was supplied — the rules tests ask what a chain *is*, not who is attempting it.
-    bonus: int = 0
-    terms: list[dict] = field(default_factory=list)
-    chance: int = 0
-
-    def as_dict(self) -> dict:
-        return {
-            "name": self.name, "tier": self.tier, "rank": self.rank,
-            "quality": self.quality, "stages": self.stages, "dc": self.dc,
-            "risky": self.risky, "weight_lb": self.weight_lb, "base": self.base,
-            "effects": self.effects, "specs": self.specs, "removed": self.removed,
-            "problems": self.problems, "consumes": self.consumes,
-            "output": self.output, "bonus": self.bonus, "terms": self.terms,
-            "chance": self.chance,
-        }
-
-
-# Which body slot a finished piece occupies, by what it is. `tables.SLOTS` owns the
-# vocabulary; these are the three a forge can fill.
-def _slot_for(base: dict | None) -> str | None:
-    if not base:
-        return None
-    if base.get("family") == "armour":
-        return "armor"
-    if base.get("family") == "weapon":
-        return "shield" if "shield" in str(base.get("id", "")) else "hands"
-    return None
 
 
 def _slug(text: str) -> str:
@@ -609,43 +377,6 @@ def _slug(text: str) -> str:
     while "--" in out:
         out = out.replace("--", "-")
     return out
-
-
-def _output(name: str, tier: str, rank: int, quality: str, base: dict | None,
-            effects: list[str], specs: list[dict], materials_used: list[str],
-            weight_lb: int | None) -> dict:
-    """The finished piece as an inventory item.
-
-    Shaped so the pack, the equip screen and the engine can all read it without knowing
-    which craft made it: `kind: "crafted"` and `craft` say where it came from, `weapon`
-    and `armour` point back at the real tables so it can actually be wielded or worn,
-    and `specs` are the validated effects the engine already knows how to apply.
-
-    `masterwork` is surfaced as its own boolean rather than left implicit in `quality`,
-    because it is the fact another track asks about: the enchanter refuses a vessel that
-    does not assert it, and reading a quality string from a sibling module would be a
-    second copy of this rule waiting to drift.
-    """
-    slot = _slot_for(base)
-    family = (base or {}).get("family")
-    return {
-        "id": _slug(name), "name": name, "kind": "crafted", "craft": TRACK_ID,
-        "tier": tier, "rank": rank, "count": 1,
-        "effects": list(effects), "specs": [dict(s) for s in specs],
-        "from_materials": list(materials_used),
-        "masterwork": quality == "masterwork",
-        "quality": quality,
-        "weight_lb": weight_lb,
-        "weapon": (base or {}).get("id") if family == "weapon" else None,
-        "armour": (base or {}).get("id") if family == "armour" else None,
-        "slot": slot,
-        "wearable": slot is not None,
-        # A forged piece is equipment, not a consumable: nothing is drunk or thrown, so
-        # `usable` is false and `how` is empty. Both are stated rather than omitted, so
-        # a pack rendering every craft's output does not have to special-case this one.
-        "usable": False,
-        "how": [],
-    }
 
 
 def check_terms(actor, level: int) -> list[dict]:
@@ -661,220 +392,16 @@ def check_terms(actor, level: int) -> list[dict]:
     Itemised rather than summed for the reason every roll in this app is: "+9" says
     nothing, "Blacksmith 3, half level +4, Int +2" says which of the three to improve.
     """
-    track_level = max(0, int(level or 0))
-    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
-    intel = int(actor.ability_mod("int")) if actor is not None else 0
+    # Half the Craft ranks ride last: smithing is Craft (weapons) or Craft (armour), and
+    # this game keeps one Craft (option A, 2026-10-07; `tradecraft.bench_terms`).
     from . import tradecraft
 
-    return [
-        {"label": f"Blacksmith {track_level}", "value": track_level},
-        {"label": f"half character level ({char_level})", "value": char_level // 2},
-        {"label": "Intelligence", "value": intel},
-        # Half the Craft ranks: smithing is Craft (weapons) or Craft (armour), and this
-        # game keeps one Craft (option A, 2026-10-07; `tradecraft.bench_terms`).
-        *tradecraft.bench_terms(actor, "blacksmith"),
-    ]
+    return tradecraft.bench_check_terms(actor, level, track=TRACK_ID, name="Blacksmith",
+                                        ability="int")
 
 
 def check_bonus(actor, level: int) -> int:
     return sum(t["value"] for t in check_terms(actor, level))
-
-
-def _chance(dc: int, bonus: int, problems=()) -> int:
-    """Percent chance the check makes the DC, for the label on the button.
-
-    Same clamp as crafting's, for the same reason: a natural 1 always fails and a
-    natural 20 always succeeds, so no craft is ever certain either way and the number
-    should not claim otherwise.
-    """
-    if problems:
-        return 0
-    need = dc - bonus
-    return max(5, min(95, int(round(100 * (21 - need) / 20))))
-
-
-def preview(level: int, chain: Chain, stock: dict | None = None,
-            actor=None) -> Result:
-    """What this chain would forge, and everything wrong with attempting it.
-
-    Never raises for a chain that is merely bad — an unknown method, metal above the
-    smith's tier, a cold forge all come back as `problems` so the page can grey the
-    button and say why, exactly as `crafting.preview` does. `CraftError` is reserved for
-    chains that cannot be described at all.
-
-    `stock` is what the smith is carrying, as {material id: count}. Passing None means
-    "assume they have it" — what every caller wants until acquisition (mining, buying)
-    exists, and what the tests of the chain rules want forever.
-
-    `actor` is the character attempting it. Supplied, the result carries the itemised
-    bonus and the percentage chance; omitted, those stay at zero and the result is a
-    statement about the chain rather than about anybody's odds — which is what the rules
-    tests ask for and what a shelf preview shows before a character is chosen.
-    """
-    track = wc.get(TRACK_ID)
-    level = max(1, min(int(level), track.max_level))
-    known = track.unlocked_methods(level)
-    ceiling = wc.tier_rank(track.at(level).max_tier)
-
-    problems: list[str] = []
-    items: list[Material] = []
-    wanted: dict[str, int] = {}
-    for mid in chain.material_ids:
-        try:
-            items.append(get(mid))
-            wanted[mid] = wanted.get(mid, 0) + 1
-        except KeyError:
-            problems.append(f"No such material: {mid}.")
-
-    if stock is not None:
-        for mid, n in wanted.items():
-            carrying = int(stock.get(mid, 0))
-            if carrying < n:
-                name = get(mid).name
-                problems.append(
-                    f"{name}: you are carrying {carrying}, the chain wants {n}."
-                    if carrying else f"You have no {name}.")
-
-    for m in chain.methods:
-        if m not in track.unlocked_methods(track.max_level):
-            moved = old_method(m)
-            problems.append(
-                f"{track.name} has no method called {m!r}"
-                + (f": {m.title()} became {moved.title()}." if moved != m else "."))
-        elif m not in known:
-            need = next(l.level for l in sorted(track.levels, key=lambda x: x.level)
-                        if m in l.methods)
-            problems.append(f"{m.title()} is learned at {track.name} {need}.")
-
-    if not chain.methods:
-        problems.append("No method chosen.")
-    if not items:
-        problems.append("Nothing in the charge.")
-
-    metals = [i for i in items if i.kind in METAL_KINDS]
-    if items and not metals:
-        problems.append("Nothing to work: no ore, metal or alloy in the charge.")
-
-    base = base_item(chain.base)
-    if chain.base and base is None:
-        problems.append(
-            f"No such base item {chain.base!r}: name a weapon from the weapons list "
-            f"or an armour by name.")
-    if not chain.base and any(m in ("forge", "assemble") for m in chain.methods):
-        problems.append("Forging needs a shape: say what is being made.")
-
-    # The physical grammar: each method's prerequisite must already have happened.
-    for at, m in enumerate(chain.methods):
-        need = AFTER.get(m)
-        if need and need not in chain.methods[:at]:
-            problems.append(_AFTER_WHY[m])
-
-    for m in chain.methods[:-1]:
-        if m in FINISHING:
-            problems.append(f"{m.title()} finishes a piece; nothing follows it.")
-
-    # Fire needs feeding, and skymetal fire needs better food than charcoal.
-    fuels = [i for i in items if i.kind == "fuel"]
-    if any(m in FUEL_BURNING for m in chain.methods) and not fuels:
-        problems.append("The forge is cold: smelting and forging burn fuel, and there "
-                        "is none in the charge.")
-    if "smelt" in chain.methods and fuels:
-        hottest = max(f.rank for f in fuels)
-        for i in metals:
-            if i.rank >= HOT_METAL_RANK and hottest < HOT_FUEL_RANK:
-                problems.append(
-                    f"{i.name} does not melt over {fuels[0].name.lower()}: smelting "
-                    f"{i.tier} metal needs a fuel of rare tier or better.")
-
-    # Alloying: at least two metals, and none of the solitary ones.
-    if "alloy" in chain.methods:
-        if len(metals) < 2:
-            problems.append("Alloying combines metals, and there are not two in the "
-                            "charge.")
-        for i in metals:
-            if i.id in SOLITARY and len(metals) > 1:
-                others = ", ".join(sorted(m.name for m in metals if m is not i))
-                problems.append(
-                    f"{i.name} works alone: melted together with {others} it is only "
-                    f"dead metal — what makes it {i.name.lower()} does not survive "
-                    f"the mixing.")
-                break
-
-    # The result is as rare as its rarest component — and a novel alloy of two distinct
-    # same-tier metals is one band rarer than either. Until 2026-10-03 the ceiling was
-    # checked against the inputs only, because the stepped-up output was the one road
-    # to the level-5 deed; the deed is gone, so the output is gated as well, as the
-    # Herbalist's revamped bench gates a concentration by what it makes.
-    rank = max((i.rank for i in items), default=1)
-    tops = {i.id for i in metals if i.rank == rank}
-    if ("alloy" in chain.methods and len(tops) >= 2
-            and not tops & SOLITARY):
-        rank = min(len(wc.TIERS), rank + ALLOY_RARITY_STEP)
-    tier = wc.TIERS[rank - 1]
-
-    for i in items:
-        if i.rank > ceiling:
-            problems.append(f"{i.name} is {i.tier}; {track.name} {level} works "
-                            f"{track.at(level).max_tier} at best.")
-    if rank > ceiling and not any(i.rank > ceiling for i in items):
-        problems.append(f"This would make {tier} metal, beyond {track.name} {level}: "
-                        f"it needs {track.name} {_level_for_rank(rank) or track.max_level}.")
-
-    quality = quality_of(chain.methods)
-    dc = _dc(items, rank, chain.stages)
-    if quality == "masterwork":
-        # The book's own number: a masterwork component is a DC 20 piece of work in its
-        # own right, so the chain is never easier than that.
-        dc = max(dc, MASTERWORK_DC)
-
-    # Effects: what every material contributes, plus what the quality adds. A flux in a
-    # smelted charge strips the harm carried by dirty ore, the way purify strips a
-    # poison — but only from ore: a metal that sickens the smith (fever skymetal) is not cleaner
-    # for the slag being gone.
-    cleansed = CLEANSED_BY in chain.methods and any(i.kind == "flux" for i in items)
-    specs: list[dict] = []
-    effects: list[str] = []
-    removed: list[str] = []
-    from . import consumables as con
-
-    for i in items:
-        for spec in i.specs:
-            marked = {**spec, "from": spec.get("from") or i.name}
-            if cleansed and i.kind == "ore" and con.hurts(marked):
-                removed.append(f"The flux in the melt carried off {i.name}'s impurity: "
-                               f"{effectspec.render(spec)}.")
-                continue
-            specs.append(marked)
-            effects.append(f"{i.name}: {effectspec.render(spec)}")
-
-    family = (base or {}).get("family", "weapon")
-    for spec in _quality_specs(quality, family):
-        specs.append(spec)
-        effects.append(effectspec.render(spec))
-
-    risky = any(i.risky for i in items)
-
-    # Weight: the base item's, scaled by every material's factor, rounded as a cost.
-    weight = None
-    if base and base.get("weight_lb"):
-        factor = 1.0
-        for i in items:
-            factor *= i.weight_factor
-        weight = max(0, round_cost(float(base["weight_lb"]) * factor))
-
-    name = chain.name or _name_for(items, base, quality)
-    terms = check_terms(actor, level) if actor is not None else []
-    bonus = sum(t["value"] for t in terms)
-    return Result(
-        name=name, tier=tier, rank=rank, quality=quality, stages=chain.stages,
-        dc=dc, risky=risky, weight_lb=weight, base=base,
-        effects=effects, specs=specs, removed=removed, problems=problems,
-        consumes=dict(wanted),
-        output=_output(name, tier, rank, quality, base, effects, specs,
-                       list(wanted), weight),
-        bonus=bonus, terms=terms,
-        chance=_chance(dc, bonus, problems) if actor is not None else 0,
-    )
 
 
 def _level_for_rank(rank: int) -> int | None:
@@ -884,35 +411,6 @@ def _level_for_rank(rank: int) -> int | None:
         if wc.tier_rank(row.max_tier) >= rank:
             return row.level
     return None
-
-
-def _dc(items: list[Material], rank: int, stages: int) -> int:
-    """Hardest material sets the floor; length of the chain adds to it.
-
-    The same shape as `crafting._dc`, deliberately not the same function: materials that
-    carry their own DC use it — an authored number beats a derived one — and the rest
-    fall back on their tier at 5 + 5 × rank, plus 2 per stage beyond the first.
-    """
-    stated = [i.craft_dc for i in items if i.craft_dc is not None]
-    base = max(stated) if stated else 5 + 5 * rank
-    return base + 2 * max(0, stages - 1)
-
-
-def _name_for(items: list[Material], base: dict | None, quality: str) -> str:
-    """A working name — "Masterwork Cold Iron Longsword" — so the preview is never
-    headed "Untitled". The lead metal names the piece; refined metal and alloys outrank
-    ore, because a sword smelted from cold iron ore is a cold iron sword, not an ore
-    sword."""
-    lead = next((i for i in items if i.kind in ("metal", "alloy")),
-                next((i for i in items if i.kind == "ore"), None))
-    shape = (base or {}).get("name", "work")
-    metal = ""
-    if lead is not None:
-        metal = lead.name
-        if lead.kind == "ore" and metal.lower().endswith(" ore"):
-            metal = metal[:-4]
-    prefix = {"masterwork": "Masterwork ", "fine": "Fine "}.get(quality, "")
-    return f"{prefix}{metal} {shape}".replace("  ", " ").strip().title()
 
 
 # =========================================================================================
@@ -925,11 +423,11 @@ def _name_for(items: list[Material], base: dict | None, quality: str) -> str:
 # player's words: shapes come from the weapon and armour tables, materials from lane C's
 # documents, the smithy from lane G's places.
 #
-# Three sibling lanes are built in parallel with this one and may not be merged yet:
-# `rules/materials.py` (C), `rules/forge_items.py` (B), `rules/knowledge.py` (E), and
-# `places.smithy_here` / `places.has_field_kit` / `market.forge_rent` (G). Each is imported
-# lazily through `_lane` and every call has a stated fallback, so the bench works (more
-# plainly) before they land and picks them up the moment they do, with no edit here.
+# Three sibling lanes were built in parallel with this one: `rules/materials.py` (C),
+# `rules/forge_items.py` (B), `rules/knowledge.py` (E), and `places.smithy_here` /
+# `places.has_field_kit` / `market.forge_rent` (G). Each is imported through `_lane`, on
+# each call, so a test can stand a fake in `sys.modules`. The fallbacks each call carried
+# for a tree without them were deleted on 2026-11-08, once all four had long merged.
 
 import copy as _copy
 
@@ -1003,12 +501,13 @@ LEATHER_ONLY_KINDS = ("hide", "tannin", "oil", "wax", "thread", "dye")
 
 
 def _lane(name: str):
-    """A sibling lane's module, or None while it is not merged (contracts §1). Imported on
-    each call rather than at module load, so a test can stand a fake in `sys.modules`."""
-    try:
-        return importlib.import_module(f"rules.{name}")
-    except ImportError:
-        return None
+    """A sibling module, imported on each call so a test can stand a fake in `sys.modules`.
+
+    It returned None while a sibling lane was not merged yet (contracts §1), and every
+    caller carried a fallback for that tree. Every lane merged in October; the fallbacks
+    were deleted on 2026-11-08 (audit, "dead 'not merged yet' fallbacks in the craft
+    modules")."""
+    return importlib.import_module(f"rules.{name}")
 
 
 def bench_rules() -> dict:
@@ -1039,9 +538,8 @@ def stud_ids() -> tuple[str, ...]:
     list both benches read (the leather bench refuses them as "studs make a forge suit";
     the forge takes exactly these). Never a second copy here: two lists of what a stud is
     are two answers that drift."""
-    lw = _lane("leatherworker")
     try:
-        got = (lw.bench_rules().get("forge_fittings") or ()) if lw is not None else ()
+        got = _lane("leatherworker").bench_rules().get("forge_fittings") or ()
     except Exception:          # noqa: BLE001 - no leather rules, no studs
         got = ()
     return tuple(str(x) for x in got)
@@ -1053,31 +551,6 @@ def method_level(method: str) -> int:
         if method in row.methods:
             return row.level
     return track.max_level + 1
-
-
-def old_method(name: str) -> str:
-    """What a removed method became (plan §14: draw -> forge, polish -> hone, flux -> a
-    Smelt ingredient, rivet -> assemble), for an old recipe or chain naming it."""
-    key = str(name or "").strip().lower()
-    return str((wc.get(TRACK_ID).data.get("old_methods") or {}).get(key, key))
-
-
-def migrate_methods(methods) -> list[str]:
-    """An old recipe's method list with the removed methods mapped onto the new (plan §14).
-
-    Before this (measured 2026-10-04, lane H) a saved recipe naming draw or polish was
-    loaded as written and refused by `preview` — "Blacksmith has no method called 'draw':
-    Draw became Forge." — a sentence telling the player what the code already knew. Now
-    the step is the new one: draw -> forge, polish -> hone, rivet -> assemble, and flux,
-    which became an ingredient of Smelt, is the Smelt step (the flux stays in the charge,
-    where Smelt reads it). A step the map produces twice in a row is one step: "forge,
-    draw" was always one shaping, and is now "forge"."""
-    out: list[str] = []
-    for m in methods or ():
-        new = old_method(str(m))
-        if new and (not out or out[-1] != new) and not (new == "smelt" and "smelt" in out):
-            out.append(new)
-    return out
 
 
 # The record an old "Iron Work" is re-derived into (plan §14). Its haft and fittings the
@@ -1111,8 +584,7 @@ def _main_material_of(d: dict) -> str:
     says. Only a material that can fill the main piece is an answer."""
     gear = "weapon" if d.get("weapon") else "armour"
     main = "head" if gear == "weapon" else "body"
-    mats = _lane("materials")
-    shelf = mats.all() if mats is not None else {}
+    shelf = _lane("materials").all()
 
     def fills(mid: str) -> str:
         mid = str(mid or "").strip().lower()
@@ -1285,12 +757,10 @@ def metal(material_id: str) -> Metal | None:
     if not mid:
         return None
     mats = _lane("materials")
-    doc = None
-    if mats is not None and hasattr(mats, "get"):
-        try:
-            doc = mats.get(mid)
-        except Exception:          # noqa: BLE001 - a bad document is "no such material"
-            doc = None
+    try:
+        doc = mats.get(mid)
+    except Exception:              # noqa: BLE001 - a bad document is "no such material"
+        doc = None
     old = materials().get(mid)
     if doc is None and old is None:
         return None
@@ -1300,7 +770,7 @@ def metal(material_id: str) -> Metal | None:
                "weapon": [], "armour": [], "working": [], "quench_mark": None,
                "price_gp": old.price_gp, "text": old.text, "craft_dc": old.craft_dc}
     parent = ""
-    if mats is not None and hasattr(mats, "material_of"):
+    if hasattr(mats, "material_of"):
         try:
             parent = str(mats.material_of(mid) or "")
         except Exception:          # noqa: BLE001
@@ -1345,11 +815,10 @@ def _known_keys(actor, mid: str) -> set:
 def unknown_count(actor, m: Metal | None) -> int:
     """Properties of this material the actor does not know (the rack's "?"). One store:
     `Actor.herb_known`, keyed by material id (contracts §6)."""
-    kn = _lane("knowledge")
-    if kn is None or actor is None or m is None:
+    if actor is None or m is None:
         return 0
     try:
-        keys = list(kn.property_keys(m.doc))
+        keys = list(_lane("knowledge").property_keys(m.doc))
     except Exception:              # noqa: BLE001
         return 0
     known = _known_keys(actor, m.id)
@@ -1655,13 +1124,10 @@ def work_name(w: Work) -> str:
     if w.form == "item" and w.from_base:
         # Named as the leather bench names its suits ("Fine Deer Studded Leather"), the
         # hide's word without "Hide": the body is the tanner's, the studs are the smith's.
-        lw = _lane("leatherworker")
-        lead = getattr(lw, "_lead_word", None) if lw is not None else None
-        if lead is not None:
-            try:
-                metal_name = str(lead(w.material)) or metal_name
-            except Exception:      # noqa: BLE001 - the material's own name will do
-                pass
+        try:
+            metal_name = str(_lane("leatherworker")._lead_word(w.material)) or metal_name
+        except Exception:          # noqa: BLE001 - the material's own name will do
+            pass
     if w.form == "item":
         q = int(w.quality or 0)
         prefix = "" if q == 1 else f"{wc.quality_name(q)} "
@@ -1773,21 +1239,19 @@ def records(actor) -> list[dict]:
 
 
 def build_of(rec: dict | None) -> dict | None:
-    """Lane B's `forge_items.build(record)`, or None while it is not merged: the page then
-    shows the pieces without a sum rather than numbers this lane made up."""
-    fi = _lane("forge_items")
-    if rec is None or fi is None or not hasattr(fi, "build"):
+    """Lane B's `forge_items.build(record)`, or None with no record."""
+    if rec is None:
         return None
-    return fi.build(rec)
+    return _lane("forge_items").build(rec)
 
 
 def preview_of(pieces: dict, *, gear: str, base: str, quality_index: int, level: int,
                perks: dict, marks=()) -> dict | None:
-    """Lane B's `forge_items.preview` (contracts §4), or None while it is not merged.
+    """Lane B's `forge_items.preview` (contracts §4), or None with no pieces.
     `marks`: a leather base's tanner's marks, carried onto the suit (`Work.marks`)."""
-    fi = _lane("forge_items")
-    if fi is None or not hasattr(fi, "preview") or not pieces:
+    if not pieces:
         return None
+    fi = _lane("forge_items")
     # `marks` only when there are some: a forge suit of the smith's own has none, and the
     # call then stays the contract's §4 shape (the forge bench's tests stand a fake
     # `preview` with exactly that signature in for lane B).
@@ -1963,7 +1427,7 @@ def _leather_piece(actor, sid: str, st, reserved: dict) -> Piece | None:
                      tier=str(rec.get("tier") or getattr(st, "tier", "") or "common"),
                      base=_copy.deepcopy(rec), worn=bool(rid and rid in _worn_ids(actor)))
     lw = _lane("leatherworker")
-    if lw is None or str(getattr(st, "craft", "") or "") != getattr(lw, "TRACK_ID", ""):
+    if str(getattr(st, "craft", "") or "") != lw.TRACK_ID:
         return None
     h = lw.Hide.from_stock(st)
     if h is None or h.form not in LEATHER_FILLS:
@@ -1987,8 +1451,7 @@ def off_rack_reason(actor, key: str) -> str:
             return f"{m.name} is a tanner's material: it is used at the leather bench."
     if kind == "stock":
         st = (getattr(actor, "stock", {}) or {}).get(ident)
-        lw = _lane("leatherworker")
-        h = lw.Hide.from_stock(st) if (st is not None and lw is not None) else None
+        h = _lane("leatherworker").Hide.from_stock(st) if st is not None else None
         if h is not None and h.form not in LEATHER_FILLS:
             return (f"{st.name} is not yet a piece the forge can use: cut it at the leather "
                     f"bench into a grip, a lacing set or a base.")
@@ -2060,41 +1523,30 @@ def where_here(scene, actor, known=()) -> dict:
 
     Asked of `places.smithy_here(scene, known)` and `places.has_field_kit(actor)`, never
     of the player's words (plan §10). `known` is `Engine.places()`, which lane G needs for
-    an authored place whose id does not spell its name. Before lane G is present there is
-    no smithy anywhere and the kit folds out wherever the character stands, which is how
-    the forge worked before the revamp."""
+    an authored place whose id does not spell its name."""
     places = _lane("places")
-    smithy, kit = None, True
-    fn = getattr(places, "smithy_here", None) if places is not None else None
-    if fn is not None:
-        try:
-            smithy = fn(scene, known) or None
-        except Exception:          # noqa: BLE001 - a place we cannot read is no smithy
-            smithy = None
-    fk = getattr(places, "has_field_kit", None) if places is not None else None
-    if fk is not None:
-        try:
-            kit = bool(fk(actor))
-        except Exception:          # noqa: BLE001
-            kit = False
+    try:
+        smithy = places.smithy_here(scene, known) or None
+    except Exception:              # noqa: BLE001 - a place we cannot read is no smithy
+        smithy = None
+    try:
+        kit = bool(places.has_field_kit(actor))
+    except Exception:              # noqa: BLE001
+        kit = False
     return {"smithy": smithy, "kit": kit}
 
 
 def rent_cp(scene, smithy: dict | None, minutes: int, known=()) -> int:
-    """What the forge here charges for the hours (plan §10), asked of lane G's
-    `market.forge_rent`, which knows that your own smithy is free and a friend's is not.
-    Never computed from a rate here while that exists: a second answer to what the smith
-    charges is how two numbers drift. The smithy's own `rate_cp_per_hour` is the fallback
-    only while lane G is absent."""
+    """What the forge here charges for the hours (plan §10): `market.forge_rent`, which
+    knows that your own smithy is free and a friend's is not, through `market._rent`, the
+    one rent arithmetic. The copy of that arithmetic kept here for a tree without lane G
+    (the smithy's rate, no ownership asked) was deleted on 2026-11-08: `market` is on
+    every tree, so the copy could not run."""
     if not smithy or minutes <= 0:
         return 0
-    hours = minutes / 60
-    market = _lane("market")
-    fn = getattr(market, "forge_rent", None) if market is not None else None
-    if fn is not None:
-        return max(0, int(fn(scene, hours, known)))
-    return max(0, int(math.ceil(round(int(smithy.get("rate_cp_per_hour") or 0) * hours,
-                                      6))))
+    from . import market
+
+    return max(0, int(market.forge_rent(scene, minutes / 60, known)))
 
 
 def methods_view(level: int, where: dict | None = None) -> list[dict]:
@@ -3342,8 +2794,6 @@ def working_keys(doc: dict) -> list[str]:
     traits, quench mark (contracts §6 says one positional key per effect and working
     trait, "as today")."""
     kn = _lane("knowledge")
-    if kn is None:
-        return []
     fn = getattr(kn, "working_keys", None)
     if fn is not None:
         return list(fn(doc))
@@ -3353,15 +2803,9 @@ def working_keys(doc: dict) -> list[str]:
 
 
 def reveal(actor, material_id: str, keys, how: str) -> list[str]:
-    """Record keys as known; returns the new ones. Lane E's `reveal` when it has one, else
-    the herbarium's own (one store, `Actor.herb_known`, contracts §6)."""
-    kn = _lane("knowledge")
-    fn = getattr(kn, "reveal", None) if kn is not None else None
-    if fn is None:
-        from . import herbknowledge
-
-        fn = herbknowledge.reveal
-    return list(fn(actor, material_id, list(keys), how) or [])
+    """Record keys as known; returns the new ones. Lane E's `reveal` (one store,
+    `Actor.herb_known`, contracts §6)."""
+    return list(_lane("knowledge").reveal(actor, material_id, list(keys), how) or [])
 
 
 # --- settling a step (shared by the bench and a typed line) ------------------------------
@@ -3492,7 +2936,7 @@ def settle_made(actor, progress, plan: ForgePlan, tier: int, consumes, *, dice=N
     kn = _lane("knowledge")
     for mid in worked:
         m = metal(mid)
-        if m is None or kn is None:
+        if m is None:
             continue
         try:
             keys = working_keys(m.doc)

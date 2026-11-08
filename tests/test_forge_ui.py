@@ -145,7 +145,7 @@ def test_no_forge_string_carries_an_em_or_en_dash():
     """UI plan §8 and the design skill's §9.G: zero em-dashes and en-dashes in the forge's
     files, comments included, and in the old tab's forge card."""
     craft = _src(CRAFT)
-    card = craft[craft.index("function renderForgeMoved()"):craft.index("function renderLoading()")]
+    card = craft[craft.index("function renderForgeMoved()"):craft.index("function renderEnchantMoved()")]
     html = _src(TABLE)
     layer = html[html.index('<div id="forge"'):html.index('<div id="veil">')]
     for name, text in [(p.name, _src(p)) for p in FORGE_JS + [FORGE_CSS]] + [
@@ -551,19 +551,8 @@ def test_the_old_blacksmithing_tab_is_a_card_that_opens_the_forge():
     src = _src(CRAFT)
     sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
     assert 'if (CRAFT === "blacksmithing") { renderForgeMoved(); return; }' in sel
-    card = src[src.index("function renderForgeMoved()"):src.index("function renderLoading()")]
+    card = src[src.index("function renderForgeMoved()"):src.index("function renderEnchantMoved()")]
     assert 'href="/play/#forge"' in card and "Open the forge" in card
-
-
-def test_choosing_a_tab_never_shows_the_last_tabs_card_while_it_loads():
-    """The audit's defect (UI plan §2): choosing Blacksmithing showed "Herbalism is at the
-    table now" for about two seconds, because #main kept the last tab's card while the
-    shelf was fetched. The tab draws its own loading panel BEFORE it awaits, and an answer
-    for a tab no longer in front is dropped rather than drawn over the newer one."""
-    src = _src(CRAFT)
-    sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
-    assert sel.index("renderLoading();") < sel.index("await Promise.all(")
-    assert "const seq = ++CRAFT_SEQ;" in sel and "if (seq !== CRAFT_SEQ) return;" in sel
 
 
 def test_the_frames_heat_reaches_the_stage_through_the_game_view():

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from rules import blacksmith, crafting, enchanter, leatherworker, magicitem, tradecraft
+from rules import blacksmith, crafting, enchanter, leatherworker, tradecraft
 from rules.sheet import load_pc
 
 BENCHES = [(crafting, "herbalist"), (blacksmith, "blacksmith"), (enchanter, "enchanter"),
@@ -65,10 +65,6 @@ def test_herbalism_takes_the_better_of_craft_and_profession():
 def test_the_alchemy_bench_helper_is_ready_for_its_lane():
     assert tradecraft.bench_terms(_pc(craft=7), "alchemist") == [
         {"label": "Craft ranks ½ (7)", "value": 3}]
-
-
-def test_magic_item_making_reads_the_enchanters_terms_and_so_the_ranks():
-    assert magicitem.check_terms(_pc(craft=4), 2)[-1]["value"] == 2
 
 
 def test_a_worn_skill_bonus_never_reaches_the_bench():

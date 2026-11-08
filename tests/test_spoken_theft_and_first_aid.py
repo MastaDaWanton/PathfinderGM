@@ -111,13 +111,19 @@ def test_a_hand_over_by_the_holder_is_still_a_hand_over():
     assert not (s.prop_named("apple") or {}).get("stolen")
 
 
-def test_a_price_is_consent_and_a_companion_s_pack_is_the_party_s():
-    """A price paid makes it a sale (docs/items-have-owners.md: "a price is consent"), and
-    somebody travelling with the player hands over what is asked — neither is a theft."""
+def test_a_sale_is_buys_and_a_companion_s_pack_is_the_party_s():
+    """A price paid made a give a sale (docs/items-have-owners.md: "a price is consent")
+    until 2026-11-07, when `price` left the give (audit #24: it charged the buyer before
+    anything moved and never paid the seller). A sale is `buy`'s now, so a give with a
+    price is refused with the trade op named and nothing moves; somebody travelling with
+    the player still hands over what is asked — not a theft."""
+    from rules.intents import IntentError
+
     s, pc, e = _street()
     pc.purse = {"cp": 50}
-    out = _run(e, [_take("apple", price="1 cp")])[0]
-    assert out.effects[0]["how"] == "handed"
+    with pytest.raises(IntentError, match="buy item="):
+        e.validate([_take("apple", price="1 cp")])
+    assert pc.purse == {"cp": 50}
     friend = _person(s, "c9", "Drenn", goods={"rope": 1})
     friend.apply_effect(ActiveEffect(
         name="travels with you", kind="bond", key="company:c9:travels",

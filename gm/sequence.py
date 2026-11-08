@@ -405,9 +405,3 @@ def _split_at_span(parts: list[str], placed: list, stop: int, at: int):
     if not _tidy(head) or not _tidy(tail) or not re.search(r"\w", head):
         return None
     return parts[:at] + [head], [tail] + parts[at + 1:]
-
-
-def only_going(clause: str) -> bool:
-    """A clause that is the move and nothing else a verb could carry: "I slip out
-    quietly", "I run for it". Used with the declared ops, not instead of them."""
-    return bool(_MOVES.search(clause))

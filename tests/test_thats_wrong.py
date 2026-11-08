@@ -400,3 +400,27 @@ def test_settings_counts_the_corrections(table):
     got = Client().get("/api/corrections").json()
     assert got["episodes"] == 1 and got["versions"] == 2
     assert got["folder"].endswith("training")
+
+
+def test_the_log_is_appended_to_and_an_earlier_line_is_never_rewritten(table, tmp_path):
+    """Audit 2026-11-07: every click rewrote `corrections.jsonl` in full — read every
+    episode, replace one, write them all back — so the cost of a click grew with the
+    owner's whole training history, and every click was a chance to lose it. The log is
+    now appended to: an episode's every change is one more whole line, the bytes already
+    on disk are never touched, and the readers (the table, the report, the exporter) take
+    each episode's latest line."""
+    turn = table["turn"]
+    log = table["root"] / "training" / "corrections.jsonl"
+    i = turn(WRONG)
+    _post(beat=i, do="fix", sentences=[WRONG_SENTENCE])
+    before = log.read_bytes()
+    turn("The guard steps back. What do you do?", player="I press him.")
+    after = log.read_bytes()
+    assert after.startswith(before) and len(after) > len(before)
+    raw = [json.loads(x) for x in after.decode("utf-8").splitlines() if x.strip()]
+    assert len({r["id"] for r in raw}) == 1 < len(raw)
+    # One episode, read as its latest line, by the table and by the exporter alike.
+    from tools.corrections_to_pairs import _read
+
+    for episodes in (_log(table["root"]), _read(log)):
+        assert len(episodes) == 1 and episodes[0]["closed"] is True

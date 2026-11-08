@@ -772,6 +772,16 @@ def _build_imported(printed_only: bool = False) -> dict[str, dict]:
             if not isinstance(entries, list):
                 entries = [data] if isinstance(data, dict) and data.get("id") else []
             for e in entries:
+                # A bare string where a block belongs (`{"creatures": ["wolf"]}`) raised
+                # here, outside any `try`, and left `_IMPORTED` unset, so every later
+                # lookup raised and nothing could spawn (audit 2026-11-07 #19). One bad
+                # entry is skipped and named; its neighbours still load.
+                if not isinstance(e, dict) or not isinstance(e.get("id") or "", str):
+                    # A non-string id is the same trap one step later: the index sorts
+                    # every id together, and 7 against "wolf" raises.
+                    files.unreadable(path, ValueError(f"an entry is {type(e).__name__}, "
+                                                      "not a creature block with a text id"))
+                    continue
                 if e.get("id"):
                     base = dict(out.get(e["id"], {}))
                     base.update({k: v for k, v in e.items() if v not in (None, "")})
@@ -815,6 +825,10 @@ def _people(out: dict[str, dict], folders) -> None:
                 files.unreadable(path, exc)
                 continue
             for doc in (data.get("builds") if isinstance(data, dict) else None) or []:
+                if not isinstance(doc, dict):
+                    files.unreadable(path, ValueError(f"a build is {type(doc).__name__}, "
+                                                      "not a build document"))
+                    continue
                 pre = made.get(str(doc.get("id") or "").strip().lower())
                 # Only a sheet made from exactly this build: one edited since (the roster
                 # re-run without the sheets) is built live, so a stale file is slow, never
@@ -822,9 +836,13 @@ def _people(out: dict[str, dict], folders) -> None:
                 if pre is not None and pre.get("stamp") == build_stamp(doc):
                     out.setdefault(pre["block"]["id"], pre["block"])
                     continue
+                # Any exception, not only the refusals `people_block` means to raise: a
+                # homebrew build of the wrong shape fails as TypeError or AttributeError
+                # deep in the engine, and escaping here left the whole catalogue unbuilt
+                # (#19). The build is skipped and named.
                 try:
                     block = people_block(doc)
-                except (ValueError, KeyError) as exc:
+                except Exception as exc:  # noqa: BLE001 — one bad build, never the bestiary
                     files.unreadable(path, exc)
                     continue
                 out.setdefault(block["id"], block)

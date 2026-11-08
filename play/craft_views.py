@@ -1,11 +1,11 @@
-"""The crafting bench, as a browser page.
+"""The /craft/ page, the acquisition hub, foraging and travel.
 
 Its own module rather than more of `views.py`, which is the play loop and should stay
-that. Nothing here talks to a model: crafting is arithmetic over ingredients and a track,
-so it is engine work start to finish.
-
-The workbench is assumed to fold out wherever the character is standing, per the design
-call, so a chain is judged on the crafter and the materials alone and never on location.
+that. Every craft is worked at its own step bench over the table now (bench_views,
+forge_views, enchant_views, alchemy_views, leather_views); the page's tabs are doors to
+them. The old chain bench's routes (/api/craft/preview, /do and /recipes) were deleted on
+2026-11-08 (audit finding #20): no page reached them, and the forge's chain skipped rent
+and let natural 1s and 20s decide, against the live forge.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import (benches, biomes, consumables, crafting, foraging, goods,
+from rules import (benches, biomes, consumables, foraging, goods,
                    ingredients, market, worldclass)
 from rules.dice import BadDice
 from rules.intents import IntentError
@@ -54,8 +54,6 @@ DISCIPLINES = [
 
 # Each discipline's own shelf. Herbalism reads the herb corpus through `ingredients`;
 # the four newer tracks each carry a materials module with the same as_dict shape.
-# Chains for these benches are the next slice — the guard in preview/do says so
-# rather than letting `crafting.preview` misread a forge chain as a brew.
 _MATERIALS_OF = {
     "alchemist": "rules.alchemist",
     "blacksmith": "rules.blacksmith",
@@ -90,17 +88,6 @@ def _craft_materials(track_id: str) -> list[dict]:
     mod = importlib.import_module(_MATERIALS_OF[track_id])
     return [m.as_dict() for mid, m in sorted(mod.materials().items())
             if mid in own or mid not in elsewhere]
-
-
-def _is_night(campaign) -> bool:
-    """Whether it is dark, from the scene's own clock.
-
-    Asked here rather than by each bench: the world clock is campaign state, and a
-    binding circle should not have to know how this app stores time. Dusk to dawn, the
-    same window the survival rules treat as night.
-    """
-    minutes = int(getattr(campaign.scene, "clock_minutes", 0) or 0) % 1440
-    return minutes >= 18 * 60 or minutes < 6 * 60
 
 
 def _discipline(disc_id: str) -> dict:
@@ -148,8 +135,6 @@ def _track_state(campaign, disc: dict) -> dict:
         # it in the same edit rather than in a second place nobody remembers.
         "method_help": _method_help(track),
         "descriptions": _raw_track(track).get("method_descriptions") or {},
-        # Secondary tabs — the enchanter's book-faithful magic-item mode is the first.
-        "modes": benches.modes_for(track.id),
         # What this craft can be told to make, if it needs telling. A forge shapes a
         # base item and a tannery cuts a pattern; herbalism names its output from what
         # went in the pot and answers with an empty list, which is how the page knows
@@ -234,39 +219,6 @@ def _method_help(track) -> dict:
     return out
 
 
-def _chain_from(body: dict, track_id: str) -> crafting.Chain:
-    return crafting.Chain(
-        track=track_id,
-        methods=[str(m).strip().lower() for m in body.get("methods", [])],
-        ingredient_ids=[str(i).strip().lower() for i in body.get("ingredients", [])],
-        name=str(body.get("name", "")).strip(),
-        stock_used={str(k): int(v) for k, v in (body.get("stock") or {}).items()
-                    if int(v) > 0},
-    )
-
-
-def _bench_stock(campaign, disc: dict) -> dict:
-    """What this bench can reach for, in the shape its own module expects.
-
-    Herbalism's pot takes crafted jars — a tea goes back in to be concentrated — and
-    reads raw herbs separately through `satchel`. The four newer benches make no such
-    distinction: an ore and a masterwork blade are both "stock", counted, and their
-    `_stock_entry` readers accept a bare number. So the satchel is folded in for them
-    and left alone for herbalism, rather than teaching four modules a split that only
-    one craft has a reason for.
-    """
-    pc = campaign.scene.pc()
-    if pc is None:
-        return {}
-    crafted = _stock_of(campaign, disc["id"])
-    if disc["track"] == "herbalist":
-        return crafted
-    merged: dict = {mid: int(n) for mid, n in pc.inventory.items() if n}
-    for key, item in crafted.items():
-        merged[key] = item
-    return merged
-
-
 def _stock_of(campaign, craft_id: str) -> dict:
     """What the character has made in this discipline, and can craft with again.
 
@@ -313,20 +265,6 @@ def craft_ingredients(request):
 
     state = _track_state(c, disc)
     ceiling = state.get("max_rank", 0)
-
-    mode = str(request.GET.get("mode", "")).strip().lower()
-    if mode and benches.supports(disc["track"], mode):
-        # A secondary mode brings its own shelf — the magic-item mode's is a catalogue
-        # of named properties and wondrous items, not the essences next door.
-        mod = benches.module_for(disc["track"], mode)
-        listing = getattr(mod, "catalogue", None) or getattr(mod, "materials", None)
-        mats = [m.as_dict() for _, m in sorted((listing() or {}).items())] if listing else []
-        for d in mats:
-            d["usable"] = bool(ceiling) and int(d.get("rank", 1)) <= ceiling
-        state = dict(state, glyphs=getattr(mod, "KIND_GLYPH", {}) or state.get("glyphs", {}))
-        return JsonResponse({"ingredients": mats, "stock": [], "track": state,
-                             "mode": mode, "biome": c.biome,
-                             "biome_describe": biomes.describe(c.biome)})
 
     if disc["track"] in _MATERIALS_OF:
         # This bench's own catalogue, tier-marked the same way the herb shelf is.
@@ -382,360 +320,6 @@ def craft_ingredients(request):
         "table": foraging.table_for(c.biome,
                                     state.get("max_rank", 1)).as_dict(),
     })
-
-
-@require_POST
-def craft_preview(request):
-    """What the chain would make. Never an error for a chain that is merely bad — the
-    problems come back in the body so the page can grey the button and say why."""
-    body = read_body(request)
-    c = campaign_mod.current()
-    try:
-        disc = _discipline(str(body.get("craft", "herbalism")))
-    except LookupError as exc:
-        return JsonResponse({"error": str(exc)}, status=404)
-
-    if disc.get("moved"):
-        return _moved(disc)
-    state = _track_state(c, disc)
-    if not state.get("available"):
-        return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
-
-    mode = str(body.get("mode", "")).strip().lower()
-    if not benches.supports(state["track"], mode):
-        return JsonResponse(
-            {"error": f"The {disc['name'].lower()} bench cannot take a chain yet."},
-            status=409)
-
-    pc = c.scene.pc()
-    try:
-        chain = benches.chain_from_body(state["track"], body, mode)
-        result = benches.preview(
-            state["track"], state["level"], chain, mode=mode,
-            stock=_bench_stock(c, disc),
-            satchel=dict(pc.inventory) if pc else {},
-            carrier=pc, actor=pc, now_minute=c.scene.clock_minutes,
-            at_night=_is_night(c), item=body.get("item"), vessel=body.get("item"))
-    except benches.UnknownBench as exc:
-        return JsonResponse({"error": str(exc)}, status=404)
-    except (ValueError, KeyError) as exc:
-        # A chain naming a material that does not exist is a bad request, not a crash:
-        # the page can say so and the player can pick something else.
-        return JsonResponse({"error": str(exc)}, status=400)
-    out = result.as_dict()
-    # Why each jar on the shelf would be refused by the chain as it currently stands, so
-    # the shelf can grey them before one is picked up. The preparation rules were being
-    # enforced correctly and saying nothing until you had already built a chain and
-    # pressed Craft — which reads exactly like the rules not working at all.
-    # Herbalism's own shelf-greying, which reads the herb preparation rules. The other
-    # crafts state their refusals in `problems` instead, one chain at a time.
-    out["refused"] = (_shelf_refusals(chain.methods)
-                      if state["track"] == "herbalist" else {})
-    # How many the materials allow, so the bench can offer "all 47" rather than making the
-    # player count it out and then find they were three short halfway through the batch.
-    out["batch_max"] = batch_max(result, pc)
-    return JsonResponse(out)
-
-
-def _moved(disc: dict) -> JsonResponse:
-    """A discipline whose chains are worked elsewhere now, refused in plain words.
-
-    409 rather than 404: the craft exists and the request was well formed; the bench it
-    asked has stopped taking that work. Herbalism (docs/herbalism-revamp-plan.md) and
-    leatherworking (docs/leatherworking-ui-plan.md §13), each retired from this page when it
-    moved to its own step bench at the table.
-    """
-    return JsonResponse({"error": disc["moved"], "moved": True}, status=409)
-
-
-def _shelf_refusals(methods) -> dict:
-    """`{ingredient id: why the chain would refuse it}` for everything on the shelf.
-
-    Computed here rather than in the page, from the same walk `preview` uses, because a
-    second copy of the preparation rules in JavaScript is the shape of bug this project
-    has paid for twice — a rule corrected in one place and left stale in the copy nobody
-    looked at. 162 ingredients through a walk of at most a handful of steps is nothing.
-    """
-    if not methods:
-        return {}
-    out = {}
-    for iid, item in ingredients.all_ingredients().items():
-        why = crafting.prep_problem(item, methods)
-        if why:
-            out[iid] = why
-    return out
-
-
-# A ceiling on one request, well above any real batch. "100 acacia powder tea" is the
-# case this exists for; a hand-written request for a million would otherwise roll a
-# million d20s before the response ever went out.
-MAX_BATCH = 1000
-
-
-def batch_max(result, pc) -> int:
-    """How many of this chain the materials on hand allow.
-
-    Per-dose costs against what is carried, taking the tightest. Reported with the preview
-    so the bench can offer "all 47" rather than making the player work it out and then
-    discover halfway through a batch that they were three short.
-    """
-    if pc is None:
-        return 0
-    limit = MAX_BATCH
-    for sid, n in (result.consumes or {}).items():
-        if n > 0:
-            # A material may be a crafted jar on the shelf or a raw thing in the
-            # satchel: the four newer crafts make no distinction and put both in
-            # `consumes`, so both places are asked before deciding the count.
-            held = getattr(pc.stock.get(sid), "count", 0) or pc.inventory.get(sid, 0)
-            limit = min(limit, int(held) // n)
-    # Herbalism alone separates raw ingredients from crafted stock. Read with a default
-    # rather than demanded of every craft — a forge has no such split, and asking for
-    # the field crashed every preview at four of the five benches.
-    for iid, n in (benches.result_field(result, "consumes_raw", {}) or {}).items():
-        if n > 0:
-            limit = min(limit, int(pc.inventory.get(iid, 0)) // n)
-    return max(0, limit)
-
-
-@require_POST
-def craft_do(request):
-    """Attempt the chain, once or many times over.
-
-    Scored through the engine's `craft` op rather than here, so crafting at this bench and
-    crafting narrated at the table pass through exactly one piece of arithmetic. A spoiled
-    batch still teaches something, which is the author's rule and the reason failure is
-    reported rather than refused.
-
-    A batch is N separate attempts, not one attempt for N doses: its own d20 each time,
-    its own success, its own mastery. "i should not need to click the craft button 100
-    times" is a complaint about the clicking, and the fix must not quietly become a change
-    to the game — one roll for a hundred doses would mean a single 1 spoiling the lot,
-    which is a different rule rather than the same rule automated.
-    """
-    body = read_body(request)
-    c = campaign_mod.current()
-    try:
-        disc = _discipline(str(body.get("craft", "herbalism")))
-    except LookupError as exc:
-        return JsonResponse({"error": str(exc)}, status=404)
-
-    if disc.get("moved"):
-        return _moved(disc)
-    state = _track_state(c, disc)
-    if not state.get("available"):
-        return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
-
-    mode = str(body.get("mode", "")).strip().lower()
-    if not benches.supports(state["track"], mode):
-        return JsonResponse(
-            {"error": f"The {disc['name'].lower()} bench cannot take a chain yet."},
-            status=409)
-
-    wanted = read_int(body, "batch", 1, lo=1, hi=MAX_BATCH)
-    try:
-        chain = benches.chain_from_body(state["track"], body, mode)
-    except benches.UnknownBench as exc:
-        return JsonResponse({"error": str(exc)}, status=404)
-
-    attempts, made_all, spent_all = [], [], {}
-    stopped = ""
-    for _ in range(wanted):
-        # Recomputed every time round. The shelf changes as the batch runs — doses are
-        # spent, and a concentration puts its output back on it — so a preview taken once
-        # and reused would be describing a pot that no longer exists by attempt three.
-        pc = c.scene.pc()
-        try:
-            result = benches.preview(
-                state["track"], state["level"], chain, mode=mode,
-                stock=_bench_stock(c, disc),
-                satchel=dict(pc.inventory) if pc else {},
-                carrier=pc, actor=pc, now_minute=c.scene.clock_minutes,
-                at_night=_is_night(c), item=body.get("item"),
-                vessel=body.get("item"))
-        except (ValueError, KeyError) as exc:
-            if not attempts:
-                return JsonResponse({"error": str(exc)}, status=400)
-            stopped = str(exc)
-            break
-        if result.problems:
-            if not attempts:
-                return JsonResponse({"error": " ".join(result.problems)}, status=400)
-            # Out of something, partway through. The doses already made are kept and the
-            # reason is reported: a batch that rolled back on running short would throw
-            # away work that really happened.
-            stopped = " ".join(result.problems)
-            break
-        try:
-            one = _one_craft(c, disc, state, result)
-        except IntentError as exc:
-            if not attempts:
-                return JsonResponse({"error": str(exc)}, status=400)
-            stopped = str(exc)
-            break
-        attempts.append(one)
-        if one["made"]:
-            made_all.append(one["made"])
-        for k, n in one["spent"].items():
-            spent_all[k] = spent_all.get(k, 0) + n
-
-    succeeded = sum(1 for a in attempts if a["succeeded"])
-    spoiled = len(attempts) - succeeded
-    name = attempts[0]["name"] if attempts else ""
-
-    # One line in the transcript however many doses were worked. A hundred crafts is one
-    # afternoon at the bench, not a hundred things that happened to the party.
-    if len(attempts) == 1:
-        a = attempts[0]
-        line = (f"{name}: {'made' if a['succeeded'] else 'spoiled'} "
-                f"(d20 {a['roll']}{a['bonus']:+d} = {a['total']} vs DC {a['dc']}). "
-                f"{a['tell']}").strip()
-    elif attempts:
-        line = (f"{name} x{len(attempts)}: {succeeded} made, {spoiled} spoiled "
-                f"(d20{attempts[0]['bonus']:+d} vs DC {attempts[0]['dc']} each).")
-    else:
-        line = ""
-    if stopped:
-        line = f"{line} Stopped: {stopped}".strip()
-    if line:
-        c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
-    c.save()
-
-    last = attempts[-1] if attempts else {}
-    return JsonResponse({
-        # The single-craft shape is kept intact so the page and everything else reading
-        # this endpoint go on working unchanged; the batch block is an addition.
-        "succeeded": bool(last.get("succeeded")),
-        "roll": last.get("roll"), "chance": last.get("chance"),
-        "total": last.get("total"), "bonus": last.get("bonus"),
-        "dc": last.get("dc"), "terms": last.get("terms") or [],
-        "result": last.get("result"), "tell": last.get("tell", ""),
-        "made": last.get("made"), "spent": spent_all,
-        "batch": {
-            "asked": wanted, "attempted": len(attempts),
-            "made": succeeded, "spoiled": spoiled,
-            "rolls": [a["roll"] for a in attempts],
-            "items": made_all, "stopped": stopped,
-        },
-        "track": _track_state(c, disc),
-    })
-
-
-def _one_craft(c, disc, state, result) -> dict:
-    """One attempt: one roll, one outcome, one advance of the track."""
-    engine = c.engine()
-    roll = engine.dice.d20(label=f"{disc['name']}: {result.name}", visibility="player")
-    face = roll.faces[0]
-    # A check, not a percentile behind a curtain. The DC was already computed from the
-    # chain and then thrown away in favour of a chance-to-hit; now the die is added to the
-    # crafter's own bonus and compared to it, the way every other roll in the game works.
-    # Natural 1 and natural 20 keep their usual authority over the arithmetic.
-    bonus = int(benches.result_field(result, "bonus", 0) or 0)
-    total = face + bonus
-    succeeded = face != 1 and (face == 20 or total >= result.dc)
-
-    # The deed a milestone-locked level waits on, recorded when it is actually done.
-    # Without this the bench sent no `milestone` at all, so a character could craft the
-    # very thing Herbalist 5 asks for and the level stayed locked for good — the points
-    # were kept and nothing on the page ever explained what was missing.
-    track = worldclass.get(state["track"])
-    milestone = track.deed_done(tier=result.tier, success=succeeded)
-
-    resolution = engine.run(engine.validate([{
-        "op": "craft", "actor": "pc",
-        "because": f"a session at the {disc['name'].lower()} bench",
-        "params": {
-            "track": state["track"],
-            "recipe": result.name.lower(),
-            "tier": result.tier,
-            "stages": max(1, result.stages),
-            "risky": result.risky,
-            "failed": not succeeded,
-            "milestone": milestone,
-            # Two doses in, one of the next band out: the ceiling is checked against
-            # what went in, so the engine has to be told which kind of craft this is.
-            # Only herbalism concentrates — two doses in, one of the next band out.
-            # Read with a default rather than demanded of every craft: a forge has no
-            # opinion about concentration and should not have to declare one.
-            "concentrating": benches.result_field(result, "concentrating", False),
-        },
-    }]))
-
-    # The inputs are spent either way. A spoiled batch that hands the ingredients back
-    # would make failure free, and the author's own note is that failure matters because
-    # "rare ingredients spoil".
-    pc = c.scene.pc()
-    spent = {}
-    for sid, n in result.consumes.items():
-        # A material may be a crafted jar on the shelf or a raw thing in the satchel.
-        # Herbalism keeps those in two fields and spends them separately; the four newer
-        # crafts put everything in `consumes`, so asking only the shelf spent nothing at
-        # all — a forge chain could be attempted forever on the same four bars of steel.
-        took = pc.take_stock(sid, n)
-        if not took:
-            took = pc.spend(sid, n)
-        if took:
-            spent[sid] = took
-
-    for iid, n in benches.result_field(result, "consumes_raw", {}).items():
-        took = pc.spend(iid, n)
-        if took:
-            spent[iid] = spent.get(iid, 0) + took
-
-    made = None
-    output = benches.result_field(result, "output", None)
-    if succeeded and output:
-        # Every craft's output lands in the same pack. `Stock` grew the handful of
-        # fields the other four shapes need — slot, wearable, how, masterwork, the
-        # weapon or armour row it really is — so a forged blade and a brewed tea are
-        # one kind of record on the sheet rather than five inventory panels.
-        item = crafting.from_stock_dict(dict(output, craft=state["track"]))
-        pc.add_stock(item, 1)
-        made = item.as_dict()
-
-    return {
-        "name": result.name, "succeeded": succeeded, "roll": face,
-        "chance": benches.result_field(result, "chance", 0),
-        "result": result.as_dict(), "made": made,
-        "spent": spent,
-        # The whole check, so the bench can show the arithmetic rather than a verdict.
-        "total": total, "bonus": bonus, "dc": result.dc,
-        "terms": benches.result_field(result, "terms", []),
-        "tell": " ".join(o.tell for o in resolution.outcomes if o.tell),
-    }
-
-
-@require_POST
-def craft_recipes(request):
-    """Keep a chain under a name, so a working recipe is worked out once."""
-    body = read_body(request)
-    c = campaign_mod.current()
-    try:
-        disc = _discipline(str(body.get("craft", "herbalism")))
-    except LookupError as exc:
-        return JsonResponse({"error": str(exc)}, status=404)
-    if disc.get("moved"):
-        # The table bench keeps herbalism's recipes in its own step shape
-        # (/api/bench/recipe); a chain saved here would be one it has to convert.
-        return _moved(disc)
-    name = str(body.get("name", "")).strip()
-    if not name:
-        return JsonResponse({"error": "A recipe needs a name."}, status=400)
-    if not body.get("ingredients"):
-        return JsonResponse({"error": "A recipe needs ingredients."}, status=400)
-
-    entry = {
-        "name": name,
-        "craft": str(body.get("craft", "herbalism")),
-        "methods": [str(m).strip().lower() for m in body.get("methods", [])],
-        "ingredients": [str(i).strip().lower() for i in body.get("ingredients", [])],
-    }
-    # Saving under a name that already exists replaces it. A bench where the second save
-    # silently makes a duplicate is a bench nobody can correct a recipe at.
-    c.recipes = [r for r in c.recipes if r["name"].lower() != name.lower()]
-    c.recipes.append(entry)
-    c.save()
-    return JsonResponse({"recipes": c.recipes})
 
 
 # --- foraging -------------------------------------------------------------------------------
@@ -1403,7 +987,7 @@ def craft_excursion(request):
     face = roll.faces[0]
     # The same arithmetic the bench uses for a craft check, so going out for material
     # and working it are scored on one formula rather than two.
-    bonus = benches.module_for(track).check_bonus(pc, level)         if hasattr(benches.module_for(track), "check_bonus") else level
+    bonus = benches.module_for(track).check_bonus(pc, level)
     dc = 10 + max(0, ceiling - 1) * 3
     total = face + bonus
     ok = face != 1 and (face == 20 or total >= dc)

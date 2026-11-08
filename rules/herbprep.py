@@ -13,9 +13,10 @@ prevent. Grinding third. Preservation is not a step in that line at all — it i
 something done to a *fresh* thing to stop the clock, and it is the only step that costs
 potency rather than adding it.
 
-**Potency is the whole economy.** Grinding and brewing each raise it, and how much
-depends on the herbalist: a novice grinding a leaf gets less out of it than a master
-does. Preserving lowers it, which is the price of not losing the material entirely.
+**Potency is not here.** The old chain bench read its grind, brew and preserve
+multipliers from this module; the step bench reads them from
+content/rules/herbal-methods.json, and the chain's copies were deleted with it on
+2026-11-08 (audit finding #20).
 
 **Freshness is a clock, not a flag.** An animal part has 48 hours before it is refuse;
 a plant has a week. Preserved, neither spoils. The numbers are the author's and live in
@@ -33,20 +34,8 @@ from dataclasses import dataclass
 ANIMAL_HOURS = 48
 PLANT_HOURS = 24 * 7
 
-# What each step does to potency, before the herbalist's own skill is added.
-#
-# THE RETIRED CHAIN BENCH'S NUMBERS. The table's step bench reads its multipliers from
-# content/rules/herbal-methods.json (grind x1.1, brew x1.0 with the decoction's x1.25 on
-# the product, plan §6), and the Herbalist level no longer scales potency: it raises the
-# quality ceiling and the check instead. These stay only for `crafting.preview`, the old
-# chain reader kept as a library; nothing a player clicks reaches them.
-GRIND_POTENCY = 0.25
-BREW_POTENCY = 0.25
+# What curing a fresh thing with salt costs it, the author's number (`preserve_automatically`).
 PRESERVE_POTENCY = -0.20
-
-# Per level of the herbalism track, on top of the base. A master gets more out of the
-# same leaf, which is what levelling a craft is for.
-PER_LEVEL = 0.05
 
 # The ingredient states (docs/herbalism-contracts.md §2). "dried" is the step bench's
 # Dry; "preserved" left the list with the Preserve method — salting is a flag on the
@@ -242,7 +231,7 @@ def preserve_automatically(actor, prep: Prep) -> tuple[bool, float, str]:
     if not has_salt(actor):
         return False, 0.0, ("no salt: this keeps for "
                             f"{spoils_after(prep)} hours and then it is refuse")
-    return True, potency_change("preserve"), "preserved with salt"
+    return True, PRESERVE_POTENCY, "preserved with salt"
 
 
 def can(step: str, prep: Prep, state: str = "raw") -> tuple[bool, str]:
@@ -306,56 +295,3 @@ def can(step: str, prep: Prep, state: str = "raw") -> tuple[bool, str]:
                        "cures a fresh thing as it is picked")
 
     return False, f"{step!r} is not something you can do to an ingredient"
-
-
-def potency_change(step: str, herbalism_level: int = 0) -> float:
-    """What a step does to potency. Negative for preservation, which is its price."""
-    step = str(step).lower()
-    bonus = max(0, int(herbalism_level or 0)) * PER_LEVEL
-    if step == "grind":
-        return GRIND_POTENCY + bonus
-    if step == "brew":
-        return BREW_POTENCY + bonus
-    if step == "preserve":
-        return PRESERVE_POTENCY
-    return 0.0
-
-
-def after(step: str, state: str = "raw") -> str:
-    """The state a step leaves the ingredient in."""
-    step, state = str(step).lower(), str(state or "raw").lower()
-    return {"extract": "extracted", "neutralise": "neutralised",
-            "grind": "ground", "dry": "dried"}.get(step, state)
-
-
-# --- infusions ----------------------------------------------------------------------
-
-def can_infuse(base, addition, state: str = "raw") -> tuple[bool, str]:
-    """Whether this can go into an existing tincture.
-
-    "Infusions are only possible on already crafted tinctures, they can be infused with
-    other tinctures or brews, ground or mixed herbs, raw herbs as long as the raw herbs
-    could be brewed raw, and some herbs that are volatile need extraction."
-
-    So the base has to be finished work, and the addition has to be in a state the
-    tincture can actually take up — which for a raw herb is the same question as
-    whether it could have been brewed raw in the first place.
-    """
-    base_kind = str((base or {}).get("kind", "") if isinstance(base, dict)
-                    else getattr(base, "kind", "")).lower()
-    if "tincture" not in base_kind and not (
-            base.get("crafted") if isinstance(base, dict)
-            else getattr(base, "crafted", False)):
-        return False, "an infusion goes into a tincture that has already been crafted"
-
-    prep = Prep.of(addition)
-    state = str(state or "raw").lower()
-
-    if prep.needs_extraction and state == "raw":
-        return False, "it has to be extracted before it can be infused"
-    if state in ("ground", "extracted", "neutralised"):
-        return True, ""
-    if prep.brew_raw:
-        return True, ""
-    return False, ("a raw herb can only be infused if it could be brewed raw; "
-                   "grind it first")

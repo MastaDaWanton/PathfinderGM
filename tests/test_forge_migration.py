@@ -6,25 +6,38 @@ and no `pieces` — so none of the forge's readers could see what it was made of
 material, no strikes, no build, its +1 masterwork a flat spec. It is re-derived on load
 into a contracts §4 record: the main material inferred, the haft and fittings plain, the
 masterwork kept, and the old record kept beside it for one version so a bad inference can
-be undone. Old recipes naming the four removed methods load with them mapped.
+be undone.
 """
 from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
 
 import pytest
 
 from rules import blacksmith as bs
-from rules import crafting, forge_items
+from rules import forge_items
 from rules.sheet import from_dict, load_pc, to_dict
+
+
+_OLD = json.loads((Path(__file__).parent / "old_chain" / "items.json")
+                  .read_text(encoding="utf-8"))["forge"]
 
 
 def old_chain_item(materials=("cold-iron", "charcoal"), base="longsword",
                    methods=("smelt", "forge", "quench", "temper", "hone")) -> dict:
     """What the old /craft/ tab put in the pack: the chain's output through
-    `crafting.from_stock_dict`, saved with `as_dict` (play/craft_views.py, before wave 2)."""
-    r = bs.preview(3, bs.Chain(track="blacksmith", methods=list(methods),
-                               material_ids=list(materials), base=base))
-    assert r.output, r.problems
-    return crafting.from_stock_dict(dict(r.output, craft="blacksmith")).as_dict()
+    `crafting.from_stock_dict`, saved with `as_dict`. The chain was deleted on 2026-11-08
+    (audit finding #20), so its records are frozen in tests/old_chain/items.json, as an old
+    save still carries them."""
+    if methods == ("smelt",):
+        key = "iron-work"
+    elif methods == ("smelt", "forge"):
+        key = f"{materials[0]}|{base}"
+    else:
+        key = "masterwork-cold-iron-longsword"
+    return copy.deepcopy(_OLD[key])
 
 
 def saved_with(stock: dict, worn: dict | None = None, slots: dict | None = None) -> dict:
@@ -133,18 +146,3 @@ def test_what_is_not_an_old_forge_item_is_left_alone():
                                   "properties": ["forge.form.item"]}) is None
     assert bs.migrate_old_record({"name": "x", "craft": "blacksmith", "gear": "weapon",
                                   "pieces": {}}) is None
-
-
-def test_an_old_recipe_naming_removed_methods_loads_with_them_mapped():
-    """Plan §14: draw -> forge, polish -> hone, flux -> a Smelt ingredient, rivet ->
-    assemble. Measured before: a saved recipe naming draw was refused by the chain
-    preview — "Blacksmith has no method called 'draw': Draw became Forge." — a sentence
-    telling the player what the code already knew."""
-    assert bs.migrate_methods(["smelt", "flux", "forge", "draw", "polish", "rivet"]) == \
-        ["smelt", "forge", "hone", "assemble"]
-    assert bs.migrate_methods(["flux", "forge"]) == ["smelt", "forge"]
-    chain = bs.chain_from_body({"methods": ["smelt", "draw", "temper", "polish"],
-                                "materials": ["iron", "charcoal"], "base": "longsword"})
-    assert chain.methods == ["smelt", "forge", "temper", "hone"]
-    problems = bs.preview(3, chain).problems
-    assert not any("no method called" in p for p in problems), problems

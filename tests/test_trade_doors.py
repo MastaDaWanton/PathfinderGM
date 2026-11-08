@@ -133,3 +133,48 @@ def test_the_trade_header_counts_days_from_one_like_every_other_clock():
     assert "day ${TRADE.day}`" not in src
     assert "day ${Number(TRADE.day || 0) + 1}`" in src
     assert market.day_of(0) == 0 and market.day_of(24 * 60 + 5) == 1
+
+
+def _engine_run(cm, raw):
+    c = cm.current()
+    e = c.engine()
+    out = e.run(e.validate([raw])).outcomes[0]
+    c.save()
+    return out
+
+
+def test_a_thing_on_the_panels_counter_is_on_it_when_asked_for_in_words(market):
+    """Audit #13, measured on 0.2.26: the panel keyed the general store `market:general`,
+    and typed `buy` with no seller keyed the whole market `market` — a different shelf
+    drawn from a different seed. Slaked lime on the panel was "not on the counter" when
+    the player asked for it in words. Every door keys a shop by `market.stall_of`."""
+    c, cm = market
+    shelf = {x["id"] for x in _post("/api/trade", {"line": "general"}).json()["theirs"]}
+    from rules import market as market_mod
+
+    c = cm.current()
+    whole = {m.id for m in market_mod.on_sale(
+        c.scene.location_id, "market", market_mod.day_of(c.scene.clock_minutes),
+        c.scene.market_taken, counter_kind="market")}
+    only_here = sorted(shelf - whole)
+    assert only_here, "the test needs a thing the whole-market shelf does not draw"
+    out = _engine_run(cm, {"op": "buy", "actor": "pc", "because": "t",
+                           "params": {"item": only_here[0]}})
+    assert out.effects and out.effects[0]["kind"] == "bought", out.tell
+
+
+def test_a_haggle_lost_at_the_panel_is_not_tried_again_in_words(market):
+    """Audit #13: the panel's Haggle wrote the day's record under its stall
+    (`market:general`) and the typed `haggle` op under the keeper's ref, so a haggle lost
+    at one door was rolled again at the other. Once a counter a day (`_op_haggle`)."""
+    c, cm = market
+    seller = _post("/api/trade", {"line": "general"}).json()["seller"]["ref"]
+    assert _post("/api/tradeskill", {"use": "haggle", "line": "general"}).status_code == 200
+    assert _post("/api/roll", {"face": 1}).status_code == 200
+    c = cm.current()
+    e = c.engine()
+    res = e.run(e.validate([{"op": "haggle", "actor": "pc", "target": seller,
+                             "because": "t", "params": {}}]))
+    assert not res.awaiting, "the lost haggle asked for a second roll"
+    out = res.outcomes[0]
+    assert out.status == "refused" and "once today" in out.tell, out.tell

@@ -1813,36 +1813,6 @@ _NUMBER_WORDS = {"two": 2, "both": 2, "pair": 2, "couple": 2, "three": 3,
                  "nineteen": 19, "twenty": 20, "score": 20, "thirty": 30,
                  "forty": 40, "fifty": 50}
 
-_NUMBER_IN = re.compile(r"\b(?:\d{1,2}|" + "|".join(_NUMBER_WORDS) + r")\b", re.I)
-# What a beat hangs off the end of a description and is no part of who they are: "the twelve
-# raiders COMING UP THE ROAD", "the guards STANDING BY THE GATE". A participle clause is a
-# thing they are doing, and a creature named for it keeps doing it forever.
-_DOING_SOMETHING = re.compile(
-    r"\s+(?:coming|going|walking|running|standing|waiting|approaching|closing|moving|"
-    r"heading|riding|marching|charging|advancing|gathered|blocking|guarding|watching)\b.*$",
-    re.I)
-
-
-def _without_the_count(phrase: str) -> str:
-    """"twelve raiders coming up the road" → "raiders". What is left is who they are.
-
-    A name is not a head-count and not a stage direction. Both halves measured: the ledger
-    held a person called "twelve soldier" (item 30) and a live spawn produced one creature
-    called "twelve raiders coming up the road" (item 33's own check).
-    """
-    text = " ".join(str(phrase or "").split())
-    text = _DOING_SOMETHING.sub("", text)
-    words = text.split()
-    while words and (words[0].lower() in _NUMBER_WORDS or words[0].isdigit()
-                     or words[0].lower() in ("a", "an", "the", "some")):
-        # "a pair of guards" is a collective phrase and `split_collective_name` reads it
-        # properly downstream — stripping "pair" here left "of guards", which is nobody.
-        if len(words) > 1 and words[1].lower() == "of":
-            break
-        words = words[1:]
-    return " ".join(words) or text
-
-
 def _touches_ref(raw: dict, refs: list[str]) -> bool:
     """Does this intent name one of these refs anywhere — actor, target, or `opposed_by`?
     The test for what to drop when the person it reaches for does not exist."""
@@ -2147,18 +2117,6 @@ def drop_unfulfillable_trades(raw_intents, scene):
         kept = [{"op": "narrate_only", "actor": "pc",
                  "because": "the person they addressed is not here", "params": {}}]
     return kept
-
-
-def _refs_depend_on_spawn(intents, scene) -> bool:
-    """Does any intent point at a creature that only a spawn in this list will create?"""
-    known = set(getattr(scene, "actors", {}) or {})
-    for intent in intents:
-        candidates = [intent.actor, *intent.targets(),
-                      intent.params.get("to"), intent.params.get("who")]
-        for ref in candidates:
-            if isinstance(ref, str) and re.fullmatch(r"c\d+", ref) and ref not in known:
-                return True
-    return False
 
 
 def default_npc_action(scene, ref: str) -> list[dict] | None:
@@ -2499,7 +2457,6 @@ _WONT_SLEEP = re.compile(r"\b(?:can't|cannot|won't|will not|don't|do not|no|neve
                          r"|trying not to|avoid\w*)\s+(?:\w+\s){0,3}?sleep", re.I)
 _EATS = re.compile(r"\b(?:eat|eats|eating|have (?:a|some) (?:meal|food|breakfast|supper"
                    r"|dinner)|chew|rations?)\b", re.I)
-_DRINKS = re.compile(r"\b(?:drink|drinks|drinking|waterskin)\b", re.I)
 # "the drink" is a thing, not the player drinking. Measured live 2026-09-25: "I knock the
 # drink out of the biggest man's hand" came back with "Kesst Vayr drinks." — and "I buy
 # him a drink" would have too. A drink after an article or a possessive is the noun,
@@ -2620,31 +2577,6 @@ on off up in out over under away back down
 # "satisfaction" ×1 — the Continue directive ("I take no action. Carry the scene on…")
 # read by `_ACQUIRES` as "I take … the scene on", and "pay for satisfaction" read as a
 # purchase. Words for what is happening are not things.
-
-# Idioms where the verb is not acquisition at all. Matched on what immediately follows the
-# verb, because "take in", "take note of" and "take stock of" are single verbs wearing two
-# words — and "I take in the scene" is not a theft.
-_IDIOM = re.compile(
-    r"^\s*(?:in|note|stock|cover|charge|heed|aim|offence|offense|umbrage|refuge|shelter|"
-    r"comfort|solace|pride|issue|leave|part|place|root|shape|effect|hold\s+of|"
-    # A possessive in front of the idiom: "I take my leave", "I take our chances". The
-    # first cut matched only what sat immediately after the verb, so "I take my leave of
-    # the innkeeper" read on and came back with the innkeeper.
-    r"(?:my|our|your|his|her|their)\s+(?:leave|turn|chances?|time|rest|place|position|"
-    r"aim|revenge|vengeance|bearings|pick|seat|stand|due|share)|"
-    r"a\s+(?:look|glance|peek|seat|moment|breath|break|rest|turn|step|walk|stroll|chance|"
-    r"stand|hint|guess|dislike|liking|shine|swing|bow|knee))\b", re.I)
-
-
-# Bare "pick" (not "pick up") before these is a skill or a choice, not a pick-up: "I pick
-# the lock on her door" made the goods detector require a `give` in the 2026-09-27
-# battery (docs/the-interpreter.md), and "I pick his pocket" is a theft of whatever is IN
-# it. "I pick an apple" still picks an apple.
-_PICK_IS_NOT_TAKING = re.compile(
-    r"^\s*(?:(?:the|a|an|his|her|their|its|that|this|my|your|another)\s+)?"
-    r"(?:\w+\s+)?(?:locks?|pockets?|fights?|quarrels?|sides?|spots?|targets?|moments?)\b",
-    re.I)
-
 
 def _is_a_thing(item: str) -> bool:
     """Whether this noun phrase could be something you carry.
@@ -3130,6 +3062,8 @@ def fill_bare_checks(raw_intents) -> list:
     lines — check verbs, every one. The band is a plain fact to fill, not a thing to
     ask a model to remember.
     """
+    from rules.intents import _flag
+
     if not isinstance(raw_intents, list):
         return raw_intents
     out = []
@@ -3150,8 +3084,9 @@ def fill_bare_checks(raw_intents) -> list:
             # (a hiding's own DC, every watcher's Sense Motive), and `_check_params`
             # refuses either with a band. Measured live 2026-10-30: the reading's built
             # `check bluff diversion=true` was given `dc: average` here and refused seven
-            # plans running, until the turn fell to the fallback.
-            engine_set = bool(params.get("search") or params.get("diversion"))
+            # plans running, until the turn fell to the fallback. Read as flags: a
+            # `search: "false"` is no search, and wants its band like any other check.
+            engine_set = _flag(params.get("search")) or _flag(params.get("diversion"))
             if not params.get("dc") and not params.get("opposed_by") and not social \
                     and not engine_set:
                 raw = dict(raw)
@@ -4159,11 +4094,6 @@ def false_claim(player_text: str, scene, reading=None, plan=None) -> str:
         # already built and already ratified by the player — it just has the wrong door."
         return false_possession(text, scene, reading=reading, plan=plan)
     return _as_they(candidates[0].strip())
-
-
-def claims_a_nature(player_text: str, scene) -> str:
-    """Kept for the callers that asked the old question; the answer is the claim."""
-    return false_claim(player_text, scene)
 
 
 # How believable a claim is, by the words of the claim itself — the rows of the Core
@@ -9586,15 +9516,6 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
 # tag, the person asked, the world's true name, a head word, the one unnamed person.
 # Who a name on the page belongs to is the beat reader's answer now (its "names");
 # the engine's refusals below stay, asked by `beat_reader.name_refusal`.
-
-
-def _a_people(given: str, peoples_names) -> str:
-    """"a people of this world" when `given` is what a people is called, else "" — in the
-    shape `_answers_to` returns, so the refusal is logged the same way."""
-    from rules import names as names_mod
-
-    return ("a people of this world" if names_mod.is_a_peoples_name(
-        given, known=peoples_names) else "")
 
 
 def _answers_to(actors, who, given: str) -> str:

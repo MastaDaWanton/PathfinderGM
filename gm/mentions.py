@@ -243,11 +243,14 @@ def what_they_are(a) -> str:
 
 def people(scene) -> list[dict]:
     """Everyone here, as the labeller is shown them: ref, name, what they are."""
+    from rules import states
+
     out = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
         what = what_they_are(a)
-        dead = bool(getattr(a, "hp", 1) < 0 or (hasattr(a, "has_state")
-                                                 and a.has_state("state.down.dead")))
+        # Dead or broken, never "below 0", which is dying: the labeller was told a dying
+        # bandit was "dead" (`states.lifeless`, ponytail audit #18).
+        dead = hasattr(a, "has_state") and states.lifeless(a)
         out.append({"ref": ref, "name": str(a.name), "true": str(getattr(a, "true_name", "") or ""),
                     "pc": bool(getattr(a, "is_pc", False)), "what": what,
                     # The rules race, for the finder's head words only (`find`): the

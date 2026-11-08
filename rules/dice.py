@@ -181,8 +181,10 @@ def d20_succeeds(roll: Roll, dc: int) -> bool:
     ask). One reader now, and every save site calls it.
 
     NOT for skill or ability checks: 1e says in as many words that a 20 on a skill check
-    is not an automatic success, and stabilising, holding one's breath and a caster
-    level check are checks. `Roll.natural` is the one d20 face — a player-rolled d20
+    is not an automatic success, and holding one's breath and a caster level check are
+    checks. Stabilising is a check with its own exception — "A natural 20 on this check
+    is an automatic success" (CRB, Injury and Death), the 20 only — and reads the face
+    itself (`Actor.bleed_out`). `Roll.natural` is the one d20 face — a player-rolled d20
     through `Dice.given` or `Dice.given_total` keeps it too — and None for anything
     else, which then falls through to the total.
     """

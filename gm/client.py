@@ -236,11 +236,68 @@ def _fold(text: str) -> dict:
     return body
 
 
+def _answered_with(model: str, host: str, code: int, detail: str) -> ModelUnavailable:
+    why = " ".join(str(detail or "").split())[:160]
+    return ModelUnavailable(
+        f"Ollama at {host} answered {model}'s call with HTTP {code}"
+        + (f": {why}" if why else "") + ".")
+
+
 def _stalled(model: str, host: str, why: str) -> ModelStalled:
     return ModelStalled(
         f"The model has stopped answering: Ollama has {model} loaded but {why}. This is "
         f"Ollama, not your game. Quit Ollama from its tray icon, start it again, and send "
         f"your line again. Your turn has not been lost.")
+
+
+# A host that stalled, remembered: host -> (when, the model that stalled, whether
+# `/api/ps` listed it then, the sentence). Ponytail audit 2026-11-07, finding #6: only the
+# planner honoured `ModelStalled`; the interpreter, the free narrator, the retries and
+# every read-back caught it as a plain `Exception` and called again, so a stall at the
+# interpreter cost 120 s and the planner then waited another 120 s, and a stall mid-groom
+# cost 120 s per read-back. Remembered, every later call to the same Ollama is refused in
+# milliseconds with the same sentence. For a minute, and only while `/api/ps` still says
+# what it said at the stall: a player who restarts Ollama as told and sends the line again
+# inside the minute finds the model no longer loaded, and is let through — rejected was a
+# plain one-minute cooldown, which answered the restarted Ollama with "restart Ollama".
+# Keyed by host, not model: a wedged Ollama is wedged for every model it serves (the
+# planner's own reading, `GMAgent.plan_turn`).
+STALL_MEMORY_SECONDS = 60.0
+_stalls: dict[str, tuple[float, str, bool | None, str]] = {}
+
+
+def _remember_stall(host: str, model: str, was_loaded: bool | None,
+                    exc: ModelStalled) -> ModelStalled:
+    _stalls[host.rstrip("/")] = (time.monotonic(), model, was_loaded, str(exc))
+    return exc
+
+
+def _remembered_stall(host: str) -> ModelStalled | None:
+    """The stall this host is still in, or None (and then it is forgotten)."""
+    key = host.rstrip("/")
+    got = _stalls.get(key)
+    if got is None:
+        return None
+    when, model, was_loaded, said = got
+    if time.monotonic() - when < STALL_MEMORY_SECONDS:
+        now = loaded(model, host)
+        if now is not None and now == was_loaded:
+            return ModelStalled(said)
+    _stalls.pop(key, None)
+    return None
+
+
+def stalled_since(started: float, hosts=()) -> ModelStalled | None:
+    """The stall recorded on any of `hosts` at or after `started` (`time.monotonic()`),
+    or None. For a caller that runs many model calls, each of which may swallow a failure
+    on its own terms (a read-back that "must never lose the turn"): asked once at the end,
+    it says whether the turn ran into a wedged Ollama, so the player is told whichever
+    call met it first (`agent.surfaces_a_stall`)."""
+    for host in hosts or ():
+        got = _stalls.get(str(host or "").rstrip("/"))
+        if got is not None and got[0] >= started:
+            return ModelStalled(got[3])
+    return None
 
 
 def warm(model: str, host: str, provider: str = "ollama") -> bool:
@@ -371,7 +428,11 @@ def chat(
     started = time.monotonic()
     # Loaded: silence past `STALL_SECONDS` is a wedged Ollama. Not loaded (or no answer
     # from `/api/ps`): the caller's own allowance, which covers a cold load.
-    warm = loaded(model, host) is True
+    remembered = _remembered_stall(host)
+    if remembered is not None:
+        raise remembered
+    was_loaded = loaded(model, host)
+    warm = was_loaded is True
     wait = min(timeout, STALL_SECONDS) if warm else timeout
 
     def _post(pl):
@@ -423,18 +484,25 @@ def chat(
                 # "Load failed … timed out waiting for llama-server" after its GPU
                 # discovery watchdog timed out, on a healthy GPU. The same cure as a stall.
                 why = " ".join(detail.split())[:160] or f"HTTP {exc.code}"
-                raise ModelStalled(
+                raise _remember_stall(host, model, was_loaded, ModelStalled(
                     f"Ollama could not start {model} ({why}). This is Ollama, not your "
                     f"game. Quit Ollama from its tray icon, start it again, and send "
-                    f"your line again. Your turn has not been lost.") from exc
+                    f"your line again. Your turn has not been lost.")) from exc
             else:
-                raise
+                # Ollama answered, with an error: said as itself. Re-raised bare, an
+                # `HTTPError` is a `URLError`, and the clause below wrote "cannot reach
+                # Ollama … Start Ollama" for a server that had just answered.
+                raise _answered_with(model, host, exc.code, detail) from exc
     except TimeoutError as exc:
         if warm:
-            raise _stalled(model, host, f"sent nothing for {wait} seconds") from exc
+            raise _remember_stall(host, model, was_loaded, _stalled(
+                model, host, f"sent nothing for {wait} seconds")) from exc
         raise ModelUnavailable(
             f"{model} did not answer within {timeout}s."
         ) from exc
+    # The schema-stripped retry above can itself be answered with an error.
+    except urllib.error.HTTPError as exc:
+        raise _answered_with(model, host, exc.code, "") from exc
     # `URLError` is what urllib raises when the CONNECT fails. When Ollama dies or
     # restarts with a request already sent — measured 2026-09-17, turn 59 of a sixty-turn
     # audit, the server restarted under the running model — CPython's `do_open` calls
@@ -450,6 +518,8 @@ def chat(
             f"settings.MODELS at a running host."
         ) from exc
 
+    # An answer: whatever stall this host was in is over.
+    _stalls.pop(host.rstrip("/"), None)
     # A reply the budget cut off is said in the log. `done_reason` and
     # `prompt_eval_count` were never read (measured 2026-09-25), so a truncated turn and a
     # prompt that filled the window both looked, from the log, like a model that simply

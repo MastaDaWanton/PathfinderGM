@@ -15,7 +15,6 @@ from django.conf import settings
 
 from rules import blacksmith, effectspec
 from rules import worldclass as wc
-from rules.blacksmith import Chain
 
 
 @pytest.fixture
@@ -113,18 +112,6 @@ def test_an_old_blacksmith_5_migrates_to_endless_levels_with_picks():
     assert wc.migrate(p) is False
 
 
-def test_old_recipes_map_their_removed_methods():
-    """Plan §14: an old recipe naming draw, polish, flux or rivet loads with the step
-    mapped onto its successor, and the old chain says where the method went rather than
-    only that it is gone."""
-    assert [blacksmith.old_method(m) for m in ("draw", "polish", "flux", "rivet",
-                                                 "forge")] == \
-        ["forge", "hone", "smelt", "assemble", "forge"]
-    r = blacksmith.preview(3, Chain("blacksmith", ["smelt", "forge", "polish"],
-                                    ["iron", "charcoal"], base="longsword"))
-    assert any("Polish became Hone" in p for p in r.problems)
-
-
 # --- the material catalogue ---------------------------------------------------------------
 
 def _raw_entries() -> list[dict]:
@@ -196,158 +183,11 @@ def test_the_three_famous_metals_are_not_reskins(stock):
 
 # --- chain validation refuses before rolling ----------------------------------------------
 
-def test_quench_before_forge_is_refused_with_a_sentence():
-    """The physical grammar of the forge: you cannot quench what was never forged. The
-    refusal is a sentence a player can read, not a code or a silent grey button."""
-    r = blacksmith.preview(1, Chain("blacksmith", ["quench", "forge"],
-                                    ["iron", "charcoal"], base="longsword"))
-    assert "You cannot quench what was never forged — quench follows forge." \
-        in r.problems
-
-
-def test_metal_above_your_tier_is_refused_by_name():
-    """Same sentence shape as the Herbalist's tier refusal, so the two benches read the
-    same. Adamantine is exotic; a Blacksmith 1 works uncommon at best (plan §4.1)."""
-    r = blacksmith.preview(1, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                    ["adamantine", "charcoal"], base="longsword"))
-    assert any("Adamantine is exotic" in p and "works uncommon" in p
-               for p in r.problems)
-
-
-def test_a_cold_forge_is_refused():
-    """Smelting and forging burn fuel. A chain with metal and no fuel is not a weaker
-    craft, it is a smith staring at a cold hearth."""
-    r = blacksmith.preview(1, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                    ["iron"], base="longsword"))
-    assert any("The forge is cold" in p for p in r.problems)
-
-
-def test_skymetal_does_not_melt_over_charcoal():
-    """Exotic metal needs a rare-tier fuel: dragonfire coal exists as an entry precisely
-    so that adamantine over charcoal can be a refusal rather than a house-rule."""
-    cold = blacksmith.preview(5, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                       ["adamantine", "charcoal"], base="longsword"))
-    assert any("does not melt over" in p for p in cold.problems)
-    hot = blacksmith.preview(5, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                      ["adamantine", "dragonfire-coal"],
-                                      base="longsword"))
-    assert not any("does not melt over" in p for p in hot.problems)
-
-
-def test_solitary_metals_refuse_the_crucible():
-    """What makes cold iron cold iron does not survive being melted into something else.
-    The refusal names both metals, because 'invalid alloy' teaches nothing."""
-    r = blacksmith.preview(3, Chain("blacksmith", ["smelt", "alloy", "forge", "quench"],
-                                    ["cold-iron", "iron", "charcoal"],
-                                    base="longsword"))
-    assert any("Cold Iron works alone" in p for p in r.problems)
-
-
-def test_the_base_item_must_really_exist():
-    """Grounded names, the lesson every model project here has paid for: the base item
-    comes from the real weapons table or the armour list, never free text."""
-    r = blacksmith.preview(1, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                    ["iron", "charcoal"], base="vorpal-zweihander"))
-    assert any("No such base item" in p for p in r.problems)
-
 
 # --- the quality ladder -------------------------------------------------------------------
 
-def test_masterwork_requires_temper_and_a_finished_surface():
-    """Masterwork is the book's DC-20 component made procedural: tempered steel and a
-    finished working surface (hone or polish). One of the two alone is merely fine;
-    neither is plain."""
-    full = ["smelt", "forge", "quench", "temper", "hone"]
-    r = blacksmith.preview(3, Chain("blacksmith", full,
-                                    ["steel", "charcoal"], base="longsword"))
-    assert r.quality == "masterwork"
-    assert r.dc >= blacksmith.MASTERWORK_DC
-    # PF1e's actual masterwork rule: +1 enhancement on attack rolls, never damage.
-    assert {"type": "combat_mod", "amount": 1, "bonus_type": "enhancement",
-            "target": "attack", "note": "(masterwork)"} in r.specs
-
-    fine = blacksmith.preview(3, Chain(
-        "blacksmith", ["smelt", "forge", "quench", "temper"],
-        ["steel", "charcoal"], base="longsword"))
-    assert fine.quality == "fine"
-    plain = blacksmith.preview(3, Chain(
-        "blacksmith", ["smelt", "forge", "quench"],
-        ["steel", "charcoal"], base="longsword"))
-    assert plain.quality == "plain"
-
-
-def test_masterwork_is_reachable_at_blacksmith_2_for_the_enchanter():
-    """The dead-end check, measured rather than assumed.
-
-    `rules/enchanter.py` refuses every binding whose vessel is not masterwork — at
-    Enchanter *1*, with the message "Commission one from the smith". The first version
-    of this ladder also required fold or draw, which were Blacksmith 4, so the entire
-    enchanting economy sat behind 140 MP of a track the enchanter may never have taken.
-    Re-pinned 2026-10-03: temper and hone are Blacksmith 2 under the three-level track,
-    and Superior (masterwork) is Blacksmith 2's ceiling (plan §4.4).
-
-    Pinned on both vessels the enchanter is most likely to be handed: a longsword and a
-    breastplate, at the level and DC the book says.
-    """
-    for base, weapon, armour in (("longsword", "longsword", None),
-                                 ("breastplate", None, "breastplate")):
-        r = blacksmith.preview(2, Chain(
-            "blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
-            ["steel", "charcoal"], base=base))
-        assert r.problems == [], f"{base}: {r.problems}"
-        assert r.quality == "masterwork"
-        assert r.dc == 20, f"{base} came out DC {r.dc}"
-        assert r.output["masterwork"] is True
-        assert r.output["weapon"] == weapon
-        assert r.output["armour"] == armour
-
-    # And a Blacksmith 1 still cannot: temper is learned at 2, so the gate is a real
-    # one rather than a formality.
-    early = blacksmith.preview(1, Chain(
-        "blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
-        ["steel", "charcoal"], base="longsword"))
-    assert any("Temper is learned at Blacksmith 2" in p for p in early.problems)
-
 
 # --- the dispatch surface -----------------------------------------------------------------
-
-def test_chain_from_body_parses_the_benchs_post():
-    """One shape for all five crafts. Tolerant on purpose: a missing key is an empty
-    chain, not an error, because `preview` is the place that says what is wrong with a
-    chain in sentences and a parser that raised here would turn "you have not chosen a
-    method yet" into a 500."""
-    c = blacksmith.chain_from_body({
-        "methods": ["smelt", "forge"], "materials": ["iron", "charcoal"],
-        "name": "Test Blade", "base": "longsword",
-    })
-    assert c.track == "blacksmith"
-    assert c.methods == ["smelt", "forge"]
-    assert c.material_ids == ["iron", "charcoal"]
-    assert c.name == "Test Blade" and c.base == "longsword"
-
-    empty = blacksmith.chain_from_body({})
-    assert empty.methods == [] and empty.material_ids == [] and empty.base == ""
-    assert blacksmith.chain_from_body(None).methods == []
-
-    # A plain HTML form with scripting off sends comma-joined strings; reading only the
-    # list form would make the bench work only with JavaScript.
-    typed = blacksmith.chain_from_body({"methods": "smelt, forge",
-                                        "materials": "iron,charcoal"})
-    assert typed.methods == ["smelt", "forge"]
-    assert typed.material_ids == ["iron", "charcoal"]
-
-    # Three things send the base item under three names.
-    for key in ("base", "item", "weapon"):
-        assert blacksmith.chain_from_body({key: "longsword"}).base == "longsword"
-
-
-def test_stock_from_body_keeps_only_real_counts():
-    """Junk in the stock dict must not become a phantom material the chain thinks the
-    smith is carrying."""
-    got = blacksmith.stock_from_body(
-        {"stock": {"iron": 3, "charcoal": "2", "steel": 0, "bogus": "many"}})
-    assert got == {"iron": 3, "charcoal": 2}
-    assert blacksmith.stock_from_body({}) == {}
 
 
 def test_the_check_is_intelligence_not_wisdom():
@@ -369,85 +209,7 @@ def test_the_check_is_intelligence_not_wisdom():
     assert blacksmith.check_bonus(None, 3) == 3
 
 
-def test_an_actor_gets_a_bonus_and_a_chance_and_no_actor_does_not():
-    """`preview` must keep working with actor=None — every rules test calls it that
-    way — and must carry the itemised terms when a character is supplied."""
-    class FakeActor:
-        level = 8
-
-        def ability_mod(self, which):
-            return 3
-
-    chain = Chain("blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
-                  ["steel", "charcoal"], base="longsword")
-    bare = blacksmith.preview(3, chain)
-    assert bare.bonus == 0 and bare.terms == [] and bare.chance == 0
-
-    withactor = blacksmith.preview(3, chain, actor=FakeActor())
-    assert withactor.bonus == 10
-    assert len(withactor.terms) == 3
-    # DC 20 against +10 needs a 10: eleven faces of twenty.
-    assert withactor.chance == 55
-
-    # A chain with problems is never a percentage — the button is greyed, not gambled.
-    broken = blacksmith.preview(1, Chain("blacksmith", ["quench"], ["iron"]),
-                                actor=FakeActor())
-    assert broken.chance == 0
-
-
-def test_as_dict_carries_everything_the_bench_needs():
-    """The dispatch contract: a bench that renders five crafts through one template
-    reads these keys and no others. A missing key is a blank panel with no error."""
-    r = blacksmith.preview(3, Chain(
-        "blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
-        ["steel", "charcoal"], base="longsword"))
-    d = r.as_dict()
-    for key in ("name", "tier", "rank", "stages", "dc", "risky", "problems",
-                "effects", "specs", "consumes", "output", "bonus", "terms", "chance"):
-        assert key in d, f"as_dict is missing {key}"
-
-
 # --- the output contract ------------------------------------------------------------------
-
-def test_the_output_is_an_equippable_inventory_item():
-    """A forged sword that cannot be wielded is a paragraph. The output names the real
-    weapons.json key and a `tables.SLOTS` slot, so the pack and the equip screen can act
-    on it without knowing which craft made it."""
-    from rules.tables import SLOTS
-
-    r = blacksmith.preview(3, Chain(
-        "blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
-        ["cold-iron", "charcoal"], base="longsword"))
-    out = r.output
-    assert out["kind"] == "crafted" and out["craft"] == "blacksmith"
-    assert out["count"] == 1 and out["tier"] == "uncommon"
-    assert out["weapon"] == "longsword" and out["armour"] is None
-    assert out["slot"] == "hands" and out["slot"] in SLOTS
-    assert out["wearable"] is True and out["usable"] is False and out["how"] == []
-    assert "cold-iron" in out["from_materials"]
-    assert out["masterwork"] is True
-    # Every spec on the finished item must be one the engine can actually read.
-    for spec in out["specs"]:
-        assert effectspec.validate(spec) == []
-
-
-def test_armour_and_shields_land_in_their_own_slots():
-    """Three slots a forge can fill, and they are the vocabulary `tables.SLOTS` owns —
-    not invented words that would silently equip nothing."""
-    from rules.tables import SLOTS
-
-    armour = blacksmith.preview(3, Chain(
-        "blacksmith", ["smelt", "forge", "quench"],
-        ["steel", "charcoal"], base="breastplate"))
-    assert armour.output["slot"] == "armor" and armour.output["armour"] == "breastplate"
-    assert armour.output["weapon"] is None
-
-    shield = blacksmith.preview(3, Chain(
-        "blacksmith", ["smelt", "forge", "quench"],
-        ["steel", "charcoal"], base="heavy-shield"))
-    assert shield.output["slot"] == "shield"
-    for slot in ("armor", "shield", "hands"):
-        assert slot in SLOTS
 
 
 # --- icons ------------------------------------------------------------------------------
@@ -575,64 +337,6 @@ def test_buying_and_gathering_are_offered_and_populated():
     assert "salvage" not in blacksmith.ACQUISITION
 
 
-def test_a_novel_alloy_is_one_band_rarer_and_gated_by_what_it_makes():
-    """Two distinct exotic skymetals in one crucible come out legendary (mixing can beat
-    purity). Re-pinned 2026-10-03: the input-only check existed so a Blacksmith 4 could
-    reach the level-5 deed; the deed is gone, so a legendary melt now needs the level that
-    works legendary metal, as the Herbalist's revamped bench gates by its output."""
-    chain = Chain("blacksmith", ["smelt", "alloy", "forge", "quench"],
-                  ["searing-skymetal", "fever-skymetal", "dragonfire-coal"], base="longsword")
-    r = blacksmith.preview(3, chain)
-    assert r.problems == []
-    assert r.tier == "legendary"
-    early = blacksmith.preview(2, chain)
-    assert any("would make legendary metal" in p and "Blacksmith 3" in p
-               for p in early.problems)
-
-
-def test_mithral_halves_weight_and_the_cost_rounds_down():
-    """The rounding rule, applied where it bites: a 4 lb longsword in mithral is 2 lb,
-    and weight is a cost, so it rounds down — the character is never surprised in the
-    direction that hurts them."""
-    r = blacksmith.preview(3, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                    ["mithral", "charcoal"], base="longsword"))
-    assert r.weight_lb == 2
-    assert blacksmith.round_cost(2.5) == 2
-    assert blacksmith.round_benefit(0.8) == 1
-
-
-def test_flux_in_a_smelted_charge_cleans_the_ore_but_not_the_smith(stock):
-    """Flux is to dirty ore what Purify is to a poisonous herb: bog iron's slag-brittle
-    penalty is stripped, and the removal is named on the result. Re-pinned 2026-10-03:
-    flux is no longer a method but an ingredient of Smelt (plan §2), so the flux in a
-    smelted charge does the cleaning, and naming the old method is refused."""
-    dirty = blacksmith.preview(2, Chain(
-        "blacksmith", ["smelt", "forge", "quench"],
-        ["bog-iron", "charcoal"], base="longsword"))
-    assert any("slag-brittle" in line for line in dirty.effects)
-
-    fluxed = blacksmith.preview(2, Chain(
-        "blacksmith", ["smelt", "forge", "quench"],
-        ["bog-iron", "limestone", "charcoal"], base="longsword"))
-    assert not any("slag-brittle" in line for line in fluxed.effects)
-    assert fluxed.removed and "impurity" in fluxed.removed[0]
-    assert fluxed.problems == []
-
-    old = blacksmith.preview(2, Chain(
-        "blacksmith", ["smelt", "flux", "forge", "quench"],
-        ["bog-iron", "limestone", "charcoal"], base="longsword"))
-    assert any("Flux became Smelt" in p for p in old.problems)
-
-
-def test_the_finished_piece_is_named_after_its_metal():
-    """"Masterwork Cold Iron Longsword", not "Untitled" — and ore names shed the word
-    "ore", because a sword smelted from cold iron ore is a cold iron sword."""
-    r = blacksmith.preview(2, Chain(
-        "blacksmith", ["smelt", "forge", "quench", "temper", "fold", "hone"],
-        ["cold-iron", "charcoal"], base="longsword"))
-    assert r.name == "Masterwork Cold Iron Longsword"
-
-
 # --- homebrew layering --------------------------------------------------------------------
 
 def test_a_homebrew_metal_dropped_in_a_file_just_works():
@@ -654,11 +358,6 @@ def test_a_homebrew_metal_dropped_in_a_file_just_works():
         found = blacksmith.materials(refresh=True)
         assert "orichalch" in found
         assert found["orichalch"].tier == "rare"
-        # And it forges, through the same preview as shipped metal.
-        r = blacksmith.preview(3, Chain("blacksmith", ["smelt", "forge", "quench"],
-                                        ["orichalch", "charcoal"], base="longsword"))
-        assert r.problems == []
-        assert r.name == "Orichalch Longsword"
     finally:
         path.unlink(missing_ok=True)
         blacksmith.materials(refresh=True)

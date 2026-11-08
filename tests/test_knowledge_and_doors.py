@@ -152,8 +152,11 @@ def test_an_xp_op_exists_and_the_cheat_reads_the_amount_without_the_model(vormoo
     pc = vormoor.pc()
     engine = Engine(vormoor, Dice(seed=1))
     before = int(pc.xp)
+    # Through the cheat's own origin, as `/cheat` validates it: since 2026-11-07 (audit
+    # #22) an xp op from any other origin is refused — a plan awarded itself 50,000 XP.
     res = engine.run(engine.validate([{"op": "xp", "params": {"amount": 2000,
-                                                               "reason": "the author's word"}}]))
+                                                               "reason": "the author's word"}}],
+                                     origin="author:cheat"))
     assert int(pc.xp) == before + 2000
     assert "2,000 XP" in res.outcomes[0].tell or "2000 XP" in res.outcomes[0].tell
     raw = judgement.cheat_intents("I gain 2000 experience", vormoor)
@@ -165,6 +168,22 @@ def test_an_xp_op_exists_and_the_cheat_reads_the_amount_without_the_model(vormoo
     from gm import prompts
 
     assert "xp" in prompts.CHEAT_OPS
+
+
+def test_a_plan_cannot_award_itself_experience(vormoor):
+    """Audit #22, measured on 0.2.26: `xp` was in every turn's op list, and a plain plan
+    `{"op": "xp", "params": {"amount": 50000}}` printed "You gain 50,000 XP... Enough to
+    advance". No model authors a number (law 3): the op is the author's (`/cheat`) alone,
+    off the turn's enum and refused from any other origin."""
+    from gm import prompts
+
+    pc = vormoor.pc()
+    engine = Engine(vormoor, Dice(seed=1))
+    before = int(pc.xp)
+    out = engine.run(engine.validate([{"op": "xp", "params": {"amount": 50000}}])).outcomes[0]
+    assert out.status == "refused" and int(pc.xp) == before, out.tell
+    enum = prompts.turn_schema()["properties"]["intents"]["items"]["properties"]["op"]["enum"]
+    assert "xp" not in enum
 
 
 # --- 3: the dice card ----------------------------------------------------------------------------

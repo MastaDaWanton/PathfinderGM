@@ -47,7 +47,7 @@ acquisition hub (rules/benches.py), now read through the one door
 saw the hybrid herbs, and the harvest excursion lost the basilisk eye when the gland row
 merged into the herb. The gathering functions are being rebuilt by the gathering-parity
 lane and are otherwise left as they were. The old chain (`Chain`, `preview`) retired with
-the `/craft/` Alchemy tab: `rules/benches.MOVED` refuses it in words.
+the `/craft/` Alchemy tab and was deleted on 2026-11-08 (audit finding #20).
 
 Namespace note: "alchemist" here is the WORLD CLASS (`rules.worldclass.get("alchemist")`),
 not the PF1e Alchemist character class in `content/classes/`.
@@ -66,17 +66,13 @@ from . import worldclass as wc
 TRACK_ID = "alchemist"
 
 
-class CraftError(ValueError):
-    """A step that cannot be described at all (kept for the routing table's shape)."""
-
-
 def _lane(name: str):
-    """A sibling lane's module, or None while it is not merged. Imported on each call, so a
-    test can stand a fake in `sys.modules` (the forge's `_lane`)."""
-    try:
-        return importlib.import_module(f"rules.{name}")
-    except ImportError:
-        return None
+    """A sibling module, imported on each call so a test can stand a fake in `sys.modules`.
+
+    It returned None while a sibling lane was not merged yet, and every caller carried a
+    fallback for that tree. Every lane merged in October; the fallbacks were deleted on
+    2026-11-08 (audit, "dead 'not merged yet' fallbacks in the craft modules")."""
+    return importlib.import_module(f"rules.{name}")
 
 
 # =============================================================================================
@@ -157,19 +153,12 @@ def check_terms(actor, level: int, *, lab: bool = False) -> list[dict]:
     """d20 + Alchemist level + half character level + Intelligence, itemised (plan §7.1),
     with the laboratory's +2 circumstance when the work is done in one (the book's
     alchemist's lab: "+2 circumstance bonus on Craft (alchemy) checks", UE p.77)."""
-    track_level = max(0, int(level or 0))
-    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor is not None else 1
-    intelligence = int(actor.ability_mod("int")) if actor is not None else 0
-    out = [
-        {"label": f"Alchemist {track_level}", "value": track_level},
-        {"label": f"half character level ({char_level})", "value": char_level // 2},
-        {"label": "Intelligence", "value": intelligence},
-    ]
     # Half the Craft ranks (option A, 2026-10-07; `tradecraft.bench_terms`), as at every
     # other bench, so Craft (alchemy) is worth a rank here too.
     from . import tradecraft
 
-    out += tradecraft.bench_terms(actor, "alchemist")
+    out = tradecraft.bench_check_terms(actor, level, track=TRACK_ID, name="Alchemist",
+                                       ability="int")
     if lab:
         out.append({"label": "laboratory", "value": int(bench_rules().get("lab_bonus", 2))})
     return out
@@ -212,28 +201,22 @@ def laboratory_here(scene, known=()) -> dict | None:
     """Lane G's `places.laboratory_here(scene, known)` (contracts §9), or None while it is
     not merged: no laboratory anywhere, so rare work and Distill, Sublime and Transmute are
     refused with the reason in words."""
-    places = _lane("places")
-    fn = getattr(places, "laboratory_here", None) if places is not None else None
-    if fn is None or scene is None:
+    if scene is None:
         return None
     try:
-        return fn(scene, known) or None
+        return _lane("places").laboratory_here(scene, known) or None
     except Exception:  # noqa: BLE001 - a place we cannot read is no laboratory
         return None
 
 
 def has_kit(actor) -> bool:
     """Lane G's `places.has_alchemy_kit(actor)`: the `alchemist's field kit` carried (or
-    one of the rule row's `kit_names`). The fallback below — the kit everywhere — only
-    runs with no places module at all; it is what lane F tested against before lane G
-    merged, and 8 API tests went red the day the real rule arrived, because their
-    character carried no kit. They now carry one bought through `goods.deliver`."""
-    places = _lane("places")
-    fn = getattr(places, "has_alchemy_kit", None) if places is not None else None
-    if fn is None:
-        return True
+    one of the rule row's `kit_names`). A fallback for a tree without lane G, the kit
+    everywhere, was deleted on 2026-11-08; 8 API tests had gone red the day the real rule
+    arrived, because their character carried no kit, and they carry one now."""
     try:
-        return bool(fn(actor)) or _named(actor, bench_rules().get("kit_names") or ())
+        return bool(_lane("places").has_alchemy_kit(actor)) or _named(
+            actor, bench_rules().get("kit_names") or ())
     except Exception:  # noqa: BLE001
         return False
 
@@ -268,21 +251,15 @@ def where_here(scene, actor, known=()) -> dict:
 
 
 def rent_cp(scene, lab: dict | None, minutes: int, known=()) -> int:
-    """What the laboratory here charges for the minutes (plan §14), asked of lane G's
-    `market.lab_rent` when it exists; the laboratory's own rate (or the rule row's 2 sp an
-    hour, proposed) only while it does not. Your own laboratory is free."""
+    """What the laboratory here charges for the minutes (plan §14): `market.lab_rent`,
+    through `market._rent`, the one rent arithmetic. Your own laboratory is free. The copy
+    kept here for a tree without lane G (the lab's rate or a rule row's 2 sp, and a
+    swallowed error falling back to it) was deleted on 2026-11-08."""
     if not lab or minutes <= 0 or lab.get("kind") == "owned":
         return 0
-    hours = minutes / 60
-    market = _lane("market")
-    fn = getattr(market, "lab_rent", None) if market is not None else None
-    if fn is not None:
-        try:
-            return max(0, int(fn(scene, hours, known)))
-        except Exception:  # noqa: BLE001
-            pass
-    rate = int(lab.get("rate_cp_per_hour") or bench_rules().get("lab_rate_cp_per_hour", 20))
-    return max(0, int(math.ceil(round(rate * hours, 6))))
+    from . import market
+
+    return max(0, int(market.lab_rent(scene, minutes / 60, known)))
 
 
 def methods_view(level: int, where: dict | None = None) -> list[dict]:
@@ -1558,9 +1535,7 @@ def land(actor, plan: AlchemyPlan, made: list[dict], *, now: int,
             # Its own entry, never stacked into a ready one: the whole entry goes into the
             # section (inprogress.begin), and a stack that was half ready is not a thing.
             st = items.to_stock(rec, n)
-            key = st.id
-            while key in (actor.stock or {}):
-                key += "+"
+            key = inprogress.fresh_key(actor, st.id)
             actor.stock[key] = st
             doing = {"bottle": "setting", "transmute": "transmuting"}.get(plan.method,
                                                                           "working")
@@ -1961,33 +1936,6 @@ def obtainable(obtain_kind: str, *, biome: str = None,
     return sorted(out, key=lambda m: (m.rank, m.name))
 
 
-# --- the old chain, retired --------------------------------------------------------------------
-
-MOVED_WORDS = ("Alchemy is worked at the bench at the table now, one step at a time: "
-               "dissolve, react, bottle. The chain bench no longer takes it.")
-
-
-@dataclass
-class Chain:
-    methods: list = field(default_factory=list)
-    material_ids: list = field(default_factory=list)
-    name: str = ""
-    stock_used: dict = field(default_factory=dict)
-
-
-def chain_from_body(body: dict) -> Chain:
-    """The old chain's reader, kept so `benches.supports` stays honest; `benches.MOVED`
-    refuses the alchemist's chains before this is reached."""
-    body = body or {}
-    return Chain(methods=list(body.get("methods") or []),
-                 material_ids=list(body.get("materials") or []),
-                 name=str(body.get("name") or ""))
-
-
-def preview(level: int, chain: Chain, **_kw):
-    raise CraftError(MOVED_WORDS)
-
-
 # =============================================================================================
 # Settling a step (shared by the bench and a typed line)
 # =============================================================================================
@@ -2127,7 +2075,7 @@ def settle_made(actor, progress, plan: AlchemyPlan, tier: int, consumes, *, dice
             "discoveries": discoveries}
 
 
-__all__ = ["ACQUISITION", "AlchemyPlan", "CraftError", "Item", "KIND_GLYPH", "METHODS",
+__all__ = ["ACQUISITION", "AlchemyPlan", "Item", "KIND_GLYPH", "METHODS",
            "METHOD_GLYPH", "Material", "TRACK_ID", "apply_rule", "assay_dangers",
            "assay_source", "bench_rules", "check_bonus", "check_odds", "check_terms",
            "failure_losses", "find", "fit_reason", "fits_for", "from_dict", "get",

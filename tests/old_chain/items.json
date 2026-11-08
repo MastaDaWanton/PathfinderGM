@@ -1,0 +1,265 @@
+{
+ "_about": "What the retired /craft/ chain bench wrote into a pack, frozen on 2026-11-08 from rules/blacksmith.py and rules/magicitem.py `preview` at 8ee580e4 (the last commit with the chain) through crafting.from_stock_dict(...).as_dict(). Old saves still carry these, so the migrations are tested against them; the chain itself is gone (audit finding #20).",
+ "by-the-book": {
+  "frost-longsword-1": {
+   "armour": null,
+   "base": "Frost Item +1",
+   "caster_level": null,
+   "concentration": 1,
+   "count": 1,
+   "craft": "enchanter",
+   "crafted": true,
+   "drawbacks": [],
+   "effects": [
+    "Frost: 1d6 cold damage, on a hit",
+    "+1: +1 Attack rolls (permanent)",
+    "+1: +1 Damage rolls (permanent)"
+   ],
+   "enhancement": 1,
+   "from_ingredients": [],
+   "from_materials": [
+    "mi-frost"
+   ],
+   "holds_spell": null,
+   "how": [],
+   "id": "frost-item-1#1",
+   "kind": "crafted",
+   "masterwork": true,
+   "name": "Frost Item +1",
+   "potency": 1.0,
+   "properties": [
+    "Frost"
+   ],
+   "rank": 3,
+   "slot": null,
+   "specs": [
+    {
+     "book": true,
+     "damage_type": "cold",
+     "dice": "1d6",
+     "from": "Frost",
+     "lethality": "lethal",
+     "source": "property:frost",
+     "trigger": "hit",
+     "type": "damage"
+    },
+    {
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "duration": {
+      "unit": "permanent"
+     },
+     "from": "+1",
+     "target": "attack",
+     "type": "combat_mod"
+    },
+    {
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "duration": {
+      "unit": "permanent"
+     },
+     "from": "+1",
+     "target": "damage",
+     "type": "combat_mod"
+    }
+   ],
+   "tier": "rare",
+   "weapon": "longsword",
+   "wearable": false
+  }
+ },
+ "forge": {
+  "iron-work": {
+   "armour": null,
+   "base": "Iron Work",
+   "caster_level": null,
+   "concentration": 1,
+   "count": 1,
+   "craft": "blacksmith",
+   "crafted": true,
+   "drawbacks": [],
+   "effects": [],
+   "enhancement": 0,
+   "from_ingredients": [],
+   "from_materials": [
+    "iron",
+    "charcoal"
+   ],
+   "holds_spell": null,
+   "how": [],
+   "id": "iron-work#1",
+   "kind": "crafted",
+   "masterwork": false,
+   "name": "Iron Work",
+   "potency": 1.0,
+   "properties": [],
+   "rank": 1,
+   "slot": null,
+   "specs": [],
+   "tier": "common",
+   "weapon": null,
+   "wearable": false
+  },
+  "iron|longsword": {
+   "armour": null,
+   "base": "Iron Longsword",
+   "caster_level": null,
+   "concentration": 1,
+   "count": 1,
+   "craft": "blacksmith",
+   "crafted": true,
+   "drawbacks": [],
+   "effects": [],
+   "enhancement": 0,
+   "from_ingredients": [],
+   "from_materials": [
+    "iron",
+    "charcoal"
+   ],
+   "holds_spell": null,
+   "how": [],
+   "id": "iron-longsword#1",
+   "kind": "crafted",
+   "masterwork": false,
+   "name": "Iron Longsword",
+   "potency": 1.0,
+   "properties": [],
+   "rank": 1,
+   "slot": "hands",
+   "specs": [],
+   "tier": "common",
+   "weapon": "longsword",
+   "wearable": true
+  },
+  "masterwork-cold-iron-longsword": {
+   "armour": null,
+   "base": "Masterwork Cold Iron Longsword",
+   "caster_level": null,
+   "concentration": 1,
+   "count": 1,
+   "craft": "blacksmith",
+   "crafted": true,
+   "drawbacks": [],
+   "effects": [
+    "Cold Iron: Bypasses the damage reduction of demons and fey (DR/cold iron)",
+    "Cold Iron: Costs double the forge-time and coin: cold iron forgives no reworking",
+    "+1 Attack rolls (masterwork)"
+   ],
+   "enhancement": 0,
+   "from_ingredients": [],
+   "from_materials": [
+    "cold-iron",
+    "charcoal"
+   ],
+   "holds_spell": null,
+   "how": [],
+   "id": "masterwork-cold-iron-longsword#1",
+   "kind": "crafted",
+   "masterwork": true,
+   "name": "Masterwork Cold Iron Longsword",
+   "potency": 1.0,
+   "properties": [],
+   "rank": 2,
+   "slot": "hands",
+   "specs": [
+    {
+     "from": "Cold Iron",
+     "target": "Bypasses the damage reduction of demons and fey (DR/cold iron)",
+     "type": "narrative"
+    },
+    {
+     "from": "Cold Iron",
+     "target": "Costs double the forge-time and coin: cold iron forgives no reworking",
+     "type": "narrative"
+    },
+    {
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "note": "(masterwork)",
+     "target": "attack",
+     "type": "combat_mod"
+    }
+   ],
+   "tier": "uncommon",
+   "weapon": "longsword",
+   "wearable": true
+  },
+  "mithral|chain shirt": {
+   "armour": "chain shirt",
+   "base": "Mithral Chain Shirt",
+   "caster_level": null,
+   "concentration": 1,
+   "count": 1,
+   "craft": "blacksmith",
+   "crafted": true,
+   "drawbacks": [],
+   "effects": [
+    "Mithral: Half weight; armour counts one category lighter for movement (not for proficiency)",
+    "Mithral: Armour: maximum Dexterity bonus +2, armour check penalty 3 lighter, spell failure 10% lower; a weapon counts as silver"
+   ],
+   "enhancement": 0,
+   "from_ingredients": [],
+   "from_materials": [
+    "mithral",
+    "charcoal"
+   ],
+   "holds_spell": null,
+   "how": [],
+   "id": "mithral-chain-shirt#1",
+   "kind": "crafted",
+   "masterwork": false,
+   "name": "Mithral Chain Shirt",
+   "potency": 1.0,
+   "properties": [],
+   "rank": 3,
+   "slot": "armor",
+   "specs": [
+    {
+     "from": "Mithral",
+     "target": "Half weight; armour counts one category lighter for movement (not for proficiency)",
+     "type": "narrative"
+    },
+    {
+     "from": "Mithral",
+     "target": "Armour: maximum Dexterity bonus +2, armour check penalty 3 lighter, spell failure 10% lower; a weapon counts as silver",
+     "type": "narrative"
+    }
+   ],
+   "tier": "rare",
+   "weapon": null,
+   "wearable": true
+  },
+  "steel|battleaxe": {
+   "armour": null,
+   "base": "Steel Battleaxe",
+   "caster_level": null,
+   "concentration": 1,
+   "count": 1,
+   "craft": "blacksmith",
+   "crafted": true,
+   "drawbacks": [],
+   "effects": [],
+   "enhancement": 0,
+   "from_ingredients": [],
+   "from_materials": [
+    "steel",
+    "coke"
+   ],
+   "holds_spell": null,
+   "how": [],
+   "id": "steel-battleaxe#1",
+   "kind": "crafted",
+   "masterwork": false,
+   "name": "Steel Battleaxe",
+   "potency": 1.0,
+   "properties": [],
+   "rank": 2,
+   "slot": "hands",
+   "specs": [],
+   "tier": "uncommon",
+   "weapon": "battleaxe",
+   "wearable": true
+  }
+ }
+}

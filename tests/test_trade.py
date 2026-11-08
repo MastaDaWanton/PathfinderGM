@@ -252,10 +252,15 @@ def test_you_can_buy_a_thing_while_standing_in_front_of_it(engine):
     """Buying existed only on the crafting bench, as an excursion that spends hours and
     rolls a check to go and find a supplier. That is the right shape for stocking a
     workshop and the wrong one for standing at a counter, so there was no way at all to
-    buy a thing while looking at it."""
+    buy a thing while looking at it.
+
+    Asked for two, it sells one: the cheapest thing here is off the day's draw, which puts
+    one of each thing on the shelf (audit #17, 2026-11-07 — this test bought two until
+    then, and three of a drawn ring were three rings)."""
     pc = engine.scene.pc()
     pc.purse = {"gp": 50}
     cheapest = min(_counter(), key=pricing.worth)
+    assert not getattr(cheapest, "staple", False)
     held = dict(pc.inventory)
     jars = dict(pc.stock)
 
@@ -263,6 +268,7 @@ def test_you_can_buy_a_thing_while_standing_in_front_of_it(engine):
                        "params": {"item": cheapest.id, "count": 2}})
 
     assert out[0].effects[0]["kind"] == "bought"
+    assert out[0].effects[0]["count"] == 1 and "only one" in out[0].tell
     # Named exactly, not "something in the satchel has a count of 2" — the loose version
     # of this passes even when the wrong thing was bought.
     if market.is_craft_material(cheapest):
@@ -270,12 +276,12 @@ def test_you_can_buy_a_thing_while_standing_in_front_of_it(engine):
         # it (2026-10-05: counter-bought charcoal had been a pack jar the forge never
         # offered). The cheapest thing on this counter is a craft material since the
         # consumables were priced — the smith's water, at a copper.
-        assert pc.inventory.get(cheapest.id, 0) - held.get(cheapest.id, 0) == 2
+        assert pc.inventory.get(cheapest.id, 0) - held.get(cheapest.id, 0) == 1
         assert pc.stock == jars
     else:
         assert len(pc.stock) == len(jars) + 1
         bought = next(v for k, v in pc.stock.items() if k not in jars)
-        assert bought.base == cheapest.name and bought.count == 2
+        assert bought.base == cheapest.name and bought.count == 1
     assert pc.purse != {"gp": 50}, "nothing was paid"
 
 
@@ -987,7 +993,7 @@ def test_the_trade_panel_needs_a_merchant_and_the_state_says_so():
             # The stall key is `market:<counter>` for the counter `line` names.
             assert body["stall"].split(":")[-1] == body["line"], body.get("lines")
         else:
-            assert body["stall"] == _stall_of(c)[1]
+            assert body["stall"] == _stall_of(c, None, _merchant_here(c.scene))[1]
     finally:
         c.scene.remove("m1")
 
@@ -1233,7 +1239,13 @@ def test_stuff_is_a_word_not_a_thing():
     world-never-runs-out branch and minted an object called merchants stuff,
     labelled 'the engine has no rules for it'. A bulk phrase with a giver moves
     everything they hold — kit claim collapsed first — and with nobody named it
-    refuses in words instead of inventing."""
+    refuses in words instead of inventing.
+
+    The giver here was living until 2026-11-07, and the whole pack moved to the player
+    who was not handed it (audit #23: "all the apples" stripped a guildhand of his pack
+    and 30 gp, nothing marked stolen). No owner ruling stood behind that half — the live
+    case this was built from was a dead merchant (the next test) — so a living giver who
+    is not the one acting now keeps his pack, and the body is what moves whole."""
     from rules.bestiary import instantiate
 
     scene = Scene(location_id="pangrella")
@@ -1249,9 +1261,14 @@ def test_stuff_is_a_word_not_a_thing():
     scene.add(m)
     m.goods["bolt-of-silk"] = 2
     before = dict(pc.goods)
-    out = eng.run(eng.validate([{"op": "give", "actor": "pc", "because": "t",
-                                 "params": {"item": "everything he has",
-                                            "from_": m.ref, "to": "pc"}}])).outcomes[0]
+    give = {"op": "give", "actor": "pc", "because": "t",
+            "params": {"item": "everything he has", "from_": m.ref, "to": "pc"}}
+    out = eng.run(eng.validate([give])).outcomes[0]
+    assert out.status == "refused" and "Buy" in out.tell, out.tell
+    assert pc.goods == before and m.goods == {"bolt-of-silk": 2}
+
+    m.die("a blow")                  # dead: the dead own nothing, and the body moves whole
+    out = eng.run(eng.validate([give])).outcomes[0]
     assert pc.goods.get("bolt-of-silk", 0) == 2
     assert m.goods == {} and m.kit_pending == {}
     # The collapsed kit's pockets came along — on the shelf since 2026-10-30, which the
@@ -1283,3 +1300,114 @@ def test_a_bulk_give_from_a_corpse_is_the_loot_it_meant():
         [{"op": "give", "actor": "pc",
           "params": {"item": "everything", "from_": m.ref}}], scene)
     assert same[0]["op"] == "give"
+
+
+# --- the ponytail audit, 2026-11-07 ----------------------------------------------------------
+
+def test_a_bought_plain_thing_never_sells_back_for_more_than_it_cost():
+    """Audit #1, measured on 0.2.26: bought gear was filed as an unpriced shelf row and
+    resold by the tier ladder — 1 gp of hemp rope sold back for 9.50 gp (fifty feet at
+    19 cp each), a 1 cp torch for 19 cp, and 11 of the 41 plain goods for more than they
+    cost. Core Rulebook p.140: an item sells for half its listed price."""
+    from rules import goods
+
+    over = []
+    for key in goods.GEAR:
+        scene = Scene(location_id="pangrella")
+        pc = load_pc("fixtures/pc-kesst.json")
+        scene.add(pc)
+        had_stock, had_goods = dict(pc.stock), dict(pc.goods)
+        good = goods.good(key)
+        goods.deliver(scene, pc, good, 1)
+        back = sum(pricing.what_a_shop_pays(s) * s.count
+                   for sid, s in pc.stock.items() if sid not in had_stock)
+        back += sum(pricing.what_a_shop_pays_for_goods(k) * (n - had_goods.get(k, 0))
+                    for k, n in pc.goods.items() if n != had_goods.get(k))
+        if back > good.price_gp:
+            over.append(f"{key}: paid {good.price_gp}, sells for {back:.2f}")
+    assert not over, over
+    rope = Stock(base="hemp rope", tier="common", craft="", count=50)
+    assert pricing.what_a_shop_pays(rope) * 50 == pytest.approx(0.5)
+
+
+def test_arrows_are_priced_by_the_round_they_are_counted_in():
+    """Audit #1: "Arrows (20)" bought for 1 gp is twenty single rounds in `goods`
+    (`goods.stow`), and each round was priced at the whole bundle's 1 gp — the twenty
+    sold back for 10 gp."""
+    from rules import goods
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.goods = {}
+    key, n = goods.stow(pc, "arrows-20", 1)
+    assert n == 20
+    assert pricing.goods_worth(key) == pytest.approx(1.0 / 20)
+    assert pricing.what_a_shop_pays_for_goods(key) * n < 1.0
+
+
+def test_one_of_a_kind_on_the_shelf_is_sold_once():
+    """Audit #17, measured on 0.2.26: the day's draw puts one of each thing on the shelf
+    (`market.stock` samples without repeats), but `buy` delivered `count` copies — three
+    of the single drawn ring were three rings, up to the trade window's 999. A staple
+    (rope, the always-stocked consumables) still sells by the count."""
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    eng = Engine(scene, Dice(seed=3))
+    pc.purse = {"gp": 100000}
+    drawn = max((m for m in _counter() if not getattr(m, "staple", False)),
+                key=pricing.worth)
+    paid_one = pricing.worth(drawn, buyer=pc, town="pangrella")
+    out = run(eng, {"op": "buy", "actor": "pc", "params": {"item": drawn.id, "count": 3}})
+    assert out[0].effects[0]["count"] == 1, out[0].tell
+    assert out[0].effects[0]["paid_cp"] == int(round(paid_one * 100))
+    again = run(eng, {"op": "buy", "actor": "pc", "params": {"item": drawn.id}})
+    assert not again[0].effects, "the one on the counter was sold twice"
+
+    rope = run(eng, {"op": "buy", "actor": "pc", "params": {"item": "rope", "count": 3}})
+    assert rope[0].effects[0]["count"] == 3, rope[0].tell
+
+
+def test_all_the_apples_is_not_the_sellers_whole_pack():
+    """Audit #23, measured on 0.2.26: the bulk branch's `all (the|his...) <word>`
+    alternative matched "all the apples", and a give of them from a living guildhand
+    moved his whole pack and 30 gp to the player with no `stolen` flag. "All the apples"
+    is apples: the bulk words are stuff, everything, belongings, wares, inventory."""
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    m = instantiate("guildhand", scene=scene, name="the fruit seller")
+    scene.add(m)
+    m.goods = {"apple": 5, "rope": 1}
+    m.purse = {"gp": 30}
+    eng = Engine(scene, Dice(seed=5))
+    out = eng.run(eng.validate([{"op": "give", "actor": "pc", "because": "t",
+                                 "params": {"item": "all the apples", "from_": m.ref,
+                                            "to": "pc"}}])).outcomes[0]
+    assert m.purse.get("gp") == 30 and m.goods.get("rope") == 1, out.tell
+    assert "Everything" not in out.tell
+
+
+def test_dropping_everything_with_nobody_to_take_it_lays_it_on_the_ground():
+    """Audit #23, measured on 0.2.26: "drop everything" with no taker ran `store.clear()`
+    on the pack and the purse — 50 gp, a rope and a lantern vanished and nothing reached
+    the ground. Each thing is set down as one dropped thing is (`_lay_down`), and the
+    coin lies in a pile holding its amount."""
+    from rules import holding
+
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    pc.goods = {"rope": 1, "lantern": 1}
+    pc.purse = {"gp": 50}
+    eng = Engine(scene, Dice(seed=5))
+    out = eng.run(eng.validate([{"op": "give", "actor": "pc", "because": "t",
+                                 "params": {"item": "everything", "from_": "pc"}}])).outcomes[0]
+    assert pc.goods == {} and pc.purse == {}, out.tell
+    for thing in ("rope", "lantern"):
+        rec = scene.prop_on_the_ground(thing)
+        assert rec is not None and rec.get("owner") == pc.ref, thing
+    pile = next(r for r in scene.props if r.get("kind") == "coins")
+    assert holding.contents(pile)["purse"] == {"gp": 50}
+    assert "lies here" in out.tell

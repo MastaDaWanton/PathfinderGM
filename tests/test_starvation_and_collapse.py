@@ -224,6 +224,7 @@ def test_every_heal_path_goes_through_the_floor():
 
 def test_drinking_frees_the_thirst_and_it_heals_by_the_hour():
     pc = _parched(_pc(), 4)
+    pc.goods["waterskin"] = 1        # a drink is out of the pack or at a well (2026-11-07)
     s, engine = _engine(pc)
     res = _run(engine, {"op": "drink", "actor": "pc", "because": "a stream"})
     assert "The thirst damage on Kesst Vayr (4) can mend now." in _tells(res)
@@ -237,6 +238,7 @@ def test_drinking_frees_the_thirst_and_it_heals_by_the_hour():
 def test_eating_frees_hunger_and_leaves_thirst_held():
     pc = _parched(_pc(), 3, need="hunger")
     _parched(pc, 2, need="thirst")
+    pc.goods["bread"] = 1            # a meal is out of the pack (2026-11-07)
     s, engine = _engine(pc)
     _run(engine, {"op": "eat", "actor": "pc", "because": "bread"})
     assert pc.withheld_nonlethal() == {"thirst": 2}

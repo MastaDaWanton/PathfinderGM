@@ -162,6 +162,16 @@ def _open_worth(item) -> float:
                                       magic_layer.vessel_kind(rec), str(rec["slot"] or ""))
         if gp > 0:
             return float(gp)
+    # A plain thing off a counter (rope, a torch, a saddle) is worth the book's price for
+    # one of its shelf units, never the tier ladder (`goods.unit_price`, audit #1). Only a
+    # row no bench made: a crafted draught that shares a name with a store row is still
+    # the bench's to price.
+    if not _field(item, "craft"):
+        from . import goods
+
+        listed = goods.unit_price(_field(item, "base") or _field(item, "name") or "")
+        if listed is not None:
+            return listed
 
     potency = _as_float(_field(item, "potency"), 1.0)
     # A step-bench thing carries `potency` 1.0, because its strength is baked into the
@@ -438,9 +448,17 @@ def goods_worth(name: str) -> float:
     entry = goods.known_item(low)
     if entry and entry.get("cost_gp") not in (None, "", 0):
         try:
-            return float(entry["cost_gp"])
+            cost = float(entry["cost_gp"])
         except (TypeError, ValueError):
-            pass
+            return UNLISTED_GP
+        if entry.get("table") == "ammunition":
+            # Rounds are carried singly (`goods.stow`: "Arrows (20)" is twenty arrows in
+            # `goods`) and the row's price is the bundle's. Measured 2026-11-07 (audit
+            # #1): 1 gp of arrows sold back for 10 gp, half the bundle's price a round.
+            from . import weapons
+
+            cost /= weapons.rounds_per(str(entry.get("key") or low))
+        return cost
     return UNLISTED_GP
 
 

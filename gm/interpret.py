@@ -2436,7 +2436,17 @@ def _going(frame, scene, places, location) -> str:
 
 
 # Which acts of the reading can stand behind an op a word-detector requires. An op with
-# no row here is not judged (the reading has no view on it).
+# no row here is dropped (`supported`), unless it is in `UNJUDGED`.
+#
+# Until 2026-11-08 an op with no row was kept, unjudged (ponytail audit #7): `take_off`,
+# `found`, `venture` and `check` survived a reading of nothing but `talk`, and the take-off
+# regex matches "I promise I'll never take off my armour". Their rows, below the first
+# block: taking armour off is no act of its own in the reading's list, so whatever deed
+# a small model files it under (`use`, `drop`, `take` for the verb, or `other`); a base is
+# made where one goes (`go`, the heard place's found and travel, `acts_to_ops.apply`),
+# settles (`rest`, "make camp") or declares (`claim`, `other`); new ground is entered by
+# going, searching, sneaking or climbing into it; and a check is any deed a skill rolls
+# for, speech included (persuade, bluff, threaten are `talk`, `request`, `insult`).
 _OP_NEEDS = {
     "travel": {"go", "leave", "journey", "search", "seek", "call_on"},
     "journey": {"journey"}, "introduce": {"seek", "talk", "call_on", "request"},
@@ -2449,7 +2459,19 @@ _OP_NEEDS = {
     "loot": {"take", "steal", "loot"}, "cast": {"cast"},
     "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},
     "taste": {"consume", "use"},
+    "take_off": {"use", "drop", "take", "other"},
+    "found": {"go", "rest", "claim", "other"},
+    "venture": {"go", "leave", "journey", "search", "seek", "stealth", "athletics",
+                "follow"},
+    "check": {"stealth", "steal", "take", "break_in", "use", "athletics", "exert", "go",
+              "escape", "talk", "request", "insult", "claim", "search", "look", "track",
+              "follow", "other"},
 }
+
+# The declarers that read a CLOSED vocabulary, not English: an ability's name against
+# the character's own sheet. Their op is the reading's to override only where a row says
+# so (a spell's `cast` and a jar's `use_item` have rows above). The audit's short list.
+UNJUDGED = frozenset({"use_ability"})
 
 
 def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]:
@@ -2481,7 +2503,8 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
             continue
         need = _OP_NEEDS.get(op)
         have = elsewhere if op == "travel" else acts
-        (kept if need is None or have & need else dropped).append(op)
+        backed = op in UNJUDGED if need is None else bool(have & need)
+        (kept if backed else dropped).append(op)
     return kept, dropped
 
 
@@ -2510,15 +2533,6 @@ def gets_nothing(frame: dict | None) -> bool:
 # something to Kesst Vayr". The rule that already held for gains holds for hand-overs;
 # `drop` joined with the act itself.
 PARTING_ACTS = frozenset({"give", "sell", "buy", "drop"})
-
-
-def hands_nothing(frame: dict | None) -> bool:
-    """Whether a reading exists and none of its acts can part the player from anything.
-    False when there is no reading to judge by."""
-    if not frame or frame.get("error"):
-        return False
-    return not ({a.get("act") for a in frame.get("actions") or [] if acting(a)}
-                & PARTING_ACTS)
 
 
 def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:

@@ -63,8 +63,9 @@ def settle(healer, patient, succeeded: bool) -> tuple[str, list[dict]]:
     """What the check did to the patient: (the tell's clause, the effects)."""
     if not succeeded:
         return (f" {patient.name} is still dying.", [])
-    patient.remove_condition("dying")
-    patient.add_condition("stable", source="first aid")
+    # The one writer of the rung (`Actor.stabilise`), shared with the patient's own
+    # Constitution check and with any healing that leaves them negative.
+    patient.stabilise("first aid")
     return (f" {healer.name} stops {patient.name} losing blood: {patient.name} is stable, "
             f"no longer dying, and no better than that.",
             [{"kind": "condition", "ref": patient.ref, "condition": "stable",

@@ -40,9 +40,13 @@ is kept per campaign in `training/inputs/<campaign>.json` for the last `INPUTS_K
 narrated beats, out of the save so a long campaign does not carry kilobytes of prompt per
 beat. A record copies it in when an episode opens, so every line of the log stands alone.
 
-**The log** is one JSON object per correction episode, rewritten in place (by `id`) as the
-episode changes and closed when the player moves on — so the file is always a list of
-whole episodes, never events to fold.
+**The log** is appended to and never rewritten: every change to a correction episode
+writes the WHOLE episode as one more line, and an episode is its latest line by `id`
+(`read_log`). Each line still stands alone — a whole episode, never an event to fold — and
+the bytes already on disk are never touched. It used to be rewritten in place, the whole
+file on every click (audit 2026-11-07): a click's cost grew with the owner's entire
+training history, and each rewrite was a chance to lose it. The price is size: an
+episode's earlier states stay in the file, which is also a record of how it went.
 """
 from __future__ import annotations
 
@@ -102,7 +106,20 @@ def _fingerprint(text: str) -> str:
 # --- the log ---------------------------------------------------------------------------
 
 def read_log(path: Path | None = None) -> list[dict]:
-    """Every record in the log, oldest first. A line that does not parse is skipped, not
+    """Every episode in the log, oldest first, each as its latest line by `id`.
+
+    The log is appended to (`_write_record`), so an episode can have several lines; its
+    place in the list is where it first appeared. A line with no `id` is its own record.
+    The machine log's ids are unique, so it reads back line for line, as before."""
+    latest: dict = {}
+    for rec in read_lines(path):
+        rid = rec.get("id")
+        latest[rid if rid is not None else object()] = rec
+    return list(latest.values())
+
+
+def read_lines(path: Path | None = None) -> list[dict]:
+    """Every line of the log, oldest first. A line that does not parse is skipped, not
     fatal: a hand-edited file must not take the table down."""
     path = path or log_path()
     try:
@@ -124,19 +141,25 @@ def read_log(path: Path | None = None) -> list[dict]:
 
 
 def _write_record(rec: dict) -> None:
-    """Put `rec` into the log, replacing the record with its `id` or appending. Whole-file
-    and atomic (`files.write_text`): the log is small next to the saves, and a log that is
-    always whole episodes is one a trainer can read without folding events."""
+    """Append `rec`, the whole episode as it now stands, as one line. Never rewrites what
+    is already there: this file is the owner's training data (see the module docstring).
+
+    A line torn by a crash mid-write is skipped by `read_lines`; a newline is put before
+    the next one so it cannot be glued onto the torn tail and lost with it."""
     rec["updated"] = _now()
-    records = read_log()
-    for i, old in enumerate(records):
-        if old.get("id") == rec["id"]:
-            records[i] = rec
-            break
-    else:
-        records.append(rec)
-    files.write_text(log_path(), "".join(json.dumps(r, ensure_ascii=False) + "\n"
-                                         for r in records))
+    path = log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lead = ""
+    try:
+        with path.open("rb") as fh:
+            fh.seek(-1, os.SEEK_END)
+            lead = "" if fh.read(1) == b"\n" else "\n"
+    except OSError:
+        pass                             # no file yet, or an empty one
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(lead + json.dumps(rec, ensure_ascii=False) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
 
 
 def _record(rid: str) -> dict | None:

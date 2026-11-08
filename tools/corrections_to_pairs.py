@@ -69,7 +69,10 @@ def _default_log() -> Path:
 
 
 def _read(path: Path) -> list[dict]:
-    out = []
+    """Each episode once, as its latest line. The table appends a whole episode on every
+    change and never rewrites (play/corrections.py `read_log`, the same fold); read line
+    for line, an episode remade twice would be trained on three times."""
+    latest: dict = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -79,8 +82,9 @@ def _read(path: Path) -> list[dict]:
         except ValueError:
             continue
         if isinstance(rec, dict):
-            out.append(rec)
-    return out
+            rid = rec.get("id")
+            latest[rid if rid is not None else object()] = rec
+    return list(latest.values())
 
 
 def _completion(text: str, plain: bool) -> list[dict]:

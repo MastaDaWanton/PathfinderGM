@@ -321,12 +321,12 @@ def test_a_save_with_no_enchanting_content_is_not_touched(path):
     assert json.dumps(again, sort_keys=True) == json.dumps(data, sort_keys=True)
 
 
-def test_the_old_by_the_book_tab_still_writes_old_records_and_they_convert_on_load():
-    """The old tab (rules/magicitem.py) is kept until the UI wave retires it, and it still
-    writes the flat record. What it makes today converts on the next load like the rest."""
-    r = magicitem.preview(5, magicitem.Chain(material_ids=["mi-frost"], enhancement=1),
-                          item={"masterwork": True, "kind": "weapon", "weapon": "longsword"})
-    saved = crafting.from_stock_dict(dict(r.output, craft="enchanter")).as_dict()
+def test_a_record_from_the_old_by_the_book_tab_converts_on_load():
+    """The old "By the book" tab (rules/magicitem.py) wrote the flat record. The tab and its
+    chain were deleted on 2026-11-08 (audit finding #20); what it made in an old save, frozen
+    in tests/old_chain/items.json, converts on the next load like the rest."""
+    saved = json.loads((Path(__file__).parent / "old_chain" / "items.json")
+                       .read_text(encoding="utf-8"))["by-the-book"]["frost-longsword-1"]
     rec = enchanter.migrate_old_record(saved)
     assert forge_items.is_forged(rec)
     assert [p["id"] for p in rec["magic"]["properties"]] == ["frost"]

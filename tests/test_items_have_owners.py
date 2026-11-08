@@ -113,12 +113,15 @@ def test_a_persons_label_says_what_is_in_their_hands():
     assert "from merchant" not in again[0].tell
 
 
-def test_a_thing_paid_for_is_handed_over_not_stolen():
+def test_a_thing_handed_over_by_its_holder_is_not_stolen():
+    """Paid-for used to ride a give's `price` (removed 2026-11-07, audit #24: buy and sell
+    own prices). The consent a price stood for is the holder handing it over: the pedlar
+    acting, the lantern moves and nothing is marked stolen."""
     scene = _scene("the pedlar")
-    pedlar = scene.actors[_ref(scene, "the pedlar")]
+    ref = _ref(scene, "the pedlar")
+    pedlar = scene.actors[ref]
     pedlar.goods["lantern"] = 1
-    scene.pc().purse = {"gp": 9}
-    _run(scene, [{"op": "give", "params": {"item": "lantern", "to": "pc", "price": "7 gp"}}])
+    _run(scene, [{"op": "give", "actor": ref, "params": {"item": "lantern", "to": "pc"}}])
     assert scene.pc().goods == {"lantern": 1} and not pedlar.goods
     assert not (scene.prop_named("lantern") or {}).get("stolen")
 

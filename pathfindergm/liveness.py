@@ -123,10 +123,17 @@ class QuietHeartbeat(logging.Filter):
     Matched on the record's own arguments rather than the formatted line, because
     `django.server` formats with colour codes when it can and a substring search against
     a coloured string is the kind of thing that quietly stops matching.
+
+    `/api/revision` too: the table polls it every three seconds for the second device
+    (`checkTheOtherDevice`), 28,800 lines a day — six times the heartbeat's flood, and
+    left out of this filter when the poll was added (audit 2026-11-07).
     """
+
+    QUIET = ("/api/alive", "/api/revision")
 
     def filter(self, record: logging.LogRecord) -> bool:
         args = getattr(record, "args", None)
         if isinstance(args, tuple) and args:
-            return "/api/alive" not in str(args[0])
+            line = str(args[0])
+            return not any(path in line for path in self.QUIET)
         return True

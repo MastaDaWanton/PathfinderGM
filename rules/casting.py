@@ -19,6 +19,8 @@ for.
 """
 from __future__ import annotations
 
+import re
+
 # Slots per day for a full caster, by class level then spell level 0-9. The wizard's table
 # from Core Rulebook 7-2; the cleric's is the same shape, plus a domain slot per level.
 #
@@ -331,15 +333,29 @@ def casting_ability(actor) -> str:
     return caster_data(actor).get("ability", "")
 
 
+# A paladin's or ranger's "caster level is equal to his paladin level - 3" (CRB, the class
+# entries), keyed by the class document's `progression` so a homebrew four-level caster
+# gets it too. Here, beside `caster_level`, since 2026-11-08: it lived only in
+# `formulae.py` (a potion's minimum caster level), and `caster_level` read class level for
+# every caster — a paladin 4's cure light wounds healed 1d8+4 where the book gives 1d8+1
+# (audit #34). `formulae` reads it from here.
+CL_OFFSET_BY_PROGRESSION: dict[str, int] = {"four_level": 3}
+
+
 def caster_level(actor) -> int:
-    """Caster level, which is class level for a single-classed character.
+    """Caster level: class level for a single-classed character, less the four-level
+    casters' offset (`CL_OFFSET_BY_PROGRESSION`), never below 1.
 
     Its own function because it stops being class level the moment anything multiclasses
-    or takes a prestige class, and every DC and duration in the game reads it.
+    or takes a prestige class, and every DC and duration in the game reads it. The floor
+    of 1 is for the paladin or ranger of level 1-3, who has no spells to cast: nothing
+    that reads a caster level (a duration, a range, an item's power) reads 0 or less
+    sensibly.
     """
     if not is_caster(actor):
         return 0
-    return max(0, int(actor.level))
+    offset = CL_OFFSET_BY_PROGRESSION.get(str(caster_data(actor).get("progression") or ""), 0)
+    return max(1, int(actor.level) - offset)
 
 
 def highest_spell_level(actor) -> int:
@@ -1197,6 +1213,31 @@ def sacrifice_for(actor, spell_level: int) -> str:
     return best
 
 
+def conversion_source(actor, spell) -> dict | None:
+    """Where a spontaneously converted cure comes from, in `cast_source`'s shape plus the
+    prepared spell given up (`sacrifice`), or None when it cannot be converted.
+
+    The slot that pays is the GIVEN-UP spell's: "a good cleric ... can spontaneously cast a
+    cure spell in place of a prepared spell of the same level or higher" (CRB, Spontaneous
+    Casting). The cure is still cast at its own level (`level`), for its DC and dice.
+    Measured on 0.2.26: a cleric with only a 3rd-level spell prepared converted it to cure
+    light wounds, lost the 3rd-level spell, and was charged a 1st-level slot as well."""
+    lvl = spell_level_for(actor, spell) if spell is not None else None
+    if lvl is None or at_will(lvl) or not converts_spontaneously(actor, spell):
+        return None
+    given = sacrifice_for(actor, lvl)
+    if not given:
+        return None
+    from . import spells as spells_mod
+
+    try:
+        paid = spell_level_for(actor, spells_mod.get(given))
+    except KeyError:
+        paid = None
+    return {"pool": slot_pool(paid if paid is not None else lvl), "key": "", "cost": 1,
+            "level": lvl, "sacrifice": given}
+
+
 def prepared_count(actor, spell_id: str) -> int:
     return int(actor.prepared.get(spell_id, 0))
 
@@ -1748,11 +1789,50 @@ def metal_effect(spec: dict, target, contact: str, *, source: str, origin: str):
                    "schedule": list(curve[1:])}])
 
 
-def touch_attack(spell) -> dict | None:
-    """The spell's `touch_attack` document, or None (most spells roll no attack)."""
+_RAY = re.compile(r"\bray", re.I)
+_RANGED_TOUCH = re.compile(r"\branged touch attack", re.I)
+_MELEE_TOUCH = re.compile(r"\bmelee touch attack", re.I)
+
+
+def touch_attack(spell, caster_level: int = 1) -> dict | None:
+    """The touch attack this spell rolls, or None (most spells roll no attack): its own
+    `touch_attack` document when it carries one (shocking grasp's +3 against metal), else
+    the one the spell's shape calls for (CRB, Aiming a Spell):
+
+      * a ray — its target or effect line says "ray", or its text "ranged touch attack" —
+        is a RANGED touch attack: "You must make a ranged touch attack to hit with a ray";
+      * a harmful spell with range "touch", or whose text says "melee touch attack", is a
+        MELEE touch attack: "To use a touch spell, you cast the spell and then touch the
+        subject ... you can touch one friend or yourself, but an opponent takes a touch
+        attack" (harmless touches on willing allies roll nothing, so only harm asks).
+
+    Detected mechanically from the spell's own lines, never from its name. Until
+    2026-11-08 only shocking grasp carried a document, so scorching ray, disintegrate,
+    inflict wounds, chill touch and polar ray never missed (audit #28). A turned cure on
+    the undead is a touch too; the cast door asks that per target (`Engine._op_cast`)."""
     for spec in getattr(spell, "effects", None) or ():
         if isinstance(spec, dict) and spec.get("type") == "touch_attack":
             return spec
+    if spell is None:
+        return None
+    text = str(getattr(spell, "description", "") or "")
+    lines = " ".join(str(getattr(spell, k, "") or "") for k in ("targets", "effect"))
+    # The text's "ranged touch attack" counts only for a spell with no area: fireball's
+    # says a bead sent through a narrow opening must hit it, which is no attack on the
+    # creatures in the burst.
+    if _RAY.search(lines) or (_RANGED_TOUCH.search(text)
+                              and not str(getattr(spell, "area", "") or "").strip()):
+        return {"type": "touch_attack", "touch": "ranged", "derived": True}
+    reach = str(getattr(spell, "range", "") or "").strip().lower()
+    # A creature touched, not a thing: explosive runes and glyph of warding are written on
+    # an object, and touching a door is no attack roll. Only a FOE is rolled against
+    # (`Engine._op_cast`): a willing subject is touched without one.
+    if reach.startswith("touch") and "creature" in str(getattr(spell, "targets", "")
+                                                       or "").lower():
+        from . import attitude
+
+        if _MELEE_TOUCH.search(text) or attitude.harmful_spell(spell, caster_level):
+            return {"type": "touch_attack", "touch": "melee", "derived": True}
     return None
 
 

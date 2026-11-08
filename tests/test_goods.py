@@ -154,22 +154,23 @@ def test_parting_with_something_you_do_not_have_says_so_rather_than_going_negati
     assert engine.scene.pc().goods == {}
 
 
-def test_a_price_is_paid_out_of_the_purse_in_the_same_breath(engine):
+def test_a_give_carries_no_price(engine):
+    """Audit #24, measured on 0.2.26. These two tests pinned a give's `price` paid out of
+    the purse "in the same breath": it was taken before the engine knew anything would
+    move (a refused give still charged 7 gp), the seller was never credited, a 300 gp
+    sword the giver never had went for 1 cp, and "1.5 gp" read as 15 gp. `buy` and
+    `sell` own prices; a give with one is refused with them named, and nothing moves."""
+    from rules.intents import IntentError
+
     pc = engine.scene.pc()
     pc.purse = {"gp": 3}
-    run(engine, {"op": "give", "params": {"item": "lantern", "to": "pc",
-                                          "price": "2 gp"}})
-    assert pc.goods == {"lantern": 1}
-    assert pc.purse == {"gp": 1}
-
-
-def test_a_sale_you_cannot_afford_does_not_happen(engine):
-    pc = engine.scene.pc()
-    pc.purse = {"sp": 2}
-    out = run(engine, {"op": "give", "params": {"item": "warhorse", "to": "pc",
-                                                "price": "200 gp"}})
-    assert "cannot afford" in out[0].tell
-    assert pc.goods == {} and pc.purse == {"sp": 2}
+    with pytest.raises(IntentError, match="buy item="):
+        engine.validate([{"op": "give", "params": {"item": "lantern", "to": "pc",
+                                                   "price": "2 gp"}}])
+    with pytest.raises(IntentError, match="no price"):
+        engine.validate([{"op": "give", "params": {"item": "warhorse", "to": "pc",
+                                                   "cost": "200 gp"}}])
+    assert pc.goods == {} and pc.purse == {"gp": 3}
 
 
 def test_what_is_carried_survives_a_save(engine):

@@ -86,12 +86,9 @@ def test_no_intermediate_word_answers_herbalisms_questions():
     assert not words & set(crafting.SHAPE_WORDS.values())
 
 
-def test_the_old_chain_is_refused_in_words():
-    """The old chain bench retired with the /craft/ tab (owner Q9.1). A chain sent there
-    is refused with a sentence naming the new bench, never run on retired rules."""
-    with pytest.raises(benches.MovedBench) as got:
-        benches.chain_from_body("alchemist", {"methods": ["seal"]})
-    assert "one step at a time" in str(got.value)
+def test_every_alchemy_method_has_its_own_station_icon():
+    """The station icons follow the track's methods, so a method the revamp added never
+    falls through to the fallback crate."""
     assert set(benches.method_glyphs("alchemist")) == set(al.METHODS)
 
 

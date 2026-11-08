@@ -91,30 +91,6 @@ def test_with_no_backup_that_reads_the_refusal_still_stands(campaigns):
         cm.current("gone")
 
 
-def test_a_new_game_takes_its_backups_with_the_archive(campaigns):
-    """Left under the old name, the next campaign with this id would inherit them, and a
-    failed load would restore the ARCHIVED game over the new one."""
-    cm = campaigns
-    c = _new(cm, "reuse")
-    c.save()
-    c.save()
-    assert files.backups(c.path(), keep=cm.BACKUPS_KEPT)
-    cm.current("reuse", reset=True)
-    fresh = cm.current("reuse")
-    assert all(p.stat().st_mtime >= fresh.path().stat().st_mtime - 5
-               for p in files.backups(fresh.path(), keep=cm.BACKUPS_KEPT))
-    archived = list(fresh.path().parent.glob("reuse-*.json.1"))
-    assert archived, "the archive carries its own backups"
-
-
-def test_two_new_games_in_one_second_do_not_collide(campaigns):
-    cm = campaigns
-    _new(cm, "twice")
-    cm.current("twice", reset=True).save()
-    cm.current("twice", reset=True).save()
-    assert len(list(cm._save_path("twice").parent.glob("twice-*.json"))) == 2
-
-
 def test_no_writer_truncates_a_file_in_place():
     """The ratchet: `Path.write_text` in shipped code is the shape this replaced."""
     offenders = []

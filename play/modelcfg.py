@@ -87,12 +87,40 @@ def _path() -> Path:
     return p / "models.json"
 
 
-def _stored() -> dict:
-    try:
-        raw = json.loads(_path().read_text(encoding="utf-8"))
-    except Exception:
+class _Unreadable(Exception):
+    """models.json exists and is not a settings object we can read."""
+
+
+def _read() -> dict:
+    """The stored overrides; {} when there is no file; `_Unreadable` when there is one
+    that does not parse.
+
+    utf-8-sig, because Notepad's "UTF-8 with BOM" is an ordinary way to hand-edit this
+    file, and plain utf-8 refused it (audit 2026-11-07 #9). The error carries the parse
+    position and never the text — this file holds the keys.
+    """
+    p = _path()
+    if not p.exists():
         return {}
-    return raw if isinstance(raw, dict) else {}
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        raise _Unreadable(f"not valid JSON at line {exc.lineno}, column {exc.colno}")
+    except Exception as exc:
+        raise _Unreadable(type(exc).__name__)
+    if not isinstance(raw, dict):
+        raise _Unreadable("not a JSON object")
+    return raw
+
+
+def _stored() -> dict:
+    # Reading falls back to the shipped defaults, so a broken file still plays; the log
+    # names it. Only `save` refuses, below.
+    try:
+        return _read()
+    except _Unreadable as exc:
+        files.unreadable(_path(), exc)
+        return {}
 
 
 def keys() -> dict[str, str]:
@@ -146,7 +174,14 @@ def save(roles_in: dict | None = None, keys_in: dict | None = None) -> list[str]
     remove a key the page sends the word `clear`, which is a thing nobody's key is.
     """
     problems: list[str] = []
-    data = _stored()
+    # Merged into what is on disk, so a file that exists and will not parse refuses the
+    # save: merging into `{}` was how one stray comma wiped every key and role (#9).
+    try:
+        data = _read()
+    except _Unreadable as exc:
+        files.unreadable(_path(), exc)
+        return [f"{_path()} could not be read ({exc}), so nothing was saved over it. "
+                f"Fix or remove that file, then save again."]
     data.setdefault("roles", {})
     data.setdefault("keys", {})
 

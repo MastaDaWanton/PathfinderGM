@@ -27,7 +27,7 @@ Where the phases come from (searched 2026-10-05, before this file was written):
   evolution.shtml) — fixed windows, no sun, no season, which is exactly this app's clock.
 
 The windows. The app has no sunrise: the engine's dawn is 06:00 (`Engine._camp_for` runs a
-night to it) and night is 18:00-06:00 (`play/craft_views._is_night`, the survival rules'
+night to it) and night is 18:00-06:00 (the survival rules'
 window). Those two are the one constant pair below, so a world that later has seasons
 changes one place. Each of the four turning points owns the two hours centred on it —
 dawn 05:00-07:00, noon 11:00-13:00, dusk 17:00-19:00, midnight 23:00-01:00 — and the

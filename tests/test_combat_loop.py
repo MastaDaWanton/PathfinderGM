@@ -129,25 +129,6 @@ def test_a_campaign_resumes_instead_of_being_overwritten(tmp_path, settings=None
     assert again.scene.pc().hp == 3
 
 
-def test_starting_a_new_game_archives_the_old_one(tmp_path):
-    """`?new=1` is one keystroke from a campaign nobody meant to end."""
-    from django.test import override_settings
-    from play import campaign as cm
-
-    with override_settings(CAMPAIGN_DIR=tmp_path):
-        cm._LIVE.clear()
-        cm.current("archive-test").transcript.append({"who": "player", "text": "old game"})
-        cm.current("archive-test").save()
-
-        cm._LIVE.clear()
-        cm.current("archive-test", reset=True)
-
-        archived = [p for p in tmp_path.glob("archive-test-*.json")]
-        assert len(archived) == 1
-        kept = json.loads(archived[0].read_text(encoding="utf-8"))
-        assert any(b["text"] == "old game" for b in kept["transcript"])
-
-
 def test_an_unreadable_save_is_left_alone_and_never_replaced(tmp_path):
     """A save this build cannot parse is the player's only copy of their game.
 

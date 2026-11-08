@@ -1062,38 +1062,21 @@ def _save_path(campaign_id: str) -> Path:
     return Campaign(id=campaign_id, world_source="", scene=Scene()).path()
 
 
-def current(campaign_id: str | None = None, reset: bool = False) -> Campaign:
+def current(campaign_id: str | None = None) -> Campaign:
     """The campaign in play, resumed from disk if it is not already in memory.
 
     Reading the save back was missing, and the consequence was not merely that a restart
     forgot the game: `new_campaign` immediately called `save()`, so restarting the server
     *overwrote* the campaign with a fresh one. A session could not survive the app being
     closed, which is not a game anyone can run.
+
+    There was a `reset=True` here that archived the save and began again in its place,
+    with `_retire_outgoing` to retire its character. Its one door, `?new=1`, was removed
+    2026-09-25 (a GET that ended a campaign); a new game is `begin_with`, which names the
+    campaign for its character and retires abandoned starts itself. Removed as dead code
+    (audit 2026-11-07), only tests still called it.
     """
     campaign_id = campaign_id or active_id()
-    if reset:
-        _LIVE.pop(campaign_id, None)
-        path = Campaign(id=campaign_id, world_source="", scene=Scene()).path()
-        if path.exists():
-            _retire_outgoing(path)
-            # An explicit new game archives the old one rather than deleting it. Saves
-            # are cheap and losing a campaign to a stray ?new=1 is not recoverable.
-            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            # A second reset inside the same second collided with the first archive's
-            # name, and `rename` onto an existing file raises on Windows — a 500.
-            archive = path.with_name(f"{campaign_id}-{stamp}.json")
-            n = 2
-            while archive.exists():
-                archive = path.with_name(f"{campaign_id}-{stamp}-{n}.json")
-                n += 1
-            # The backups go with the game they are backups OF. Left under the old
-            # name, the next campaign to take this id would inherit them, and a failed
-            # load would "restore" the archived game over the new one.
-            for kept in files.backups(path, keep=BACKUPS_KEPT):
-                suffix = kept.name[len(path.name):]
-                kept.replace(archive.with_name(archive.name + suffix))
-            path.rename(archive)
-
     if campaign_id not in _LIVE:
         # `_resume` returns None only when there is genuinely no save to read; a save
         # that exists and cannot be read raises, and that raise travels rather than
@@ -1104,28 +1087,6 @@ def current(campaign_id: str | None = None, reset: bool = False) -> Campaign:
         _heal_background(c)
         _LIVE[campaign_id] = c
     return _LIVE[campaign_id]
-
-
-def _retire_outgoing(path: Path) -> None:
-    """Mark the character of a campaign being replaced as retired.
-
-    Without this every `?new=1` left another living copy on the roster — three identical
-    Kessts, all alive, none being played. The dead are kept because they are a record;
-    an abandoned character is not the same thing, and saying so keeps the roster honest.
-    """
-    from . import roster
-
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return
-    cid = data.get("character_id")
-    if not cid:
-        return
-    entry = roster.load(cid)
-    if entry and entry.status == roster.ALIVE:
-        entry.status = roster.RETIRED
-        roster.save(entry)
 
 
 def _restore_from_backup(path: Path, why: Exception) -> Campaign | None:

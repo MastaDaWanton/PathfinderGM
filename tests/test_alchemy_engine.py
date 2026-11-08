@@ -149,6 +149,20 @@ def test_a_spell_potion_with_no_documents_resolves_through_the_spells_own():
     assert "bull#1" not in pc.stock and "clw#1" not in pc.stock
 
 
+def test_a_potion_refused_for_its_spell_is_not_drunk():
+    """Ponytail audit 2026-11-07 (smaller findings): a spell potion whose spell the Spells
+    bench does not have was refused AFTER the dose was spent — the refusal ate the potion.
+    The spell is read first; refused, the potion is still in the satchel."""
+    s, e, pc = _scene()
+    pc.stock["odd#1"] = Stock(base="Potion of Nothing Known", count=1,
+                              holds_spell="no-such-spell-anywhere", caster_level=1)
+    res = e.run(e.validate([{"op": "use_item", "actor": "pc", "because": "t",
+                             "params": {"item": "odd#1", "how": "drink"}}]))
+    out = res.outcomes[0]
+    assert out.status == "refused" and "does not have" in out.tell, out.tell
+    assert pc.stock["odd#1"].count == 1
+
+
 # --- "against X only" ---------------------------------------------------------------------------
 
 SUNMETAL = [{"type": "damage", "dice": "2d6", "damage_type": "fire", "route": "struck",

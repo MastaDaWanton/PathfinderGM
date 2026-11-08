@@ -123,7 +123,7 @@ def _templates_bench_parts() -> list[tuple[str, str]]:
     html = _src(TABLE)
     layer = html[html.index('<div id="bench"'):html.index('<div id="veil">')]
     craft = _src(CRAFT)
-    card = craft[craft.index("function renderHerbalismMoved()"):craft.index("function renderLocked()")]
+    card = craft[craft.index("function renderHerbalismMoved()"):craft.index("function renderForgeMoved()")]
     opener = html[html.index("<!-- Herbalism opens over the table"):html.index("Crafting bench</a>")]
     panel = html[html.index("<!-- The herbalism bench, over the table"):html.index("Open the full bench")]
     return [("table.html #bench", layer), ("craft.html herbalism card", card),

@@ -91,10 +91,10 @@ COPY_RETRY_MINUTES = 7 * 24 * 60      # "cannot attempt ... again until one week
 STUDY_MINUTES = 60                    # "1 hour studying the spell"
 
 # A paladin's or ranger's "caster level is equal to his paladin level - 3" (CRB, the class
-# entries). `casting.caster_level` reads class level for every caster; a potion's MINIMUM
-# caster level is a book number (plan §11.3: "never lower than the minimum level needed to
-# cast the needed spell"), so the conversion is made here, for that question only.
-CL_OFFSET_BY_PROGRESSION: dict[str, int] = {"four_level": 3}
+# entries): one constant, kept in `casting` beside the `caster_level` that applies it since
+# 2026-11-08 (audit #34). A potion's MINIMUM caster level is a book number (plan §11.3) worked
+# out from a class level, so `min_caster_level` reads the same offset.
+from .casting import CL_OFFSET_BY_PROGRESSION  # noqa: E402
 
 # How a formula came to be known, in the words the Formulary prints ("found by experiment,
 # day 14"). Any other `how` is kept as given.

@@ -244,9 +244,6 @@ def phase_a(client) -> list[dict]:
         ("travel to a biome that is not one", lambda: post("/api/travel", {
             "biome": "the moon"}), _expect_4xx()),
         # Crafting.
-        ("craft with herbs you do not have", lambda: post("/api/craft/do", {
-            "craft": "herbalism", "ingredients": ["woundwort"] * 3,
-            "methods": ["brew"]}), _expect_not_500),
         ("excursion that is not a thing", lambda: post("/api/craft/excursion", {
             "action": "necromancy:raise", "hours": 2}), _expect_4xx()),
     ]

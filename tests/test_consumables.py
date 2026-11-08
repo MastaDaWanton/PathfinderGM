@@ -18,7 +18,7 @@ from rules import consumables as con
 from rules import effectspec
 from rules import ingredients as ing_mod
 from rules.bestiary import instantiate
-from rules.crafting import Stock, _name_for, from_stock_dict
+from rules.crafting import Stock, from_stock_dict
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import IntentError
@@ -91,21 +91,6 @@ def finish(engine, res, faces=(19, 14, 6, 5, 4)):
 
 
 # --- the name that would not stop growing ---------------------------------------------
-
-def test_a_shape_word_is_not_stacked_on_itself():
-    """Crafted outputs go back into the craft tree as inputs — that is the whole point of
-    keeping them in inventory — so distilling a tincture produced a "Dragon Flower Tincture
-    Tincture". Seen in play ten deep, ending "Tincture Tincture Preparation"."""
-    assert _name_for([Named("Dragon Flower")], ["distill"]) == "Dragon Flower Tincture"
-    assert _name_for([Named("Dragon Flower Tincture")], ["distill"]) == \
-        "Dragon Flower Tincture"
-
-
-def test_a_name_that_already_compounded_is_healed():
-    """Saves written before the fix carry the stacked name. Crafting with one brings it
-    back rather than adding an eleventh."""
-    assert _name_for([Named("Dragon Flower Tincture Tincture Tincture")], ["brew"]) == \
-        "Dragon Flower Tea"
 
 
 # --- the structure that used to be lost --------------------------------------------------

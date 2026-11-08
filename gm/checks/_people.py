@@ -231,14 +231,6 @@ def _named_by(att, sentence: str, ref: str, name: str) -> bool | None:
                if m.ref is None and m.model != NOBODY)
 
 
-def sentences_of(text: str) -> list[str]:
-    """The narration's sentences, speech out — what every truth check reads."""
-    from gm.narration import _sentences
-    from gm.speech import unquoted
-
-    return _sentences(unquoted(str(text or "")))
-
-
 def about(ctx, ref: str) -> list[tuple[str, str]]:
     """The sentences this beat spends on `ref`, in order, each as (written on the page,
     its narration with speech blanked — `_page.page_sentences`): the attribution's

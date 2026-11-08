@@ -137,6 +137,26 @@ class TestHowItGrows:
                          origin="author:test"))
         assert attitude.regard_of(grix) == before + attitude.REGARD_GIFT
 
+    def test_gifts_share_the_days_cap_with_talk(self):
+        """Audit #40, measured on 0.2.26: each gift added +3 regard with no daily cap
+        while talk was capped at three exchanges a day — nineteen 1 cp gifts took a
+        stranger from indifferent (35) to devoted (92). A gift spends the same budget."""
+        s, e, grix = _table()
+        pc = s.pc()
+        pc.purse = {"cp": 19}
+        before = attitude.regard_of(grix)
+        for _ in range(19):
+            e.run(e.validate([{"op": "give", "actor": pc.ref, "because": "t",
+                               "params": {"item": "cp", "count": 1, "from_": pc.ref,
+                                          "to": grix.ref}}]))
+        assert pc.purse == {}, "the coppers were not all handed over"
+        assert attitude.regard_of(grix) == before + attitude.TALKS_A_DAY * attitude.REGARD_GIFT
+        assert attitude.of(grix) != "devoted"
+        # And talk the same day finds the budget spent.
+        e.run(e.validate([{"op": "say", "actor": pc.ref, "because": "t",
+                           "params": {"words": "Fine day.", "to": grix.ref}}]))
+        assert attitude.regard_of(grix) == before + attitude.TALKS_A_DAY * attitude.REGARD_GIFT
+
     def test_the_narrator_hears_a_step_crossed_and_never_a_number(self):
         s, e, grix = _table()
         pc = s.pc()

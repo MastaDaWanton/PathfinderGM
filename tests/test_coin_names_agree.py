@@ -156,17 +156,14 @@ def test_a_purchase_refused_for_want_of_coin_names_the_same_coin():
     _assert_names(out.tell, goods.coins_here(WORLD, s))
 
 
-def test_coin_handed_over_and_a_price_paid_name_the_same_coin():
-    """The give asked `coinage(world, None)` — the world's faction, Saltmakers'."""
+def test_coin_handed_over_names_the_same_coin():
+    """The give asked `coinage(world, None)` — the world's faction, Saltmakers'. (Its
+    second half, a give's `price`, went with the param on 2026-11-07, audit #24: a price
+    is `buy`'s, whose tell `test_a_purchase_refused_for_want_of_coin...` covers.)"""
     s, pc, keeper, e = _here()
     out = _run(e, {"op": "give", "target": keeper.ref,
                    "params": {"item": "sp", "count": 2, "to": keeper.ref, "from_": "pc"}})
     _assert_names(out.tell, goods.coins_here(WORLD, s))
-    keeper.goods["lantern"] = 1
-    out = _run(e, {"op": "give", "params": {"item": "lantern", "to": "pc",
-                                            "from_": keeper.ref, "price": "1 sp"}})
-    if _names_in(out.tell):
-        _assert_names(out.tell, goods.coins_here(WORLD, s))
 
 
 def test_a_days_work_names_the_pay_in_the_sheets_coin():

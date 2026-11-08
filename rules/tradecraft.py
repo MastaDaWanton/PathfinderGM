@@ -83,6 +83,39 @@ def bench_terms(actor, bench: str) -> list[dict]:
     return [{"label": m.source, "value": m.value} for m in stack([mod])]
 
 
+
+# The one bench check, written once. Each of the five world-class benches carried its own
+# copy of this list (herbalism, forge, tannery, laboratory, circle) and the copies had
+# already begun to differ in small ways (`if actor` against `if actor is not None`, a
+# half-level comment in two of five). Each bench's `check_terms` now names its own track,
+# word and ability and asks for this.
+_ABILITY_WORDS = {"str": "Strength", "dex": "Dexterity", "con": "Constitution",
+                  "int": "Intelligence", "wis": "Wisdom", "cha": "Charisma"}
+
+
+def bench_check_terms(actor, level: int, *, track: str, name: str, ability: str,
+                      ability_mod: int | None = None) -> list[dict]:
+    """**d20 + track level + half character level + the craft's ability**, plus half the
+    Craft ranks (`bench_terms`), always last, itemised as `{"label", "value"}`.
+
+    Itemised rather than summed because "+9" says nothing and "Blacksmith 3, half level
+    +4, Int +2" says which of the three to improve. `ability_mod` overrides the sheet's
+    own modifier for a bench that reads something narrower (the enchanter's circle counts
+    no worn bonus to Intelligence, `enchanter._base_int`).
+    """
+    track_level = max(0, int(level or 0))
+    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor is not None else 1
+    if ability_mod is None:
+        ability_mod = int(actor.ability_mod(ability)) if actor is not None else 0
+    return [
+        {"label": f"{name} {track_level}", "value": track_level},
+        # Half level, rounded down, as every half-level term in 1e rounds.
+        {"label": f"half character level ({char_level})", "value": char_level // 2},
+        {"label": _ABILITY_WORDS[ability], "value": int(ability_mod)},
+        *bench_terms(actor, track),
+    ]
+
+
 # --- the rule rows ----------------------------------------------------------------------
 
 _ROWS: dict | None = None

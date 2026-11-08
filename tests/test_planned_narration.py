@@ -1004,3 +1004,25 @@ def test_the_scene_briefs_looks_line_reads_one_of_the_people():
     brief = p.scene_brief(world, s, None, [])
     assert "keeps to it): one of the Korvu people:" in brief
     assert "keeps to it): Korvu:" not in brief
+
+
+@pytest.mark.parametrize("raw", ['{"text": "The smith', '["The smith nods."]'])
+def test_a_malformed_slot_reply_is_kept_and_logged(monkeypatch, caplog, raw):
+    """Ponytail audit 2026-11-07 (smaller finding): a slot reply that would not parse was
+    logged with `raw: ""` (`call_slot` raised before the caller held the reply), and one
+    that parsed to a list died in `realise` on `.get`, logged nowhere."""
+    import logging
+
+    from gm import client
+
+    s, engine = _scene()
+    monkeypatch.setattr(planned.client, "chat",
+                        lambda *a, **k: client.Reply(raw, 0.1, "stub-12b"))
+    caplog.set_level(logging.WARNING, logger="pathfindergm")
+    with pytest.raises(planned.PlanFailed) as exc:
+        planned.write(engine, brief="BRIEF", player_input="I ask about the ore.",
+                      outcomes=[_asked(engine)],
+                      who=("stub-12b", "http://x", "ollama", ""), last_beat=LAST_BEAT)
+    calls = getattr(exc.value, "calls", None) or []
+    assert calls and calls[0]["raw"] == raw, calls
+    assert "malformed reply" in caplog.text and "The smith" in caplog.text

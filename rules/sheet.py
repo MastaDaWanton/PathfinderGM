@@ -1527,6 +1527,61 @@ class Actor:
 
     # --- the periodic executor (plan §12.6) ------------------------------------------
 
+    def bleed_groups(self) -> list[dict]:
+        """Every bleed on this body, counted the way the book counts them.
+
+        CRB Appendix 2, Bleed: "Bleed effects do not stack with each other unless they
+        deal different kinds of damage. When two or more bleed effects deal the same kind
+        of damage, take the worse effect." A source that says otherwise is one group:
+        wounding's "multiple hits from a wounding weapon increase the bleed damage" (CRB,
+        magic weapon special abilities) is laid with `stacking: "stack"` under the one
+        origin (`Engine._magic_riders`), so its hits add up inside the group and the
+        group competes as one bleed. Every other bleed is a group of its own.
+
+        Each group: {"type", "mean", "said", "effects"}; `mean` is the average of its
+        dice, the measure "worse" is judged by.
+        """
+        from . import states
+
+        groups: dict = {}
+        for e in self.effects:
+            if not any(states.matches(str(t), "state.wound.bleeding") for t in e.tags):
+                continue
+            for p in e.periodic or ():
+                if "damage" not in p:
+                    continue
+                dtype = normalise_damage_type(
+                    str(p.get("damage_type") or p.get("type") or "untyped"))
+                key = ((dtype, e.origin or e.source) if e.stacking == "stack"
+                       else (dtype, id(e)))
+                g = groups.setdefault(key, {"type": dtype, "mean": 0.0, "amounts": [],
+                                            "effects": []})
+                g["mean"] += _mean_amount(p.get("damage"))
+                g["amounts"].append(p.get("damage"))
+                if e not in g["effects"]:
+                    g["effects"].append(e)
+        for g in groups.values():
+            amounts = g.pop("amounts")
+            ints = [a for a in amounts if isinstance(a, int) or str(a).isdigit()]
+            g["said"] = (str(sum(int(a) for a in ints)) if len(ints) == len(amounts)
+                         else " + ".join(str(a) for a in amounts))
+        return list(groups.values())
+
+    def running_bleeds(self) -> list[dict]:
+        """The bleed groups that run: the worst of each kind of damage (`bleed_groups`).
+
+        One rule asked by the executor, so it no longer matters who laid which bleed
+        first. Until 2026-11-08 the three writers each had their own (ponytail audit):
+        a creature's bleed replaced every other bleed when it was worse than any ONE of
+        them, wounding added to whatever was there, and a flask's bleed just added — a
+        flask's 1 and a claw's 3 bled 4, or 3, depending on which landed last.
+        """
+        best: dict[str, dict] = {}
+        for g in self.bleed_groups():
+            if g["type"] not in best or g["mean"] > best[g["type"]]["mean"]:
+                best[g["type"]] = g
+        return list(best.values())
+
     def run_periodic(self, per: str = "round", times: int = 1, dice=None,
                      elapsed: bool = False) -> list[dict]:
         """Run every standing effect's `periodic` work that falls on this clock.
@@ -1564,9 +1619,16 @@ class Actor:
             # §4: "`run_periodic("day")` resets the counts") — the clock's own day
             # boundary, so there is no second ticker for item uses.
             self.reset_item_uses()
+        # Bleed takes the worse, whatever order the bleeds arrived in (`running_bleeds`):
+        # the ones that lose run nothing this round, and stay to be stopped with the rest.
+        bleeds = {id(e) for g in self.bleed_groups() for e in g["effects"]}
+        running = {id(e) for g in self.running_bleeds() for e in g["effects"]}
+        before = (self.hp, self.nonlethal)
         for e in list(self.effects):
             for p in list(e.periodic or ()):
                 if str(p.get("per") or "round").lower() != per or "spend_pool" in p:
+                    continue
+                if "damage" in p and id(e) in bleeds and id(e) not in running:
                     continue
                 # An affliction runs over a stretch of time as well as in played rounds:
                 # a disease's "1/day" is a day of the clock, and a poison's "1/minute for
@@ -1594,13 +1656,11 @@ class Actor:
                         total += _amount_of(p.get("heal"), dice)
                     had = self.nonlethal
                     healed = self.heal(total) if total > 0 and not self.is_dead else 0
-                    if healed and self.hp > 0 and self.clear_states("recovery.hit-points"):
-                        # Back above zero: the dying stop dying, as a cure's do
-                        # (`Engine._op_heal`) — "fast healing continues to function
-                        # (even at negative hit points) until a creature dies" (Bestiary).
-                        # The non-lethal ladder is asked again: what it still holds
-                        # them down with, it puts back.
-                        self.apply_nonlethal_state()
+                    # The dying stop dying, as a cure's do (`after_healing`, the one
+                    # rule) — "fast healing continues to function (even at negative hit
+                    # points) until a creature dies" (Bestiary), so a point of it below
+                    # zero stabilises and a rise to 0 wakes them disabled.
+                    lifted, written = self.after_healing(healed) if healed else ([], [])
                     # Fast healing is magic too, and "not even magic" mends what thirst
                     # or hunger holds (CRB p.444): a refusal is a thing that happened,
                     # so it is a record even when nothing else was restored.
@@ -1614,6 +1674,8 @@ class Actor:
                         if held:
                             rec["unmended"] = held
                         out.append(rec)
+                    out.extend({"kind": "condition", "ref": self.ref, "condition": k,
+                                "from": "hit points"} for k in written)
                 elif "damage" in p:
                     dtype = str(p.get("damage_type") or p.get("type") or "untyped")
                     # `times_left`: a burn that fires a counted number of times and then
@@ -1656,6 +1718,14 @@ class Actor:
                 elif isinstance(p.get("effect"), dict):
                     for _ in range(times):
                         out.extend(self._periodic_effect(p["effect"], source, e.origin, dice))
+        # What the round's damage did to the ladder. A burn, a bleed, a poison's damage
+        # and Constitution damage all took hit points here and nothing asked the
+        # thresholds until 2026-11-08 (ponytail audit #2): a thug at 1 hit point burnt
+        # for 6d6 lay at -21 with no condition, neither dying nor dead, and a player at
+        # -5 could still act. Asked only when the totals moved, so an unhurt body's round
+        # never writes a rung it did not earn this round.
+        if (self.hp, self.nonlethal) != before:
+            out.extend(self.hp_state_records())
         return out
 
     def _periodic_effect(self, spec: dict, source: str, origin: str, dice) -> list[dict]:
@@ -1671,8 +1741,14 @@ class Actor:
             n = _amount_of(spec.get("dice") or spec.get("amount"), dice)
             if n > 0:
                 self.damage_ability(ab, n)
+                # A score taken to 0 has its own consequence (Constitution is death), as
+                # the ability-damage op and an affliction's strike already ask; a carried
+                # price that ran a body's Constitution out left it alive (ponytail #2).
                 return [{"kind": "ability_damage", "ref": self.ref, "amount": n,
-                         "ability": ab, "source": source, "origin": origin}]
+                         "ability": ab, "source": source, "origin": origin}] + [
+                    {"kind": "condition", "ref": self.ref, "condition": c,
+                     "from": f"{ABILITY_FULL.get(ab, ab)} 0"}
+                    for c in self.ability_zero_effects()]
             return []
         if kind != "save_gate":
             return []
@@ -1824,6 +1900,7 @@ class Actor:
 
         aff = (e.payload or {}).get("affliction") or {}
         out: list[dict] = []
+        before = (self.hp, self.nonlethal)
         for eff in aff.get("effects") or ():
             if self.is_dead:
                 break
@@ -1872,6 +1949,11 @@ class Actor:
                                    payload=None if rounds else {"with": e.payload.get("id")})
                 out.append({"kind": "condition", "ref": self.ref, "condition": cond,
                             "from": e.name, "rounds": rounds})
+        # Hit points the strike took — its own damage, or the Constitution it carried
+        # away — cross the thresholds here too (ponytail audit #2). A strike inside the
+        # periodic executor is asked again there, and the ladder answers nothing twice.
+        if (self.hp, self.nonlethal) != before:
+            out.extend(self.hp_state_records())
         return out
 
     def end_affliction(self, e: "ActiveEffect", why: str) -> list[dict]:
@@ -2501,9 +2583,12 @@ class Actor:
         for ab in ABILITIES:
             if self.ability_score(ab) > 0:
                 continue
-            if ab == "con" and not self.has_condition("dead"):
-                self.add_condition("dead", source="Constitution reduced to 0")
-                out.append("dead")
+            if ab == "con":
+                # Through `die`, the one door: this wrote `dead` itself and left a body
+                # that was dying when its Constitution ran out dead, dying and
+                # unconscious at once (ponytail audit, 2026-11-07).
+                if self.die("Constitution reduced to 0"):
+                    out.append("dead")
             elif ab == "str" and not self.has_condition("helpless"):
                 self.add_condition("helpless", source="Strength reduced to 0")
                 out.append("helpless")
@@ -4744,6 +4829,16 @@ class Actor:
             self.hp -= overflow
         else:
             self.hp -= taken
+        # Fresh damage below 0 reopens the wound: stable is "stopped losing hit points"
+        # (CRB Appendix 2), and a body that has just lost more has not. The Disabled
+        # rule is the book's own model of it — a fragile body that takes one point "is
+        # now at -1 hit points and dying". Nothing removed `stable` until 2026-11-08
+        # (ponytail audit #15): stable at -3, hit for 2, was still stable at -5, and the
+        # test that pinned the dying starting again took it off by hand. Here, in the one
+        # place hit points leave an actor, and asked of the vocabulary so the ratchet on
+        # literal condition keys holds; `apply_hp_state` writes the dying back.
+        if (overflow if lethality == "nonlethal" else taken) > 0 and self.hp < 0:
+            self.clear_states("state.down.stable")
         # A unit's pool is its members: every member's worth of damage takes one of them
         # off their feet, with the excess cascading (13th Age's mob). One writer, here,
         # because this is the one place hit points leave an actor — attrition applied
@@ -4972,6 +5067,27 @@ class Actor:
                 self.preserved[key] = True
         return self.inventory[key]
 
+    def carry_from(self, giver, ingredient_id: str, count: int, now: int) -> int:
+        """Raw material out of somebody else's satchel into this one, keeping its age.
+
+        Measured 2026-11-07 (ponytail audit, smaller findings): a herb handed over was
+        carried with the clock reset to the minute of the handover, so a gland two days
+        from rotting came back fresh; and a looted body's satchel went in with no clock at
+        all, which `freshness` reads as never spoiling. The giver's own pick-time travels
+        with it; a giver with none (a kit rolled at the loot, a stranger's pockets) starts
+        the clock now. The newest handful still sets the pile's clock (`carry`), and salt
+        on the giver's side stays salt."""
+        key = (ingredient_id or "").strip().lower()
+        picked = (getattr(giver, "picked_at", None) or {}).get(key) if giver else None
+        when = int(picked) if picked is not None else int(now)
+        mine = self.picked_at.get(key)
+        n = self.carry(key, count, at_minute=when)
+        if mine is not None and int(mine) > when:
+            self.picked_at[key] = int(mine)
+        if giver is not None and (getattr(giver, "preserved", None) or {}).get(key):
+            self.preserved[key] = True
+        return n
+
     def freshness(self, ingredient_id: str, now_minute: int, prep) -> tuple[bool, int]:
         """Whether this has spoiled, and how many hours are left if it has not.
 
@@ -5051,6 +5167,20 @@ class Actor:
             # Same condition twice does not stack in 1e; the longer duration wins.
             if rounds is not None and (existing.rounds_left is None or rounds > existing.rounds_left):
                 existing.rounds_left = rounds
+            elif rounds is None and existing.rounds_left is not None:
+                # A copy with no end is the longer one. It lost to any timer until
+                # 2026-11-08 (ponytail audit #16): a 2-round sickened met a disease's
+                # open-ended sickened, kept its 2 rounds and dropped the payload, so the
+                # sickness wore off while the disease still held. What holds it open now
+                # is the new copy's — its `with` (the affliction it goes with,
+                # `end_affliction`) comes across with it. A copy that was ALREADY open
+                # keeps its own terms: handing a curse's sickness to a fever would let
+                # curing the fever lift the curse's.
+                existing.rounds_left = None
+                existing.duration = "until-dismissed"
+                if payload and payload.get("with"):
+                    existing.payload = {**(existing.payload or {}),
+                                        "with": payload["with"]}
             # An end the old copy did not have is not taken on by the new one: a greater
             # invisibility (no end on attack) under a drunk invisibility keeps the
             # greater's terms. A copy that had an end and meets one without keeps none.
@@ -6140,7 +6270,6 @@ class Actor:
         floor = max(self.hp, 0)
         self.hp = min(self.hp_max, floor + per_level * max(1, self.level))
 
-        woke = bool(self.hp > 0 and self.clear_states("recovery.hit-points"))
         # You stand up in the morning. Waking still prone, shaken and entangled from a
         # fight the night before is the sort of stale state that quietly poisons every
         # roll for the rest of the campaign.
@@ -6194,6 +6323,10 @@ class Actor:
         held = sum(self.withheld_nonlethal().values())
         nonlethal_gone = max(0, self.nonlethal - held)
         self.nonlethal -= nonlethal_gone
+        # Back on their feet by the one rule every healing door asks (`after_healing`),
+        # after the night's non-lethal has healed, so what is still holding them down is
+        # only what thirst or hunger withholds (CRB p.444) and not last night's bruises.
+        woke = bool(self.after_healing(self.hp - before)[0])
         # A night is what the awake clock is measured against, so a night resets it.
         from . import survival
 
@@ -6253,10 +6386,16 @@ class Actor:
         return dict(result, levelled=levelled, refilled=refilled, prepared=prepared)
 
     def bleed_out(self, dice) -> dict | None:
-        """One round of dying: lose a hit point, then try to stabilise.
+        """One round of dying: try to stabilise, and lose a hit point only on a failure.
 
-        PF1e: a Constitution check against DC 10 + the negative hit point total. Success
-        makes you stable; failure takes you a point closer to dead.
+        CRB (Combat, Injury and Death): "the character must make a DC 10 Constitution
+        check to become stable. The character takes a penalty on this roll equal to his
+        negative hit point total ... A natural 20 on this check is an automatic success.
+        If the character fails this check, he loses 1 hit point."
+
+        The point came off FIRST until 2026-11-08 (ponytail audit #3), so a made check
+        still cost it — a 21 against DC 11 at -1 left the character stable at -2 — and a
+        body one rung above the floor died with no roll at all, a forced 20 included.
         """
         if not self.has_condition("dying") or self.has_condition("dead"):
             return None
@@ -6270,31 +6409,122 @@ class Actor:
         # round to avoid losing additional hit points." Asked of the vocabulary — the
         # feat document's `dying.stabilises` tag (`standing_tags`) — so a homebrew trait
         # or an orc's ferocity-like gift is a document line, not a branch here.
-        automatic = self.has_state(DYING_STABILISES)
-        if not automatic:
-            if self.hp > self.death_floor():
-                self.hp -= 1
-            if self.hp <= self.death_floor():
-                self.apply_hp_state()
-                return {"ref": self.ref, "outcome": "dead", "hp": self.hp}
+        if self.has_state(DYING_STABILISES):
+            self.stabilise("stabilised on its own")
+            return {"ref": self.ref, "outcome": "stable", "hp": self.hp,
+                    "automatic": True}
 
         dc = 10 + abs(self.hp)
         # Through the ability-check funnel since 2026-10-09: a sickened body's "-2 on
-        # ability checks" reaches the check that keeps it alive.
-        roll = None if automatic else dice.d20(self.ability_check_modifiers("con"),
-                                               label=f"{self.name} stabilise",
-                                               visibility="hidden")
-        if automatic or roll.total >= dc:
-            self.remove_condition("dying")
-            self.add_condition("stable", source="stabilised on its own" if automatic
-                               else "stabilised")
-            if automatic:
-                return {"ref": self.ref, "outcome": "stable", "hp": self.hp,
-                        "automatic": True}
+        # ability checks" reaches the check that keeps it alive. The natural 20 is read
+        # off the face here and not through `dice.d20_succeeds`, which owns saves and
+        # attacks: this is an ability check, and the stabilise rule grants its 20 alone
+        # — a natural 1 here is only a low roll.
+        #
+        # "Characters taking continuous damage, such as from an acid arrow or a bleed
+        # effect, automatically fail all Constitution checks made to stabilize" (CRB,
+        # Injury and Death). No die is rolled, so not even a natural 20 saves them: the
+        # wound has to be stopped first (a Heal check, a cure, the fire put out).
+        continuous = self.taking_continuous_damage()
+        roll = None if continuous else dice.d20(self.ability_check_modifiers("con"),
+                                                label=f"{self.name} stabilise",
+                                                visibility="hidden")
+        if roll is not None and (roll.natural == 20 or roll.total >= dc):
+            self.stabilise("stabilised")
             return {"ref": self.ref, "outcome": "stable", "hp": self.hp,
                     "roll": roll.total, "dc": dc}
-        return {"ref": self.ref, "outcome": "dying", "hp": self.hp,
-                "roll": roll.total, "dc": dc}
+        said = {"roll": roll.total if roll is not None else None, "dc": dc,
+                **({"continuous": True} if continuous else {})}
+        if self.hp > self.death_floor():
+            self.hp -= 1
+        if self.hp <= self.death_floor():
+            self.apply_hp_state()
+            return {"ref": self.ref, "outcome": "dead", "hp": self.hp, **said}
+        return {"ref": self.ref, "outcome": "dying", "hp": self.hp, **said}
+
+    def taking_continuous_damage(self) -> bool:
+        """Whether something is still hurting this body every round — the CRB's
+        "continuous damage, such as from an acid arrow or a bleed effect", which fails
+        every stabilise check (`bleed_out`).
+
+        A bleed is asked through `running_bleeds` (the one bleed rule); anything else is
+        an effect whose periodic work deals damage by the round — a clinging fire
+        (`state.burning`), heat metal's curve, a homebrew acid — read off the executor's
+        own vocabulary (`damage` / `schedule`), never a condition's name. A burn with no
+        firings left (`times_left` 0) is not hurting anybody.
+        """
+        if self.running_bleeds():
+            return True
+        for e in self.effects:
+            for p in e.periodic or ():
+                if str(p.get("per") or "round").lower() != "round":
+                    continue
+                if "times_left" in p and int(p.get("times_left") or 0) <= 0:
+                    continue
+                if isinstance(p.get("schedule"), list) and p["schedule"]:
+                    return True
+                if "damage" in p and _mean_amount(p.get("damage")) > 0:
+                    return True
+        return False
+
+    def stabilise(self, source: str) -> bool:
+        """Dying becomes stable: the one writer of that rung. False when not dying.
+
+        Four doors reach it — the patient's own Constitution check (`bleed_out`), first
+        aid's DC 15 Heal (`firstaid.settle`), any healing that leaves them negative
+        (`after_healing`) and the off-screen resolution, which is `bleed_out` again — and
+        two of them wrote the pair of lines themselves until 2026-11-08.
+        """
+        if not self.has_state("state.down.dying"):
+            return False
+        self.remove_condition("dying")
+        self.add_condition("stable", source=source)
+        return True
+
+    def after_healing(self, healed: int) -> tuple[list[str], list[str]]:
+        """What healing does to the hit-point rungs: (lifted, written).
+
+        CRB (Combat, Injury and Death): "If any sort of healing cures the dying
+        character of even 1 point of damage, he becomes stable and stops losing hit
+        points"; "Healing that raises the dying character's hit points to 0 makes him
+        fully conscious and disabled. Healing that raises his hit points to 1 or more
+        makes him fully functional again."
+
+        One helper for every healing door — a cure (`Engine._op_heal`), a shared heal
+        (`_op_use_ability`), fast healing (`run_periodic`) and a night's rest. Three of
+        them carried their own `hp > 0` until 2026-11-08 (ponytail audit #4): at -5,
+        healed by 5, the character lay unconscious, dying AND disabled, and bled again
+        next round. None of them stabilised a patient a cure left negative.
+
+        `written` is what the ladder put on afterwards (`disabled` at exactly 0, `stable`
+        below it, or the non-lethal knockout the cure could not lift), so the caller's
+        tell can say it: law 3 asks for a tell on every application.
+        """
+        if self.is_dead:
+            return [], []
+        if self.hp >= 0:
+            lifted = self.clear_states("recovery.hit-points")
+            if not lifted:
+                return [], []
+            # The ladder asked again: `disabled` at exactly 0, and the non-lethal still
+            # holding them down where a cure could not take it off (CRB p.444).
+            again = self.apply_hp_state()
+            return [k for k in lifted if k not in again], \
+                [k for k in again if k not in lifted]
+        if healed > 0 and self.stabilise("healed"):
+            return ["dying"], ["stable"]
+        return [], []
+
+    def hp_state_records(self) -> list[dict]:
+        """`apply_hp_state`, as the condition records a tell is built from.
+
+        The engine's `_hp_state_effects` was the one place that shaped these; the
+        periodic executor and an affliction's strike need the same thing and never asked
+        (ponytail audit #2: a thug at 1 hit point burnt for 6d6 lay at -21 with no
+        condition at all, and a player at -5 could still act).
+        """
+        return [{"ref": self.ref, "kind": "condition", "condition": c,
+                 "from": "hit points"} for c in self.apply_hp_state()]
 
     # --- serialisation ------------------------------------------------------------------
 
@@ -7338,6 +7568,19 @@ def _with_layer(row: dict, lay: dict | None) -> dict:
 # Rounds in each unit a duration may be written in (ten rounds a minute, CRB p.178).
 _ROUNDS_PER = {"round": 1, "rounds": 1, "minute": 10, "minutes": 10, "hour": 600,
                "hours": 600, "day": 14400, "days": 14400}
+
+
+def _mean_amount(value) -> float:
+    """The average of a fixed number or a dice string ("1d6" is 3.5, "2d4+1" is 6): the
+    measure one bleed is judged worse than another by. Unreadable is 0."""
+    try:
+        return float(int(value))
+    except (TypeError, ValueError):
+        pass
+    m = re.fullmatch(r"(\d*)d(\d+)([+-]\d+)?", str(value or "").replace(" ", "").lower())
+    if not m:
+        return 0.0
+    return int(m.group(1) or 1) * (int(m.group(2)) + 1) / 2 + int(m.group(3) or 0)
 
 
 def _amount_of(value, dice) -> int:

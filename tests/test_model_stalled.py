@@ -137,3 +137,94 @@ def test_a_stall_does_not_hand_the_turn_to_a_backup_on_the_same_ollama(monkeypat
     with pytest.raises(client.ModelStalled):
         g.plan_turn("I look around.", [])
     assert asked == [g.model], asked
+
+
+# --- remembered (ponytail audit 2026-11-07, finding #6) ------------------------------------
+#
+# Only the planner honoured `ModelStalled`. The interpreter, the free narrator, the retries
+# and every read-back caught it as a plain `Exception` and called again: a stall at the
+# interpreter cost 120 s and the planner then waited another 120 s; a stall mid-groom cost
+# 120 s per read-back.
+
+
+def test_a_stalled_host_is_refused_at_once_for_the_next_call(monkeypatch):
+    """The second call to a wedged Ollama raised after a fresh 120-second wait on 0.2.27;
+    remembered, it never reaches `/api/chat` at all."""
+    calls = []
+
+    def silent(req, timeout):
+        calls.append(timeout)
+        raise TimeoutError("timed out")
+
+    _ollama(monkeypatch, chat=silent)
+    with pytest.raises(client.ModelStalled):
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434")
+    with pytest.raises(client.ModelStalled) as exc:
+        client.chat([{"role": "user", "content": "y"}], "other-model",
+                    "http://localhost:11434/")
+    assert len(calls) == 1, calls
+    assert "start it again" in str(exc.value)
+
+
+def test_a_restarted_ollama_is_let_through_inside_the_minute(monkeypatch):
+    """The sentence says restart Ollama and send the line again. Restarted, the model is
+    no longer loaded (`/api/ps` lists nothing), and the call goes to the new server
+    rather than being answered "restart Ollama" for the rest of the minute."""
+    _ollama(monkeypatch, chat=_silent)
+    with pytest.raises(client.ModelStalled):
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434")
+    _ollama(monkeypatch, ps=(), chat=lambda req, t: _Resp(json.dumps(
+        {"message": {"content": "back"}, "done": True})))
+    reply = client.chat([{"role": "user", "content": "x"}], "gemma",
+                        "http://localhost:11434")
+    assert reply.text == "back"
+    assert client._stalls == {}
+
+
+def test_a_stall_is_forgotten_after_the_minute(monkeypatch):
+    _ollama(monkeypatch, chat=_silent)
+    with pytest.raises(client.ModelStalled):
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434")
+    when, *rest = client._stalls["http://localhost:11434"]
+    client._stalls["http://localhost:11434"] = (when - client.STALL_MEMORY_SECONDS - 1,
+                                                *rest)
+    _ollama(monkeypatch, chat=lambda req, t: _Resp(json.dumps(
+        {"message": {"content": "ok"}, "done": True})))
+    assert client.chat([{"role": "user", "content": "x"}], "gemma",
+                       "http://localhost:11434").text == "ok"
+
+
+def test_stalled_since_names_a_stall_any_call_met(monkeypatch):
+    """For the narrator's boundary (`agent.surfaces_a_stall`): a read-back that swallowed
+    the stall still leaves it on record."""
+    import time
+
+    started = time.monotonic()
+    assert client.stalled_since(started, ["http://localhost:11434"]) is None
+    _ollama(monkeypatch, chat=_silent)
+    try:
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434")
+    except Exception:  # noqa: BLE001 — swallowed, as a read-back does
+        pass
+    got = client.stalled_since(started, ["http://localhost:11434/"])
+    assert isinstance(got, client.ModelStalled)
+    assert client.stalled_since(time.monotonic() + 1, ["http://localhost:11434"]) is None
+    assert client.stalled_since(started, ["http://elsewhere:11434"]) is None
+
+
+def test_another_http_error_is_named_not_called_unreachable(monkeypatch):
+    """Ponytail audit, smaller finding: any HTTP error but 400-grammar, 404 and a load
+    failure was re-raised bare, and an `HTTPError` is a `URLError`, so the player read
+    "cannot reach Ollama … Start Ollama" from a server that had just answered."""
+    def refused(req, timeout):
+        raise urllib.error.HTTPError(
+            req.full_url, 500, "Internal Server Error", {},
+            __import__("io").BytesIO(b'{"error":"out of memory"}'))
+
+    _ollama(monkeypatch, chat=refused)
+    with pytest.raises(client.ModelUnavailable) as exc:
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434")
+    msg = str(exc.value)
+    assert "cannot reach" not in msg and "Start Ollama" not in msg
+    assert "HTTP 500" in msg and "out of memory" in msg
+    assert not isinstance(exc.value, client.ModelStalled)

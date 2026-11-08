@@ -372,8 +372,7 @@ def capacity(record, *, binder_level: int | None = None, binder_perks=None) -> d
 
     `binder_level` and `binder_perks` (an int, or the perk dict with `capacity`) default to
     the record's last binding. Arms and armour must be masterwork first ("only a masterwork
-    weapon can become a magic weapon", CRB); rings and wondrous items need not be
-    (`magicitem.VESSEL_RULES`, kept).
+    weapon can become a magic weapon", CRB); rings and wondrous items need not be.
 
     {"bonus": 5, "used": 2, "left": 3, "cap": None, "level": 6, "from_level": 3,
      "from_quality": 1, "from_perks": 1, "masterwork": True,

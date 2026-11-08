@@ -134,7 +134,7 @@ def test_abilities_that_are_not_an_object_are_refused_not_raised():
 
 
 @pytest.mark.parametrize("url", [
-    "/api/roll", "/api/combat/act", "/api/craft/preview", "/api/craft/do",
+    "/api/roll", "/api/combat/act", "/api/craft/excursion",
     "/api/forage", "/api/spells/save", "/api/level-up", "/api/slots",
     "/api/character/create", "/api/travel",
 ])
