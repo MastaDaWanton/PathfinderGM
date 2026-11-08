@@ -523,3 +523,34 @@ def test_table_talk_tripping_a_check_is_mended_once(camp, monkeypatch):
     tt.after_the_beat(camp, _agent(), plain)
     assert len(asked) == 2
     assert camp.transcript[-1]["text"] == "Bold. Now let's see what you do next."
+
+
+# --- every turn on "always" (the owner's second packaged game, 2026-11-07) ---------------
+
+def test_always_speaks_on_a_turn_the_engine_decided_nothing_about(camp, monkeypatch):
+    """"I wiggle my butt and spread my legs wide…" was pure narration: no roll, no
+    outcome, no facts. The GM said nothing on "always" and left no row in the log."""
+    houserules.set_active({"table_talk": "always"})
+    assert tt.wanted([], [], "always") and not tt.wanted([], [], "big")
+    asked = _scripted(monkeypatch, "Making yourself at home, I see. What now?")
+    tt.after_the_beat(camp, _agent(), SimpleNamespace(outcomes=[]))
+    assert "No roll and no ruling" in asked[0][-1]["content"]
+    assert camp.transcript[-1]["text"] == "Making yourself at home, I see. What now?"
+
+
+def test_a_repeated_praise_word_is_mended_not_dropped(camp, monkeypatch):
+    """"Nice try" one turn, "nice" two turns later: the second line was dropped whole and
+    the GM skipped a turn on "always". Now it is asked once more without the word."""
+    houserules.set_active({"table_talk": "always"})
+    camp.transcript.append({"who": "table", "kind": "table", "text": "[I chuckle.] Nice try."})
+    asked = _scripted(monkeypatch, "Nice, you got your seat.", "You got your seat. Comfy?")
+    tt.after_the_beat(camp, _agent(), SimpleNamespace(outcomes=[]))
+    assert len(asked) == 2 and '"nice"' in asked[1][-1]["content"]
+    assert camp.transcript[-1]["text"] == "You got your seat. Comfy?"
+
+
+def test_every_silent_turn_leaves_its_reason_in_the_log(camp, monkeypatch):
+    houserules.set_active({"table_talk": "big"})
+    _scripted(monkeypatch)
+    tt.after_the_beat(camp, _agent(), SimpleNamespace(outcomes=[]))
+    assert camp.scene.said["table:log"][-1]["dropped"] == "not a big moment"

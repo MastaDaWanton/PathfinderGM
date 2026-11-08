@@ -174,9 +174,14 @@ def moments(c, resolution) -> tuple[list[str], list[str]]:
 def wanted(kinds: list[str], facts: list[str], mode: str | None = None) -> bool:
     """Whether the table's house rule asks for a line on this moment."""
     mode = mode or houserules.table_talk()
-    if mode == "off" or not facts:
+    if mode == "off":
         return False
-    return mode == "always" or bool(BIG & set(kinds))
+    # "Always" means every turn, a turn with nothing the engine decided included. Measured
+    # 2026-11-07 on the owner's game: "I wiggle my butt and spread my legs wide…" was
+    # pure narration, no roll and no outcome, so no facts, and the GM said nothing on
+    # "always" without even a line in the log. The quiet job reacts to the player's own
+    # words and the beat, which every turn has.
+    return mode == "always" or bool(facts and BIG & set(kinds))
 
 
 # --- the prompt ------------------------------------------------------------------------
@@ -236,6 +241,12 @@ def _mend_ask(why: str) -> str:
         word = why.split(": ", 1)[1]
         return (f'Say it again without the word "{word}", and name nobody and nothing '
                 f"that is not given above.")
+    if why.startswith("praise word again: "):
+        # The owner's next turn after the mend landed (2026-11-07): "nice" two lines after
+        # "Nice try", dropped whole, and the GM skipped a turn on "always".
+        word = why.split(": ", 1)[1]
+        return (f'Say it again without the word "{word}" or any other praise. React to '
+                f"what they did, or ask what they do next.")
     if why == "a number":
         return "Say it again with no numbers in it at all."
     if why == "too long":
@@ -262,7 +273,9 @@ def table_messages(v: dict, facts: list[str], player_line: str, beat: str,
         msgs.append({"role": "user", "content": f"YOUR JOB: {JOBS.get(kind, JOBS['quiet'])}"
                                                 f"\nMOMENT: {ex['moment']}"})
         msgs.append({"role": "assistant", "content": ex["said"]})
-    ask = f"YOUR JOB: {JOBS.get(job, JOBS['quiet'])}\nMOMENT: " + " ".join(facts)
+    ask = f"YOUR JOB: {JOBS.get(job, JOBS['quiet'])}\nMOMENT: " + (
+        " ".join(facts) or "No roll and no ruling: they did what they wrote, and the story "
+        "told it.")
     if player_line:
         ask += f"\n\nThe player wrote: {player_line}"
     if beat:
@@ -485,11 +498,15 @@ def after_the_beat(c, agent, resolution) -> None:
     try:
         if houserules.table_talk() == "off":
             return
+        # Every silent way out below "off" leaves its reason in the log: a turn with no GM
+        # and no row was undiagnosable from the owner's own save (2026-11-07).
         intimate = getattr(agent, "_intimate_beat", None)
         if callable(intimate) and intimate():
+            _log(c, {"said": "", "dropped": "an intimate beat"})
             return
         kinds, facts = moments(c, resolution)
         if not wanted(kinds, facts):
+            _log(c, {"moments": kinds, "said": "", "dropped": "not a big moment"})
             return
         from gm import client
         from gm.client import ModelUnavailable
