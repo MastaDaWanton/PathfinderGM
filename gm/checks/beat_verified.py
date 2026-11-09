@@ -48,8 +48,8 @@ KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
                    "beat-omits-outcome", "beat-condition", "beat-attempt", "beat-setting",
                    "beat-struck-with", "beat-swing-early", "beat-foe-struck-with",
-                   "beat-struck-at-early", "beat-aimed-wrong", "beat-makes-item",
-                   "beat-height"})
+                   "beat-struck-at-early", "beat-aimed-wrong", "beat-sees-the-unseen",
+                   "beat-makes-item", "beat-height"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the

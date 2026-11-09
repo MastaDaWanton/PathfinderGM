@@ -168,6 +168,54 @@ def test_a_failed_read_costs_the_turn_nothing_and_is_logged(monkeypatch):
     bv.clear_cache()
 
 
+_AT_YOU = "The thug swings the sap in an arc aimed at your head."
+_UNSEEN_LINE = "The thug's attack with the sap misses Kesst Vayr."
+
+
+def _unseen_contradiction():
+    claim = bv.Claim("unseen", {"who": "c1"}, "aimed at your head")
+    return bv.Discrepancy("contradiction", "unseen", "The thug cannot see you.", _AT_YOU,
+                          _UNSEEN_LINE, claim, ref="c1")
+
+
+def test_an_unseen_contradiction_does_not_lose_the_beats_other_findings(monkeypatch):
+    """`_KIND` mapped "unseen" to beat-sees-the-unseen from 2026-10-30 (20329b8b) but `KINDS`
+    never declared it, so `checks.run` booked one `check-error` and threw away every finding
+    `beat_verified` had for that beat: 2 contradictions read, 0 reached the repair."""
+    moved = "You set off toward the crossroads."
+    other = bv.Discrepancy("contradiction", "move", "You are still at the market.", moved,
+                           "", bv.Claim("move", {}, moved))
+    monkeypatch.setattr(beat_verified, "discrepancies",
+                        lambda ctx: [_unseen_contradiction(), other])
+    agent, _ = scene_at(MARKET)
+    errors: list = []
+    found = checks.run(context(agent, f"{_AT_YOU} {moved}", outcomes=[]), errors=errors)
+    assert errors == []
+    assert {"beat-sees-the-unseen", "beat-moves-player"} <= {f.kind for f in found}
+
+
+def test_every_kind_a_category_raises_is_declared():
+    """The one-line guard on the defect above: "unseen" was the one `_KIND` value of 17
+    missing from `KINDS`, and only a beat with that contradiction could show it."""
+    assert {kind for kind, _weight in beat_verified._KIND.values()} <= beat_verified.KINDS
+
+
+@pytest.mark.parametrize("planned", [False, True])
+def test_the_unseen_backstop_puts_the_engines_line_in_the_sentences_place(monkeypatch, planned):
+    """The backstop's "unseen" branch could not run in the game while the undeclared kind
+    discarded the finding that asks for it. It reads the category, and `PLANNED_OFF` holds
+    only beat-makes-item, so a planned beat is backstopped the same way."""
+    from dataclasses import replace
+
+    monkeypatch.setattr(beat_verified, "discrepancies", lambda ctx: [_unseen_contradiction()])
+    agent, _ = scene_at(MARKET)
+    text = f"The stalls are loud. {_AT_YOU} What do you do?"
+    ctx = replace(context(agent, text, outcomes=[]), planned=planned)
+    out, notes = beat_verified.backstop(ctx, text, [])
+    assert _AT_YOU not in out and _UNSEEN_LINE in out
+    assert notes and "unseen" in notes[0]
+
+
 def test_without_a_route_or_switched_off_it_reads_nothing(scripted, monkeypatch):
     agent, _ = scene_at(MARKET)
     ctx = context(agent, "You set off toward the crossroads.", outcomes=_REFUSED)
