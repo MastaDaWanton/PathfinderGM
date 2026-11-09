@@ -1531,11 +1531,17 @@
       {
        "type": "apply_condition",
        "target": "unconscious",
+       "ends_when": {
+        "wounded": true
+       },
        "note": "magical slumber"
       },
       {
        "type": "apply_condition",
-       "target": "helpless"
+       "target": "helpless",
+       "ends_when": {
+        "wounded": true
+       }
       }
      ],
      "on_success": []

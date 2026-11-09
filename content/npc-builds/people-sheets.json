@@ -33435,7 +33435,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Precise Shot' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {},
     "worn": {},
     "id": "hunter-level-1",
@@ -33710,7 +33710,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Precise Shot' is carried as flavour; engine applies nothing]\n[feat 'Rapid Shot' is carried as flavour; engine applies nothing]",
+    "notes": "\n[feat 'Rapid Shot' is carried as flavour; engine applies nothing]",
     "slots": {
      "hands": [
       "masterwork longbow"
@@ -34165,7 +34165,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Precise Shot' is carried as flavour; engine applies nothing]\n[feat 'Rapid Shot' is carried as flavour; engine applies nothing]",
+    "notes": "\n[feat 'Rapid Shot' is carried as flavour; engine applies nothing]",
     "slots": {
      "hands": [
       "+1 longbow"

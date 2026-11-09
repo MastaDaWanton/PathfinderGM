@@ -275,16 +275,21 @@ def test_a_bare_scoped_feat_is_bound_to_the_weapon_in_hand_on_load():
 
 def test_power_attack_comes_from_the_document_with_the_weapon_in_hand():
     """`tables.power_attack_terms` is deleted; the three rungs are formulas on the
-    document, conditional on the weapon: one-handed +2 per step, light +1, two-handed
-    +3 (test_engine pins BAB 8 two-handed at +9). Melee only — the shortbow used to
-    take −1/+2 — and never without the choice."""
+    document, conditional on the weapon: one-handed +2 per step, two-handed +3
+    (test_engine pins BAB 8 two-handed at +9). Melee only — the shortbow used to
+    take −1/+2 — and never without the choice.
+
+    A light weapon takes the full +2 (changed 2026-11-08, ponytail audit): the CRB halves
+    the bonus only "if you are making an attack with an off-hand weapon or secondary
+    natural weapon" (aonprd.com/FeatDisplay.aspx?ItemName=Power%20Attack). The light
+    rung was 3.5's, and this test had pinned the dagger at +1."""
     b = _borin()                                   # BAB 1: one step
     atk = {m.source: m.value for m in b.attack_modifiers("longsword", power_attack=True)}
     dmg = {m.source: m.value for m in b.damage_modifiers("longsword", power_attack=True)}
     assert atk["Power Attack"] == -1 and dmg["Power Attack"] == 2
     light = [m.value for m in b.damage_modifiers("dagger", power_attack=True)
              if m.source == "Power Attack"]
-    assert light == [1]
+    assert light == [2]
     assert "Power Attack" not in _sources(b.attack_modifiers("shortbow", power_attack=True))
     assert "Power Attack" not in _sources(b.damage_modifiers("shortbow", power_attack=True))
     assert "Power Attack" not in _sources(b.attack_modifiers("longsword"))

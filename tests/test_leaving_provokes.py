@@ -46,6 +46,9 @@ def board(pc_at=(5, 5), thug_at=(6, 5), fighting=True, seed=7):
     if fighting:
         s.initiative = [("pc", 20), ("c1", 10)]
         s.turn = 0
+        # The thug has had a turn: a creature that has not is flat-footed and takes no
+        # attack of opportunity (CRB, Combat; enforced since 2026-11-08).
+        s.acted = {"c1"}
     return s, Engine(s, Dice(seed=seed))
 
 
@@ -200,6 +203,7 @@ def _road_fight(hp=500):
     s.sides = {"us": ["pc"], "them": [ogre.ref]}
     s.initiative = [("pc", 20), (ogre.ref, 10)]
     s.turn = 0
+    s.acted = {ogre.ref}        # has had a turn, so not flat-footed (see `board`)
     leg = journey.legs_from(AURVANTIS, VORMOOR)[0]
     return s, e, ogre, leg
 

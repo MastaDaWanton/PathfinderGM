@@ -855,6 +855,9 @@
       {
        "type": "apply_condition",
        "target": "paralyzed",
+       "ends_when": {
+        "save_each_turn": true
+       },
        "note": "aware and breathing normally but unable to take any action, even speech"
       },
       {
@@ -913,6 +916,9 @@
       {
        "type": "apply_condition",
        "target": "paralyzed",
+       "ends_when": {
+        "save_each_turn": true
+       },
        "note": "aware and breathing normally but unable to take any action, even speech"
       },
       {
@@ -942,6 +948,9 @@
       {
        "type": "apply_condition",
        "target": "paralyzed",
+       "ends_when": {
+        "save_each_turn": true
+       },
        "note": "aware and breathing normally but unable to take any action, even speech"
       },
       {
@@ -971,6 +980,9 @@
       {
        "type": "apply_condition",
        "target": "paralyzed",
+       "ends_when": {
+        "save_each_turn": true
+       },
        "note": "aware and breathing normally but unable to take any action, even speech"
       },
       {
@@ -1000,6 +1012,9 @@
       {
        "type": "apply_condition",
        "target": "paralyzed",
+       "ends_when": {
+        "save_each_turn": true
+       },
        "note": "aware and breathing normally but unable to take any action, even speech"
       },
       {

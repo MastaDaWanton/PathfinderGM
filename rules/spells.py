@@ -1037,11 +1037,61 @@ def hp_tier(spell_id: str, hp: int):
     return None
 
 
+# Spells whose failed save does more to a creature of fewer Hit Dice, as phases one after
+# another: (most HD, ((conditions, dice), ...)), the last row for everyone above. Color
+# spray (CRB, checked on aonprd 2026-11-08): "2 HD or less: The creature is unconscious,
+# blinded, and stunned for 2d4 rounds, then blinded and stunned for 1d4 rounds, and then
+# stunned for 1 round. (Only living creatures are knocked unconscious.) 3 or 4 HD: The
+# creature is blinded and stunned for 1d4 rounds, then stunned for 1 round. 5 or more HD:
+# The creature is stunned for 1 round. Sightless creatures are not affected." Before
+# 2026-11-08 every creature that failed took the 1-round stun, the floor, and nothing else.
+HD_TIERS: dict[str, tuple] = {
+    "color-spray": (
+        (2, ((("unconscious", "blinded", "stunned"), "2d4"),
+             (("blinded", "stunned"), "1d4"),
+             (("stunned",), "1"))),
+        (4, ((("blinded", "stunned"), "1d4"),
+             (("stunned",), "1"))),
+        (None, ((("stunned",), "1"),)),
+    ),
+}
+# What only the living suffer in an `HD_TIERS` row ("Only living creatures are knocked
+# unconscious").
+_LIVING_ONLY = ("unconscious",)
+
+
+def hd_tier_conditions(spell_id: str, hit_dice: int, living: bool, roll) -> list | None:
+    """The conditions a failed save lays, as [(key, rounds)], for a spell in `HD_TIERS`, or
+    None for a spell with no table. The phases run one after another, so a condition held
+    through several lasts their durations together: color spray's unconscious 2d4, its
+    blindness 2d4 + 1d4, its stun 2d4 + 1d4 + 1. `roll` turns dice into a number (the
+    engine's own dice)."""
+    rows = HD_TIERS.get(str(spell_id or ""))
+    if rows is None:
+        return None
+    phases = next(p for most, p in rows if most is None or int(hit_dice) <= most)
+    lengths = [int(roll(d)) for _keys, d in phases]
+    out: dict[str, int] = {}
+    for i, (keys, _d) in enumerate(phases):
+        for key in keys:
+            if key in out or (key in _LIVING_ONLY and not living):
+                continue
+            # From this phase on, for as long as the following phases still hold it.
+            span = 0
+            for j in range(i, len(phases)):
+                if key not in phases[j][0]:
+                    break
+                span += lengths[j]
+            out[key] = max(1, span)
+    return list(out.items())
+
+
 # Spells that take hold of a number of Hit Dice of creatures, the fewest first (CRB, Sleep:
 # "4 HD of creatures ... Creatures with the fewest HD are affected first ... Hit Dice that are
 # not sufficient to affect a creature are wasted"; Deep Slumber: "10 HD of creatures").
 HD_POOL: dict[str, int] = {"sleep": 4, "deep-slumber": 10}
 
+_SIGHTLESS = re.compile(r"\bsightless creatures are not affected\b", re.I)
 _HD_CAP = re.compile(r"\bwith (\d+) (?:HD|Hit Dice) or (?:less|fewer)\b", re.I)
 _TYPE_WORDS = ("monstrous humanoid", "magical beast", "aberration", "animal", "construct",
                "dragon", "fey", "humanoid", "ooze", "outsider", "plant", "undead", "vermin")
@@ -1056,6 +1106,12 @@ def spared_by(spell, target, hit_dice: int) -> str:
     thug — is a person and answers to "humanoid"; the world owns its own peoples
     (docs: the-world-owns-its-own-races), so their type is never second-guessed here. Only a
     creature typed otherwise (a wolf is `type.animal`) is spared by the type."""
+    # "Sightless creatures are not affected" (color spray): read off the spell's own text,
+    # and answered by the vocabulary's blindness — the nearest thing a sheet says to having
+    # no sight to dazzle.
+    if _SIGHTLESS.search(str(getattr(spell, "description", "") or "")) \
+            and target.has_state("state.senses.blinded"):
+        return "cannot see it"
     line = str(getattr(spell, "targets", "") or "").lower()
     if not line:
         return ""

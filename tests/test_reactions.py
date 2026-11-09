@@ -38,6 +38,10 @@ def board(pc_at=(5, 5), thug_at=(6, 5), fighting=True, **terrain):
     if fighting:
         s.initiative = [("pc", 20), ("c1", 10)]
         s.turn = 0
+        # Both have had a turn. Since 2026-11-08 a creature that has not yet acted is
+        # flat-footed and takes no attack of opportunity (CRB, Combat), and every swing in
+        # this file is about the reaction, not about round one.
+        s.acted = {"pc", "c1"}
     return s, Engine(s, Dice(seed=7))
 
 
@@ -261,6 +265,9 @@ def test_a_blow_that_drops_the_mover_stops_the_move():
     down as it turns to run does not also complete the run."""
     s, e = board()
     s.actors["pc"].hp = 1
+    # As flat-footed as the seeded swing was measured against before the acted mark in
+    # `board` (2026-11-08): what is measured is the drop, not Kesst's AC.
+    s.actors["pc"].add_condition("flat-footed")
     res = run_move(e, "pc", (5, 9))
 
     assert res.outcomes[0].op == "attack"
@@ -376,6 +383,7 @@ def test_a_provoked_blow_that_drops_the_attacker_stops_the_manoeuvre():
     """The order the whole module turns on, for a manoeuvre: seed 5's critical puts the
     player down before the trip, and the trip is never rolled."""
     s, e = board()
+    s.actors["pc"].add_condition("flat-footed")        # as measured; see the move's twin
     res = run_maneuver(e, seed=5)
     assert res.outcomes[1].status == "prevented"
     assert "never swings" in res.outcomes[1].tell

@@ -55,6 +55,10 @@ def _owners_board(spy_at=(0, 13), pc_at=(5, 7), seed: int = 3, template="clockwo
     scene.positions = {"pc": tuple(pc_at), "c1": tuple(spy_at)}
     scene.resync_zones()
     scene.turn = next(i for i, row in enumerate(scene.initiative) if row[0] == "c1")
+    # A running fight: the player has had a turn, so is not flat-footed and may take the
+    # attacks of opportunity these tests measure (since 2026-11-08 a flat-footed creature
+    # takes none, CRB, Combat).
+    scene.acted.add("pc")
     engine._battle_joined = False
     return scene, engine
 

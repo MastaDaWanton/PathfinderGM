@@ -1164,6 +1164,12 @@ def lookup(key: str) -> dict | None:
         return None
     data = {k: v for k, v in raw.items() if k not in _NOT_ON_THE_SHEET}
     data["name"] = raw.get("name", key)
+    # The block's base attack and CMB, under the sheet's own names (`Actor.flat_bab`,
+    # `flat_cmb`). Stripped with the rest until 2026-11-08, and `flat_attack` stood in for
+    # both (ponytail audit #27). Only a whole number: 272 blocks state neither.
+    for src, dst in (("base_attack", "flat_bab"), ("cmb", "flat_cmb")):
+        if isinstance(raw.get(src), int) and not isinstance(raw.get(src), bool):
+            data[dst] = raw[src]
     data["kind"] = "npc"
     # `immune`, `resist`, `weaknesses` and `senses` are stripped by `_NOT_ON_THE_SHEET`
     # above, and `Actor` had no field for any of them — so a frost giant took full damage

@@ -43,6 +43,9 @@ def _fight():
     s.sides = {"us": ["pc"], "them": [down.ref, standing.ref]}
     s.initiative = [("pc", 20), (down.ref, 10), (standing.ref, 5)]
     s.round, s.turn = 1, 0
+    # The standing bandit has had a turn: a creature that has not is flat-footed and
+    # takes no attack of opportunity (CRB, Combat; enforced since 2026-11-08).
+    s.acted = {standing.ref}
     return s, down.ref, standing.ref
 
 

@@ -566,3 +566,195 @@ def test_evasion_takes_nothing_from_a_class_abilitys_reflex_half_blast():
     out, _ = _use(e, "Elemental Blast", to="c1")
     assert "got clear of it entirely" in out.tell, out.tell
     assert not [x for x in _hurt(out, "c1") if x.get("amount")], out.tell
+
+
+# --- the gaps the working save gates opened (2026-11-08, second pass) -----------------------
+
+def _charm_scene(seed=2, will=-40):
+    pc = caster("wizard", 5, book=("charm-person",))
+    s, e = scene_with(pc, seed=seed)
+    t = foe(s)
+    t.add_buff("save_mod", "will", will, source="test: save fixed")
+    # Inside a fight already: a charm at a creature that resents it opens one first (I3's
+    # gated harm and the battle gate), which these tests do not measure.
+    fight(s)
+    return pc, s, e, t
+
+
+def test_charm_person_makes_a_thug_who_fails_friendly_for_the_spells_hours():
+    """CRB, Charm Person: "This charm makes a humanoid creature regard you as its trusted
+    friend and ally (treat the target's attitude as friendly)", 1 hour/level. Measured
+    after the first pass: the Will save was rolled and failed, the spell's prose was told,
+    and the thug's attitude never moved."""
+    from rules import attitude as attitude_mod
+
+    pc, s, e, t = _charm_scene()
+    res = run(e, "cast", spell="charm-person", at=t.ref)
+    assert attitude_mod.of(t) == "friendly", said(res)
+    held = [x for x in t.effects if x.key == "friendly"]
+    assert held and held[0].rounds_left == 5 * 600, held
+
+
+def test_a_charm_that_takes_hold_does_not_also_cost_the_thugs_regard():
+    """I3's gated harm is for the unfriendly eye that sees a charm laid; the charmed thug
+    now regards the caster as a friend. Before, the harm ran first and set him hostile for
+    good, so when the charm ended he was worse off than before the spell. When it ends
+    his old standing answers again."""
+    from rules import attitude as attitude_mod
+
+    pc, s, e, t = _charm_scene()
+    before = attitude_mod.regard_of(t)
+    was = attitude_mod.of(t)
+    run(e, "cast", spell="charm-person", at=t.ref)
+    assert attitude_mod.regard_of(t) == before
+    t.tick_effects(5 * 600)
+    assert attitude_mod.of(t) == was
+
+
+def test_harming_a_charmed_thug_breaks_the_charm():
+    """CRB: "Any act by you or your apparent allies that threatens the charmed person
+    breaks the spell." The caster's harm sets him hostile through the one applicator,
+    which clears the friendly step."""
+    from rules import attitude as attitude_mod
+
+    pc, s, e, t = _charm_scene()
+    run(e, "cast", spell="charm-person", at=t.ref)
+    attitude_mod.harmed(e, t, pc, "attack:test", seen=True)
+    assert attitude_mod.of(t) == "hostile"
+
+
+def test_a_charm_in_a_fight_gives_the_target_plus_five_on_its_save():
+    """CRB, Charm Person: "If the creature is currently being threatened or attacked by
+    you or your allies, however, it receives a +5 bonus on its saving throw" — read here
+    as a fight with the caster on the other side. A made save charms nobody."""
+    from rules import attitude as attitude_mod
+
+    pc, s, e, t = _charm_scene(will=0)
+    fight(s)
+    res = run(e, "cast", spell="charm-person", at=t.ref)
+    roll = [r for o in res.outcomes for r in o.rolls if "Will save" in r.label][0]
+    assert any(m.source == "threatened by the caster" and m.value == 5
+               for m in roll.modifiers), roll.modifiers
+    if "makes the Will save" in said(res):
+        assert attitude_mod.of(t) != "friendly"
+
+
+def test_hold_person_is_broken_by_a_save_made_on_the_held_creatures_turn():
+    """CRB, Hold Person: "Each round on its turn, the subject may attempt a new saving
+    throw to end the effect. This is a full-round action". Before, a held thug stayed
+    paralyzed for the spell's whole duration."""
+    from rules.engine import _ward_tell
+
+    pc = caster("wizard", 5, book=("hold-person",))
+    s, e = scene_with(pc, seed=2)
+    t = foe(s)
+    t.add_buff("save_mod", "will", -40, source="test: fails the first")
+    fight(s)
+    run(e, "cast", spell="hold-person", at=t.ref)
+    held = [x for x in t.effects if x.key == "paralyzed"]
+    assert held and held[0].payload["ends_when"]["save_each_turn"]["save"] == "will"
+    t.remove_effects(match=lambda x: x.source == "test: fails the first")
+    t.add_buff("save_mod", "will", 40, source="test: makes the next")
+    s.turn = 0
+    s.advance_turn()
+    assert not any(x.key == "paralyzed" for x in t.effects), s.hazards
+    lines = [_ward_tell(s, h) for h in s.hazards if h.get("kind") == "held_save"]
+    assert lines and "breaks free of Hold Person" in lines[0], lines
+
+
+def test_a_held_creature_that_fails_its_turns_save_stays_held():
+    pc = caster("wizard", 5, book=("hold-person",))
+    s, e = scene_with(pc, seed=2)
+    t = foe(s)
+    t.add_buff("save_mod", "will", -40, source="test: always fails")
+    fight(s)
+    run(e, "cast", spell="hold-person", at=t.ref)
+    s.turn = 0
+    s.advance_turn()
+    assert any(x.key == "paralyzed" for x in t.effects)
+    assert any(h.get("kind") == "held_save" and not h["made"] for h in s.hazards)
+
+
+def _asleep(t_hp=None, **over):
+    pc = caster("wizard", 1, book=("sleep",))
+    s, e = scene_with(pc, seed=2)
+    t = foe(s)
+    t.add_buff("save_mod", "will", -40, source="test: always fails")
+    if t_hp:
+        t.hp = t.hp_max = t_hp
+    for k, v in over.items():
+        setattr(t, k, v)
+    fight(s)
+    run(e, "cast", spell="sleep", at=t.ref)
+    assert any(x.key == "unconscious" for x in t.effects)
+    return s, e, t
+
+
+def test_a_wound_wakes_a_magical_sleeper():
+    """CRB, Sleep: "Slapping or wounding awakens an affected creature, but normal noise
+    does not." Before, a sleeper slept through a sword for the spell's whole duration."""
+    s, e, t = _asleep(t_hp=30)
+    hit = e._apply_damage(t, 3, "slashing")
+    assert not any(x.key in ("unconscious", "helpless") for x in t.effects), t.effects
+    assert hit.get("woke") and "wakes" in hit["note"], hit
+
+
+def test_a_blow_that_wounds_nobody_wakes_nobody():
+    s, e, t = _asleep(resistances={"fire": 10})
+    e._apply_damage(t, 4, "fire")
+    assert any(x.key == "unconscious" for x in t.effects)
+
+
+def test_a_sleeper_wounded_below_zero_is_still_down():
+    """The ladder's own unconsciousness is not the sleep's to lift."""
+    s, e, t = _asleep()
+    e._apply_damage(t, t.hp + 2, "slashing")
+    e._hp_state_effects(t)
+    assert t.hp < 0 and t.is_down
+
+
+@pytest.mark.parametrize("hd,want", [
+    (1, {"unconscious": 3, "blinded": 6, "stunned": 7}),
+    (4, {"blinded": 3, "stunned": 4}),
+    (6, {"stunned": 1})])
+def test_color_spray_lays_its_table_by_hit_dice(hd, want):
+    """CRB, Color Spray: 2 HD or less unconscious, blinded and stunned 2d4 rounds, then
+    blinded and stunned 1d4, then stunned 1; 3 or 4 HD blinded and stunned 1d4, then
+    stunned 1; 5 or more stunned 1. The phases run one after another, so each condition
+    lasts the phases that hold it together. Before, every creature that failed was
+    stunned for 1 round and nothing else (every die here rolls 3)."""
+    got = dict(spells_mod.hd_tier_conditions("color-spray", hd, True,
+                                             lambda d: 1 if d == "1" else 3))
+    assert got == want
+
+
+def test_color_spray_does_not_knock_a_zombie_unconscious():
+    """"(Only living creatures are knocked unconscious.)" """
+    got = dict(spells_mod.hd_tier_conditions("color-spray", 2, False,
+                                             lambda d: 1 if d == "1" else 3))
+    assert "unconscious" not in got and got["stunned"] == 7
+
+
+def test_color_spray_cast_at_a_1_hd_thug_lays_the_table():
+    pc = caster("wizard", 1, book=("color-spray",))
+    s, e = scene_with(pc, seed=2)
+    t = foe(s)
+    t.add_buff("save_mod", "will", -40, source="test: always fails")
+    fight(s)
+    res = run(e, "cast", spell="color-spray", at=t.ref)
+    on = {x.key: x.rounds_left for x in t.effects if x.kind == "condition"}
+    assert {"unconscious", "blinded", "stunned"} <= set(on), said(res)
+    assert on["unconscious"] < on["blinded"] < on["stunned"], on
+    assert "Effect depends on the creature's HD" not in said(res)
+
+
+def test_color_spray_leaves_a_blinded_creature_alone():
+    """"Sightless creatures are not affected" — answered by the blindness on the sheet."""
+    pc = caster("wizard", 1, book=("color-spray",))
+    s, e = scene_with(pc, seed=2)
+    t = foe(s)
+    t.add_condition("blinded", source="test")
+    fight(s)
+    res = run(e, "cast", spell="color-spray", at=t.ref)
+    assert not any(x.key == "stunned" for x in t.effects), said(res)
+    assert "cannot see it" in said(res)

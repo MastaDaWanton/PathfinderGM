@@ -272,8 +272,9 @@ def _simple(block: dict, tpl: dict) -> tuple[dict, str]:
     skills = dict(block.get("flat_skills") or {})
     for sk in skills:
         skills[sk] = int(skills[sk]) + dm.get(_SKILL_ABILITY.get(sk.split(" (")[0], ""), 0)
-        if sk == "stealth":
-            skills[sk] += (SIZES[new_size]["stealth"] - SIZES[size]["stealth"])
+        # Both skills the book sizes: Stealth, and Fly (CRB, Fly's own size table).
+        if sk in ("stealth", "fly"):
+            skills[sk] += (SIZES[new_size][sk] - SIZES[size][sk])
     if skills:
         out["flat_skills"] = skills
 

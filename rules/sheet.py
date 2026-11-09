@@ -701,6 +701,14 @@ class Actor:
     flat_damage: str | None = None
     flat_initiative: int | None = None
     flat_cmd: int | None = None
+    # The block's own base attack and CMB (its `base_attack` and `cmb` lines). Until
+    # 2026-11-08 both were stripped on import and `flat_attack` — the first weapon's total,
+    # Strength, size and all — stood in for each: an ogre's BAB read 7 where the block says
+    # 3, its touch attack +11 for +7, and every Large creature's CMB 2 short (ogre 7 for a
+    # printed +9). None on a hand-written townsperson and on saves from before, which keep
+    # the stand-in (`bab`, `cmb_modifiers`).
+    flat_bab: int | None = None
+    flat_cmb: int | None = None
 
     notes: str = ""
 
@@ -2474,6 +2482,25 @@ class Actor:
         """
         return ability_modifier(self.ability_score(ab))
 
+    def printed_shift(self, ab: str) -> int:
+        """How far `ab`'s modifier has moved since a stat block printed its totals.
+
+        A printed total (AC, a save, a skill, an attack, CMB, CMD) was summed by the book
+        from the block's own scores, so it already holds the modifier those scores give
+        and nothing that has happened since. What has happened since — ability damage and
+        drain, a condition's ability penalty (entangled's -4 Dex, fatigue's -2 Str and
+        Dex), a belt or a bull's strength — moves the score (`ability_score`), and this is
+        the change in the modifier it makes. `rules/templates.py` shifts printed totals
+        the same way when a template changes a score. Measured 2026-11-07 (ponytail audit
+        #26) before it was read: an entangled goblin kept AC 16 and Reflex +2, and an ogre
+        carrying 8 points of Strength damage still hit at +7 for +7."""
+        return self.ability_mod(ab) - ability_modifier(self.abilities.get(ab, 10))
+
+    def _shifted(self, ab: str) -> list[Modifier]:
+        """`printed_shift` as the one term a printed total takes, or nothing."""
+        d = self.printed_shift(ab)
+        return [Modifier(d, f"{ABILITY_FULL.get(ab, ab.title())} since printed")] if d else []
+
     # --- ability damage ---------------------------------------------------------------
 
     def damage_ability(self, ab: str, amount: int, drain: bool = False) -> dict:
@@ -2615,6 +2642,10 @@ class Actor:
     @property
     def bab(self) -> int:
         if not self.class_data:
+            # The block's own base attack, when the import kept it (`flat_bab`); the
+            # attack bonus stood in before, Strength and size included.
+            if self.flat_bab is not None:
+                return int(self.flat_bab)
             return self.flat_attack or 0
         return bab_for(self.class_data["bab"], self.level)
 
@@ -2956,6 +2987,7 @@ class Actor:
         printed = self.printed_skill(skill)
         if printed is not None:
             mods.append(Modifier(printed[1], printed[0].title()))
+            mods.extend(self._shifted(ability))
         else:
             rank = self.ranks.get(skill, 0)
             if trained_only and rank == 0:
@@ -2971,11 +3003,18 @@ class Actor:
                 mods.append(Modifier(am, ability.title()))
             if acp_applies and self.armour_check_penalty:
                 mods.append(Modifier(self.armour_check_penalty, "armour check"))
+            # Size only when the number was derived, as with attack and AC: a printed
+            # Stealth (or Fly) already holds it. Measured 2026-11-07 (ponytail audit #37)
+            # with the size term outside this branch: a goblin's printed Stealth 10 rolled
+            # at 14, a dire rat's 11 at 15, a sprite's 19 at 31. Fly's column is the
+            # Fly skill's own size table (CRB, Fly: "Fine +8 ... Large -2 ... Colossal
+            # -8"), which nothing read before.
+            if skill in ("stealth", "fly"):
+                size_mod = SIZES.get(self.size, SIZES["medium"])[skill]
+                if size_mod:
+                    mods.append(Modifier(size_mod, f"{self.size} size"))
 
         if skill == "stealth":
-            size_mod = SIZES.get(self.size, SIZES["medium"])["stealth"]
-            if size_mod:
-                mods.append(Modifier(size_mod, f"{self.size} size"))
             # The invisible condition's own: "+40 bonus on Stealth checks if you are
             # immobile, or a +20 bonus on Stealth checks if you're moving" (Stealth, CRB
             # p.106). The condition's, so a spell's invisibility and a potion's give it
@@ -2987,6 +3026,11 @@ class Actor:
                 mods.append(awareness.invisible_stealth(self))
 
         mods.extend(self._condition_mods("skills"))
+        # A condition that reaches only some skills: by the skill's ability (blinded's
+        # "most Strength- and Dexterity-based skill checks") or by name (its "opposed
+        # Perception").
+        mods.extend(self._condition_mods(f"{ability}_skills"))
+        mods.extend(self._condition_mods(f"skill_{skill}"))
         mods.extend(self._buff_mods("skill_mod", skill))
         # "On all skill checks": a skill_mod aimed at `all` — Touch of Good, Inspiring
         # Word, Diviner's Fortune, Aura of Despair. Foundry PF1's change target `skills`
@@ -3008,6 +3052,7 @@ class Actor:
 
         if save in self.flat_saves:
             mods.append(Modifier(self.flat_saves[save], SAVES[save]))
+            mods.extend(self._shifted(SAVE_ABILITY[save]))
         else:
             # A class may state each save's progression outright. `good_saves` remains the
             # fallback because the Core four are described that way and because it is what
@@ -3083,10 +3128,15 @@ class Actor:
         mods: list[Modifier] = []
         if self.flat_initiative is not None:
             mods.append(Modifier(self.flat_initiative, "Initiative"))
+            mods.extend(self._shifted("dex"))
         else:
             am = self.ability_mod("dex")
             if am:
                 mods.append(Modifier(am, "Dex"))
+        # The condition rows' own initiative terms: deafened's "-4 penalty on initiative
+        # checks" (CRB, Deafened) sat on its row from the day the table was written and
+        # nothing here read it (ponytail audit 2026-11-07).
+        mods.extend(self._condition_mods("initiative"))
         mods.extend(self._buff_mods("combat_mod", "initiative"))
         return stack(mods)
 
@@ -3816,6 +3866,15 @@ class Actor:
         # (enchanting leftovers): a thrown dagger rolled BAB + Str, as if it were stabbed.
         # Strength stays on its damage (`damage_modifiers`, untouched), which is the book's.
         ranged = w["category"] == "ranged" or (thrown and bool(w.get("range_ft")))
+        # The ability this roll is made with: Dex for ranged, Dex for melee only when
+        # Weapon Finesse applies and actually helps, else Str. Asked once for both the
+        # derived number and the change a printed one takes (`printed_shift`).
+        if ranged:
+            ab, label = "dex", "Dex"
+        elif (sub := self._attack_ability(w, key)):
+            ab, label = sub, f"{sub.title()} (Finesse)"
+        else:
+            ab, label = "str", "Str"
 
         if printed:
             # The stat block's own total for THIS swing — "+11/+6" is two numbers, and
@@ -3828,18 +3887,12 @@ class Actor:
             bonuses = printed["bonuses"] or [self.flat_attack or 0]
             mods.append(Modifier(int(bonuses[min(iteration, len(bonuses) - 1)]),
                                  f"{w['name']} (stat block)"))
+            mods.extend(self._shifted(ab))
         elif self.flat_attack is not None:
             mods.append(Modifier(self.flat_attack, "attack bonus"))
+            mods.extend(self._shifted(ab))
         else:
             mods.append(Modifier(self.bab, "BAB"))
-            # Str for melee, Dex for ranged — and Dex for melee only when Weapon Finesse
-            # applies and actually helps.
-            if ranged:
-                ab, label = "dex", "Dex"
-            elif (sub := self._attack_ability(w, key)):
-                ab, label = sub, f"{sub.title()} (Finesse)"
-            else:
-                ab, label = "str", "Str"
             am = self.ability_mod(ab)
             if am:
                 mods.append(Modifier(am, label))
@@ -3910,7 +3963,9 @@ class Actor:
         enhancement and no feat names it), and nothing melee-only. The engine adds the
         range increments and the board (`Engine._splash`)."""
         mods: list[Modifier] = []
-        if self.flat_attack is not None:
+        # The stand-in only for a block with no base attack to read (`flat_bab`): a touch
+        # attack is base attack, Dex and size, and a weapon's printed total is not one.
+        if self.flat_attack is not None and self.flat_bab is None:
             mods.append(Modifier(self.flat_attack, "attack bonus"))
         else:
             mods.append(Modifier(self.bab, "BAB"))
@@ -3956,6 +4011,15 @@ class Actor:
         extra = [0] * int(self.weapon(weapon_key).get("extra_attacks", 0) or 0)
         if self.flat_attack is not None:
             return [0] + extra + bonus
+        # A natural weapon never takes iteratives: "You do not receive additional natural
+        # attacks for a high base attack bonus. Instead, you receive additional attack
+        # rolls for multiple limb and body parts capable of making the attack" (CRB,
+        # Combat, Natural Attacks). Until 2026-11-08 a bite at BAB +6 rolled at +6/+1 like
+        # a sword (ponytail audit); now it is one roll per limb (`count`), each at the
+        # full bonus.
+        w = self.weapon(weapon_key)
+        if w.get("natural"):
+            return [0] * max(1, int(w.get("count", 1) or 1)) + extra + bonus
         return list(range(len(iterative_attacks(self.bab)))) + extra + bonus
 
     def attack_plan(self, weapon_key: str | None = None,
@@ -4005,11 +4069,16 @@ class Actor:
             if printed["damage_bonus"]:
                 mods.append(Modifier(int(printed["damage_bonus"]),
                                      f"{w['name']} (stat block)"))
-        elif w["category"] == "melee":
+            # What has happened to Strength since the print (`printed_shift`), at the
+            # same multiple the rule below takes a derived Strength at.
+            moved = self._strength_on_damage(w, key, thrown, self.printed_shift("str"))
+            if moved:
+                mods.append(Modifier(moved, "Strength since printed"))
+        else:
             # Str applies to melee damage even when Finesse supplied the attack roll —
             # Weapon Finesse changes the attack, never the damage. This is a standard
             # place to get 1e wrong.
-            am = self.ability_mod("str")
+            am = self._strength_on_damage(w, key, thrown, self.ability_mod("str"))
             if am:
                 mods.append(Modifier(am, "Str"))
         mods.extend(self._condition_mods("damage"))
@@ -4027,6 +4096,47 @@ class Actor:
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
                                  "enhancement"))
         return stack(mods)
+
+    @staticmethod
+    def _strength_on_damage(w: dict, key: str, thrown: bool, am: int) -> int:
+        """The Strength a swing's damage takes, given the modifier `am`.
+
+        Core Rulebook, Combat, "Strength Bonus" (legacy.aonprd.com/coreRulebook/
+        combat.html): a melee or thrown weapon adds the Strength modifier; "when you deal
+        damage with a weapon that you are wielding two-handed, you add 1-1/2 times your
+        Strength bonus" — the bonus, so a penalty stays whole, and a thrown two-hander
+        (a spear) is not wielded two-handed when it leaves the hand; slings add it too;
+        a bow that is not composite takes a penalty and never a bonus; a crossbow or a
+        firearm takes neither. Measured 2026-11-07 (ponytail audit #31) before this: with
+        Str 16 a greatsword added +3 where the book says +4, and a sling and every thrown
+        javelin and dart added nothing, because only the `melee` category was read.
+
+        A thrown ranged-row weapon is one the table knows with a range and no ammunition
+        (javelin, dart, bolas); a ranged row the table does not know (a granted ray) is
+        left at nothing, as before. Composite bows' Strength rating has no field yet, so a
+        composite bow is treated as a plain one: its penalty, never its bonus. A natural
+        attack keeps 1x here — the lone-natural 1.5x and secondary 0.5x need the attack's
+        place in its routine, which the printed numbers already carry."""
+        from . import weapons as weapons_mod
+
+        if not am:
+            return 0
+        if w.get("category") == "melee":
+            two_handed = int(w.get("hands", 1) or 1) >= 2 and not w.get("natural")
+            if am > 0 and two_handed and not (thrown and w.get("range_ft")):
+                return int(am * 1.5)
+            return am
+        base = str(w.get("crafted_base") or key)
+        if weapons_mod.key_for(base) is None:
+            return 0
+        families = weapons_mod.ammo_families(base)
+        if not families:
+            return am if w.get("range_ft") else 0
+        if "sling bullets" in families:
+            return am
+        if "arrows" in families and am < 0:
+            return am
+        return 0
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
         """The dice one swing rolls: a double weapon's first end (`weapon`, E2)."""
@@ -4177,12 +4287,25 @@ class Actor:
                                          "natural armour")]
             parts = [p for p in parts if p[0]]
         elif not parts:
-            dex = self.ability_mod("dex")
+            # The Dex the block was printed with, so the remainder below is the print's
+            # and the change since is added once, after it.
+            dex = ability_modifier(self.abilities.get("dex", 10))
             parts = [(dex, "Dex", "")] if dex else []
         terms = [Modifier(10, "base")] + [Modifier(v, src, typ) for v, src, typ in parts]
         rest = int(self.flat_ac) - sum(m.value for m in stack(terms))
         if rest:
             terms.append(Modifier(rest, "stat block"))
+        # The total is the print's EXACTLY until Dexterity moves (`printed_shift`): an
+        # entangled goblin's -4 Dex is -2 AC. Folded into the Dex term itself rather than
+        # added beside it, so losing Dex to AC (flat-footed, stunned) takes the bonus
+        # that is left and keeps a penalty, as `ac_modifiers` does for a derived AC.
+        shift = self.printed_shift("dex")
+        if shift:
+            at = next((i for i, m in enumerate(terms) if m.source == "Dex"), None)
+            if at is None:
+                terms.append(Modifier(shift, "Dex"))
+            else:
+                terms[at] = Modifier(terms[at].value + shift, "Dex", terms[at].type)
         return terms
 
     # The three channels a touch attack ignores. Named as bonus TYPES rather than as
@@ -4193,7 +4316,7 @@ class Actor:
     _TOUCH_IGNORES = ("armour", "shield", "natural armour")
 
     def touch_ac_modifiers(self, flat_footed: bool = False,
-                           attacker=None) -> list[Modifier]:
+                           attacker=None, against: str = "melee") -> list[Modifier]:
         """Armour class against a touch attack: everything except what you are wearing.
 
         This was `ac() - armour[ac] - shield[ac] - natural_armour`, three table lookups
@@ -4202,12 +4325,18 @@ class Actor:
         aimed at `touch_ac` reached nothing at all, and the thirteen crafted hides
         whose own notes read "worked into armour" were typed untyped and counted
         towards a number they have no business in.
+
+        `against` is the touch attack's kind, as `ac_modifiers` takes it: a ray or a
+        thrown flask is "ranged", and a prone defender is +4 against it where she is -4
+        against a hand. Measured 2026-11-07 (ponytail audit #38) when this always asked
+        for melee: a prone goblin's ranged touch AC was 9, where it is 17.
         """
-        return [m for m in self.ac_modifiers("melee", flat_footed, attacker)
+        return [m for m in self.ac_modifiers(against, flat_footed, attacker)
                 if (m.type or "") not in self._TOUCH_IGNORES] +             self._buff_mods("combat_mod", "touch_ac")
 
-    def touch_ac(self, flat_footed: bool = False, attacker=None) -> int:
-        return sum(m.value for m in self.touch_ac_modifiers(flat_footed, attacker))
+    def touch_ac(self, flat_footed: bool = False, attacker=None,
+                 against: str = "melee") -> int:
+        return sum(m.value for m in self.touch_ac_modifiers(flat_footed, attacker, against))
 
     def ac(self, against: str = "melee", flat_footed: bool = False, attacker=None) -> int:
         return sum(m.value for m in self.ac_modifiers(against, flat_footed, attacker))
@@ -4246,15 +4375,20 @@ class Actor:
 
     def cmb_modifiers(self, maneuver: str | None = None,
                       power_attack: bool = False) -> list[Modifier]:
-        if self.flat_attack is not None:
-            # An NPC stat block prints CMB directly; when it does not, the attack bonus
-            # is the closest honest stand-in.
-            mods = [Modifier(self.flat_attack, "CMB")]
+        # Tiny or smaller creatures use Dex in place of Str for CMB.
+        uses_dex = self.size in ("fine", "diminutive", "tiny")
+        ab = "dex" if uses_dex else "str"
+        if self.flat_cmb is not None:
+            # The block's printed CMB (`flat_cmb`), moved by what has happened to the
+            # ability since (`printed_shift`).
+            mods = [Modifier(self.flat_cmb, "CMB"), *self._shifted(ab)]
+        elif self.flat_attack is not None and self.flat_bab is None:
+            # A block that states neither CMB nor base attack (the hand-written
+            # townsfolk, a save from before 2026-11-08): the attack bonus is the closest
+            # honest stand-in. With a base attack to read, the rule below derives it.
+            mods = [Modifier(self.flat_attack, "CMB"), *self._shifted(ab)]
         else:
             mods = [Modifier(self.bab, "BAB")]
-            # Tiny or smaller creatures use Dex in place of Str for CMB.
-            uses_dex = self.size in ("fine", "diminutive", "tiny")
-            ab = "dex" if uses_dex else "str"
             mods.append(Modifier(self.ability_mod(ab), ab.title()))
             size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
             if size_mod:
@@ -4278,10 +4412,16 @@ class Actor:
     def cmd_modifiers(self, flat_footed: bool = False,
                       maneuver: str | None = None) -> list[Modifier]:
         if self.flat_cmd is not None:
-            mods = [Modifier(self.flat_cmd, "CMD")]
-            if flat_footed and self.ability_mod("dex") > 0:
-                # A printed CMD includes Dex; a flat-footed creature does not add it.
-                mods.append(Modifier(-self.ability_mod("dex"), "flat-footed (no Dex)"))
+            # The print, moved by what Strength and Dexterity have done since
+            # (`printed_shift`), so its Dex part is the creature's Dex now.
+            mods = [Modifier(self.flat_cmd, "CMD"), *self._shifted("str"),
+                    *self._shifted("dex")]
+            if (flat_footed or self.loses_dex_to_ac) and self.ability_mod("dex") > 0:
+                # A printed CMD includes Dex; a creature denied Dex to AC does not add it
+                # — flat-footed, and every lose-Dex condition (stunned, blinded, pinned).
+                # Until 2026-11-08 only the `flat_footed` argument was asked, so a stunned
+                # ogre kept its Dex in CMD while the derived branch below dropped it.
+                mods.append(Modifier(-self.ability_mod("dex"), "no Dex to AC"))
         else:
             mods = [Modifier(10, "base"), Modifier(self.bab, "BAB"),
                     Modifier(self.ability_mod("str"), "Str")]
@@ -4292,8 +4432,12 @@ class Actor:
             if size_mod:
                 mods.append(Modifier(size_mod, f"{self.size} size"))
 
-        # "Any penalties to a creature's AC also apply to its CMD."
+        # "Any penalties to a creature's AC also apply to its CMD" (CRB p.199): a
+        # condition row's and an effect's alike. Until 2026-11-08 only the condition rows
+        # were read, so rage's -2 AC (an effect's `combat_mod`) left CMD untouched —
+        # the filter below keeps only bonuses.
         mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
+        mods.extend(m for m in self._buff_mods("combat_mod", "ac") if m.value < 0)
         # And the bonuses the book names: "A creature can also add any circumstance,
         # deflection, dodge, insight, luck, morale, profane, and sacred bonuses to AC to
         # its CMD" (CRB p.199, Combat Maneuver Defense; legacy.aonprd.com/coreRulebook/
@@ -5264,7 +5408,7 @@ class Actor:
                     "ac": self.flat_ac is not None,
                     "touch_ac": self.flat_ac is not None,
                     "attack": self.flat_attack is not None,
-                    "cmb": self.flat_attack is not None,
+                    "cmb": self.flat_cmb is not None or self.flat_attack is not None,
                     "damage": bool(self.flat_damage),
                     "cmd": self.flat_cmd is not None}.get(t, False)
         return False
@@ -8103,6 +8247,11 @@ def to_dict(actor: Actor) -> dict:
         d["described_as"] = [str(s) for s in actor.described_as]
     if actor.loadout:
         d["loadout"] = {str(k): int(v) for k, v in actor.loadout.items()}
+    # A stat block's base attack and CMB, on the same rule: only a creature imported with
+    # them has them, and every older save reads back byte for byte.
+    for key in ("flat_bab", "flat_cmb"):
+        if getattr(actor, key, None) is not None:
+            d[key] = int(getattr(actor, key))
     # The free level-up spells taken (`casting.learning`). Only when some were: written
     # always, every actor in every older save gained a key, and the owner's saves stopped
     # round-tripping byte for byte. Absent reads as "infer it" (`from_dict`), which for a
@@ -8537,6 +8686,14 @@ def _current_prepared(prepared: dict) -> dict[str, int]:
     return out
 
 
+def _int_or_none(value) -> int | None:
+    """A whole number a block or a save states, or None when it states none."""
+    try:
+        return None if value is None or value == "" else int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _current_feats(feats: list) -> list[str]:
     """A renamed feat under its new name; a dropped one stays as the player wrote it —
     the sheet already shows a feat it cannot read, and silently deleting a line a player
@@ -8710,6 +8867,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         flat_damage=data.get("flat_damage"),
         flat_initiative=data.get("flat_initiative"),
         flat_cmd=data.get("flat_cmd"),
+        flat_bab=_int_or_none(data.get("flat_bab")),
+        flat_cmb=_int_or_none(data.get("flat_cmb")),
         notes=data.get("notes", ""),
         slots={k: list(v) for k, v in (data.get("slots") or {}).items()
                if k in SLOTS},

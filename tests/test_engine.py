@@ -348,7 +348,9 @@ def test_power_attack_is_declared_by_the_gm_but_scored_by_the_engine(scene):
     plain = sum(m.value for m in brute.attack_modifiers("greatsword"))
     assert plain - atk == 3
     dmg = sum(m.value for m in brute.damage_modifiers("greatsword", power_attack=True))
-    assert dmg == 4 + 9          # Str 18 plus the Power Attack bonus
+    # Str 18 two-handed is 1-1/2 times +4 = +6 (CRB, Strength Bonus; was pinned at +4
+    # until 2026-11-08, ponytail audit #31), plus the Power Attack bonus.
+    assert dmg == 6 + 9
 
 
 def test_power_attack_without_the_feat_is_refused(engine):

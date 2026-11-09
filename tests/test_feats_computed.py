@@ -214,6 +214,9 @@ def _board(pc, dice, thug_at=(6, 5)):
     s.sides = {"us": ["pc"], "them": ["c1"]}
     s.initiative = [("pc", 20), ("c1", 10)]
     s.round, s.turn = 1, 0
+    # The thug has had a turn: a creature that has not is flat-footed and takes no attack
+    # of opportunity (CRB, Combat; enforced since 2026-11-08).
+    s.acted = {"c1"}
     return s, Engine(s, dice)
 
 

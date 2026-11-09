@@ -2503,6 +2503,10 @@
      "dc": "10 + spell level + casting ability modifier",
      "on_failure": [
       {
+       "type": "attitude",
+       "target": "friendly"
+      },
+      {
        "type": "narrative",
        "target": "The creature regards you as a trusted friend and ally - treat its attitude as friendly. You cannot control it like an automaton, but it perceives your words and actions in the most favourable way. You may try to give it orders, but must win an opposed Charisma check to make it do anything it would not ordinarily do, with no retries. It never obeys suicidal or obviously harmful orders, though it might be convinced something very dangerous is worth doing. Any act by you or your apparent allies that threatens it breaks the spell. A creature currently being threatened or attacked by you or your allies gains +5 on its saving throw. You must speak its language to give commands, or else pantomime well."
       }
@@ -2524,6 +2528,10 @@
      "target": "will",
      "dc": "10 + spell level + casting ability modifier",
      "on_failure": [
+      {
+       "type": "attitude",
+       "target": "friendly"
+      },
       {
        "type": "narrative",
        "target": "Each affected creature regards you as a trusted friend and ally - treat its attitude as friendly. You cannot control it like an automaton, but it perceives your words and actions in the most favourable way. You may try to give it orders, but must win an opposed Charisma check to make it do anything it would not ordinarily do, with no retries. It never obeys suicidal or obviously harmful orders. Any act by you or your apparent allies that threatens it breaks the spell. A creature currently being threatened or attacked by you or your allies gains +5 on its saving throw."
@@ -2551,6 +2559,10 @@
      "dc": "10 + spell level + casting ability modifier",
      "on_failure": [
       {
+       "type": "attitude",
+       "target": "friendly"
+      },
+      {
        "type": "narrative",
        "target": "The humanoid regards you as a trusted friend and ally - treat its attitude as friendly. You cannot control it like an automaton, but it perceives your words and actions in the most favourable way. You may try to give it orders, but must win an opposed Charisma check to make it do anything it would not ordinarily do, with no retries. It never obeys suicidal or obviously harmful orders, though it might be convinced something very dangerous is worth doing. Any act by you or your apparent allies that threatens it breaks the spell. You must speak its language to give commands, or else pantomime well."
       }
@@ -2576,6 +2588,10 @@
      "target": "will",
      "dc": "10 + spell level + casting ability modifier",
      "on_failure": [
+      {
+       "type": "attitude",
+       "target": "friendly"
+      },
       {
        "type": "narrative",
        "target": "Each affected humanoid regards you as a trusted friend and ally - treat its attitude as friendly. You cannot control it like an automaton, but it perceives your words and actions in the most favourable way. You may try to give it orders, but must win an opposed Charisma check to make it do anything it would not ordinarily do, with no retries. It never obeys suicidal or obviously harmful orders. Any act by you or your apparent allies that threatens it breaks the spell."

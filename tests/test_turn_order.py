@@ -112,6 +112,10 @@ def test_a_strike_then_a_move_resolves_both_in_that_order(panel):
     reach, which `_reactions_before` splices in front of it as for any move."""
     client, cm = panel
     scene = cm.current().scene
+    # The thug has had a turn: a creature that has not is flat-footed and takes no attack
+    # of opportunity (CRB, Combat; enforced since 2026-11-08), and the swing is measured.
+    scene.acted.add("c1")
+    cm.current().save()
     start = tuple(scene.positions["pc"])[:2]
     to = _square_away(scene)
     before = len(cm.current().turn_log)

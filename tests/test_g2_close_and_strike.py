@@ -167,6 +167,9 @@ def test_the_step_provokes_the_attack_of_opportunity_the_rules_give():
     engine.join_fight(other.ref)
     scene.positions[other.ref] = (4, 9)
     scene.resync_zones()
+    # He has had his turn: a creature that has not is flat-footed and takes no attack of
+    # opportunity (CRB, Combat; enforced since 2026-11-08).
+    scene.acted.add(other.ref)
     from rules import reactions
 
     assert reactions.threatens(scene, other.ref, (4, 10))
@@ -316,6 +319,7 @@ def test_a_manoeuvre_closes_the_same_way():
     """The reach refusal covers the manoeuvres (docs/maneuver-outcomes.md), and so does
     the ruling: a trip made in place of a melee attack is a standard action too."""
     scene, engine = _fight()
+    scene.acted.add("c1")       # has had his turn, so not flat-footed: he may swing
     res = _finish(engine, engine.run(engine.validate([_attack({"manoeuvre": "trip"})])))
     # The step, then — since 2026-09-30, a trip without Improved Trip provoking its
     # target (tests/test_reactions.py) — the thug's swing, then the trip.

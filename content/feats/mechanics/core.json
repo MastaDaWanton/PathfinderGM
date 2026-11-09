@@ -288,6 +288,11 @@
       }
     ]
   },
+  "precise-shot": {
+    "tags": [
+      "shot.into-melee.unpenalised"
+    ]
+  },
   "weapon-focus": {
     "modifiers": [
       {
@@ -357,21 +362,7 @@
         "when": {
           "choice": "power_attack",
           "weapon": {
-            "category": "melee",
-            "light": false
-          }
-        }
-      },
-      {
-        "type": "combat_mod",
-        "target": "damage",
-        "formula": "(1 + bab // 4)",
-        "bonus_type": "untyped",
-        "when": {
-          "choice": "power_attack",
-          "weapon": {
-            "category": "melee",
-            "light": true
+            "category": "melee"
           }
         }
       },
@@ -390,17 +381,15 @@
       }
     ],
     "not_yet": [
-      "off-hand weapons take the light rung; the sheet has no off-hand yet",
+      "off-hand weapons and secondary natural attacks are halved by the feat; the sheet has no off-hand and the roll context does not say primary or secondary",
+      "a primary natural attack adding 1-1/2 times Strength takes the two-handed rung; the roll context does not say so",
       "touch attacks and effects that deal no hit-point damage are not excluded"
     ]
   },
   "combat-reflexes": {
     "budget": {
       "attack_of_opportunity": "1 + max(0, dex_mod)"
-    },
-    "not_yet": [
-      "attacks of opportunity while flat-footed"
-    ]
+    }
   },
   "simple-weapon-proficiency": {
     "tags": [

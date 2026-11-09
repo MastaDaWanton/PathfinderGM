@@ -296,6 +296,9 @@ def test_the_players_own_pick_up_provokes_an_armed_foe_and_not_a_disarmed_one():
     assert not reactions.provoked_by_action(scene, "pc")
     thug.equipped = "dagger"
     assert [w for w, _ in reactions.provoked_by_action(scene, "pc")] == ["c1"]
+    # He has had his turn (he was disarmed in it): not flat-footed, so he may swing — a
+    # creature that has not acted takes no attack of opportunity (CRB, Combat; 2026-11-08).
+    scene.acted.add("c1")
     outcomes = _run(engine, [{"op": "give", "actor": "pc",
                               "params": {"item": "sap", "to": "pc"}}])
     assert [o.op for o in outcomes] == ["attack", "give"]

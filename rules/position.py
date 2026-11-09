@@ -111,7 +111,12 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
         return []
     here = scene.positions.get(actor.ref)
     there = scene.positions.get(defender.ref)
-    if here is None or there is None or not _melee(weapon):
+    if here is None or there is None:
+        return []
+    if not _melee(weapon):
+        friend = engaged_with_friend(scene, actor, defender)
+        if friend and not actor.has_state(SHOOTS_INTO_MELEE):
+            return [Modifier(INTO_MELEE_PENALTY, f"shooting into melee with {friend}")]
         return []
 
     mods: list[Modifier] = []
@@ -123,6 +128,50 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
     if _level(here) - _level(there) >= HIGHER_GROUND_SQUARES:
         mods.append(Modifier(HIGHER_GROUND_BONUS, "higher ground"))
     return mods
+
+
+INTO_MELEE_PENALTY = -4
+# Precise Shot's tag (content/feats/mechanics/core.json): "You can shoot or throw ranged
+# weapons at an opponent engaged in melee without taking the standard -4 penalty".
+SHOOTS_INTO_MELEE = "shot.into-melee.unpenalised"
+
+
+def engaged_with_friend(scene, actor, defender) -> str:
+    """The name of a friend of the shooter's the defender is in melee with, or "".
+
+    CRB, Combat, "Shooting or Throwing into a Melee": "If you shoot or throw a ranged
+    weapon at a target engaged in melee with a friendly character, you take a -4 penalty on
+    your attack roll. Two characters are engaged in melee if they are enemies of each other
+    and either threatens the other." Until 2026-11-08 nothing charged it (ponytail audit):
+    Kesst's bow was as good into the thug wrestling her companion as across an empty yard.
+
+    Friendly is the declared sides' word (`Scene.sides`): on a scene with none there is
+    no fight to be engaged in, and nobody is charged — the answer `_same_side` gives
+    flanking, turned the careful way round because this one is a penalty. Threatening is
+    `reactions.threatens`, the rule attacks of opportunity already use, over either
+    body's whole footprint. Helpless or downed friends are not fighting anybody."""
+    from . import reactions
+
+    sides = getattr(scene, "sides", None) or {}
+    if not any(actor.ref in refs for refs in sides.values()):
+        return ""
+    there = scene.positions.get(defender.ref)
+    if there is None:
+        return ""
+    theirs = footprint((there[0], there[1]), defender.size or "medium")
+    for ref, other in scene.actors.items():
+        if ref in (actor.ref, defender.ref) or other.is_down or other.is_helpless:
+            continue
+        if not _same_side(scene, actor.ref, ref) or _same_side(scene, defender.ref, ref):
+            continue
+        spot = scene.positions.get(ref)
+        if spot is None or _level(spot) != _level(there):
+            continue
+        mine = footprint((spot[0], spot[1]), other.size or "medium")
+        if any(reactions.threatens(scene, ref, sq) for sq in theirs) \
+                or any(reactions.threatens(scene, defender.ref, sq) for sq in mine):
+            return other.name
+    return ""
 
 
 def flanking_with(scene, actor, defender, weapon=None) -> str:

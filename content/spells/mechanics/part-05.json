@@ -1256,6 +1256,9 @@
       {
        "type": "apply_condition",
        "target": "helpless",
+       "ends_when": {
+        "wounded": true
+       },
        "note": "magical slumber; sleeping creatures are helpless. Slapping or wounding wakes the creature, but normal noise does not, and waking one is a standard action"
       }
      ],

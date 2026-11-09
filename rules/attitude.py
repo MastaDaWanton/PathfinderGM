@@ -627,6 +627,13 @@ def harmed(engine, victim, by, source: str, *, seen: bool | None = None,
         seen = perceived(engine, by, victim)
     if not seen:
         return {"kind": "harm_unseen", "ref": victim.ref, "by": by.ref, "source": source}
+    # A charm breaks on harm (CRB, Charm Person: "Any act by you or your apparent allies
+    # that threatens the charmed person breaks the spell"): the charm's friendly step goes,
+    # through the applicator, and the harm then meets the victim's own standing — not the
+    # friendship the spell lent. A gated harm (another charm, a sleep) is not that act.
+    charm = [] if gated else [e for e in victim.effects if (e.payload or {}).get("charm")]
+    if charm:
+        victim.remove_effects(match=lambda e: any(e is c for c in charm))
     was = of(victim)
     if victim.has_state(states.TRAVELS_WITH_YOU) or step_of(was) >= step_of(COMES_ALONG):
         before, after = nudge_regard(victim, -HARMED, f"harmed by {by.name}")

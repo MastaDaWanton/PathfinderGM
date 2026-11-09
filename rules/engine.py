@@ -1105,6 +1105,9 @@ class Scene:
                 # narrated and the fight simply ended with no reason given.
                 self.hazards.extend(self.tick_standing(1))
             ref = self.initiative[nxt][0]
+            # Their turn has come round, able or not: a hold that a new save may end
+            # (hold person) is tried now, and trying it is the turn (a full-round action).
+            self.hazards.extend(self._held_saves(ref))
             if halt_on is not None and ref == halt_on:
                 self.turn = nxt          # their slot, able or not (`advance_turn`)
                 return ref
@@ -1117,6 +1120,43 @@ class Scene:
                 self.acted.add(ref)
                 return ref
         return None                      # nobody able this pass
+
+    def _held_saves(self, ref: str) -> list[dict]:
+        """The new saving throw a held creature makes on its turn (hold person, CRB:
+        "Each round on its turn, the subject may attempt a new saving throw to end the
+        effect. This is a full-round action that does not provoke attacks of
+        opportunity"). One roll per effect carrying `ends_when.save_each_turn`, against
+        the DC the cast set; a made save ends it through the applicator. The turn is spent
+        either way — the effect stopped it from acting, and the try is a full-round
+        action — so nothing else happens on it. Rolled by the engine, like an
+        affliction's periodic save (`Actor._afflicted`), and recorded for the round's
+        narration (`_ward_tell`, `held_save`). Added 2026-11-08: before it a held creature
+        stayed paralyzed for the spell's whole duration."""
+        who = self.people.get(ref)
+        if who is None or who.is_dead:
+            return []
+        out: list[dict] = []
+        for e in list(who.effects):
+            held = ((e.payload or {}).get("ends_when") or {}).get("save_each_turn")
+            if not isinstance(held, dict) or e not in who.effects:
+                continue
+            save, dc = str(held.get("save") or ""), int(held.get("dc") or 0)
+            if save not in SAVES or not dc:
+                continue
+            roll = self._dice.d20(who.save_modifiers(save, {"against": "spell"}),
+                                  label=f"{SAVES[save]} save to break {e.key}",
+                                  visibility="hidden")
+            made = d20_succeeds(roll, dc)
+            if made:
+                who.remove_effects(match=lambda x, e=e: x is e)
+            # The gate's applicator names its source "the <spell>" (`_magic_gate`).
+            source = str(e.source or e.name)
+            source = source[4:] if source.startswith("the ") else source
+            out.append({"kind": "held_save", "ref": ref, "what": e.key,
+                        "source": source, "made": bool(made),
+                        "roll": roll.total, "dc": dc, "natural": natural_said(roll, dc),
+                        "origin": e.origin})
+        return out
 
     def _drain_periodic(self, actor: "Actor") -> list[dict]:
         """Run each standing effect's per-round work — today, pool upkeep.
@@ -5154,14 +5194,9 @@ class Engine:
                 if step is not None:
                     # The step is the move action and this blow the standard one; any
                     # further blow of the same attacker's in this list would be a full
-                    # attack after a move, which the rule does not allow. Marked in its
-                    # params, so the mark survives a suspension for the player's dice.
-                    for later in queue[1:]:
-                        if later.get("op") == "attack" \
-                                and later.get("actor") == raw.get("actor") \
-                                and not (later.get("params") or {}).get("reaction"):
-                            later["params"] = dict(later.get("params") or {},
-                                                   after_close=True)
+                    # attack after a move, which the rule does not allow (`_one_blow_left`;
+                    # this blow is the queue's first, already made single by the step).
+                    self._one_blow_left(str(raw.get("actor") or ""), queue)
                     queue[0:0] = [step]
                     raw["_closed"] = True
                     continue
@@ -5208,6 +5243,9 @@ class Engine:
             # written onto the blows still queued behind it (`_draw_paid`).
             if intent.op == "wear":
                 self._draw_paid(intent, outcome, queue)
+            # So is a declared move further than a 5-foot step (`_move_paid`).
+            if intent.op == "move":
+                self._move_paid(intent, outcome, queue)
             # And a coup de grâce in a fight is the whole round (`_coup_paid`).
             if intent.op == "attack":
                 self._coup_paid(intent, outcome, queue)
@@ -5667,6 +5705,63 @@ class Engine:
             })
         if owed:
             raise _ReactionsOwed(owed, [o["actor"] for o in owed])
+
+    def _one_blow_left(self, actor_ref: str, queue: list[dict]) -> None:
+        """A move action spent this round: the actor's next blow still queued is one
+        attack at the highest bonus, and every blow after it is refused (`after_close`).
+
+        "You must use a full-round action to get your additional attacks. The only
+        movement you can take during a full attack is a 5-foot step" (Core Rulebook,
+        Full Attack; aonprd.com/Rules.aspx?ID=145). The one helper for both moves that
+        spend the move action: the closing step `_close_before` inserts and a move the
+        plan declared itself (`_move_paid`). Written into the queued params, so the mark
+        survives a suspension for the player's dice. An attack of opportunity is not the
+        actor's turn, and a coup de grâce has its own full-round rule (`_coup_round_spent`
+        reads `Scene.move_spent`), so neither takes the one blow's place."""
+        first = True
+        for later in queue:
+            if later.get("op") != "attack" or later.get("actor") != actor_ref:
+                continue
+            params = dict(later.get("params") or {})
+            if params.get("reaction") or params.get("coup_de_grace"):
+                continue
+            if first:
+                params["full_attack"] = False
+                params.pop("iteration", None)
+                first = False
+            else:
+                params["after_close"] = True
+            later["params"] = params
+
+    def _move_paid(self, intent: Intent, outcome: "Outcome", queue: list[dict]) -> None:
+        """What a declared move in a fight leaves of the turn: one blow, when it went
+        further than a 5-foot step (`_one_blow_left`).
+
+        Measured 2026-11-07 (ponytail audit #25): "move 10 ft, then full attack" rolled
+        two attacks, and an owlbear that walked 25 ft threw its whole claw, claw, bite.
+        Only the closing step the engine inserts had ever marked the blows behind it; a
+        move the plan declared itself — the order `_reach_refusal` tells the model to
+        write — marked nothing. A 5-foot step (one square, 5 ft paid) leaves the full
+        attack, the rule's own exception. The closing step is skipped here: its blow was
+        marked when the step was spliced in. A zone move on a scene with no map is not
+        counted — a zone is a distance band, with no feet to weigh."""
+        if not self.scene.in_encounter or outcome.status != "resolved":
+            return
+        params = intent.params or {}
+        mover = str(params.get("who") or intent.actor or "")
+        if not mover or mover != (intent.actor or "") or params.get("closing_on"):
+            return
+        went = next((e for e in outcome.effects or () if e.get("kind") == "position"
+                     and e.get("ref") == mover), None)
+        if went is None or went.get("from") is None or went.get("to") is None:
+            return
+        feet = went.get("feet")
+        if feet is None:
+            a, b = tuple(went["from"])[:2], tuple(went["to"])[:2]
+            feet = max(abs(a[0] - b[0]), abs(a[1] - b[1])) * gridmod.SQUARE_FT
+        if int(feet) <= gridmod.SQUARE_FT:
+            return
+        self._one_blow_left(mover, queue)
 
     def _coup_paid(self, intent: Intent, outcome: "Outcome", queue: list[dict]) -> None:
         """What a coup de grâce delivered in a fight leaves of the round: nothing. The move
@@ -6206,6 +6301,17 @@ class Engine:
         """
         actor = self.scene.actors.get(ref)
         if actor is None:
+            return False
+        # "A flat-footed character can't make attacks of opportunity, unless he has the
+        # Combat Reflexes feat" (CRB, Combat; legacy.aonprd.com/coreRulebook/combat.html).
+        # Measured 2026-11-07 (ponytail audit #32): in round 1 a thug who had not yet
+        # acted hit Kesst for 8 as she stepped away. Asked here, the one door every attack
+        # of opportunity spends through (a walk, a pick-up, a manoeuvre, a cast, a coup),
+        # and only inside a fight with an initiative order — outside one `_flat_footed`
+        # answers yes for everybody, and no swing is owed there anyway.
+        if budget == "attack_of_opportunity" and self.scene.initiative \
+                and self._flat_footed(actor) \
+                and not reactions.reacts_flat_footed(actor, budget):
             return False
         key = f"{ref}:{budget}"
         used = self.scene.reacted.get(key, 0)
@@ -8118,13 +8224,14 @@ class Engine:
                 effects=[{"ref": actor.ref, "kind": "attack_stopped", "why": why}],
                 tell=f"{actor.name} is {why} and never swings.",
                 because=intent.because)
-        # A second blow behind one that closed the distance (`_drive` marks it): a move
-        # action and a standard action leave ONE attack — "the only movement you can take
-        # during a full attack is a 5-foot step" (aonprd.com/Rules.aspx?ID=145).
+        # A second blow behind a move this turn — the closing step or a declared one
+        # (`_one_blow_left` marks it): a move action and a standard action leave ONE
+        # attack — "the only movement you can take during a full attack is a 5-foot step"
+        # (aonprd.com/Rules.aspx?ID=145).
         if partial.get("attack_state") is None and intent.params.get("after_close"):
             return self._refuse(
-                intent, f"{actor.name} closed the distance this turn, and a move leaves "
-                        f"time for one blow, already struck. Nothing more is rolled.")
+                intent, f"{actor.name} moved this turn, and a move leaves time for one "
+                        f"blow, already struck. Nothing more is rolled.")
         # A blow behind a coup de grâce the same attacker delivered in this fight
         # (`_coup_paid`): the coup took the whole round (CRB p.197, a full-round action).
         if partial.get("attack_state") is None and intent.params.get("after_coup"):
@@ -8664,7 +8771,8 @@ class Engine:
             if printed.get("touch"):
                 # "tongue +7 touch", "incorporeal touch +5": armour, shield and natural
                 # armour do not count. 243 printed attacks say so.
-                touch = defender.touch_ac(flat_footed or bool(flounders), attacker=actor)
+                touch = defender.touch_ac(flat_footed or bool(flounders), attacker=actor,
+                                          against=weapon["category"])
                 swing_ac = touch + footing
                 swing_note = _ac_said("touch AC", touch, flat_footed, footing_parts)
                 # Ghost touch armour (CRB): "its enhancement bonus and armor bonus count
@@ -17006,7 +17114,9 @@ class Engine:
             ends = intent.params.get("ends_when") if intent.origin else None
             payload = (None if not intent.origin else
                        {"ends_when": _shared_ends(ends)}
-                       if isinstance(ends, dict) and (ends.get("acts") or ends.get("group"))
+                       if isinstance(ends, dict) and (ends.get("acts") or ends.get("group")
+                                                      or ends.get("save_each_turn")
+                                                      or ends.get("wounded"))
                        else {})
             cond = target.add_condition(key, rounds, source=intent.because,
                                          origin=intent.origin, payload=payload)
@@ -17028,7 +17138,8 @@ class Engine:
         """
         return self._set_attitude(target, key, rounds, source or "the engine")
 
-    def _set_attitude(self, target, key: str, rounds: int | None, source: str):
+    def _set_attitude(self, target, key: str, rounds: int | None, source: str,
+                      payload: dict | None = None):
         """Move a creature to one step of the track. The one applicator for an attitude.
 
         One step at a time: nobody is hostile and helpful at once, and without the clear
@@ -17053,7 +17164,9 @@ class Engine:
 
             if attitude_mod.band_of(attitude_mod.regard_of(target)) != key:
                 attitude_mod.set_regard(target, attitude_mod.floor_of(key), source)
-        return target.add_condition(key, rounds, source=source)
+        # `payload` rides on the step: a charm's `{"charm": ...}` is what lets harm by the
+        # caster break it (`attitude.harmed`).
+        return target.add_condition(key, rounds, source=source, payload=payload)
 
     # What a natural weapon does past its damage. The rider tags a race grants —
     # `natural.trip`, `natural.grab.bite`, `natural.poison.sting` — and the intent each
@@ -18436,6 +18549,25 @@ class Engine:
                 got = self._slay(defender, branch, what, None)
                 if got:
                     out.append(got)
+            elif kind == "attitude":
+                # Charm person: "regard you as its trusted friend and ally (treat the
+                # target's attitude as friendly)" (CRB), for the spell's duration, through
+                # the one attitude applicator. Timed, so the standing regard is left where
+                # it was and answers again when the charm ends (`attitude.of`); harm by the
+                # caster breaks it there too (`attitude.harmed` sets hostile, which clears
+                # the step — the book's "any act ... that threatens it breaks the spell").
+                from . import attitude as attitude_mod
+
+                key = str(branch.get("target") or "").strip().lower()
+                if key not in states.ATTITUDES:
+                    continue
+                was = attitude_mod.of(defender)
+                cond = self._set_attitude(defender, key, int(rounds) if rounds else None,
+                                          what, payload={"charm": origin or what})
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": key, "rounds_left": cond.rounds_left,
+                                       "origin": origin, "charmed": True},
+                            "tell": attitude_mod.said(defender.name, was, key)})
             elif kind == "apply_condition":
                 params = {"condition": str(branch.get("target") or ""), "to": defender.ref}
                 dur = branch.get("duration")
@@ -18446,6 +18578,15 @@ class Engine:
                     params["duration"] = {"amount": int(rounds), "unit": "round"}
                 if descriptors:
                     params["descriptors"] = list(descriptors)
+                # What else ends it, from the document: a save on each of the bearer's
+                # turns at this gate's own DC (hold person), or a wound (sleep).
+                ends = branch.get("ends_when") if isinstance(branch.get("ends_when"),
+                                                             dict) else {}
+                if ends.get("save_each_turn") or ends.get("wounded"):
+                    params["ends_when"] = _shared_ends({
+                        "save_each_turn": ({"save": save, "dc": dc}
+                                           if ends.get("save_each_turn") else None),
+                        "wounded": bool(ends.get("wounded"))})
                 res = self.run(self.validate([{
                     "op": "condition", "visibility": "hidden", "because": f"the {what}",
                     "params": params}], origin=origin, origin_name=what))
@@ -20377,10 +20518,19 @@ class Engine:
 
         # What the harm does to how they feel — once, after every roll, and only for a
         # spell that harms (being caught is the attack, so a made save counts).
+        # A creature the charm takes hold of is not also harmed by it: I3's gated harm is
+        # for the unfriendly eye that SEES a charm laid, and the charmed one now regards
+        # the caster as a friend (`_magic_gate`'s attitude branch). Measured before
+        # 2026-11-08: the harm ran first and set a thug hostile for good, so when the
+        # charm ended he was worse off than before it — the cast worsened him twice.
+        charming = self._charm_saves(plan)
+        charmed = {r for r in live if r not in (state.get("spared") or {}) and any(
+            (state.get("saved") or {}).get(f"{k}:{r}", {}).get("saved") is False
+            for k in charming)}
         if state.get("harms"):
             for ref in live:
                 victim = self.scene.actors.get(ref)
-                if victim is None or ref == actor.ref:
+                if victim is None or ref == actor.ref or ref in charmed:
                     continue
                 felt = attitude_mod.harmed(self, victim, actor, f"spell:{spell.id}",
                                            seen=(state.get("seen") or {}).get(ref, True),
@@ -20433,7 +20583,7 @@ class Engine:
         )
 
     def _cast_save(self, intent: Intent, target: Actor, save: str, dc: int, spell,
-                   partial: dict, state: dict) -> tuple[bool, Roll]:
+                   partial: dict, state: dict, extra=()) -> tuple[bool, Roll]:
         """`target`'s saving throw against this cast: (saved, roll), rolled once per target
         and save and kept in `state["saved"]` across the popups. The one copy for the
         damage loop and the riders' gate (`_rider_saves`), so a hold person's Will save is
@@ -20456,7 +20606,7 @@ class Engine:
             state["rolls"].extend(gut["rolls"])
             state["tells"].extend(gut["tells"])
         with self._guttered(guts[target.ref]["origins"]):
-            save_mods = target.save_modifiers(save, {"against": "spell"})
+            save_mods = target.save_modifiers(save, {"against": "spell"}) + list(extra)
         roll = self._roll_or_suspend_stage(
             intent, target, save_mods, f"{SAVES[save]} save against {spell.name}", dc,
             partial, state, "1d20", state_key="cast_state")
@@ -20548,9 +20698,10 @@ class Engine:
         ranged = str(touch.get("touch") or "melee") == "ranged"
         mods = _stack(self._touch_mods(actor, target, ranged)
                       + casting.touch_terms(touch, target))
-        ac = target.touch_ac(self._flat_footed(target)
-                             or self._unseen_attacker(target, actor), attacker=actor)
         kind = "ranged" if ranged else "melee"
+        ac = target.touch_ac(self._flat_footed(target)
+                             or self._unseen_attacker(target, actor), attacker=actor,
+                             against=kind)
         roll = self._roll_or_suspend_stage(
             intent, actor, mods, f"{spell.name}{which}: {kind} touch attack on {target.name}", ac,
             partial, state, "1d20", state_key="cast_state")
@@ -21106,6 +21257,18 @@ class Engine:
         kinds: list[str] = []
         for g in gates:
             kinds.append(spells_mod.save_key(str(g.get("target") or "")))
+        # Charm person: "If the creature is currently being threatened or attacked by you
+        # or your allies, however, it receives a +5 bonus on its saving throw" (CRB). A
+        # charm is a gate whose failure sets an attitude (`_charm_saves`); the threat is a
+        # fight with the caster on the other side.
+        charming = self._charm_saves(plan)
+
+        def threat(target: Actor, save: str) -> list:
+            if save in charming and self.scene.in_encounter and any(
+                    actor.ref in refs and target.ref not in refs
+                    for refs in (self.scene.sides or {}).values()):
+                return [Modifier(5, "threatened by the caster")]
+            return []
         if lays and ctx["spell_save"] and not ctx["spell_harmless"] \
                 and ctx["spell_save_effect"] == "negates":
             kinds.append(spells_mod.save_key(ctx["spell_save"]))
@@ -21116,12 +21279,23 @@ class Engine:
                 target = self.scene.actors[ref]
                 first = f"{save}:{ref}" not in (state.get("saved") or {})
                 saved, roll = self._cast_save(intent, target, save, dc, spell, partial,
-                                              state)
+                                              state, extra=threat(target, save))
                 if first:
                     nat = natural_said(roll, dc)
                     state["tells"].append(
                         f"{target.name} {'makes' if saved else 'fails'} the {SAVES[save]} "
                         f"save ({nat + ', ' if nat else ''}{roll.total} against DC {dc}).")
+
+    @staticmethod
+    def _charm_saves(plan: dict) -> set[str]:
+        """The saves whose failure charms: a top-level gate with an `attitude` branch."""
+        out: set[str] = set()
+        for g in plan.get("riders") or ():
+            if isinstance(g, dict) and str(g.get("type") or "") == "save_gate" and any(
+                    isinstance(b, dict) and str(b.get("type") or "") == "attitude"
+                    for b in g.get("on_failure") or ()):
+                out.add(spells_mod.save_key(str(g.get("target") or "")))
+        return out
 
     def _gate_rider(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A spell's top-level `save_gate` rider, run once per target through the one
@@ -21129,6 +21303,7 @@ class Engine:
         the save `_rider_saves` already rolled (audit #36). A branch the engine cannot
         apply — charm person's whole effect is prose — is told for the failed target
         only, never for one who saved."""
+        from . import class_abilities as ca
         from . import effectspec as fx
 
         caster = self.scene.actors.get(str(ctx.get("caster") or ""))
@@ -21145,14 +21320,27 @@ class Engine:
             made = saved.get(f"{save}:{ref}")
             if made is None:
                 continue
-            for got in self._magic_gate(caster, target, spec, source,
+            gate = spec
+            # A spell that does more to fewer Hit Dice (`spells.HD_TIERS`: color spray's
+            # phases), laid as its table says in place of the document's one-round floor,
+            # and its prose no longer told for this creature: the table is that prose.
+            tiers = None if made else spells_mod.hd_tier_conditions(
+                str(ctx.get("spell_id") or ""), ca.hit_dice_of(target),
+                not (target.has_state(states.UNDEAD) or target.has_state(states.CONSTRUCT)),
+                lambda d: self.dice.roll(str(d), label=f"{source} (how long)",
+                                         visibility="hidden").total)
+            if tiers is not None:
+                gate = {**spec, "on_failure": [
+                    {"type": "apply_condition", "target": key,
+                     "duration": {"amount": n, "unit": "round"}} for key, n in tiers]}
+            for got in self._magic_gate(caster, target, gate, source,
                                         str(ctx.get("origin") or ""), dc=ctx.get("dc"),
                                         rounds=ctx.get("rounds"), saved=made,
                                         descriptors=ctx.get("descriptors") or ()):
                 effects.append(got["effect"])
                 if got.get("tell"):
                     tells.append(got["tell"])
-            for b in spec.get("on_success" if made else "on_failure") or ():
+            for b in gate.get("on_success" if made else "on_failure") or ():
                 if isinstance(b, dict) and not self._gate_applies(b, made):
                     tells.append(f"On {target.name}: {fx.render(b)}.")
         return effects, tells
@@ -21163,7 +21351,7 @@ class Engine:
         a success's condition with a duration of its own."""
         kind = str(branch.get("type") or "")
         if not saved:
-            return kind in ("apply_condition", "slay")
+            return kind in ("apply_condition", "slay", "attitude")
         dur = branch.get("duration")
         return kind == "apply_condition" and isinstance(dur, dict) and bool(dur.get("amount"))
 
@@ -23132,14 +23320,18 @@ class Engine:
             mods = actor.splash_attack_modifiers()
         else:
             flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
-            ac = defender.touch_ac(flat_footed, attacker=actor)
+            # A thrown flask is a ranged touch attack: a prone target is +4 against it.
+            ac = defender.touch_ac(flat_footed, attacker=actor, against="ranged")
             cover = position_mod.ac_mods(self.scene, actor, defender)
             # From the final number, as the attack's note is (`_ac_said`): this printed
             # the touch AC before cover's +4 and appended "with cover".
             note = _ac_said("touch AC", ac, flat_footed, [(m.source, m.value) for m in cover])
             if cover:
                 ac += sum(m.value for m in cover)
-            mods = actor.splash_attack_modifiers(defender)
+            # And the board's terms for a ranged attack: a flask thrown at a foe engaged
+            # with a friend is -4 like any other throw (`position.engaged_with_friend`).
+            mods = actor.splash_attack_modifiers(defender) + position_mod.attack_mods(
+                self.scene, actor, defender, {"category": "ranged"})
         if feet and int(feet) > inc:
             n = (int(feet) - 1) // inc
             mods = mods + [Modifier(-2 * n, f"range ({int(feet)} ft: {n} increment"
@@ -23551,12 +23743,14 @@ class Engine:
         distance_ft = self._gap_ft(actor, defender)
         # Cover is not concealment in 1e — they are different rules with different
         # sources — but total cover means there is nothing to aim at. The rogue's bar is
-        # concealment, so only what obscures counts.
-        #
-        # Asked as a PREFIX question, the first law: `state.hidden` covers invisibility
-        # and everything else anyone hides behind later, without this line being edited
-        # again. Matching "invisible" by name here is what the three-laws ratchet caught.
-        concealed = bool(defender.has_state("state.hidden")
+        # concealment: "A rogue cannot sneak attack while striking a creature with
+        # concealment" (CRB, Rogue). Asked of the ONE miss-chance reader the attack roll
+        # itself rolls against (`_concealment_of`: blur, invisibility unless seen through,
+        # dim light and darkness, smoke, hidden and unseen). Until 2026-11-08 this asked
+        # `state.hidden` alone — the rule written two ways (ponytail audit): a rogue
+        # stabbing a blurred or fog-wrapped foe rolled both the 20% miss chance and her
+        # sneak dice, and one who had found a hiding foe was still refused them.
+        concealed = bool(self._concealment_of(actor, defender)[0] > 0
                          or position_mod.cover_of(self.scene, actor, defender) == "total")
         return precision_mod.applies(
             self.scene, actor, defender, weapon,
@@ -25851,6 +26045,13 @@ class Engine:
                           "hands": 0, "light": False, "finessable": False},
                "target_actor": target}
         mods.extend(actor._buff_mods("combat_mod", "attack", ctx))
+        if ranged:
+            # A ray is a ranged attack: into a melee with a friend it is -4 like an arrow
+            # (`position.engaged_with_friend`; Precise Shot waives it).
+            from . import position as position_mod
+
+            mods.extend(position_mod.attack_mods(self.scene, actor, target,
+                                                 {"category": "ranged"}))
         return mods
 
     def _class_touch_attack(self, intent: Intent, actor: Actor, target: Actor, doc: dict,
@@ -25863,7 +26064,8 @@ class Engine:
 
         ranged = str(doc.get("attack")) == "ranged touch"
         mods = stack(self._touch_mods(actor, target, ranged))
-        ac = target.touch_ac(self._flat_footed(target), attacker=actor)
+        ac = target.touch_ac(self._flat_footed(target), attacker=actor,
+                             against="ranged" if ranged else "melee")
         roll = self.dice.d20(mods, label=f"{shown}: {doc.get('attack')} attack",
                              visibility="player")
         made = d20_succeeds(roll, ac)
@@ -28273,8 +28475,29 @@ class Engine:
             mult = troops_mod.damage_multiplier(unit, pk.traits)
             if mult != 1.0:
                 amount = int(amount * mult)
+        # A magical sleep ends on a wound (sleep, CRB: "Slapping or wounding awakens an
+        # affected creature, but normal noise does not"; `ends_when.wounded`). Lifted
+        # BEFORE the damage lands, because the hit-point ladder may write `unconscious`
+        # onto the very condition the sleep laid (`add_condition` merges a key), and
+        # lifting it after would take the ladder's with it; put back as it was if the
+        # blow wounded nobody (all of it soaked). Added 2026-11-08: before it a sleeper
+        # slept through a sword for the spell's whole duration.
+        sleep = [e for e in target.effects
+                 if ((e.payload or {}).get("ends_when") or {}).get("wounded")] \
+            if amount > 0 else []
+        if sleep:
+            target.remove_effects(match=lambda x: any(x is e for e in sleep))
+        hp_was, nl_was = target.hp, target.nonlethal
         d = target.take_damage(amount, pk.dtype, pk.traits, pk.lethality)
+        if sleep and target.hp == hp_was and target.nonlethal == nl_was:
+            for e in sleep:
+                target.apply_effect(e)
+            sleep = []
         effect = self._describe_damage(target, d, pk.lethality)
+        if sleep:
+            effect["woke"] = sorted({str(e.key) for e in sleep})
+            woke = f"the wound wakes {target.name}"
+            effect["note"] = f"{effect['note']}, {woke}" if effect.get("note") else woke
         if unit is not None:
             effect.update(self._unit_took_it(target, d))
         if pk.notes:
@@ -28700,6 +28923,19 @@ def _shared_ends(ends: dict) -> dict:
             pass
     if ends.get("see_each_other"):
         out["see_each_other"] = True
+    # `save_each_turn` — {"save", "dc"}: a new saving throw on each of the bearer's turns
+    # ends it (hold person: "Each round on its turn, the subject may attempt a new saving
+    # throw to end the effect", CRB), rolled by `Scene._held_saves`. `wounded` — damage
+    # that lands ends it (sleep: "Slapping or wounding awakens an affected creature"),
+    # read by `Engine._land`. Both 2026-11-08, the save-gate gaps.
+    held = ends.get("save_each_turn")
+    if isinstance(held, dict) and str(held.get("save") or "") in ("fort", "ref", "will"):
+        try:
+            out["save_each_turn"] = {"save": str(held["save"]), "dc": int(held.get("dc") or 0)}
+        except (TypeError, ValueError):
+            pass
+    if ends.get("wounded"):
+        out["wounded"] = True
     return out
 
 
@@ -28898,6 +29134,12 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "ward_saved":
         nat = f"{e['natural']}, " if e.get("natural") else ""
         return f"{name} rides out {source} ({nat}{e.get('roll')} against DC {e.get('dc')})."
+    # A held creature's save on its turn (`Scene._held_saves`): free, or still held.
+    if kind == "held_save":
+        nat = f"{e['natural']}, " if e.get("natural") else ""
+        roll = f"{nat}{e.get('roll')} against DC {e.get('dc')}"
+        return (f"{name} breaks free of {source} ({roll})." if e.get("made") else
+                f"{name} strains against {source} and is still held ({roll}).")
     if kind == "condition":
         key = str(e.get("condition") or "")
         said = _STATE_SAID.get(key, "{name} is " + key)

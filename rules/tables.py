@@ -291,7 +291,14 @@ CONDITIONS: dict[str, dict] = {
     "dazzled": {"name": "Dazzled", "attack": -1, "note": "-1 on attack rolls"},
     "blinded": {
         "name": "Blinded",
-        "lose_dex_to_ac": True, "ac": -2, "skills": -4,
+        # CRB, Blinded: "-4 penalty on most Strength- and Dexterity-based skill checks and
+        # on opposed Perception skill checks". Until 2026-11-08 this row said "skills": -4,
+        # so a blinded wizard took -4 on Knowledge and Spellcraft. Read by
+        # `Actor.skill_modifiers` as `<ability>_skills` and `skill_<name>`. Perception is
+        # charged on every check: nearly every Perception check this game rolls is the
+        # opposed one (against Stealth), and a sight-based one fails outright anyway.
+        "lose_dex_to_ac": True, "ac": -2,
+        "str_skills": -4, "dex_skills": -4, "skill_perception": -4,
         "note": "-2 AC, loses Dex to AC, -4 on most Dex- and Str-based skills",
     },
     "grappled": {
@@ -1042,17 +1049,17 @@ MANEUVERS_WITH_THE_WEAPON = frozenset({"disarm", "sunder", "trip"})
 SIZE_ORDER = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
               "gargantuan", "colossal")
 
-# Size modifiers: (AC and attack, CMB and CMD, Stealth)
+# Size modifiers: (AC and attack, CMB and CMD, Stealth, Fly — CRB, Fly: "Fine +8 ... Colossal -8")
 SIZES: dict[str, dict] = {
-    "fine": {"attack_ac": 8, "cmb_cmd": -8, "stealth": 16},
-    "diminutive": {"attack_ac": 4, "cmb_cmd": -4, "stealth": 12},
-    "tiny": {"attack_ac": 2, "cmb_cmd": -2, "stealth": 8},
-    "small": {"attack_ac": 1, "cmb_cmd": -1, "stealth": 4},
-    "medium": {"attack_ac": 0, "cmb_cmd": 0, "stealth": 0},
-    "large": {"attack_ac": -1, "cmb_cmd": 1, "stealth": -4},
-    "huge": {"attack_ac": -2, "cmb_cmd": 2, "stealth": -8},
-    "gargantuan": {"attack_ac": -4, "cmb_cmd": 4, "stealth": -12},
-    "colossal": {"attack_ac": -8, "cmb_cmd": 8, "stealth": -16},
+    "fine": {"attack_ac": 8, "cmb_cmd": -8, "stealth": 16, "fly": 8},
+    "diminutive": {"attack_ac": 4, "cmb_cmd": -4, "stealth": 12, "fly": 6},
+    "tiny": {"attack_ac": 2, "cmb_cmd": -2, "stealth": 8, "fly": 4},
+    "small": {"attack_ac": 1, "cmb_cmd": -1, "stealth": 4, "fly": 2},
+    "medium": {"attack_ac": 0, "cmb_cmd": 0, "stealth": 0, "fly": 0},
+    "large": {"attack_ac": -1, "cmb_cmd": 1, "stealth": -4, "fly": -2},
+    "huge": {"attack_ac": -2, "cmb_cmd": 2, "stealth": -8, "fly": -4},
+    "gargantuan": {"attack_ac": -4, "cmb_cmd": 4, "stealth": -12, "fly": -6},
+    "colossal": {"attack_ac": -8, "cmb_cmd": 8, "stealth": -16, "fly": -8},
 }
 
 # Space and natural reach, in feet. Core Rulebook table 8-4.

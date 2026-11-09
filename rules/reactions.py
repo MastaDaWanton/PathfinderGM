@@ -148,6 +148,23 @@ def budget_for(actor, name: str = "attack_of_opportunity") -> int:
     return best
 
 
+def reacts_flat_footed(actor, name: str = "attack_of_opportunity") -> bool:
+    """Whether this creature may take these reactions while flat-footed.
+
+    Combat Reflexes: "With this feat, you may also make attacks of opportunity while
+    flat-footed" (CRB, Feats). Asked of the same document line `budget_for` reads — a feat
+    that raises the allowance is the feat that lifts the flat-footed bar — so a homebrew
+    feat written in the same grammar answers alike, and no name is matched. A bestiary
+    creature's feats are not on its sheet (`bestiary._NOT_ON_THE_SHEET`), so a monster's
+    printed Combat Reflexes lifts neither, as its extra swings were never counted either."""
+    from . import feats as feats_mod
+
+    for raw in getattr(actor, "feats", ()) or ():
+        if name in ((feats_mod.document(raw) or {}).get("budget") or {}):
+            return True
+    return False
+
+
 def threatens(scene, watcher_ref: str, square) -> bool:
     """Does this creature threaten that square?
 
