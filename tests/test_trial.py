@@ -754,3 +754,28 @@ def test_ruling_a_small_favours_captain_is_granted_the_officer_tag_and_old_saves
     assert not cap.has_state(states.GUARD)
     schemes._heal_cast_grants(s, schemes.all_schemes())
     assert cap.has_state(states.GUARD)
+
+
+def test_a_confiscation_that_cannot_give_is_logged_and_still_ends_the_matter(caplog):
+    """Review 2026-11-11, finding 10: `_confiscate` wrapped the give in `except Exception:
+    pass`, so a give that raised left no trace anywhere. The record still goes back to
+    its owner — `charges` charges theft afresh for anything still held, so a thing that
+    can never be given would otherwise be charged at every arrest — but the log now says
+    the give failed, and why."""
+    import logging
+
+    s, e, pc, g, _ = _taken_for_theft()
+    pc.purse = {"gp": 30}
+    _check(e, "diplomacy", g.ref, face=1)           # guilty
+
+    def broken(intent, partial):
+        raise RuntimeError("the give door is broken")
+
+    e._op_give = broken
+    with caplog.at_level(logging.WARNING, logger="rules.trial"):
+        res = _wait(e)                              # sentence
+    assert any("giving up 'apple' failed" in r.getMessage() for r in caplog.records)
+    rec = next(r for r in s.props if r["name"] == "apple")
+    assert rec["held_by"] == "c90" and not rec.get("stolen")
+    assert trial.custody(pc) is None, _tells(res)
+    assert trial.charges(e, pc, TOWN) == []
