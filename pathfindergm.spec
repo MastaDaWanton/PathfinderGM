@@ -145,6 +145,10 @@ hiddenimports = (
         "django.core.servers.basehttp",
         "django.template.backends.django",
         "django.template.context_processors",
+        # Named in MIDDLEWARE as a string. PyInstaller's Django hook collects all of
+        # django today; written down because a middleware missing from the bundle is
+        # every request failing, not one.
+        "django.middleware.clickjacking",
     ]
 )
 

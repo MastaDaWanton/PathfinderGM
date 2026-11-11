@@ -37,6 +37,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
+    # No other site may put the game in a frame and lay its own buttons over it
+    # (review 2026-11-11, finding 16). Up here so the door's own refusals carry the header
+    # too; it only sets a response header.
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Before CSRF, and inert unless `desktop.py --lan` armed it. A request from off this
     # machine with no pass must be turned away at the door rather than a step inside it:
     # CSRF's answer to a stranger is a 403 about a token, which tells somebody who
@@ -49,6 +53,10 @@ MIDDLEWARE = [
     # would send every open device off to re-fetch a state that had not changed.
     "play.concurrency.OneGameAtATime",
 ]
+
+# SAMEORIGIN, not Django's default DENY: the table opens Settings as an iframe of this
+# same server (`#settingsframe`, `/?tab=settings&embed=1`), and DENY would blank it.
+X_FRAME_OPTIONS = "SAMEORIGIN"
 
 ROOT_URLCONF = "pathfindergm.urls"
 
