@@ -98,6 +98,10 @@ Ids are unique within a world, not across worlds. Key your own storage on
   null as empty and skips an entity with no id (audit 2026-11-07 #11: one `"name": null`
   once imported fine and crashed every turn), but an empty name is still a person or
   place the game cannot call by name.
+- **Every `facts` value is a string.** Not a list, a number or an object: several values
+  under one tag are written as one string. Pathfinder GM reads a list as its items joined
+  with ", " and anything else through `str()` (review 2026-11-11, finding 12: a list
+  imported fine and crashed the situation cards and the opening).
 
 ## `chronology[]`
 
@@ -117,6 +121,11 @@ Ids are unique within a world, not across worlds. Key your own storage on
 
 `year` is a signed integer counted from the world's founding reckoning — negative for
 before it — or `null` when the event is undated. All years across a world are comparable.
+It is a JSON number, never text: no era suffix, no "c." — `1200`, not `"1200 AE"`.
+Pathfinder GM reads a whole number written as text (`"1200"`) as that number and any
+other text as undated (review 2026-11-11, finding 12: `"1200 AE"` imported fine and
+crashed the event sort on every turn), so an era written into `year` loses the event its
+place in the order. The era belongs in `summary`.
 A figure's `entity_id` is `null` when that person has never been written up; look them up
 in `unwritten`.
 

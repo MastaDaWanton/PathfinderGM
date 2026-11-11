@@ -287,3 +287,30 @@ def test_a_null_in_the_export_is_read_as_empty_not_as_none(tmp_path):
     assert w.get("nobody").fact("Role") == "" and w.get("nobody").prose == ""
     assert all(isinstance(f["name"], str) for c in w.chronology for f in c.figures)
     assert all(isinstance(f["name"], str) for f in w.factions + w.unwritten)
+
+
+def test_an_off_contract_year_or_fact_is_coerced_at_the_door(tmp_path):
+    """Review 2026-11-11, finding 12. `"year": "1200 AE"` passed the import and raised
+    `TypeError: bad operand type for unary -: 'str'` in `events_touching`'s sort — run
+    every turn — and a list where a fact's string belongs raised `AttributeError: 'list'
+    object has no attribute 'strip'` in `cards._fact` and the opening. A whole number
+    written as text is that number; text with an era on it is undated, never guessed at
+    ("1200 AE" and "1200 BE" would both keep 1200); a fact is always a string."""
+    raw = json.loads(open(EXPORT, encoding="utf-8").read())
+    years = ["1200 AE", "1200", " -300 ", 1200.0, 12.5, True, [1200], {"y": 1}, None, 7]
+    template = raw["chronology"][0]
+    raw["chronology"] = [dict(template, name=f"e{i}", year=y) for i, y in enumerate(years)]
+    town = next(e for e in raw["entities"] if e["id"] == PANGRELLA_TOWN)
+    town["facts"] = {"Governance": ["a council", "a reeve"], "Founded": 1200,
+                     "Open": True, "Gone": None}
+    p = tmp_path / "offcontract.json"
+    p.write_text(json.dumps(raw), encoding="utf-8")
+
+    w = load(p)
+    assert [c.year for c in w.chronology] == [None, 1200, -300, 1200, None, None, None,
+                                              None, None, 7]
+    assert isinstance(w.events_touching(PANGRELLA_TOWN), list)     # the per-turn sort
+    home = w.get(PANGRELLA_TOWN)
+    assert home.facts == {"Governance": "a council, a reeve", "Founded": "1200",
+                          "Open": "True"}
+    assert home.fact("Governance").strip().lower() == "a council, a reeve"
