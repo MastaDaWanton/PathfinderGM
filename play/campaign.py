@@ -1317,6 +1317,11 @@ def _bind_background(c, acquaint: bool = True) -> list[dict]:
         if acquaint:
             backgrounds.acquaint(engine, pc, bound)
     except Exception:
+        # Still never a reason to lose the start, but said: silent, a bug in the
+        # binding read as a character who simply had no ties.
+        import logging
+
+        logging.getLogger(__name__).exception("binding the background's ties failed")
         pc.background_ties = []
     c._bound = bound
     return bound

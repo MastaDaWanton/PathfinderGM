@@ -154,7 +154,8 @@ def load(character_id: str) -> Entry | None:
         return None
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        files.unreadable(p, exc)    # named: a character that vanished from the shelf
         return None
     # Only NEWER is refused — the rule `Campaign.load` already learned. Written `!=`
     # (measured 2026-09-25), bumping ROSTER_VERSION would have made every character on

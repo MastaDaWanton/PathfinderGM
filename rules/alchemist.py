@@ -2058,6 +2058,9 @@ def settle_made(actor, progress, plan: AlchemyPlan, tier: int, consumes, *, dice
             new = reveal(actor, mid, list(dict.fromkeys(keys)), how)
             rows = {r.get("key"): r for r in knowledge.properties(actor, doc)} if new else {}
         except Exception:      # noqa: BLE001 - a discovery is never worth losing the work
+            import logging
+
+            logging.getLogger(__name__).exception("a discovery about %r failed", mid)
             new, rows = [], {}
         for k in new:
             text = str((rows.get(k) or {}).get("text") or "")

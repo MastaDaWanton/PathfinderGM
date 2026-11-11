@@ -385,6 +385,11 @@ def _narrate(messages, cfg, *, as_json=False, num_predict=220, schema=None):
         # "Reply(text='You push aside…', model='llama3.1:8b')" into the book verbatim.
         return reply.json() if (as_json or schema is not None) else reply.text
     except Exception:
+        # The caller's floor still stands; the log says whether it was the model or us.
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "the bench narrator's call failed", exc_info=True)
         return None
 
 
