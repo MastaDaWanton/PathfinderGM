@@ -12,7 +12,9 @@ example `http://localhost:8993/docs/mock/polish/`. It needs a server (it fetches
 
 Controls, shared by both panels:
 
-- **Scene**: A (the fight), B at dawn, noon and night (the same fight at three hours).
+- **Scene**: A (the fight), B at dawn, noon and night (the same fight at three hours), C
+  and C at night (the same cast in Zhilvarnia's great square, 24 x 24: the city's own
+  `size_ft` of 120 by 120, laid by `floorplan.for_place`, set up exactly as A; for zoom).
 - **Flat / 3D** and **Turn left / right** (3D only). The board's own buttons inside
   either panel work too, and the other panel follows.
 - **Show the burning hands area**: lays `extras.spell_area` into `scene.grid.areas`,

@@ -78,14 +78,31 @@ FOES = [
 ]
 
 
-def build(seed: int):
+# Scene C: the largest mapped place the fixture city has. Zhilvarnia's own World Bible
+# entry gives the great square a size (120 x 120 ft), so floorplan.for_place lays it at
+# 24 x 24 rather than BY_SPOT's 20 x 18: stalls and statues (blocked), loose setts
+# (difficult) and the steps and plinth (raised, 5 ft). The same cast, set up the same way,
+# placed round the square's real clutter: the third goblin on a plinth square at (17,11),
+# the hidden one at (20,13) behind the run of blocked squares at (20-21,12).
+SQUARE = CITY + "~urban:the-great-square"
+SQUARE_PC_AT = (12, 12)
+SQUARE_ALLY_AT = (14, 12)
+SQUARE_FOES = [
+    ("flanked", (13, 12)),
+    ("beside", (12, 13)),
+    ("on the wall", (17, 11, 1)),   # role name kept for foes_by_role; here it is the plinth
+    ("hidden", (20, 13)),
+]
+
+
+def build(seed: int, place: str = GATE):
     world = load_cached(WORLD)
     s = Scene(location_id=CITY)
     pc = load_pc(PC_FILE)
     s.add(pc)
     s.clock_minutes = FIGHT_HOUR
     e = Engine(s, Dice(seed=seed), world=world)
-    e.place_party(GATE)
+    e.place_party(place)
     ally = instantiate("watchman", scene=s)
     s.add(ally, zone="near")
     foes = []
@@ -100,29 +117,39 @@ def build(seed: int):
     return s, e, pc, ally, foes
 
 
-seed = next(n for n in range(500) if build(n)[0].current_ref() == "pc")
-scene, engine, pc, ally, foes = build(seed)
-scene.positions[pc.ref] = PC_AT
-scene.positions[ally.ref] = ALLY_AT
-for f, (_, at) in zip(foes, FOES):
-    scene.positions[f.ref] = at
-roles = {f.ref: role for f, (role, _) in zip(foes, FOES)}
-hidden = foes[3]
-hidden.apply_effect(ActiveEffect(
-    name="Hidden", kind="condition", key=awareness.SNEAKING_KEY,
-    source=awareness.STEALTH_ORIGIN, origin=awareness.STEALTH_ORIGIN,
-    duration="until-dismissed", tags=states.tags_for(awareness.SNEAKING_KEY),
-    payload={"result": 30, "at": scene.at, "ends_when": dict(awareness.ENDS_ON_ATTACK),
-             "pace": "half"}))
-awareness.hunch(scene, pc, hidden)
-assert scene.current_ref() == pc.ref and scene.in_encounter
+def set_up(place: str, pc_at, ally_at, foe_at, camp_id: str = "polish-mock"):
+    """One fight, saved: the PC's turn by initiative, positions as the tests write them,
+    the fourth goblin hidden with a hunch. Returns (save, seed, roles, hidden goblin)."""
+    seed = next(n for n in range(500) if build(n, place)[0].current_ref() == "pc")
+    scene, _, pc, ally, foes = build(seed, place)
+    scene.positions[pc.ref] = pc_at
+    scene.positions[ally.ref] = ally_at
+    for f, (_, at) in zip(foes, foe_at):
+        assert tuple(at[:2]) not in scene.grid.blocked, f"{at} is blocked in {place}"
+        scene.positions[f.ref] = at
+    roles = {f.ref: role for f, (role, _) in zip(foes, foe_at)}
+    hidden = foes[3]
+    hidden.apply_effect(ActiveEffect(
+        name="Hidden", kind="condition", key=awareness.SNEAKING_KEY,
+        source=awareness.STEALTH_ORIGIN, origin=awareness.STEALTH_ORIGIN,
+        duration="until-dismissed", tags=states.tags_for(awareness.SNEAKING_KEY),
+        payload={"result": 30, "at": scene.at, "ends_when": dict(awareness.ENDS_ON_ATTACK),
+                 "pace": "half"}))
+    awareness.hunch(scene, pc, hidden)
+    assert scene.current_ref() == pc.ref and scene.in_encounter
+    # Each scene its own save id: Campaign.save writes <data>/<id>, and one id for both
+    # had scene C's save overwrite A's before A was read back.
+    camp = campaign_mod.Campaign(id=camp_id, world_source=WORLD, scene=scene, seed=seed)
+    return camp.save(), seed, roles, hidden
 
-camp = campaign_mod.Campaign(id="polish-mock", world_source=WORLD, scene=scene, seed=seed)
-saved = camp.save()
+
+saved, seed, roles, hidden = set_up(GATE, PC_AT, ALLY_AT, FOES)
+square_saved, square_seed, square_roles, square_hidden = set_up(
+    SQUARE, SQUARE_PC_AT, SQUARE_ALLY_AT, SQUARE_FOES, camp_id="polish-mock-square")
 
 
-def state_at(clock: int | None = None) -> tuple[dict, campaign_mod.Campaign]:
-    c = campaign_mod.Campaign.load(saved)
+def state_at(clock: int | None = None, save=None) -> tuple[dict, campaign_mod.Campaign]:
+    c = campaign_mod.Campaign.load(save if save is not None else saved)
     if clock is not None:
         c.scene.clock_minutes = clock
     return views._state(c), c
@@ -143,7 +170,8 @@ def terms(mods) -> list:
     return [[m.source, m.value] for m in mods if m.value]
 
 
-def extras(c) -> dict:
+def extras(c, roles=None) -> dict:
+    roles = roles if roles is not None else globals()["roles"]
     s = c.scene
     e = c.engine()
     me = s.pc()
@@ -209,7 +237,8 @@ def extras(c) -> dict:
     # is the geometry a cast would get, for drawing. Caught creatures the PC cannot locate
     # are dropped.
     spell = spells.get("burning-hands")
-    area = areas.lay(s, me.ref, spell, 1, areas.Aim("ref", foes_by_role(s)["beside"]))
+    beside = next(ref for ref, role in roles.items() if role == "beside")
+    area = areas.lay(s, me.ref, spell, 1, areas.Aim("ref", beside))
     caught = [r for r in areas.caught(s, area, exclude=(me.ref,))
               if r not in foe_refs or r in seen]
 
@@ -243,10 +272,6 @@ def extras(c) -> dict:
     }
 
 
-def foes_by_role(s):
-    return {role: ref for ref, role in roles.items()}
-
-
 def light(c) -> dict:
     s = c.scene
     me = s.pc()
@@ -274,14 +299,21 @@ for name, clock in HOURS.items():
     st, c = state_at(clock)
     scenes[name] = {"label": f"The hour: {name[2:]}", "state": keep(st), "extras": extras(c),
                     "light": light(c)}
+st, c = state_at(save=square_saved)
+scenes["C"] = {"label": "The great square, 24 by 24", "state": keep(st),
+               "extras": extras(c, square_roles), "light": light(c)}
+st, c = state_at(HOURS["B-night"], save=square_saved)
+scenes["C-night"] = {"label": "The great square at night", "state": keep(st),
+                     "extras": extras(c, square_roles), "light": light(c)}
 
 # The hidden goblin must not reach the extras in any field. The state is the game's own
 # payload and is kept as sent: `_state` drops the hidden goblin from `actors` but lists it
 # in `initiative` with its name and score (found while building this; README, "Found").
-for sc in scenes.values():
-    assert hidden.ref not in [a["ref"] for a in sc["state"]["scene"]["actors"]]
-    assert f'"{hidden.ref}"' not in json.dumps(sc["extras"]), "the hidden goblin reached the extras"
-    leak = [i for i in sc["state"]["scene"]["initiative"] if i["ref"] == hidden.ref]
+for name, sc in scenes.items():
+    h = square_hidden if name.startswith("C") else hidden
+    assert h.ref not in [a["ref"] for a in sc["state"]["scene"]["actors"]]
+    assert f'"{h.ref}"' not in json.dumps(sc["extras"]), "the hidden goblin reached the extras"
+    leak = [i for i in sc["state"]["scene"]["initiative"] if i["ref"] == h.ref]
 assert leak, "_state no longer lists the hidden goblin in initiative: update the README"
 
 data = {
@@ -292,6 +324,8 @@ data = {
                  "with Campaign.save, loaded with Campaign.load, read through "
                  "play/views.py _state",
         "seed": seed,
+        "scene_C": SQUARE + " (24 x 24 from the world's own size_ft, 120 by 120), seed "
+                   + str(square_seed) + ", the same cast and set-up",
         "placed": "positions written after begin_encounter, as the engine's tests do; one "
                   "goblin hidden with the Stealth effect and a hunch from awareness.hunch",
     },
