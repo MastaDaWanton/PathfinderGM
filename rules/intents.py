@@ -23,8 +23,8 @@ import re
 from dataclasses import dataclass, field
 
 from .tables import (
-    CIRCUMSTANCE, DC_BANDS, LETHALITIES, MANEUVER_ALIASES, MANEUVERS, SAVES, SKILLS,
-    WEAPONS, base_skill,
+    CIRCUMSTANCE, CONDITIONS, DC_BANDS, LETHALITIES, MANEUVER_ALIASES, MANEUVERS, SAVES,
+    SKILLS, WEAPONS, base_skill,
 )
 
 # Hyphens and spaces are already gone when this is read ("non-lethal" -> "nonlethal").
@@ -273,9 +273,11 @@ def _bounded(value, low: int, high: int, index: int, what: str) -> int:
     honest reading of it — and the refusal names what the field is for, so the retry
     is a repair rather than a guess.
     """
+    # OverflowError: JSON's `Infinity` parses to a float and `int(inf)` raises it — a 500
+    # from four ops' counts until 2026-11-11 (review finding 5).
     try:
         return max(low, min(high, int(value)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise IntentError(f"{what}. {value!r} is not a number.", "schema", index)
 
 # --- The op table ------------------------------------------------------------------
@@ -1221,12 +1223,25 @@ def parse(raw: dict, index: int = 0) -> Intent:
     target = raw.get("target")
     if isinstance(target, list):
         target = [normalise_ref(t) for t in target]
+        # One ref in a list is that ref. Handlers that take one target key the roster
+        # with it, and `["c1"]` was `TypeError: unhashable type: 'list'` at resolution.
+        if len(target) == 1:
+            target = target[0]
     else:
         target = normalise_ref(target)
 
+    # A ref is a string. A list or a number as the actor reached `scene.actors[...]` in
+    # every op that reads it — `TypeError: unhashable type` or `KeyError: 3`, a 500
+    # where the model needed a sentence (review 2026-11-11, finding 5).
+    actor = normalise_ref(raw.get("actor"))
+    if actor is not None and not isinstance(actor, str):
+        raise IntentError(
+            f"{op}: actor is one ref, a string like \"pc\" or \"c1\" — got {actor!r}. "
+            f"Several people acting is one intent each.", "schema", index)
+
     intent = Intent(
         op=op,
-        actor=normalise_ref(raw.get("actor")),
+        actor=actor,
         target=target,
         because=str(raw.get("because") or "").strip(),
         params=params,
@@ -1371,6 +1386,23 @@ def _check_params(intent: Intent, index: int) -> None:
         if save not in SAVES:
             raise IntentError(f"save: no such save {save!r}", "schema", index)
         p["save"] = save
+        # A branch is {damage, type, condition, rounds} and `_op_save` reads it with
+        # `.get`. "shaken" where the object belongs was `AttributeError: 'str' object has
+        # no attribute 'get'` at resolution, and a list as the condition died in
+        # `add_condition` (review 2026-11-11, finding 5). A bare condition name is read
+        # as exactly that; anything else is refused with the shape named.
+        for branch in ("on_failure", "on_success"):
+            got = p.get(branch)
+            if got in (None, "", {}):
+                continue
+            if isinstance(got, str) and got.strip().lower() in CONDITIONS:
+                got = p[branch] = {"condition": got.strip().lower()}
+            if not isinstance(got, dict) or not isinstance(
+                    got.get("condition") or "", str):
+                raise IntentError(
+                    f"save: {branch} is an object naming one condition, like "
+                    f"{{\"condition\": \"shaken\"}} — got {p[branch]!r}. Leave it out "
+                    f"when nothing follows the save.", "schema", index)
 
     elif op == "attack":
         # "none" in either slot is nothing in it (`NULL_WORDS`), and "punch" as a weapon
@@ -1462,8 +1494,19 @@ def _check_params(intent: Intent, index: int) -> None:
         # Where a reposition puts its target — the attacker's choice.
         if p.get("square") not in (None, ""):
             p["square"] = _square(p["square"], op, index)
+        # Code's own slot (`judgement.check_the_target` parks candidate refs here). A
+        # model's `"undecided": true` was `TypeError: 'bool' object is not iterable` in
+        # `_op_attack`; anything that is not a list says nothing, like any other
+        # engine-owned key a model fills in.
+        if not isinstance(p.get("undecided"), (list, tuple, type(None))):
+            p.pop("undecided")
 
     elif op == "cast":
+        # The missed copy of the attack and move fix: `areas.aim_of` reads the square
+        # with `int(v) for v in tuple(square)`, so "5,3" was `ValueError: invalid literal
+        # for int()` out of validate — a 500, not a refusal (review 2026-11-11).
+        if p.get("square") not in (None, "", [], ()):
+            p["square"] = _square(p["square"], op, index)
         # The aim's grammar is closed, and checked here so a malformed one is the plan's
         # to repair with the forms named, rather than a guess the engine makes later.
         if p.get("aim") not in (None, ""):
@@ -1549,6 +1592,52 @@ def _check_params(intent: Intent, index: int) -> None:
                 p["count"], 1, 500, index,
                 "give: count is how many of the item change hands")
 
+    elif op in ("sell", "buy"):
+        # `give`'s bound, for the two ops that had none: the handlers read
+        # `max(1, int(count))`, and "two" was a ValueError at resolution — a 502 and the
+        # player's line lost (review 2026-11-11, finding 5).
+        if p.get("count") not in (None, ""):
+            p["count"] = _bounded(
+                p["count"], 1, 500, index,
+                f"{op}: count is how many of the item change hands")
+
+    elif op == "blood_pool":
+        if p.get("amount") not in (None, ""):
+            p["amount"] = _bounded(
+                p["amount"], 1, 1000, index,
+                "blood_pool: amount is how much blood is in the pool")
+        if p.get("at") not in (None, "", [], ()):
+            p["at"] = _square(p["at"], op, index)
+
+    elif op == "spend_pools":
+        # "all" is the op's own word (Hemorrhagic Eruption) and stays a word. The ceiling
+        # is no rule: the handler takes `mine[:count]`, so it only keeps a number a number.
+        if p.get("count") not in (None, "") \
+                and str(p["count"]).strip().lower() != "all":
+            p["count"] = _bounded(
+                p["count"], 1, 1000, index,
+                "spend_pools: count is how many pools are spent, or \"all\"")
+
+    elif op == "quest":
+        # `_op_quest` splits a string and iterates a list; `"objectives": 3` was
+        # `TypeError: 'int' object is not iterable` at resolution.
+        if not isinstance(p["objectives"], (str, list, tuple)):
+            raise IntentError(
+                "quest: objectives is a list of sentences, one per thing to be done — "
+                f"got {p['objectives']!r}", "schema", index)
+
+    elif op == "condition":
+        # `states.touches_the_mind` iterates the descriptors: `true` was a TypeError out
+        # of validate, and a bare string was read letter by letter, so "mind-affecting"
+        # as a string named no descriptor at all.
+        desc = p.get("descriptors")
+        if isinstance(desc, str):
+            p["descriptors"] = [desc]
+        elif not isinstance(desc, (list, tuple, type(None))):
+            raise IntentError(
+                "condition: descriptors is a list of words, like [\"mind-affecting\", "
+                f"\"fear\"] — got {desc!r}", "schema", index)
+
     elif op in ("forage", "prospect", "gather"):
         # Every op through the one gathering door (`Engine._gather`) runs the same hour
         # loop, so every one takes the same bound: prospect had none at all until the
@@ -1581,6 +1670,10 @@ def _check_params(intent: Intent, index: int) -> None:
             p.pop("zone", None)
         if p.get("square") not in (None, ""):
             p["square"] = _square(p["square"], "move", index)
+        else:
+            # An empty square is no square: left in, `""` reached the board's bounds
+            # check as an IndexError out of validate.
+            p.pop("square", None)
 
     elif op == "guard":
         kind = str(p.get("kind", "redirect")).strip().lower()
@@ -1653,7 +1746,7 @@ def _check_params(intent: Intent, index: int) -> None:
         p["template"] = raw_t
         try:
             p["count"] = max(1, min(12, int(p.get("count", 1) or 1)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise IntentError("spawn: count must be a number", "schema", index)
 
     elif op == "introduce":
@@ -1670,7 +1763,7 @@ def _check_params(intent: Intent, index: int) -> None:
         p["who"] = who
         try:
             p["count"] = max(1, min(len(INTRODUCED_REFS), int(p.get("count", 1) or 1)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise IntentError("introduce: count must be a number", "schema", index)
         # Read, not refused. Measured live 2026-09-25: `"how": "already_there"` cost a whole
         # attempt on a param whose only choice is "new, or somebody standing here". A word
@@ -1755,8 +1848,36 @@ def _check_params(intent: Intent, index: int) -> None:
     for key in ("to", "who"):
         if p.get(key):
             p[key] = normalise_ref(p[key])
+    # A param that names somebody is one ref, a string. The handlers key the roster with
+    # it: a list was `TypeError: unhashable type`, and `"to": 0` slipped past every
+    # truthiness check to a `KeyError: 0` in compel and guard (review 2026-11-11,
+    # finding 5). `who` only on move — elsewhere it is words, already made a string —
+    # and not journey's `to`, a place `_op_journey` refuses in its own words.
+    for key in ("to", "from_", "actor") + (("who",) if op == "move" else ()):
+        if op == "journey" and key == "to":
+            continue
+        if p.get(key) is not None and not isinstance(p[key], str):
+            raise IntentError(
+                f"{op}: {key} is one ref, a string like \"c1\" — got {p[key]!r}. "
+                f"Several people is one intent each.", "schema", index)
+    if op == "travel" and not isinstance(p.get("with"), (list, tuple, str, type(None))):
+        raise IntentError(
+            f"travel: with is a list of the refs who come along, like [\"c1\"] — got "
+            f"{p['with']!r}", "schema", index)
     if op == "begin_encounter" and isinstance(p.get("sides"), dict):
-        p["sides"] = {k: [normalise_ref(r) for r in v] for k, v in p["sides"].items()}
+        sides = {}
+        for side, refs in p["sides"].items():
+            # One ref as a bare string is that ref (`_check_refs` reads it so); `null`
+            # and a number were `TypeError: not iterable` here, out of validate.
+            if isinstance(refs, str):
+                refs = [refs]
+            if not isinstance(refs, (list, tuple)):
+                raise IntentError(
+                    "begin_encounter: sides is a map of side name to a list of refs, "
+                    f"like {{\"you\": [\"pc\"], \"them\": [\"c1\"]}} — side {side!r} "
+                    f"has {refs!r}", "schema", index)
+            sides[side] = [normalise_ref(r) for r in refs]
+        p["sides"] = sides
 
     circ = p.get("circumstance")
     if circ:
