@@ -1462,11 +1462,18 @@ def interpret(sentence: str, *, model: str | None = None, host: str | None = Non
                         api_key=api_key or cfg.get("api_key", ""), schema=reply_schema())
     try:
         raw = reply.json()
-    except Exception:
-        raw = {}
+    except Exception:  # noqa: BLE001 — whatever the reply's JSON can fail with
+        raw = None
     frame, dropped = ground(raw if isinstance(raw, dict) else {}, sentence)
     frame.update(dropped=dropped, seconds=round(time.monotonic() - started, 2),
                  raw=reply.text)
+    if not isinstance(raw, dict):
+        # A reply that is not a frame is a FAILED reading, said in the key both callers
+        # already test (`"error" not in reading`), so the turn runs on the plan alone.
+        # Until 2026-11-11 (review finding 9) it came back as a good reading of nothing:
+        # "the player declared no deed", which `gets_nothing` then used to strip a give
+        # the plan had made and `acts_to_ops` built an empty table from.
+        frame["error"] = "unreadable reply"
     return frame
 
 
@@ -2060,7 +2067,11 @@ def remember(text: str, frame: dict | None) -> None:
     """This turn's reading of this sentence, for the readers that ask later in the turn."""
     if len(_READINGS) > 64:
         _READINGS.clear()
-    if frame is not None:
+    if isinstance(frame, dict) and frame.get("error"):
+        # A failed reading is a missing one for the later readers too: most of them
+        # test `reading_of(...) is None`, not the error key.
+        _READINGS.pop(_key(text), None)
+    elif frame is not None:
         _READINGS[_key(text)] = frame
 
 
