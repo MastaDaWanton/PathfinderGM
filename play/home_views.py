@@ -538,6 +538,7 @@ def house_rules(request):
         if problems:
             return JsonResponse({"rules": rules, "problems": problems}, status=400)
     from gm import intimate
+    from pathfindergm import lan
     from rules import races as races_mod
 
     from . import table_talk
@@ -549,7 +550,11 @@ def house_rules(request):
                          # Where the table writes its intimate-scene passages, shown on
                          # the content card. Named, not created: the file is made the
                          # first time a scene needs it (gm/intimate.py).
-                         "intimate_examples": str(intimate.demonstrations_path()),
+                         # Not to a guest: the path carries the Windows user name
+                         # (review 2026-11-11, finding 14). The page falls back to
+                         # the folder's relative name.
+                         "intimate_examples": (str(intimate.demonstrations_path())
+                                               if lan._from_this_machine(request) else ""),
                          # The GM personalities Settings offers (play/table_talk.py), by
                          # the names and one-line sketches their file gives them.
                          "dm_voices": table_talk.voice_cards()})
@@ -597,13 +602,23 @@ def model_settings(request):
 
     from gm.client import available
 
+    from pathfindergm import lan
+
     live = modelcfg.roles()
     local = live.get("narrator", {}).get("host") or "http://localhost:11434"
+    masked = modelcfg.masked()
+    # A guest on the network gets the same shape with the host's own facts left out:
+    # no key tails and no hosts (review 2026-11-11, finding 14). Redacted rather than
+    # refused, because the table's Settings panel a guest opens draws from this answer
+    # and a 403 there is a panel that never draws, sound settings and all.
+    if not lan._from_this_machine(request):
+        live = {r: {**cfg, "host": ""} for r, cfg in live.items()}
+        masked = {pid: {"set": k["set"], "tail": ""} for pid, k in masked.items()}
     return JsonResponse({
         "roles": [{"id": r, "label": label, "why": why, **live.get(r, {})}
                   for r, label, why in modelcfg.ROLES],
         "providers": [{"id": k, **v} for k, v in modelcfg.PROVIDERS.items()],
-        "keys": modelcfg.masked(),
+        "keys": masked,
         # What Ollama actually has pulled, so the page can offer real names rather
         # than making the player remember a tag.
         "installed": available(local),

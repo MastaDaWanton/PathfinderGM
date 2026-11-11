@@ -105,3 +105,33 @@ def test_the_log_never_holds_the_pass(monkeypatch):
     desktop._console_only(f"    {address}", redacted=f"    {desktop._without_pass(address)}")
     assert "ABCDEFGHJK" in console.getvalue()
     assert "ABCDEFGHJK" not in log.getvalue()
+
+
+def test_a_guests_reads_leave_out_the_hosts_own_facts(phone):
+    """Review 2026-11-11, finding 14: reads were open to a guest whole, so
+    `GET /api/settings/models` gave a phone the last four characters of every stored
+    key and each role's host, and `GET /api/homebrew/rules` a path holding the Windows
+    user name. Redacted, not refused: the Settings panel a guest opens from the table
+    draws from both answers, so the shape has to stay."""
+    from play import modelcfg
+
+    assert modelcfg.save({"narrator": {"provider": "openai", "model": "gpt"}},
+                         {"openai": "sk-secret-9876"}) == []
+    guest = phone.get("/api/settings/models")
+    assert guest.status_code == 200
+    body = guest.json()
+    assert "9876" not in guest.content.decode()
+    assert body["keys"]["openai"] == {"set": True, "tail": ""}
+    assert all(r["host"] == "" for r in body["roles"])
+    assert {"roles", "providers", "keys", "installed"} <= set(body)   # the page's shape
+
+    rules = phone.get("/api/homebrew/rules").json()
+    assert rules["intimate_examples"] == ""
+    assert rules["rules"] and rules["tiers"]
+
+    # The person at the machine still sees all of it.
+    local = Client(REMOTE_ADDR="127.0.0.1")
+    mine = local.get("/api/settings/models").json()
+    assert mine["keys"]["openai"]["tail"] == "9876"
+    assert mine["roles"][0]["host"] == "https://api.openai.com/v1"
+    assert "intimate" in local.get("/api/homebrew/rules").json()["intimate_examples"]
