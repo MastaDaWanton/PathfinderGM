@@ -201,7 +201,9 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
             actor.appearance = names_mod.face_of(world, scene.location_id, actor,
                                                  own=own)
     if getattr(scene, "grid", None) is not None:
-        scene.place_by_zone([actor.ref])
+        # Somebody the prose shows was already here: at their post, unless the words
+        # put them in the player's face or across the room (`place_by_zone`).
+        scene.place_by_zone([actor.ref], posts=True)
     return actor
 
 

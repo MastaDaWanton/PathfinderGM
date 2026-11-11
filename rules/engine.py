@@ -807,14 +807,23 @@ class Scene:
             return None
         return gap(pa, self.actors[a].size, pb, self.actors[b].size)
 
-    def place_by_zone(self, refs: list[str], feet: int | None = None) -> None:
+    def place_by_zone(self, refs: list[str], feet: int | None = None,
+                      posts: bool = False) -> None:
         """Put these actors on the map at the distance their zone claims.
 
         Needed because a zone set *after* the board was laid — anything spawned
         mid-fight — had nowhere to be put, and `resync_zones` runs the other way: it
         reads distance off the map and names it, so on its own it simply renamed the
         zone back to whatever the stale position implied.
+
+        `posts`: these people were already in the room when the party came in, so out
+        of a fight they stand at their post (`fixtures.post_for`) — a trader behind
+        their stall, a drinker at a table — not in a ring round the player (the owner's
+        market picture, 2026-11-11). A keeper always does. Somebody the scene brings up
+        to the player mid-scene, a stated range, and anyone `engaged` or `far` keep the
+        ring: there the distance is what the words said.
         """
+        from . import fixtures, keepers
         pc = self.pc()
         if self.grid is None or pc is None or pc.ref not in self.positions:
             return
@@ -825,6 +834,14 @@ class Scene:
                 continue
             away = (max(1, int(feet) // FEET_PER_SQUARE) if feet
                     else SQUARES_BY_ZONE.get(self.zones.get(ref, "near"), 3))
+            keeper = keepers.is_keeper(getattr(self.actors[ref], "world_entity_id", ""))
+            if (not feet and not self.in_encounter and (posts or keeper)
+                    and self.zones.get(ref, "near") == "near"):
+                spot = fixtures.post_for(self, self.actors[ref], taken)
+                if spot is not None:
+                    self.positions[ref] = spot
+                    taken.add(spot)
+                    continue
             # The default board is a hundred feet square and a bowshot is not. Grown
             # rather than clamped: clamping put the archer's target at the edge of the
             # map and called it 100 feet, which is a different fight from the one the
@@ -13532,7 +13549,7 @@ class Engine:
                 stragglers = [r for r in self.scene.actors
                               if r != pc.ref and r not in self.scene.positions]
                 if stragglers:
-                    self.scene.place_by_zone(stragglers)
+                    self.scene.place_by_zone(stragglers, posts=True)
             return False
         if not (self.scene.at or even_nowhere):
             return False
@@ -13560,7 +13577,7 @@ class Engine:
         unplaced = [r for r in self.scene.actors
                     if r != pc.ref and r not in self.scene.positions]
         if unplaced:
-            self.scene.place_by_zone(unplaced)
+            self.scene.place_by_zone(unplaced, posts=True)
         return True
 
     def _type_the_ground(self) -> None:

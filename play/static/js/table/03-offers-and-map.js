@@ -74,6 +74,7 @@ let MAP_TURN = 0, MAP_3D = false;
 // gradient: url(#id) resolves to the first copy in the page, which may sit in a hidden
 // board, and Chrome then paints nothing.
 const FX_SYMBOL = { barrel: "barrel", crate: "crate", table: "table", counter: "counter",
+  stall: "stall",
   bookshelf: "shelf", rack: "rack", hearth: "hearth", cart: "cart", stair: "stair",
   gallery: "planks", water: "water", rubble: "rubble", chandelier: "chandelier",
   door: "door", window: "window", crane: "crane" };
@@ -102,6 +103,13 @@ const FX_DEFS = `
     <rect x="0" y="12" width="18" height="4.6" fill="#4a3326" stroke="#241d15"
           stroke-width=".6"/>
     <path d="M6 12.6v3.4M12 12.6v3.4" stroke="#6b4a3a" stroke-width=".8"/></symbol>
+  <symbol id="fx-stall" viewBox="0 0 18 18">
+    <rect x="0" y="9" width="18" height="7.5" fill="#7d6845" stroke="#4a3326"
+          stroke-width=".8"/>
+    <path d="M0 12.6h18" stroke="#5c4a35" stroke-width=".45"/>
+    <rect x="0" y="1" width="18" height="7" fill="#7d1a14" stroke="#241d15"
+          stroke-width=".6"/>
+    <path d="M3 1v7M9 1v7M15 1v7" stroke="#7d6845" stroke-width="2.2"/></symbol>
   <symbol id="fx-shelf" viewBox="0 0 18 18">
     <rect x="0" y=".5" width="18" height="15.5" fill="#4a3326" stroke="#241d15"
           stroke-width=".8"/>
@@ -259,7 +267,8 @@ function renderMap(s) {
         const up = [[0, -1], [0, 1], [-1, 0], [1, 0]].reduce((best, d) =>
           at(c + d[0], r + d[1]) > at(c + best[0], r + best[1]) ? d : best, [0, -1]);
         turn = (fxRot[`${-up[0]},${-up[1]}`] || 0);
-      } else if (["bookshelf", "rack", "hearth", "counter", "door", "window"].includes(f.kind)) {
+      } else if (["bookshelf", "rack", "hearth", "counter", "stall", "door", "window"]
+                 .includes(f.kind)) {
         // The front faces the open floor across the run: a shelf against a wall.
         const sides = runX ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
         const front = sides.find(([dx, dy]) => openAt(c + dx, r + dy)) || sides[0];

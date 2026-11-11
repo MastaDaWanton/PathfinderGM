@@ -542,6 +542,25 @@
             z + 0.82, "wood", cls);
       return z + 1.05;
     }
+    if (k === "stall") {
+      // A trestle counter, two poles at its back and a cloth awning over the lot: the
+      // book-spine red, with a brass fringe along the front edge.
+      slab(out, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + 0.78, "wooddark", cls, NOPOINT);
+      slab2(out, x + 0.02, y + 0.02, x + 0.98, y + 0.98, z + 0.78, z + 0.86, "plank", "wood",
+            cls, NOPOINT);
+      var bx = front[0] ? (front[0] > 0 ? x + 0.06 : x + 0.86) : null;
+      var by = front[1] ? (front[1] > 0 ? y + 0.06 : y + 0.86) : null;
+      (bx !== null ? [[bx, y + 0.06], [bx, y + 0.86]] : [[x + 0.06, by], [x + 0.86, by]])
+        .forEach(function (p) {
+          slab(out, p[0], p[1], p[0] + 0.08, p[1] + 0.08, z + 0.86, z + 1.75, "wooddark", cls,
+               NOPOINT);
+        });
+      slab(out, x - 0.02, y - 0.02, x + 1.02, y + 1.02, z + 1.75, z + 1.81, "spine0", cls,
+           NOPOINT);
+      panel(out, x - 0.02, y - 0.02, x + 1.02, y + 1.02, front, 0, 1, z + 1.66, z + 1.75,
+            "plank", cls);
+      return z + 1.81;
+    }
     if (k === "hearth") {
       slab(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, z, z + 1, "stone", cls, NOPOINT);
       SIDES.forEach(function (d) {

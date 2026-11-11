@@ -471,3 +471,84 @@ def where_said(grid: Grid | None, start, end) -> str:
     if f is not None and kinds()[f["kind"]].get("stair"):
         return f"onto {f['name']}"
     return ""
+
+
+# --- posts: where a person stands when they come into a room -------------------------
+#
+# Reported 2026-11-11 with a picture of the market: every stallholder stood in a ring
+# round the player, because an arrival was put at its zone's distance from the PC and
+# nothing else (`Scene.place_by_zone`). A trader belongs behind their own stall.
+#
+# Prior art: the Creation Kit links an NPC to furniture or an idle marker it OWNS, and a
+# sandboxing NPC only uses markers nobody owns (ck.uesp.net, Sandbox Package, IdleMarker);
+# The Sims' smart objects advertise what they offer and people go to them. Here a fixture
+# is the marker: a stall or a counter is owned by its keeper, a table or a hearth is
+# anybody's. Nothing is stored: the post is derived on arrival, and the square it gives
+# is then the person's own until they move (the 2026-09-28 ruling).
+_SELLS = ("stall", "counter")
+_GATHER = ("table", "hearth", "counter", "stall", "barrel", "cart", "crate", "bookshelf", "rack")
+
+
+def post_for(scene, actor, taken) -> tuple | None:
+    """The square this person would be standing on when the party walks in, or None.
+
+    A market counter's keeper stands behind a stall of their own (one keeper a stall);
+    any other keeper behind the place's counter, else its stall; everyone else beside a
+    table, the hearth or a stall front — never in a ring round the player."""
+    from . import keepers
+
+    grid = getattr(scene, "grid", None)
+    if grid is None or not grid.fixtures:
+        return None
+    pc = scene.pc()
+    pcsq = scene.positions.get(pc.ref) if pc is not None else None
+    centre = (grid.width / 2, grid.height / 2)
+
+    def free(p) -> bool:
+        return (grid.inside(p) and p not in grid.blocked and p not in grid.difficult
+                and grid.ground(p) == 0 and p not in taken
+                and not (pcsq and max(abs(p[0] - pcsq[0]), abs(p[1] - pcsq[1])) < 2))
+
+    def around(f):
+        return sorted({q for s in f["squares"] for q in (
+            (s[0] + 1, s[1]), (s[0] - 1, s[1]), (s[0], s[1] + 1), (s[0], s[1] - 1)) if free(q)})
+
+    def far(q):          # behind a counter is the side away from the middle of the room
+        return (q[0] - centre[0]) ** 2 + (q[1] - centre[1]) ** 2, q
+
+    ground = [f for f in grid.fixtures if f["level"] == 0]
+    wid = str(getattr(actor, "world_entity_id", "") or "")
+    seed = floorplan._seed(str(actor.ref) + wid)
+    if keepers.is_keeper(wid):
+        counter = keepers.counter_of(wid)
+        order = ("stall", "counter") if counter else ("counter", "stall")
+        for kind in order:
+            posts = [f for f in ground if f["kind"] == kind]
+            if counter:
+                # One keeper a stall: a stall with a keeper beside it is theirs.
+                kept = {tuple(p) for r, p in scene.positions.items()
+                        if keepers.counter_of(getattr(scene.people.get(r), "world_entity_id",
+                                                      "") or "")}
+                posts = [f for f in posts if not any(
+                    max(abs(k[0] - s[0]), abs(k[1] - s[1])) <= 1
+                    for k in kept for s in f["squares"])] or posts
+            start = seed % len(posts) if posts else 0
+            for f in posts[start:] + posts[:start]:
+                spots = around(f)
+                if spots:
+                    return max(spots, key=far)[:2]
+    # Everyone else goes to the least crowded table, hearth or stall front, ties broken by
+    # their own seed. Measured live 2026-11-11: picking from "the fronts nearest the middle"
+    # put five of the market's six shoppers round one stall.
+    here = [p for r, p in scene.positions.items() if r != getattr(pc, "ref", None)]
+    best = None
+    for i, f in enumerate(f for f in ground if f["kind"] in _GATHER):
+        spots = around(f)
+        if not spots:
+            continue
+        crowd = sum(1 for p in here if any(max(abs(p[0] - s[0]), abs(p[1] - s[1])) <= 1
+                                           for s in f["squares"]))
+        rank = (crowd, (i * 7919 + seed) % 101)
+        if best is None or rank < best[0]:
+            best = (rank, min(spots, key=far))     # its front nearest the middle
+    return best[1][:2] if best else None

@@ -362,3 +362,76 @@ def test_every_fixture_kind_is_drawn_as_itself_on_the_flat_board():
         assert kind in symbols, f"{kind} has no drawing on the flat board"
         assert f'id="fx-{symbols[kind]}"' in defs, f"no symbol fx-{symbols[kind]}"
     assert "url(#" not in defs
+
+
+# --- posts: where people stand when they come in --------------------------------------
+
+def _trader(scene, counter, name):
+    from rules import keepers
+
+    t = instantiate("guildhand", scene=scene, name=name)
+    t.world_entity_id = keepers.holder_id(MARKET, counter)
+    return t
+
+
+def _beside(sq, f):
+    return any(max(abs(sq[0] - s[0]), abs(sq[1] - s[1])) <= 1 for s in f["squares"])
+
+
+def test_market_traders_stand_at_their_own_stalls_not_round_the_player():
+    """The owner's picture, 2026-11-11: seven people in a ring round the player in the
+    market, every one of them two or three squares from Kesst and none by any goods —
+    arrivals were put at their zone's distance from the PC and nowhere else. A trader
+    stands behind a stall of their own, one trader a stall."""
+    s, e, pc = _at(MARKET)
+    stalls = _kind(s.grid, "stall")
+    assert len(stalls) >= 3, "the market lays stalls"
+    for i, counter in enumerate(("general", "stall-cloth", "stall-spice")):
+        s.add(_trader(s, counter, f"Trader{i}"), zone="near")
+    traders = [r for r, a in s.actors.items() if a.name.startswith("Trader")]
+    homes = []
+    for r in traders:
+        sq = s.positions[r]
+        mine = [i for i, f in enumerate(stalls) if _beside(sq, f)]
+        assert mine, f"{s.actors[r].name} at {sq} is beside no stall"
+        homes.append(mine[0])
+    assert len(set(homes)) == len(homes), "two traders share one stall"
+
+
+def test_a_shopper_stands_at_a_front_and_a_fight_arrival_keeps_its_distance():
+    """Anyone else already there stands beside a table or a stall front, not in a ring;
+    somebody spawned at a stated range keeps the ring, because the range is the point,
+    and so does somebody the scene brings up to the player mid-scene (a thug stepping
+    out of the crowd is near the player, not at a stall)."""
+    s, e, pc = _at(MARKET)
+    shopper = instantiate("guildhand", scene=s, name="Shopper")
+    s.add(shopper, zone="near")
+    s.place_by_zone([shopper.ref], posts=True)      # already here when the party came
+    sq = s.positions[shopper.ref]
+    assert any(_beside(sq, f) for f in s.grid.fixtures)
+    p = s.positions[pc.ref]
+    assert max(abs(sq[0] - p[0]), abs(sq[1] - p[1])) >= 2
+    taken = set(s.positions.values())
+    foe = instantiate("guildhand", scene=s, name="Archer")
+    s.add(foe, zone="near")
+    s.positions.pop(foe.ref)
+    s.place_by_zone([foe.ref], feet=30)
+    from rules.grid import distance
+    assert abs(distance(p, s.positions[foe.ref]) - 30) <= 5
+    assert s.positions[foe.ref] not in taken
+    thug = s.add(instantiate("thug", scene=s, name="the thug"), zone="near")
+    assert distance(p, s.positions[thug.ref]) == 15
+
+
+def test_a_crowd_spreads_over_the_stalls_and_tables():
+    """Measured live 2026-11-11: picking a shopper's square from the fronts nearest the
+    middle of the market put five of six shoppers round one stall. Each goes to the least
+    crowded fixture, so no fixture has more than two while another stands empty."""
+    s, e, pc = _at(MARKET)
+    for i in range(6):
+        s.place_by_zone([s.add(instantiate("guildhand", scene=s, name=f"Shopper{i}"),
+                               zone="near").ref], posts=True)
+    crowds = [sum(1 for r, a in s.actors.items() if a.name.startswith("Shopper")
+                  and _beside(s.positions[r], f)) for f in s.grid.fixtures
+              if f["level"] == 0 and f["kind"] in fixtures._GATHER]
+    assert max(crowds) <= 2, crowds
