@@ -239,7 +239,8 @@ def test_the_brief_says_the_fixtures_in_words_and_no_numbers():
         scene, here = s, e.here()
 
     text, facts = fixtures_here.section(Ctx)
-    assert "the bar" in text and "a gallery reached by a stair" in text, text
+    # The tavern's raised floor by the place's own word (fixtures.json `names`).
+    assert "the bar" in text and "the landing reached by a stair" in text, text
     assert not any(ch.isdigit() for ch in text.split(":", 1)[1]), text
     assert facts["fixtures"]
 

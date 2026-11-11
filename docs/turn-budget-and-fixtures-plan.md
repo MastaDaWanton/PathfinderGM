@@ -110,6 +110,18 @@ lets do that now". Amended from the plan above where building it said otherwise:
   still falls back to its noun list when the reader says neither `within_place` nor
   `fixture`. Retiring it needs `keep_movement_in_the_scene` to be handed the frame.
 - **World Bible** may author `fixtures` on a place (docs/for-world-bible.md ask 15).
+- **A walk to a fixture moves the token** (the owner at the gate, same day: "the
+  narration let him go up the stairs but the character never moved on the map"). A
+  `go` with a `fixture` builds a real `move` (`fixtures.walk_to`): to a gallery's free
+  square nearest its stair, a stair's square, the floor beside something solid, or —
+  the reader's `floor` — back down to the stair's foot. Free of time, never of the map.
+  A raised floor takes the place's own word (`names`: the gate's wall-walk, an inn's
+  landing, a granary's loft). The plan's travel cannot stand in for it
+  (`acts_to_ops.walk_in_place`), the move's tell says where it ended ("up onto the
+  wall-walk"), and the read-back asks where in the place the page leaves the player
+  (`beat_verify` `height`, finding `beat-height`).
+- **The rail opens where the stair arrives**, and both boards draw a gallery's rail on
+  its edge rather than through the square in front of it.
 
 ### Phase 2 (not built)
 

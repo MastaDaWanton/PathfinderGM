@@ -1,0 +1,168 @@
+"""A walk to a fixture of the room moves the token (the gate, 2026-11-11).
+
+The owner: "the character didn't move when he should have, the narration let him go up
+the stairs but the character never moved on the map". The turn log of that turn: the line
+"I walk up the stair onto the wall-walk above the gate" was read as
+`go: the stair (within_place, fixture stair)` and `go: the wall-walk above the gate`; the
+act table built nothing for either ("a move inside the place: no travel"); the plan wrote
+`travel` to "the wall-walk above the gate", which resolved "You are already at the gate.";
+positions stayed {'pc': [2, 3]}; and the planned slot wrote "You climb the stone stairs
+and step onto the wall-walk". Neither the tells check nor the read-back flagged it: the
+only tell said where the party was (the gate), which the wall-walk does not contradict,
+and the read-back's place question counts a walk inside a place as staying.
+"""
+from __future__ import annotations
+
+from gm import acts_to_ops, beat_verify, interpret
+from gm.checks import beat_verified
+from rules import fixtures
+
+from test_map_fixtures import _at, _kind
+
+GATE = "5bbd0c40345f~urban:the-gate"
+LINE = "I walk up the stair onto the wall-walk above the gate"
+# The reading as the owner's turn should have read it (the second walk now names its
+# fixture: the gate's gallery is "the wall-walk", fixtures.json `names`).
+READING = {"question": False, "claims": [], "actions": [
+    {"act": "go", "place": "the stair", "within_place": True, "fixture": "stair",
+     "span": "walk up the stair"},
+    {"act": "go", "place": "the wall-walk above the gate", "within_place": True,
+     "fixture": "gallery", "span": "onto the wall-walk above the gate"}]}
+
+
+def _run(engine, intents):
+    return engine.run(engine.validate(intents, origin="author:test"))
+
+
+def test_the_owners_line_moves_the_token_up_onto_the_wall_walk():
+    """The line itself: two walks inside the gate, each now a real `move` the engine
+    disposes of — to the stair, then up it onto the wall-walk — and the token ends up
+    there at the wall-walk's level. Out of a fight it costs no time; it still happens."""
+    s, e, pc = _at(GATE)
+    clock = s.clock_minutes
+    wall = _kind(s.grid, "gallery")[0]
+    assert wall["name"] == "the wall-walk", "the gate's raised floor is not called so"
+    rows = acts_to_ops.table(READING, s, sentence=LINE)
+    built = [i for r in rows for i in r.intents]
+    assert [i["op"] for i in built] == ["move", "move"], [r.record() for r in rows]
+    res = _run(e, built)
+    at = tuple(s.positions[pc.ref])
+    assert at[2:] == (wall["level"],) and list(at[:2]) in wall["squares"], \
+        [o.tell for o in res.outcomes]
+    tells = " ".join(o.tell for o in res.outcomes)
+    assert "up onto the wall-walk" in tells, tells
+    assert s.clock_minutes == clock, "a walk inside the place took time"
+
+
+def test_going_back_down_moves_the_token_back_to_the_floor():
+    """ "I go back down": the reader's closed `floor`, from up on the wall-walk, is a move
+    to the stair's foot, at floor level."""
+    s, e, pc = _at(GATE)
+    _run(e, [i for r in acts_to_ops.table(READING, s, sentence=LINE) for i in r.intents])
+    assert s.positions[pc.ref][2] > 0
+    down = {"question": False, "claims": [], "actions": [
+        {"act": "go", "place": "the ground", "within_place": True, "fixture": "floor",
+         "span": "go back down"}]}
+    rows = acts_to_ops.table(down, s, sentence="I go back down")
+    res = _run(e, [i for r in rows for i in r.intents])
+    at = tuple(s.positions[pc.ref])
+    assert (at[2] if len(at) > 2 else 0) == 0, [o.tell for o in res.outcomes]
+    assert "back down to the floor" in " ".join(o.tell for o in res.outcomes)
+
+
+def test_a_walk_to_the_bar_stands_beside_it_not_in_it():
+    """A solid fixture is walked TO: the free floor beside it, never its own square."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    bar = _kind(s.grid, "counter")[0]
+    square, why = fixtures.walk_to(s, "counter", pc)
+    assert square is not None and not why
+    assert list(square[:2]) not in bar["squares"] and square[:2] not in s.grid.blocked
+
+
+def test_no_room_on_the_wall_walk_is_refused_with_the_reason():
+    """Somebody on every square: the walk is refused in words, never a move into them."""
+    s, e, pc = _at(GATE)
+    wall = _kind(s.grid, "gallery")[0]
+    from rules.bestiary import instantiate
+
+    for p in wall["squares"]:
+        guard = instantiate("guildhand", scene=s, name="Guard")
+        s.add(guard, zone="near")
+        s.positions[guard.ref] = (*p, wall["level"])
+    square, why = fixtures.walk_to(s, "gallery", pc)
+    assert square is None and "no room on the wall-walk" in why
+
+
+def test_the_plans_travel_to_the_place_already_stood_in_is_dropped():
+    """The plan's `travel` to "the wall-walk above the gate" answered "You are already at
+    the gate." and stood in for the walk. With the reading walking inside the place it is
+    dropped, logged — even beside a walk out to the market the same words make."""
+    s, e, pc = _at(GATE)
+    reading = {**READING, "actions": [
+        *READING["actions"], {"act": "go", "place": "the market", "span": "then the market"}]}
+    rows = acts_to_ops.table(reading, s, sentence=LINE)
+    raw = [{"op": "travel", "actor": "pc", "params": {"place": "the wall-walk above the gate"}},
+           {"op": "travel", "actor": "pc", "params": {"place": "the market"}}]
+    notes: list = []
+    out = acts_to_ops.walk_in_place(raw, rows, reading, s, e.places(), notes=notes)
+    assert [r["params"]["place"] for r in out] == ["the market"], out
+    assert any("walk inside the place" in n for n in notes), notes
+
+
+def test_the_reader_may_answer_a_raised_part_and_the_floor():
+    """The closed `fixture` answer covers the wall-walk (the gallery kind) and the way back
+    down (`floor`); `ground` keeps both and drops a word off the list."""
+    kinds = interpret.fixture_kinds()
+    assert "gallery" in kinds and fixtures.FLOOR in kinds and kinds[0] == "none"
+    frame, dropped = interpret.ground({"question": False, "claims": [], "actions": [
+        {"act": "go", "place": "the ground", "within_place": True, "fixture": "floor",
+         "span": "go back down"}]}, "I go back down")
+    assert frame["actions"][0].get("fixture") == "floor", (frame, dropped)
+
+
+def test_the_read_back_asks_where_in_the_place_and_flags_the_wall_walk_never_reached():
+    """The read-back's half: where the place has a raised floor a stair reaches, the page's
+    "step onto the wall-walk" is asked and judged against the token's own level. On the
+    owner's turn the token was on the ground."""
+    s, e, pc = _at(GATE)
+    got = beat_verify._height_of(s, pc)
+    assert got == {"heights": ("up on the wall-walk", "down on the floor"),
+                   "height": "down on the floor"}
+    facts = beat_verify.Facts(start="the gate", end="the gate", places=("the gate",),
+                              **got)
+    text = ("You climb the stone stairs and step onto the wall-walk, gaining a vantage "
+            "point above the gate.")
+    claims = beat_verify.claims_of({"player_height": [
+        {"where": "up on the wall-walk",
+         "quote": "step onto the wall-walk, gaining a vantage point"}]}, facts)
+    kept, _dropped = beat_verify.validate(claims, text, facts)
+    found = beat_verify.diff(kept, facts, text)
+    assert [d.category for d in found] == ["height"], found
+    assert found[0].line == "You are down on the floor."
+    assert beat_verified._KIND["height"][0] in beat_verified.KINDS, \
+        "an undeclared finding kind discards the check's findings"
+    # And the question is asked only where a stair reaches a raised floor.
+    s.grid.fixtures = [f for f in s.grid.fixtures if f["kind"] not in ("gallery", "stair")]
+    assert beat_verify._height_of(s, pc) == {}
+
+
+def test_going_back_down_never_walks_the_party_out_of_town():
+    """Live on this fix, 2026-11-11: "I go back down" was read `go, within_place, fixture
+    floor`, the table built the move to the stair's foot, and the plan ALSO wrote a travel
+    to the outskirts; `unasked_travel` stands aside for any moving act, so the party left
+    Xylorvotha for the desert and the move then ran on the outskirts' ground. When every
+    walk the words make is inside the place, no travel is the player's."""
+    s, e, pc = _at(GATE)
+    _run(e, [i for r in acts_to_ops.table(READING, s, sentence=LINE) for i in r.intents])
+    down = {"question": False, "claims": [], "actions": [
+        {"act": "go", "within_place": True, "fixture": "floor", "span": "go back down"}]}
+    rows = acts_to_ops.table(down, s, sentence="I go back down")
+    raw = [{"op": "travel", "actor": "pc", "params": {"place": "the outskirts"}},
+           *[i for r in rows for i in r.intents]]
+    out = acts_to_ops.walk_in_place(raw, rows, down, s, e.places(), notes=[])
+    assert [r["op"] for r in out] == ["move"], out
+    # A walk inside AND a walk out keeps the walk out.
+    both = {"question": False, "claims": [], "actions": [
+        *down["actions"], {"act": "go", "place": "the market", "span": "head to the market"}]}
+    raw = [{"op": "travel", "actor": "pc", "params": {"place": "the market"}}]
+    assert acts_to_ops.walk_in_place(raw, rows, both, s, e.places(), notes=[]) == raw

@@ -322,10 +322,11 @@ def said_to_nobody(frame: dict | None, scene=None) -> bool:
 # ("room"); the part of the room is the word before "of" ("side"). No model is asked to
 # decide it and no sentence is parsed: a closed field, then a closed noun list.
 def fixture_kinds() -> tuple[str, ...]:
-    """The reader's closed fixture answer: "none" first, then content/rules/fixtures.json."""
+    """The reader's closed fixture answer: "none" first, then content/rules/fixtures.json,
+    then `fixtures.FLOOR` — back down to the room's own floor ("I go back down")."""
     from rules import fixtures
 
-    return ("none", *fixtures.names())
+    return ("none", *fixtures.names(), fixtures.FLOOR)
 
 
 _ROOM_EXTRA = frozenset({"fire", "fireside", "stair", "stairs", "staircase", "seat",
@@ -441,7 +442,8 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           `within_place` is true for a move inside the place you are in (across the
           room, to the hearth, a corner, the bar, the window), false for anywhere else;
           `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
-          barrel…), or none
+          barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
+          floor for back down to the ground), or none
 journey   take the road or a ship to another town
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
@@ -699,6 +701,18 @@ _DEMOS = [
          {"span": "shoulder through the crowd to the far end of the bar",
           "place": "the far end of the bar", "within_place": True, "fixture": "counter",
           "act": "go"}]}),
+    # A raised part of the place by its own name, and the walk back down (the gate,
+    # 2026-11-11): "onto the wall-walk above the gate" was read as a walk to somewhere
+    # else, planned as travel to the gate the player stood in, and moved nobody.
+    ("I climb the steps up onto the wall-walk above the gate.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "climb the steps up onto the wall-walk above the gate",
+          "place": "the wall-walk", "within_place": True, "fixture": "gallery",
+          "act": "go"}]}),
+    ("I head back down to the ground.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "head back down to the ground", "place": "the ground",
+          "within_place": True, "fixture": "floor", "act": "go"}]}),
     ("I pick up the lantern, light it and peer down the stairwell.",
      {"question": False, "claims": [], "actions": [
          {"span": "pick up the lantern", "object": "the lantern", "act": "take"},

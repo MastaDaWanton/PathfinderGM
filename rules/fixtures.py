@@ -152,11 +152,15 @@ def _profile(place_id: str, terrain: str = "", authored=None) -> dict:
     d = data()
     bare = str(place_id or "").rsplit(floorplan.STOREY, 1)[0]
     spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
-    row = dict(d.get("places", {}).get(spot) or {})
-    if not row or floorplan._storey(place_id):
+    own = dict(d.get("places", {}).get(spot) or {})
+    row = own
+    if not any(own.get(slot) for slot in _SLOTS) or floorplan._storey(place_id):
         # A storey is rooms over the work, not the work: the terrain's row, as for any
-        # room this table does not know.
+        # room this table does not know. A row of names alone (the gate's wall-walk) is
+        # still a room the table does not type.
         row = dict(d.get("terrain", {}).get(str(terrain or "").strip().lower()) or {})
+        if own.get("names") and not floorplan._storey(place_id):
+            row["names"] = {**(row.get("names") or {}), **own["names"]}
     world = tuple(getattr(authored, "fixtures", ()) or ())
     if world:
         k = kinds()
@@ -367,3 +371,103 @@ def name_one(scene, kind: str, near: str | None = None) -> dict | None:
     grid.fixtures.append(fixture)
     scene.fixtures_named.setdefault(str(scene.at or ""), []).append(dict(fixture))
     return fixture
+
+
+# The reader's answer for a walk back down off a raised fixture to the room's own floor
+# ("I go back down"): not a kind, so never on the map, but in the reader's closed list.
+FLOOR = "floor"
+
+
+def walk_to(scene, kind: str, who) -> tuple[tuple | None, str]:
+    """Where a walk to this fixture of the room ends: (square, "") with the level written
+    in, (None, why) when there is no room for them there, or (None, "") when nothing here
+    answers or they are there already.
+
+    Measured at the gate, 2026-11-11: "I walk up the stair onto the wall-walk above the
+    gate" was read as two walks within the place, to the stair and the wall-walk, and built
+    no move at all — the narration put the player on the wall-walk while the token stayed
+    on the ground. A walk inside the place is free (the turn-budget ruling, 2026-11-06),
+    which means it costs no time, not that it does not happen.
+
+    * a raised fixture reached by a stair (a gallery): its free square nearest the stair,
+      on its floor — the engine's stair rule walks them up;
+    * the stair itself, or anything else open: its own free square;
+    * something solid (the bar, a shelf, a barrel): the free floor beside it nearest them;
+    * FLOOR, from up on a gallery: the stair's foot, else free floor beside it.
+    """
+    grid = getattr(scene, "grid", None)
+    if grid is None or not grid.fixtures or who is None or who.ref not in scene.positions:
+        return None, ""
+    from .grid import distance
+
+    here = tuple(scene.positions[who.ref])
+    level = here[2] if len(here) > 2 else grid.ground(here)
+    taken = scene.occupied(ignore=who.ref)
+
+    def free(p) -> bool:
+        return grid.inside(p) and p not in taken and p not in grid.blocked \
+            and grid.passable(p)
+
+    def nearest(squares, origin):
+        return sorted(squares, key=lambda p: (distance(origin, p), p))
+
+    def beside(squares):
+        ring = {(p[0] + dx, p[1] + dy) for p in squares
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))}
+        return [p for p in ring - set(squares) if free(p) and grid.ground(p) == 0]
+
+    if kind == FLOOR:
+        if level <= 0:
+            return None, ""
+        stair = stair_to(grid, here) or next(
+            (tuple(f["squares"][0]) for f in grid.fixtures
+             if kinds()[f["kind"]].get("stair")), None)
+        if stair is None:
+            return None, ""
+        spots = [stair] if free(stair) else nearest(beside([stair]), stair)
+        if not spots:
+            return None, "There is no clear floor at the foot of the stair to step down to."
+        return (*spots[0], 0), ""
+
+    found = [f for f in grid.fixtures if f["kind"] == kind]
+    if not found:
+        return None, ""
+    k = kinds()[kind]
+    f = min(found, key=lambda f: min(distance(here[:2], tuple(p)) for p in f["squares"]))
+    squares = [tuple(p) for p in f["squares"]]
+    name = f["name"]
+    if here[:2] in squares and level == f["level"]:
+        return None, ""
+    if "blocked" in k["occupies"] and set(squares) <= grid.blocked:
+        if any(distance(here[:2], p) <= 5 for p in squares) and level == 0:
+            return None, ""                   # already standing at it
+        spots = nearest(beside(squares), here[:2])
+        if not spots:
+            return None, f"There is no clear floor beside {name} to stand at."
+        return (*spots[0], 0), ""
+    origin = tuple(f["stair"]) if f.get("stair") else here[:2]
+    spots = nearest([p for p in squares if free(p)], origin)
+    if not spots:
+        return None, f"There is no room on {name}: somebody stands on every square of it."
+    return (*spots[0], grid.ground(spots[0])), ""
+
+
+def where_said(grid: Grid | None, start, end) -> str:
+    """Where a move left its walker in words, for the move's tell: "up onto the wall-walk",
+    "onto the stair", "back down to the floor", or "". The tell is all the narrator and the
+    tells check know of a move (the third law); "moves to near (25 ft)" said nothing a
+    page putting the player on the wall-walk could contradict (the gate, 2026-11-11)."""
+    if grid is None or end is None:
+        return ""
+    end = tuple(end)
+    now = end[2] if len(end) > 2 else grid.ground(end)
+    was = (start[2] if start is not None and len(start) > 2
+           else grid.ground(tuple(start)[:2]) if start is not None else 0)
+    f = at(grid, end)
+    if now < was and now == 0:
+        return "back down to the floor"
+    if f is not None and f["level"] > 0 and now > was:
+        return f"up onto {f['name']}"
+    if f is not None and kinds()[f["kind"]].get("stair"):
+        return f"onto {f['name']}"
+    return ""

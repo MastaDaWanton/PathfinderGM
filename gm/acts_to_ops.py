@@ -870,6 +870,10 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 from rules import fixtures as fixtures_mod
 
                 fixtures_mod.name_one(scene, str(a["fixture"]))
+                # And the walk happens: free of the turn's time, never of the map. Built
+                # whole, through the engine's own move (stair, reach and provoking rules).
+                if pc is not None:
+                    _to_the_fixture(row, str(a["fixture"]), scene, pc)
             if act == "call_on" and pc is not None:
                 # The reader's own call on a person who is standing here is the same walk
                 # home together; their door would refuse them ("is here, with you").
@@ -1473,6 +1477,30 @@ def _home_together(row: Row, ref: str, scene, pc) -> None:
                         "because": f"the player goes home with {who.name}"})
     row.ops = []
     row.note = f"home with {who.name}, who is here"
+
+
+def _to_the_fixture(row: Row, kind: str, scene, pc) -> None:
+    """The move a walk to a fixture of this room owes (`fixtures.walk_to`).
+
+    The gate, 2026-11-11: "I walk up the stair onto the wall-walk above the gate" read as
+    two walks within the place, `fixture: stair` and the wall-walk, and the table built
+    nothing for either ("a move inside the place: no travel"); the plan's travel to the
+    gate answered "You are already at the gate", the token stayed at (2, 3) on the ground,
+    and the page said "You climb the stone stairs and step onto the wall-walk". Moving
+    about the place is free of time (2026-11-06), not free of happening."""
+    from rules import fixtures
+
+    square, why = fixtures.walk_to(scene, kind, pc)
+    if square is not None:
+        here = getattr(getattr(scene, "grid", None), "fixtures", None) or []
+        name = next((f["name"] for f in here if f["kind"] == kind),
+                    "the floor" if kind == fixtures.FLOOR else kind)
+        row.intents.append({"op": "move", "actor": pc.ref,
+                            "params": {"who": pc.ref, "square": list(square)},
+                            "because": f"the player walks to {name}"})
+        row.note = ""
+    elif why:
+        row.nowhere = why
 
 
 def _nowhere(row: Row, a: dict, scene, places) -> None:
@@ -2767,6 +2795,72 @@ def _pays_for_the_room(r: dict, acts: set, scene, pc) -> bool:
 # The acts that choose where a walk goes: a move, a person sought or followed, a door
 # forced (`interpret._MOVING_ACTS`). A search stands behind a walk only to the places next
 # door (`interpret._sought_nearby`).
+def walk_in_place(raw, rows: list[Row], frame: dict | None, scene, places=(), *,
+                  notes: list | None = None) -> list:
+    """The plan, with no travel to the place the party already stands in when the reading
+    walks inside it, and no move of the player's own beside the move the table built.
+
+    The gate, 2026-11-11: "I walk up the stair onto the wall-walk above the gate" — the
+    reading's walks were inside the place, the table built nothing, and the plan wrote
+    `travel` to "the wall-walk above the gate", which the engine answered "You are already
+    at the gate." A travel cannot stand in for a walk across the room; the built move is
+    that walk (`_to_the_fixture`)."""
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
+        return raw
+    here = str(getattr(scene, "at", "") or "")
+    within = any(interpret.acting(a) and interpret.within_place(a, places, here)
+                 for a in frame.get("actions") or [])
+    built = [i for r in rows for i in r.intents if i.get("op") == "move"]
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if not within and not built:
+        return raw
+
+    inside = {" ".join(str(a.get("place") or "").lower().split())
+              for a in frame.get("actions") or []
+              if interpret.acting(a) and interpret.within_place(a, places, here)} - {""}
+
+    def is_here(name: str) -> bool:
+        if not name:
+            return True                     # a travel to nowhere, for a walk in the room
+        found = places_mod.find(places, name) if places else None
+        # The place stood in, or the very words the reading put inside it — never a
+        # place not founded yet ("…then head to the old tannery" keeps its walk).
+        return (found is not None and getattr(found, "id", "") == here)             or " ".join(name.lower().split()) in inside
+
+    # Every walk the words make stays inside the place: then no travel, journey or
+    # venture is the player's at all. Live on the fix, 2026-11-11: "I go back down"
+    # (fixture `floor`) was planned as a travel to the outskirts beside the built move;
+    # `unasked_travel` stands aside for any moving act, so it walked the party out of town.
+    moving = [a for a in frame.get("actions") or []
+              if interpret.acting(a) and a.get("act") in interpret._MOVING_ACTS]
+    inside_only = within and moving and all(
+        interpret.within_place(a, places, here) for a in moving)
+    out = []
+    for r in raw:
+        op = _op(r)
+        params = (r.get("params") or {}) if isinstance(r, dict) else {}
+        if inside_only and op in ("travel", "journey", "venture"):
+            if notes is not None:
+                notes.append(f"the plan's {op} dropped: every walk the words make is "
+                             f"inside the place")
+            continue
+        if within and op == "travel" and is_here(str(params.get("place") or "")):
+            if notes is not None:
+                notes.append(f"the plan's travel to {params.get('place')!r} dropped: the "
+                             f"words walk inside the place")
+            continue
+        if built and op == "move" and pc is not None and not any(r is b for b in built)                 and str(r.get("actor") or "") in (pc.ref, "pc")                 and str(params.get("who") or pc.ref) in (pc.ref, "pc"):
+            if notes is not None:
+                notes.append("the plan's move replaced by the reading's walk to a fixture")
+            continue
+        out.append(r)
+    return out
+
+
 def unasked_travel(raw, frame: dict | None, scene=None, places=(), *,
                    notes: list | None = None) -> list:
     """A walk no deed of the player's stands behind is the plan's, and is struck.

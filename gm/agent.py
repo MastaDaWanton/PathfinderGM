@@ -835,6 +835,10 @@ class GMAgent:
                 # phrasing per live bug (docs/structured-turn.md).
                 raw = acts_to_ops.apply(raw, self.rows, read_ok, self.engine.scene,
                                         notes=own_words)
+                # A walk inside the place is the table's move, never a travel to the
+                # place already stood in (`acts_to_ops.walk_in_place`, the gate 2026-11-11).
+                raw = acts_to_ops.walk_in_place(raw, self.rows, read_ok, self.engine.scene,
+                                                self.engine.places(), notes=own_words)
                 # And somebody comes along only on the player's own word: a plan's
                 # `company` no deed of the reading asks for is struck, never refused onto
                 # the page ("Vyrnys remains unmoved…" on a job taken, the owner's save of
