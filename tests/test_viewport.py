@@ -219,20 +219,15 @@ def test_the_rule_the_parapet_is_drawn_from_is_still_the_rule():
         "the parapet rule has been reworded; check scene3d.js still draws what it means")
 
 
-def test_a_wall_is_never_drawn_through_and_a_gallery_over_your_head_is():
-    """The clarity pass, and the line it must not cross. Standing on the library floor,
-    the player's own token sits behind ten feet of gallery — correct occlusion and no use
-    to anybody, which is why XCOM cuts the walls between the camera and the floor being
-    played on. The level picker is already that control, so it drives this rather than a
-    second control being invented.
-
-    A raised FLOOR above the level being looked at is drawn through. A wall is not: a wall
-    is a wall from every level, and a translucent one would be telling the player they
-    have a shot they do not have."""
+def test_no_mass_is_drawn_as_glass():
+    """The owner, 2026-11-11: "fix the glass block". Every gallery and wall-walk above the
+    level being looked at was drawn at 45% so a token under it stayed in view, and the
+    whole mass read as glass. Masses are opaque now; only what they hide is shown through
+    them (tests/test_map_figures.py proves the x-ray at all four quarter-turns)."""
     js = _code(_js())
-    assert "if (!solid[k] && topz > level) cls += \" above\";" in js, \
-        "the cutaway no longer excludes walls"
-    assert "#view3d .above" in _page(), "nothing draws the cutaway"
+    assert '" above"' not in js, "a raised floor is drawn through again"
+    assert "#view3d .above" not in _page(), "the stylesheet still fades a mass"
+    assert "#view3d .xray" in _page(), "nothing draws what a mass hides"
 
 
 def test_reach_is_a_wash_over_the_ground_and_not_a_colour_of_its_own():

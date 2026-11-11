@@ -235,10 +235,16 @@
   /* Solid things read as solid: a seam between two faces of one box says "two faces". */
   #view3d .fig, #view3d .rail3 { stroke: none; }
   #view3d .fig.offlevel { opacity: .38; }
-  /* A floor over your head — a gallery you are not standing on — and the rail along it.
-     Walls are never in here: a wall is a wall from every level, and drawing one through
-     would tell the player they have a shot they do not have. */
-  #view3d .above { opacity: .45; }
+  /* Every mass is solid (the half-clear gallery read as a glass block). What a mass hides
+     is drawn over it, last: a token as a ghost of itself in its side's colour, a square
+     you can reach as a dashed gold outline that still takes the click (scene3d.js, the
+     x-ray pass). Nothing transitions: it is there the moment the board turns. */
+  #view3d .xray { opacity: .5; }
+  #view3d .xray.offlevel { opacity: .22; }
+  #view3d .xray polygon { stroke: none; }
+  #view3d .xsq { fill: var(--gold); fill-opacity: .1; stroke: var(--gold);
+                 stroke-opacity: .55; stroke-width: .6; stroke-dasharray: 2 1.5; }
+  #view3d .xsq:hover { fill: var(--gold); fill-opacity: .45; }
   .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
   .levelpick button { padding: 1px 8px; font-size: 11px; }
   .levelpick button.on { border-color: var(--accent); color: #f0dcae; }

@@ -279,6 +279,18 @@
 
   function key(c, r) { return c + "," + r; }
 
+  // Whether screen point p lies inside polygon q (even-odd ray cast).
+  function inside(p, q) {
+    var hit = false;
+    for (var i = 0, j = q.length - 1; i < q.length; j = i++) {
+      if ((q[i][1] > p[1]) !== (q[j][1] > p[1]) &&
+          p[0] < (q[j][0] - q[i][0]) * (p[1] - q[i][1]) / (q[j][1] - q[i][1]) + q[i][0]) {
+        hit = !hit;
+      }
+    }
+    return hit;
+  }
+
   // --- fixtures as the things they are (2026-11-11) ---------------------------------------
   // The owner: "i want the fixtures to actually look like what the represent". Each kind
   // in content/rules/fixtures.json is built from the same lit faces as everything else —
@@ -570,25 +582,15 @@
         var topz = topAt(x, y);
         if (topz > tallest) tallest = topz;
 
-        /* A GALLERY YOU ARE NOT ON IS DRAWN THROUGH. Standing on the library floor at
-           turn 0, the player's own token sits behind ten feet of gallery and the camera
-           cannot see it — correct occlusion, and useless. XCOM answers this by cutting
-           away the walls between the camera and the floor being played on.
-           The level picker above the map is already that control, so it is given
-           something to do here rather than a second control being invented: a raised
-           FLOOR standing above the level being looked at is drawn through, and a wall is
-           not. That distinction is the point — a gallery is somebody else's floor and you
-           are entitled to see under it, where a wall is a wall from every level, and
-           making the stacks translucent would be telling the player they have a shot. */
-        if (!solid[k] && topz > level) cls += " above";
-
+        /* RAISED GROUND IS SOLID (2026-11-11). It used to be drawn at 45% whenever it
+           stood above the level being looked at, so a token under a gallery stayed in
+           view — and the owner saw the whole mass as glass: "fix the glass block". The
+           mass is opaque now, and only what it actually hides is shown through it (the
+           x-ray pass at the end of `render`). */
         var f3 = fx[k], drawn = -1;
-        // A crate or cart you can climb onto (a raised square, not a solid one) is a thing
-        // in the room, not somebody's floor overhead: never drawn through, and built of wood.
-        if (f3 && !solid[k] && (f3.kind === "crate" || f3.kind === "cart")) {
-          cls = cls.replace(" above", "");
-          mat = "wood";
-        }
+        // A crate or cart you can climb onto (a raised square, not a solid one) is built of
+        // wood, not of the room's raised floor.
+        if (f3 && !solid[k] && (f3.kind === "crate" || f3.kind === "cart")) mat = "wood";
         if (solid[k] && f3) {
           drawn = fixtureAt(faces, f3, x, y, z, frontOf(f3, x, y), runsX(f3), cls);
         }
@@ -632,7 +634,7 @@
            * itself used to make. A hand's breadth of stone standing in the square says
            * "shoot over this" the way a wall does not. */
           var top = rails[k], foot = Math.max(0, topAt(x, y)), t = 0.14;
-          var rcls = "rail3" + (top > level ? " above" : "");
+          var rcls = "rail3";
           /* A GALLERY'S RAIL IS DRAWN ON THE GALLERY'S EDGE (2026-11-11). The floorplan
              stores a gallery's rail on the ground square in front of it (`_raise`'s lip),
              so the pane above stood in the middle of that square: at the gate it cut the
@@ -703,7 +705,7 @@
           }
           var zt = z0 + (n - i) * rise / n;
           slab2(faces, x0, y0, x1, y1, z0, zt, "tread", "wooddark",
-                "fxstep" + (z0 > level ? " above" : ""), NOPOINT);
+                "fxstep", NOPOINT);
         }
         if (z0 + rise > tallest) tallest = z0 + rise;
       });
@@ -754,6 +756,7 @@
            "<title>" + name + (s.here ? "" : ", above or below this floor") + "</title>");
     });
 
+    var figs = [];
     (actors || []).forEach(function (a) {
       if (!a.at) return;
       var ax = a.at[0], ay = a.at[1], az = a.at.length > 2 ? a.at[2] : 0;
@@ -771,6 +774,7 @@
       var tall = a.hp <= 0 ? 0.3 : Math.min(1.6 * n, 2 * n);
       var tip = "<title>" + esc(a.name || "") + " — " + a.hp + "/" + a.hp_max +
                 (az ? " · " + az * 5 + " ft up" : "") + "</title>";
+      var start = faces.length;
       for (var dx = 0; dx < n; dx++) {
         for (var dy = 0; dy < n; dy++) {
           box(faces, ax + dx, ay + dy, az, az + tall, side, cls, "",
@@ -778,24 +782,123 @@
         }
       }
       if (az + tall > tallest) tallest = az + tall;
+      figs.push({ faces: faces.slice(start), x: ax + n / 2, y: ay + n / 2, z: az,
+                  top: az + tall, own: [ax, ay, ax + n, ay + n], offlevel: az !== level });
     });
 
     // Back to front. One comparison on the real distance to the viewer, where the first
     // version summed a rotated row and column and added hand-picked offsets for the
-    // things that came out wrong.
-    faces.sort(function (a, b) { return depth(a.at, turn) - depth(b.at, turn); });
+    // things that came out wrong. A face marked `cull` (a closed solid's back) that faces
+    // away from the camera is hidden by its own front and is not drawn at all.
+    faces = faces.filter(function (f) {
+      return !f.cull || dot(turned(f.n, turn), TOWARD) > 0;
+    });
+    faces.forEach(function (f) {
+      f.d = depth(f.at, turn);
+      f.sp = f.pts.map(function (p) { return project(p, turn); });
+    });
+    faces.sort(function (a, b) { return a.d - b.d; });
+
+    /* WHAT A MASS HIDES IS SHOWN THROUGH IT, AND NOTHING ELSE IS (2026-11-11).
+     *
+     * The tactical games that put people behind walls agree on the shape of the answer
+     * and disagree only on the cut. Baldur's Gate 3 cuts a circular hole through the wall
+     * round the character (community recreations of its "occlusion cutout": 80.lv,
+     * Brendan Sullivan's ArtStation write-up); Divinity: Original Sin 2 and Torchlight 2
+     * draw the hidden character's silhouette over the wall (players asking BG3 for
+     * opaque walls cite Divinity's outline as what they want — Steam discussion
+     * 3811785047377002290). XCOM 2 fades whole walls and roofs, which players report as
+     * "translucent walls" they cannot read — the glass this replaced. A hole needs a
+     * depth buffer this painter's-sort SVG does not have; a silhouette needs only the
+     * figure's own faces drawn again, last. So: the mass stays solid, and a token the
+     * mass actually hides is drawn over it as a flat ghost in its side's colour.
+     *
+     * "Actually hides" is measured, not guessed: three points up the figure's axis, each
+     * tested against every face nearer the camera than it that rises above the floor the
+     * figure stands on (a floor tile in front cannot hide anybody). Two of three covered
+     * and the figure is hidden. The same test on five points of each square the player
+     * can reach, four of them covered: such a square is redrawn as an outline on top,
+     * carrying the same `data-sq`, so a move can still be queued onto the floor behind
+     * a gallery. Both are
+     * worked out from the projected faces after the sort, so they hold at every
+     * quarter-turn and agree with the painter's order by construction. */
+    var masses = faces.filter(function (f) {
+      if (f.mat === "area" || f.cls.lastIndexOf("fig", 0) === 0) return false;
+      var top = -1e9, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      f.pts.forEach(function (p) { if (p[2] > top) top = p[2]; });
+      f.sp.forEach(function (p) {
+        if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+      });
+      f.top = top; f.box = [x0, y0, x1, y1];
+      return true;
+    });
+    // Binned by screen position, so a point is tested against the few faces over it
+    // rather than every face on the board (a 24x24 board: 31 ms of render to 10).
+    var BIN = 24, bins = {};
+    masses.forEach(function (m) {
+      for (var bx = Math.floor(m.box[0] / BIN); bx <= Math.floor(m.box[2] / BIN); bx++) {
+        for (var by = Math.floor(m.box[1] / BIN); by <= Math.floor(m.box[3] / BIN); by++) {
+          (bins[bx + "," + by] = bins[bx + "," + by] || []).push(m);
+        }
+      }
+    });
+    // `own` is the footprint the thing stands on: a stair's own steps, the crate it is
+    // climbing, are under it, not in front of it (measured at the gate: the player on
+    // the stair was ghosted at every turn by the steps beneath their feet).
+    function covered(p, floor, own) {
+      var d = depth(p, turn), s = project(p, turn);
+      var near = bins[Math.floor(s[0] / BIN) + "," + Math.floor(s[1] / BIN)] || [];
+      for (var i = 0; i < near.length; i++) {
+        var m = near[i], b = m.box;
+        if (m.d <= d || m.top <= floor + 0.05) continue;
+        if (m.at[0] > own[0] && m.at[0] < own[2] && m.at[1] > own[1] && m.at[1] < own[3]) {
+          continue;
+        }
+        if (s[0] < b[0] || s[0] > b[2] || s[1] < b[1] || s[1] > b[3]) continue;
+        if (inside(s, m.sp)) return true;
+      }
+      return false;
+    }
+    function pts2(sp) {
+      return sp.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    }
+    var xray = "";
+    figs.forEach(function (g) {
+      var h = g.top - g.z, hid = 0;
+      [0.3, 0.6, 0.9].forEach(function (k) {
+        if (covered([g.x, g.y, g.z + h * k], g.z, g.own)) hid++;
+      });
+      if (hid < 2) return;
+      xray += '<g class="xray' + (g.offlevel ? " offlevel" : "") + '" pointer-events="none">' +
+        g.faces.filter(function (f) { return f.sp; }).map(function (f) {
+          return '<polygon fill="' + paint(f.mat, shade(f.n, turn)) + '" points="' +
+            pts2(f.sp) + '"/>';
+        }).join("") + "</g>";
+    });
+    faces.forEach(function (f) {
+      if (f.attrs.indexOf("data-sq") < 0) return;
+      var c = f.at, z = c[2], hid = 0, sq = [Math.floor(c[0]), Math.floor(c[1])];
+      sq.push(sq[0] + 1, sq[1] + 1);
+      var seen = 0;
+      [[0, 0], [-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]].forEach(function (o) {
+        if (seen > 1) return;          // two points in view: it can no longer be hidden
+        if (covered([c[0] + o[0], c[1] + o[1], z], z, sq)) hid++; else seen++;
+      });
+      if (hid < 4) return;           // mostly in view: the square itself takes the click
+      xray += '<polygon class="xsq lit face-top" points="' + pts2(f.sp) + '"' + f.attrs +
+        "><title>reachable, behind what stands in front of it</title></polygon>";
+    });
 
     var body = faces.map(function (f) {
-      var pts = f.pts.map(function (p) { return project(p, turn); });
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
       return '<polygon class="' + f.cls + '" fill="' +
         (f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
          : paint(f.mat, shade(f.n, turn), f.wash)) +
-        '" points="' +
-        pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") +
-        '"' + f.attrs + (f.inner ? ">" + f.inner + "</polygon>" : "/>");
-    }).join("");
+        '" points="' + pts2(f.sp) + '"' + f.attrs +
+        (f.inner ? ">" + f.inner + "</polygon>" : "/>");
+    }).join("") + xray;
 
     // The viewBox is measured from the projected corners rather than guessed, so a map of
     // any size at any rotation fills the frame without clipping. Measured to the board's
