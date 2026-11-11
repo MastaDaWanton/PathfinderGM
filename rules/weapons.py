@@ -39,7 +39,7 @@ from pathfindergm import files
 
 _ALL: dict[str, dict] | None = None
 _META: dict = {}
-_INDEX: tuple[int, dict[str, str]] | None = None
+_INDEX: tuple[dict, dict[str, str]] | None = None
 
 # Curated keys whose row in the imported file has another id. The curated entry merges
 # onto that row and its key answers as an alias, so the 3 tests and the fixture written
@@ -170,9 +170,10 @@ def all_weapons() -> dict[str, dict]:
 
 def forget() -> None:
     """Drop the table so the next read sees a file the weapon bench just saved."""
-    global _ALL, _INDEX
+    global _ALL, _INDEX, _GROUP_INDEX
     _ALL = None
     _INDEX = None
+    _GROUP_INDEX = None
 
 
 def meta() -> dict:
@@ -188,7 +189,7 @@ def _index() -> dict[str, str]:
     """Every spelling that names a row -> the row's key. Built once per table."""
     global _INDEX
     table = all_weapons()
-    if _INDEX is not None and _INDEX[0] == id(table):
+    if _INDEX is not None and _INDEX[0] is table:      # held, as `_GROUP_INDEX` is
         return _INDEX[1]
     idx: dict[str, str] = {}
 
@@ -211,7 +212,7 @@ def _index() -> dict[str, str]:
     for alias, key in ALIASES.items():
         if key in table:
             add(alias, key)
-    _INDEX = (id(table), idx)
+    _INDEX = (table, idx)
     return idx
 
 
@@ -510,7 +511,10 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "firearms": (),
 }
 _FIREARM_SECTION = re.compile(r"firearm", re.I)
-_GROUP_INDEX: tuple[int, dict[str, frozenset]] | None = None
+# (the table it was built from, the index). The table itself, compared with `is`, and
+# dropped by `forget()`: it used to be the table's id(), which the rebuilt table can
+# be handed once the old one is freed — a homebrew weapon then had no groups.
+_GROUP_INDEX: tuple[dict, dict[str, frozenset]] | None = None
 
 
 def groups_of(key: str) -> frozenset:
@@ -518,7 +522,7 @@ def groups_of(key: str) -> frozenset:
     {"heavy blades"}. Built once per table, by name through `key_for`."""
     global _GROUP_INDEX
     table = all_weapons()
-    if _GROUP_INDEX is None or _GROUP_INDEX[0] != id(table):
+    if _GROUP_INDEX is None or _GROUP_INDEX[0] is not table:
         idx: dict[str, set] = {}
         for group, names in GROUPS.items():
             for name in names:
@@ -530,7 +534,7 @@ def groups_of(key: str) -> frozenset:
                     and "siege" not in str(row.get("section") or "").lower() \
                     and not is_ammunition(k):
                 idx.setdefault(k, set()).add("firearms")
-        _GROUP_INDEX = (id(table), {k: frozenset(v) for k, v in idx.items()})
+        _GROUP_INDEX = (table, {k: frozenset(v) for k, v in idx.items()})
     return _GROUP_INDEX[1].get(key_for(key) or str(key or "").lower(), frozenset())
 
 

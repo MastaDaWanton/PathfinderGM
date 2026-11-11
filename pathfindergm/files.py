@@ -15,6 +15,7 @@ on NTFS and POSIX alike. A reader sees the old file or the new one, never a torn
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -83,14 +84,58 @@ def _wrote(path: Path) -> None:
 def write_text(path, text: str, encoding: str = "utf-8") -> Path:
     """`Path.write_text`, atomically. Same newline handling, so the bytes on disk are
     the ones `write_text` would have written."""
+    return _write(path, text, "w", encoding)
+
+
+def write_bytes(path, data: bytes, check=None) -> Path:
+    """`Path.write_bytes`, atomically. `check(tmp)` is handed the finished temporary
+    file before it replaces anything; if it raises, `path` is exactly as it was."""
+    return _write(path, data, "wb", None, check)
+
+
+# A kill between `mkstemp` and the rename below leaves the temporary file for good, and
+# for a campaign each one is the size of the whole save (review 2026-11-11). Swept on
+# the FIRST write this process makes in a folder: one directory listing per folder per
+# run, in every folder the app writes, with no start-up hook to forget to call.
+# Only names of exactly the shape `_write` makes (mkstemp's alphabet, eight of them),
+# and only old ones — a young temporary file may be another thread's write in flight,
+# and no write here takes ten minutes. A clock set back makes an orphan look young,
+# which only delays it.
+_TEMP_NAME = re.compile(r"\..+\.[a-z0-9_]{8}\.tmp")
+_STALE_AFTER = 600.0
+
+
+def _sweep(folder: Path) -> None:
+    cutoff = time.time() - _STALE_AFTER
+    try:
+        with os.scandir(folder) as entries:
+            stale = [e.path for e in entries
+                     if _TEMP_NAME.fullmatch(e.name) and e.stat().st_mtime < cutoff]
+    except OSError:
+        return
+    for orphan in stale:
+        try:
+            os.unlink(orphan)
+        except OSError:
+            # PermissionError on Windows while an indexer or a scanner holds it open;
+            # gone already if another thread swept first. Either way the next run tries
+            # again, and a courtesy must never be the reason a save fails.
+            pass
+
+
+def _write(path, payload, mode: str, encoding, check=None) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    if _folder_key(path.parent) not in _WRITTEN:
+        _sweep(path.parent)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
-        with os.fdopen(fd, "w", encoding=encoding) as f:
-            f.write(text)
+        with os.fdopen(fd, mode, encoding=encoding) as f:
+            f.write(payload)
             f.flush()
             os.fsync(f.fileno())
+        if check is not None:
+            check(Path(tmp))
         _replace(tmp, path)
     except BaseException:
         try:

@@ -2001,7 +2001,12 @@ class GMAgent:
             log.debug("known names: the counters could not be read", exc_info=True)
         return {n for n in names if n}
 
-    _VOCAB: dict[int, set[str]] = {}
+    # id(world) -> (the world, the ingredient table, the words). Both objects are HELD
+    # and compared with `is` (review 2026-11-11): keyed on a bare id(), a world that was
+    # freed and another loaded at the same address answered with the first one's words.
+    # The ingredient table is part of it because its names are folded in below — a
+    # table rebuilt for a homebrew herb must not go on being read as the old one.
+    _VOCAB: dict[int, tuple] = {}
     _CAPITALISED = re.compile(r"\b[A-Z][a-zA-Z'’-]{2,}\b")
 
     def _world_vocabulary(self) -> set[str]:
@@ -2012,8 +2017,15 @@ class GMAgent:
         """
         world = self.world
         key = id(world)
-        if key in GMAgent._VOCAB:
-            return GMAgent._VOCAB[key]
+        try:
+            from rules import ingredients as ing_mod
+
+            herbs = ing_mod.all_ingredients()
+        except Exception:
+            herbs = None
+        got = GMAgent._VOCAB.get(key)
+        if got is not None and got[0] is world and got[1] is herbs:
+            return got[2]
 
         found: set[str] = set()
         try:
@@ -2042,9 +2054,7 @@ class GMAgent:
         # is entitled to name and which no *world* file mentions. A shelf the app carries
         # is not a name from nowhere.
         try:
-            from rules import ingredients as ing_mod
-
-            for i in ing_mod.all_ingredients().values():
+            for i in (herbs or {}).values():
                 found |= set(GMAgent._CAPITALISED.findall(str(getattr(i, "name", ""))))
         except Exception:
             pass
@@ -2055,7 +2065,10 @@ class GMAgent:
                 found |= set(GMAgent._CAPITALISED.findall(str(getattr(m, "name", ""))))
         except Exception:
             pass
-        GMAgent._VOCAB[key] = found
+        # Bounded, now that an entry keeps its world alive: `load_cached` holds four.
+        if len(GMAgent._VOCAB) >= 8:
+            GMAgent._VOCAB.clear()
+        GMAgent._VOCAB[key] = (world, herbs, found)
         return found
 
     def _pc_pronouns(self) -> str:

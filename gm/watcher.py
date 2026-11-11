@@ -416,7 +416,10 @@ def _ask(messages: list[dict], cfg: dict, schema: dict):
                 as_json=True, provider=cfg.get("provider", "ollama"),
                 api_key=cfg.get("api_key", ""),
                 temperature=0.4, num_predict=num_predict,
-                schema=schema, think=think)
+                schema=schema, think=think,
+                # Nobody is waiting on this thread, and it queues behind the player's
+                # own call: its silence is not evidence the player's model is wedged.
+                remember_stall=False)
             break
         except client.ModelStalled:
             raise                          # a wedged Ollama is not asked twice

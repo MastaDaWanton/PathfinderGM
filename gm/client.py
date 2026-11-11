@@ -349,6 +349,7 @@ def chat(
     api_key: str = "",
     schema: dict | None = None,
     think: bool | None = None,
+    remember_stall: bool = True,
 ) -> Reply:
     """
     The timeout is generous because a cold load is genuinely slow: measured on this
@@ -357,6 +358,13 @@ def chat(
     ample and still failed under disk contention. Latency here is load time, not
     inference — which is why the first turn of a session should warm the model rather
     than making the player wait for it.
+
+    `remember_stall=False` is for a caller nobody is waiting on (the event watcher's
+    daemon thread). Its request queues behind the player's own on the one Ollama, so
+    120 s of silence there can be a long foreground call rather than a wedged server —
+    and remembered, that refused the player's NEXT call against a model that was
+    answering (review 2026-11-11). Such a call still raises its own `ModelStalled` and
+    still stands down for a stall somebody else recorded; it only writes nothing.
     """
     if provider and provider != "ollama":
         return _hosted(messages, model, host, provider, api_key, as_json,
@@ -435,6 +443,9 @@ def chat(
     warm = was_loaded is True
     wait = min(timeout, STALL_SECONDS) if warm else timeout
 
+    def _stall(exc: ModelStalled) -> ModelStalled:
+        return _remember_stall(host, model, was_loaded, exc) if remember_stall else exc
+
     def _post(pl):
         req = urllib.request.Request(
             f"{host.rstrip('/')}/api/chat",
@@ -484,7 +495,7 @@ def chat(
                 # "Load failed … timed out waiting for llama-server" after its GPU
                 # discovery watchdog timed out, on a healthy GPU. The same cure as a stall.
                 why = " ".join(detail.split())[:160] or f"HTTP {exc.code}"
-                raise _remember_stall(host, model, was_loaded, ModelStalled(
+                raise _stall(ModelStalled(
                     f"Ollama could not start {model} ({why}). This is Ollama, not your "
                     f"game. Quit Ollama from its tray icon, start it again, and send "
                     f"your line again. Your turn has not been lost.")) from exc
@@ -495,7 +506,7 @@ def chat(
                 raise _answered_with(model, host, exc.code, detail) from exc
     except TimeoutError as exc:
         if warm:
-            raise _remember_stall(host, model, was_loaded, _stalled(
+            raise _stall(_stalled(
                 model, host, f"sent nothing for {wait} seconds")) from exc
         raise ModelUnavailable(
             f"{model} did not answer within {timeout}s."

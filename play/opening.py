@@ -569,7 +569,8 @@ def _name_words(world) -> frozenset:
     if world is None:
         return frozenset()
     key = id(world)
-    got = _NAME_WORDS.get(key)
+    held = _NAME_WORDS.get(key)
+    got = held[1] if held is not None and held[0] is world else None
     if got is None:
         words = set()
         for e in (getattr(world, "entities", None) or {}).values():
@@ -577,11 +578,16 @@ def _name_words(world) -> frozenset:
         for c in ((getattr(world, "play", None) or {}).get("cast") or []):
             if isinstance(c, dict):
                 words.update(re.findall(r"[A-Z][\w'’-]*", str(c.get("name") or "")))
-        got = _NAME_WORDS[key] = frozenset(words)
+        got = frozenset(words)
+        # The world is held and compared with `is`: its id() alone is reused once it
+        # is freed. Bounded for that reason (`load_cached` holds four worlds).
+        if len(_NAME_WORDS) >= 8:
+            _NAME_WORDS.clear()
+        _NAME_WORDS[key] = (world, got)
     return got
 
 
-_NAME_WORDS: dict[int, frozenset] = {}
+_NAME_WORDS: dict[int, tuple] = {}
 
 
 def _lower_common(text: str, world=None) -> str:

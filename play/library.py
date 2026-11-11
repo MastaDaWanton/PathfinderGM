@@ -17,7 +17,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from world.loader import SUPPORTED_MAJOR, UnsupportedSchema, load_cached
+from world.loader import SUPPORTED_MAJOR, UnsupportedSchema, load, load_cached
 from pathfindergm import files
 
 
@@ -160,10 +160,14 @@ def safe_name(filename: str) -> str:
 def import_upload(filename: str, data: bytes) -> WorldCard:
     """Land an uploaded export on the shelf, or raise with a reason a player can act on.
 
-    Written to its final place and validated there, then removed again if it does not
-    read — rather than validated in a temp file and copied — because `load_cached` keys
-    its cache on the path, and a world validated at one path and played from another is
-    two different files as far as the cache is concerned.
+    Written beside its final place, read there with the plain loader, and renamed over
+    the target only if it reads (review 2026-11-11). It used to be written straight to
+    its final place and validated there, with the old bytes held in memory to put back:
+    a full disk or a kill mid-write truncated a world that worked, and every campaign in
+    it then failed to load. That shape was chosen because `load_cached` keys its cache
+    on the path — which is why the check here is `load`, not `load_cached`: nothing is
+    cached under the temporary name, and the shelf card below parses the file where it
+    will be played from. An import therefore parses the world twice; it is a rare act.
     """
     if len(data) > MAX_IMPORT_BYTES:
         raise ValueError(f"That file is {len(data) // (1024 * 1024)} MB. "
@@ -172,19 +176,15 @@ def import_upload(filename: str, data: bytes) -> WorldCard:
         raise ValueError("That file is empty.")
 
     target = user_dir() / safe_name(filename)
-    existed = target.exists()
-    backup = target.read_bytes() if existed else None
-    target.write_bytes(data)
-    try:
-        load_cached(target)
-    except Exception:
-        # Put back whatever was there. Importing a broken file over a world that worked
-        # would otherwise cost the player the good one as well as the bad one.
-        if backup is None:
-            target.unlink(missing_ok=True)
-        else:
-            target.write_bytes(backup)
-        raise
+
+    def reads(tmp: Path) -> None:
+        try:
+            load(tmp)
+        except UnsupportedSchema as exc:
+            # The loader names the file it was given; the player sent `target.name`.
+            raise UnsupportedSchema(str(exc).replace(tmp.name, target.name)) from exc
+
+    files.write_bytes(target, data, check=reads)
     return _card(target, shipped=False)
 
 

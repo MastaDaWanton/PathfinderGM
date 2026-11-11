@@ -228,3 +228,65 @@ def test_another_http_error_is_named_not_called_unreachable(monkeypatch):
     assert "cannot reach" not in msg and "Start Ollama" not in msg
     assert "HTTP 500" in msg and "out of memory" in msg
     assert not isinstance(exc.value, client.ModelStalled)
+
+
+# --- the background watcher's stall is its own (review 2026-11-11, finding 11) -------------
+
+def test_the_watchers_stall_is_not_the_players(monkeypatch):
+    """`_stalls` is one memory per host, and the watcher's call wrote to it like any
+    other. The watcher runs on a daemon thread after the turn; its request queues behind
+    whatever the player's next line is doing on the same Ollama, hears nothing for
+    `STALL_SECONDS`, and records a stall. Measured on 7f63ab60 with a stubbed transport:
+    after one silent watcher call, the player's next call was refused in milliseconds
+    with "The model has stopped answering" and never reached a server that would have
+    answered it (0 requests sent). A call that passes `remember_stall=False` still
+    raises its own ModelStalled, and leaves nothing behind for anybody else."""
+    _ollama(monkeypatch, chat=_silent)
+    with pytest.raises(client.ModelStalled):
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434",
+                    remember_stall=False)
+    assert client._stalls == {}
+
+    sent = []
+    _ollama(monkeypatch, chat=lambda req, t: sent.append(1) or _Resp(json.dumps(
+        {"message": {"content": "the smith looks up"}, "done": True})))
+    started = 0.0
+    reply = client.chat([{"role": "user", "content": "x"}], "gemma",
+                        "http://localhost:11434")
+    assert reply.text == "the smith looks up" and sent == [1]
+    assert client.stalled_since(started, ["http://localhost:11434"]) is None
+
+
+def test_the_watcher_still_stands_down_for_a_stall_the_player_met(monkeypatch):
+    """The other direction is kept: a stall a foreground call recorded still refuses the
+    watcher at once, so a wedged Ollama is not asked again from the background."""
+    calls = []
+
+    def silent(req, timeout):
+        calls.append(1)
+        raise TimeoutError("timed out")
+
+    _ollama(monkeypatch, chat=silent)
+    with pytest.raises(client.ModelStalled):
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434")
+    with pytest.raises(client.ModelStalled):
+        client.chat([{"role": "user", "content": "x"}], "gemma", "http://localhost:11434",
+                    remember_stall=False)
+    assert len(calls) == 1
+
+
+def test_the_watcher_is_the_caller_that_does_not_remember(monkeypatch):
+    """The wiring: every watcher model call goes through `_ask`, on a daemon thread."""
+    from gm import watcher
+
+    seen = {}
+
+    def chat(messages, model, host, **kw):
+        seen.update(kw)
+        raise client.ModelStalled("stalled")
+
+    monkeypatch.setattr(watcher.client, "chat", chat)
+    with pytest.raises(client.ModelStalled):
+        watcher._ask([{"role": "user", "content": "x"}], {"model": "gemma"},
+                     {"type": "object", "properties": {}})
+    assert seen["remember_stall"] is False

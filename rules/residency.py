@@ -210,11 +210,14 @@ def _places_of(location_id: str, world, founded) -> tuple:
     per person otherwise, and a finder over a town's people would derive the town's
     layout hundreds of times over."""
     key = (location_id, id(world), tuple(str(p.get("id")) for p in founded or ()))
-    if key not in _PLACES:
+    got = _PLACES.get(key)
+    # The world is held beside the answer and compared with `is`: its id() alone is
+    # reused once the world is freed, and would hand a new world the old one's town.
+    if got is None or got[0] is not world:
         if len(_PLACES) > 256:
             _PLACES.clear()
-        _PLACES[key] = _derive_places(location_id, world, founded)
-    return _PLACES[key]
+        got = _PLACES[key] = (world, _derive_places(location_id, world, founded))
+    return got[1]
 
 
 def _derive_places(location_id: str, world, founded) -> tuple:
@@ -308,12 +311,14 @@ def observe(rec: dict, location_id: str, place_id: str, clock: int) -> None:
 _ROADS: dict = {}
 
 
-def _memo(key, make):
-    if key not in _ROADS:
+def _memo(key, make, world):
+    # As `_places_of`: every key here carries id(world), so the world is held too.
+    got = _ROADS.get(key)
+    if got is None or got[0] is not world:
         if len(_ROADS) > 4096:
             _ROADS.clear()
-        _ROADS[key] = make()
-    return _ROADS[key]
+        got = _ROADS[key] = (world, make())
+    return got[1]
 
 
 def _legs(world, loc: str):
@@ -324,7 +329,7 @@ def _legs(world, loc: str):
             return journey.legs_from(world, loc) if world is not None else []
         except Exception:
             return []
-    return _memo(("legs", id(world), loc), make)
+    return _memo(("legs", id(world), loc), make, world)
 
 
 def _hours(world, leg) -> int:
@@ -335,11 +340,11 @@ def _hours(world, leg) -> int:
             return max(1, int(journey.hours_for(leg, 30)[0]))
         except Exception:
             return 24
-    return _memo(("hours", id(world), leg.to_id, leg.miles, leg.by_sea), make)
+    return _memo(("hours", id(world), leg.to_id, leg.miles, leg.by_sea), make, world)
 
 
 def _trade_partners(world, loc: str) -> set[str]:
-    return _memo(("trade", id(world), loc), lambda: _find_partners(world, loc))
+    return _memo(("trade", id(world), loc), lambda: _find_partners(world, loc), world)
 
 
 def _find_partners(world, loc: str) -> set[str]:
