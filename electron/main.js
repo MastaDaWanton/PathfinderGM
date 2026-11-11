@@ -219,13 +219,13 @@ function createWindow() {
   // Anything genuinely external (the OGL links, World Bible's repo) belongs in the
   // real browser.
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
-    shell.openExternal(target);
+    openOutside(target);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, target) => {
     if (!target.startsWith(backendUrl)) {
       event.preventDefault();
-      shell.openExternal(target);
+      openOutside(target);
     }
   });
 
@@ -326,6 +326,21 @@ function makeReportFromShell(note) {
       done({ error: `the report stopped (exit ${code})` });
     });
   });
+}
+
+/** The one door from the page to the Windows shell: web and mail links only.
+ * `shell.openExternal` hands ANY url to the shell, so `window.open('file:///C:/...exe')`
+ * or a custom protocol from script in the page would have run it (review 2026-11-11,
+ * finding 2). Anything else is dropped, and logged so a dead link has a reason. */
+const OUTSIDE_PROTOCOLS = ['http:', 'https:', 'mailto:'];
+function openOutside(target) {
+  let protocol = '';
+  try { protocol = new URL(target).protocol; } catch (err) { /* not a url: dropped */ }
+  if (!OUTSIDE_PROTOCOLS.includes(protocol)) {
+    updateLog('warn', 'refused to open outside the app: ' + String(target).slice(0, 200));
+    return;
+  }
+  shell.openExternal(target).catch((err) => updateLog('error', 'open link: ' + err.message));
 }
 
 /** Opened the way every outside link is (`setWindowOpenHandler` above): the player's own
