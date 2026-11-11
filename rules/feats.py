@@ -107,6 +107,7 @@ def _build_feats() -> dict[str, Feat]:
     from django.conf import settings
 
     raw: dict[str, dict] = {}
+    last_file: dict[str, Path] = {}     # the file to name when an entry will not build
     for folder in (Path(settings.BASE_DIR) / "content" / "feats",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "feats"):
         if not folder.is_dir():
@@ -127,12 +128,22 @@ def _build_feats() -> dict[str, Feat]:
             if isinstance(data, dict):
                 _META.update({k: v for k, v in data.items() if k != "feats"})
             for e in entries:
-                if not e.get("id"):
+                if not isinstance(e, dict) or not e.get("id"):
                     continue
                 # Merged, not replaced: a homebrew edit changing one field must not
                 # drop the fifteen it never mentioned.
                 raw.setdefault(e["id"], {}).update(e)
-    return {k: from_dict(v) for k, v in raw.items()}
+                last_file[e["id"]] = path
+    # One entry at a time: a homebrew `{"id": "my-feat"}` parses, and `Feat.__init__()
+    # missing 1 required positional argument: 'name'` here took every `all_feats()` call
+    # down with no file named (review 2026-11-11, finding 4).
+    out: dict[str, Feat] = {}
+    for k, v in raw.items():
+        try:
+            out[k] = from_dict(v)
+        except Exception as exc:  # noqa: BLE001 — whatever a hand-written file can hold
+            files.unreadable(last_file.get(k, k), exc)
+    return out
 
 
 def meta() -> dict:

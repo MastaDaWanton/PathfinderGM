@@ -69,6 +69,10 @@ def _build_classes() -> dict[str, dict]:
             if not isinstance(entries, list):
                 entries = [data] if isinstance(data, dict) and data.get("id") else []
             for e in entries:
+                # `{"classes": [null, 5]}` parses; `.get` on a row that is not an
+                # object took every class down with it (review 2026-11-11, finding 4).
+                if not isinstance(e, dict):
+                    continue
                 key = str(e.get("id") or e.get("name", "")).strip().lower()
                 if not key:
                     continue

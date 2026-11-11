@@ -3609,9 +3609,28 @@ class Engine:
             pc = self.scene.pc()
             if pc is not None:
                 intent.actor = pc.ref
-        needs_actor = intent.op in ("check", "save", "attack", "move", "cast")
+        # Every op whose handler keys the roster with the actor. The last five were
+        # missing until 2026-11-11 (review finding 5): `extinguish` and `break_free` with
+        # no actor, or any of them with a name for a ref, was a KeyError at resolution —
+        # a 502 and the player's line popped — where this refusal gets its retry.
+        needs_actor = intent.op in ("check", "save", "attack", "move", "cast",
+                                    "sell", "buy", "use_item", "extinguish", "break_free")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
+        # `_op_condition` lands on `to`, else the actor, else the target. `to` and the
+        # targets are checked below; the middle one, and nobody at all, were not.
+        if intent.op == "condition" and not intent.params.get("to") and not (
+                self._known(intent.actor, extra) if intent.actor else intent.targets()):
+            if intent.actor:
+                self._refuse_ref(intent, index, intent.actor, "actor", extra)
+            raise IntentError(
+                "condition: nobody is named for it to land on. Say who with "
+                "params.to, their ref.", "refs", index)
+        # `who` on a move is the mover, a ref like `to` — a name there was a KeyError in
+        # `_op_move`.
+        who = intent.params.get("who")
+        if intent.op == "move" and who and not self._known(who, extra):
+            self._refuse_ref(intent, index, who, "mover", extra)
         for t in intent.targets():
             if not self._known(t, extra):
                 self._refuse_ref(intent, index, t, "target", extra)

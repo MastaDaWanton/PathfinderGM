@@ -222,6 +222,36 @@ def _text(d: dict, key: str, default: str = "") -> str:
     return default if got is None else str(got)
 
 
+def _year(got) -> int | None:
+    """An event's year as the contract writes it: a signed integer, or None for undated.
+
+    Review 2026-11-11, finding 12: `"year": "1200 AE"` passed the import and raised
+    `TypeError: bad operand type for unary -: 'str'` in `events_touching`'s sort, on
+    every turn. A whole number written as text ("1200", "-300", 1200.0) is that number.
+    Anything with an era on it is read as undated rather than guessed at: "1200 AE" and
+    "1200 BE" would both keep 1200, and the contract's one promise about years is that
+    they compare across the world.
+    """
+    if isinstance(got, bool):
+        return None
+    if isinstance(got, float) and got != got:       # NaN
+        return None
+    try:
+        whole = int(str(got).strip()) if isinstance(got, str) else int(got)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return whole if isinstance(got, (int, str)) or whole == got else None
+
+
+def _fact(value) -> str:
+    """A fact's value as the text every reader takes it for (`.strip()`, `.lower()`):
+    a list where a string belongs was `AttributeError: 'list' object has no attribute
+    'strip'` in `cards._fact` and the opening. A list is its items, said in a row."""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v) for v in value if v is not None)
+    return str(value)
+
+
 def _named_rows(rows) -> list[dict]:
     """Rows somebody reads `row["name"]` off (unwritten, factions, chronology figures):
     objects only, each with a string name. Copied, never mutated in place."""
@@ -257,7 +287,7 @@ def load(path: str | Path) -> World:
             summary=_text(e, "summary"),
             parent_id=e.get("parent_id") or None,
             path=_text(e, "path"),
-            facts={str(k): v for k, v in facts.items() if v is not None},
+            facts={str(k): _fact(v) for k, v in facts.items() if v is not None},
             sections=[s for s in (e.get("sections") or []) if isinstance(s, dict)],
             links=e.get("links") or [],
             trade=e.get("trade") if isinstance(e.get("trade"), dict) else {},
@@ -282,7 +312,7 @@ def load(path: str | Path) -> World:
     chronology = [
         Event(
             name=_text(c, "name"),
-            year=c.get("year"),
+            year=_year(c.get("year")),
             summary=_text(c, "summary"),
             scope=_text(c, "scope"),
             background=_text(c, "background"),

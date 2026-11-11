@@ -301,6 +301,12 @@ def _work(jobs: list[dict]) -> None:
                         else _propose_cards(job, cfg) if job["job"] == "cards"
                         else _propose_undercurrent(job, cfg))
         except Exception:
+            # Said, not swallowed: a bug in a proposer read as a model with nothing to
+            # offer. A warning with the traceback, since a model that is down lands here.
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "the watcher's %s proposal failed", job.get("job"), exc_info=True)
             proposal = None
         if proposal:
             with _LOCK:
@@ -775,6 +781,11 @@ def drain(c) -> bool:
             else:
                 changed = _apply_undercurrent(c, p) or changed
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "applying the watcher's %s proposal failed",
+                p.get("job") if isinstance(p, dict) else p)
             continue                      # a broken proposal must never cost a turn
     if changed:
         c.save()

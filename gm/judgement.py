@@ -1865,8 +1865,12 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
         targets = targets if isinstance(targets, list) else [targets]
         # `opposed_by` too: a turn was lost to `opposed_by: {ref: "thug1"}` when only
         # actor and target were being repaired.
-        opposed = (raw.get("params") or {}).get("opposed_by") or {}
-        for ref in [raw.get("actor"), *targets, opposed.get("ref")]:
+        # A string here (`opposed_by: "c1"`) is validation's to refuse, with the shape
+        # named — `.get` on it raised AttributeError out of the repair instead.
+        params = raw.get("params")
+        opposed = params.get("opposed_by") if isinstance(params, dict) else None
+        for ref in [raw.get("actor"), *targets,
+                    opposed.get("ref") if isinstance(opposed, dict) else None]:
             if not isinstance(ref, str) or ref in known or ref in invented:
                 continue
             if not _INVENTED_REF.match(ref) or re.fullmatch(r"c\d+|pc", ref, re.I):

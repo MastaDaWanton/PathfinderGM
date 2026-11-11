@@ -605,7 +605,15 @@ def _normalised(folder: Path) -> dict[str, dict]:
     hit = _CACHE.get(str(folder))
     if hit is not None and hit[0] == sig:
         return hit[1]
-    fresh = {k: normalise(v) for k, v in _read_folder(folder).items()}
+    # One race at a time: a card whose field is the wrong type (`"choose": 5`) raised
+    # `TypeError: 'int' object is not iterable` in `normalise` and took every race in
+    # the folder down with it (review 2026-11-11, finding 4).
+    fresh = {}
+    for k, v in _read_folder(folder).items():
+        try:
+            fresh[k] = normalise(v)
+        except Exception as exc:  # noqa: BLE001 — whatever a hand-written file can hold
+            files.unreadable(folder / f"{k}.json", exc)
     _CACHE[str(folder)] = (sig, fresh)
     return fresh
 

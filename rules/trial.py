@@ -1268,19 +1268,32 @@ def _confiscate(engine, pc) -> list[dict]:
     """Stolen things off the player and back to the people they were stolen from: the
     item leaves the player's holdings (the give door, from the player to nobody) and its
     ledger record is put in the owner's hands, no longer marked stolen."""
+    import logging
+
     from .engine import Intent
 
+    log = logging.getLogger(__name__)
     scene = engine.scene
     out = []
     for rec in list(_goods_held(engine, pc)):
         name = str(rec.get("name") or "")
         owner = scene.people.get(str(rec.get("owner") or ""))
         try:
-            engine._op_give(Intent(op="give", actor=pc.ref,
-                                   params={"item": name, "from_": pc.ref},
-                                   because="confiscated by the watch"), {})
+            gave = engine._op_give(Intent(op="give", actor=pc.ref,
+                                          params={"item": name, "from_": pc.ref},
+                                          because="confiscated by the watch"), {})
+            if not gave.effects:
+                log.warning("confiscation: %r did not leave %s's hands (%s); the "
+                            "ledger is put right regardless", name, pc.name, gave.tell)
         except Exception:       # noqa: BLE001 - the ledger is still put right below
-            pass
+            log.exception("confiscation: giving up %r failed", name)
+        # Unconditional ON PURPOSE, and weighed again 2026-11-11 (review finding 10,
+        # which asked for the record to flip only when the give moved the item). Two
+        # reasons it stays: the give only sets the thing down, so this flip is the
+        # second half of the move, not a note about it; and `charges` charges theft
+        # afresh for anything `_goods_held` still finds, so a thing the give can never
+        # move would be charged at every arrest with no way to end it. What was silent
+        # is now logged.
         rec.pop("at", None)
         rec.pop("square", None)
         rec.pop("stolen", None)

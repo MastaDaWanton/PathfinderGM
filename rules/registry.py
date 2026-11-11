@@ -443,6 +443,11 @@ def shipped(kind_id: str) -> dict:
     try:
         loaded = getattr(import_module(module_name), func_name)()
     except Exception:
+        # Empty for the page, said in the log: silent, a loader that raised looked
+        # exactly like a kind that ships nothing.
+        import logging
+
+        logging.getLogger(__name__).exception("the shipped %s could not be loaded", kind_id)
         return {}
     return loaded if isinstance(loaded, dict) else {}
 
@@ -482,6 +487,10 @@ def _derived(kind_id: str, entry: dict) -> dict:
     try:
         return getattr(import_module(module_name), func_name)(entry)
     except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "deriving %s %r failed", kind_id, entry.get("id") if isinstance(entry, dict) else "")
         return entry
 
 

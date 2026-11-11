@@ -5780,8 +5780,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             try:
                 intents = engine.validate(fallback)
                 resolution = engine.run(intents)
-            except (IntentError, ValueError, KeyError):
+            except (IntentError, ValueError, KeyError, TypeError, AttributeError) as exc:
+                # TypeError and AttributeError since 2026-11-11 (review finding 5): a
+                # wrong-typed param the gates missed was the PLAYER's request as a 500.
+                # Logged with its type, because this list is code's own and those two
+                # are a bug here, never a refusal.
                 scene.restore(undo)
+                c.turn_log.append({"kind": "npc-turn", "ref": ref, "error":
+                                   f"fallback: {type(exc).__name__}: {str(exc)[:400]}"})
                 c.transcript.append({"who": "gm", "kind": "consequence",
                                      "text": f"{actor.name} holds back."})
                 continue
@@ -5801,7 +5807,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         undo = scene.snapshot()
         try:
             resolution = engine.run(plan.intents)
-        except (IntentError, ValueError, KeyError) as exc:
+        except (IntentError, ValueError, KeyError, TypeError, AttributeError) as exc:
             # "Holds back" has to mean it: an NPC whose list raised after spawning
             # its friends left the friends on the board and said nothing about them.
             scene.restore(undo)
@@ -5811,8 +5817,10 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             # between the two — took down the PLAYER's request as a 500, on a turn the
             # player had already finished. A creature the engine cannot resolve holds
             # back, exactly as one the GM could not speak for does.
-            c.turn_log.append({"kind": "npc-turn", "ref": ref,
-                               "error": f"resolution: {str(exc)[:400]}"})
+            # The type is named since TypeError and AttributeError joined the tuple
+            # (2026-11-11): those are a bug in a handler, and the log must say so.
+            c.turn_log.append({"kind": "npc-turn", "ref": ref, "error":
+                               f"resolution: {type(exc).__name__}: {str(exc)[:400]}"})
             c.transcript.append({"who": "gm", "kind": "consequence",
                                  "text": f"{actor.name} holds back."})
             continue

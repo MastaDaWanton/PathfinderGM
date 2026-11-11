@@ -293,7 +293,8 @@ def modifiers(actor, kind: str, target: str, ctx: dict | None = None) -> list:
                 amount = (resources.evaluate(spec["formula"], actor)
                           if spec.get("formula") is not None
                           else int(spec.get("amount", 0) or 0))
-            except Exception:  # noqa: BLE001 — a malformed formula grants nothing
+            except Exception as exc:  # noqa: BLE001 — a malformed formula grants nothing
+                classfeatures.bad_formula(spec, exc)
                 amount = 0
             if amount:
                 out.append(Modifier(amount, str(power.get("name") or row["label"]),

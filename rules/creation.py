@@ -517,8 +517,7 @@ def options(world_id: str = "") -> dict:
                      # the server's (`build`) and not a class name the page tests for.
                      "bonus_feats_at_1": leveling.class_bonus_feats_at(cid, 1),
                      "unlocks_b": leveling.unlocks_at(cid, 1)}
-                    for cid, c in sorted(classes_mod.all_classes().items())
-                    if cid != "blood bending" or True],
+                    for cid, c in sorted(classes_mod.all_classes().items())],
         # The budget is the house rule's, not the constant's: a forge that showed 20
         # while the validator enforced 40 would refuse characters its own form said
         # were legal.

@@ -478,6 +478,24 @@ def evaluate(formula, actor, leaf: str, extra: dict | None = None) -> int:
     return int(resources._walk(tree.body, _variables(actor, leaf, extra), text) // 1)
 
 
+_BAD_FORMULAS: set[str] = set()
+
+
+def bad_formula(spec, exc: Exception) -> None:
+    """Say, once per document, that a formula granted nothing because it raised.
+
+    The handlers that call this sit in the modifier funnel and run on every roll, and
+    were silent: a typo in a document and a bug in `evaluate` both read as "no bonus".
+    Once per spec, because the funnel would otherwise say it a thousand times a turn."""
+    key = repr(spec)[:300]
+    if key in _BAD_FORMULAS:
+        return
+    _BAD_FORMULAS.add(key)
+    import logging
+
+    logging.getLogger(__name__).warning("a formula granted nothing: %s (%r)", key, exc)
+
+
 def check_formula(formula) -> str:
     """"" when the formula is well formed over the names a document may use, else why."""
     import ast
@@ -554,7 +572,8 @@ def _picks(actor, leaf: str, doc: dict) -> list[tuple[str, int]]:
             try:
                 bonus = evaluate(doc.get("pick_bonus", 0), actor, leaf,
                                  {"index": i, "picks": len(got)})
-            except Exception:  # noqa: BLE001 — a malformed formula grants nothing
+            except Exception as exc:  # noqa: BLE001 — a malformed formula grants nothing
+                bad_formula({"pick_bonus": doc.get("pick_bonus")}, exc)
                 bonus = 0
         out.append((entry["pick"], int(bonus)))
     return out
@@ -715,7 +734,8 @@ def modifiers(actor, kind: str, target: str, ctx: dict | None = None) -> list:
                         amount = evaluate(spec["formula"], actor, leaf)
                     else:
                         amount = int(spec.get("amount", 0) or 0)
-                except Exception:  # noqa: BLE001 — a malformed formula grants nothing
+                except Exception as exc:  # noqa: BLE001 — a malformed formula grants nothing
+                    bad_formula(spec, exc)
                     continue
                 if amount:
                     out.append(Modifier(amount, label, _bonus_type(spec.get("bonus_type"))))
