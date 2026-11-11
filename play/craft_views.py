@@ -9,7 +9,6 @@ and let natural 1s and 20s decide, against the live forge.
 """
 from __future__ import annotations
 
-import json
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -22,7 +21,7 @@ from rules.dice import BadDice
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
-from .apiutil import read_body, read_int
+from .apiutil import read_body, read_int, script_json
 
 # The disciplines the app knows about. Only Herbalism has rules behind it; the rest are
 # declared so the page is honest about what is coming instead of hiding it. `track` is
@@ -240,7 +239,7 @@ def craft_page(request):
     c = campaign_mod.current()
     pc = c.scene.pc()
     return render(request, "play/craft.html", {
-        "state_json": json.dumps({
+        "state_json": script_json({
             "disciplines": DISCIPLINES,
             "pc": {"name": pc.name if pc else "", "hp": pc.hp if pc else 0,
                    "hp_max": pc.hp_max if pc else 0},

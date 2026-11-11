@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 
 from django.http import JsonResponse
-from .apiutil import read_body, read_int
+from .apiutil import read_body, read_int, script_json
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -55,7 +55,7 @@ def _payload(request) -> dict:
 def class_builder(request):
     """The page itself. The whole schema goes down with it, so the form exists offline."""
     return render(request, "play/classbuilder.html", {
-        "state_json": json.dumps(_catalogue()),
+        "state_json": script_json(_catalogue()),
     })
 
 

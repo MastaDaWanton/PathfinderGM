@@ -13,7 +13,6 @@ so nothing here starts a campaign of its own.
 """
 from __future__ import annotations
 
-import json
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -26,7 +25,7 @@ from rules.crafting import Stock
 from rules.tables import ARMOUR, SHIELDS
 
 from . import roster
-from .apiutil import read_body
+from .apiutil import read_body, script_json
 
 # Outfitting happens before the sandbox: the character stands in no world and no town,
 # so the purse is counted in the book's own names. Asked through the same one door as
@@ -182,7 +181,7 @@ def begun(entry) -> bool:
 def outfit_page(request):
     """The screen. The whole catalogue goes with it so it draws once."""
     return render(request, "play/outfit.html", {
-        "state_json": json.dumps({
+        "state_json": script_json({
             "character": str(request.GET.get("character", "")).strip(),
             "world": str(request.GET.get("world", "")).strip(),
             "catalogue": catalogue(),

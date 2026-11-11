@@ -35,6 +35,21 @@ def read_body(request) -> dict:
     return body if isinstance(body, dict) else {}
 
 
+def script_json(obj) -> str:
+    """`obj` as JSON that is safe to write inside an inline `<script>` block.
+
+    `json.dumps` leaves `<` alone and the HTML parser ends a script at the first
+    `</script>` whatever JavaScript thinks of it. Measured 2026-11-11:
+    `GET /outfit/?character=</script><script>alert(1)</script>` came back 200 with the
+    payload raw in the page, and a character name, a world name or a LAN guest's line
+    did the same on the table. The three characters are written as `\\uXXXX`, which
+    JavaScript reads back as the same string, so the page parses the identical object.
+    U+2028/U+2029 need nothing: `ensure_ascii` (the default) already escapes them.
+    """
+    return (json.dumps(obj).replace("<", "\\u003c")
+            .replace(">", "\\u003e").replace("&", "\\u0026"))
+
+
 def read_int(body: dict, key: str, default: int = 0,
              *, lo: int | None = None, hi: int | None = None) -> int:
     """One integer out of a body, clamped, never raising.

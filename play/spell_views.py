@@ -17,10 +17,9 @@ field that must not be inherited is the one that would silently overwrite the or
 """
 from __future__ import annotations
 
-import json
 
 from django.http import JsonResponse
-from .apiutil import read_body, read_int
+from .apiutil import read_body, read_int, script_json
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -40,7 +39,7 @@ def spell_builder(request):
     """The page. Its whole schema and vocabulary go with it, so the form draws once."""
     kind = registry.get("spells")
     return render(request, "play/spellbuilder.html", {
-        "state_json": json.dumps({
+        "state_json": script_json({
             "fields": [f.as_dict() for f in kind.fields],
             "vocab": spells_mod.vocabularies(),
             "effects": effectspec.catalogue(),

@@ -12,7 +12,6 @@ evolutions into tags, modifiers and natural weapons every time it is read.
 """
 from __future__ import annotations
 
-import json
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -21,6 +20,8 @@ from django.views.decorators.http import require_GET
 
 from rules import houserules, races as races_mod
 
+from .apiutil import script_json
+
 
 @ensure_csrf_cookie
 @require_GET
@@ -28,7 +29,7 @@ def race_builder(request):
     """The page. The whole catalogue goes with it, so the form draws once and works
     offline; `?open=<id>` opens a race, shipped or yours, as the starting point."""
     return render(request, "play/racebuilder.html", {
-        "state_json": json.dumps({
+        "state_json": script_json({
             "catalogue": races_mod.catalogue(),
             "races": [{"id": k, "name": d["name"], "origin": d.get("origin", "core")}
                       for k, d in sorted(races_mod.all_races().items(),

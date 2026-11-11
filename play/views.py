@@ -25,7 +25,7 @@ from rules.intents import IntentError
 
 from . import campaign as campaign_mod
 from . import concurrency
-from .apiutil import read_body, read_int
+from .apiutil import read_body, read_int, script_json
 from . import downed, gm_answers, player_input, roster, table_talk
 from . import history as history_mod
 
@@ -1414,7 +1414,7 @@ def table(request):
         # not be a dead end. See `home_views.home` for the measurement.
         return redirect("/?unreadable=1")
     return render(request, "play/table.html", {
-        "state_json": json.dumps(_state(c)),
+        "state_json": script_json(_state(c)),
         # For the <title>, which read "Pangrella" in Aurvantis (2026-09-18).
         "world_name": c.world.name if c.world else "",
         # The revision the state below was drawn at, handed over with it rather than

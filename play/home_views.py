@@ -21,7 +21,7 @@ from rules import biomes, effectspec, registry, spells
 from world.loader import UnsupportedSchema
 
 from . import campaign as campaign_mod
-from .apiutil import read_body, read_int
+from .apiutil import read_body, read_int, script_json
 from . import homebrew, library, roster
 from .craft_views import DISCIPLINES
 from pathfindergm import files
@@ -67,7 +67,7 @@ def home(request):
 
     return render(request, "play/home.html", {
         "build": version.build(),
-        "state_json": json.dumps({
+        "state_json": script_json({
             "worlds": [w.as_dict() for w in library.worlds()],
             "recent": library.recent_characters(),
             "benches": [b.as_dict() for b in homebrew.benches()],
