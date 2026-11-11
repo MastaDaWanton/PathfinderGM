@@ -103,10 +103,19 @@ function renderMap(s) {
       `<title>${v * 5} ft above the floor</title>`));
   // Rails as edges, not fills. A parapet is a thing to shoot over; a filled square
   // would read as a wall, which is the very mistake the engine was making.
-  for (const [c, r, v] of (g.parapet || []))
-    parts.push(`<line class="rail" x1="${c * CELL + 2}" y1="${(r + .5) * CELL}" x2="${
-      (c + 1) * CELL - 2}" y2="${(r + .5) * CELL}"><title>a rail, ${
-      v * 5} ft up</title></line>`);
+  // A gallery's rail is stored on the ground square in front of it and drawn on the
+  // gallery's edge (the side meeting floor at the rail's height), as scene3d.js does:
+  // through the middle of that square it crossed the stair and whoever stood there.
+  const solidSq = new Set((g.blocked || []).map(([c, r]) => `${c},${r}`));
+  for (const [c, r, v] of (g.parapet || [])) {
+    const d = [[0, -1], [0, 1], [-1, 0], [1, 0]].find(([dx, dy]) =>
+      !solidSq.has(`${c + dx},${r + dy}`) && at(c + dx, r + dy) >= v);
+    const [x1, y1, x2, y2] = !d ? [c + .1, r + .5, c + .9, r + .5]
+      : d[0] ? [c + (d[0] > 0 ? 1 : 0), r + .1, c + (d[0] > 0 ? 1 : 0), r + .9]
+      : [c + .1, r + (d[1] > 0 ? 1 : 0), c + .9, r + (d[1] > 0 ? 1 : 0)];
+    parts.push(`<line class="rail" x1="${x1 * CELL}" y1="${y1 * CELL}" x2="${
+      x2 * CELL}" y2="${y2 * CELL}"><title>a rail, ${v * 5} ft up</title></line>`);
+  }
   // The named fixtures (rules/fixtures.py), drawn as forms that are data, never icons: a
   // shelf or a bar is one long narrow block over its squares, a barrel round, a crate a
   // square box, a stair three treads toward the higher ground beside it. Over the terrain

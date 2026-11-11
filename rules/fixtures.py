@@ -264,6 +264,14 @@ def type_the_ground(scene, place_id: str, terrain: str = "", authored=None) -> N
     grid.fixtures = derive(grid, place_id, terrain, authored) + [dict(f) for f in named]
     grid.low = {tuple(p): grid.ground(tuple(p)) + 1 for f in grid.fixtures
                 if kinds()[f["kind"]].get("low") for p in f["squares"]}
+    # The rail opens where the stair arrives. The floorplan's rail stands on the squares in
+    # front of a gallery (`floorplan._raise`'s lip), and the stair's foot is one of those
+    # squares: left there, the board drew a rail through the stair and anyone on it, and a
+    # line from the stair's top met a rail in its own square (the gate, 2026-11-11).
+    for f in grid.fixtures:
+        if kinds()[f["kind"]].get("stair"):
+            for p in f["squares"]:
+                grid.parapet.pop(tuple(p), None)
 
 
 def at(grid: Grid | None, square) -> dict | None:

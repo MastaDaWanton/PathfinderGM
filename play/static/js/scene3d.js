@@ -258,6 +258,16 @@
     walls(out, x, y, z1, [z0, z0, z0, z0], mat, cls);
   }
 
+  // A box of any footprint and height, all five visible faces: a rail on an edge, a step,
+  // a table top, a shelf. `attrs` (e.g. pointer-events) goes on every face.
+  function slab(out, x0, y0, x1, y1, z0, z1, mat, cls, attrs) {
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], UP, mat, cls, attrs);
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], NORTH, mat, cls, attrs);
+    face(out, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], SOUTH, mat, cls, attrs);
+    face(out, [[x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0]], WEST, mat, cls, attrs);
+    face(out, [[x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0]], EAST, mat, cls, attrs);
+  }
+
   function key(c, r) { return c + "," + r; }
 
   function esc(s) {
@@ -370,7 +380,29 @@
            * "shoot over this" the way a wall does not. */
           var top = rails[k], foot = Math.max(0, topAt(x, y)), t = 0.14;
           var rcls = "rail3" + (top > level ? " above" : "");
-          if (top > foot) {
+          /* A GALLERY'S RAIL IS DRAWN ON THE GALLERY'S EDGE (2026-11-11). The floorplan
+             stores a gallery's rail on the ground square in front of it (`_raise`'s lip),
+             so the pane above stood in the middle of that square: at the gate it cut the
+             stair in half and ran through the player standing beside it. What the rule
+             asks of that square — lines at or under the walkway stopped — is the
+             gallery's own face, which `walls` already draws; what a player needs to see
+             is the railing on top of it. So where the square in front of the rail is
+             floor at the rail's height, the rail is a low bar on that shared edge, from
+             the walkway up, and the lip square stays clear. */
+          var edge = null;
+          [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (d) {
+            var n = key(x + d[0], y + d[1]);
+            if (!edge && !solid[n] && (ground[n] || 0) >= top) edge = d;
+          });
+          if (edge) {
+            var e = 0.09, rh = 0.42;
+            var ex0 = edge[0] > 0 ? x + 1 : edge[0] < 0 ? x - e : x;
+            var ex1 = edge[0] > 0 ? x + 1 + e : edge[0] < 0 ? x : x + 1;
+            var ey0 = edge[1] > 0 ? y + 1 : edge[1] < 0 ? y - e : y;
+            var ey1 = edge[1] > 0 ? y + 1 + e : edge[1] < 0 ? y : y + 1;
+            slab(faces, ex0, ey0, ex1, ey1, top, top + rh, "rail", rcls);
+            if (top + rh > tallest) tallest = top + rh;
+          } else if (top > foot) {
             // Which way the fence runs: along the row if the parapet continues that way,
             // along the column otherwise. A run of them should read as one balustrade
             // rather than as a line of unrelated posts.

@@ -90,8 +90,12 @@ def test_typing_the_ground_moves_no_square_in_any_real_world(worlds):
         s = Scene(location_id="t")
         s.grid = g
         fixtures.type_the_ground(s, p.id, terrain, getattr(p, "shape", None))
-        assert (g.blocked, g.difficult, g.floor, g.parapet) == (
-            before.blocked, before.difficult, before.floor, before.parapet), p.id
+        # The one change allowed: the rail opens where the stair arrives (a rail is never
+        # a square anybody stands in, so no saved position moves for it).
+        stairs = {tuple(q) for f in g.fixtures if f["kind"] == "stair" for q in f["squares"]}
+        assert (g.blocked, g.difficult, g.floor) == (
+            before.blocked, before.difficult, before.floor), p.id
+        assert g.parapet == {q: v for q, v in before.parapet.items() if q not in stairs}, p.id
         for f in g.fixtures:
             occupies = fixtures.kinds()[f["kind"]]["occupies"]
             squares = {tuple(q) for q in f["squares"]}
@@ -294,3 +298,45 @@ def test_a_world_may_author_its_own_fixtures_from_the_closed_list():
     fixtures.type_the_ground(s, TAVERN, "urban", got)
     solids = {f["kind"] for f in g.fixtures if "blocked" in fixtures.kinds()[f["kind"]]["occupies"]}
     assert solids == {"bookshelf"}, solids
+
+
+# --- the rail and the stair (2026-11-11, the owner at the gate) --------------------------
+
+def test_the_rail_opens_where_the_stair_arrives_and_the_walk_up_is_not_stopped():
+    """The owner, looking at the gate in 3D: "what is the random thin wall that cuts the
+    stairs and goes through the character". `/api/state` there held parapet (1..7, 3) at
+    level 2, the gallery (1..7, 4) at level 2, and the stair at (7, 3) — a rail stored on
+    the very square the stair stands on, drawn as a pane through it and through the
+    player at (2, 3). The rail now opens at the stair's foot, the walk up the stair onto
+    the gallery is a move like any other, and a reload keeps it open."""
+    s, e, pc = _at(TAVERN)
+    stair = _kind(s.grid, "stair")[0]
+    foot = tuple(stair["squares"][0])
+    assert foot not in s.grid.parapet, "the rail still stands on the stair"
+    assert s.grid.parapet, "the rest of the gallery lost its rail"
+    gallery = _kind(s.grid, "gallery")[0]
+    top = next(tuple(p) for p in gallery["squares"]
+               if abs(p[0] - foot[0]) + abs(p[1] - foot[1]) == 1)
+    _move(e, pc.ref, foot)
+    assert tuple(s.positions[pc.ref])[:2] == foot
+    res = _move(e, pc.ref, (*top, gallery["level"]))
+    assert tuple(s.positions[pc.ref]) == (*top, gallery["level"]), \
+        [o.tell for o in res.outcomes]
+    s.grid.fixtures = None                     # a reload re-types the saved grid
+    e.lay_the_ground()
+    assert foot not in s.grid.parapet
+
+
+def test_both_boards_draw_a_gallery_rail_on_its_edge_not_through_the_square_in_front():
+    """The same report, the picture's half: the rail was drawn as a pane standing in the
+    middle of the ground square in front of the gallery, from the floor up — so it cut the
+    stair and anyone on that row. Both boards now find the neighbour that is floor at the
+    rail's height and draw the rail on that shared edge, from the walkway up."""
+    from django.conf import settings
+
+    js = (settings.BASE_DIR / "play" / "static" / "js")
+    three = (js / "scene3d.js").read_text(encoding="utf-8")
+    flat = (js / "table" / "03-offers-and-map.js").read_text(encoding="utf-8")
+    assert "(ground[n] || 0) >= top) edge = d;" in three
+    assert "slab(faces, ex0, ey0, ex1, ey1, top, top + rh" in three
+    assert "at(c + dx, r + dy) >= v);" in flat
