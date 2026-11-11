@@ -2006,7 +2006,14 @@ def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]
         except Exception as exc:
             files.unreadable(path, exc)
             continue
-        for sid, got in (data.get("spells") or {}).items():
+        spells = data.get("spells") if isinstance(data, dict) else None
+        if not isinstance(spells, dict):
+            # `null`, a list, or `"spells": "oops"` parse as JSON and are not a layer:
+            # `.get`/`.items` on them took `all_spells()` down (review 2026-11-11, #4).
+            if spells or not isinstance(data, dict):
+                files.unreadable(path, ValueError("expected {\"spells\": {id: spec}}"))
+            continue
+        for sid, got in spells.items():
             key = str(sid).strip().lower()
             if key not in raw or not isinstance(got, dict):
                 continue
@@ -2074,6 +2081,7 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
     from django.conf import settings
 
     raw: dict[str, dict] = {}
+    last_file: dict[str, Path] = {}     # the file to name when an entry will not build
     meta: dict = {}
     for folder in (Path(settings.BASE_DIR) / "content" / "spells",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spells"):
@@ -2091,12 +2099,13 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
             if not isinstance(entries, list):
                 entries = [data] if isinstance(data, dict) and data.get("id") else []
             for e in entries:
-                if e.get("id"):
+                if isinstance(e, dict) and e.get("id"):
                     # Merged, not replaced: an edit that changes one field must not
                     # drop the twenty it never asked about.
                     base = dict(raw.get(e["id"], {}))
                     base.update({k: v for k, v in e.items() if v not in (None, "")})
                     raw[e["id"]] = base
+                    last_file[e["id"]] = path
             if isinstance(data, dict) and data.get("descriptors"):
                 meta = {"descriptors": data["descriptors"],
                          "classes": data.get("classes", []),
@@ -2113,7 +2122,18 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
     # Normalised after the merge rather than per file, because the mechanics file and
     # the Codex file each hold half of what a derivation needs — an element read from
     # a scaling formula in one and from descriptors in the other.
-    return {k: from_dict(normalise(v)) for k, v in raw.items()}, meta
+    #
+    # One entry at a time: a homebrew file holding `{"id": "my-spell"}` parses, and
+    # `Spell.__init__() missing 1 required positional argument: 'name'` here took every
+    # `all_spells()` call down with no file named (review 2026-11-11, finding 4). A bad
+    # entry costs itself, and the log says which file it came from.
+    out: dict[str, Spell] = {}
+    for k, v in raw.items():
+        try:
+            out[k] = from_dict(normalise(v))
+        except Exception as exc:  # noqa: BLE001 — whatever a hand-written file can hold
+            files.unreadable(last_file.get(k, k), exc)
+    return out, meta
 
 
 def _spell_key(name: str) -> str:

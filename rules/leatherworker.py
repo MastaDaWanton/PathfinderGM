@@ -2394,12 +2394,18 @@ def load_dir(path: str | Path, claimed_by: str = "") -> dict[str, Material]:
         if not isinstance(entries, list):
             entries = [data] if isinstance(data, dict) and data.get("id") else []
         for raw in entries:
-            if not raw.get("id"):
+            if not isinstance(raw, dict) or not raw.get("id"):
                 continue
             craft = str(raw.get("craft") or file_craft or "").strip().lower()
             if claimed_by and craft != claimed_by:
                 continue
-            m = from_dict(raw)
+            # One row at a time, as every homebrew loader reads (review 2026-11-11,
+            # finding 4): a row that will not build costs itself, and the file is named.
+            try:
+                m = from_dict(raw)
+            except Exception as exc:  # noqa: BLE001 — whatever a hand-written file holds
+                files.unreadable(file, exc)
+                continue
             out[m.id] = m
     return out
 

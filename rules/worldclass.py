@@ -19,6 +19,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pathfindergm import files
+
 # Material tiers, in order. A track names them however it likes ("Common / Mundane") and
 # the position in this list is what the rules compare.
 TIERS = ("common", "uncommon", "rare", "exotic", "legendary")
@@ -755,7 +757,15 @@ def from_dict(data: dict) -> Track:
 def load_dir(path: str | Path) -> dict[str, Track]:
     out: dict[str, Track] = {}
     for p in sorted(Path(path).glob("*.json")):
-        track = from_dict(json.loads(p.read_text(encoding="utf-8")))
+        # One file at a time. Unguarded, one bad homebrew file raised out of `tracks()`
+        # AFTER `_TRACKS` held the shipped set — so that first call died, and every call
+        # after it answered with no homebrew world class at all and no word about why
+        # (review 2026-11-11, finding 4).
+        try:
+            track = from_dict(json.loads(p.read_text(encoding="utf-8")))
+        except Exception as exc:  # noqa: BLE001 — whatever a hand-written file can hold
+            files.unreadable(p, exc)
+            continue
         out[track.id] = track
     return out
 

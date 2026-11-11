@@ -296,7 +296,7 @@ def load_dir(path: str | Path, key: str = "ingredients") -> dict[str, dict]:
         if not isinstance(entries, list):
             entries = [data] if isinstance(data, dict) and data.get("id") else []
         for raw in entries:
-            if raw.get("id"):
+            if isinstance(raw, dict) and raw.get("id"):
                 out[raw["id"]] = raw
     return out
 
@@ -315,8 +315,17 @@ def all_ingredients() -> dict[str, Ingredient]:
     if _ALL is None:
         from . import registry
 
-        _ALL = {k: from_dict({**v, "id": k})
-                for k, v in registry.load_raw("ingredients").items()}
+        # One entry at a time: a homebrew `{"id": "my-herb"}` parses, and `KeyError:
+        # 'name'` here took the whole shelf down (review 2026-11-11, finding 4). The
+        # overlay merges files, so the entry is named under the homebrew folder — the
+        # only place a hand-written one can be.
+        built: dict[str, Ingredient] = {}
+        for k, v in registry.load_raw("ingredients").items():
+            try:
+                built[k] = from_dict({**v, "id": k})
+            except Exception as exc:  # noqa: BLE001 — whatever a hand-written file holds
+                files.unreadable(registry.homebrew_dir("ingredients") / k, exc)
+        _ALL = built
     return _ALL
 
 
