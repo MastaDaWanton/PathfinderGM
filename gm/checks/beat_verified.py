@@ -131,6 +131,12 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
 # alone, "the blade" is nobody's, and a blow whose striker is not shown at someone other
 # than the player is not judged. The engine's line ("the hired sword's attack with the
 # halberd misses Toll-Keeper") takes the first wrong sentence's place instead.
+#
+# The unseen kind does NOT join it, measured 2026-11-11 (tools/unseen_rewrite_bench.py,
+# gemma-4-12B, the 14 flagged gold beats x3): 41 of 42 rewrites right ("levels his spear at
+# your chest" -> "at the empty air", the rest of the sentence kept), 1 borderline ("tells
+# someone to move along"). Its sentences name the one who cannot see, so alone they are not
+# nobody's. Gold beats are hand-written; no live unseen rewrite has been seen yet.
 CUT_ONLY = frozenset({"beat-foe-struck-with", "beat-swing-early", "beat-struck-at-early",
                       "beat-aimed-wrong"})
 
