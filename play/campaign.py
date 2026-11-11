@@ -1020,7 +1020,6 @@ def switch_to(character_id: str, *, start_town: str | None = None,
     # brand new `kesst-vayr` campaign at full hit points and left the played one behind.
     # `campaign_id` is the record of which campaign is hers; the id is not.
     campaign_id = entry.campaign_id or character_id
-    set_active(campaign_id)
     if campaign_id not in _LIVE and not _save_path(campaign_id).exists():
         # Enrolled but never played — begin their campaign now, without enrolling them
         # a second time. In the world they were made for: this call passed no
@@ -1037,6 +1036,13 @@ def switch_to(character_id: str, *, start_town: str | None = None,
         if not entry.campaign_id:
             entry.campaign_id = campaign_id
             roster.save(entry)
+    # After the save exists, never before (review 2026-11-11): written first, a start
+    # cut off during the opening's model call left active.txt naming a campaign with no
+    # save, and the next launch's `current()` answered that by saving the shipped pregen
+    # under this character's id — their game from then on. `begin_with` has the same
+    # order. Still before `current()` below, so a save that cannot be read is reported
+    # as the active campaign's, exactly as it was.
+    set_active(campaign_id)
     if entry.status == roster.RETIRED:
         entry.status = roster.ALIVE
         roster.save(entry)
