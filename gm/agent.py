@@ -4590,7 +4590,7 @@ class GMAgent:
                 correction = (
                     f"{who} {'is' if len(lost) == 1 else 'are'} already here, standing "
                     f"in this scene from the beat before, and you have written "
-                    f"{'them' if len(lost) > 1 else 'them'} in as if newly arrived — "
+                    f"them in as if newly arrived — "
                     f"'a {lost[0].split()[-1]}'. Write the same beat again with "
                     f"{who} as the person already present: no arrival, no indefinite "
                     f"article, the same events otherwise.")
