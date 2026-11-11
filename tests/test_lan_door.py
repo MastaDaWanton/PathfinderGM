@@ -242,3 +242,37 @@ def test_the_door_endpoints_never_wait_on_the_game_lock(client, monkeypatch,
     finally:
         release.set()
         worker.join(5)
+
+
+def test_two_openings_at_once_bind_one_server(monkeypatch, shut_afterwards):
+    """Review 2026-11-11, finding 19. `open_the_door` checked for a server and then
+    built one with nothing held between the two; measured with a bind slowed to 0.2 s,
+    two simultaneous calls built two servers, and the first was left listening on the
+    network with no name by which `close_the_door` could ever shut it."""
+    import threading
+    import time
+
+    from django.core.servers import basehttp
+
+    built = []
+
+    class SlowServer:
+        server_address = ("0.0.0.0", 54321)
+
+        def __init__(self, *a, **k):
+            time.sleep(0.2)
+            built.append(self)
+
+        def set_app(self, app): pass
+        def serve_forever(self): pass
+        def shutdown(self): pass
+        def server_close(self): pass
+
+    monkeypatch.setattr(basehttp, "ThreadedWSGIServer", SlowServer)
+    callers = [threading.Thread(target=lan.open_the_door) for _ in range(2)]
+    for t in callers:
+        t.start()
+    for t in callers:
+        t.join(10)
+    assert len(built) == 1, f"{len(built)} servers were bound"
+    assert lan.is_open()

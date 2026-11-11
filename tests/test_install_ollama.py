@@ -254,3 +254,34 @@ def rf():
     from django.test import RequestFactory
 
     return RequestFactory()
+
+
+def test_a_second_install_is_told_one_is_under_way(monkeypatch, rf):
+    """Review 2026-11-11, finding 19. The endpoint checked "not installed" and then
+    began the download with nothing held between the two, so two clicks — or the desk
+    and a second window — both wrote the same OllamaSetup.exe at once. The second
+    asker is told, in the stream's own error frame; when the first ends, by finishing
+    or by its page going away, the button works again."""
+    monkeypatch.setattr(
+        preflight, "check",
+        lambda timeout=3: preflight.Report(state="not-installed", host="http://x"))
+    started = []
+
+    def fake():
+        started.append(1)
+        yield {"status": "downloading Ollama"}
+        yield {"done": True}
+
+    monkeypatch.setattr(preflight, "fetch_and_run_installer", fake)
+
+    def ask():
+        return setup_views.setup_install(rf.post("/api/setup/install"))
+
+    first = ask()
+    assert b"downloading" in next(iter(first.streaming_content))
+    second = [json.loads(f) for f in ask().streaming_content]
+    assert len(second) == 1 and "already being downloaded" in second[0]["error"]
+    assert len(started) == 1, "the second request began a download of its own"
+    first.close()                     # the page went away mid-download; the server closes
+    assert any(b"done" in f for f in ask().streaming_content)
+    assert len(started) == 2

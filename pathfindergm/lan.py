@@ -123,8 +123,18 @@ def is_open() -> bool:
     return _server is not None
 
 
+_opening = threading.Lock()
+
+
 def open_the_door() -> dict:
     """Start listening on the network and mint the pass. Idempotent."""
+    # Two requests at once both saw "no server" and both bound one (review 2026-11-11,
+    # finding 19): the first socket kept listening with nothing left to shut it.
+    with _opening:
+        return _open_the_door()
+
+
+def _open_the_door() -> dict:
     global _server, _thread
 
     if _server is not None:

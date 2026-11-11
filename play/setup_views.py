@@ -8,6 +8,7 @@ than a spinner and a guess.
 from __future__ import annotations
 
 import json
+import threading
 
 from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_GET, require_POST
@@ -82,10 +83,25 @@ def setup_install(request):
             {"error": "Ollama is already installed on this machine."}, status=409)
 
     def frames():
-        for frame in preflight.fetch_and_run_installer():
-            yield json.dumps(frame) + "\n"
+        # One at a time (review 2026-11-11, finding 19): two clicks, or two devices,
+        # both passed the check above and both wrote the same OllamaSetup.exe. Taken
+        # here rather than in the view body because a generator that is never started
+        # never runs its `finally`, and the lock would stay held for the whole launch.
+        # Not waited for: the second asker is told, and the first stream carries on.
+        if not _INSTALLING.acquire(blocking=False):
+            yield json.dumps({"error": "Ollama is already being downloaded — watch "
+                                       "the first window, or wait for it."}) + "\n"
+            return
+        try:
+            for frame in preflight.fetch_and_run_installer():
+                yield json.dumps(frame) + "\n"
+        finally:
+            _INSTALLING.release()
 
     response = StreamingHttpResponse(frames(), content_type="application/x-ndjson")
     response["Cache-Control"] = "no-store"
     response["X-Accel-Buffering"] = "no"
     return response
+
+
+_INSTALLING = threading.Lock()
