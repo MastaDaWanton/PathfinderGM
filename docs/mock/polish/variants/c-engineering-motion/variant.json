@@ -1,0 +1,39 @@
+{
+  "name": "c-engineering-motion",
+  "title": "C: Inspect and turn (engineering + motion)",
+  "skills": ["agent-skills:frontend-ui-engineering", "choreograph", "animate"],
+  "summary": "A quiet board at rest that answers when you ask. One model (board-read.js) is built from the payload and both views draw the same marks from it. At rest the board shows only threatened ground (a dashed alarm edge), the squares you can move to without provoking, what is out of sight, and how near an unseen thing is. Pointing at a square, or walking to it with the arrow keys, opens a small card and lights what that square concerns: a foe's threat zone, or rings on the foes a move would provoke, in the same frame on one 120 ms fade. The 3D board turns through its quarter instead of jumping. The room lamp takes its tint and strength from the hour, in both views. Colours, textures and fonts are the game's; new meanings are drawn in --alarm, --candle, --player, --ember and the spell's existing orange.",
+  "changes": [
+    {"change": "Threatened squares drawn as one dashed --alarm edge round all of them, not a fill.",
+     "reason": "An edge says where the danger starts without covering the ground; a fill over half the board made every square look equally urgent. Wrath of the Righteous draws a threat range the same way (unconfirmed against the game, per the brief)."},
+    {"change": "The squares you can move to without provoking are lit brighter than the rest of the reach; the key counts them (6 of 86 here).",
+     "reason": "In this fight 80 of the 86 reachable squares provoke. Marking the 80 would paint the board red; marking the 6 safe ones makes the one useful answer, the 5 ft step, the brightest thing on the floor."},
+    {"change": "Hover or keyboard on a square opens a card: cost in feet, whether it provokes and from whom, threatened by whom, height, line of sight. The provoking foes get a ring in the same frame.",
+     "reason": "Into the Breach telegraphs consequences before you commit and makes the attacker the thing that lights up; cause (the square) and effect (the rings) arriving together read as one statement rather than two events."},
+    {"change": "Hovering a foe shows the PC's own attack: weapon, total bonus, itemised terms with the situational ones in candle, out of reach, the foe's cover, and caught in the spell. Weapons with identical numbers share a line. No AC, no needed roll.",
+     "reason": "The player sees exactly what goes into their swing and what the position is adding (flanking +2), which is what they can act on; the target's defence stays hidden as the game hides it."},
+    {"change": "The spell area gets an outline round its whole shape and a dashed ring on each creature it catches.",
+     "reason": "The filled squares alone did not say where the cone ends or who is in it; a ring on the caught goblin answers the question the player is casting to settle."},
+    {"change": "Squares out of line of sight are hatched dark; a hunch is a faint --player dashed outline of everything within its 30 ft, centred on the PC, and the key says 'Something unseen within 30 ft'.",
+     "reason": "Fog that still shows the floor keeps the map readable; the hunch outline tells how near without ever pointing at a square, so the hidden goblin's position is not leaked."},
+    {"change": "Tokens say their side by shape as well as colour: you and allies round, foes square. A body at 0 hp is struck through. Whose turn it is gets a still --candle ring.",
+     "reason": "Shape survives colour blindness and the night lamp. A still ring is found as fast as a pulsing one once it is the only candle ring on the board, and the owner's rule forbids looping motion; so no pulse."},
+    {"change": "Flat raised ground casts a short shadow to the south and east and catches a lit lip on its north and west; in 3D the tops of raised and solid squares get a faint lit rim.",
+     "reason": "The wall-walk read as a different floor, not a higher one. The shadow follows the same lamp direction scene3d.js lights with, so both views agree which way is up."},
+    {"change": "The room lamp: a multiply colour from the hour (sky phase) and ambient light. Dawn and dusk take --ember, night takes --player, noon is untouched; dim light is 76% strength. In flat it sits under the previews and people; in 3D it is multiplied into each face and people take only 40% of it. A change of hour eases over 300 ms.",
+     "reason": "The hour becomes something you see, not only read, while tokens, previews and lit squares keep their colours so the board stays legible at night. The light line in the foot says it in words."},
+    {"change": "The board is one tab stop. Arrow keys walk a cursor over squares (in 3D, an arrow means the way it points on screen at any turn), Enter sends the same click a lit square takes, Home returns to you, Escape closes the card. A live region reads the card.",
+     "reason": "Before, the board could not be used from the keyboard at all. One stop with a roving cursor follows the WAI-ARIA grid pattern without hundreds of tab stops, and the visible --candle focus ring meets the owner's visible-focus rule."},
+    {"change": "Turning the 3D board animates the quarter-turn (300 ms, strong ease-in-out) instead of jumping; a second click mid-turn continues from where the board is. Jumps under reduced motion or in a hidden page.",
+     "reason": "A jump moves every square at once and the player has to find the room again; seeing it swing shows where everything went. Everything on the board is carried by the one motion, so nothing is timed separately and the resting frame is exactly the jump's."},
+    {"change": "Switching Flat and 3D fades the new board in over 150 ms; the card and rings use a 120 ms opacity fade. Nothing moves under the pointer, nothing loops or staggers.",
+     "reason": "Short opacity-only transitions soften a swap without delaying the next input; the card jumps between squares rather than gliding, so it never lags the pointer."},
+    {"change": "The key is one line drawn with the board's own marks, and it replaces the separate reach-count line; the light sits on the place's line. Short wordings on a phone.",
+     "reason": "Every new mark is explained on the board itself while the well keeps the same height as the current board, so nothing gets smaller to make room."}
+  ],
+  "files": {
+    "markup": "board.html",
+    "styles": ["board.css"],
+    "scripts": ["scene3d.js", "board-read.js", "map.js"]
+  }
+}

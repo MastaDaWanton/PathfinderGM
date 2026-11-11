@@ -1,0 +1,39 @@
+{
+  "name": "b-emil-apple",
+  "title": "B: quiet glass (Emil Kowalski + Apple)",
+  "skills": ["emil-design-eng", "apple-design"],
+  "summary": "Restraint first: every new mark is a thin line, a wash or a hatch in a colour the theme already has, so the tokens stay the loudest thing on the board. What the board means is answered where the pointer is: a fixed-height readout line under the board says the distance of the square pointed at and who it provokes, and pointing at (or tabbing to) a foe opens a small card of the theme's dark glass with your own bonus per weapon and its terms, never the foe's AC. Motion is 120ms of opacity and a .97 scale from the token's side, nothing loops, nothing moves under the pointer. Flat and 3D draw the same marks from one reading of the scene (polish.js), and the 3D view takes the hour's lamp into its existing shading.",
+  "changes": [
+    {"change": "Squares you can reach without provoking are washed brighter gold; squares whose move provokes keep a faint wash under a thin --alarm hatch.",
+     "reason": "With two goblins adjacent nearly every square provokes. A red fill would turn the board red and say nothing; a quiet hatch says 'caution' everywhere it applies, and the few bright squares left are the actual choice, which the eye finds first."},
+    {"change": "Threatened squares are one dashed --alarm outline round their union; a foe's own threatened squares fill only while that foe is pointed at.",
+     "reason": "An outline marks the edge you cross, which is what costs you, and leaves the safe and provokes washes readable inside it. Filling per foe on demand answers 'who threatens this' without stacking three red layers at once."},
+    {"change": "Pointing at a foe (or focusing it with Tab) shows a card: your bonus with each weapon, the terms it is built from, out of reach and cover notes. It opens in 120ms from the token's side and picks the first side that covers nobody.",
+     "reason": "The breakdown is the information the player plans with, and putting it beside the token keeps cause and number together. The card never takes the pointer and never sits on the flanking ally, so it cannot hide the reason for the +2 or block the next click. No AC or needed roll appears: the game hides both."},
+    {"change": "One fixed-height readout line under the board: the distance of the square pointed at and who walking there provokes, or 'Your turn' when nothing is pointed at.",
+     "reason": "Distance read as words ('20 ft. Walking there provokes from goblin and second goblin.') beats counting squares, and a line of fixed height means nothing below it ever shifts under the pointer."},
+    {"change": "Whose turn is a still candle-coloured ring round the token, and in 3D also an edge round the figure's top.",
+     "reason": "Found at a glance without a pulse. A looping pulse is ambient motion beside every control on the page, which the brief forbids and which trains the eye to ignore it; the 3D top edge is there because the ring at the feet can be hidden behind a neighbour."},
+    {"change": "Duplicate names get numbered labels (G1, G2, G3 from 'goblin', 'second goblin', 'third goblin'), on flat tokens and on 3D figure tops.",
+     "reason": "Current labels them G, S and T, which reads as three different creatures, and 3D had no labels at all. The numbers come from the names alone, so they match the tooltips and the turn order."},
+    {"change": "A down token is struck through and half faded, not only faded.",
+     "reason": "Opacity alone at .35 reads as 'on another floor', which the same board already uses for off-level tokens; a stroke is unambiguous."},
+    {"change": "The burning hands template gains an outline round its filled squares, an ember ring on each creature it catches, and a line naming who it catches.",
+     "reason": "A scatter of orange squares does not read as one cone; the outline makes it a shape, and the ring answers the question the player is asking, 'who does this hit', on the token itself."},
+    {"change": "Squares out of the PC's line of sight are veiled in --sunk (flat) or drawn at half light (3D).",
+     "reason": "Fog of war at a fixed partial opacity, as Foundry does, keeps the ground readable while saying plainly that you cannot see it."},
+    {"change": "A hunch is a dashed --dim ring of its notice range round the PC, plus a line saying a foe is sensed but not where.",
+     "reason": "The ring shows the range the game actually gives (30 ft) and marks no square inside it, so the hidden goblin's position stays hidden."},
+    {"change": "The room lamp follows the clock: noon plain, morning a touch warm, dawn dim and cooled toward --player, night dim and warmed toward --ember. Flat multiplies the ground only; 3D multiplies it into the existing face shading, figures a third as much.",
+     "reason": "The hour reads from the board's colour without a word, and because tokens are exempt (or nearly), night never costs legibility. The lamp is one value, derived once, so the dice can take the same one."},
+    {"change": "Flat grid lines are a faint gold hairline; raised ground gets a lit lip on its north and west edges and a shadow on its south and east.",
+     "reason": "The dark seam vanished on dark stone. The lip uses the theme's own --bevel light direction, so the wall-walk reads as standing up from the floor rather than as a paler stripe."},
+    {"change": "A key in the board's own shapes and one notes paragraph replace the two italic lines; on a phone the notes clamp to three lines, most important first.",
+     "reason": "Every new mark is explained once, in the shape it has on the board, and the foot stays short enough that the board keeps its height."}
+  ],
+  "files": {
+    "markup": "board.html",
+    "styles": ["board.css", "polish.css"],
+    "scripts": ["polish.js", "scene3d.js", "map.js"]
+  }
+}

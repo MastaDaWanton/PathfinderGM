@@ -1,0 +1,37 @@
+{
+  "name": "d-phone-worst-case",
+  "title": "Phone first, tested against the worst case",
+  "skills": ["design-taste-frontend (redesign-preserve)", "mobile-native", "break-ui"],
+  "summary": "The same board, colours, textures and Cinzel headings, made to work by tap as well as by pointer and checked against a made-up worst case. One readout strip under the board answers whatever is tapped, pointed at or focused: a foe gives your own attack bonus and its terms (never its AC), a square gives the move's cost and who would take a swing. Safe steps glow, threatened squares are hatched, unseen squares are fogged, a hunch is a dashed range and never a square, and the room's lamp takes its hue from the hour and its strength from the light level. Flat and 3D read one object (PV.facts) so they cannot disagree. The 'Worst case (made up)' button swaps in an invented scene (long names, 20 tokens, a crowded square, fog, night, a foe's turn) and the board says so in a red strip while it is on.",
+  "changes": [
+    {"change": "Tokens carry initials (KV, SG, TG), unique per board (a clash becomes G1, G2), larger in their square; the downed are struck through; in 3D the initials float over the bodies.",
+     "reason": "Three goblins all lettered by their first word read as the same creature; two letters tell 'second goblin' from 'third goblin' at a glance, and the worst case proved a clash rule was needed (two FG, two G)."},
+    {"change": "Whose turn: a still candle ring round the token in flat and on the floor in 3D, and 'Your turn' or 'Ünsal the Twice-Drowned's turn' at the head of the readout.",
+     "reason": "The board had no turn marker at all. A ring reads without motion; a pulse was refused because it would be the one thing on the board that never stops moving."},
+    {"change": "Raised ground gets a lit lip on its north and west edges and a shadow on its south and east; 3D raised tops get a faint brass rim.",
+     "reason": "Four shades of brown said 'different', not 'higher'. A bevel toward the room's lamp is how a map says height."},
+    {"change": "Safe moves glow bright gold inside a candle outline; provoking moves keep the game's dim gold; the edge of the whole move is one gold line.",
+     "reason": "In this fight 80 of 86 squares provoke. A red wash on all of them (tried first) turned every hour red, and a corner notch on each (tried second) was confetti. Marking the exception, the few safe steps, is what reads."},
+    {"change": "Threatened squares are hatched in --alarm, in both views.",
+     "reason": "A hatch lets the ground and the move wash show through, and survives colour blindness where a red tint does not."},
+    {"change": "Tap, point at or tab to a foe: the readout gives your total first, then weapon, then each term, with situational ones in gold, 'out of reach' and 'behind cover' in words. Tap a square: its cost, 'Provokes an attack from goblin and second goblin' or 'No attack of opportunity', and the foes who would swing get a dashed ring.",
+     "reason": "A phone has no hover, so nothing here is hover-only. The total leads because it is what a player compares; ringing the attacker is the fix Into the Breach made after outside testers could not tell who was attacking what. The target's AC and the needed roll are never shown."},
+    {"change": "With the spell area on, the caught creatures get an orange stroke and the readout says 'Burning hands would catch second goblin'.",
+     "reason": "The orange squares said where the cone went but not who was in it; naming the caught is the question a player is asking."},
+    {"change": "Squares the PC cannot see are fogged (the same .5 in 3D); a hunch is a dashed ember line round the squares within its range, plus 'You sense a foe within 30 ft, but not where'.",
+     "reason": "Fog as an opacity, not a black-out, keeps remembered walls readable (Foundry ships it this way). A range is all awareness.has_hunch gives the player, so the line never narrows to a square."},
+    {"change": "The room lamp: hue from the phase of the day (--ember at dawn, --candle in the morning, --player at night), strength from the light level, laid over the ground and under the tokens; 3D tints the ground fully and bodies by half.",
+     "reason": "Dawn, noon and night now look like three hours while every token keeps its colour, which is the owner's rule that the board stays readable at night."},
+    {"change": "The readout is a fixed-height box and the key opens over the board, not under it.",
+     "reason": "Nothing tapped or opened changes the board's size, so nothing moves under the finger or pointer."},
+    {"change": "Phone: hover rules gated behind (hover: hover) and (pointer: fine), no tap flash, touch-action manipulation, the head on two rows (Turn left/right shown as Left/Right, full labels kept for screen readers), a two-line clamp on long place names.",
+     "reason": "A tapped 3D square stayed gold after the finger left, and in 3D the head took three rows and pushed the board 7px under the readout on a 375 by 520 screen."},
+    {"change": "Worst case (made up) button, with a red strip and border on the board while it is on.",
+     "reason": "The real scene was built to look good. The worst case found nine breaks, all fixed here, and the label means no screenshot of invented data can pass for the game's."}
+  ],
+  "files": {
+    "markup": "board.html",
+    "styles": ["board.css"],
+    "scripts": ["scene3d.js", "polish.js", "map.js"]
+  }
+}

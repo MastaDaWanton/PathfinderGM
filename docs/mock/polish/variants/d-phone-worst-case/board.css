@@ -1,0 +1,313 @@
+/* Variant d-phone-worst-case. Starts as the verbatim 0.2.29 copy of the board's CSS
+   (each block names its source lines in table.html); the variant's own rules are in the
+   block at the foot, and the two original rules it changes say so where they stand.
+   The theme (play/static/css/theme-v2.css) is linked by board.html, as table.html does. */
+
+/* table.html line 30 */
+  * { box-sizing: border-box; }
+
+/* table.html lines 175 (.sub, the legend's class) */
+  .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
+
+/* table.html lines 189-257: the flat map, the 3D view, the tokens, the level picker */
+  /* The map: a stone relief under glass. */
+  #map { width: 100%; height: auto; display: block; background: #14110e;
+         border: 1px solid #241d15; border-radius: 3px;
+         box-shadow: inset 0 0 24px rgba(0,0,0,.55); }
+  #map .rule { stroke: #241d15; stroke-width: .5; }
+  #map .blocked { fill: #3a3128; }
+  #map .difficult { fill: #2a2416; }
+  #map .obscuring { fill: #23262b; }
+  #map .reach { fill: var(--gold); opacity: .12; }
+  /* The vertical. Raised ground reads as lighter stone the higher it goes, and a rail
+     is drawn as an edge rather than a fill, because it is a thing you shoot over and a
+     filled square would read as a wall — which is exactly the mistake the engine was
+     making before stage 5b. */
+  #map .up1 { fill: #3d3527; }
+  #map .up2 { fill: #4a4130; }
+  #map .up3 { fill: #585039; }
+  #map .rail { stroke: #7a6a44; stroke-width: 2.5; stroke-linecap: round; }
+  /* Somebody on another floor of the same room: still there, still worth seeing, and
+     plainly not who you are looking at. */
+  #map .token.offlevel { opacity: .32; }
+  #map .here { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .5; }
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point
+     is to be able to read the board at a glance, and shading exists only to tell one
+     face of a box from another. The two visible sides are stepped darker so a cube
+     reads as a cube without an outline round it. */
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point is
+     to read the board at a glance.
+
+     There are no `fill` rules here on purpose, and that is the whole of the rework. Every
+     face's colour is its material multiplied by a light that belongs to the ROOM, worked
+     out in `scene3d.js` from the face's own normal and written onto the polygon — the
+     same expression and the same LIGHT vector `dice3d.js` shades brass with. The version
+     before this shaded by class (`.face-a` .72, `.face-b` .55), which welded a brightness
+     to a geometric side, so turning the board turned the light with it. A `fill` rule in
+     here would overrule the shading and put that back, because a stylesheet rule beats a
+     presentation attribute. Hover is the one deliberate exception. */
+  #view3d { width: 100%; height: auto; display: block; background: #14110e;
+            border: 1px solid #241d15; border-radius: 3px; }
+  #view3d polygon { stroke: #15120d; stroke-width: .35; stroke-linejoin: round; }
+  #view3d .lit.face-top { cursor: pointer; }
+  /* Changed: hover only where a pointer can hover. On a phone the first tap applies
+     :hover and leaves it stuck, so a tapped square stayed gold after the finger left. */
+  @media (hover: hover) and (pointer: fine) { #view3d .lit.face-top:hover { fill: var(--gold); } }
+  /* Solid things read as solid: a seam between two faces of one box says "two faces". */
+  #view3d .fig, #view3d .rail3 { stroke: none; }
+  #view3d .fig.offlevel { opacity: .38; }
+  /* A floor over your head — a gallery you are not standing on — and the rail along it.
+     Walls are never in here: a wall is a wall from every level, and drawing one through
+     would tell the player they have a shot they do not have. */
+  #view3d .above { opacity: .45; }
+  .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
+  .levelpick button { padding: 1px 8px; font-size: 11px; }
+  .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
+  #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1;
+                transition: cx .4s ease, cy .4s ease; }
+  #map .token.pc { fill: var(--gold); }
+  /* Who is in the fight and who is only standing in the room. Asked for in as many
+     words, 2026-09-06: "make the bystanders white and the enemies bright red". */
+  #map .token.foe { fill: #e0261e; stroke: #5a0c08; }
+  #map .token.ally { fill: #6fc276; stroke: #1f4a26; }
+  #map .token.bystander { fill: #f2ecdd; stroke: #7a6f5a; }
+  #map .token.down { opacity: .35; }
+  /* A crowd held as one actor (item 33). Hatched rather than solid, and dashed at the
+     edge, because a filled 3x3 block reads as one big creature — the whole point is that
+     it is many people standing together. The colour still says which side they are on. */
+  #map .token.unit { stroke-dasharray: 4 3; stroke-width: 1.5; }
+  #map .token.unit.foe { fill: url(#unithatch-foe); }
+  #map .token.unit.bystander { fill: url(#unithatch-quiet); }
+  #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
+                  pointer-events: none; }
+  .maplegend { margin-top: 4px; }
+
+/* table.html line 837 */
+  #map .reach, #maptrayinner .reach { cursor: crosshair; pointer-events: all; }
+
+/* table.html lines 1838-1841: the candle cursor */
+  body, a, button, select, label, summary, [role="tab"],
+  .sugg, .exitbtn, .pick, .tab, .card.pick, .prepbtn {
+    cursor: var(--cursor-candle) 24 0, auto;
+  }
+
+/* table.html lines 1901-1907: the page's root and body */
+  :root { --col-max: 880px; color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
+    display: grid; grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh; overflow: hidden;
+  }
+
+/* table.html lines 1918-1921: the shell's focus ring */
+  .v2-btn:focus-visible, .v2-tabs > button:focus-visible, .v2-recess > button:focus-visible {
+    outline: 2px solid var(--candle); outline-offset: 2px;
+  }
+  .v2-btn.is-small { letter-spacing: .06em; }
+
+/* table.html lines 1998 and 2002: the board's place and measure in the stage */
+  .book, .board { grid-area: book; }
+  .book, .board, .desk, .sheetmore { width: 100%; max-width: var(--col-max); justify-self: center; }
+
+/* table.html lines 2135-2137: the framed board's clasps and bosses */
+  .book.v2-framed::after, .board.v2-framed::after {
+    background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
+                     0 0, auto 40px; }
+
+/* table.html lines 2458-2488: the board */
+  /* --- Map: the board, where the book was -------------------------------------------- */
+  /* Its left padding clears the device, which hangs on this frame's left edge as it does
+     on the book's (58px, the book's own): at 26px it covered the first letter of the
+     heading. */
+  /* One grid: the head row, then the ground (#mapwrap) or the town (#placeswrap), each a
+     well over a foot line; the line for "no ground yet" only while there is none. */
+  .board { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+           gap: 10px; padding: 20px 26px 16px 58px; box-shadow: var(--emboss), var(--sh-3); }
+  .board > :not(.v2-rim) { position: relative; z-index: 1; min-width: 0; }
+  .board > #mapwrap, .board > #placeswrap { min-height: 0; display: grid;
+                                            grid-template-rows: minmax(0, 1fr) auto; gap: 10px; }
+  .board > #mapwrap:empty, .board.places > #mapwrap, .board > #placeswrap[hidden] { display: none; }
+  #mapwrap:not(:empty) ~ .boardempty, .board.places > .boardempty { display: none; }
+  .boardhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+               justify-content: space-between; }
+  .boardhead h2 { margin: 0; color: var(--gold); font: 400 17px/1.1 var(--display);
+                  letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .boardctl, .groundctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .boardctl .seglabel { padding: 0 6px 0 4px; color: var(--dim); font-size: 13px; font-style: italic; }
+  /* The board sits in a stone well sunk into the card. The old page's `#map` and `#view3d`
+     rules sized each board to its width (`height: auto`), which in a well of fixed height
+     let a tall room run off its foot: here they fill the well and keep their shape. */
+  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
+               border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken); overflow: hidden; }
+  .boardview svg, .boardview > #map, .boardview > #view3d {
+    width: 100%; height: 100%; max-height: 100%; display: block; }
+  .boardfoot { display: grid; gap: 2px; font-size: 14px; }
+  .boardfoot p { margin: 0; }
+  .boardfoot .sub { margin: 0; color: var(--dim); font-style: italic; }
+  .boardabout { color: var(--dim); font-style: italic; }
+  .boardkey { color: var(--ink); }
+
+/* table.html @media (max-width: 760px), the board's rules only: lines 3224-3226, 3268-3273, 3279 */
+@media (max-width: 760px) {
+    .book.v2-framed::after, .board.v2-framed::after {
+      background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
+                       auto 40px, auto 40px; }
+    .board { padding: 22px 18px 12px 26px; }
+    .boardview { min-height: 200px; padding: 6px; }
+    .boardhead { gap: 6px; }
+    .boardhead h2 { font-size: 15px; }
+    .boardctl .v2-recess > .v2-btn { min-height: 30px; padding: 4px 9px; }
+    .boardkey { font-size: 12.5px; line-height: 1.5; }
+    .board.places #groundctl { display: none; }
+}
+
+/* ===================================================================================
+   Variant d-phone-worst-case: the board's own additions. Every colour is an existing
+   token (--gold, --alarm, --candle, --ember, --ink, --dim, --sunk, --glass) or one the
+   board already used (#f0a050 for spells, the token reds and greens).
+   =================================================================================== */
+html { -webkit-tap-highlight-color: transparent; }
+#mapwrap svg { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+
+/* Moves: safe in gold, provoking in the alarm tint; the edge of the move as one line. */
+#map .reach { opacity: .3; }
+#map .reach.risky { opacity: .12; }
+#map .safeedge { fill: none; stroke: var(--candle); stroke-width: 1.2; pointer-events: none; }
+#map .reach.is-sel { fill: var(--candle); opacity: .5; }
+#map .reachedge { fill: none; stroke: var(--gold); stroke-opacity: .6; stroke-width: .9;
+                  pointer-events: none; }
+#map .threat, #view3d .threat3 { fill: url(#pv-hatch); stroke: none; pointer-events: none; }
+#map .fog { fill: var(--sunk); opacity: .62; pointer-events: none; }
+#map .fog.dark { opacity: .38; }
+#map .lamp { mix-blend-mode: multiply; pointer-events: none; }
+#map .lamp.hue { mix-blend-mode: color; }
+#map .hunch, #view3d .hunch { fill: none; stroke: rgb(var(--ember)); stroke-opacity: .85;
+                              stroke-width: 1; stroke-dasharray: 3 2.5; pointer-events: none; }
+/* Raised ground as relief: lit lip toward the lamp, shadow away from it. */
+#map .lip { fill: none; stroke: rgba(255, 225, 170, .3); stroke-width: 1; pointer-events: none; }
+#map .shade { fill: none; stroke: rgba(0, 0, 0, .6); stroke-width: 1.6; pointer-events: none; }
+#map .rule { stroke: #2a2219; }
+
+/* Tokens. */
+#map .tokg { cursor: pointer; }
+#map .tokg:focus { outline: none; }
+#map .tokg.offlevel { opacity: .32; }
+#map .tokg.down .token { opacity: .5; }
+#map .strike { stroke: #14120f; stroke-width: 1.4; stroke-linecap: round; pointer-events: none; }
+#map .turnring { fill: none; stroke: var(--candle); stroke-width: 1.4; pointer-events: none; }
+#map .tokg.caught .token { stroke: #f0a050; stroke-width: 1.6; }
+#map .tokg.is-sel .token, #map .tokg:focus-visible .token { stroke: var(--candle); stroke-width: 2; }
+#map .tokg.is-warn .token { stroke: var(--ink); stroke-width: 1.8; stroke-dasharray: 2.5 1.5; }
+#map text.tok { font-family: var(--display); font-weight: 700; letter-spacing: -.02em; }
+
+/* 3D: no fill rules (the view's own rule), only strokes and marks. */
+#view3d .turnring3 { stroke: var(--candle); stroke-width: 1.4; }
+#view3d .tile.raised.face-top { stroke: rgba(221, 196, 142, .32); }
+#view3d .fig.caught { stroke: #f0a050; stroke-width: .8; }
+#view3d .fig.is-sel { stroke: var(--candle); stroke-width: 1; }
+#view3d .fig.is-warn { stroke: var(--ink); stroke-width: .9; stroke-dasharray: 2 1.5; }
+#view3d .lit.face-top.is-sel { fill: var(--candle); }
+#view3d .fig { cursor: pointer; }
+#view3d .lab3 { font: 700 7px var(--display); fill: var(--ink); text-anchor: middle;
+                stroke: #14110e; stroke-width: 2.4px; paint-order: stroke; stroke-linejoin: round;
+                pointer-events: none; }
+#view3d .lab3.small { font-size: 5px; stroke-width: 1.6px; }
+#view3d .lab3.offlevel { opacity: .45; }
+#view3d .lab3.down { fill: var(--dim); }
+
+/* The worst-case flag: on the board itself, so no screenshot of it can pass for real. */
+.boardview { position: relative; }
+/* Its own strip above the board: laid over the board's corner it hid a token at (0,0). */
+.boardview.is-worst { padding-top: 30px;
+                      box-shadow: var(--sunken), inset 0 0 0 2px rgba(176, 72, 60, .75); }
+.pv-flag { position: absolute; top: 5px; left: 6px; z-index: 2; margin: 0; padding: 1px 8px;
+           border-radius: 3px; background: rgba(110, 31, 31, .92); color: #f6e7d2;
+           font: 600 12px/1.6 var(--body); letter-spacing: .04em; pointer-events: none; }
+
+/* The readout: a fixed box, so whatever is tapped never moves the board above it. */
+/* The well's one column may not grow past the frame. The worst case's long "about" line
+   (nowrap, so it can ellipsis) widened the grid track to its own length and pushed the
+   board 420px past a 375px phone. */
+.board > #mapwrap { grid-template-columns: minmax(0, 1fr); }
+.boardfoot { gap: 6px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.pv-read { height: calc(2 * 1.4em + 12px); overflow-y: auto; overscroll-behavior: contain;
+           padding: 6px 10px; font-size: 14px; line-height: 1.4; border-radius: 3px;
+           background: var(--glass); border: 1px solid var(--glass-edge);
+           overflow-wrap: anywhere; }
+.pv-read p { margin: 0; }
+.pv-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; color: var(--gold);
+        font: 400 14px/1.4 var(--display); font-variant: small-caps; letter-spacing: .05em; }
+.pv-h .pv-dim { font-family: var(--body); font-variant: normal; letter-spacing: 0; font-size: 13px; }
+.pv-name { min-width: 0; }
+/* The idle heading keeps to one line: whose turn whole, the light trimmed if it must be.
+   Wrapping it put the hunch below the readout's two-line fold on a phone. */
+.pv-one { flex-wrap: nowrap; white-space: nowrap; }
+.pv-one > span:first-child { flex: none; }
+.pv-one > .pv-dim { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A creature's heading: here it is the name that gives way, never its numbers. */
+.pv-who > .pv-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pv-who > .pv-dim, .pv-who > .pv-spell { flex: none; overflow: visible; }
+.pv-read { overflow-x: hidden; }
+.pv-bonus { color: var(--ink); font-variant-numeric: tabular-nums; min-width: 2ch; }
+.pv-dim { color: var(--dim); font-style: italic; }
+.pv-warn { color: color-mix(in srgb, var(--alarm) 62%, var(--ink)); font-style: normal; }
+.pv-spell { color: #f0a050; }
+.pv-hunch { color: rgb(var(--ember)); }
+.pv-atk { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+.pv-wpn { color: var(--ink); }
+.pv-wpn b { font-variant-numeric: tabular-nums; }
+/* Wraps between words; the &nbsp; keeps each term's number with its name. nowrap here
+   ran "Flanking with Bartholomew Fitzgerald-Ó Súilleabháin +2" out of a phone's box. */
+.pv-term { color: var(--dim); font-size: 13px; }
+.pv-term.sit { color: var(--gold); }
+
+.pv-row { position: relative; display: flex; align-items: center; gap: 4px 14px; font-size: 13px; }
+.pv-key { flex: none; }
+/* Opens over the foot of the board, so opening it never shrinks the board. */
+.pv-key[open] .pv-keyrow { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 3;
+  padding: 8px 10px; border-radius: 3px; background: rgba(16, 12, 9, .94);
+  border: 1px solid var(--glass-edge); box-shadow: var(--sh-2); }
+.pv-key summary { cursor: pointer; color: var(--gold); font: 400 13px/1 var(--display);
+                  font-variant: small-caps; letter-spacing: .08em; padding: 6px 0; width: max-content; }
+.pv-key summary:focus-visible, .pv-worst:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+.pv-keyrow { display: flex; flex-wrap: wrap; gap: 3px 14px; color: var(--ink); }
+.pv-k { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.pv-about { color: var(--dim); font-style: italic; min-width: 0; flex: 1 1 auto;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-aboutk { white-space: normal; color: var(--dim); font-style: italic; flex-basis: 100%; }
+.sw { display: inline-block; width: 11px; height: 11px; flex: none; background: #14110e;
+      border: 1px solid #241d15; }
+.sw.k-pc { background: var(--gold); border-radius: 2px; }
+.sw.k-ally { background: #6fc276; border-radius: 2px; }
+.sw.k-foe { background: #e0261e; border-radius: 2px; }
+.sw.k-by { background: #f2ecdd; border-radius: 2px; }
+.sw.k-turn { border: 1.5px solid var(--candle); border-radius: 3px; }
+.sw.k-safe { background: color-mix(in srgb, var(--gold) 30%, #14110e); }
+.sw.k-safe { border-color: var(--candle); }
+.sw.k-risky { background: color-mix(in srgb, var(--gold) 12%, #14110e); }
+.sw.k-threat { background: repeating-linear-gradient(45deg, rgba(176, 72, 60, .8) 0 1px, #14110e 1px 4px); }
+.sw.k-fog { background: #0b0908; border-color: #3a2f22; }
+.sw.k-hunch { border: 1px dashed rgb(var(--ember)); }
+.pv-light { color: var(--dim); font-style: italic; }
+.pv-worst { margin-left: auto; }
+
+@media (max-width: 760px) {
+  /* The board needs the height more than the floor picker needs its caption; the group
+     keeps its aria-label. */
+  .boardctl .seglabel { display: none; }
+  .boardhead h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+                  overflow: hidden; overflow-wrap: anywhere; }
+  .pv-read { height: calc(2 * 1.4em + 10px); padding: 4px 8px; font-size: 13px; }
+  .pv-h { font-size: 13px; }
+  .pv-worst { min-height: 32px; }
+  .boardfoot { font-size: 13px; }
+  /* "Turn left / Turn right" become "Left / Right" (the group and each button keep their
+     full aria-label), which lets Places, Flat/3D and the turn share one row: in 3D the
+     head took three rows, 153px of a 520px screen, and the board's 200px floor then ran
+     7px under the readout. */
+  .pv-long { display: none; }
+  .boardctl { gap: 6px; }
+  .boardctl > .groundctl { display: contents; }
+  .boardview { min-height: 160px; }
+}

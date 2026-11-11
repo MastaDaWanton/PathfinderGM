@@ -1,0 +1,136 @@
+/* b-emil-apple. Loaded after board.css (the Current copy, untouched), so these rules win
+   by coming later. Colours are the theme's tokens or derived from them (--alarm for
+   threat, --candle for whose turn, --sunk for sight, the game's own #e0701e/#f0a050 for
+   a spell). Motion is colour and opacity, 120ms, on what is pointed at; nothing loops
+   and nothing moves under the pointer. */
+
+/* Legibility: the grid is a faint gold hairline instead of a dark seam that vanished on
+   dark stone, so distance can be counted without it competing with the tokens. */
+#map .rule { stroke: rgba(221, 196, 142, .075); stroke-width: .45; }
+#map .lip-lit { stroke: rgba(255, 225, 170, .30); stroke-width: .9; }
+#map .lip-shade { stroke: rgba(0, 0, 0, .72); stroke-width: 1.4; }
+#map .unseen { fill: var(--sunk); opacity: .66; }
+#map .lamp { mix-blend-mode: multiply; }
+
+/* Moving: safe squares bright, squares that provoke dim and hatched in --alarm. */
+#map .reach.safe { fill: var(--gold); opacity: .34; }
+#map .reach.prov { fill: var(--gold); opacity: .09; }
+#map .reach { transition: opacity 120ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  #map .reach:hover { opacity: .5; }
+}
+.hatchline { stroke: var(--alarm); stroke-width: .9; }
+#map .provhatch { opacity: .42; }
+
+/* Threat: one dashed --alarm outline round every threatened square; a foe's own squares
+   fill only while that foe is pointed at. */
+#map .threatedge { stroke: var(--alarm); stroke-width: 1; stroke-dasharray: 2.4 1.6; }
+#map .threatfill { fill: var(--alarm); opacity: 0; transition: opacity 120ms ease; }
+#map .threatfill.foehot { opacity: .24; }
+
+#map .spelledge { stroke: #f0a050; stroke-width: 1.1; stroke-linecap: square; }
+#map .hunch { fill: none; stroke: var(--dim); stroke-width: .8; stroke-dasharray: 3 3; }
+
+/* Tokens: a dark keyline, whose turn as a still candle ring, and two-character labels a
+   size down so "G2" fits the square. */
+#map .token { stroke-width: 1.1; transition: stroke 120ms ease; }
+#map .token.pc { stroke: #3a2c17; }
+#map .turnring { fill: none; stroke: var(--candle); stroke-width: 1.3; }
+#map .caughtring { fill: none; stroke: #f0a050; stroke-width: 1.3; stroke-dasharray: 2 1.4; }
+#map .downmark { stroke: #14120f; stroke-width: 1.6; stroke-linecap: round; }
+#map .token.down { opacity: .5; }
+#map text.tok.two { font-size: 7.2px; letter-spacing: -.02em; }
+#map text.tok.offlevel { opacity: .45; }
+#map .token[data-foe] { cursor: pointer; }
+#map .token.foehot, #map .token[data-foe]:focus-visible { stroke: var(--candle); stroke-width: 1.6; }
+#map .token[data-foe]:focus { outline: none; }
+
+/* The 3D view: the same marks, written as polygons. Specific enough to beat
+   `#view3d polygon`; they set stroke and fill only on marks, never on lit faces. */
+#view3d polygon.mark { fill: none; pointer-events: none; }
+#view3d polygon.threat3 { stroke: var(--alarm); stroke-width: 1; stroke-dasharray: 2.4 1.6; }
+#view3d polygon.hunch3 { stroke: var(--dim); stroke-width: .8; stroke-dasharray: 3 3; }
+#view3d polygon.turn3 { stroke: var(--candle); stroke-width: 1.4; }
+#view3d polygon.caught3 { stroke: #f0a050; stroke-width: 1.3; stroke-dasharray: 2 1.4; }
+#view3d polygon.spelledge3 { stroke: #f0a050; stroke-width: 1.1; }
+#view3d polygon.hatch3 { stroke: none; opacity: .38; pointer-events: none; }
+/* Whose turn, in 3D: the ring at the feet can be hidden behind a neighbour, so the
+   figure's top is edged in candlelight too. */
+#view3d polygon.fig.turnfig.face-top { stroke: var(--candle); stroke-width: .9; }
+#view3d polygon.fig[data-foe] { cursor: pointer; }
+#view3d polygon.fig.foehot { stroke: var(--candle); stroke-width: .7; }
+#view3d polygon.fig[data-foe]:focus { outline: none; }
+#view3d polygon.fig[data-foe]:focus-visible { stroke: var(--candle); stroke-width: 1.2; }
+#view3d polygon.threatfill3 { stroke: none; fill: var(--alarm); opacity: 0;
+                              pointer-events: none; transition: opacity 120ms ease; }
+#view3d polygon.threatfill3.foehot { opacity: .26; }
+#view3d text.tok3 { fill: #14120f; font: 700 7px var(--display); text-anchor: middle;
+                    pointer-events: none; }
+#view3d text.tok3.offlevel { opacity: .45; }
+
+/* The foe card: a pane of the theme's own glass (--glass, --glass-edge), blurred so the
+   board shows through without fighting the numbers. It appears in 120ms from the side of
+   the token it points at, scaling from .97 rather than from nothing, and never takes the
+   pointer, so it cannot get in the way of the next square. */
+.boardview { position: relative; }
+.foecard {
+  position: absolute; left: 0; top: 0; z-index: 3; min-width: 172px; max-width: 240px;
+  padding: 9px 12px 8px; color: var(--ink); font: 13px/1.35 var(--body);
+  /* --glass (.66) let a red token behind it read through the numbers; over a busy board
+     the material is made heavier, as Apple does over busy content, from the same colour. */
+  background: rgba(16, 12, 9, .86); border: 1px solid var(--glass-edge); border-radius: 3px;
+  -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: var(--sh-2), inset 0 1px 0 rgba(255, 225, 170, .08);
+  pointer-events: none; visibility: hidden; opacity: 0; transform: scale(.97);
+  transform-origin: left center;
+  transition: opacity 120ms cubic-bezier(.23, 1, .32, 1), transform 120ms cubic-bezier(.23, 1, .32, 1),
+              visibility 0s linear 120ms;
+}
+.foecard[data-from="right"] { transform-origin: right center; }
+.foecard[data-from="top"] { transform-origin: center top; }
+.foecard[data-from="bottom"] { transform-origin: center bottom; }
+.foecard.on { visibility: visible; opacity: 1; transform: none; transition-delay: 0s; }
+.foecard p { margin: 0; }
+.foecard .fc-name { margin-bottom: 4px; color: var(--gold); font: 400 14px/1.2 var(--display);
+                    font-variant: small-caps; letter-spacing: .08em; }
+.fc-rows { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.fc-rows th { padding: 1px 14px 1px 0; text-align: left; font-weight: 400; }
+.fc-rows td { padding: 1px 0; text-align: right; white-space: nowrap; }
+.fc-rows tr:not(.term) td { color: var(--gold); font-weight: 700; }
+.fc-rows tr.term th, .fc-rows tr.term td { color: var(--dim); font-size: 12px; font-style: italic;
+                                           font-weight: 400; }
+.fc-rows tr:not(.term) + tr.term th, .fc-rows tr:not(.term) + tr.term td { padding-top: 4px; }
+.fc-rows tr.far td { color: var(--dim); font-weight: 400; font-style: italic; }
+.foecard .fc-note { margin-top: 5px; color: var(--dim); font-size: 12px; font-style: italic; }
+
+/* The foot: one readout line of fixed height (no shift under the pointer), the key in the
+   board's own shapes, then the notes. */
+.boardreadout { margin: 0; height: 1.45em; overflow: hidden; white-space: nowrap;
+                text-overflow: ellipsis; color: var(--ink); font-size: 14px; line-height: 1.45; }
+.boardkey2 { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 2px 0 0; color: var(--dim);
+             font-size: 12.5px; line-height: 1.5; }
+.boardkey2 span { display: inline-flex; align-items: center; gap: 6px; }
+.boardkey2 .kz { width: 12px; height: 12px; flex: none; }
+.k-safe { fill: var(--gold); opacity: .6; }
+.k-reach { fill: var(--gold); opacity: .2; }
+.k-threat { stroke: var(--alarm); stroke-width: 1.3; stroke-dasharray: 2.2 1.4; }
+.k-unseen { fill: var(--sunk); stroke: var(--edge); }
+.k-spell { fill: #e0701e; opacity: .6; }
+
+@media (max-width: 760px) {
+  .boardreadout { height: 2.9em; white-space: normal; font-size: 13px; }
+  .boardkey2 { gap: 0 10px; font-size: 12px; }
+  .boardfoot .maplegend { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+                          overflow: hidden; font-size: 12.5px; line-height: 1.45; }
+  .foecard { min-width: 150px; font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .foecard { transform: none !important; transition: opacity 120ms ease, visibility 0s linear 120ms; }
+  .foecard.on { transition-delay: 0s; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .foecard { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .foecard { background: var(--panel); border-color: var(--gold-dim); }
+}
