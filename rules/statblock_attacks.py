@@ -427,30 +427,39 @@ def read(line: str, category: str = "melee") -> tuple[list[list[dict]], list[str
 
 
 @lru_cache(maxsize=4096)
-def _parse_cached(line: str, category: str, _table: int) -> tuple:
-    # `_table` is the identity of the weapons table the `base` of each attack was looked
-    # up in. It carries homebrew, so a parse made against one campaign's table must not
-    # answer for another's; the identity changes exactly when that cache is rebuilt.
+def _parse_cached(line: str, category: str) -> tuple:
     options, unread = read(line, category)
     return tuple(tuple(opt) for opt in options), tuple(unread)
 
 
-def unread_of(line: str, category: str = "melee") -> list[str]:
-    """The printed pieces of a line no attack was read from (`read`)."""
+# The weapons table the cached parses looked each attack's `base` up in. It carries
+# homebrew, so a parse made against one table must not answer for the next; when the
+# table is rebuilt the parses are dropped. The table ITSELF is held and compared with
+# `is` (review 2026-11-11): its id() used to ride in the cache key, and a rebuilt table
+# can be handed the freed one's address, which served the old parses for the new table.
+_PARSED_AGAINST = None
+
+
+def _parsed(line: str, category: str) -> tuple:
+    global _PARSED_AGAINST
     from . import weapons as weapons_mod
 
-    return list(_parse_cached(str(line or ""), category,
-                              id(weapons_mod.all_weapons()))[1])
+    table = weapons_mod.all_weapons()
+    if table is not _PARSED_AGAINST:
+        _parse_cached.cache_clear()
+        _PARSED_AGAINST = table
+    return _parse_cached(str(line or ""), category)
+
+
+def unread_of(line: str, category: str = "melee") -> list[str]:
+    """The printed pieces of a line no attack was read from (`read`)."""
+    return list(_parsed(line, category)[1])
 
 
 def parse(line: str, category: str = "melee") -> list[list[dict]]:
     """A melee or ranged line as options of attacks. Copies, so a caller cannot edit
     the cache."""
-    from . import weapons as weapons_mod
-
-    table = id(weapons_mod.all_weapons())
-    return [[dict(a) for a in opt]
-            for opt in _parse_cached(str(line or ""), category, table)[0]]
+    return [[dict(a) for a in opt] for opt in _parsed(line, category)[0]]
 
 
 def swings(attack: dict) -> list[int]:

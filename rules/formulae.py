@@ -564,18 +564,21 @@ _ROWS: dict = {}
 
 
 def _key() -> tuple:
-    from . import spells
-
     return (_mtime(_content(*ESSENCES_PATH)), _mtime(_content(*FORMULAE_PATH)),
-            _mtime(_content(*POTIONS_PATH)), id(spells.all_spells()))
+            _mtime(_content(*POTIONS_PATH)))
 
 
 def _rows() -> dict[str, dict]:
     """Every formula by id (authored, then derived), validated. Cached on the files'
     mtimes and the spell corpus's identity, so a corrected file or a homebrew spell is
     seen on the next call; never on a stamp alone."""
+    from . import spells
+
     key = _key()
-    if _ROWS.get("key") != key:
+    # The spell corpus is held and compared with `is`; its id() used to sit in the key,
+    # and a corpus rebuilt for a homebrew spell can be handed the freed one's address.
+    corpus = spells.all_spells()
+    if _ROWS.get("key") != key or _ROWS.get("spells") is not corpus:
         table = essence_table()
         raw = _read_json(_content(*FORMULAE_PATH))
         potions = {str(p.get("id")): p for p in
@@ -593,7 +596,8 @@ def _rows() -> dict[str, dict]:
             rows.setdefault(fid, row)
         _mark(rows, raw.get("awaiting") or {})
         _ROWS.clear()
-        _ROWS.update({"key": key, "rows": rows, "starting": list(raw.get("starting") or ()),
+        _ROWS.update({"key": key, "spells": corpus, "rows": rows,
+                      "starting": list(raw.get("starting") or ()),
                       "awaiting": dict(raw.get("awaiting") or {})})
     return _ROWS["rows"]
 

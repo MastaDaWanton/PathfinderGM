@@ -106,7 +106,10 @@ class Hit:
 
 
 _LOCK = threading.Lock()
-_INDEX: dict[int, tuple[sqlite3.Connection, dict[int, dict]]] = {}
+# id(world) -> (the world, (connection, meta)). The world is held and compared with
+# `is`: a bare id() is reused once its object is freed, and a re-imported export landing
+# on the old address would be searched through the old export's index.
+_INDEX: dict[int, tuple] = {}
 
 
 def _rows(world) -> list[tuple[str, str, str, dict]]:
@@ -143,8 +146,8 @@ def index_for(world) -> tuple[sqlite3.Connection, dict[int, dict]]:
     key = id(world)
     with _LOCK:
         got = _INDEX.get(key)
-        if got is not None:
-            return got
+        if got is not None and got[0] is world:
+            return got[1]
         con = sqlite3.connect(":memory:", check_same_thread=False)
         con.execute("CREATE VIRTUAL TABLE docs USING fts5(name, kind, body, "
                     "tokenize='porter unicode61')")
@@ -154,7 +157,10 @@ def index_for(world) -> tuple[sqlite3.Connection, dict[int, dict]]:
                         (i, name, kind, body))
             meta[i] = extra
         con.commit()
-        _INDEX[key] = (con, meta)
+        # Bounded, now that an entry keeps its world alive: `load_cached` holds four.
+        if len(_INDEX) >= 8:
+            _INDEX.clear()
+        _INDEX[key] = (world, (con, meta))
         return con, meta
 
 
