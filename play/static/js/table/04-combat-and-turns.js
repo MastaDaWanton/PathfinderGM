@@ -82,7 +82,7 @@ function renderCombat(s) {
   $("#cb-targets").innerHTML = foes.map(f =>
     `<span class="cb-target ${COMBAT.target === f.ref ? "on" : ""}" data-target="${
       esc(f.ref)}">${esc(f.name)}<small>${
-      (f.conditions || []).join(", ") || (f.hp < f.hp_max ? "wounded" : "unhurt")
+      (f.conditions || []).map(esc).join(", ") || (f.hp < f.hp_max ? "wounded" : "unhurt")
     }</small></span>`).join("")
     || `<span class="sub">Nobody left standing against you.</span>`;
 

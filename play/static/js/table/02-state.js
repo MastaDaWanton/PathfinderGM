@@ -314,8 +314,8 @@ function render(s, hold) {
   renderAbilities(s);
 
   $("#board").innerHTML = s.scene.actors.map(a =>
-    `<div class="who"><span>${esc(a.name)} <small>${a.ref}</small></span>
-     <small>${a.hp}/${a.hp_max}${a.conditions.length ? " · " + a.conditions.join(", ") : ""}</small></div>`
+    `<div class="who"><span>${esc(a.name)} <small>${esc(a.ref)}</small></span>
+     <small>${a.hp}/${a.hp_max}${a.conditions.length ? " · " + a.conditions.map(esc).join(", ") : ""}</small></div>`
   ).join("") + `<div class="sub" style="margin-top:8px">${esc(s.scene.location)}</div>`;
   renderTalk(s);
 

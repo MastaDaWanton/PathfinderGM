@@ -3273,7 +3273,7 @@ function paneForgeWho() {
           r.converted ? ` <span class="unread">unreviewed</span>` : ""}</h3>
         <div class="stat">${esc(r.size)} · ${r.speed} ft · ${
           Object.entries(r.mods || {}).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ")
-          || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${c.amount} ${c.from}`).join(", ")
+          || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${esc(c.amount)} ${esc(c.from)}`).join(", ")
           || "no adjustments"} · ${r.rp} RP</div>
         <div class="traits clip">${(r.trait_lines || r.traits || []).map(esc).join(" · ")}</div>
         <span class="quiet cardinfo" data-crinfo="${esc(r.id)}" title="the whole card">details</span>
