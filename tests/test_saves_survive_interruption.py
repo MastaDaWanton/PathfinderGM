@@ -125,3 +125,57 @@ def test_an_import_that_does_not_read_changes_nothing_and_names_the_upload(shelf
     card = library.import_upload("mine.json", good.replace(b"Pangrella", b"Pangrolla"))
     assert target.read_bytes() != good and not card.problem
     assert load_cached(target).source == target
+
+
+# --- finding 18: a temporary file orphaned by a kill is swept, and only that --------------
+
+def _orphan(folder, name, age):
+    import os
+    import time
+
+    path = folder / name
+    path.write_text("half a save", encoding="utf-8")
+    then = time.time() - age
+    os.utime(path, (then, then))
+    return path
+
+
+def test_a_temp_file_orphaned_by_a_kill_is_swept_on_the_next_start(tmp_path):
+    """`files.write_text` makes `.<name>.<8 random>.tmp` and renames it; a hard kill
+    between the two (the desktop shell's fallback is `taskkill`) left it for good.
+    Measured on 7f63ab60: an orphan an hour old was still there after any number of
+    later saves — each one the size of a whole campaign. The first write this process
+    makes in a folder now clears them. Only names of exactly the shape this module
+    makes, and only old ones: a temporary file minutes old may be another thread's
+    write in flight, and anything else in the folder is not ours to delete."""
+    from pathfindergm import files
+
+    stale = _orphan(tmp_path, ".kesst.json.a1b2c3_4.tmp", age=3600)
+    in_flight = _orphan(tmp_path, ".kesst.json.zzzzzzzz.tmp", age=5)
+    theirs = [_orphan(tmp_path, name, age=3600)
+              for name in ("notes.tmp", ".kesst.json.tmp", ".kesst.json.TOOLONG99.tmp",
+                           "kesst.json.a1b2c3_4.tmp", "kesst.json.1")]
+
+    files.write_text(tmp_path / "kesst.json", "{}")
+    assert not stale.exists(), "the orphan is still there"
+    assert in_flight.exists(), "a write that may still be in flight was deleted"
+    assert all(p.exists() for p in theirs), "a file this module did not make was deleted"
+
+
+def test_an_orphan_held_open_elsewhere_does_not_fail_the_save(tmp_path, monkeypatch):
+    """On Windows a file open in another process (an indexer, an antivirus scan)
+    refuses `unlink` with PermissionError. The sweep is a courtesy; the save is not."""
+    from pathfindergm import files
+
+    stale = _orphan(tmp_path, ".kesst.json.a1b2c3_4.tmp", age=3600)
+    real = files.os.unlink
+
+    def held(path, *a, **kw):
+        if str(path).endswith("a1b2c3_4.tmp"):
+            raise PermissionError(13, "The process cannot access the file", str(path))
+        return real(path, *a, **kw)
+
+    monkeypatch.setattr(files.os, "unlink", held)
+    files.write_text(tmp_path / "kesst.json", "{}")
+    assert (tmp_path / "kesst.json").read_text(encoding="utf-8") == "{}"
+    assert stale.exists()
