@@ -82,6 +82,24 @@ def _talk_state(c) -> list[dict]:
         return []
 
 
+# The bodies the board draws something other than a standing person for (scene3d.js
+# figures, the flat token's glyph). Asked of the type vocabulary (law 1), never of a name:
+# the world owns its own races, and an Orc in one world is a wolf-rider in the next.
+_ON_ALL_FOURS = ("type.animal", "type.vermin", "type.magical-beast", "type.dragon",
+                 "type.construct", "type.plant", "type.aberration")
+
+
+def _body_form(a) -> str:
+    """How the map draws this body: "ooze", "beast" or "humanoid". A creature's type is
+    in its stat block and visible at a glance, so it is the player's to see. Anything
+    with no type tag (the player, a world's own people) stands as a person."""
+    if a.has_state("type.ooze"):
+        return "ooze"
+    if any(a.has_state(t) for t in _ON_ALL_FOURS):
+        return "beast"
+    return "humanoid"
+
+
 def _shown_conditions(a) -> list[str]:
     """The words the panel prints after a person's hit points, and the book's head and the
     combat bar beside them: their conditions, with how they stand towards the player
@@ -831,6 +849,8 @@ def _state(c) -> dict:
                  # fight's end empties: an hour after the robbers won, neither was red.
                  "stance": attitude_mod.stance(c.scene, a),
                  "size": a.size, "squares": grid.size_squares(a.size),
+                 # What shape the board stands them up as (`_body_form`).
+                 "form": _body_form(a),
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
                  # than one big creature (item 33). Absent for every ordinary creature.

@@ -360,14 +360,31 @@ function renderMap(s) {
     // creature (item 33). The unit gets a hatched fill and its count on the glyph, so a
     // 3x3 of townsfolk cannot be mistaken for a giant.
     const unit = a.members != null;
-    parts.push(`<rect class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}"
-      x="${c * CELL + 2}" y="${r * CELL + 2}"
-      width="${n * CELL - 4}" height="${n * CELL - 4}" rx="3">
+    // Round, as a miniature's base is (2026-11-11, the owner: "replace the square people
+    // with something that will indicate it is a humanoid"). Seen from above: a person is
+    // shoulders and a head, a beast (`form`, from the `type.*` tags in play/views.py) a
+    // long body with its head to one side, an ooze a spreading ring. The initial sits on
+    // the head; a crowd keeps its hatching and its count.
+    const up = s.scene.in_encounter && a.ref && a.ref === s.scene.turn_ref ? " up" : "";
+    const cx = (c + n / 2) * CELL, cy = (r + n / 2) * CELL, k = n * CELL / 18;
+    parts.push(`<circle class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}${
+      up}" cx="${cx}" cy="${cy}" r="${n * CELL / 2 - 1.5}">
       <title>${esc(a.name)} — ${a.hp}/${a.hp_max}${
         unit ? ` · ${a.members} of ${a.members_max} still standing` : ""}${
-        a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></rect>`);
-    parts.push(`<text class="tok" x="${(c + n / 2) * CELL}" y="${
-      (r + n / 2) * CELL + 4}">${unit ? a.members
+        a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></circle>`);
+    const form = unit ? "" : a.form || "humanoid";
+    const glyph = form === "beast"
+      ? `<ellipse cx="${cx - 1.2 * k}" cy="${cy}" rx="${4.6 * k}" ry="${2.8 * k}"/>
+         <circle class="head" cx="${cx + 3.6 * k}" cy="${cy}" r="${2.2 * k}"/>`
+      : form === "ooze"
+      ? `<circle cx="${cx}" cy="${cy}" r="${5 * k}"/><circle class="head" cx="${cx}" cy="${
+          cy}" r="${2.6 * k}"/>`
+      : form ? `<ellipse cx="${cx}" cy="${cy + .4 * k}" rx="${6 * k}" ry="${3 * k}"/>
+         <circle class="head" cx="${cx}" cy="${cy}" r="${3.4 * k}"/>` : "";
+    if (glyph) parts.push(`<g class="tokbody${down ? " down" : ""}${ghost}">${glyph}</g>`);
+    parts.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
+      form === "beast" ? cx - 1.2 * k : cx}" y="${
+      unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : 6 * k}px">${unit ? a.members
         : esc(a.name.slice(0, 1).toUpperCase())}</text>`);
   }
 
@@ -388,7 +405,8 @@ function renderMap(s) {
   const svg = MAP_3D
     ? Scene3D.render(g, s.scene.actors || [],
                      { turn: MAP_TURN, level: MAP_LEVEL,
-                       reach: !!(STATE.scene && STATE.scene.in_encounter) })
+                       reach: !!(STATE.scene && STATE.scene.in_encounter),
+                       up: s.scene.in_encounter ? s.scene.turn_ref : null })
     : `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
          preserveAspectRatio="xMidYMid meet"><defs>
          <pattern id="unithatch-foe" width="6" height="6" patternUnits="userSpaceOnUse"

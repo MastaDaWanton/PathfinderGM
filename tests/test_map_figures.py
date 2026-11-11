@@ -46,8 +46,9 @@ def test_a_hidden_token_is_shown_through_the_wall_at_every_quarter_turn(tmp_path
     for turn in range(4):
         svg = _render(tmp_path, grid, [_FOE], {"turn": turn})
         assert svg.count('<g class="xray') == 1, turn
-        assert "opacity" not in re.sub(r'<g class="xray.*?</g>', "", svg), \
-            "something other than the ghost is drawn see-through"
+        # The floor's joints are a translucent pattern (in <defs>); no mass is.
+        drawn = re.sub(r'<g class="xray.*?</g>|<defs>.*?</defs>', "", svg)
+        assert "opacity" not in drawn, "something other than the ghost is see-through"
 
 
 @needs_node
@@ -87,3 +88,70 @@ def test_stone_runs_in_the_plane_of_the_wall_from_a_handful_of_patterns(tmp_path
     many = _render(tmp_path, _grid(width=24, height=24, blocked=walls), [], {"turn": 0})
     count = lambda svg: svg.count("<pattern ")
     assert count(many) == count(one), (count(one), count(many))
+
+
+def _height(svg: str) -> float:
+    """How tall the figure stands on screen: its polygons' highest point to lowest."""
+    ys = [float(p.split(",")[1])
+          for pts in re.findall(r'<polygon class="fig[^"]*"[^>]*points="([^"]+)"', svg)
+          for p in pts.split()]
+    return max(ys) - min(ys)
+
+
+@needs_node
+def test_a_person_stands_as_a_figure_and_a_beast_does_not(tmp_path):
+    """The owner: "replace the square people with something that will indicate it is a
+    humanoid". Every creature was the same tall box, a wolf and a goblin alike. Now a
+    humanoid is a miniature with a head and its initial on a plate; an animal (`form`
+    "beast", from its `type.*` tag) stands low on all fours, an ooze is lower still, and
+    nothing about the shape is read from the name."""
+    one = lambda form, **kw: _render(tmp_path, _grid(), [dict(_FOE, form=form, **kw)],
+                                     {"turn": 0})
+    person, beast, ooze = one("humanoid"), one("beast"), one("ooze")
+    assert ">G</text>" in person, "the initial is gone from the figure"
+    assert _height(beast) < 0.75 * _height(person)
+    assert _height(ooze) < _height(beast)
+
+
+@needs_node
+def test_size_a_crowd_and_the_fallen_read_at_a_glance(tmp_path):
+    """A Large body stands on its whole 2x2 footprint and is drawn bigger; a crowd is
+    three small people and its count, never one giant (item 33); a body at zero hit
+    points lies on its base. And the base of whoever's turn it is wears the rim."""
+    def one(**kw):
+        return _render(tmp_path, _grid(), [dict(_FOE, ref="g1", **kw)],
+                       {"turn": 0, "up": "g1"})
+    medium, large = one(), one(squares=2)
+    assert _height(large) > 1.8 * _height(medium)
+    crowd = one(squares=2, members=7, members_max=9)
+    assert crowd.count("base") == 3 and ">7</text>" in crowd
+    assert _height(one(hp=0)) < 0.4 * _height(medium)
+    assert medium.count(" base up") == 1
+
+
+def test_the_payload_says_what_shape_each_body_is(tmp_path):
+    """The board needs the creature's type to tell a wolf from a man, and `_state` sent
+    none. `form` comes from the vocabulary's `type.*` tags (law 1), so a goblin is a
+    humanoid, a wolf a beast, a gray ooze an ooze, and the player — no type tag — a
+    humanoid. A creature hidden from the player is not in the list at all."""
+    from django.test import override_settings
+
+    from play import campaign as cm
+    from play import concurrency, views
+    from rules.bestiary import instantiate
+
+    with override_settings(CAMPAIGN_DIR=str(tmp_path / "campaigns")):
+        cm._LIVE.clear()
+        concurrency.reset_for_tests()
+        try:
+            c = cm.current()
+            s = c.scene
+            for name in ("goblin", "wolf", "gray-ooze"):
+                s.add(instantiate(name, scene=s, name=f"the {name}"))
+            forms = {a["name"]: a["form"] for a in views._state(c)["scene"]["actors"]}
+            assert forms["the goblin"] == "humanoid"
+            assert forms["the wolf"] == "beast"
+            assert forms["the gray-ooze"] == "ooze"
+            assert forms[s.pc().name] == "humanoid"
+        finally:
+            cm._LIVE.clear()

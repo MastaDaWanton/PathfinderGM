@@ -261,12 +261,6 @@
     });
   }
 
-  // A freestanding box — a figure, a rail post. Nothing abuts it, so all four walls stand.
-  function box(out, x, y, z0, z1, mat, cls, attrs, inner, bevel) {
-    cap(out, x, y, z1, mat, cls, attrs, inner, bevel);
-    walls(out, x, y, z1, [z0, z0, z0, z0], mat, cls);
-  }
-
   // A box of any footprint and height, all five visible faces: a rail on an edge, a step,
   // a table top, a shelf. `attrs` (e.g. pointer-events) goes on every face.
   function slab(out, x0, y0, x1, y1, z0, z1, mat, cls, attrs) {
@@ -278,6 +272,93 @@
   }
 
   function key(c, r) { return c + "," + r; }
+
+  /* An upright frustum of `n` sides: radius r0 at z0 to r1 at z1, its normals tilted by
+     the taper so the lamp lights a narrowing body as it narrows. `cap` ({cls, inner})
+     puts a lid on top. */
+  function frustum(out, cx, cy, r0, r1, z0, z1, n, mat, cls, cap) {
+    var h = z1 - z0, ring = [], i;
+    for (i = 0; i < n; i++) {
+      var a = i / n * 2 * Math.PI, b = (i + 1) / n * 2 * Math.PI, m = (a + b) / 2;
+      face(out, [[cx + r1 * Math.cos(a), cy + r1 * Math.sin(a), z1],
+                 [cx + r1 * Math.cos(b), cy + r1 * Math.sin(b), z1],
+                 [cx + r0 * Math.cos(b), cy + r0 * Math.sin(b), z0],
+                 [cx + r0 * Math.cos(a), cy + r0 * Math.sin(a), z0]],
+           norm([Math.cos(m) * h, Math.sin(m) * h, r0 - r1]), mat, cls);
+      ring.push([cx + r1 * Math.cos(a), cy + r1 * Math.sin(a), z1]);
+    }
+    if (cap) face(out, ring, UP, mat, cap.cls, "", cap.inner);
+  }
+
+  /* --- figures (2026-11-11) ------------------------------------------------------------
+     The owner: "replace the square people with something that will indicate it is a
+     humanoid". A tabletop miniature, because that is the thing a player already reads
+     as "a person standing here": a round base in the side's colour, two legs, a body
+     that widens to the shoulders with the arms at its sides, a head. Built of a few lit frusta, like the rest
+     of the board — no image, no icon.
+
+     A body that is not a person must not be drawn as one (`form`, play/views.py
+     `_body_form`, from the `type.*` tags): an animal, a vermin, a magical beast stands
+     on all fours, low and long; an ooze is a mound. Two generic shapes, never one per
+     monster. Anyone at zero hit points lies on their base whatever they are: prone is
+     what should read across the room.
+
+     Every piece is a closed convex solid, so a face turned away from the camera is
+     hidden by its own front at every quarter-turn — marked `cull` and never drawn,
+     which halves what a figure costs the depth sort. Returns the figure's top. */
+  function figure(out, cx, cy, z, s, form, down, mat, cls, baseCls, tip) {
+    var start = out.length;
+    frustum(out, cx, cy, 0.42 * s, 0.4 * s, z, z + 0.07 * s, 10, mat, cls,
+            { cls: cls + baseCls, inner: tip });
+    var b = z + 0.07 * s, top;
+    if (down) {
+      slab(out, cx - 0.36 * s, cy - 0.12 * s, cx + 0.16 * s, cy + 0.12 * s, b, b + 0.2 * s,
+           mat, cls);
+      slab(out, cx + 0.18 * s, cy - 0.09 * s, cx + 0.38 * s, cy + 0.09 * s, b,
+           b + 0.17 * s, mat, cls);
+      top = b + 0.2 * s;
+    } else if (form === "beast") {
+      [[-0.24, -0.13], [0.15, -0.13], [-0.24, 0.06], [0.15, 0.06]].forEach(function (l) {
+        slab(out, cx + l[0] * s, cy + l[1] * s, cx + (l[0] + 0.07) * s,
+             cy + (l[1] + 0.07) * s, b, b + 0.34 * s, mat, cls);
+      });
+      slab(out, cx - 0.3 * s, cy - 0.16 * s, cx + 0.24 * s, cy + 0.16 * s, b + 0.3 * s,
+           b + 0.58 * s, mat, cls);
+      slab(out, cx + 0.2 * s, cy - 0.11 * s, cx + 0.44 * s, cy + 0.11 * s, b + 0.44 * s,
+           b + 0.7 * s, mat, cls);
+      slab(out, cx - 0.42 * s, cy - 0.03 * s, cx - 0.3 * s, cy + 0.03 * s, b + 0.46 * s,
+           b + 0.53 * s, mat, cls);
+      // Ears, so the head reads as a head and the block as an animal, not a table.
+      [-1, 1].forEach(function (k) {
+        slab(out, cx + 0.24 * s, cy + k * 0.1 * s - 0.03 * s, cx + 0.3 * s,
+             cy + k * 0.1 * s + 0.03 * s, b + 0.7 * s, b + 0.8 * s, mat, cls);
+      });
+      top = b + 0.8 * s;
+    } else if (form === "ooze") {
+      frustum(out, cx, cy, 0.38 * s, 0.32 * s, b, b + 0.14 * s, 10, mat, cls);
+      frustum(out, cx, cy, 0.32 * s, 0.19 * s, b + 0.14 * s, b + 0.3 * s, 10, mat, cls);
+      frustum(out, cx, cy, 0.19 * s, 0.06 * s, b + 0.3 * s, b + 0.38 * s, 10, mat, cls,
+              { cls: cls });
+      top = b + 0.38 * s;
+    } else {
+      // Two legs, a torso widening to the shoulders, arms at its sides, a head on a
+      // neck: the pawn-like first cut (one tapered column) read as a bottle.
+      [-1, 1].forEach(function (k) {
+        frustum(out, cx + k * 0.08 * s, cy, 0.06 * s, 0.075 * s, b, b + 0.52 * s, 6, mat,
+                cls);
+        slab(out, cx + k * 0.23 * s - 0.04 * s, cy - 0.045 * s, cx + k * 0.23 * s + 0.04 * s,
+             cy + 0.045 * s, b + 0.5 * s, b + 0.96 * s, mat, cls);
+      });
+      frustum(out, cx, cy, 0.13 * s, 0.21 * s, b + 0.5 * s, b + 0.96 * s, 6, mat, cls);
+      frustum(out, cx, cy, 0.21 * s, 0.07 * s, b + 0.96 * s, b + 1.04 * s, 6, mat, cls);
+      frustum(out, cx, cy, 0.09 * s, 0.15 * s, b + 1.06 * s, b + 1.19 * s, 6, mat, cls);
+      frustum(out, cx, cy, 0.15 * s, 0.08 * s, b + 1.19 * s, b + 1.35 * s, 6, mat, cls,
+              { cls: cls });
+      top = b + 1.35 * s;
+    }
+    for (var i = start; i < out.length; i++) out[i].cull = true;
+    return top;
+  }
 
   /* --- textures (2026-11-11) -----------------------------------------------------------
      The owner: "make the textures like stone apear in the 3D view as well". Stone courses
@@ -830,26 +911,39 @@
       /* The server's `stance` (attitude.stance), the one answer the flat map and the
          panel read too; never worked out here from a fight's side name. */
       var side = a.stance || "bystander";
-      var cls = "fig " + side + (a.hp <= 0 ? " down" : "");
+      var down = a.hp <= 0;
+      var cls = "fig " + side + (down ? " down" : "");
       if (az !== level) cls += " offlevel";
-      /* Eight feet of a Medium creature is 1.6 levels — "their height contained within
-         2x5ft squares (8ft is max for medium)" — and a bigger body is as tall as it is
-         wide. A creature at zero hit points is drawn as a slab a third of a level high
-         rather than a standing figure at reduced opacity: prone is a thing you should be
-         able to read across the room, and a faded box is not it. */
-      var tall = a.hp <= 0 ? 0.3 : Math.min(1.6 * n, 2 * n);
       var tip = "<title>" + esc(a.name || "") + " — " + a.hp + "/" + a.hp_max +
+                (a.members != null ? " · " + a.members + " of " + a.members_max +
+                 " still standing" : "") +
                 (az ? " · " + az * 5 + " ft up" : "") + "</title>";
-      var start = faces.length;
-      for (var dx = 0; dx < n; dx++) {
-        for (var dy = 0; dy < n; dy++) {
-          box(faces, ax + dx, ay + dy, az, az + tall, side, cls, "",
-              dx === 0 && dy === 0 ? tip : "", 0.12);
-        }
+      // Whose turn it is: a gold rim on the base (the flat token's ring, in 3D).
+      var baseCls = " base" + (opts.up && a.ref === opts.up ? " up" : "");
+      var start = faces.length, cx = ax + n / 2, cy = ay + n / 2, top;
+      if (a.members != null) {
+        /* A crowd held as one actor (item 33): three small people standing together on
+           its footprint, never one big body — a 3x3 block read as a giant. */
+        top = az;
+        [[0.28, 0.3], [0.72, 0.36], [0.46, 0.74]].forEach(function (o, i) {
+          top = Math.max(top, figure(faces, ax + n * o[0], ay + n * o[1], az, n * 0.42,
+                                     a.form, down, side, cls, baseCls, i ? "" : tip));
+        });
+      } else {
+        // A Large body stands on its whole footprint, and as much taller as it is wider.
+        top = figure(faces, cx, cy, az, n, a.form, down, side, cls, baseCls, tip);
       }
-      if (az + tall > tallest) tallest = az + tall;
-      figs.push({ faces: faces.slice(start), x: ax + n / 2, y: ay + n / 2, z: az,
-                  top: az + tall, own: [ax, ay, ax + n, ay + n], offlevel: az !== level });
+      /* The letter, on a small plate over the head: the flat token's initial, or a
+         crowd's count. In the depth sort like a face, so a wall in front still covers it
+         (and the x-ray then shows it). */
+      var mark = a.members != null ? String(a.members)
+        : String(a.name || "?").slice(0, 1).toUpperCase();
+      faces.push({ pts: [[cx, cy, top + 0.32]], n: UP, at: [cx, cy, top + 0.32], mat: side,
+                   cls: cls.replace("fig ", "fig plate "), attrs: "", inner: tip,
+                   plate: esc(mark) });
+      if (top + 0.6 > tallest) tallest = top + 0.6;
+      figs.push({ faces: faces.slice(start), x: cx, y: cy, z: az, top: top,
+                  own: [ax, ay, ax + n, ay + n], offlevel: az !== level });
     });
 
     // Back to front. One comparison on the real distance to the viewer, where the first
@@ -945,8 +1039,8 @@
       if (hid < 2) return;
       xray += '<g class="xray' + (g.offlevel ? " offlevel" : "") + '" pointer-events="none">' +
         g.faces.filter(function (f) { return f.sp; }).map(function (f) {
-          return '<polygon fill="' + paint(f.mat, shade(f.n, turn)) + '" points="' +
-            pts2(f.sp) + '"/>';
+          return f.plate ? plate(f, "plate") : '<polygon fill="' + paint(f.mat, shade(f.n, turn)) +
+            '" points="' + pts2(f.sp) + '"/>';
         }).join("") + "</g>";
     });
     faces.forEach(function (f) {
@@ -980,6 +1074,15 @@
       return "url(#" + id + ")";
     }
 
+    // A figure's letter plate: the side's colour, unshaded, as the flat token's is.
+    function plate(f, cls) {
+      var p = f.sp[0];
+      return '<g class="' + cls + '"><rect x="' + (p[0] - 4.2).toFixed(1) + '" y="' +
+        (p[1] - 4.6).toFixed(1) + '" width="8.4" height="8.4" rx="1.8" fill="' +
+        paint(f.mat, 1) + '"/><text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 2.3).toFixed(1) +
+        '">' + f.plate + "</text>" + (cls === "plate" ? "" : f.inner) + "</g>";
+    }
+
     var laid = false;
     function floorTex() {
       laid = true;
@@ -990,6 +1093,7 @@
     }
     var body = faces.map(function (f) {
       var lay = !f.ground && !laid ? floorTex() : "";
+      if (f.plate) return lay + plate(f, f.cls);
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
       var fill = f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
