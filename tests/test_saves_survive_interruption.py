@@ -59,3 +59,69 @@ def test_an_interrupted_first_start_does_not_become_the_active_campaign(
     c = cm.switch_to(entry.id)
     assert cm.active_id() == entry.id and c.character_id == entry.id
     assert c.scene.pc().name == entry.name
+
+
+# --- finding 7: a world import never touches the world that is there until it reads -------
+
+@pytest.fixture
+def shelf(tmp_path):
+    with override_settings(CAMPAIGN_DIR=str(tmp_path / "campaigns")):
+        from play import library
+
+        good = open("fixtures/pangrella-campaign.json", "rb").read()
+        library.import_upload("mine.json", good)
+        yield library, library.user_dir() / "mine.json", good
+
+
+def test_an_import_cut_off_mid_write_leaves_the_old_world_whole(shelf, monkeypatch):
+    """`import_upload` wrote the upload straight over the world on the shelf
+    (`target.write_bytes(data)`, outside its own try) and kept the old bytes only in
+    memory. Measured on 7f63ab60 with the write cut off half-way, as a full disk or a
+    hard kill leaves it: the 1,169,578-byte world that worked was a 584,789-byte file
+    that no longer parsed, and every campaign set in it failed to load. Both doors are shut here — the
+    in-place write the old code used and the rename the new one lands by — so the test
+    fails on either shape if the file on the shelf is ever the one being written."""
+    import pathlib
+
+    from pathfindergm import files
+
+    library, target, good = shelf
+    newer = good.replace(b"Pangrella", b"Pangrolla")
+    assert newer != good
+
+    def torn(self, data):
+        with open(self, "wb") as f:
+            f.write(data[: len(data) // 2])
+        raise OSError(28, "No space left on device")
+
+    def killed(*_a, **_kw):
+        raise OSError("the process died before the rename")
+
+    monkeypatch.setattr(pathlib.Path, "write_bytes", torn)
+    monkeypatch.setattr(files.os, "replace", killed)
+    with pytest.raises(OSError):
+        library.import_upload("mine.json", newer)
+    monkeypatch.undo()
+
+    assert target.read_bytes() == good, "the world on the shelf was written in place"
+    assert [p.name for p in target.parent.iterdir()] == ["mine.json"], "no temp left"
+
+
+def test_an_import_that_does_not_read_changes_nothing_and_names_the_upload(shelf):
+    """The other failure, which the old code did handle by writing the old bytes back:
+    kept true, and the refusal still names the file the player sent rather than the
+    temporary one it was checked as (`.mine.json.k3x0_a9b.tmp: schema 9.0 ...`)."""
+    from world.loader import UnsupportedSchema, load_cached
+
+    library, target, good = shelf
+    with pytest.raises(UnsupportedSchema) as refused:
+        library.import_upload("mine.json", b'{"schema_version": "9.0"}')
+    assert str(refused.value).startswith("mine.json: schema 9.0")
+    with pytest.raises(ValueError):
+        library.import_upload("mine.json", b"{ not json")
+    assert target.read_bytes() == good
+    assert [p.name for p in target.parent.iterdir()] == ["mine.json"]
+    # And a good import over it is the one the shelf and the game then read.
+    card = library.import_upload("mine.json", good.replace(b"Pangrella", b"Pangrolla"))
+    assert target.read_bytes() != good and not card.problem
+    assert load_cached(target).source == target

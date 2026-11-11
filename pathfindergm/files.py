@@ -83,14 +83,26 @@ def _wrote(path: Path) -> None:
 def write_text(path, text: str, encoding: str = "utf-8") -> Path:
     """`Path.write_text`, atomically. Same newline handling, so the bytes on disk are
     the ones `write_text` would have written."""
+    return _write(path, text, "w", encoding)
+
+
+def write_bytes(path, data: bytes, check=None) -> Path:
+    """`Path.write_bytes`, atomically. `check(tmp)` is handed the finished temporary
+    file before it replaces anything; if it raises, `path` is exactly as it was."""
+    return _write(path, data, "wb", None, check)
+
+
+def _write(path, payload, mode: str, encoding, check=None) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
-        with os.fdopen(fd, "w", encoding=encoding) as f:
-            f.write(text)
+        with os.fdopen(fd, mode, encoding=encoding) as f:
+            f.write(payload)
             f.flush()
             os.fsync(f.fileno())
+        if check is not None:
+            check(Path(tmp))
         _replace(tmp, path)
     except BaseException:
         try:
