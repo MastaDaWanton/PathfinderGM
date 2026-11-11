@@ -219,12 +219,18 @@ def test_the_ref_repair_survives_a_string_opposed_by(table):
 def test_a_creature_turn_holds_back_on_a_type_error():
     """The two NPC-turn handlers caught (IntentError, ValueError, KeyError): a
     wrong-typed plan that raised TypeError or AttributeError at resolution took the
-    PLAYER's request down as a 500 on a turn already finished. Pinned in source because
-    the player-turn handlers must NOT be widened — a bug there stays loud."""
-    import inspect
+    PLAYER's request down as a 500 on a turn already finished. Walked in the AST, and
+    counted: exactly the two creature-turn handlers are wide, because the player-turn
+    handlers must NOT be widened — a bug there stays loud."""
+    import ast
+    from pathlib import Path
 
     from play import views
 
-    src = inspect.getsource(views)
-    wide = "except (IntentError, ValueError, KeyError, TypeError, AttributeError)"
-    assert src.count(wide) == 2
+    tree = ast.parse(Path(views.__file__).read_text(encoding="utf-8"))
+    caught = [{getattr(e, "id", "") for e in h.type.elts}
+              for h in ast.walk(tree)
+              if isinstance(h, ast.ExceptHandler) and isinstance(h.type, ast.Tuple)]
+    wide = [names for names in caught if {"IntentError", "TypeError"} <= names]
+    assert wide == [{"IntentError", "ValueError", "KeyError", "TypeError",
+                     "AttributeError"}] * 2

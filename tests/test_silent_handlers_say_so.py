@@ -50,13 +50,17 @@ def test_an_unreadable_roster_entry_is_named(tmp_path, monkeypatch, caplog):
     assert any("corvin.json" in r.getMessage() for r in caplog.records)
 
 
-def test_the_watchers_two_handlers_log():
-    """The proposer set `proposal = None` and the applier `continue`d, both silently.
-    Pinned in source: the handlers sit inside a background thread and a save."""
-    import inspect
+def test_a_broken_watcher_proposal_is_logged_and_costs_nothing(monkeypatch, caplog):
+    """`drain` skipped a proposal whose applier raised with a bare `continue`."""
+    from types import SimpleNamespace
 
     from gm import watcher
 
-    src = inspect.getsource(watcher)
-    assert "applying the watcher's %s proposal failed" in src
-    assert "the watcher's %s proposal failed" in src
+    def boom(c, p):
+        raise RuntimeError("the applier is broken")
+
+    monkeypatch.setattr(watcher, "_apply_garnish", boom)
+    monkeypatch.setattr(watcher, "_PENDING", [{"campaign": "t", "job": "garnish"}])
+    with caplog.at_level(logging.ERROR, logger="gm.watcher"):
+        assert watcher.drain(SimpleNamespace(id="t")) is False
+    assert any("garnish" in r.getMessage() and r.exc_info for r in caplog.records)
