@@ -1,0 +1,29 @@
+/* The harness's own chrome: the table's tokens (theme-v2.css :root), plain and quiet, so
+   the two boards are what the eye lands on. */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.bar { position: sticky; top: 0; z-index: 2; padding: 10px 16px; background: var(--panel);
+       border-bottom: 1px solid var(--edge); }
+.bar h1 { margin: 0 0 8px; font: 400 16px/1.2 var(--body); color: var(--gold); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.controls label { display: inline-flex; gap: 6px; align-items: center; color: var(--dim); }
+.group { display: inline-flex; gap: 0; }
+.controls button, .controls select {
+  font: inherit; color: var(--ink); background: var(--sunk); border: 1px solid var(--edge);
+  padding: 4px 10px; border-radius: 2px; cursor: pointer;
+}
+.group > button + button { border-left: 0; }
+.controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--gold);
+                                         background: #231b12; }
+.controls button:disabled { opacity: .4; cursor: default; }
+.controls button:focus-visible, .controls select:focus-visible, .controls input:focus-visible {
+  outline: 2px solid var(--candle); outline-offset: 1px; }
+
+.panels { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; align-items: flex-start; }
+.panel { margin: 0; }
+.panel[hidden] { display: none; }
+.panel figcaption { color: var(--dim); font-size: 14px; margin-bottom: 4px; }
+.panel { max-width: 100%; }
+.panel iframe { display: block; max-width: 100%; border: 1px solid var(--edge); background: var(--bg); }
+.notes { margin: 0 16px 24px; color: var(--ash); font-size: 13px; max-width: 70ch; }
+@media (max-width: 760px) { .bar, .panels { padding-left: 16px; padding-right: 16px; } }

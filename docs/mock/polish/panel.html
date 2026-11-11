@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board panel</title>
+<link rel="icon" href="data:,">
+<!-- The game's theme, the real file: textures and fonts resolve from play/static. -->
+<link rel="stylesheet" href="../../../play/static/css/theme-v2.css">
+<style>
+  /* The harness's one stand-in, for the table's stage (table.html .stage, not copied):
+     the stage's padding round the board, and the board's row filling the frame. Its
+     class outranks the variant's plain `body` rule, which loads after it. */
+  body.polish-stage {
+    grid-template-rows: minmax(0, 1fr); padding: 20px 20px 16px; box-sizing: border-box;
+  }
+  #polish-error { color: #e0261e; font: 14px/1.4 ui-monospace, monospace; white-space: pre-wrap; }
+</style>
+<script src="data.js"></script>
+<script src="shim.js"></script>
+</head>
+<body class="page-backdrop-room mode-map polish-stage">
+<script src="panel.js"></script>
+</body>
+</html>
