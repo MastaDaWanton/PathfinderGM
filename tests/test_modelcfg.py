@@ -214,3 +214,47 @@ def test_a_missing_file_still_saves(isolated):
     """Absent is not unreadable: a fresh install has no models.json and must save."""
     assert not (isolated / "models.json").exists()
     assert modelcfg.save({"prose": {"provider": "ollama", "model": "qwen3:8b"}}) == []
+
+
+# --- where a key may be sent ----------------------------------------------------------
+
+def test_a_stored_key_cannot_be_pointed_at_another_server(isolated):
+    """Review 2026-11-11, finding 6. Measured before the fix: with an OpenAI key stored,
+    one save naming `https://evil.example/v1` as the narrator's host returned no
+    problems, and `for_role("narrator")` then handed the client that host with the key
+    — the next turn would have sent `Authorization: Bearer <key>` there."""
+    assert modelcfg.save({"narrator": {"provider": "openai", "model": "gpt"}},
+                         {"openai": "sk-secret-1234"}) == []
+    problems = modelcfg.save({"narrator": {"provider": "openai", "model": "gpt",
+                                           "host": "https://evil.example/v1"}})
+    assert problems and "enter the key again" in problems[0]
+    assert modelcfg.for_role("narrator")["host"] == "https://api.openai.com/v1"
+    # `clear` is not the key, and neither is another provider's.
+    for keys in ({"openai": "clear"}, {"groq": "gsk-other"}):
+        assert modelcfg.save({"narrator": {"provider": "openai", "model": "gpt",
+                                           "host": "https://evil.example/v1"}}, keys)
+
+
+def test_a_gateway_is_still_allowed_when_the_key_comes_with_it(isolated):
+    """The settings page offers the Host field on every role, so a custom gateway is a
+    thing a player may have set; it is kept, and re-saving the page (which sends every
+    role back, key fields blank) must not start refusing it."""
+    gateway = {"narrator": {"provider": "openai", "model": "gpt",
+                            "host": "http://localhost:1234/v1"}}
+    assert modelcfg.save(gateway, {"openai": "sk-secret-1234"}) == []
+    assert modelcfg.for_role("narrator")["host"] == "http://localhost:1234/v1"
+    assert modelcfg.save(gateway, {}) == []
+    # And another role may use the address the key already goes to.
+    assert modelcfg.save({"prose": {"provider": "openai", "model": "gpt",
+                                    "host": "http://localhost:1234/v1/"}}) == []
+
+
+def test_a_host_must_be_a_web_address(isolated):
+    """`urlopen` also reads `file:` URLs, and a host with no scheme was saved without a
+    word and then failed on the turn as a model that was down."""
+    for host in ("file:///C:/Windows/win.ini", "localhost:11434", "ftp://x"):
+        problems = modelcfg.save({"prose": {"provider": "ollama", "model": "m",
+                                            "host": host}})
+        assert problems and "http://" in problems[0], host
+    assert modelcfg.save({"prose": {"provider": "ollama", "model": "m",
+                                    "host": "HTTP://192.168.1.20:11434"}}) == []

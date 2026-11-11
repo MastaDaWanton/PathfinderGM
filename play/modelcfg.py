@@ -200,6 +200,29 @@ def save(roles_in: dict | None = None, keys_in: dict | None = None) -> list[str]
         if not entry["model"]:
             problems.append(f"{role}: name the model it should use.")
             continue
+        # Only web addresses reach the client. `urlopen` also speaks `file:`, and a host
+        # with no scheme never worked — it failed later, on the turn, as a dead model.
+        if not entry["host"].lower().startswith(("http://", "https://")):
+            problems.append(f"{role}: the host must start with http:// or https://.")
+            continue
+        # A provider's key goes wherever its role's host says (review 2026-11-11,
+        # finding 6): one POST naming another server would have sent the stored key
+        # there on the next turn. The page does offer the Host field for a gateway, so
+        # a new address is not refused — it has to arrive with the key itself, which
+        # the page is never sent and so only the person who holds it can supply. The
+        # provider's own address, and one already saved for it, need nothing.
+        if PROVIDERS[provider]["key"]:
+            known = {PROVIDERS[provider]["host"].rstrip("/")} | {
+                str(r.get("host", "")).rstrip("/") for r in data["roles"].values()
+                if isinstance(r, dict) and r.get("provider") == provider}
+            fresh = str((keys_in or {}).get(provider) or "").strip()
+            if entry["host"].rstrip("/") not in known and (
+                    not fresh or fresh.lower() == "clear"):
+                problems.append(
+                    f"{role}: {entry['host']} is not {PROVIDERS[provider]['name']}'s "
+                    f"own address. To send its key there, enter the key again in the "
+                    f"same save.")
+                continue
         data["roles"][role] = entry
 
     for pid, value in (keys_in or {}).items():
