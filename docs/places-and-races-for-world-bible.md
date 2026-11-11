@@ -427,6 +427,7 @@ words:
 | `footing` | `firm`, `broken`, `bad` — rubble, undergrowth, standing water, spoil |
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — **how the place is shaped upward**, below |
 | `storeys` | `{"up": n, "down": n}` — how many floors above and below this one. Omit for outdoors |
+| `fixtures` | *optional, read since 2026-11-11* — the named things on the floor, from a closed list (`counter`, `table`, `barrel`, `crate`, `bookshelf`, `hearth`, …), most important first. See `docs/for-world-bible.md` ask 15 |
 
 ```json
 {"id": "5bbd0c40345f~urban:the-library", "name": "the library",

@@ -282,6 +282,15 @@
     (g.blocked || []).forEach(function (p) { solid[key(p[0], p[1])] = true; });
     (g.difficult || []).forEach(function (p) { rough[key(p[0], p[1])] = true; });
     (g.obscuring || []).forEach(function (p) { murk[key(p[0], p[1])] = true; });
+    // The named fixtures (rules/fixtures.py). A low one (a table, the bar, a barrel) stands
+    // one level high rather than a wall's two, which is what the engine now reads it as —
+    // something you see and shoot over — and anything a person put there is brass, the
+    // palette's own word for it. Stairs are drawn after the floor, as steps.
+    var fx = {}, stairs = [];
+    (g.fixtures || []).forEach(function (f) {
+      (f.squares || []).forEach(function (p) { fx[key(p[0], p[1])] = f; });
+      if (f.form === "steps") stairs.push(f);
+    });
 
     var reach = {};
     (g.reachable || []).forEach(function (e) { reach[key(e[0], e[1])] = e; });
@@ -293,14 +302,15 @@
     function topAt(x, y) {
       if (x < 0 || y < 0 || x >= W || y >= H) return 0;
       var k = key(x, y), z = ground[k] || 0;
-      return solid[k] ? Math.max(z + 2, 2) : z;
+      if (!solid[k]) return z;
+      return fx[k] && fx[k].height === 1 ? z + 1 : Math.max(z + 2, 2);
     }
 
     var faces = [], tallest = 1;
     for (var x = 0; x < W; x++) {
       for (var y = 0; y < H; y++) {
         var k = key(x, y), z = ground[k] || 0, mat = "tile", cls = "tile";
-        if (solid[k]) { mat = "solid"; cls = "solid"; }
+        if (solid[k]) { mat = fx[k] && fx[k].height ? "rail" : "solid"; cls = "solid"; }
         else if (murk[k]) { mat = "murk"; cls = "murk"; }
         else if (rough[k]) { mat = "rough"; cls = "rough"; }
         else if (z) { mat = "raised"; cls = "tile raised"; }
@@ -331,7 +341,9 @@
            making the stacks translucent would be telling the player they have a shot. */
         if (!solid[k] && topz > level) cls += " above";
 
-        cap(faces, x, y, topz, mat, cls, hit, "", solid[k] ? 0.07 : 0, wash);
+        cap(faces, x, y, topz, mat, cls, hit,
+            fx[k] && solid[k] ? "<title>" + esc(fx[k].name) + "</title>" : "",
+            solid[k] ? (fx[k] && fx[k].form === "round" ? 0.18 : 0.07) : 0, wash);
         if (topz > 0) {
           walls(faces, x, y, topz,
                 [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y), topAt(x + 1, y)],
@@ -381,6 +393,38 @@
         }
       }
     }
+
+    /* A stair as steps: three treads climbing toward the higher ground beside it, drawn
+       over the square's own floor and deaf to the pointer, so the floor under them still
+       takes the click that queues a move onto the stair. */
+    stairs.forEach(function (f) {
+      (f.squares || []).forEach(function (p) {
+        var sx = p[0], sy = p[1], z0 = ground[key(sx, sy)] || 0;
+        var dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]], best = dirs[0], hi = -1;
+        dirs.forEach(function (d) {
+          var h = topAt(sx + d[0], sy + d[1]);
+          if (!solid[key(sx + d[0], sy + d[1])] && h > hi) { hi = h; best = d; }
+        });
+        for (var i = 0; i < 3; i++) {
+          var a = i / 3, b = (i + 1) / 3, x0, x1, y0, y1;
+          // Treads run from the far side of the square toward the gallery.
+          if (best[0]) { x0 = best[0] > 0 ? sx + a : sx + 1 - b; x1 = x0 + 1 / 3; y0 = sy; y1 = sy + 1; }
+          else { y0 = best[1] > 0 ? sy + a : sy + 1 - b; y1 = y0 + 1 / 3; x0 = sx; x1 = sx + 1; }
+          var zt = z0 + (i + 1) * Math.max(1, hi - z0) / 4;
+          var cls3 = "fxstep" + (zt > level ? " above" : "");
+          face(faces, [[x0, y0, zt], [x1, y0, zt], [x1, y1, zt], [x0, y1, zt]], UP, "rail",
+               cls3, ' pointer-events="none"');
+          face(faces, [[x0, y0, zt], [x1, y0, zt], [x1, y0, z0], [x0, y0, z0]], NORTH, "rail",
+               cls3, ' pointer-events="none"');
+          face(faces, [[x0, y1, zt], [x1, y1, zt], [x1, y1, z0], [x0, y1, z0]], SOUTH, "rail",
+               cls3, ' pointer-events="none"');
+          face(faces, [[x0, y0, zt], [x0, y1, zt], [x0, y1, z0], [x0, y0, z0]], WEST, "rail",
+               cls3, ' pointer-events="none"');
+          face(faces, [[x1, y0, zt], [x1, y1, zt], [x1, y1, z0], [x1, y0, z0]], EAST, "rail",
+               cls3, ' pointer-events="none"');
+        }
+      });
+    });
 
     /* The latest turn's spell areas (`g.areas`, the engine's ruling on where a cone or
        burst fell). Until 2026-09-29 only the flat board drew them, so turning on 3D hid

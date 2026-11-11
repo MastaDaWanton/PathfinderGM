@@ -371,6 +371,10 @@ class Campaign:
             # The trade uses spent today (2026-10-07, rules/tradecraft.py): a counter
             # talked round keeps its price, and a thing judged its look, across a save.
             "dealings": ({k: dict(v) for k, v in self.scene.dealings.items()}, {}),
+            # The reader's own fixtures (2026-11-11, rules/fixtures.name_one): a barrel
+            # the player put a back to keeps its square across a reload and a revisit.
+            "fixtures_named": ({k: [dict(f) for f in v]
+                                for k, v in self.scene.fixtures_named.items()}, {}),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -478,6 +482,10 @@ class Campaign:
             settled=int(s.get("settled") or 0),
             came_along=list(s.get("came_along") or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
+            # Absent in saves from before named fixtures: the reader has named none.
+            fixtures_named={str(k): [dict(f) for f in v if isinstance(f, dict)]
+                            for k, v in (s.get("fixtures_named") or {}).items()
+                            if isinstance(v, list)},
             heard_places=[dict(h) for h in (s.get("heard_places") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],

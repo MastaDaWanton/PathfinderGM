@@ -431,6 +431,8 @@ def _grid_state(scene) -> dict | None:
     """
     if scene.grid is None:
         return None
+    from rules import fixtures as fixtures_mod
+
     g = scene.grid
     out = {
         "width": g.width, "height": g.height,
@@ -454,6 +456,10 @@ def _grid_state(scene) -> dict | None:
         "levels": sorted({0} | set(g.floor.values())
                          | {p[2] for p in scene.positions.values() if len(p) > 2}),
         "reachable": [],
+        # The named fixtures (rules/fixtures.py): the bar, the barrels, the stair. Only
+        # what the player could see — none wholly inside fog — and the terrain sets above
+        # stay exactly as they were, so nothing that reads them has to change.
+        "fixtures": fixtures_mod.seen(g),
     }
     # WHERE this ground is. The tray said "The ground" and nothing else, so a player
     # looking at a correct map of one place while the prose described another had no way

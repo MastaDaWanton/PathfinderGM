@@ -321,6 +321,13 @@ def said_to_nobody(frame: dict | None, scene=None) -> bool:
 # toward the hearth … You remain where you are". The old check read only the LAST word
 # ("room"); the part of the room is the word before "of" ("side"). No model is asked to
 # decide it and no sentence is parsed: a closed field, then a closed noun list.
+def fixture_kinds() -> tuple[str, ...]:
+    """The reader's closed fixture answer: "none" first, then content/rules/fixtures.json."""
+    from rules import fixtures
+
+    return ("none", *fixtures.names())
+
+
 _ROOM_EXTRA = frozenset({"fire", "fireside", "stair", "stairs", "staircase", "seat",
                          "nook", "alcove", "rear"})
 
@@ -336,7 +343,7 @@ def within_place(action: dict, places=(), here: str = "") -> bool:
 
     if not isinstance(action, dict) or action.get("act") != "go":
         return False
-    if action.get("within_place") is True:
+    if action.get("within_place") is True or action.get("fixture"):
         return True
     words = " ".join(str(action.get("place") or "").lower().replace("’", "'").split())
     words = [w.strip(".,;!?") for w in words.split()]
@@ -432,7 +439,9 @@ _WHAT_EACH_IS = """\
 go        walk somewhere within reach (a place in town, the crossroads, the fields, into
           the trees, back to the gate); walking OUT INTO somewhere named is go, not leave.
           `within_place` is true for a move inside the place you are in (across the
-          room, to the hearth, a corner, the bar, the window), false for anywhere else
+          room, to the hearth, a corner, the bar, the window), false for anywhere else;
+          `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
+          barrel…), or none
 journey   take the road or a ship to another town
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
@@ -680,7 +689,7 @@ _DEMOS = [
     ("I cross to the hearth and set a pot of stew on to simmer for supper.",
      {"question": False, "claims": [], "actions": [
          {"span": "cross to the hearth", "place": "the hearth", "within_place": True,
-          "act": "go"},
+          "fixture": "hearth", "act": "go"},
          {"span": "set a pot of stew on to simmer for supper", "object": "a pot of stew",
           "cost": "takes_time", "act": "other"}]}),
     # A move inside the place named by a part of the room rather than a thing in it
@@ -688,7 +697,8 @@ _DEMOS = [
     ("I shoulder through the crowd to the far end of the bar.",
      {"question": False, "claims": [], "actions": [
          {"span": "shoulder through the crowd to the far end of the bar",
-          "place": "the far end of the bar", "within_place": True, "act": "go"}]}),
+          "place": "the far end of the bar", "within_place": True, "fixture": "counter",
+          "act": "go"}]}),
     ("I pick up the lantern, light it and peer down the stairwell.",
      {"question": False, "claims": [], "actions": [
          {"span": "pick up the lantern", "object": "the lantern", "act": "take"},
@@ -1135,6 +1145,11 @@ def per_act_schema() -> dict:
                  # place's own words, as `until` follows the time's: a closed answer the
                  # walk-to-nowhere refusal reads (`acts_to_ops._nowhere`), never English.
                  **({"within_place": {"type": "boolean"}} if act == "go" else {}),
+                 # Which fixture of the room the walk is to (`fixture_kinds`), a closed
+                 # enum after `within_place`: the map places one the room lacks
+                 # (rules/fixtures.name_one), never a word read out of the sentence.
+                 **({"fixture": {"type": "string", "enum": list(fixture_kinds())}}
+                    if act == "go" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -1187,7 +1202,8 @@ def _demo_reply(frame: dict) -> str:
                         if a["act"] == "escape" else {}),
                      **({"blow": a.get("blow") or BLOWS[0]}
                         if a["act"] == "attack" else {}),
-                     **({"within_place": bool(a.get("within_place"))}
+                     **({"within_place": bool(a.get("within_place")),
+                         "fixture": a.get("fixture") or "none"}
                         if a["act"] == "go" else {}), **cost, **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
@@ -1331,6 +1347,14 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             # A walk inside the place (`within_place`): kept only when it says so, as
             # `blow` is. Only the boolean itself: a hosted provider's "yes" is not it.
             kept["within_place"] = True
+        if kept["act"] == "go":
+            # The fixture is the enum's or nothing; "none", or a word outside the closed
+            # list (a hosted provider does not enforce the schema), is no fixture.
+            fixture = str(a.get("fixture") or "").strip().lower()
+            if fixture != "none" and fixture in fixture_kinds():
+                kept["fixture"] = fixture
+            elif fixture and fixture != "none":
+                dropped.append(f"go.fixture={a.get('fixture')!r}")
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is

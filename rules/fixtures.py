@@ -1,0 +1,361 @@
+"""Named fixtures on the tactical map: the bar, the tables, the stair, the crates.
+
+`rules/floorplan.py` refused named features on purpose — "a feature the engine cannot act
+on is decoration, and decoration belongs in the prose" — and that refusal still stands.
+What this module adds is not decoration: every kind in `content/rules/fixtures.json`
+declares only properties the engine already reads (`blocked`, `difficult`, raised floor,
+a parapet's cover) or reads from here on (a stair you walk up, a low obstacle you see
+over), and records the rest (flammable, breakable, movable) as data for phase 2.
+
+**Phase 1 types the geometry that already exists; it never lays new ground.** Campaigns
+have people standing on today's derived maps, so a fixture is a NAME given to squares
+the plan already made solid, rough or raised: this blocked clump is the bar, that one the
+barrels, this raised band is a gallery. The only addition is a stair at a gallery's foot,
+and a stair is walkable, so it can never put a saved position inside anything.
+
+Derived, not stored, the way the floorplan is: the fixtures are a pure function of the
+place id and the PRISTINE plan (`floorplan.for_place`), intersected with the grid as it
+stands — so a wall of stone a spell raised is never mistaken for a shelf, and a saved
+grid from an older plan is typed only where it still agrees. The one stored exception is
+a fixture the reader names in a room that has none of that kind (`name_one`): it is
+placed once, on a free square, and kept for good in `Scene.fixtures_named` (the
+2026-09-28 ruling that people keep their square, extended to things).
+
+Prior art, and what it settled:
+- Cataclysm: DDA's furniture JSON is the same shape — a closed list of furniture ids,
+  each with flags the engine reads (TRANSPARENT, CLIMBABLE, FLAMMABLE, GOES_UP, RAMP)
+  and nothing else; data, never code per item (doc/JSON_FLAGS.md).
+- Inform 7's supporters: a thing you can stand on is a kind with a property, not a
+  special case in the parser.
+- Fate Core's situation aspects: scenery is real once established and keeps being true.
+- The Core Rulebook for every number (cover p.195, Climb p.90, Table 7-13/7-14 p.173,
+  rubble p.411, stairs p.415); `fixtures.json` cites each and marks the house rules.
+"""
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from . import floorplan
+from .grid import Grid, Point
+
+OCCUPIES = ("blocked", "difficult", "raised", "open", "overhead")
+FORMS = ("steps", "long", "box", "round", "none")
+COVERS = ("none", "cover", "soft")
+_FLAGS = ("low", "stair", "opening", "see_through", "flammable", "breakable", "movable",
+          "burns", "swim", "placed", "narratable")
+_NUMBERS = ("climb_dc", "hardness", "hp", "break_dc")
+_TEXT = ("name", "plural", "source", "reached_by")
+_FIELDS = frozenset(_FLAGS + _NUMBERS + _TEXT + ("occupies", "form", "cover"))
+# Which geometry each list in a place row may type.
+_SLOTS = {"solid": "blocked", "rough": "difficult", "raised": "raised"}
+
+_DATA: dict | None = None
+
+
+def validate(raw) -> list[str]:
+    """Everything wrong with a fixtures document, each problem with the fix named."""
+    problems: list[str] = []
+    if not isinstance(raw, dict) or not isinstance(raw.get("kinds"), dict):
+        return ['fixtures.json is {"kinds": {...}, "places": {...}, "terrain": {...}}.']
+    kinds = raw["kinds"]
+    for kid, k in kinds.items():
+        at = f"kinds.{kid}"
+        if not re.fullmatch(r"[a-z][a-z-]*", str(kid)):
+            problems.append(f"{at}: a kind id is lower case letters and hyphens.")
+        if not isinstance(k, dict):
+            problems.append(f"{at}: a kind is an object.")
+            continue
+        for extra in sorted(set(k) - _FIELDS):
+            problems.append(f"{at}.{extra}: not a fixture property. Use one of "
+                            f"{', '.join(sorted(_FIELDS))}.")
+        for need in ("name", "plural", "source"):
+            if not isinstance(k.get(need), str) or not k.get(need).strip():
+                problems.append(f"{at}.{need}: write it as words.")
+        occ = k.get("occupies")
+        if not isinstance(occ, list) or not occ or any(o not in OCCUPIES for o in occ):
+            problems.append(f"{at}.occupies: a list from {', '.join(OCCUPIES)}.")
+            occ = []
+        if k.get("form") not in FORMS:
+            problems.append(f"{at}.form: one of {', '.join(FORMS)}.")
+        if k.get("cover") not in COVERS:
+            problems.append(f"{at}.cover: one of {', '.join(COVERS)}.")
+        for flag in _FLAGS:
+            if flag in k and not isinstance(k[flag], bool):
+                problems.append(f"{at}.{flag}: true or false.")
+        for num in _NUMBERS:
+            v = k.get(num)
+            if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v < 0):
+                problems.append(f"{at}.{num}: a whole number of at least 0, or null.")
+        if k.get("low") and ("blocked" not in occ or k.get("cover") != "cover"):
+            problems.append(f"{at}.low: a low obstacle occupies blocked squares and gives "
+                            f"cover (CRB p.195); set occupies to include blocked and "
+                            f"cover to \"cover\".")
+        if k.get("stair") and "open" not in occ:
+            problems.append(f"{at}.stair: a stair is walked on; add \"open\" to occupies.")
+        by = k.get("reached_by")
+        if by is not None and not (isinstance(kinds.get(by), dict) and kinds[by].get("stair")):
+            problems.append(f"{at}.reached_by: name a kind with \"stair\": true.")
+        if k.get("narratable") and ("blocked" not in occ or k.get("placed") is False):
+            problems.append(f"{at}.narratable: only a placeable kind that occupies blocked "
+                            f"squares can be put down by the reader.")
+    for table in ("places", "terrain"):
+        for key, row in (raw.get(table) or {}).items():
+            at = f"{table}.{key}"
+            if not isinstance(row, dict):
+                problems.append(f"{at}: a row is {{\"solid\": [...], \"rough\": [...]}}.")
+                continue
+            for extra in sorted(set(row) - set(_SLOTS) - {"names"}):
+                problems.append(f"{at}.{extra}: use solid, rough, raised or names.")
+            for slot, geometry in _SLOTS.items():
+                for kid in row.get(slot) or ():
+                    k = kinds.get(kid)
+                    if not isinstance(k, dict):
+                        problems.append(f"{at}.{slot}: no kind called {kid!r}; the kinds "
+                                        f"are {', '.join(sorted(kinds))}.")
+                    elif geometry not in (k.get("occupies") or ()):
+                        problems.append(f"{at}.{slot}: {kid} does not occupy {geometry} "
+                                        f"squares; add it to its occupies or move it.")
+            for kid, name in (row.get("names") or {}).items():
+                if kid not in kinds or not isinstance(name, str):
+                    problems.append(f"{at}.names.{kid}: a kind id and the words for it.")
+    return problems
+
+
+def data() -> dict:
+    global _DATA
+    if _DATA is None:
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "rules" / "fixtures.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        problems = validate(raw)
+        if problems:
+            raise ValueError("content/rules/fixtures.json: " + " ".join(problems))
+        _DATA = raw
+    return _DATA
+
+
+def kinds() -> dict[str, dict]:
+    return data()["kinds"]
+
+
+def names() -> list[str]:
+    """The closed list, for the reader's schema."""
+    return sorted(kinds())
+
+
+def _profile(place_id: str, terrain: str = "", authored=None) -> dict:
+    """Which kinds type this place: the world's own list when it authored one, then the
+    spot's row, then the terrain's, then nothing."""
+    d = data()
+    bare = str(place_id or "").rsplit(floorplan.STOREY, 1)[0]
+    spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
+    row = dict(d.get("places", {}).get(spot) or {})
+    if not row or floorplan._storey(place_id):
+        # A storey is rooms over the work, not the work: the terrain's row, as for any
+        # room this table does not know.
+        row = dict(d.get("terrain", {}).get(str(terrain or "").strip().lower()) or {})
+    world = tuple(getattr(authored, "fixtures", ()) or ())
+    if world:
+        k = kinds()
+        row["solid"] = [w for w in world if "blocked" in k[w]["occupies"]] or row.get("solid", [])
+        row["rough"] = [w for w in world if "difficult" in k[w]["occupies"]] or row.get("rough", [])
+        row["raised"] = [w for w in world if "raised" in k[w]["occupies"]
+                         and not k[w].get("reached_by")] or row.get("raised", [])
+    return row
+
+
+def _components(squares: set) -> list[list[Point]]:
+    """4-connected clumps, biggest first, then by their first square: a stable order."""
+    left, out = set(squares), []
+    while left:
+        seed = min(left)
+        clump, todo = set(), [seed]
+        while todo:
+            p = todo.pop()
+            if p in clump or p not in left:
+                continue
+            clump.add(p)
+            todo.extend(((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)))
+        left -= clump
+        out.append(sorted(clump))
+    return sorted(out, key=lambda c: (-len(c), c[0]))
+
+
+def _fixture(kind: str, squares, level: int, row: dict) -> dict:
+    k = kinds()[kind]
+    many = len(squares) > 1 and k["form"] in ("box", "round")
+    name = (row.get("names") or {}).get(kind) or (k["plural"] if many else k["name"])
+    return {"kind": kind, "name": name, "squares": [list(p) for p in sorted(squares)],
+            "level": int(level), "form": k["form"],
+            "height": 0 if k["form"] == "none" else (1 if k.get("low") else 2)}
+
+
+def derive(grid: Grid | None, place_id: str, terrain: str = "", authored=None) -> list[dict]:
+    """The fixtures this place's existing geometry is, the same every time it is asked."""
+    if grid is None:
+        return []
+    plan = floorplan.for_place(place_id, terrain, authored)
+    if (plan.width, plan.height) != (grid.width, grid.height):
+        return []                    # a saved room of another shape: type nothing
+    shape = floorplan.shape_for(place_id, terrain, authored)
+    row = _profile(place_id, terrain, authored)
+    out: list[dict] = []
+    for slot, squares in (("solid", plan.blocked & grid.blocked),
+                          ("rough", plan.difficult & grid.difficult)):
+        kinds_here = row.get(slot) or ()
+        for i, clump in enumerate(_components(squares) if kinds_here else ()):
+            out.append(_fixture(kinds_here[i % len(kinds_here)], clump,
+                                grid.ground(clump[0]), row))
+    raised = {p: v for p, v in plan.floor.items() if grid.floor.get(p) == v}
+    kinds_up, n = row.get("raised") or (), 0
+    for level in sorted(set(raised.values())):
+        for clump in _components({p for p, v in raised.items() if v == level}):
+            if shape.vertical == "ledge":
+                out.extend(_gallery(grid, clump, level, place_id, row))
+            elif shape.vertical == "scatter" and kinds_up:
+                out.append(_fixture(kinds_up[n % len(kinds_up)], clump, level, row))
+                n += 1
+    return out
+
+
+def _gallery(grid: Grid, band: list, level: int, place_id: str, row: dict) -> list[dict]:
+    """A raised band and the stair up to it, on an open square at its foot.
+
+    The stair is the one thing phase 1 adds, and it changes no geometry: the square stays
+    open floor, so nothing standing there is ever inside it. Taken from the band's ends
+    (the first or last candidate in order, by the place's seed), which is where a stair
+    to a gallery runs.
+    """
+    gallery = _fixture("gallery", band, level, row)
+    inner = [q for p in band
+             for q in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1))
+             if grid.inside(q) and grid.ground(q) < level and q not in grid.blocked
+             and q not in grid.difficult]
+    ring = [q for q in inner if 0 < q[0] < grid.width - 1 and 0 < q[1] < grid.height - 1]
+    feet = sorted(set(ring or inner))
+    if not feet:
+        return [gallery]
+    foot = feet[-1] if floorplan._seed(place_id) % 2 else feet[0]
+    stair = _fixture("stair", [foot], grid.ground(foot), row)
+    stair["up_to"] = level
+    gallery["stair"] = list(foot)
+    return [gallery, stair]
+
+
+def type_the_ground(scene, place_id: str, terrain: str = "", authored=None) -> None:
+    """Name the ground the scene stands on: derive, add the reader's own, apply the reads.
+
+    The one door fixtures reach a grid by, called by `Engine.lay_the_ground` both when a
+    room is laid and when a saved one is loaded (a save carries no fixtures — they are
+    derived — so a campaign from before this module gains them on its next load).
+    """
+    grid = getattr(scene, "grid", None)
+    if grid is None:
+        return
+    named = [f for f in (getattr(scene, "fixtures_named", {}) or {}).get(place_id, ())
+             if f.get("kind") in kinds()
+             and all(grid.inside(tuple(p)) for p in f.get("squares") or ())]
+    for f in named:
+        if "blocked" in kinds()[f["kind"]]["occupies"]:
+            grid.blocked.update(tuple(p) for p in f["squares"])
+    grid.fixtures = derive(grid, place_id, terrain, authored) + [dict(f) for f in named]
+    grid.low = {tuple(p): grid.ground(tuple(p)) + 1 for f in grid.fixtures
+                if kinds()[f["kind"]].get("low") for p in f["squares"]}
+
+
+def at(grid: Grid | None, square) -> dict | None:
+    """The fixture standing on this square, or None."""
+    if grid is None or not getattr(grid, "fixtures", None):
+        return None
+    sq = [int(square[0]), int(square[1])]
+    return next((f for f in grid.fixtures if sq in f["squares"]), None)
+
+
+def stair_to(grid: Grid | None, square) -> tuple | None:
+    """The stair square by which a body walks up onto this raised square, or None."""
+    f = at(grid, square)
+    if f is None or not kinds()[f["kind"]].get("reached_by") or not f.get("stair"):
+        return None
+    return tuple(f["stair"])
+
+
+def climb_onto(grid: Grid | None, square) -> tuple[str, int] | None:
+    """(what it is, its Climb DC) when this raised square is a thing to climb onto."""
+    f = at(grid, square)
+    if f is None or f["level"] <= 0:
+        return None
+    dc = kinds()[f["kind"]].get("climb_dc")
+    return (f["name"], int(dc)) if dc is not None else None
+
+
+def seen(grid: Grid | None) -> list[dict]:
+    """The fixtures the player can see: every one not wholly inside fog or smoke."""
+    if grid is None or not getattr(grid, "fixtures", None):
+        return []
+    return [{k: f[k] for k in ("kind", "name", "squares", "level", "form", "height")}
+            for f in grid.fixtures
+            if not all(tuple(p) in grid.obscuring for p in f["squares"])]
+
+
+def said(grid: Grid | None) -> list[str]:
+    """The fixtures in plain words, no numbers: one phrase per kind, in map order."""
+    out: list[str] = []
+    by: dict[str, list[dict]] = {}
+    for f in getattr(grid, "fixtures", None) or ():
+        by.setdefault(f["kind"], []).append(f)
+    for kind, fs in by.items():
+        if kind == "stair" and "gallery" in by:
+            continue                     # said with the gallery it climbs to
+        first = fs[0]["name"]
+        phrase = first if len(fs) == 1 or first.startswith("the ") else kinds()[kind]["plural"]
+        if kind == "gallery" and any(f.get("stair") for f in fs):
+            phrase += " reached by a stair"
+        out.append(phrase)
+    return out
+
+
+def name_one(scene, kind: str, near: str | None = None) -> dict | None:
+    """Put down a fixture the reader named in a room that has none of that kind.
+
+    On a free square nearest the person the sentence put it by (else the player): open,
+    level floor, nobody standing on it, nothing solid in any of its eight neighbours —
+    so a new barrel can never wall a doorway shut or box anybody in. Kept for good:
+    stored in `Scene.fixtures_named` under the place, and the square stays solid.
+    """
+    grid = getattr(scene, "grid", None)
+    k = kinds().get(str(kind or ""))
+    if grid is None or grid.fixtures is None or k is None or not k.get("narratable"):
+        return None
+    if any(f["kind"] == kind for f in grid.fixtures):
+        return None
+    from .grid import distance
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    who = near or (pc.ref if pc is not None else "")
+    origin = tuple((scene.positions.get(who) or (grid.width // 2, grid.height // 2))[:2])
+    taken = scene.occupied() | {tuple(p) for f in grid.fixtures for p in f["squares"]}
+
+    def free(p) -> bool:
+        if not (0 < p[0] < grid.width - 1 and 0 < p[1] < grid.height - 1):
+            return False
+        if p in taken or p in grid.difficult or grid.ground(p) or not grid.passable(p):
+            return False
+        return not any((p[0] + dx, p[1] + dy) in grid.blocked
+                       for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+
+    spots = sorted((p for p in ((x, y) for x in range(grid.width) for y in range(grid.height))
+                    if free(p)), key=lambda p: (distance(origin, p), p))
+    if not spots:
+        return None
+    square = spots[0]
+    fixture = _fixture(kind, [square], 0, {})
+    fixture["named"] = True
+    grid.blocked.add(square)
+    if k.get("low"):
+        grid.low[square] = grid.ground(square) + 1
+    grid.fixtures.append(fixture)
+    scene.fixtures_named.setdefault(str(scene.at or ""), []).append(dict(fixture))
+    return fixture

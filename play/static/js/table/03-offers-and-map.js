@@ -107,6 +107,53 @@ function renderMap(s) {
     parts.push(`<line class="rail" x1="${c * CELL + 2}" y1="${(r + .5) * CELL}" x2="${
       (c + 1) * CELL - 2}" y2="${(r + .5) * CELL}"><title>a rail, ${
       v * 5} ft up</title></line>`);
+  // The named fixtures (rules/fixtures.py), drawn as forms that are data, never icons: a
+  // shelf or a bar is one long narrow block over its squares, a barrel round, a crate a
+  // square box, a stair three treads toward the higher ground beside it. Over the terrain
+  // fill they name and deaf to the pointer, so a lit square under a stair still queues
+  // the move onto it.
+  const fixtures = g.fixtures || [];
+  for (const f of fixtures) {
+    const sq = f.squares || [];
+    if (!sq.length || f.form === "none") continue;
+    const off = (f.level || 0) !== MAP_LEVEL && !(f.form === "steps") ? " offlevel" : "";
+    const tip = `<title>${esc(f.name)}</title>`;
+    if (f.form === "long") {
+      const xs = sq.map(p => p[0]), ys = sq.map(p => p[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs) + 1;
+      const y0 = Math.min(...ys), y1 = Math.max(...ys) + 1;
+      const across = x1 - x0 >= y1 - y0;      // the long way is the way the clump runs
+      parts.push(`<rect class="fx${off}" pointer-events="none" x="${
+        x0 * CELL + (across ? 1.5 : 4)}" y="${y0 * CELL + (across ? 4 : 1.5)}" width="${
+        (x1 - x0) * CELL - (across ? 3 : 8)}" height="${(y1 - y0) * CELL - (across ? 8 : 3)
+        }" rx="1.5">${tip}</rect>`);
+      continue;
+    }
+    for (const [c, r] of sq) {
+      if (f.form === "round") {
+        parts.push(`<circle class="fx${off}" pointer-events="none" cx="${(c + .5) * CELL
+          }" cy="${(r + .5) * CELL}" r="${CELL * .36}">${tip}</circle>`);
+      } else if (f.form === "box") {
+        parts.push(`<rect class="fx${off}" pointer-events="none" x="${c * CELL + 3}" y="${
+          r * CELL + 3}" width="${CELL - 6}" height="${CELL - 6}">${tip}</rect>`);
+      } else if (f.form === "steps") {
+        // Which way is up: toward the highest open neighbour.
+        const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+        const up = dirs.reduce((best, d) =>
+          at(c + d[0], r + d[1]) > at(c + best[0], r + best[1]) ? d : best, dirs[0]);
+        for (let i = 0; i < 3; i++) {
+          const t = (i + .5) / 3;
+          const along = up[0] ? (up[0] > 0 ? t : 1 - t) : (up[1] > 0 ? t : 1 - t);
+          parts.push(up[0]
+            ? `<line class="fxstep" pointer-events="none" x1="${(c + along) * CELL}" y1="${
+                r * CELL + 2}" x2="${(c + along) * CELL}" y2="${(r + 1) * CELL - 2}"/>`
+            : `<line class="fxstep" pointer-events="none" x1="${c * CELL + 2}" y1="${
+                (r + along) * CELL}" x2="${(c + 1) * CELL - 2}" y2="${(r + along) * CELL}"/>`);
+        }
+      }
+    }
+  }
+
   for (const [key, cost] of reach) {
     const [c, r] = key.split(",").map(Number);
     // data-sq is what makes the square a *destination* — the combat builder queues a
@@ -257,7 +304,10 @@ function renderMap(s) {
           v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}</div>${
         g.ceiling ? `<span class="seglabel">ceiling ${g.ceiling * 5} ft</span>` : ""}`
     : "";
-  const legend = `${g.speed ? `<p class="sub maplegend">${
+  // What is on the board, in the words the narrator is given (gm/brief/fixtures_here.py).
+  const named = [...new Set(fixtures.map(f => f.name))];
+  const legend = `${named.length ? `<p class="sub maplegend">Here: ${
+      esc(named.join(", "))}</p>` : ""}${g.speed ? `<p class="sub maplegend">${
       reach.size} squares within ${g.speed} ft</p>` : ""}${
       pools ? `<p class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</p>` : ""}`;

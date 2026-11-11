@@ -864,6 +864,12 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 else:
                     _to_the_town(row, str(a["place"]), scene, places, pc)
                     _nowhere(row, a, scene, places)
+            if act == "go" and a.get("fixture"):
+                # The reader named a fixture of the room (its closed `fixture`): one the
+                # room lacks is put on the map, near the player, and keeps its square.
+                from rules import fixtures as fixtures_mod
+
+                fixtures_mod.name_one(scene, str(a["fixture"]))
             if act == "call_on" and pc is not None:
                 # The reader's own call on a person who is standing here is the same walk
                 # home together; their door would refuse them ("is here, with you").

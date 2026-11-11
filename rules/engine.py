@@ -402,6 +402,9 @@ class Scene:
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
     # set by parent at read time. `Engine.found`/`Engine.venture` are the doors.
     founded: list[dict] = field(default_factory=list)
+    # Fixtures the reader named in a room that had none of that kind, by place id
+    # (`rules/fixtures.name_one`): the stored exception to derived fixtures, kept for good.
+    fixtures_named: dict[str, list[dict]] = field(default_factory=dict)
     # Places a person named that the settlement does not have yet (`rules/heard_places.py`):
     # heard of, not been to — Inform's *familiar*. Stored because a conversation made
     # them; each becomes a place through `found`, under the landmark the speaker gave,
@@ -13516,6 +13519,10 @@ class Engine:
         # but a brawl still has to happen on ground, and `floorplan.for_place("")` falls
         # through to open ground the way every fight used to get.
         if self.scene.grid is not None:
+            # A loaded grid carries no fixtures (they are derived, never saved): name it
+            # now, the one door `rules/fixtures.py` reaches a grid by.
+            if self.scene.grid.fixtures is None and self.scene.at:
+                self._type_the_ground()
             # The ground is down already; anybody still standing nowhere on it is put
             # at their zone now — a save from before arrivals were placed, a door that
             # added somebody before the player had a square. Nobody who HAS a square is
@@ -13534,6 +13541,7 @@ class Engine:
         authored = getattr(self.here(), "shape", None)
         self.scene.grid = floorplan.for_place(
             self.scene.at, places_mod.terrain_of(self.scene.at), authored)
+        self._type_the_ground()
         # The player first and everyone else around them, because `place_by_zone` measures
         # from the PC. A quarter of the way in, the same spot a fight would have put them,
         # and never off the board — a ten-foot alley is two squares wide.
@@ -13554,6 +13562,14 @@ class Engine:
         if unplaced:
             self.scene.place_by_zone(unplaced)
         return True
+
+    def _type_the_ground(self) -> None:
+        """Name the fixtures on the ground here (`rules/fixtures.type_the_ground`)."""
+        from . import fixtures, places as places_mod
+
+        fixtures.type_the_ground(self.scene, self.scene.at or "",
+                                 places_mod.terrain_of(self.scene.at or ""),
+                                 getattr(self.here(), "shape", None))
 
     def staff_the_place(self):
         """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
@@ -22517,13 +22533,20 @@ class Engine:
         cross a gap to reach its wall is a pathing question, and this is a permission
         question; `_move_cost` already answers "there is no route" with `None`.
         """
-        level = end[2] if len(end) > 2 else 0
-        was = start[2] if start is not None and len(start) > 2 else 0
+        grid = self.scene.grid
+        # A square written without a level is the floor THERE, which is where
+        # `settle_levels` puts a walker the moment they arrive. Reading it as level 0 let
+        # any move written as (x, y) walk a man straight up onto a ten-foot gallery that
+        # the same move written as (x, y, 2) was refused (found typing fixtures,
+        # 2026-11-11): the rule depended on how the square was spelled.
+        level = end[2] if len(end) > 2 else (grid.ground(end) if grid is not None else 0)
+        was = (start[2] if start is not None and len(start) > 2
+               else grid.ground(tuple(start[:2])) if grid is not None and start is not None
+               else 0)
         if level == was:
             return ""
         if level < 0:
             return f"{actor.name} cannot go below the floor."
-        grid = self.scene.grid
         roof = grid.headroom(end) if grid is not None else None
         if roof is not None and level > roof:
             return (f"There is not that much air above {actor.name}: the ceiling is "
@@ -22534,6 +22557,19 @@ class Engine:
         # Coming back down is always allowed — that is falling, and everybody can fall.
         if level < was:
             return ""
+        # Walking up a stair is walking (rules/fixtures.py): standing on the floor of a
+        # gallery that a stair reaches needs no climb speed.
+        from . import fixtures
+
+        if grid is not None and level == grid.ground(end) \
+                and fixtures.stair_to(grid, end) is not None:
+            return ""
+        onto = fixtures.climb_onto(grid, end)
+        if onto is not None:
+            # Phase 2 rolls this; until then the refusal names the check it would be.
+            return (f"{actor.name} cannot simply walk up onto {onto[0]}: getting up is a "
+                    f"Climb check (DC {onto[1]}), and the table does not roll that "
+                    f"for a move yet.")
         return (f"{actor.name} has no way up: no fly speed and no climb speed, and "
                 f"nothing here to climb.")
 
@@ -22556,8 +22592,12 @@ class Engine:
         from .grid import SQUARE_FT
 
         here, there = tuple(start[:2]), tuple(end[:2])
-        was = start[2] if len(start) > 2 else 0
-        now = end[2] if len(end) > 2 else 0
+        # A square written without a level is the floor there, as
+        # `_cannot_leave_the_ground` reads it: priced at 0, a move written (x, y) walked
+        # a gallery's height for free and skipped the stair (2026-11-11).
+        grid = self.scene.grid
+        was = start[2] if len(start) > 2 else grid.ground(here)
+        now = end[2] if len(end) > 2 else grid.ground(there)
         if there == here:
             # Straight up or straight down, without crossing the floor at all — which is
             # the commonest move a climber makes and the one `reachable` cannot answer:
@@ -22576,6 +22616,16 @@ class Engine:
             flat = reach.get(there)
             if flat is None:
                 return None
+            # Up a stair, the walk goes BY the stair: to its foot, then onto the gallery.
+            from . import fixtures
+
+            stair = fixtures.stair_to(self.scene.grid, there)
+            if stair is not None and now > was and here != stair \
+                    and not self.scene.actors[ref].can_move_vertically():
+                up = self.scene.grid.reachable(stair, 10_000, size=size,
+                                               occupied=occupied).get(there)
+                if reach.get(stair) is not None and up is not None:
+                    flat = reach[stair] + up
         return flat + abs(now - was) * SQUARE_FT
 
     def _op_advance_time(self, intent: Intent, partial: dict) -> Outcome:

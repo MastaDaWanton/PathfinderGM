@@ -286,6 +286,15 @@ class Grid:
     # the opposite of what a rail is for. A parapet stops a line that passes at or under
     # its top and lets everything over it through.
     parapet: dict[Point, int] = field(default_factory=dict)
+    # Blocked squares that are LOW obstacles (a table, a bar, a barrel), by the level of
+    # their top: they refuse movement like any solid square, but sight passes over them
+    # and they give cover the way a parapet does, never total cover (CRB p.195). Derived
+    # by `rules/fixtures.py` from the named fixtures and never saved: until fixtures, a
+    # tavern's tables were walls and an archer behind one could not be seen at all.
+    low: dict[Point, int] = field(default_factory=dict)
+    # The named fixtures on this ground (`rules/fixtures.py`), derived on lay and on load.
+    # None until typed — "no fixtures" is an answer and untyped is not (empty vs absent).
+    fixtures: list | None = None
 
     def inside(self, p: Point) -> bool:
         return 0 <= p[0] < self.width and 0 <= p[1] < self.height
@@ -318,7 +327,8 @@ class Grid:
         """Whether this square stops a line. `solid_only` asks only what is SOLID — a
         wall stops a blow, a bank of fog does not (alchemy plan §16.5: fog cloud gives
         "concealment", never cover) — so cover is asked with it and sight without."""
-        return p in self.blocked or (not solid_only and p in self.obscuring)
+        return (p in self.blocked and p not in self.low) or (
+            not solid_only and p in self.obscuring)
 
     def line_of_sight(self, a: Point, b: Point, solid_only: bool = False) -> bool:
         """1e draws a line from any corner of one square to any corner of the other and
@@ -407,7 +417,7 @@ class Grid:
         `_crosses_opaque`, but carrying the level along the segment: a rail whose top is
         level 2 stops a line running at 1 and does nothing to one running at 3.
         """
-        if not self.parapet:
+        if not self.parapet and not self.low:
             return False
         steps = max(1, int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) * 8) + 1)
         for i in range(steps + 1):
@@ -417,7 +427,7 @@ class Grid:
             for square in _squares_at(x, y):
                 if square in ignore:
                     continue
-                top = self.parapet.get(square)
+                top = self.parapet.get(square, self.low.get(square))
                 if top is not None and at <= top:
                     return True
         return False

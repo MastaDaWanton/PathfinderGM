@@ -30,6 +30,9 @@ already knows how to read:
 Nothing else. No doors, no furniture that is only scenery, no authored encounters — a
 feature the engine cannot act on is decoration, and decoration belongs in the prose the
 narrator writes, not in a data structure that has to be saved, drawn and reasoned about.
+(Since 2026-11-11 `rules/fixtures.py` NAMES these squares — this clump is the bar, that
+raised band a gallery reached by a stair — without changing any of them; every name it
+gives carries only properties the engine reads.)
 
 Keyed off the **spot** where the spot is one this app generates, and off the terrain
 otherwise. Both vocabularies are closed and small (`places._SETTLEMENT`, `places._WILD`,
@@ -79,6 +82,10 @@ class Shape:
     #   none     flat, and meant to be
     vertical: str = "ledge"
     about: str = ""
+    # The fixture kinds a WORLD wrote for this place (`fixtures` in the export, a closed
+    # list: content/rules/fixtures.json). Empty for every derived shape; `rules/fixtures`
+    # reads it in place of the spot's own row.
+    fixtures: tuple = ()
 
 
 # Two squares of headroom is a house: ten feet, enough for a Medium creature to stand with
@@ -422,9 +429,24 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
     clutter = str(raw.get("clutter") or "").strip().lower()
     footing = str(raw.get("footing") or "").strip().lower()
     vertical = str(raw.get("vertical") or "").strip().lower()
-    if not (size or clutter or footing or vertical):
+    # The world's own fixture kinds, held to the closed list: a word outside it is
+    # dropped, never guessed at (models read, code validates — 2026-10-03). Imported only
+    # when the world wrote some: tools/check_places.py runs this module without Django.
+    named: tuple = ()
+    if isinstance(raw.get("fixtures"), list) and raw["fixtures"]:
+        from . import fixtures as fixtures_mod
+
+        named = tuple(dict.fromkeys(
+            w for w in (str(x or "").strip().lower() for x in raw["fixtures"])
+            if w in fixtures_mod.kinds()))
+    if not (size or clutter or footing or vertical or named):
         return None
     base = ground if ground is not None else OPEN
+    if not (size or clutter or footing or vertical):
+        # Fixtures and nothing else: the room keeps the table's shape exactly.
+        from dataclasses import replace
+
+        return replace(base, fixtures=named)
     width = _squares(size.get("width"), base.width)
     height = _squares(size.get("depth"), base.height)
     # An authored height of null is a place with no roof, which is a fact and not a gap:
@@ -444,7 +466,7 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
                  rough=max(0, rough),
                  rise=max(3, inner // 60) if kind == "scatter" else 0,
                  rise_to=2 if kind == "slope" else 1,
-                 vertical=kind, about=base.about)
+                 vertical=kind, about=base.about, fixtures=named)
 
 
 def _squares(feet, fallback: int) -> int:
