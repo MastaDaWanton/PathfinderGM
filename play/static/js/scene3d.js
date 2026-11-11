@@ -161,8 +161,17 @@
     pc: [0xd9, 0xc0, 0x8a],
     ally: [0x6f, 0xc2, 0x76],
     foe: [0xe0, 0x26, 0x1e],
-    bystander: [0xf2, 0xec, 0xdd]
+    bystander: [0xf2, 0xec, 0xdd],
+    // Fixtures (2026-11-11), from the table's own palette: wood from the leather and brass
+    // browns, stone from the board's greys, book spines from the side colours dimmed.
+    wood: [0x6b, 0x4a, 0x3a], wooddark: [0x4a, 0x33, 0x26], plank: [0x7d, 0x68, 0x45],
+    tread: [0x9a, 0x84, 0x58], hoop: [0x2e, 0x26, 0x1e], stone: [0x5c, 0x58, 0x52],
+    stonedark: [0x3a, 0x31, 0x28], iron: [0x6a, 0x6f, 0x76], water: [0x2e, 0x3c, 0x46],
+    waterhi: [0x6a, 0x7a, 0x86], spine0: [0x7d, 0x1a, 0x14], spine1: [0x1f, 0x4a, 0x26],
+    spine2: [0x7d, 0x68, 0x45], spine3: [0x3a, 0x40, 0x48], spine4: [0x7a, 0x6f, 0x5a]
   };
+  // A fire is its own light: the ember, never shaded by the lamp.
+  var EMBER = "#ffb054";
 
   // A square the party can reach is a WASH over whatever the ground already is, which is
   // what the flat map does with it — `#map .reach { fill: var(--gold); opacity: .12 }`.
@@ -270,6 +279,175 @@
 
   function key(c, r) { return c + "," + r; }
 
+  // --- fixtures as the things they are (2026-11-11) ---------------------------------------
+  // The owner: "i want the fixtures to actually look like what the represent". Each kind
+  // in content/rules/fixtures.json is built from the same lit faces as everything else —
+  // prisms, slabs and thin panels laid on their faces — never an image or an icon, in the
+  // table's own browns, greys and ember. Detail panels carry `fxd` (no outline stroke, so a
+  // plank seam reads as a seam) and `pointer-events="none"`, so a click still lands on the
+  // square under them.
+
+  // A box whose top and sides are different stuff: a tread over its riser, a counter top.
+  function slab2(out, x0, y0, x1, y1, z0, z1, top, side, cls, attrs) {
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], UP, top, cls, attrs);
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], NORTH, side, cls, attrs);
+    face(out, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], SOUTH, side, cls, attrs);
+    face(out, [[x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0]], WEST, side, cls, attrs);
+    face(out, [[x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0]], EAST, side, cls, attrs);
+  }
+
+  // An upright n-sided prism: a barrel's staves (or only a band of them, `sidesOnly`).
+  function prism(out, cx, cy, r, z0, z1, mat, cls, sidesOnly, top) {
+    var n = 8, ring = [];
+    for (var i = 0; i < n; i++) {
+      var a = (i + 0.5) / n * 2 * Math.PI;
+      ring.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    for (i = 0; i < n; i++) {
+      var p = ring[i], q = ring[(i + 1) % n], m = (i + 1) / n * 2 * Math.PI;
+      face(out, [[p[0], p[1], z1], [q[0], q[1], z1], [q[0], q[1], z0], [p[0], p[1], z0]],
+           [Math.cos(m), Math.sin(m), 0], mat, cls, NOPOINT);
+    }
+    if (!sidesOnly) {
+      face(out, ring.map(function (p) { return [p[0], p[1], z1]; }), UP, top || mat, cls,
+           NOPOINT);
+    }
+  }
+
+  // A thin panel lying on one face of the box [x0,x1]x[y0,y1], `d` the face's outward
+  // direction, from fraction a0 to a1 along it and z0 to z1 up it, a hair proud of it.
+  function panel(out, x0, y0, x1, y1, d, a0, a1, z0, z1, mat, cls) {
+    var e = 0.012, pts;
+    if (d[1]) {
+      var py = d[1] > 0 ? y1 + e : y0 - e, u0 = x0 + (x1 - x0) * a0, u1 = x0 + (x1 - x0) * a1;
+      pts = [[u0, py, z1], [u1, py, z1], [u1, py, z0], [u0, py, z0]];
+    } else {
+      var px = d[0] > 0 ? x1 + e : x0 - e, v0 = y0 + (y1 - y0) * a0, v1 = y0 + (y1 - y0) * a1;
+      pts = [[px, v0, z1], [px, v1, z1], [px, v1, z0], [px, v0, z0]];
+    }
+    face(out, pts, [d[0], d[1], 0], mat, cls + " fxd", NOPOINT);
+  }
+
+  // A thin strip on a top face at height z, across the square along x (`alongX`) or y.
+  function seam(out, x0, y0, x1, y1, z, at, alongX, mat, cls) {
+    var w = 0.025;
+    var pts = alongX
+      ? [[x0, at - w, z], [x1, at - w, z], [x1, at + w, z], [x0, at + w, z]]
+      : [[at - w, y0, z], [at + w, y0, z], [at + w, y1, z], [at - w, y1, z]];
+    face(out, pts, UP, mat, cls + " fxd", NOPOINT);
+  }
+
+  var NOPOINT = ' pointer-events="none"';
+  var SIDES = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  var SPINES = ["spine0", "spine1", "spine2", "spine3", "spine4"];
+
+  /* One fixture square, drawn as its kind. `front` is the side facing the open floor
+     (where a shelf's spines and a hearth's fire are), `runX` whether the fixture runs
+     along x (a counter's length, a cart's axle across it). Returns the height it reaches,
+     or -1 when the kind has no drawing of its own and the plain block should stand. */
+  function fixtureAt(out, f, x, y, z, front, runX, cls) {
+    var k = f.kind, i;
+    if (k === "barrel") {
+      prism(out, x + 0.5, y + 0.5, 0.36, z, z + 0.9, "wood", cls, false, "plank");
+      prism(out, x + 0.5, y + 0.5, 0.372, z + 0.15, z + 0.24, "hoop", cls + " fxd", true);
+      prism(out, x + 0.5, y + 0.5, 0.372, z + 0.66, z + 0.75, "hoop", cls + " fxd", true);
+      return z + 0.9;
+    }
+    if (k === "crate") {
+      var b = [x + 0.1, y + 0.1, x + 0.9, y + 0.9], h = z + 0.82;
+      slab(out, b[0], b[1], b[2], b[3], z, h, "wood", cls, NOPOINT);
+      SIDES.forEach(function (d) {
+        panel(out, b[0], b[1], b[2], b[3], d, 0, 1, z + 0.27, z + 0.3, "wooddark", cls);
+        panel(out, b[0], b[1], b[2], b[3], d, 0, 1, z + 0.53, z + 0.56, "wooddark", cls);
+        panel(out, b[0], b[1], b[2], b[3], d, 0.04, 0.12, z + 0.04, h - 0.02, "plank", cls);
+        panel(out, b[0], b[1], b[2], b[3], d, 0.88, 0.96, z + 0.04, h - 0.02, "plank", cls);
+      });
+      seam(out, b[0], b[1], b[2], b[3], h + 0.002, y + 0.37, true, "wooddark", cls);
+      seam(out, b[0], b[1], b[2], b[3], h + 0.002, y + 0.63, true, "wooddark", cls);
+      return h;
+    }
+    if (k === "table") {
+      slab2(out, x + 0.02, y + 0.02, x + 0.98, y + 0.98, z + 0.68, z + 0.8, "plank", "wood",
+            cls, NOPOINT);
+      [[0.1, 0.1], [0.82, 0.1], [0.1, 0.82], [0.82, 0.82]].forEach(function (l) {
+        slab(out, x + l[0], y + l[1], x + l[0] + 0.08, y + l[1] + 0.08, z, z + 0.68,
+             "wooddark", cls, NOPOINT);
+      });
+      return z + 0.8;
+    }
+    if (k === "counter") {
+      slab(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, z, z + 0.95, "wooddark", cls,
+           NOPOINT);
+      slab2(out, x, y, x + 1, y + 1, z + 0.95, z + 1.05, "plank", "wood", cls, NOPOINT);
+      panel(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, front, 0.12, 0.88, z + 0.15,
+            z + 0.82, "wood", cls);
+      return z + 1.05;
+    }
+    if (k === "hearth") {
+      slab(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, z, z + 1, "stone", cls, NOPOINT);
+      SIDES.forEach(function (d) {
+        panel(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, d, 0, 1, z + 0.33, z + 0.36,
+              "stonedark", cls);
+        panel(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, d, 0, 1, z + 0.66, z + 0.69,
+              "stonedark", cls);
+      });
+      panel(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, front, 0.22, 0.78, z + 0.06,
+            z + 0.62, "ember", cls);
+      face(out, [[x + 0.28, y + 0.28, z + 1.003], [x + 0.72, y + 0.28, z + 1.003],
+                 [x + 0.72, y + 0.72, z + 1.003], [x + 0.28, y + 0.72, z + 1.003]],
+           UP, "ember", cls + " fxd", NOPOINT);
+      return z + 1;
+    }
+    if (k === "bookshelf" || k === "rack") {
+      // A case against the wall behind it, its open face to the room.
+      var c0 = [x, y, x + 1, y + 1], depth = 0.5, top = z + 1.9;
+      if (front[1] > 0) c0[1] = y + 1 - depth;
+      else if (front[1] < 0) c0[3] = y + depth;
+      else if (front[0] > 0) c0[0] = x + 1 - depth;
+      else c0[2] = x + depth;
+      slab(out, c0[0], c0[1], c0[2], c0[3], z, top, "wooddark", cls, NOPOINT);
+      var rows = [z + 0.06, z + 0.68, z + 1.3];
+      rows.forEach(function (r0, ri) {
+        panel(out, c0[0], c0[1], c0[2], c0[3], front, 0, 1, r0 - 0.05, r0, "plank", cls);
+        if (k === "bookshelf") {
+          var spots = [[0.05, 0.22], [0.24, 0.37], [0.39, 0.58], [0.6, 0.74], [0.76, 0.95]];
+          spots.forEach(function (s, si) {
+            var tall = 0.42 + ((si + ri) % 3) * 0.05;
+            panel(out, c0[0], c0[1], c0[2], c0[3], front, s[0], s[1], r0, r0 + tall,
+                  SPINES[(si * 2 + ri) % SPINES.length], cls);
+          });
+        } else {
+          [0.18, 0.5, 0.82].forEach(function (a) {
+            panel(out, c0[0], c0[1], c0[2], c0[3], front, a - 0.025, a + 0.025, r0,
+                  r0 + 0.52, "iron", cls);
+          });
+        }
+      });
+      panel(out, c0[0], c0[1], c0[2], c0[3], front, 0, 1, top - 0.05, top, "plank", cls);
+      return top;
+    }
+    if (k === "cart") {
+      var bed0 = z + 0.32, bed1 = z + 0.6;
+      slab(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, bed0, bed1, "wood", cls, NOPOINT);
+      seam(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, bed1 + 0.002, runX ? y + 0.37 : x + 0.37,
+           runX, "wooddark", cls);
+      seam(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, bed1 + 0.002, runX ? y + 0.63 : x + 0.63,
+           runX, "wooddark", cls);
+      // A wheel on each long side: an upright octagon, its hub at the axle.
+      (runX ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]]).forEach(function (d) {
+        var pts = [], r = 0.3, cz = z + 0.3;
+        for (i = 0; i < 8; i++) {
+          var a = (i + 0.5) / 8 * 2 * Math.PI, u = 0.5 + r * Math.cos(a), w = cz + r * Math.sin(a);
+          pts.push(d[1] ? [x + u, d[1] > 0 ? y + 0.97 : y + 0.03, w]
+                        : [d[0] > 0 ? x + 0.97 : x + 0.03, y + u, w]);
+        }
+        face(out, pts, [d[0], d[1], 0], "hoop", cls, NOPOINT);
+      });
+      return bed1;
+    }
+    return -1;
+  }
+
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -301,6 +479,59 @@
       (f.squares || []).forEach(function (p) { fx[key(p[0], p[1])] = f; });
       if (f.form === "steps") stairs.push(f);
     });
+
+    // Which way a fixture runs (a counter's length) and which side of a square faces the
+    // open floor (where a shelf shows its spines and a hearth its fire).
+    function runsX(f) {
+      var xs = f.squares.map(function (p) { return p[0]; });
+      var ys = f.squares.map(function (p) { return p[1]; });
+      return Math.max.apply(null, xs) - Math.min.apply(null, xs) >=
+             Math.max.apply(null, ys) - Math.min.apply(null, ys);
+    }
+    function frontOf(f, x, y) {
+      var sides = runsX(f) ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
+      for (var i = 0; i < sides.length; i++) {
+        var nx = x + sides[i][0], ny = y + sides[i][1];
+        if (nx >= 0 && ny >= 0 && nx < W && ny < H && !solid[key(nx, ny)]) return sides[i];
+      }
+      return sides[0];
+    }
+    // What lies ON a walkable square: a gallery's planks, water's ripples, rubble's stones.
+    function surface(out, f, x, y, z, cls) {
+      if (!f) return;
+      var t = z + 0.003;
+      if (f.kind === "gallery") {
+        var ax = runsX(f);
+        [0.33, 0.66].forEach(function (a) {
+          seam(out, x, y, x + 1, y + 1, t, (ax ? y : x) + a, ax, "wooddark", cls);
+        });
+      } else if (f.kind === "water") {
+        face(out, [[x + 0.15, y + 0.33, t], [x + 0.6, y + 0.33, t], [x + 0.6, y + 0.37, t],
+                   [x + 0.15, y + 0.37, t]], UP, "waterhi", cls + " fxd", NOPOINT);
+        face(out, [[x + 0.4, y + 0.68, t], [x + 0.85, y + 0.68, t], [x + 0.85, y + 0.72, t],
+                   [x + 0.4, y + 0.72, t]], UP, "waterhi", cls + " fxd", NOPOINT);
+      } else if ((f.kind === "crate" || f.kind === "cart") && z > 0) {
+        // Climbable: the raised square itself is the crate or the cart's bed.
+        SIDES.forEach(function (d) {
+          if (f.kind === "crate") {
+            panel(out, x, y, x + 1, y + 1, d, 0.04, 0.12, 0.04, z - 0.02, "plank", cls);
+            panel(out, x, y, x + 1, y + 1, d, 0.88, 0.96, 0.04, z - 0.02, "plank", cls);
+            panel(out, x, y, x + 1, y + 1, d, 0, 1, z * 0.5 - 0.015, z * 0.5 + 0.015,
+                  "wooddark", cls);
+          }
+        });
+        seam(out, x, y, x + 1, y + 1, t, y + 0.37, true, "wooddark", cls);
+        seam(out, x, y, x + 1, y + 1, t, y + 0.63, true, "wooddark", cls);
+      } else if (f.kind === "rubble") {
+        var h = (x * 7 + y * 13) % 5;
+        [[0.15, 0.2, 0.18], [0.55, 0.15, 0.12], [0.35, 0.6, 0.2], [0.68, 0.62, 0.14]]
+          .forEach(function (r, i) {
+            if ((h + i) % 5 === 4) return;
+            slab(out, x + r[0], y + r[1], x + r[0] + 0.2, y + r[1] + 0.17, z, z + r[2],
+                 "stone", cls + " fxd", NOPOINT);
+          });
+      }
+    }
 
     var reach = {};
     (g.reachable || []).forEach(function (e) { reach[key(e[0], e[1])] = e; });
@@ -351,13 +582,35 @@
            making the stacks translucent would be telling the player they have a shot. */
         if (!solid[k] && topz > level) cls += " above";
 
-        cap(faces, x, y, topz, mat, cls, hit,
-            fx[k] && solid[k] ? "<title>" + esc(fx[k].name) + "</title>" : "",
-            solid[k] ? (fx[k] && fx[k].form === "round" ? 0.18 : 0.07) : 0, wash);
-        if (topz > 0) {
-          walls(faces, x, y, topz,
-                [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y), topAt(x + 1, y)],
-                mat, cls);
+        var f3 = fx[k], drawn = -1;
+        // A crate or cart you can climb onto (a raised square, not a solid one) is a thing
+        // in the room, not somebody's floor overhead: never drawn through, and built of wood.
+        if (f3 && !solid[k] && (f3.kind === "crate" || f3.kind === "cart")) {
+          cls = cls.replace(" above", "");
+          mat = "wood";
+        }
+        if (solid[k] && f3) {
+          drawn = fixtureAt(faces, f3, x, y, z, frontOf(f3, x, y), runsX(f3), cls);
+        }
+        if (drawn >= 0) {
+          // The floor under it, holding the name for the pointer (the drawing is deaf).
+          cap(faces, x, y, z, z ? "raised" : "tile", "tile", "",
+              "<title>" + esc(f3.name) + "</title>", 0, false);
+          if (z > 0) {
+            walls(faces, x, y, z, [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y),
+                                   topAt(x + 1, y)], "raised", "tile");
+          }
+        } else {
+          if (f3 && f3.kind === "water") mat = "water";
+          cap(faces, x, y, topz, mat, cls, hit,
+              f3 && solid[k] ? "<title>" + esc(f3.name) + "</title>" : "",
+              solid[k] ? (f3 && f3.form === "round" ? 0.18 : 0.07) : 0, wash);
+          if (topz > 0) {
+            walls(faces, x, y, topz,
+                  [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y), topAt(x + 1, y)],
+                  mat, cls);
+          }
+          surface(faces, f3, x, y, topz, cls);
         }
 
         if (rails[k] !== undefined) {
@@ -426,35 +679,33 @@
       }
     }
 
-    /* A stair as steps: three treads climbing toward the higher ground beside it, drawn
-       over the square's own floor and deaf to the pointer, so the floor under them still
-       takes the click that queues a move onto the stair. */
+    /* A stair as real steps (2026-11-11, the owner: "get the shape right"): four solid
+       steps climbing toward the higher ground beside it, each a lighter tread over a
+       darker riser, the last one meeting the gallery's floor. Deaf to the pointer, so the
+       floor under them still takes the click that queues a move onto the stair. */
     stairs.forEach(function (f) {
       (f.squares || []).forEach(function (p) {
         var sx = p[0], sy = p[1], z0 = ground[key(sx, sy)] || 0;
-        var dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]], best = dirs[0], hi = -1;
-        dirs.forEach(function (d) {
+        var best = SIDES[0], hi = -1;
+        SIDES.forEach(function (d) {
           var h = topAt(sx + d[0], sy + d[1]);
           if (!solid[key(sx + d[0], sy + d[1])] && h > hi) { hi = h; best = d; }
         });
-        for (var i = 0; i < 3; i++) {
-          var a = i / 3, b = (i + 1) / 3, x0, x1, y0, y1;
-          // Treads run from the far side of the square toward the gallery.
-          if (best[0]) { x0 = best[0] > 0 ? sx + a : sx + 1 - b; x1 = x0 + 1 / 3; y0 = sy; y1 = sy + 1; }
-          else { y0 = best[1] > 0 ? sy + a : sy + 1 - b; y1 = y0 + 1 / 3; x0 = sx; x1 = sx + 1; }
-          var zt = z0 + (i + 1) * Math.max(1, hi - z0) / 4;
-          var cls3 = "fxstep" + (zt > level ? " above" : "");
-          face(faces, [[x0, y0, zt], [x1, y0, zt], [x1, y1, zt], [x0, y1, zt]], UP, "rail",
-               cls3, ' pointer-events="none"');
-          face(faces, [[x0, y0, zt], [x1, y0, zt], [x1, y0, z0], [x0, y0, z0]], NORTH, "rail",
-               cls3, ' pointer-events="none"');
-          face(faces, [[x0, y1, zt], [x1, y1, zt], [x1, y1, z0], [x0, y1, z0]], SOUTH, "rail",
-               cls3, ' pointer-events="none"');
-          face(faces, [[x0, y0, zt], [x0, y1, zt], [x0, y1, z0], [x0, y0, z0]], WEST, "rail",
-               cls3, ' pointer-events="none"');
-          face(faces, [[x1, y0, zt], [x1, y1, zt], [x1, y1, z0], [x1, y0, z0]], EAST, "rail",
-               cls3, ' pointer-events="none"');
+        var rise = Math.max(1, hi - z0), n = 4;
+        for (var i = 0; i < n; i++) {
+          // Step i covers the i-th quarter of the square counted from the far side, so
+          // the highest step is the one against the gallery.
+          var a0 = (n - 1 - i) / n, a1 = (n - i) / n, x0, x1, y0, y1;
+          if (best[0]) {
+            x0 = best[0] > 0 ? sx + a0 : sx + 1 - a1; x1 = x0 + 1 / n; y0 = sy; y1 = sy + 1;
+          } else {
+            y0 = best[1] > 0 ? sy + a0 : sy + 1 - a1; y1 = y0 + 1 / n; x0 = sx; x1 = sx + 1;
+          }
+          var zt = z0 + (n - i) * rise / n;
+          slab2(faces, x0, y0, x1, y1, z0, zt, "tread", "wooddark",
+                "fxstep" + (z0 > level ? " above" : ""), NOPOINT);
         }
+        if (z0 + rise > tallest) tallest = z0 + rise;
       });
     });
 
@@ -539,7 +790,8 @@
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
       return '<polygon class="' + f.cls + '" fill="' +
-        (f.mat === "area" ? AREA : paint(f.mat, shade(f.n, turn), f.wash)) +
+        (f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
+         : paint(f.mat, shade(f.n, turn), f.wash)) +
         '" points="' +
         pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") +
         '"' + f.attrs + (f.inner ? ">" + f.inner + "</polygon>" : "/>");

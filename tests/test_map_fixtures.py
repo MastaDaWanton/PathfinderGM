@@ -341,3 +341,24 @@ def test_both_boards_draw_a_gallery_rail_on_its_edge_not_through_the_square_in_f
     assert "(ground[n] || 0) >= top) edge = d;" in three
     assert "slab(faces, ex0, ey0, ex1, ey1, top, top + rh" in three
     assert "at(c + dx, r + dy) >= v);" in flat
+
+
+def test_every_fixture_kind_is_drawn_as_itself_on_the_flat_board():
+    """The owner, 2026-11-11: "i want the fixtures to actually look like what the
+    represent". Until then every kind was one brass block, circle or square: a barrel and
+    a crate differed only in corners. Each kind in the closed list now names a symbol the
+    board defines, and the symbols carry no gradient — a url(#id) resolves to the first
+    copy in the page, and with the map tab hidden Chrome painted the hearth's fire grey."""
+    import re
+
+    from django.conf import settings
+
+    flat = (settings.BASE_DIR / "play" / "static" / "js" / "table"
+            / "03-offers-and-map.js").read_text(encoding="utf-8")
+    table = re.search(r"const FX_SYMBOL = \{(.*?)\};", flat, re.S).group(1)
+    symbols = dict(re.findall(r"(\w+): \"(\w+)\"", table))
+    defs = flat[flat.index("const FX_DEFS"):flat.index("function renderMap")]
+    for kind in fixtures.kinds():
+        assert kind in symbols, f"{kind} has no drawing on the flat board"
+        assert f'id="fx-{symbols[kind]}"' in defs, f"no symbol fx-{symbols[kind]}"
+    assert "url(#" not in defs
