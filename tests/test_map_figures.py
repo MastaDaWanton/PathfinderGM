@@ -69,3 +69,21 @@ def test_a_reachable_square_under_a_gallery_still_takes_the_click(tmp_path):
     svg = _render(tmp_path, grid, [], {"turn": 0, "reach": True})
     over = re.findall(r'<polygon class="xsq[^"]*"[^>]*>', svg)
     assert len(over) == 1 and 'data-sq="3,3"' in over[0]
+
+
+@needs_node
+def test_stone_runs_in_the_plane_of_the_wall_from_a_handful_of_patterns(tmp_path):
+    """The flat board had stone, planks and spines; the 3D one had flat colour, and the
+    owner asked for "the textures like stone" there too. Every side of a wall wears the
+    stone pattern, laid by `patternTransform` in that face's plane. The patterns are per
+    material, orientation and lit colour, never per square: a 24x24 board of walls needs
+    no more of them than one wall does (measured: 8 on the library, the same on 24x24)."""
+    one = _render(tmp_path, _grid(blocked=[[3, 3]]), [], {"turn": 0})
+    sides = re.findall(r'<polygon class="solid[^"]*" fill="([^"]+)"', one)
+    plain = [f for f in sides if not f.startswith("url(#s3stone")]
+    assert len(sides) == 6 and len(plain) == 1, sides     # 4 walls, the top, its dark lip
+    assert "patternTransform=\"matrix(" in one
+    walls = [[c, r] for c in range(24) for r in range(24) if (c * 7 + r * 3) % 5 == 0]
+    many = _render(tmp_path, _grid(width=24, height=24, blocked=walls), [], {"turn": 0})
+    count = lambda svg: svg.count("<pattern ")
+    assert count(many) == count(one), (count(one), count(many))

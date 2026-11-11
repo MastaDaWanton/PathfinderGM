@@ -212,12 +212,10 @@
      plainly not who you are looking at. */
   #map .token.offlevel { opacity: .32; }
   #map .here { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .5; }
-  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point
-     is to be able to read the board at a glance, and shading exists only to tell one
-     face of a box from another. The two visible sides are stepped darker so a cube
-     reads as a cube without an outline round it. */
-  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point is
-     to read the board at a glance.
+  /* The three-dimensional view. The point is to read the board at a glance. Since
+     2026-11-11 stone, planks and flagstones are SVG patterns laid in each face's plane
+     and painted in its lit colour (scene3d.js, TILES), asked for by the owner: "make the
+     textures like stone apear in the 3D view as well".
 
      There are no `fill` rules here on purpose, and that is the whole of the rework. Every
      face's colour is its material multiplied by a light that belongs to the ROOM, worked
@@ -233,7 +231,7 @@
   #view3d .lit.face-top { cursor: pointer; }
   #view3d .lit.face-top:hover { fill: var(--gold); }
   /* Solid things read as solid: a seam between two faces of one box says "two faces". */
-  #view3d .fig, #view3d .rail3 { stroke: none; }
+  #view3d .fig, #view3d .rail3, #view3d .txs, #view3d .floortex { stroke: none; }
   #view3d .fig.offlevel { opacity: .38; }
   /* Every mass is solid (the half-clear gallery read as a glass block). What a mass hides
      is drawn over it, last: a token as a ghost of itself in its side's colour, a square

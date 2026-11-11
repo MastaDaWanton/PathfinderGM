@@ -279,6 +279,72 @@
 
   function key(c, r) { return c + "," + r; }
 
+  /* --- textures (2026-11-11) -----------------------------------------------------------
+     The owner: "make the textures like stone apear in the 3D view as well". Stone courses
+     on walls and the sides of raised ground, planks on wall-walk tops and crates, a
+     subtle flagstone on the floor: the flat board's materials, as SVG patterns.
+
+     A pattern is laid in the FACE'S OWN PLANE. Its tile is drawn in squares and levels
+     (u along the face, v up it or across it) and `patternTransform` is the projection of
+     those two axes, so a course of stone runs level along a side face and a plank runs
+     along a top, and both turn with the board. Under an orthographic camera every face
+     of one orientation shares that map, so a board needs one pattern per material,
+     orientation and lit colour — about a dozen — never one per square.
+
+     The lamp stays on top of the texture: the pattern is painted in the face's lit
+     colour (stone mortar and plank seams are that colour darkened), so a wall turned
+     away from the lamp is dark stone and the lit one bright stone, as before.
+
+     The cost the projection leaves: parallel walls a row apart start their courses at
+     different heights (the plane through the origin is what the transform anchors). Real
+     masonry is not coursed to the board either; measured by eye, it does not read. */
+  function tint(hex, k) {
+    var out = "#";
+    for (var i = 1; i < 7; i += 2) {
+      var v = Math.round(Math.max(0, Math.min(255, parseInt(hex.substr(i, 2), 16) * k)));
+      out += (v < 16 ? "0" : "") + v.toString(16);
+    }
+    return out;
+  }
+  var TILES = {
+    // Coursed stone: courses a quarter-level high, stones half a square long, bonded.
+    stone: function (c) {
+      var m = tint(c, 0.6);
+      return [1, 0.5, '<rect width="1" height=".5" fill="' + c + '"/>' +
+        '<rect x=".5" width=".5" height=".25" fill="' + tint(c, 1.1) + '"/>' +
+        '<rect x=".25" y=".25" width=".5" height=".25" fill="' + tint(c, 0.9) + '"/>' +
+        '<path d="M0 0h1v.025H0zM0 .25h1v.025H0zM0 0h.02v.25H0zM.5 0h.02v.25h-.02z' +
+        'M.25 .25h.02v.25h-.02zM.75 .25h.02v.25h-.02z" fill="' + m + '"/>'];
+    },
+    // Boards a quarter-square wide, butt joints staggered.
+    plank: function (c) {
+      return [1, 0.75, '<rect width="1" height=".75" fill="' + c + '"/>' +
+        '<rect y=".25" width="1" height=".25" fill="' + tint(c, 1.07) + '"/>' +
+        '<path d="M0 0h1v.02H0zM0 .25h1v.02H0zM0 .5h1v.02H0zM.3 0h.02v.25h-.02z' +
+        'M.75 .25h.02v.25h-.02zM.12 .5h.02v.25h-.02z" fill="' + tint(c, 0.62) + '"/>'];
+    },
+    /* The floor, quietly: two rows of slabs to a square, joints only, laid once over
+       the whole ground as one polygon (see `ground` in render). Painted per tile it was
+       576 pattern fills on a 24x24 board and doubled the time a turn takes to show
+       (52 ms to 113, measured in Chrome); one overlay costs about nothing. */
+    flag: function () {
+      return [1, 1, '<path d="M0 .5h1v.018H0zM.5 0h.018v.5h-.018zM.25 .5h.018v.5h-.018z' +
+        'M.75 .5h.018v.5h-.018z" fill="#0a0806" fill-opacity=".3"/>' +
+        '<rect x=".5" width=".5" height=".5" fill="#0a0806" fill-opacity=".05"/>'];
+    }
+  };
+  // Which texture a face wears: axis-aligned faces only (a barrel's staves and a figure
+  // keep their flat lit colour), and never the thin detail panels laid over a face.
+  function textureOf(f) {
+    if (f.cls.indexOf("fxd") >= 0 || f.cls.lastIndexOf("fig", 0) === 0) return null;
+    var up = f.n[2] === 1, side = !f.n[2] && (Math.abs(f.n[0]) === 1 || Math.abs(f.n[1]) === 1);
+    if (!up && !side) return null;
+    if (f.mat === "solid" || f.mat === "stone") return "stone";
+    if (f.mat === "raised") return up ? "plank" : "stone";
+    if (f.mat === "wood" || (f.mat === "plank" && up)) return "plank";
+    return null;
+  }
+
   // Whether screen point p lies inside polygon q (even-odd ray cast).
   function inside(p, q) {
     var hit = false;
@@ -797,7 +863,14 @@
       f.d = depth(f.at, turn);
       f.sp = f.pts.map(function (p) { return project(p, turn); });
     });
-    faces.sort(function (a, b) { return a.d - b.d; });
+    /* Ground-level floor first, whatever its depth: nothing lies under it, so it can
+       never hide anything and is always safe to paint before the rest. That makes room
+       for the floor's texture to go down as ONE polygon right after it. */
+    faces.forEach(function (f) {
+      f.ground = f.n === UP && f.cls.lastIndexOf("tile", 0) === 0 &&
+        f.cls.indexOf("fxd") < 0 && f.pts.every(function (p) { return p[2] === 0; });
+    });
+    faces.sort(function (a, b) { return (b.ground - a.ground) || (a.d - b.d); });
 
     /* WHAT A MASS HIDES IS SHOWN THROUGH IT, AND NOTHING ELSE IS (2026-11-11).
      *
@@ -890,15 +963,46 @@
         "><title>reachable, behind what stands in front of it</title></polygon>";
     });
 
+    // The face's own plane, projected: its u and v axes in screen pixels (`TILES`).
+    var AXES = { z: [[1, 0, 0], [0, 1, 0]], y: [[1, 0, 0], [0, 0, 1]],
+                 x: [[0, 1, 0], [0, 0, 1]] };
+    var defs = {};
+    function textured(tex, n, hex) {
+      var axis = n[2] ? "z" : n[1] ? "y" : "x", id = "s3" + tex + axis + hex.slice(1);
+      if (!defs[id]) {
+        var u = project(AXES[axis][0], turn), v = project(AXES[axis][1], turn);
+        var t = TILES[tex](hex);
+        defs[id] = '<pattern id="' + id + '" patternUnits="userSpaceOnUse" width="' + t[0] +
+          '" height="' + t[1] + '" patternTransform="matrix(' + [u[0], u[1], v[0], v[1]]
+          .map(function (k) { return k.toFixed(3); }).join(" ") + ' 0 0)">' + t[2] +
+          "</pattern>";
+      }
+      return "url(#" + id + ")";
+    }
+
+    var laid = false;
+    function floorTex() {
+      laid = true;
+      return '<polygon class="floortex" pointer-events="none" fill="' +
+        textured("flag", UP, "#000000") + '" points="' +
+        pts2([[0, 0, 0], [W, 0, 0], [W, H, 0], [0, H, 0]].map(function (p) {
+          return project(p, turn); })) + '"/>';
+    }
     var body = faces.map(function (f) {
+      var lay = !f.ground && !laid ? floorTex() : "";
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
-      return '<polygon class="' + f.cls + '" fill="' +
-        (f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
-         : paint(f.mat, shade(f.n, turn), f.wash)) +
+      var fill = f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
+        : paint(f.mat, shade(f.n, turn), f.wash);
+      var tex = f.mat !== "area" && textureOf(f);
+      if (tex) fill = textured(tex, f.n, fill);
+      // A textured side carries no outline: the courses are the detail, and a stroke at
+      // every square's edge cut a twenty-square wall-walk into twenty boxes. Tops keep
+      // theirs, because the squares on them are where a player moves.
+      return lay + '<polygon class="' + f.cls + (tex && !f.n[2] ? " txs" : "") + '" fill="' + fill +
         '" points="' + pts2(f.sp) + '"' + f.attrs +
         (f.inner ? ">" + f.inner + "</polygon>" : "/>");
-    }).join("") + xray;
+    }).join("") + (laid ? "" : floorTex()) + xray;
 
     // The viewBox is measured from the projected corners rather than guessed, so a map of
     // any size at any rotation fills the frame without clipping. Measured to the board's
@@ -915,7 +1019,8 @@
     var x0 = Math.min.apply(null, xs) - pad, y0 = Math.min.apply(null, ys) - pad;
     var w = Math.max.apply(null, xs) - x0 + pad, h = Math.max.apply(null, ys) - y0 + pad;
     return '<svg id="view3d" viewBox="' + x0.toFixed(1) + " " + y0.toFixed(1) + " " +
-      w.toFixed(1) + " " + h.toFixed(1) + '" preserveAspectRatio="xMidYMid meet">' +
+      w.toFixed(1) + " " + h.toFixed(1) + '" preserveAspectRatio="xMidYMid meet"><defs>' +
+      Object.keys(defs).map(function (k) { return defs[k]; }).join("") + "</defs>" +
       body + "</svg>";
   }
 
