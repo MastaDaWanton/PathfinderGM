@@ -22395,13 +22395,18 @@ class Engine:
                 self.scene.move_spent[ref] = self.scene.round
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
-            tell = f"{actor.name} moves to {zone}{crossed}."
+            # A zone is a distance from the player, so the player's own walk has none to
+            # name: "Pip moves to near (15 ft)" was read live as near somebody (2026-11-12).
+            went = (f"{actor.name} moves {cost} ft" if cost is not None else
+                    f"{actor.name} moves") if actor.is_pc else \
+                f"{actor.name} moves to {zone}{crossed}"
+            tell = f"{went}."
             # Where in the place, when the square is a fixture's (`fixtures.where_said`).
             from . import fixtures
 
             onto = fixtures.where_said(self.scene.grid, from_square, tuple(square))
             if onto:
-                tell = f"{actor.name} moves to {zone}{crossed}, {onto}."
+                tell = f"{went}, {onto}."
             # The step `_close_before` put in front of a blow: told as what it is, so the
             # narrator hears that the distance was closed before the swing it dresses.
             # `closing_on` is written by code only — the parser refuses it from a model.

@@ -563,7 +563,18 @@ def where_said(grid: Grid | None, start, end) -> str:
         return f"up onto {f['name']}"
     if f is not None and kinds()[f["kind"]].get("stair"):
         return f"onto {f['name']}"
-    return ""
+    if now or start is None or tuple(start)[:2] == end[:2] or not grid.fixtures:
+        return ""
+    from .grid import distance
+
+    # A walk across the floor ends beside something or in the open, said: "Pip moves to
+    # near (15 ft)." alone was dressed live (2026-11-12, "I walk over to L9") as "moving
+    # toward the figure in the distance ... within fifteen feet of the one you seek" — a
+    # destination and a purpose nobody had. The nearest fixture a step away names the spot.
+    near = sorted((min(distance(end[:2], tuple(p)) for p in g["squares"]), g["name"])
+                  for g in grid.fixtures if not g.get("level"))
+    near = [n for n in near if n[0] <= 5]
+    return f"beside {near[0][1]}" if near else "out in open ground"
 
 
 # --- posts: where a person stands when they come into a room -------------------------

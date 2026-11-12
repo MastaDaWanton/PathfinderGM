@@ -363,3 +363,27 @@ def test_a_square_named_by_its_coordinate_is_walked_to():
     assert not row.intents and "solid" in row.nowhere
     assert fixtures.square_said(g, "I GO TO THE BAR") is None
     assert fixtures.square_said(g, "A1 or B2") is None
+
+
+def test_a_walk_to_a_square_is_no_travel_and_is_told_where_it_ends():
+    """Measured live 2026-11-12, "I walk over to L9": the brief said `go — place: L9`, the
+    plan's first attempt was a travel to 'L9' (refused at schema, one attempt thrown away),
+    and the move's tell "Pip moves to near (15 ft)." was dressed as "moving toward the
+    figure in the distance ... within fifteen feet of the one you seek" — near somebody,
+    with a purpose nobody had. The brief now names a board square and no place, a travel
+    for it is not licensed, and the tell says what the square is beside."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    g = s.grid
+    here = tuple(s.positions[pc.ref])[:2]
+    free = next((c, r) for r in range(g.height) for c in range(g.width)
+                if (c, r) not in g.blocked and g.passable((c, r)) and (c, r) != here
+                and (c, r) not in s.occupied() and not g.ground((c, r)))
+    name = fixtures.square_name(free)
+    reading = {"question": False, "claims": [], "actions": [
+        {"act": "go", "place": name, "within_place": True, "span": f"walk over to {name}"}]}
+    [row] = acts_to_ops.table(reading, s, sentence=f"I walk over to {name}")
+    brief = interpret.brief_lines(reading)
+    assert f"place: {name}" not in brief and f"square {name}" in brief, brief
+    assert interpret.supported(["travel"], reading)[0] == [], "a board square licenses no travel"
+    [out] = e.run(e.validate([dict(row.intents[0], because="walks")])).outcomes
+    assert "near" not in out.tell and ("beside" in out.tell or "open ground" in out.tell), out.tell

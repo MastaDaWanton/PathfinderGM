@@ -2137,6 +2137,18 @@ def _road_to(phrase, scene) -> bool:
     return any(leg.to_name.lower() == want or leg.to_id == phrase for leg in legs)
 
 
+def _board_square(a: dict, scene) -> bool:
+    """Marks a `go` whose words name a square of this room's board (`square`) — the
+    printed coordinate, read by code (`fixtures.square_said`)."""
+    from rules import fixtures
+
+    words = f"{a.get('place') or ''} {a.get('span') or ''}".upper()
+    sq = fixtures.square_said(getattr(scene, "grid", None), words)
+    if sq is not None:
+        a["square"] = fixtures.square_name(sq)
+    return sq is not None
+
+
 def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
     """The ops the reading commits the turn to, where the reading grounds.
 
@@ -2169,7 +2181,13 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             aim = cast_aim(frame, scene, a)
             if aim:
                 a["aim"] = aim
-        if act == "go" and a.get("place") and _road_to(a["place"], scene):
+        if act == "go" and _board_square(a, scene):
+            # "I walk over to L9": a square of this room's board, which the table walks
+            # (`acts_to_ops._to_the_square`). Marked so the brief says so and no travel
+            # is owed. Measured live 2026-11-12: read `go: L9`, the plan's first attempt
+            # was a travel to 'L9' and the schema refused it.
+            pass
+        elif act == "go" and a.get("place") and _road_to(a["place"], scene):
             # A town the roads from here reach, named whole: the journey, whatever verb the
             # reader filed it under. Asked before the town's own places, whose finder takes
             # "Kalixiri" for "the road to Kalixiri". Measured live 2026-10-27: "I give the
@@ -2527,9 +2545,9 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     actions = [a for a in (frame or {}).get("actions") or [] if acting(a)]
     acts = {a.get("act") for a in actions}
     # And a `go` whose place is a person here (`ops_for` marks that too): "I go back to
-    # the guild clerk" with the clerk at the table.
+    # the guild clerk" with the clerk at the table. Or a square of the board ("go to L9").
     elsewhere = {a.get("act") for a in actions
-                 if not (a.get("act") in ("seek", "go") and a.get("here"))}
+                 if not (a.get("act") in ("seek", "go") and (a.get("here") or a.get("square")))}
     kept, dropped = [], []
     # A body searched and nothing else (`acts_to_ops.body_search_only`): the check the
     # check detector reads off "search" is not the player's — the loot is the search, and
@@ -2660,7 +2678,13 @@ def brief_lines(frame: dict | None) -> str:
                 "something the character does. Answer it; the character does nothing.")
     rows = []
     for n, a in enumerate(frame.get("actions") or [], 1):
-        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim", "asks_for") if a.get(s))
+        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim", "asks_for") if a.get(s)
+                          and not (s == "place" and a.get("square")))
+        if a.get("square"):
+            # A board square is no place of the town: the engine walks it, the plan
+            # writes no travel and no found for it.
+            slots = ", ".join(filter(None, [slots, f"to square {a['square']} of this room's "
+                                            "board (the engine walks it: no travel, no found)"]))
         # How far it is done, said: a plan or a question is context for the plan, never
         # an op of its own (`COMMITS`).
         how = {"tried": " (TRIED now: the outcome is the dice's or the other person's)",
