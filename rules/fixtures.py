@@ -489,10 +489,24 @@ def walk_to(scene, kind: str, who) -> tuple[tuple | None, str]:
         by = any(distance(here[:2], p) <= 5 for p in squares) and level == 0
         if by and (not foes or behind(here[:2])):
             return None, ""                   # already standing at it
-        spots = sorted(nearest(beside(squares), here[:2]),
-                       key=lambda p: bool(foes) and not behind(p))
+        # In a fight, within this round's movement first, as the engine's move check
+        # counts it: live the same day the far side was 35 ft off with 30 ft to spend,
+        # every plan was refused and the turn fell to narration after seven attempts.
+        reach = None
+        if getattr(scene, "in_encounter", False):
+            reach = set(grid.reachable(here[:2], who.speed_feet, size=who.size,
+                                       occupied=taken)) | {here[:2]}
+        # With foes, only a side it covers counts: the next live try stood the player on
+        # the one side in reach, beside the bruiser and in the open (AC 15, sapped).
+        spots = nearest(beside(squares), here[:2])
+        covered = [p for p in spots if behind(p)] if foes else spots
+        spots = covered or spots
         if not spots:
             return None, f"There is no clear floor beside {name} to stand at."
+        if reach is not None and not any(p in reach for p in spots):
+            far = f"the far side of {name}" if foes and covered else name
+            return None, f"{who.name} cannot reach {far} this round."
+        spots = [p for p in spots if reach is None or p in reach]
         if by and spots[0] == here[:2]:
             return None, ""                   # no side of it is better than where they are
         return (*spots[0], 0), ""

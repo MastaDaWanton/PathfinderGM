@@ -215,3 +215,38 @@ def test_in_a_fight_the_bar_is_stood_behind_away_from_the_foe():
     assert s.grid.cover_between(there, foe.size, square, pc.size, solid_only=True) != "none", \
         (square, there)
     assert min(distance(square[:2], b) for b in bar) <= 5
+
+
+def test_in_a_fight_the_walk_to_the_bar_fits_the_round():
+    """Live, 2026-11-12, after the far-side fix: the bar's far side was 35 ft away with 30
+    ft to spend; the move the table built was refused as illegal at every one of seven
+    attempts and the turn fell to narration. In a fight the walk ends on a square this
+    round's movement reaches (the engine's own `reachable`), or is refused in words.
+
+    And never on an exposed side when the bar has a covered one: the next live try took
+    the one side in reach, beside the bruiser in the open, and was sapped at AC 15."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    bar = [tuple(p) for p in _kind(s.grid, "counter")[0]["squares"]]
+    foe = s.add(instantiate("guildhand", scene=s, name="Bruiser"), zone="near")
+    s.sides = {"party": [pc.ref], "foes": [foe.ref]}
+    s.initiative, s.turn = [(pc.ref, 10), (foe.ref, 5)], 0
+    g = s.grid
+    for start in [(x, y) for x in range(g.width) for y in range(g.height)
+                  if g.passable((x, y)) and (x, y) not in g.blocked and not g.ground((x, y))
+                  and (x, y) != tuple(s.positions[foe.ref][:2])]:
+        s.positions[pc.ref] = start
+        square, why = fixtures.walk_to(s, "counter", pc)
+        there = tuple(s.positions[foe.ref])
+
+        def covered(p):
+            return g.cover_between(there, foe.size, (*p[:2], 0), pc.size,
+                                   solid_only=True) != "none"
+        sides = {(b[0] + dx, b[1] + dy) for b in bar
+                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))} - set(bar)
+        if square is None:
+            continue
+        reach = g.reachable(start, pc.speed_feet, size=pc.size,
+                            occupied=s.occupied(ignore=pc.ref))
+        assert square[:2] in reach, (start, square, pc.speed_feet)
+        if any(covered(p) and g.passable(p) and p not in g.blocked for p in sides):
+            assert covered(square), (start, square, there)
