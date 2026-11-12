@@ -12415,9 +12415,22 @@ class Engine:
         # one wants a double move, the other wants a different route.
         anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied)
         if flat in anywhere:
+            # The square this round's movement gets them nearest it, named and carried as
+            # the fix: live 2026-11-12, told only the distance, the plan proposed a square
+            # 45-55 ft off seven times running and the turn fell to narration.
+            back = grid.reachable(flat, 10_000, size=actor.size, occupied=occupied)
+            toward = min((p for p in routes if p in back), default=None,
+                         key=lambda p: (back[p], -routes[p], p))
+            fix, said = None, ""
+            if toward is not None:
+                square = (*toward, grid.ground(toward)) if len(target) > 2 else tuple(toward)
+                fix = {"kind": "move", "square": list(square)}
+                said = (f" The nearest it can get this round is {square}, "
+                        f"{routes[toward]} ft.")
             raise IntentError(
                 f"move: {target} is {anywhere[flat]} ft away by the shortest open route "
-                f"and {actor.name} has {budget} ft of movement.", "legality", index,
+                f"and {actor.name} has {budget} ft of movement.{said}", "legality", index,
+                code="too_far", fix=fix,
             )
         raise IntentError(
             f"move: there is no route from {start} to {target} that {actor.name} fits "

@@ -1101,10 +1101,24 @@ class GMAgent:
                     data = dict(data, intents=raw)
                     intents = self.engine.validate(raw)
             except IntentError as exc:
+                # A move further than this round's movement goes as far as it can toward
+                # the square, in code: live 2026-11-12, told the distance, the plan asked
+                # for a square 45-55 ft off seven times running and the turn degraded.
+                amended = self._move_toward(exc, data.get("intents"))
+                if amended:
+                    try:
+                        intents = self.engine.validate(amended)
+                        rejections.append(f"attempt {n + 1} [legality, repaired]: {exc}")
+                        data = dict(data, intents=amended)
+                        exc = None
+                    except IntentError as again:
+                        exc = again
+                if exc is None:
+                    pass
                 # The GM naming people it wanted to exist — "attack thug1" — is the one
                 # rejection it will not learn from, hint and example notwithstanding. It
                 # is repaired in code instead of asked about again.
-                if exc.check == "refs":
+                elif exc.check == "refs":
                     amended = judgement.repair_unknown_refs(
                         data.get("intents"), player_input, self.engine.scene,
                         world=self.world)
@@ -1333,6 +1347,26 @@ class GMAgent:
         return None, (rest or [{"op": "narrate_only",
                                 "because": "the only op was one nobody asked for"}])
 
+    @staticmethod
+    def _move_toward(exc: IntentError, raw) -> list | None:
+        """`raw` with the too-far move's square swapped for the engine's nearest reachable
+        one toward it (`Engine._check_move`'s fix), or None when that is not the refusal."""
+        if exc.code != "too_far" or not exc.fix or exc.index is None or not raw:
+            return None
+        from rules import engine as engine_mod
+        from rules.intents import parse_all
+
+        try:
+            parsed = parse_all(raw)
+            ordered = engine_mod._introduce_after_travel(
+                engine_mod._found_before_travel(parsed))
+            at = next(k for k, p in enumerate(parsed) if p is ordered[exc.index])
+        except Exception:  # noqa: BLE001 — unreadable: the loop's own retry answers it
+            return None
+        row = dict(raw[at])
+        row["params"] = dict(row.get("params") or {}, square=list(exc.fix["square"]))
+        return [row if k == at else r for k, r in enumerate(raw)]
+
     def _refused_plan(self, refusal: dict, attempts: list, rejections: list) -> TurnPlan:
         """The turn a player-fixable refusal ends: nothing resolves, the refusal is the
         whole answer, and no second model is asked. The narration is the refusal's own
@@ -1534,8 +1568,17 @@ class GMAgent:
                               self.engine.scene, ref, raw) if friend else ""))
                 if turned:
                     raise IntentError(turned, "legality")
-                intents = self.engine.validate(raw, origin=origin,
-                                               origin_name=actor.name if origin else "")
+                try:
+                    intents = self.engine.validate(raw, origin=origin,
+                                                   origin_name=actor.name if origin else "")
+                except IntentError as exc:
+                    amended = self._move_toward(exc, raw)    # as the player's turn does
+                    if not amended:
+                        raise
+                    intents = self.engine.validate(amended, origin=origin,
+                                                   origin_name=actor.name if origin else "")
+                    rejections.append(f"attempt {n + 1} [legality, repaired]: {exc}")
+                    data = dict(data, intents=amended)
             except (ValueError, IntentError) as exc:
                 rejections.append(f"attempt {n + 1}: {exc}")
                 messages = _with_correction(base, reply.text, str(exc))
