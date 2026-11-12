@@ -382,6 +382,8 @@ function renderMap(s) {
         unit ? ` · ${a.members} of ${a.members_max} still standing` : ""}${
         a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></circle>`);
     const form = unit ? "" : a.form || "humanoid";
+    // The server's plate letters (views._marks): two when an initial clashes here.
+    const mark = a.mark || a.name.slice(0, 1).toUpperCase();
     const glyph = form === "beast"
       ? `<ellipse cx="${cx - 1.2 * k}" cy="${cy}" rx="${4.6 * k}" ry="${2.8 * k}"/>
          <circle class="head" cx="${cx + 3.6 * k}" cy="${cy}" r="${2.2 * k}"/>`
@@ -393,8 +395,8 @@ function renderMap(s) {
     if (glyph) parts.push(`<g class="tokbody${down ? " down" : ""}${ghost}">${glyph}</g>`);
     parts.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
       form === "beast" ? cx - 1.2 * k : cx}" y="${
-      unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : 6 * k}px">${unit ? a.members
-        : esc(a.name.slice(0, 1).toUpperCase())}</text>`);
+      unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : (mark.length > 1 ? 4.4 : 6) * k
+        }px">${unit ? a.members : esc(mark)}</text>`);
   }
 
   // A flask being aimed at a square (04's Throw…, CRB "Throw Splash Weapon": a grid

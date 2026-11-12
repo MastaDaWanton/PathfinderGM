@@ -435,3 +435,30 @@ def test_a_crowd_spreads_over_the_stalls_and_tables():
                   and _beside(s.positions[r], f)) for f in s.grid.fixtures
               if f["level"] == 0 and f["kind"] in fixtures._GATHER]
     assert max(crowds) <= 2, crowds
+
+
+def test_the_market_master_keeps_no_stall():
+    """Live 2026-11-11: the master of the market (the place's one keeper, no counter of
+    their own) stood at a stall, beside the goods, and read as one more trader. They
+    stand on open ground near the middle, beside no stall."""
+    from rules import keepers
+
+    s, e, pc = _at(MARKET)
+    master = instantiate("guildhand", scene=s, name="Master")
+    master.world_entity_id = keepers.entity_id(MARKET)
+    s.add(master, zone="near")
+    sq = s.positions[master.ref]
+    assert not any(_beside(sq, f) for f in _kind(s.grid, "stall")), sq
+
+
+def test_clashing_initials_get_a_second_letter():
+    """Live 2026-11-11: the market board showed two Ts and two Vs, and nothing on either
+    board told them apart. A clash takes a second letter; a lone initial stays one."""
+    from play.views import _marks
+
+    m = _marks({"a": "Tyra", "b": "Tromm", "c": "Kesst", "d": "the thug",
+                "e": "Vell Ashby", "f": "Vell Brand"})
+    assert m["c"] == "K"
+    assert {m["a"], m["b"]} == {"Ty", "Tr"}
+    assert m["d"] == "Th"          # "the" is skipped, and "thug" still clashes with T
+    assert {m["e"], m["f"]} == {"VA", "VB"}

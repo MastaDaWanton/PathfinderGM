@@ -89,6 +89,28 @@ _ON_ALL_FOURS = ("type.animal", "type.vermin", "type.magical-beast", "type.drago
                  "type.construct", "type.plant", "type.aberration")
 
 
+def _marks(names: dict) -> dict:
+    """ref -> the letters on a token's plate, one rule for both boards. One letter, the
+    name's own (a leading "the"/"a" skipped), unless another token shares it; then two
+    ("Ty", "Tr"), then first and last word's ("TB"). Live 2026-11-11 the market showed
+    two Ts and two Vs and nothing on the board told them apart."""
+    def words(n):
+        w = str(n or "?").split() or ["?"]
+        return w[1:] if len(w) > 1 and w[0].lower() in ("the", "a", "an") else w
+
+    rules = (lambda w: w[0][:1].upper(),
+             lambda w: w[0][:1].upper() + w[0][1:2].lower(),
+             lambda w: w[0][:1].upper() + w[-1][:1].upper())
+    out = {}
+    for r, n in names.items():
+        for rule in rules:
+            m = rule(words(n))
+            if not any(o != r and rule(words(on)) == m for o, on in names.items()):
+                break
+        out[r] = m
+    return out
+
+
 def _body_form(a) -> str:
     """How the map draws this body: "ooze", "beast" or "humanoid". A creature's type is
     in its stat block and visible at a glance, so it is the player's to see. Anything
@@ -774,6 +796,10 @@ def _state(c) -> dict:
     # same the engine's tells read: the room's tell said Saltmakers' while this said
     # Winged (2026-10-17).
     coins = goods_mod.coins_here(c.world, c.scene)
+    # Over the tokens the player sees only: a hidden "Tobin" must not turn Tam into "Ta".
+    shown = {r: a for r, a in c.scene.actors.items()
+             if a.is_pc or not a.has_state("state.hidden")}
+    marks = _marks({r: a.name for r, a in shown.items()})
 
     def with_areas(grid):
         # The latest turn's spell areas, for the map's overlay (§2.10): the cells each
@@ -851,6 +877,7 @@ def _state(c) -> dict:
                  "size": a.size, "squares": grid.size_squares(a.size),
                  # What shape the board stands them up as (`_body_form`).
                  "form": _body_form(a),
+                 "mark": marks[r],
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
                  # than one big creature (item 33). Absent for every ordinary creature.
@@ -872,8 +899,7 @@ def _state(c) -> dict:
                  # Held in a grapple, for the bar's Break free (`escape`, CRB p.200).
                  "grappled": bool(a.held_in_grapple),
                  "conditions": _shown_conditions(a)}
-                for r, a in c.scene.actors.items()
-                if a.is_pc or not a.has_state("state.hidden")
+                for r, a in shown.items()
             ],
             "grid": with_areas(_grid_state(c.scene)),
             # Blood on the ground. Sent whether or not there is a grid: without one

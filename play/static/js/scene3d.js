@@ -376,9 +376,10 @@
      colour (stone mortar and plank seams are that colour darkened), so a wall turned
      away from the lamp is dark stone and the lit one bright stone, as before.
 
-     The cost the projection leaves: parallel walls a row apart start their courses at
-     different heights (the plane through the origin is what the transform anchors). Real
-     masonry is not coursed to the board either; measured by eye, it does not read. */
+     Each pattern is anchored to its face's plane where it crosses the world origin, so
+     every wall's courses start at height 0. Anchored at the screen's origin, as first
+     built, parallel walls a row apart began their courses at different heights; the
+     owner's market picture showed it (plan item 9). */
   function tint(hex, k) {
     var out = "#";
     for (var i = 1; i < 7; i += 2) {
@@ -956,7 +957,7 @@
          crowd's count. In the depth sort like a face, so a wall in front still covers it
          (and the x-ray then shows it). */
       var mark = a.members != null ? String(a.members)
-        : String(a.name || "?").slice(0, 1).toUpperCase();
+        : a.mark || String(a.name || "?").slice(0, 1).toUpperCase();  // views._marks
       faces.push({ pts: [[cx, cy, top + 0.32]], n: UP, at: [cx, cy, top + 0.32], mat: side,
                    cls: cls.replace("fig ", "fig plate "), attrs: "", inner: tip,
                    plate: esc(mark) });
@@ -1009,7 +1010,10 @@
      * worked out from the projected faces after the sort, so they hold at every
      * quarter-turn and agree with the painter's order by construction. */
     var masses = faces.filter(function (f) {
-      if (f.mat === "area" || f.cls.lastIndexOf("fig", 0) === 0) return false;
+      // A figure hides a figure behind it too (plan item 2: only walls ghosted what they
+      // hid, so a goblin behind the ogre simply vanished). Its plate never hides anything.
+      if (f.mat === "area" || f.plate) return false;
+      f.fig = f.cls.lastIndexOf("fig", 0) === 0;
       var top = -1e9, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
       f.pts.forEach(function (p) { if (p[2] > top) top = p[2]; });
       f.sp.forEach(function (p) {
@@ -1032,12 +1036,14 @@
     // `own` is the footprint the thing stands on: a stair's own steps, the crate it is
     // climbing, are under it, not in front of it (measured at the gate: the player on
     // the stair was ghosted at every turn by the steps beneath their feet).
-    function covered(p, floor, own) {
+    // `figs` says whether people count as cover: they do for a person behind them, never
+    // for a square, or a move outline would be drawn over whoever stands in front of it.
+    function covered(p, floor, own, figs) {
       var d = depth(p, turn), s = project(p, turn);
       var near = bins[Math.floor(s[0] / BIN) + "," + Math.floor(s[1] / BIN)] || [];
       for (var i = 0; i < near.length; i++) {
         var m = near[i], b = m.box;
-        if (m.d <= d || m.top <= floor + 0.05) continue;
+        if ((m.fig && !figs) || m.d <= d || m.top <= floor + 0.05) continue;
         if (m.at[0] > own[0] && m.at[0] < own[2] && m.at[1] > own[1] && m.at[1] < own[3]) {
           continue;
         }
@@ -1053,7 +1059,7 @@
     figs.forEach(function (g) {
       var h = g.top - g.z, hid = 0;
       [0.3, 0.6, 0.9].forEach(function (k) {
-        if (covered([g.x, g.y, g.z + h * k], g.z, g.own)) hid++;
+        if (covered([g.x, g.y, g.z + h * k], g.z, g.own, true)) hid++;
       });
       if (hid < 2) return;
       xray += '<g class="xray' + (g.offlevel ? " offlevel" : "") + '" pointer-events="none">' +
@@ -1080,14 +1086,22 @@
     var AXES = { z: [[1, 0, 0], [0, 1, 0]], y: [[1, 0, 0], [0, 0, 1]],
                  x: [[0, 1, 0], [0, 0, 1]] };
     var defs = {};
-    function textured(tex, n, hex) {
-      var axis = n[2] ? "z" : n[1] ? "y" : "x", id = "s3" + tex + axis + hex.slice(1);
+    // `at` is a point on the face: the pattern is anchored to the world point where the
+    // face's own plane crosses u = v = 0, so every wall's courses start at world height 0
+    // and two parallel walls a row apart line up (plan item 9). Anchored at the screen's
+    // origin they started wherever that plane happened to cross it. One pattern per plane,
+    // not per face: a 24-square board has at most a few dozen.
+    function textured(tex, n, hex, at) {
+      var axis = n[2] ? "z" : n[1] ? "y" : "x", k = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+      var off = Math.round((at ? at[k] : 0) * 100) / 100;
+      var id = "s3" + tex + axis + hex.slice(1) + "_" + String(off).replace(/[.-]/g, "_");
       if (!defs[id]) {
         var u = project(AXES[axis][0], turn), v = project(AXES[axis][1], turn);
-        var t = TILES[tex](hex);
+        var o = [0, 0, 0]; o[k] = off;
+        var t = TILES[tex](hex), t0 = project(o, turn);
         defs[id] = '<pattern id="' + id + '" patternUnits="userSpaceOnUse" width="' + t[0] +
-          '" height="' + t[1] + '" patternTransform="matrix(' + [u[0], u[1], v[0], v[1]]
-          .map(function (k) { return k.toFixed(3); }).join(" ") + ' 0 0)">' + t[2] +
+          '" height="' + t[1] + '" patternTransform="matrix(' + [u[0], u[1], v[0], v[1],
+          t0[0], t0[1]].map(function (k) { return k.toFixed(3); }).join(" ") + ')">' + t[2] +
           "</pattern>";
       }
       return "url(#" + id + ")";
@@ -1095,9 +1109,9 @@
 
     // A figure's letter plate: the side's colour, unshaded, as the flat token's is.
     function plate(f, cls) {
-      var p = f.sp[0];
-      return '<g class="' + cls + '"><rect x="' + (p[0] - 4.2).toFixed(1) + '" y="' +
-        (p[1] - 4.6).toFixed(1) + '" width="8.4" height="8.4" rx="1.8" fill="' +
+      var p = f.sp[0], w = f.plate.length > 1 ? 12 : 8.4;   // "Ty" needs the room
+      return '<g class="' + cls + '"><rect x="' + (p[0] - w / 2).toFixed(1) + '" y="' +
+        (p[1] - 4.6).toFixed(1) + '" width="' + w + '" height="8.4" rx="1.8" fill="' +
         paint(f.mat, 1) + '"/><text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 2.3).toFixed(1) +
         '">' + f.plate + "</text>" + (cls === "plate" ? "" : f.inner) + "</g>";
     }
@@ -1118,7 +1132,7 @@
       var fill = f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
         : paint(f.mat, shade(f.n, turn), f.wash);
       var tex = f.mat !== "area" && textureOf(f);
-      if (tex) fill = textured(tex, f.n, fill);
+      if (tex) fill = textured(tex, f.n, fill, f.pts[0]);
       // A textured side carries no outline: the courses are the detail, and a stroke at
       // every square's edge cut a twenty-square wall-walk into twenty boxes. Tops keep
       // theirs, because the squares on them are where a player moves.

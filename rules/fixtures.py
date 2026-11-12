@@ -521,7 +521,11 @@ def post_for(scene, actor, taken) -> tuple | None:
     seed = floorplan._seed(str(actor.ref) + wid)
     if keepers.is_keeper(wid):
         counter = keepers.counter_of(wid)
-        order = ("stall", "counter") if counter else ("counter", "stall")
+        # A place's one keeper keeps no stall: the bar if there is one; in a market (stalls,
+        # no bar) the open ground near the middle. Live 2026-11-11 the market's master
+        # stood at a stall and read as a trader. A smith or librarian falls through to the
+        # hearth or the shelves below.
+        order = ("stall", "counter") if counter else ("counter",)
         for kind in order:
             posts = [f for f in ground if f["kind"] == kind]
             if counter:
@@ -537,6 +541,13 @@ def post_for(scene, actor, taken) -> tuple | None:
                 spots = around(f)
                 if spots:
                     return max(spots, key=far)[:2]
+        if not counter and any(f["kind"] == "stall" for f in ground):
+            open_ = [(x, y) for x in range(grid.width) for y in range(grid.height)
+                     if free((x, y))]
+            stood = {q for f in ground for s in f["squares"] for q in (
+                (s[0] + dx, s[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1))}
+            if open_:
+                return min(open_, key=lambda q: (q in stood, far(q)))
     # Everyone else goes to the least crowded table, hearth or stall front, ties broken by
     # their own seed. Measured live 2026-11-11: picking from "the fronts nearest the middle"
     # put five of the market's six shoppers round one stall.

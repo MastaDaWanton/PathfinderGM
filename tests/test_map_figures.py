@@ -77,8 +77,9 @@ def test_stone_runs_in_the_plane_of_the_wall_from_a_handful_of_patterns(tmp_path
     """The flat board had stone, planks and spines; the 3D one had flat colour, and the
     owner asked for "the textures like stone" there too. Every side of a wall wears the
     stone pattern, laid by `patternTransform` in that face's plane. The patterns are per
-    material, orientation and lit colour, never per square: a 24x24 board of walls needs
-    no more of them than one wall does (measured: 8 on the library, the same on 24x24)."""
+    material, orientation, lit colour and plane, never per square: a 24x24 board needs one
+    per row and column of wall faces at most (measured 98 for the board below, 6 before
+    the courses were anchored, at the same 7.5 ms a render under node)."""
     one = _render(tmp_path, _grid(blocked=[[3, 3]]), [], {"turn": 0})
     sides = re.findall(r'<polygon class="solid[^"]*" fill="([^"]+)"', one)
     plain = [f for f in sides if not f.startswith("url(#s3stone")]
@@ -86,8 +87,31 @@ def test_stone_runs_in_the_plane_of_the_wall_from_a_handful_of_patterns(tmp_path
     assert "patternTransform=\"matrix(" in one
     walls = [[c, r] for c in range(24) for r in range(24) if (c * 7 + r * 3) % 5 == 0]
     many = _render(tmp_path, _grid(width=24, height=24, blocked=walls), [], {"turn": 0})
-    count = lambda svg: svg.count("<pattern ")
-    assert count(many) == count(one), (count(one), count(many))
+    count = many.count("<pattern ")
+    assert count <= 4 * 2 * (24 + 1) + 4, count       # shades x axes x planes, + tops
+
+
+@needs_node
+def test_every_wall_starts_its_courses_at_the_ground(tmp_path):
+    """The owner's market picture: two parallel walls a row apart started their stone
+    courses at different heights, because each pattern was anchored at the screen's
+    origin rather than in the world. Read back through its own pattern, the bottom edge
+    of every stone wall face falls on a course joint (v a whole number of courses)."""
+    grid = _grid(width=9, height=9, blocked=[[2, 2], [2, 4], [5, 3], [6, 6]])
+    for turn in range(4):
+        svg = _render(tmp_path, grid, [], {"turn": turn})
+        mats = {m[0]: [float(k) for k in m[1].split()] for m in re.findall(
+            r'<pattern id="([^"]+)"[^>]*patternTransform="matrix\(([^)]+)\)"', svg)}
+        walls = re.findall(r'fill="url\(#(s3stone[xy][^)]+)\)" points="([^"]+)"', svg)
+        assert len(walls) >= 8, turn
+        for pid, pts in walls:
+            a, b, c, d, e, f = mats[pid]
+            xy = sorted((tuple(map(float, q.split(","))) for q in pts.split()),
+                        key=lambda q: -q[1])[:2]          # the two lowest: the ground edge
+            det = a * d - b * c
+            for x, y in xy:
+                v = (a * (y - f) - b * (x - e)) / det
+                assert abs(v * 4 - round(v * 4)) < 0.05, (turn, pid, v)
 
 
 def _height(svg: str) -> float:
@@ -155,3 +179,26 @@ def test_the_payload_says_what_shape_each_body_is(tmp_path):
             assert forms[s.pc().name] == "humanoid"
         finally:
             cm._LIVE.clear()
+
+
+@needs_node
+def test_a_figure_behind_an_ogre_is_ghosted_and_squares_are_not(tmp_path):
+    """Only walls ghosted what they hid, so a goblin behind an ogre simply vanished from
+    the 3D board. An ogre (Large) on each diagonal of a goblin: at every quarter-turn the
+    one standing between the goblin and the camera ghosts it, the others do not, and the
+    ogre itself never is. People never count as cover for a square, or a move outline
+    would be drawn over whoever stood in front of it."""
+    goblin = dict(_FOE, ref="g", at=[4, 4, 0], form="humanoid")
+    reach = [[c, r, 5, 0] for c in range(9) for r in range(9)]
+    for turn in range(4):
+        ghosted = []
+        for dx, dy in ((1, 1), (-2, -2), (1, -2), (-2, 1)):
+            ogre = {"name": "Ogre", "ref": "o", "stance": "foe", "at": [4 + dx, 4 + dy, 0],
+                    "hp": 30, "hp_max": 30, "form": "humanoid", "size": "Large",
+                    "squares": 2}
+            svg = _render(tmp_path, _grid(width=9, height=9, reachable=reach),
+                          [goblin, ogre], {"turn": turn, "reach": True})
+            ghosts = re.findall(r'<g class="xray.*?</g>', svg)
+            ghosted += [re.search(r">(\w)</text>", g).group(1) for g in ghosts]
+            assert "xsq" not in svg, (turn, dx, dy)
+        assert ghosted == ["G"], (turn, ghosted)
