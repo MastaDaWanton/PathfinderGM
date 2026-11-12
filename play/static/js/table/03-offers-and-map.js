@@ -188,6 +188,14 @@ const FX_DEFS = `
     <rect x="3" y="0" width="12" height="2.4" fill="#6a7a86" opacity=".7" stroke="#6b4a3a"
           stroke-width=".9"/></symbol>`;
 
+// A square's name on the board: column letters (A..Z, then AA..), rows from 1 at the top.
+// The engine reads the same names back (rules/fixtures.py `square_name`).
+function sqCol(c) {
+  return c < 26 ? String.fromCharCode(65 + c)
+    : String.fromCharCode(64 + Math.floor(c / 26)) + String.fromCharCode(65 + c % 26);
+}
+function sqName(c, r) { return `${sqCol(c)}${r + 1}`; }
+
 function renderMap(s) {
   const g = s.scene.grid;
   if (!g) {
@@ -203,7 +211,7 @@ function renderMap(s) {
     return;
   }
 
-  const CELL = 18;
+  const CELL = 18, MARGIN = 10;   // MARGIN: room for the coordinates, top and left
   const reach = new Map((g.reachable || []).map(([c, r, cost]) => [`${c},${r}`, cost]));
   const parts = [];
 
@@ -295,7 +303,7 @@ function renderMap(s) {
     // A destination carries the level it lands you on, so the combat builder queues a
     // move to a CELL and not merely a square. Walking onto a dais is walking up onto it.
     const lvl = at(c, r);
-    parts.push(cell(c, r, "reach", `<title>${cost} ft${
+    parts.push(cell(c, r, "reach", `<title>${sqName(c, r)} · ${cost} ft${
         lvl ? ` · ${lvl * 5} ft up` : ""}</title>`)
       .replace('class="reach"', `class="reach" data-sq="${c},${r}${
         lvl ? "," + lvl : ""}"`));
@@ -340,6 +348,15 @@ function renderMap(s) {
   for (let r = 0; r <= g.height; r++)
     parts.push(`<line class="rule" x1="0" y1="${r * CELL}" x2="${
       g.width * CELL}" y2="${r * CELL}"/>`);
+
+  // Coordinates in the margin, letters across and numbers down, as play-by-post tables
+  // name squares ("move to H3"): the owner, 2026-11-12, "display coordinates on the map so
+  // that the user can be precise about where he wants to stand even outside of combat".
+  // A line naming one ("I go to C5") walks there (rules/fixtures.py `square_said`).
+  for (let c = 0; c < g.width; c++)
+    parts.push(`<text class="coord" x="${(c + .5) * CELL}" y="${-3}">${sqCol(c)}</text>`);
+  for (let r = 0; r < g.height; r++)
+    parts.push(`<text class="coord" x="${-5}" y="${(r + .5) * CELL + 2.5}">${r + 1}</text>`);
 
   // Blood before bodies, so a token stands in its own pool rather than under it.
   for (const b of (s.scene.pools || [])) {
@@ -418,7 +435,8 @@ function renderMap(s) {
                      { turn: MAP_TURN, level: MAP_LEVEL,
                        reach: !!(STATE.scene && STATE.scene.in_encounter),
                        up: s.scene.in_encounter ? s.scene.turn_ref : null })
-    : `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
+    : `<svg id="map" viewBox="${-MARGIN} ${-MARGIN} ${g.width * CELL + MARGIN} ${
+         g.height * CELL + MARGIN}"
          preserveAspectRatio="xMidYMid meet"><defs>
          <pattern id="unithatch-foe" width="6" height="6" patternUnits="userSpaceOnUse"
                   patternTransform="rotate(45)">

@@ -406,6 +406,26 @@ def held_to_words(grid: Grid | None, kind: str, words: str) -> str:
     return named[0] if named else kind
 
 
+def square_name(p) -> str:
+    """A square's name as the board prints it: column letters across (A..Z, then AA..),
+    rows from 1 at the top — `sqName` in play/static/js/table/03-offers-and-map.js."""
+    c, r = int(p[0]), int(p[1])
+    col = chr(65 + c) if c < 26 else chr(64 + c // 26) + chr(65 + c % 26)
+    return f"{col}{r + 1}"
+
+
+def square_said(grid: Grid | None, words: str):
+    """The board square a line names by its printed coordinate ("I go to C5"), or None.
+    The owner, 2026-11-12: coordinates on the map "so that the user can be precise about
+    where he wants to stand". A name the board printed, matched only against squares this
+    board has — never a guess at English. One square: two named is no single place to go."""
+    if grid is None or not words:
+        return None
+    names = {square_name((c, r)): (c, r) for c in range(grid.width) for r in range(grid.height)}
+    found = {names[m] for m in re.findall(r"\b([A-Z]{1,2}\d{1,2})\b", words) if m in names}
+    return found.pop() if len(found) == 1 else None
+
+
 # The reader's answer for a walk back down off a raised fixture to the room's own floor
 # ("I go back down"): not a kind, so never on the map, but in the reader's closed list.
 FLOOR = "floor"

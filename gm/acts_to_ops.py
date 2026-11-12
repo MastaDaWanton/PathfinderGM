@@ -835,6 +835,9 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
             row.ops = interpret.ops_for({"actions": [a]}, scene, places)
+            if act == "go" and pc is not None and _to_the_square(row, a, scene, pc):
+                rows.append(row)              # "I go to C5": the board's own square
+                continue
             # A walk to a place somebody named and the town does not have yet owes the
             # found and the travel `judgement.go_to_heard_place` writes for it — owned by
             # this action, so `order` puts them where the words do. Measured live on the
@@ -943,6 +946,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 if kind:
                     _to_the_fixture(row, kind, scene, pc)
                 _sneak(row, a, scene, pc)
+            if act == "use" and pc is not None and not row.ops:
+                _draw(row, a, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)
             if act == "escape" and pc is not None:
@@ -1128,6 +1133,26 @@ def _harvest(row: Row, frame, i, scene, pc, rows=()) -> None:
                         "because": "the player cuts parts off the carcass"})
     who = (getattr(scene, "actors", {}) or {}).get(ref)
     row.note = f"a harvest of {getattr(who, 'name', ref)}"
+
+
+def _draw(row: Row, a: dict, pc) -> None:
+    """A weapon the player carries and does not hold, used: drawn, through the `wear` door
+    every draw takes (`Engine._draw_before`), which prices it in a fight.
+
+    Live 2026-11-12, three fights running: "I draw my rapier and ..." was read `use: my
+    rapier`, the act owed no op, and the page said "You draw your rapier" while the rapier
+    stayed on the belt. shortcut: weapons the sheet lists only, not crafted ones; widen when
+    a crafted blade is drawn this way."""
+    from rules import weapons as weapons_mod
+
+    want = weapons_mod.key_for(str(a.get("object") or ""))
+    if not want or want == weapons_mod.key_for(str(pc.equipped or "")):
+        return
+    carried = next((w for w in pc.weapons if w and weapons_mod.key_for(str(w)) == want), None)
+    if carried is not None:
+        row.intents.append({"op": "wear", "actor": pc.ref,
+                            "params": {"item": str(carried), "actor": pc.ref},
+                            "because": f"the player draws the {carried}"})
 
 
 def _sneak(row: Row, a: dict, scene, pc) -> None:
@@ -1492,6 +1517,32 @@ def _home_together(row: Row, ref: str, scene, pc) -> None:
                         "because": f"the player goes home with {who.name}"})
     row.ops = []
     row.note = f"home with {who.name}, who is here"
+
+
+def _to_the_square(row: Row, a: dict, scene, pc) -> bool:
+    """A walk to a square the board names by its printed coordinate ("I stand at C5",
+    `fixtures.square_said`): the move to it, or the reason there is none. False when the
+    words name no square of this board. The owner, 2026-11-12: "display coordinates on the
+    map so that the user can be precise about where he wants to stand even outside of
+    combat"."""
+    from rules import fixtures
+
+    grid = getattr(scene, "grid", None)
+    words = f"{a.get('place') or ''} {a.get('span') or ''}".upper()
+    sq = fixtures.square_said(grid, words)
+    if sq is None:
+        return False
+    row.ops = []
+    name = fixtures.square_name(sq)
+    if sq in grid.blocked or not grid.passable(sq):
+        row.nowhere = f"{name} is solid: nobody can stand there."
+    elif sq in scene.occupied(ignore=pc.ref):
+        row.nowhere = f"Somebody already stands at {name}."
+    elif tuple(scene.positions.get(pc.ref) or ())[:2] != sq:
+        row.intents.append({"op": "move", "actor": pc.ref,
+                            "params": {"who": pc.ref, "square": [*sq, grid.ground(sq)]},
+                            "because": f"the player walks to {name}"})
+    return True
 
 
 def _to_the_fixture(row: Row, kind: str, scene, pc) -> None:

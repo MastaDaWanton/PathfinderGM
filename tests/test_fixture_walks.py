@@ -315,3 +315,51 @@ def test_the_nearest_stall_is_the_one_walked_to():
     square, why = fixtures.walk_to(s, "stall", pc)
     assert square is not None, why
     assert min(distance(square[:2], tuple(p)) for p in near["squares"]) <= 5, (square, near)
+
+
+def test_drawing_the_rapier_puts_it_in_hand():
+    """Live 2026-11-12, three fights running: "I draw my rapier and duck behind the
+    nearest stall" was read `use: my rapier`, owed no op, and the page said "You draw
+    your rapier" with the rapier still on the belt. A carried weapon used is drawn."""
+    from rules import goods
+
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    goods.stow(pc, "rapier")
+    assert "rapier" not in str(pc.equipped or "").lower()
+    reading = {"question": False, "claims": [], "actions": [
+        {"act": "use", "object": "my rapier", "span": "draw my rapier"}]}
+    built = [i for r in acts_to_ops.table(reading, s, sentence="I draw my rapier")
+             for i in r.intents]
+    assert [i["op"] for i in built] == ["wear"], built
+    e.run(e.validate([dict(built[0], because="draws")]))
+    assert "rapier" in str(pc.equipped or "").lower()
+    again = [i for r in acts_to_ops.table(reading, s, sentence="I draw my rapier")
+             for i in r.intents]
+    assert again == []                       # already in hand: nothing to draw
+
+
+def test_a_square_named_by_its_coordinate_is_walked_to():
+    """The owner, 2026-11-12: "display coordinates on the map so that the user can be
+    precise about where he wants to stand even outside of combat". The board prints
+    letters across and numbers down (03-offers-and-map.js `sqName`); a walk naming one
+    goes there, a solid one is refused in words, and nothing else reads as a square."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    g = s.grid
+    assert fixtures.square_name((0, 0)) == "A1" and fixtures.square_name((2, 4)) == "C5"
+    assert fixtures.square_name((27, 0)) == "AB1"
+    free = next((c, r) for r in range(g.height) for c in range(g.width)
+                if (c, r) not in g.blocked and g.passable((c, r))
+                and (c, r) not in s.occupied() and not g.ground((c, r)))
+    solid = next(iter(sorted(g.blocked)))
+
+    def walk(place):
+        reading = {"question": False, "claims": [], "actions": [
+            {"act": "go", "place": place, "within_place": True, "span": f"go to {place}"}]}
+        return acts_to_ops.table(reading, s, sentence=f"I go to {place}")
+
+    [row] = walk(fixtures.square_name(free).lower())
+    assert [i["params"]["square"][:2] for i in row.intents] == [list(free)], row.intents
+    [row] = walk(fixtures.square_name(solid))
+    assert not row.intents and "solid" in row.nowhere
+    assert fixtures.square_said(g, "I GO TO THE BAR") is None
+    assert fixtures.square_said(g, "A1 or B2") is None
