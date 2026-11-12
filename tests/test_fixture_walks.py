@@ -290,3 +290,28 @@ def test_foes_on_both_sides_still_leave_cover_from_one():
                != "none" for f in (west, east)), square
     assert square[:2] in g.reachable((4, 4), pc.speed_feet, size=pc.size,
                                      occupied=s.occupied(ignore=pc.ref))
+
+
+def test_the_nearest_stall_is_the_one_walked_to():
+    """The market, 2026-11-12: "duck behind the nearest stall" walked the player 30 ft to
+    a stall that hid them from both thugs, past the nearest one. The owner: "if i say go to
+    the nearest stall that is were i should go unless its not possible for some reason".
+    The walk takes the nearest of the kind it can reach a side of, wherever cover is."""
+    from rules.grid import distance
+
+    s, e, pc = _at("5bbd0c40345f~urban:the-market")
+    stalls = _kind(s.grid, "stall")
+    assert len(stalls) > 1
+    south = s.add(instantiate("guildhand", scene=s, name="Cutpurse"), zone="near")
+    north = s.add(instantiate("guildhand", scene=s, name="Lookout"), zone="near")
+    s.sides = {"party": [pc.ref], "foes": [south.ref, north.ref]}
+    s.initiative, s.turn = [(pc.ref, 10), (south.ref, 5), (north.ref, 4)], 0
+    # Found by search: from here the most-covered square of any stall was 30 ft west,
+    # the nearest stall covers from one thug only.
+    s.positions[pc.ref], s.positions[south.ref], s.positions[north.ref] = \
+        (14, 7), (13, 14), (15, 0)
+    here = (14, 7)
+    near = min(stalls, key=lambda f: min(distance(here, tuple(p)) for p in f["squares"]))
+    square, why = fixtures.walk_to(s, "stall", pc)
+    assert square is not None, why
+    assert min(distance(square[:2], tuple(p)) for p in near["squares"]) <= 5, (square, near)
