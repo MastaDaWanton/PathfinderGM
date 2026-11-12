@@ -869,6 +869,11 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 # room lacks is put on the map, near the player, and keeps its square.
                 from rules import fixtures as fixtures_mod
 
+                # Held to the walker's own words against the room's fixtures ("the bar"
+                # is the counter here, never the barrel the reader chose, 2026-11-12).
+                a["fixture"] = fixtures_mod.held_to_words(
+                    getattr(scene, "grid", None), str(a["fixture"]),
+                    f"{a.get('place') or ''} {a.get('span') or ''}")
                 fixtures_mod.name_one(scene, str(a["fixture"]))
                 # And the walk happens: free of the turn's time, never of the map. Built
                 # whole, through the engine's own move (stair, reach and provoking rules).

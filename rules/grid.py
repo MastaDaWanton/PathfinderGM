@@ -424,12 +424,14 @@ class Grid:
             t = i / steps
             x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
             at = a_level + (b_level - a_level) * t
-            for square in _squares_at(x, y):
-                if square in ignore:
-                    continue
-                top = self.parapet.get(square, self.low.get(square))
-                if top is not None and at <= top:
-                    return True
+            # A seam point is in the way only when every square it touches is, as
+            # `_crosses_opaque` has it: a line along a barrel's edge grazes past. Measured
+            # 2026-11-12: beside a bar, every square of the room gave +4 cover, an ogre
+            # adjacent included, because each line to a corner on the bar's seam "crossed" it.
+            here = [s for s in _squares_at(x, y) if s not in ignore]
+            tops = [self.parapet.get(s, self.low.get(s)) for s in here]
+            if here and all(top is not None and at <= top for top in tops):
+                return True
         return False
 
     def _crosses_opaque(self, a: tuple[float, float], b: tuple[float, float],

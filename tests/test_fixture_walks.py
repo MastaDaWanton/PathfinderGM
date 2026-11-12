@@ -16,6 +16,7 @@ from __future__ import annotations
 from gm import acts_to_ops, beat_verify, interpret
 from gm.checks import beat_verified
 from rules import fixtures
+from rules.bestiary import instantiate
 
 from test_map_fixtures import _at, _kind
 
@@ -166,3 +167,51 @@ def test_going_back_down_never_walks_the_party_out_of_town():
         *down["actions"], {"act": "go", "place": "the market", "span": "head to the market"}]}
     raw = [{"op": "travel", "actor": "pc", "params": {"place": "the market"}}]
     assert acts_to_ops.walk_in_place(raw, rows, both, s, e.places(), notes=[]) == raw
+
+
+def test_the_bar_is_the_counter_even_when_the_reader_says_barrel():
+    """The Copper Kettle, 2026-11-12: "I draw my rapier and step behind the bar" was read
+    `fixture: barrel`, and the walk stood the player beside the barrel in the open, an
+    ogre a square off. The room calls its counter "the bar"; the walker's words win over
+    the reader's kind. Words that name nothing here keep the reader's answer, and a walk
+    back down (`floor`) is never turned into the stair its words mention."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    g = s.grid
+    assert fixtures.held_to_words(g, "barrel", "behind the bar step behind the bar") == "counter"
+    assert fixtures.held_to_words(g, "barrel", "to the barrel") == "barrel"
+    assert fixtures.held_to_words(g, "counter", "over to the counters") == "counter"
+    assert fixtures.held_to_words(g, "table", "the corner seat") == "table"
+    assert fixtures.held_to_words(g, fixtures.FLOOR, "back down the stair") == fixtures.FLOOR
+    reading = {"question": False, "claims": [], "actions": [
+        {"act": "go", "place": "behind the bar", "within_place": True, "fixture": "barrel",
+         "span": "step behind the bar"}]}
+    rows = acts_to_ops.table(reading, s, sentence="I step behind the bar")
+    moved = [i for r in rows for i in r.intents if i["op"] == "move"]
+    assert moved and "the bar" in moved[0]["because"], [r.record() for r in rows]
+
+
+def test_in_a_fight_the_bar_is_stood_behind_away_from_the_foe():
+    """Same turn: even walked to the right fixture, the nearest side of the bar was the
+    ogre's. In a fight the walk takes the side the bar covers from every standing foe
+    (CRB p.195 cover, the grid's own `cover_between`); out of a fight, the nearest."""
+    from rules.grid import distance
+
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    bar = [tuple(p) for p in _kind(s.grid, "counter")[0]["squares"]]
+    calm, _ = fixtures.walk_to(s, "counter", pc)
+    foe = s.add(instantiate("guildhand", scene=s, name="Bruiser"), zone="near")
+    # The foe on the player's own side of the bar, by the square a calm walk takes.
+    s.positions[foe.ref] = min(
+        ((x, y) for x in range(s.grid.width) for y in range(s.grid.height)
+         if (x, y) not in s.grid.blocked and (x, y) not in s.occupied()
+         and (x, y) != calm[:2] and s.grid.passable((x, y))
+         and s.grid.cover_between((x, y), foe.size, (*calm[:2], 0), pc.size,
+                                  solid_only=True) == "none"),
+        key=lambda p: distance(p, calm[:2]))
+    there = s.positions[foe.ref]
+    s.sides = {"party": [pc.ref], "foes": [foe.ref]}
+    square, why = fixtures.walk_to(s, "counter", pc)
+    assert square is not None and not why
+    assert s.grid.cover_between(there, foe.size, square, pc.size, solid_only=True) != "none", \
+        (square, there)
+    assert min(distance(square[:2], b) for b in bar) <= 5

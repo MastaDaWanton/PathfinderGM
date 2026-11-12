@@ -379,6 +379,33 @@ def name_one(scene, kind: str, near: str | None = None) -> dict | None:
     return fixture
 
 
+def held_to_words(grid: Grid | None, kind: str, words: str) -> str:
+    """The reader's fixture, held to the walker's own words against this room's fixtures.
+
+    The Copper Kettle, 2026-11-12: "I step behind the bar" was read `fixture: barrel`,
+    and the walk stood the player beside the barrel in the open, an ogre a square away;
+    the room's counter is called "the bar". So when the words name a fixture of the room
+    — by its own name's noun ("bar", "landing") or its kind's ("counter", "counters") —
+    and not the kind the reader chose, the named one is the walk's. Words naming nothing
+    here leave the reader's answer as it was (a room that lacks the kind gets one,
+    `name_one`)."""
+    if grid is None or not grid.fixtures or not words or kind == FLOOR:
+        return kind
+    word = r"[a-z]+(?:-[a-z]+)*"             # "wall-walk" is one word, never "walk"
+    said = set(re.findall(word, words.lower()))
+
+    def nouns(k: str) -> set[str]:
+        row = kinds().get(k) or {}
+        names = [f["name"] for f in grid.fixtures if f["kind"] == k]
+        names += [str(row.get("name") or ""), str(row.get("plural") or "")]
+        return {re.findall(word, n.lower())[-1] for n in names if re.findall(word, n.lower())}
+
+    if nouns(kind) & said:
+        return kind
+    named = [f["kind"] for f in grid.fixtures if nouns(f["kind"]) & said]
+    return named[0] if named else kind
+
+
 # The reader's answer for a walk back down off a raised fixture to the room's own floor
 # ("I go back down"): not a kind, so never on the map, but in the reader's closed list.
 FLOOR = "floor"
@@ -445,11 +472,29 @@ def walk_to(scene, kind: str, who) -> tuple[tuple | None, str]:
     if here[:2] in squares and level == f["level"]:
         return None, ""
     if "blocked" in k["occupies"] and set(squares) <= grid.blocked:
-        if any(distance(here[:2], p) <= 5 for p in squares) and level == 0:
+        # In a fight, the side of it away from the foes: the Copper Kettle, 2026-11-12,
+        # "I step behind the bar, keeping it between me and the ogre" stood the player on
+        # the ogre's side. Any side does out of a fight (the nearest).
+        foes = [(tuple(scene.positions[r]), scene.actors[r].size)
+                for side, refs in (getattr(scene, "sides", None) or {}).items()
+                if who.ref not in refs for r in refs
+                if r in scene.positions and r in scene.actors
+                and scene.actors[r].hp > 0]
+        foes = foes if any(who.ref in refs for refs in (scene.sides or {}).values()) else []
+
+        def behind(p) -> bool:
+            return all(grid.cover_between(at, size, (*p, 0), who.size, solid_only=True)
+                       != "none" for at, size in foes)
+
+        by = any(distance(here[:2], p) <= 5 for p in squares) and level == 0
+        if by and (not foes or behind(here[:2])):
             return None, ""                   # already standing at it
-        spots = nearest(beside(squares), here[:2])
+        spots = sorted(nearest(beside(squares), here[:2]),
+                       key=lambda p: bool(foes) and not behind(p))
         if not spots:
             return None, f"There is no clear floor beside {name} to stand at."
+        if by and spots[0] == here[:2]:
+            return None, ""                   # no side of it is better than where they are
         return (*spots[0], 0), ""
     origin = tuple(f["stair"]) if f.get("stair") else here[:2]
     spots = nearest([p for p in squares if free(p)], origin)
