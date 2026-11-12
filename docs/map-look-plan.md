@@ -59,3 +59,28 @@ untrue.
 
 Each lane runs the whole suite, checks live in the running app, and merges nothing
 without the owner's word.
+
+## Done, 2026-11-12 (steps 1 and 2)
+
+- **Fixes 2, 3, 7, 9, 1, 11** (0f2b8826, b8de2195, 19d682bc):
+  - people behind people are drawn as ghosts;
+  - initials get a second letter when two clash;
+  - the market master stands off the stalls;
+  - patrons sit at tables and stand up in a fight;
+  - hidden-square outlines show only on hover.
+- **Found while checking:**
+  - a tavern founded in play got carts and crates (now a bar and tables);
+  - a Large body spawned half inside the gallery;
+  - `_sits` crashed with no fixtures.
+- **Check 12, the live fights**, turned up four walk-to-a-fixture faults, all fixed:
+  - 5a2bf0a5: "behind the bar" was read as the barrel; the player's words now pick the fixture.
+  - 5a2bf0a5: a line grazing a low obstacle's edge gave +4 cover from everywhere.
+  - 225e0e56: a walk in a fight must fit the round's movement and take a covered side. Before, all seven plans were refused, and then the PC stood in the open beside the foe.
+  - 56642baa: "duck/slip behind X" is read as stealth; it now walks there first.
+  - ad9051d3: the reachable square covered from the most foes wins, across every fixture of the kind (two foes on opposite sides refused the walk outright).
+- **Live result:** in the market, "duck behind the nearest stall" moved the PC 30 ft behind a stall, the Stealth roll was offered and succeeded, and the board showed "Sneaking". In the tavern, rapier rounds resolved with legal squares on both boards.
+- **Found, not fixed (not map work):**
+  - the planner retries an illegal move seven times, then degrades;
+  - "You draw your rapier" was narrated with no draw op;
+  - a hidden PC's foe "swings blind" with a sap from about 40 ft without moving.
+- **Judgement call for the owner:** a fight walk prefers cover from more foes over the nearest fixture. "The nearest stall" went to a stall 30 ft off that hid the PC from both thugs.
