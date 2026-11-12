@@ -482,12 +482,13 @@ def walk_to(scene, kind: str, who) -> tuple[tuple | None, str]:
                 and scene.actors[r].hp > 0]
         foes = foes if any(who.ref in refs for refs in (scene.sides or {}).values()) else []
 
-        def behind(p) -> bool:
-            return all(grid.cover_between(at, size, (*p, 0), who.size, solid_only=True)
+        def covers(p) -> int:
+            """How many foes it covers this square from."""
+            return sum(grid.cover_between(at, size, (*p, 0), who.size, solid_only=True)
                        != "none" for at, size in foes)
 
         by = any(distance(here[:2], p) <= 5 for p in squares) and level == 0
-        if by and (not foes or behind(here[:2])):
+        if by and not foes:
             return None, ""                   # already standing at it
         # In a fight, within this round's movement first, as the engine's move check
         # counts it: live the same day the far side was 35 ft off with 30 ft to spend,
@@ -496,19 +497,29 @@ def walk_to(scene, kind: str, who) -> tuple[tuple | None, str]:
         if getattr(scene, "in_encounter", False):
             reach = set(grid.reachable(here[:2], who.speed_feet, size=who.size,
                                        occupied=taken)) | {here[:2]}
-        # With foes, only a side it covers counts: the next live try stood the player on
-        # the one side in reach, beside the bruiser and in the open (AC 15, sapped).
-        spots = nearest(beside(squares), here[:2])
-        covered = [p for p in spots if behind(p)] if foes else spots
-        spots = covered or spots
-        if not spots:
-            return None, f"There is no clear floor beside {name} to stand at."
-        if reach is not None and not any(p in reach for p in spots):
-            far = f"the far side of {name}" if foes and covered else name
-            return None, f"{who.name} cannot reach {far} this round."
-        spots = [p for p in spots if reach is None or p in reach]
-        if by and spots[0] == here[:2]:
-            return None, ""                   # no side of it is better than where they are
+        if not foes:
+            spots = [p for p in nearest(beside(squares), here[:2])
+                     if reach is None or p in reach]
+            if not spots:
+                return None, f"There is no clear floor beside {name} that {who.name} can reach."
+            return (*spots[0], 0), ""
+        # With foes: any of the kind, the square covered from the most foes, then the
+        # nearest. The next live try stood the player on the one side of the bar in
+        # reach, beside the bruiser in the open (AC 15, sapped); in the market a lookout
+        # north and a cutpurse south left no square of the nearest stall covered from
+        # both, and the walk was refused though one side hid them from the cutpurse.
+        ring = {p for g_ in found for p in beside([tuple(q) for q in g_["squares"]])}
+        if by:
+            ring.add(here[:2])
+        spots = sorted((p for p in ring if reach is None or p in reach),
+                       key=lambda p: (-covers(p), distance(here[:2], p), p))
+        if not spots or not covers(spots[0]):
+            if any(covers(p) for p in ring):
+                return None, f"{who.name} cannot reach cover behind {name} this round."
+            if not spots:
+                return None, f"There is no clear floor beside {name} that {who.name} can reach."
+        if spots[0] == here[:2]:
+            return None, ""                   # no square of it is better than where they are
         return (*spots[0], 0), ""
     origin = tuple(f["stair"]) if f.get("stair") else here[:2]
     spots = nearest([p for p in squares if free(p)], origin)

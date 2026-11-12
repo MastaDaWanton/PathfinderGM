@@ -268,3 +268,25 @@ def test_hiding_behind_the_bar_walks_there_first():
 
     assert built("behind the bar")[:1] == ["move"], built("behind the bar")
     assert "move" not in built("into the crowd")
+
+
+def test_foes_on_both_sides_still_leave_cover_from_one():
+    """The market, 2026-11-12: a lookout north and a cutpurse south of the nearest stall,
+    no square of it covered from both, and "duck behind the nearest stall" was refused
+    outright though one side hid the player from the cutpurse. The walk takes the reachable
+    square covered from the most foes; it is refused only when none covers from any."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+    g = s.grid
+    west = s.add(instantiate("guildhand", scene=s, name="West"), zone="near")
+    east = s.add(instantiate("guildhand", scene=s, name="East"), zone="near")
+    # One foe at the bar's west end, one off its north-east corner: the square behind it
+    # from both is out of this round's reach, a square behind it from one is not.
+    s.positions[pc.ref], s.positions[west.ref], s.positions[east.ref] = (4, 4), (4, 6), (6, 5)
+    s.sides = {"party": [pc.ref], "foes": [west.ref, east.ref]}
+    s.initiative, s.turn = [(pc.ref, 10), (west.ref, 5), (east.ref, 4)], 0
+    square, why = fixtures.walk_to(s, "counter", pc)
+    assert square is not None, why
+    assert any(g.cover_between(s.positions[f.ref], f.size, square, pc.size, solid_only=True)
+               != "none" for f in (west, east)), square
+    assert square[:2] in g.reachable((4, 4), pc.speed_feet, size=pc.size,
+                                     occupied=s.occupied(ignore=pc.ref))
