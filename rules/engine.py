@@ -3190,7 +3190,7 @@ class Engine:
                     f"are, so cannot {what}. Search for them first (a Perception check)"
                     + (f", or {ways}" if ways and op != "use_ability" else "") + ".")
         guess = ""
-        if op == "attack":
+        if op == "attack" and awareness.has_hunch(actor, subject):   # `_guess_square`
             guess = (f", swing blind at where {actor.name} guesses they are "
                      f"({awareness.guess_fix(actor.ref)})")
         elif op == "cast" and need == "square":
@@ -3307,6 +3307,16 @@ class Engine:
         if not self.scene.has_grid or actor.ref not in self.scene.positions:
             return self._refuse(intent, f"{actor.name} has nothing to aim at: there is no "
                                         f"ground mapped to guess a square on.")
+        # A creature swings blind only on a hunch that somebody unseen is close by. The
+        # market, 2026-11-12: a lookout that had lost the player 40 ft off swung at the air
+        # beside itself instead of searching. Its own knowledge, so the refusal says nothing
+        # of where anyone is; the player's guesses are the player's to make.
+        if not actor.is_pc and not any(
+                awareness.has_hunch(actor, a) for a in self.scene.actors.values()
+                if a is not actor and a.has_state(awareness.HIDDEN)):
+            return self._refuse(intent, f"{actor.name} has no idea anybody unseen is close "
+                                        f"enough to swing at; it may search instead: "
+                                        f"{awareness.search_fix(actor.ref)}.")
         seen = set()
         for r, a in self.scene.actors.items():
             if r != actor.ref and r in self.scene.positions \
