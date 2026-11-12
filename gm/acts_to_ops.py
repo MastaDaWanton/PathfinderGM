@@ -932,6 +932,16 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act == "harvest" and pc is not None:
                 _harvest(row, frame, i, scene, pc, rows)
             if act == "stealth" and pc is not None:
+                # Hiding behind something of this room moves you there first. Live
+                # 2026-11-12, twice: "duck behind the nearest stall" and "slip around
+                # behind the bar" were read as stealth (`place` the stall, the bar), and
+                # the player never left their square.
+                from rules import fixtures as fixtures_mod
+
+                kind = fixtures_mod.held_to_words(
+                    getattr(scene, "grid", None), "", str(a.get("place") or ""))
+                if kind:
+                    _to_the_fixture(row, kind, scene, pc)
                 _sneak(row, a, scene, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)

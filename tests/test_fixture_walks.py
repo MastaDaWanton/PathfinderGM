@@ -250,3 +250,21 @@ def test_in_a_fight_the_walk_to_the_bar_fits_the_round():
         assert square[:2] in reach, (start, square, pc.speed_feet)
         if any(covered(p) and g.passable(p) and p not in g.blocked for p in sides):
             assert covered(square), (start, square, there)
+
+
+def test_hiding_behind_the_bar_walks_there_first():
+    """Live 2026-11-12, twice in two fights: "duck behind the nearest stall" and "slip
+    around behind the bar" were read as stealth with the fixture as its `place`; no walk
+    was built, the player stayed in the open and the hide was refused. Stealth whose place
+    names a fixture of this room moves there first, then hides; one naming nothing here
+    ("into the crowd") moves nobody."""
+    s, e, pc = _at("5bbd0c40345f~urban:the-tavern")
+
+    def built(place):
+        reading = {"question": False, "claims": [], "actions": [
+            {"act": "stealth", "place": place, "span": f"slip {place}"}]}
+        return [i["op"] for r in acts_to_ops.table(reading, s, sentence=f"I slip {place}")
+                for i in r.intents]
+
+    assert built("behind the bar")[:1] == ["move"], built("behind the bar")
+    assert "move" not in built("into the crowd")
