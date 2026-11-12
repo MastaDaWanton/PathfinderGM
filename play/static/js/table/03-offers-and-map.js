@@ -354,9 +354,9 @@ function renderMap(s) {
   // that the user can be precise about where he wants to stand even outside of combat".
   // A line naming one ("I go to C5") walks there (rules/fixtures.py `square_said`).
   for (let c = 0; c < g.width; c++)
-    parts.push(`<text class="coord" x="${(c + .5) * CELL}" y="${-4}">${sqCol(c)}</text>`);
+    parts.push(`<text class="coord col" x="${(c + .5) * CELL}" y="${-4}">${sqCol(c)}</text>`);
   for (let r = 0; r < g.height; r++)
-    parts.push(`<text class="coord" x="${-7}" y="${(r + .5) * CELL + 3}">${r + 1}</text>`);
+    parts.push(`<text class="coord row" x="${-7}" y="${(r + .5) * CELL + 3}">${r + 1}</text>`);
 
   // Blood before bodies, so a token stands in its own pool rather than under it.
   for (const b of (s.scene.pools || [])) {
@@ -492,6 +492,7 @@ function renderMap(s) {
     <div class="boardfoot">${g.about ? `<p class="sub maplegend">${esc(g.about)}</p>` : ""}${
       legend}</div>`;
   if (typeof mapPaint === "function") mapPaint();
+  if (typeof MapZoom !== "undefined") MapZoom.mount(g, s.scene);
 
   function cell(c, r, cls, inner = "") {
     return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${

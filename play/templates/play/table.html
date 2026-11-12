@@ -191,6 +191,9 @@
          border: 1px solid #241d15; border-radius: 3px;
          box-shadow: inset 0 0 24px rgba(0,0,0,.55); }
   #map .rule { stroke: #241d15; stroke-width: .5; }
+  /* Pinned to the view's edge while zoomed: a halo of the well's colour keeps a label
+     readable over the squares it now sits on. */
+  #map .coord.pinned { paint-order: stroke; stroke: #0f0c09; stroke-width: 2.5px; }
   #map .coord { fill: var(--dim); font-size: 8.5px; text-anchor: middle;
                 pointer-events: none; user-select: none; }
   #map .blocked { fill: #3a3128; }
@@ -2506,8 +2509,23 @@
   /* The board sits in a stone well sunk into the card. The old page's `#map` and `#view3d`
      rules sized each board to its width (`height: auto`), which in a well of fixed height
      let a tall room run off its foot: here they fill the well and keep their shape. */
-  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
+  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px; position: relative;
                border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken); overflow: hidden; }
+  /* Zoom (js/table/24-map-zoom.js): the board owns the touches and the middle button on
+     it; the buttons sit over its corner, so zooming never changes the board's size. */
+  #mapwrap .boardview, #mapwrap .boardview svg { touch-action: none; }
+  #mapwrap .boardview:focus { outline: none; }
+  #mapwrap .boardview:focus-visible { box-shadow: var(--sunken), 0 0 0 2px var(--candle); }
+  #mapwrap .boardview.is-zoomed svg { cursor: grab; }
+  #mapwrap .boardview.is-zoomed svg:active { cursor: grabbing; }
+  .mapzoom { position: absolute; right: 6px; bottom: 6px; z-index: 2; display: grid; gap: 2px;
+             padding: 2px; border-radius: 4px; background: var(--glass);
+             border: 1px solid var(--glass-edge); box-shadow: var(--sh-2); }
+  .mapzoom .v2-btn { width: 36px; height: 30px; min-height: 0; padding: 0; font-size: 13px;
+                     line-height: 1; letter-spacing: 0; touch-action: manipulation; user-select: none; }
+  .mapzoom .v2-btn[data-mapzoom="in"], .mapzoom .v2-btn[data-mapzoom="out"] { font-size: 17px; }
+  .mapzoom .v2-btn:disabled { opacity: .4; cursor: default; }
+  .mapzoom .v2-btn:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px; }
   .boardview svg, .boardview > #map, .boardview > #view3d {
     width: 100%; height: 100%; max-height: 100%; display: block; }
   .boardfoot { display: grid; gap: 2px; font-size: 14px; }
@@ -4291,6 +4309,9 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/01-core.js' %}"></script>
 <script src="{% asset 'js/table/02-state.js' %}"></script>
 <script src="{% asset 'js/table/03-offers-and-map.js' %}"></script>
+<!-- Zoom and pan on the ground board (2026-11-12), mounted by renderMap: before the first
+     board is drawn, which happens while the later scripts are still loading. -->
+<script src="{% asset 'js/table/24-map-zoom.js' %}"></script>
 <script src="{% asset 'js/table/04-combat-and-turns.js' %}"></script>
 <script src="{% asset 'js/table/05-sheet.js' %}"></script>
 <script src="{% asset 'js/table/06-trade-and-page.js' %}"></script>

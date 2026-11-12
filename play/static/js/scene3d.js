@@ -1190,5 +1190,17 @@
       body + "</svg>";
   }
 
-  window.Scene3D = { render: render, TURNS: 4 };
+  /* For js/table/24-map-zoom.js: a point on the board (squares, on the floor) to this
+     view's SVG units, and back. Zoom keeps its centre as a point on the board, so it holds
+     the same spot through a quarter-turn and across Flat and 3D. */
+  function toUser(bx, by, q) { return project([bx, by, 0], q & 3); }
+  function toBoard(u, v, q) {
+    // project() at z = 0 is linear in (x, y); invert its 2 x 2 matrix.
+    var o = project([0, 0, 0], q), ex = project([1, 0, 0], q), ey = project([0, 1, 0], q);
+    var a = ex[0] - o[0], b = ey[0] - o[0], c = ex[1] - o[1], d = ey[1] - o[1];
+    var det = a * d - b * c, du = u - o[0], dv = v - o[1];
+    return [(d * du - b * dv) / det, (a * dv - c * du) / det];
+  }
+
+  window.Scene3D = { render: render, TURNS: 4, toUser: toUser, toBoard: toBoard };
 })();
