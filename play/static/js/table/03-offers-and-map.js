@@ -211,7 +211,7 @@ function renderMap(s) {
     return;
   }
 
-  const CELL = 18, MARGIN = 10;   // MARGIN: room for the coordinates, top and left
+  const CELL = 18, MARGIN = 14;   // MARGIN: room for the coordinates, top and left
   const reach = new Map((g.reachable || []).map(([c, r, cost]) => [`${c},${r}`, cost]));
   const parts = [];
 
@@ -354,9 +354,9 @@ function renderMap(s) {
   // that the user can be precise about where he wants to stand even outside of combat".
   // A line naming one ("I go to C5") walks there (rules/fixtures.py `square_said`).
   for (let c = 0; c < g.width; c++)
-    parts.push(`<text class="coord" x="${(c + .5) * CELL}" y="${-3}">${sqCol(c)}</text>`);
+    parts.push(`<text class="coord" x="${(c + .5) * CELL}" y="${-4}">${sqCol(c)}</text>`);
   for (let r = 0; r < g.height; r++)
-    parts.push(`<text class="coord" x="${-5}" y="${(r + .5) * CELL + 2.5}">${r + 1}</text>`);
+    parts.push(`<text class="coord" x="${-7}" y="${(r + .5) * CELL + 3}">${r + 1}</text>`);
 
   // Blood before bodies, so a token stands in its own pool rather than under it.
   for (const b of (s.scene.pools || [])) {
