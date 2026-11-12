@@ -111,6 +111,23 @@ def _marks(names: dict) -> dict:
     return out
 
 
+def _sits(scene, ref, a) -> list | None:
+    """Which way a person seated at a table faces it ([dx, dy]), or None for standing.
+    Drawing only, like `form`: no rule reads it and it is no state (standing up is not
+    an action here). Out of a fight, not the player, beside a table on the floor: the
+    posts put tavern patrons at tables and the board stood them up there (plan item 11)."""
+    g = getattr(scene, "grid", None)
+    sq = scene.positions.get(ref)
+    if g is None or not sq or a.is_pc or scene.in_encounter or a.hp <= 0             or (len(sq) > 2 and sq[2]):
+        return None
+    tables = {tuple(t[:2]) for f in g.fixtures
+              if f["kind"] == "table" and f["level"] == 0 for t in f["squares"]}
+    for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)):
+        if (sq[0] + dx, sq[1] + dy) in tables:
+            return [dx, dy]
+    return None
+
+
 def _body_form(a) -> str:
     """How the map draws this body: "ooze", "beast" or "humanoid". A creature's type is
     in its stat block and visible at a glance, so it is the player's to see. Anything
@@ -878,6 +895,7 @@ def _state(c) -> dict:
                  # What shape the board stands them up as (`_body_form`).
                  "form": _body_form(a),
                  "mark": marks[r],
+                 "sits": _sits(c.scene, r, a),
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
                  # than one big creature (item 33). Absent for every ordinary creature.

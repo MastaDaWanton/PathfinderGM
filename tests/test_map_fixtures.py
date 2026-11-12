@@ -462,3 +462,41 @@ def test_clashing_initials_get_a_second_letter():
     assert {m["a"], m["b"]} == {"Ty", "Tr"}
     assert m["d"] == "Th"          # "the" is skipped, and "thug" still clashes with T
     assert {m["e"], m["f"]} == {"VA", "VB"}
+
+
+def test_tavern_patrons_sit_facing_their_table_and_stand_in_a_fight():
+    """Plan item 11: the posts put tavern patrons beside tables and the board stood them
+    up there, so a tavern read as a queue. Someone posted at a table is drawn seated,
+    facing it; the player never is, and nobody sits through a fight."""
+    from play.views import _sits
+
+    s, e, pc = _at(TAVERN)
+    tables = _kind(s.grid, "table")
+    assert tables
+    pats = [s.add(instantiate("guildhand", scene=s, name=f"Pat{i}"), zone="near")
+            for i in range(3)]
+    s.place_by_zone([p.ref for p in pats], posts=True)
+    seated = [p for p in pats if _sits(s, p.ref, p)]
+    assert seated, [s.positions[p.ref] for p in pats]
+    for p in seated:
+        dx, dy = _sits(s, p.ref, p)
+        sq = s.positions[p.ref]
+        assert any((sq[0] + dx, sq[1] + dy) == tuple(t[:2]) for f in tables
+                   for t in f["squares"])
+    assert _sits(s, pc.ref, pc) is None
+    s.initiative, s.turn = [(pc.ref, 10)], 0          # a fight is on
+    assert s.in_encounter and all(_sits(s, p.ref, p) is None for p in pats)
+
+
+def test_a_tavern_founded_in_play_has_a_bar_and_tables():
+    """Live 2026-11-12: "the Copper Kettle", founded as a tavern, was laid with a cart,
+    crates and barrels and nowhere to sit: the fixture rows were looked up by the place's
+    own slug, which a founded place never matches. Its kind's shape finds its kind's row."""
+    from rules import floorplan, places
+
+    pid = "5bbd0c40345f~urban:the-market/the-copper-kettle"
+    shape = places.shape_of_kind("tavern", "urban")
+    got = {f["kind"] for f in fixtures.derive(floorplan.for_place(pid, "urban", shape),
+                                              pid, "urban", shape)}
+    assert {"counter", "table"} <= got, got
+    assert "cart" not in got, got

@@ -153,6 +153,12 @@ def _profile(place_id: str, terrain: str = "", authored=None) -> dict:
     bare = str(place_id or "").rsplit(floorplan.STOREY, 1)[0]
     spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
     own = dict(d.get("places", {}).get(spot) or {})
+    if not own and authored is not None:
+        # A place founded in play ("the Copper Kettle", a tavern) has its own slug and its
+        # kind's shape (`places.shape_of_kind`): find the kind's row by that shape. Live
+        # 2026-11-12 a founded tavern was laid with carts and crates, no bar, no tables.
+        kin = next((k for k, v in floorplan.BY_SPOT.items() if v == authored), "")
+        own = dict(d.get("places", {}).get(kin) or {})
     row = own
     if not any(own.get(slot) for slot in _SLOTS) or floorplan._storey(place_id):
         # A storey is rooms over the work, not the work: the terrain's row, as for any

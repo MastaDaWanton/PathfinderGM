@@ -202,3 +202,14 @@ def test_a_figure_behind_an_ogre_is_ghosted_and_squares_are_not(tmp_path):
             ghosted += [re.search(r">(\w)</text>", g).group(1) for g in ghosts]
             assert "xsq" not in svg, (turn, dx, dy)
         assert ghosted == ["G"], (turn, ghosted)
+
+
+@needs_node
+def test_a_seated_patron_is_lower_and_sits_on_a_stool(tmp_path):
+    """Plan item 11: patrons posted at a tavern table stood there like a queue. Given
+    `sits` (the way to the table), a person is drawn seated, lower than standing;
+    a beast ignores it."""
+    one = lambda **kw: _render(tmp_path, _grid(), [dict(_FOE, **kw)], {"turn": 0})
+    stand, sit = one(form="humanoid"), one(form="humanoid", sits=[1, 0])
+    assert _height(sit) < 0.95 * _height(stand)
+    assert one(form="beast", sits=[1, 0]) == one(form="beast")

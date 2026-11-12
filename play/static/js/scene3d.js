@@ -306,7 +306,7 @@
      Every piece is a closed convex solid, so a face turned away from the camera is
      hidden by its own front at every quarter-turn — marked `cull` and never drawn,
      which halves what a figure costs the depth sort. Returns the figure's top. */
-  function figure(out, cx, cy, z, s, form, down, mat, cls, baseCls, tip) {
+  function figure(out, cx, cy, z, s, form, down, mat, cls, baseCls, tip, sits) {
     var start = out.length;
     frustum(out, cx, cy, 0.42 * s, 0.4 * s, z, z + 0.07 * s, 10, mat, cls,
             { cls: cls + baseCls, inner: tip });
@@ -340,6 +340,34 @@
       frustum(out, cx, cy, 0.19 * s, 0.06 * s, b + 0.3 * s, b + 0.38 * s, 10, mat, cls,
               { cls: cls });
       top = b + 0.38 * s;
+    } else if (sits) {
+      /* Seated at a table (`sits` is the way to it, views._sits): a stool, thighs
+         level toward the table, shins down at its edge, the body on top 0.16 lower
+         than standing. The posts put patrons at tables; standing there, plan item 11,
+         a tavern read as a queue. */
+      var dx = sits[0], dy = sits[1], px = -dy, py = dx, h = 0.3 * s;
+      var bx = cx - dx * 0.1 * s, by = cy - dy * 0.1 * s;
+      var box = function (x0, y0, x1, y1, z0, z1, m) {
+        slab(out, Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1),
+             z0, z1, m, cls);
+      };
+      box(bx - 0.17 * s, by - 0.17 * s, bx + 0.17 * s, by + 0.17 * s, b, b + h, "wooddark");
+      [-1, 1].forEach(function (k) {
+        var ox = px * k * 0.08 * s, oy = py * k * 0.08 * s;
+        box(bx + ox - 0.05 * s, by + oy - 0.05 * s, bx + ox + dx * 0.36 * s + 0.05 * s,
+            by + oy + dy * 0.36 * s + 0.05 * s, b + h, b + h + 0.1 * s, mat);
+        var kx = bx + ox + dx * 0.33 * s, ky = by + oy + dy * 0.33 * s;
+        box(kx - 0.045 * s, ky - 0.045 * s, kx + 0.045 * s, ky + 0.045 * s, b, b + h, mat);
+        box(bx + px * k * 0.23 * s - 0.04 * s, by + py * k * 0.23 * s - 0.04 * s,
+            bx + px * k * 0.23 * s + 0.04 * s, by + py * k * 0.23 * s + 0.04 * s,
+            b + 0.34 * s, b + 0.8 * s, mat);
+      });
+      frustum(out, bx, by, 0.13 * s, 0.21 * s, b + 0.34 * s, b + 0.8 * s, 6, mat, cls);
+      frustum(out, bx, by, 0.21 * s, 0.07 * s, b + 0.8 * s, b + 0.88 * s, 6, mat, cls);
+      frustum(out, bx, by, 0.09 * s, 0.15 * s, b + 0.9 * s, b + 1.03 * s, 6, mat, cls);
+      frustum(out, bx, by, 0.15 * s, 0.08 * s, b + 1.03 * s, b + 1.19 * s, 6, mat, cls,
+              { cls: cls });
+      top = b + 1.19 * s;
     } else {
       // Two legs, a torso widening to the shoulders, arms at its sides, a head on a
       // neck: the pawn-like first cut (one tapered column) read as a bottle.
@@ -951,7 +979,8 @@
         });
       } else {
         // A Large body stands on its whole footprint, and as much taller as it is wider.
-        top = figure(faces, cx, cy, az, n, a.form, down, side, cls, baseCls, tip);
+        top = figure(faces, cx, cy, az, n, a.form, down, side, cls, baseCls, tip,
+                     (a.form || "humanoid") === "humanoid" ? a.sits : null);
       }
       /* The letter, on a small plate over the head: the flat token's initial, or a
          crowd's count. In the depth sort like a face, so a wall in front still covers it

@@ -243,6 +243,10 @@
   #view3d .xsq { fill: var(--gold); fill-opacity: .1; stroke: var(--gold);
                  stroke-opacity: .55; stroke-width: .6; stroke-dasharray: 2 1.5; }
   #view3d .xsq:hover { fill: var(--gold); fill-opacity: .45; }
+  /* Drawn over the mass that hides them, the outlines read as walkway squares on top of
+     a gallery (plan item 1, the owner's tavern). They show only while the pointer is on
+     the board, which is when a move is being chosen; still clickable either way. */
+  #view3d:not(:hover) .xsq { opacity: 0; }
   /* A figure's letter plate over its head (the flat token's initial, or a crowd's
      count), and the gold rim on the base of whoever's turn it is. */
   #view3d .plate rect { stroke: #15120d; stroke-width: .45; }
