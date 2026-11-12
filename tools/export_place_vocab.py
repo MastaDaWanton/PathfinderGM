@@ -150,12 +150,15 @@ def build() -> dict:
             # simply publishing it.
             "clamp_min_ft": floorplan.MIN_SQUARES * floorplan.FEET_PER_SQUARE,
             "clamp_max_ft": floorplan.MAX_SQUARES * floorplan.FEET_PER_SQUARE,
+            # The owner, 2026-11-12: the max holds for a building's interior in a town
+            # only; open ground and anything outside a town is as big as written.
+            "clamp_max_applies_to": "a place in a town with a roof (size_ft.height not null)",
             "why": "the range the consumer's own tables cover. An authored value is "
-                   "read at five feet to a square and clamped to "
-                   f"{floorplan.MIN_SQUARES}-{floorplan.MAX_SQUARES} squares "
-                   f"({floorplan.MIN_SQUARES * 5}-{floorplan.MAX_SQUARES * 5} ft): "
-                   "below that is a room with nowhere to stand off, above it is more "
-                   "map than a player reads.",
+                   "read at five feet to a square, never below "
+                   f"{floorplan.MIN_SQUARES} squares ({floorplan.MIN_SQUARES * 5} ft), "
+                   "a room with nowhere to stand off. A roofed place in a town is held "
+                   f"to {floorplan.MAX_SQUARES} squares ({floorplan.MAX_SQUARES * 5} ft); "
+                   "open ground and anything outside a town is not capped.",
         },
         # What a settlement may hold, which is the base draw plus what its own words
         # earned. `most_places` is the one a checker compares against; the parts are here

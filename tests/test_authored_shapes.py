@@ -207,6 +207,19 @@ def test_nothing_comes_out_smaller_than_a_scene_or_bigger_than_a_map():
     assert max(max(s.width, s.height) for s in every) <= floorplan.MAX_SQUARES
 
 
+def test_only_a_roof_in_a_town_is_capped():
+    """The owner, 2026-11-12: the 24-square cap is "probably okay for building interiors
+    inside of towns but anywhere else it should be uncapped". A 300-ft town hall is held to
+    24 squares; a 300-ft square under the sky, or a roofed place outside a town, is 60."""
+    def side(pid, height):
+        raw = {"id": pid, "size_ft": {"width": 300, "depth": 300, "height": height}}
+        return floorplan.from_world(raw).width
+
+    assert side("c1~urban:the-hall", 20) == floorplan.MAX_SQUARES
+    assert side("c1~urban:the-square", None) == 60
+    assert side("c1~wild:the-cave", 20) == 60
+
+
 def test_the_rooms_are_smaller_than_the_ones_this_app_invented():
     """The headline consequence, stated so nobody has to rediscover it: real rooms are
     smaller than generous ones. If this ever inverts, the reader has stopped reading."""

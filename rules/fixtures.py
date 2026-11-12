@@ -422,7 +422,7 @@ def square_said(grid: Grid | None, words: str):
     if grid is None or not words:
         return None
     names = {square_name((c, r)): (c, r) for c in range(grid.width) for r in range(grid.height)}
-    found = {names[m] for m in re.findall(r"\b([A-Z]{1,2}\d{1,2})\b", words) if m in names}
+    found = {names[m] for m in re.findall(r"\b([A-Z]{1,2}\d{1,3})\b", words) if m in names}
     return found.pop() if len(found) == 1 else None
 
 

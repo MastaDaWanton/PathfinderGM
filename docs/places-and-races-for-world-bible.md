@@ -403,7 +403,7 @@ to the ceiling with a gallery round them.
 >
 > | Field | What it becomes |
 > |---|---|
-> | `size_ft.width` / `.depth` | the grid, at five feet to a square, clamped to 6–24 squares — a 15-foot closet is a room but not a scene, and past 24 is more map than anybody reads |
+> | `size_ft.width` / `.depth` | the grid, at five feet to a square, never below 2 squares (10 ft). **Since 2026-11-12** a place in a town with a roof (`height` not null) is held to 24 squares (120 ft); open ground (`height: null`) and anything outside a town is laid as big as written — the board zooms |
 > | `size_ft.height` | the ceiling in squares; `null` means no roof, and a place with no roof has no floors above it whatever `storeys` says |
 > | `clutter` | how much of the floor is solid stuff in the way: 2% of squares for `bare`, 11% for `dense` |
 > | `footing` | how much is difficult going: 2% for `firm`, 18% for `bad` |

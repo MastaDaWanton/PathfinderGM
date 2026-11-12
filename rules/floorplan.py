@@ -393,8 +393,11 @@ FEET_PER_SQUARE = 5
 # narrowest thing that is still a fight rather than a queue. Nothing below that, because
 # a one-square room has no room to miss in.
 #
-# The ceiling stays twenty-four: the authored range runs to 125 feet and a grid much past
-# twenty-four is a map a player reads badly.
+# The ceiling of twenty-four holds for a building's interior in a town only (the owner,
+# 2026-11-12: "probably okay for building interiors inside of towns but anywhere else it
+# should be uncapped"). It was set when the board had no zoom, as "a grid much past
+# twenty-four is a map a player reads badly"; a street, a square or a yard is as big as
+# the world says.
 MIN_SQUARES, MAX_SQUARES = 2, 24
 
 # How much of the floor each clutter word puts something solid on, as a fraction of the
@@ -447,8 +450,11 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
         from dataclasses import replace
 
         return replace(base, fixtures=named)
-    width = _squares(size.get("width"), base.width)
-    height = _squares(size.get("depth"), base.height)
+    # A roof in a town is a building's interior: capped. Anything else is not.
+    cap = MAX_SQUARES if size and size.get("height") is not None \
+        and "~urban:" in str(raw.get("id") or "") else None
+    width = _squares(size.get("width"), base.width, cap)
+    height = _squares(size.get("depth"), base.height, cap)
     # An authored height of null is a place with no roof, which is a fact and not a gap:
     # 241 of the 456 are written that way and they are the yards, the greens and the
     # streets. Only a place that wrote nothing at all about its size keeps the table's
@@ -469,12 +475,14 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
                  vertical=kind, about=base.about, fixtures=named)
 
 
-def _squares(feet, fallback: int) -> int:
+def _squares(feet, fallback: int, cap: int | None = MAX_SQUARES) -> int:
     try:
         n = round(float(feet) / FEET_PER_SQUARE)
     except (TypeError, ValueError):
         return fallback
-    return max(MIN_SQUARES, min(MAX_SQUARES, n)) if n else fallback
+    if not n:
+        return fallback
+    return max(MIN_SQUARES, min(cap, n) if cap else n)
 
 
 def _levels(feet) -> int | None:
