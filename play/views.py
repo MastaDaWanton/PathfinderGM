@@ -120,7 +120,7 @@ def _sits(scene, ref, a) -> list | None:
     sq = scene.positions.get(ref)
     if g is None or not sq or a.is_pc or scene.in_encounter or a.hp <= 0             or (len(sq) > 2 and sq[2]):
         return None
-    tables = {tuple(t[:2]) for f in g.fixtures
+    tables = {tuple(t[:2]) for f in (g.fixtures or ())     # None on an untyped grid
               if f["kind"] == "table" and f["level"] == 0 for t in f["squares"]}
     for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)):
         if (sq[0] + dx, sq[1] + dy) in tables:

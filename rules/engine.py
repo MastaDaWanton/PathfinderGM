@@ -824,11 +824,14 @@ class Scene:
         ring: there the distance is what the words said.
         """
         from . import fixtures, keepers
+        from .grid import footprint
         pc = self.pc()
         if self.grid is None or pc is None or pc.ref not in self.positions:
             return
-        px, py = self.positions[pc.ref]
-        taken = set(self.positions.values())
+        px, py = self.positions[pc.ref][:2]
+        # Every square a body stands on, flat: a Large creature's whole 2x2, and nobody
+        # missed for standing on a gallery (a 3-tuple never matched a 2-tuple here).
+        taken = self.occupied() | {tuple(p[:2]) for p in self.positions.values()}
         for ref in refs:
             if ref not in self.actors:
                 continue
@@ -848,13 +851,14 @@ class Scene:
             # player described.
             if self.grid is not None and px + away >= self.grid.width:
                 self.grid.width = px + away + 2
-            spot = self._free_spot_at(px, py, away, taken)
+            size = str(getattr(self.actors[ref], "size", "") or "medium")
+            spot = self._free_spot_at(px, py, away, taken, size)
             if spot is not None:
                 self.positions[ref] = spot
-                taken.add(spot)
+                taken.update(footprint(spot, size))
 
     def _free_spot_at(self, px: int, py: int, away: int,
-                      taken: set) -> tuple[int, int] | None:
+                      taken: set, size: str = "medium") -> tuple[int, int] | None:
         """A free square about `away` squares from (px, py), spread around it.
 
         Reported from the table 2026-09-17 with a picture of the board: seven creatures
@@ -868,8 +872,12 @@ class Scene:
         the zone asked for, so the first free square is the one that keeps the zone
         honest; ties break by a fixed rotation so the spread is deterministic and a
         seeded test can assert where everybody stood.
+
+        A Large body needs its whole footprint free and on one level. Only its corner was
+        checked, and a live fight in a tavern (2026-11-12) put an ogre at the room's edge
+        with half its 2x2 inside the gallery.
         """
-        from .grid import distance
+        from .grid import distance, footprint
 
         if self.grid is None:
             return None
@@ -884,7 +892,10 @@ class Scene:
                 x, y = px + dx, py + dy
                 if not (0 <= x < self.grid.width and 0 <= y < self.grid.height):
                     continue
-                if (x, y) in taken or (x, y) in self.grid.blocked:
+                fp = footprint((x, y), size)
+                if any(not (0 <= q[0] < self.grid.width and 0 <= q[1] < self.grid.height)
+                       or q in taken or q in self.grid.blocked
+                       or self.grid.ground(q) != self.grid.ground((x, y)) for q in fp):
                     continue
                 off = abs(distance(anchor, (x, y)) - want_ft)
                 # Second key spreads the ring: squares are tried in a rotation around

@@ -484,6 +484,11 @@ def test_tavern_patrons_sit_facing_their_table_and_stand_in_a_fight():
         assert any((sq[0] + dx, sq[1] + dy) == tuple(t[:2]) for f in tables
                    for t in f["squares"])
     assert _sits(s, pc.ref, pc) is None
+    # An untyped grid holds None, not []: the first build crashed every /api/say on one
+    # (two e_magic tests, 500 "NoneType is not iterable").
+    kept, s.grid.fixtures = s.grid.fixtures, None
+    assert _sits(s, seated[0].ref, seated[0]) is None
+    s.grid.fixtures = kept
     s.initiative, s.turn = [(pc.ref, 10)], 0          # a fight is on
     assert s.in_encounter and all(_sits(s, p.ref, p) is None for p in pats)
 
@@ -500,3 +505,24 @@ def test_a_tavern_founded_in_play_has_a_bar_and_tables():
                                               pid, "urban", shape)}
     assert {"counter", "table"} <= got, got
     assert "cart" not in got, got
+
+
+def test_an_ogre_spawned_at_range_stands_wholly_on_one_level():
+    """Live fight, 2026-11-12: an ogre spawned 30 ft off in a tavern was put at the
+    room's edge with half its 2x2 inside the raised gallery, because only the corner
+    square of a Large body was checked. Every square of the footprint is free, inside
+    the room, unblocked, unshared and on one level."""
+    from rules.grid import footprint
+
+    s, e, pc = _at(TAVERN, foe=True)
+    for feet in (10, 20, 30, 40):
+        ogre = s.add(instantiate("ogre", scene=s, name=f"Ogre{feet}"), zone="near")
+        s.positions.pop(ogre.ref)
+        s.place_by_zone([ogre.ref], feet=feet)
+        sq = s.positions[ogre.ref]
+        fp = footprint(sq[:2], ogre.size)
+        others = s.occupied(ignore=ogre.ref)
+        assert len(fp) == 4
+        for q in fp:
+            assert s.grid.inside(q) and q not in s.grid.blocked and q not in others, (feet, q)
+        assert len({s.grid.ground(q) for q in fp}) == 1, (feet, fp)
