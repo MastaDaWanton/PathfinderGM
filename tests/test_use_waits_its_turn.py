@@ -62,6 +62,11 @@ def _fight(on_the_foe: bool) -> str:
     """A thug, a fight, and the turn parked on whoever the test names."""
     c = cm.current()
     engine = c.engine()
+    if c.scene.in_encounter:
+        # The opening is not seeded and can start a robbery (measured 2026-11-13: 1 of
+        # 4 begin_with calls), and a turn's plan may not spawn into a fight, so these
+        # tests failed at random. End the opening's own fight first.
+        engine.run(engine.validate([{"op": "end_encounter", "because": "test setup"}]))
     before = set(c.scene.actors)
     engine.run(engine.validate([{"op": "spawn", "because": "a thug steps out",
                                  "params": {"template": "thug", "count": 1,
