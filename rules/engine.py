@@ -8859,7 +8859,9 @@ class Engine:
             # "I finish him" never resolved at all. The first swing is the one the
             # player declared at the body, and it lands (at helpless AC); what the
             # guard is for is the swing QUEUED behind one that dropped them.
-            if defender.is_down and state["i"]:
+            # Not mid-way through the swing that dropped them: back from the popup in
+            # `after_hit`, that swing's dose and riders are still owed.
+            if defender.is_down and state["i"] and state["stage"] != "after_hit":
                 state["tells"].append(
                     f"{defender.name} is already down; {actor.name} holds the blow.")
                 break
@@ -9110,7 +9112,7 @@ class Engine:
                 # through the `ability_damage` op with the stat block's provenance, the
                 # way `_natural_riders` lands a race's rider — the one applicator, so
                 # Constitution's hit points and a score at 0 follow by the op's rules.
-                res = self.run(self.validate([{
+                drained = self._run_within(self.validate([{
                     "op": "ability_damage", "actor": actor.ref, "target": defender.ref,
                     "visibility": "hidden",
                     "because": f"{actor.name}'s {weapon['name']}",
@@ -9119,7 +9121,7 @@ class Engine:
                 }], origin=printed.get("origin", ""), origin_name=actor.name))
                 state["tells"].append(f"{actor.name}'s {weapon['name']} finds "
                                       f"{defender.name}.")
-                for o in res.outcomes:
+                for o in drained:
                     state["effects"].extend(o.effects or [])
                     state["rolls"].extend(r.as_dict() for r in (o.rolls or []))
                     if o.tell:
@@ -9441,10 +9443,18 @@ class Engine:
                     state["tells"].append(
                         f"The {rider['what']} adds {more['amount']} {more['type']}"
                         + (f" ({more['note']})." if more.get("note") else "."))
+                # What follows the wound is its own stage: the dose on the blade can stop
+                # for the PC's own save when the PC is the one cut, and the resume must
+                # come back here — after damage that has already landed — and never to
+                # the damage roll, which would take the save's face as its die.
+                state["stage"] = "after_hit"
+
+            if state["stage"] == "after_hit":
                 # A coated blade delivers its dose on the first thing it cuts, and then it
                 # is gone. Spent on the hit rather than on the swing: a poison wiped off
                 # by a miss is a dose nobody got.
-                for extra in self._deliver_coating(actor, defender, weapon_key):
+                for extra in self._deliver_coating(actor, defender, weapon_key,
+                                                   partial, state):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # A blow charged before the roll — stunning fist's save — spends itself on
@@ -17391,14 +17401,14 @@ class Engine:
 
             hd = templates_mod.total_hd(doc) or actor.hit_dice
             dc = 10 + hd // 2 + actor.ability_mod("con")
-        res = self.run(self.validate([{
+        res = self._run_within(self.validate([{
             "op": "save", "actor": defender.ref, "visibility": "hidden",
             "because": f"{actor.name} is all over them",
             "params": {"save": "fort", "dc": dc,
                        "on_failure": {"condition": "nauseated", "rounds": 1}},
         }], origin=f"creature:{actor.from_template}", origin_name="distraction"))
         out: list[dict] = []
-        for o in res.outcomes:
+        for o in res:
             got = [e for e in (o.effects or []) if e.get("kind") == "condition"]
             out.extend({"effect": e, "tell": o.tell} for e in got)
             if not got:
@@ -17762,14 +17772,14 @@ class Engine:
             return out
         rounds = self.dice.roll("1d4", label="burning rounds", visibility="hidden")
         state.setdefault("rolls", []).append(rounds.as_dict())
-        res = self.run(self.validate([{
+        res = self._run_within(self.validate([{
             "op": "burn", "actor": defender.ref, "visibility": "hidden",
             "because": f"{actor.name}'s burn",
             "params": {"to": defender.ref, "dice": dice, "damage_type": "fire",
                        "rounds": max(1, rounds.total), "put_out_with": "ref",
                        "put_out_dc": dc, "smother_bonus": 4},
         }], origin=origin, origin_name="burn"))
-        for o in res.outcomes:
+        for o in res:
             out.extend({"effect": e, "tell": ""} for e in o.effects or [])
             out.append({"effect": {"ref": defender.ref, "kind": "rider", "rider": "burn",
                                    "origin": origin},
@@ -17791,14 +17801,14 @@ class Engine:
                                 "rider": word, "why": refused, "origin": origin},
                      "tell": f"{defender.name} has {refused}; {actor.name}'s {word} "
                              f"takes nothing from it."}]
-        res = self.run(self.validate([{
+        res = self._run_within(self.validate([{
             "op": "ability_damage", "actor": actor.ref, "visibility": "hidden",
             "because": f"{actor.name}'s {word}",
             "params": {"to": defender.ref, "ability": ab, "amount": str(rule["dice"]),
                        "drain": drain},
         }], origin=origin, origin_name=word))
         out: list[dict] = []
-        for o in res.outcomes:
+        for o in res:
             for r in o.rolls or ():
                 state.setdefault("rolls", []).append(r.as_dict())
             out.extend({"effect": e, "tell": ""} for e in o.effects or [])
@@ -17963,9 +17973,10 @@ class Engine:
                     "params": {"save": "ref", "dc": dc,
                                "on_failure": {"condition": condition}},
                 }]
-                res = self.run(self.validate(intents, origin=f"race:natural.{rider}",
-                                             origin_name=rider))
-                for o in res.outcomes:
+                # The defender's save, and always the engine's to roll ("hidden"), so it
+                # never stops for a die: `_run_within` with no state to park in.
+                for o in self._run_within(self.validate(
+                        intents, origin=f"race:natural.{rider}", origin_name=rider)):
                     out.extend({"effect": e, "tell": o.tell} for e in (o.effects or [])
                                if e.get("kind") == "condition")
                     if not o.effects:
@@ -18004,13 +18015,23 @@ class Engine:
         self.scene.resync_zones()
         return True
 
-    def _deliver_coating(self, actor: Actor, defender: Actor, weapon_key: str) -> list[dict]:
+    def _deliver_coating(self, actor: Actor, defender: Actor, weapon_key: str,
+                         partial: dict | None = None,
+                         state: dict | None = None) -> list[dict]:
         """Everything a coated weapon does to the thing it just cut.
 
         Returns effect/tell pairs rather than resolving into the attack's state directly,
         so the attack op stays readable and a coating that resolves to nothing costs it
         nothing.
+
+        `state` is the attack's own: when the one cut is the PC, the poison's save is
+        their d20, and the dose's list waits in it across the popup (`_run_within`). The
+        blade is already clean by then, so the resume is told what was on it from there.
         """
+        if state is not None and "coating_inner" in state:
+            item = str(state.get("coating_item") or "poison")
+            return self._coating_lands(defender, weapon_key, item,
+                                       None, partial or {}, state)
         raw = getattr(actor, "coating", None)
         if not raw:
             return []
@@ -18028,12 +18049,25 @@ class Engine:
                                 "item": coat.item},
                      "tell": f"The {coat.item} on the blade does nothing to "
                              f"{defender.name}."}]
-        resolution = self.run(self.validate(intents, origin=f"item:{coat.item}",
-                                            origin_name=coat.item))
+        if state is not None:
+            state["coating_item"] = coat.item
+        return self._coating_lands(
+            defender, weapon_key, coat.item,
+            self.validate(intents, origin=f"item:{coat.item}", origin_name=coat.item),
+            partial or {}, state)
+
+    def _coating_lands(self, defender: Actor, weapon_key: str, item: str,
+                       validated: list[Intent] | None, partial: dict,
+                       state: dict | None) -> list[dict]:
+        """The dose's list resolved inside the blow, and told as the blow's."""
+        outcomes = self._run_within(validated or [], partial, held=state,
+                                    slot="coating_inner", state_key="attack_state")
+        if state is not None:
+            state.pop("coating_item", None)
         out = [{"effect": {"ref": defender.ref, "kind": "coating_spent",
-                           "item": coat.item, "weapon": weapon_key},
-                "tell": f"The {coat.item} goes into the wound."}]
-        for o in resolution.outcomes:
+                           "item": item, "weapon": weapon_key},
+                "tell": f"The {item} goes into the wound."}]
+        for o in outcomes:
             for e in o.effects:
                 out.append({"effect": e, "tell": ""})
             if o.tell:
@@ -18601,10 +18635,10 @@ class Engine:
             who = actor if on_self else defender
             if kind == "apply_condition":
                 params = {"condition": str(r.get("target") or ""), "to": who.ref}
-                res = self.run(self.validate([{
+                res = self._run_within(self.validate([{
                     "op": "condition", "visibility": "hidden", "because": f"the {what}",
                     "params": params}], origin=origin, origin_name=what))
-                for o in res.outcomes:
+                for o in res:
                     out.extend({"effect": e_, "tell": ""} for e_ in o.effects or [])
                     if o.tell:
                         out.append({"effect": {"ref": who.ref, "kind": "item_rider_said"},
@@ -18749,10 +18783,10 @@ class Engine:
                         "save_each_turn": ({"save": save, "dc": dc}
                                            if ends.get("save_each_turn") else None),
                         "wounded": bool(ends.get("wounded"))})
-                res = self.run(self.validate([{
+                res = self._run_within(self.validate([{
                     "op": "condition", "visibility": "hidden", "because": f"the {what}",
                     "params": params}], origin=origin, origin_name=what))
-                for o in res.outcomes:
+                for o in res:
                     for e in o.effects or []:
                         out.append({"effect": e, "tell": ""})
                     if o.tell:
@@ -19014,8 +19048,8 @@ class Engine:
                         "tell": f"The {what} in {actor.name}'s {item} works on "
                                 f"{onto.name}."
                                 + told})
-            res = self.run(self.validate(intents, origin=origin, origin_name=item))
-            for o in res.outcomes:
+            res = self._run_within(self.validate(intents, origin=origin, origin_name=item))
+            for o in res:
                 for e in o.effects or []:
                     out.append({"effect": e, "tell": ""})
                 if o.tell:
@@ -19469,8 +19503,8 @@ class Engine:
                         continue
                     for i in made:
                         i["visibility"] = "hidden"
-                    res = self.run(self.validate(made, origin=origin, origin_name=name))
-                    for o in res.outcomes:
+                    res = self._run_within(self.validate(made, origin=origin, origin_name=name))
+                    for o in res:
                         effects.extend(o.effects or [])
                         if o.tell:
                             tells.append(o.tell)
@@ -19524,6 +19558,12 @@ class Engine:
         if intent.params.get("power"):
             return self._use_power(intent, partial)
         actor = self.scene.actors[intent.actor]
+        # Back from the dice popup: the dose is already spent and its effects part-way
+        # through — the drinker's own Fortitude save against the jar — so nothing above
+        # the delivery runs twice (`_run_within`).
+        held_state = partial.get("use_item_state")
+        if held_state is not None:
+            return self._use_item_delivers(intent, partial, held_state, actor)
         said = str(intent.params["item"]).strip().lower()
         how = str(intent.params.get("how", "drink")).strip().lower()
         target = intent.params.get("to") or intent.actor
@@ -19686,37 +19726,53 @@ class Engine:
         # Stamped here, with the jar still in hand: `held` may already be popped from
         # the satchel (the last dose), so provenance is resolved by the door, not
         # looked up later.
-        resolution = (self.run(self.validate(use.intents, origin=f"item:{item_id}",
-                                             origin_name=use.item))
-                      if use.intents else None)
-        if resolution is not None:
-            effects.extend(e for o in resolution.outcomes for e in o.effects)
+        state = {"effects": effects, "item": use.item, "how": how, "target": target,
+                 "route": route, "clouds": cloud_tells,
+                 "narrate": list(use.narrate or []), "delivers": bool(use.intents)}
+        validated = (self.validate(use.intents, origin=f"item:{item_id}",
+                                   origin_name=use.item) if use.intents else [])
+        return self._use_item_delivers(intent, partial, state, actor, validated)
 
-        who = self.scene.actors[target].name
+    def _use_item_delivers(self, intent: Intent, partial: dict, state: dict,
+                           actor: Actor, validated: list[Intent] | None = None) -> Outcome:
+        """The jar's effects resolved, and the use's outcome told from them.
+
+        Its own method because it is entered twice when the drinker is the PC: once with
+        the validated list, and again from the dice popup with the list parked in
+        `use_item_state`, the dose already gone from the satchel."""
+        outcomes = (self._run_within(validated or [], partial, held=state, slot="inner",
+                                     state_key="use_item_state")
+                    if state.get("delivers") else [])
+        effects = list(state["effects"])
+        effects.extend(e for o in outcomes for e in o.effects)
+        how, route, target = state["how"], state["route"], state["target"]
+        item = state["item"]
+
+        who = self.scene.actors[target].name if target in self.scene.actors else target
         if how == "apply":
             # Where it went, said plainly, so the narrator writes a salve rubbed into a
             # wound rather than a jar drunk: "Kesst binds Comfrey Salve on Bob's wound."
             _, verb, part = consumables.ROUTE_USE.get(route, ("", "uses", ""))
             whose = "their" if target == intent.actor else f"{who}'s"
-            tell = (f"{actor.name} {verb} {use.item} on {whose} {part}." if part else
-                    f"{actor.name} {verb} {use.item}"
+            tell = (f"{actor.name} {verb} {item} on {whose} {part}." if part else
+                    f"{actor.name} {verb} {item}"
                     + ("" if target == intent.actor else f" for {who}") + ".")
         elif how == "light":
-            tell = f"{actor.name} strikes {use.item}."
+            tell = f"{actor.name} strikes {item}."
         else:
             verb = "drinks" if how == "drink" else "throws"
             at = "" if target == intent.actor else f" at {who}"
-            tell = f"{actor.name} {verb} {use.item}{at}."
-        if resolution is not None:
-            tell += " " + " ".join(o.tell for o in resolution.outcomes if o.tell)
-        if cloud_tells:
-            tell += " " + " ".join(cloud_tells)
-        if use.narrate:
-            tell += f" ({'; '.join(use.narrate)})"
+            tell = f"{actor.name} {verb} {item}{at}."
+        if outcomes:
+            tell += " " + " ".join(o.tell for o in outcomes if o.tell)
+        if state.get("clouds"):
+            tell += " " + " ".join(state["clouds"])
+        if state.get("narrate"):
+            tell += f" ({'; '.join(state['narrate'])})"
 
         return Outcome(
             intent_id=intent.id, op="use_item",
-            rolls=[r for o in (resolution.outcomes if resolution else []) for r in o.rolls],
+            rolls=[r for o in outcomes for r in o.rolls],
             effects=effects, tell=tell.strip(), because=intent.because,
         )
 
@@ -21353,11 +21409,11 @@ class Engine:
                 params["descriptors"] = list(ctx["descriptors"])
             if ends.get("acts") or shared:
                 params["ends_when"] = _shared_ends({**ends, **shared})
-            res = self.run(self.validate([{
+            res = self._run_within(self.validate([{
                 "op": "condition", "actor": ctx.get("caster"), "visibility": "hidden",
                 "because": source, "params": params}],
                 origin=str(ctx.get("origin") or ""), origin_name=source))
-            for o in res.outcomes:
+            for o in res:
                 fx_out.extend(o.effects or [])
                 if o.tell:
                     said.append(o.tell)
@@ -28205,13 +28261,13 @@ class Engine:
                                    "ends": bool(params["remove"])}
             if made:
                 try:
-                    res = self.run(self.validate(made, origin=origin,
+                    res = self._run_within(self.validate(made, origin=origin,
                                                  origin_name=ing.name))
                 except IntentError:
                     # A spec the engine cannot stand up is a property that did nothing
                     # this time, never a taste that crashes the turn.
                     return
-                by_key[key].extend(res.outcomes)
+                by_key[key].extend(res)
 
         gate_of = anatomy["gate_of"]
         bodies = set(gate_of)
@@ -28220,14 +28276,14 @@ class Engine:
             save = str(anatomy["specs"][gate].get("target") or "fort").lower()
             made_it = False
             if dc is not None:
-                res = self.run(self.validate([{
+                res = self._run_within(self.validate([{
                     "op": "save", "actor": actor.ref, "because": because,
                     "visibility": "hidden",
                     "params": {"save": save if save in SAVES else "fort",
                                "dc": {"value": dc}}}], origin=origin, origin_name=ing.name))
-                by_key[gate].extend(res.outcomes)
+                by_key[gate].extend(res)
                 made_it = any(o.op == "save" and o.verdict == "success"
-                              for o in res.outcomes)
+                              for o in res)
             if not made_it:
                 for body in (k for k in keys if gate_of.get(k) == gate):
                     run_spec(body)
@@ -28592,6 +28648,78 @@ class Engine:
         return made
 
     # --- helpers ------------------------------------------------------------------------
+
+    def _run_within(self, intents: list[Intent], partial: dict | None = None, *,
+                    held: dict | None = None, slot: str = "",
+                    state_key: str = "") -> list[Outcome]:
+        """Resolve the intents an op produced, as part of that op, and return their
+        outcomes.
+
+        A jar's save and its poison, a blade's dose, a race's rider, a stat block's
+        Strength drain, an item's or a spell's laid condition: an op that hands its
+        effects to other ops runs them here, never through `run`. `run` is the batch's
+        own entry point, and called from inside an op it was a second batch nested in
+        the first. Measured 2026-10-02 on a hemlock jar the PC drank, and again on master
+        2026-11-13 (tests/test_inner_lists_wait.py, 9 of 10 failing): the inner save
+        suspended for the player's d20 and wrote the scene's pending queue, the op
+        ignored it, and the outer batch came back "complete" with `scene.awaiting` set.
+        An NPC's check queued behind the drink ran while the save waited; a later PC
+        check in the same batch suspended again and overwrote the frozen queue, so the
+        save was never rolled and the paralysis never landed; the world's schemes ticked
+        with a die still on the table; and the player-turn view wrote "you drink it and
+        feel fine" before the save was rolled. Each nested `run` also reset the batch's
+        own gates — one journey a turn, the battle joined, who was provoked — mid-batch,
+        and ticked the schemes a second time.
+
+        The shape every other multi-stage op already has: when the inner list stops for
+        the player's die, its frozen queue is parked in the op's OWN state (`held[slot]`)
+        and the op suspends, so the outer queue freezes with this op at its head. The
+        resume re-enters the op, which reaches this call again and continues the inner
+        list with the face; the op finishes only when the list it started has. That is
+        `_roll_or_suspend_stage`'s `state_key`, one level up, and the fix the netrunner
+        engine made for the same bug (Rip Deal, mtgred/netrunner#3985: `continue-ability`
+        carries the parent's effect instead of a nested `resolve-ability`). Splicing the
+        inner list into the outer queue (Slay the Spire's `addToTop`) was refused: the
+        op's outcome IS the account of what it did — the drink's tell carries the save,
+        the blow's effects carry the dose.
+
+        `held` is the op's own state dict, parked across the suspension under
+        `state_key`; an op whose list is always the engine's to roll passes none, and a
+        suspension there is the engine's bug, refused rather than half-applied.
+        """
+        partial = partial if partial is not None else {}
+        # `_drive` points `_so_far` at its own list; the outer batch's is put back.
+        outer_so_far = getattr(self, "_so_far", None)
+        cont = held.pop(slot, None) if held is not None else None
+        try:
+            if cont is not None:
+                inner = dict(cont.get("partial") or {})
+                if "player_face" in partial:
+                    inner["player_face"] = partial.pop("player_face")
+                res = self._drive(list(cont["queue"]), list(cont["done"]), inner)
+            else:
+                res = self._drive([i.as_dict() for i in intents], [], {})
+        finally:
+            self._so_far = outer_so_far
+        if not res.awaiting:
+            return res.outcomes
+        # The inner `_drive` froze its list into the scene, as a batch does; it is not a
+        # batch, so the list moves into the op's state and the scene is left for the
+        # outer `_drive` to freeze its own queue into.
+        frozen = {"queue": list(self.scene.pending_intents),
+                  "done": list(self.scene.pending_outcomes),
+                  "partial": dict(self.scene.pending_partial)}
+        self.scene.awaiting = None
+        self.scene.pending_intents = []
+        self.scene.pending_outcomes = []
+        self.scene.pending_partial = {}
+        if held is None:
+            raise IntentError(
+                f"{intents[0].op if intents else 'an effect'}: stopped for the player's "
+                f"die inside a list the engine rolls itself; nothing was finished.",
+                "schema")
+        held[slot] = frozen
+        raise _NeedsPlayerRoll(res.awaiting, {state_key: held})
 
     def _roll_or_suspend_stage(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,

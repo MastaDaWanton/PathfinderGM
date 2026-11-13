@@ -169,9 +169,13 @@ def test_a_poison_that_bites_on_a_made_save_still_does(board):
 def _drink_and_suspend(scene, engine):
     use(engine, "hemlock#1", how="drink")
     assert scene.awaiting and scene.awaiting["label"] == "Fortitude save"
-    # The queue as the campaign file holds it between the two requests.
+    # The queue as the campaign file holds it between the two requests. The jar's own
+    # list waits inside the drink (`Engine._run_within`, use_item_state), not in the
+    # batch's queue: a nested `run` once left it there and the batch said "complete".
     scene.pending_intents = json.loads(json.dumps(scene.pending_intents))
-    assert any(i.get("gated_by") for i in scene.pending_intents)
+    scene.pending_partial = json.loads(json.dumps(scene.pending_partial))
+    inner = scene.pending_partial["use_item_state"]["inner"]["queue"]
+    assert any(i.get("gated_by") for i in inner)
     assert not scene.pc().has_condition("paralyzed")
 
 
