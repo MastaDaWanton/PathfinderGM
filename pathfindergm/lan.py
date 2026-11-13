@@ -168,7 +168,10 @@ def close_the_door() -> dict:
     """
     global _server, _thread
 
-    server, _server, _thread = _server, None, None
+    # Under the opening lock too (review 2026-11-13): a Close that ran while an Open was
+    # still binding found no server, did nothing, and the Open then left the door open.
+    with _opening:
+        server, _server, _thread = _server, None, None
     disarm()
     if server is not None:
         server.shutdown()
