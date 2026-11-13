@@ -142,10 +142,17 @@ def test_the_rail_covers_from_outboard_and_never_along_the_deck():
     had cover from each other down the whole length of the ship."""
     s, e, pc = _aboard("warship")
     g = s.grid
+    # Nothing but the rail beside or in line with them: once vessel ids carried their kind
+    # (2026-11-13) the warship's seed changed, and the 15 ft run first found ended beside
+    # her boat and the next began behind a crate — real cover both, not the rail's. This
+    # hull has no clear 15 ft stretch, so the pair stands 10 ft apart.
+    things = {tuple(p)[:2] for f in g.fixtures if f["kind"] not in ("rail", "sea")
+              for p in f["squares"]}
     free = [y for y in range(2, g.height - 1) if (1, y) not in g.blocked
             and not g.ground((1, y))]
-    run = next(y for y in free if y + 1 in free and y + 2 in free and y + 3 in free)
-    a, b = (1, run, 0), (1, run + 3, 0)          # both at the port rail, 15 ft apart
+    run = next(y for y in free if y + 1 in free and y + 2 in free and not things & (
+        {(x, y + d) for x in (1, 2) for d in range(3)} | {(1, y - 1), (1, y + 3)}))
+    a, b = (1, run, 0), (1, run + 2, 0)          # both at the port rail, 10 ft apart
     assert g.cover_between(a, "medium", b, "medium") == "none"
     sea = sorted(_squares(g, "sea") | _squares(g, "rail"))
     assert all(g.low[p] == (1 if p in _squares(g, "rail") else -1) for p in sea)

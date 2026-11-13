@@ -144,14 +144,16 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
         out[here.id] = _rows_from(engine, here, known, pc, loc, scale, speed, clock,
                                   roads_here, ride, watched, legs)
     # Aboard a booked ship, the way on is the voyage (`Engine._sail`): one journey row,
-    # from every room of her, to where she is bound.
+    # from every room of her, to where she is bound. Keyed by the SHIP's id, not the
+    # port's: the page keeps a chip whose id is still a way on as "the move did not
+    # happen", and live the booking row and this one shared the port's id.
     ship = engine.aboard()
     if ship is not None and ship.bound_for:
         from rules import ships
 
         dest = world.get(ship.bound_for) if world is not None else None
         days = ship.days_left
-        row = {"id": ship.bound_for, "name": str(getattr(dest, "name", "") or "port"),
+        row = {"id": ship.id, "name": str(getattr(dest, "name", "") or "port"),
                "group": "road", "blocked": "", "journey": True, "minutes": 0,
                "time_words": f"{'a day' if days == 1 else f'{days} days'} at sea"}
         for place_id, rows in out.items():

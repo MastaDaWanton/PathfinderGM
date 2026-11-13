@@ -98,8 +98,11 @@ def test_the_exits_row_offers_the_passage_and_then_the_voyage():
     assert passage["journey"] and not passage["blocked"]
     _journey(engine, to=passage["id"])
     rows = exits.exits(engine, PANGRELLA)
-    sail = next(r for r in rows if r["id"] == ZHILVARNIA)
-    assert sail["journey"]
+    # Keyed by the ship: live, a row sharing the port's id made the page keep the
+    # booking chip with "The move did not happen".
+    assert all(r["id"] != ZHILVARNIA for r in rows)
+    sail = next(r for r in rows if r["id"] == engine.aboard().id)
+    assert sail["journey"] and sail["name"] == "Zhilvarnia"
     assert any(r["name"] == "the docks" for r in rows), "no gangplank back ashore"
     out = _journey(engine, to=sail["id"])
     assert scene.location_id == ZHILVARNIA, out.tell

@@ -13967,15 +13967,17 @@ class Engine:
 
     def _ground_shape(self):
         """The shape the ground here was laid from: the world's authored one, or on a ship
-        the hull of the vessel the room belongs to (`floorplan.ship_shape`), which only the
-        scene knows — a ship room's id carries its vessel's id, never its kind."""
-        from . import floorplan, places as places_mod
+        the hull of the vessel the room belongs to (`floorplan.ship_shape`). The kind rides
+        in the vessel id since 2026-11-13 (`ships.kind_of_id`); an id minted before that
+        carries none, and the scene's record answers for it."""
+        from . import floorplan, places as places_mod, ships as ships_mod
 
         at = self.scene.at or ""
         if places_mod.terrain_of(at) == "deck":
             ship = at.split("~", 1)[0]
-            kind = next((str(v.get("kind") or "") for v in self.scene.vessels
-                         if isinstance(v, dict) and str(v.get("id")) == ship), "")
+            kind = ships_mod.kind_of_id(ship) or next(
+                (str(v.get("kind") or "") for v in self.scene.vessels
+                 if isinstance(v, dict) and str(v.get("id")) == ship), "")
             return floorplan.ship_shape(kind, at)
         return getattr(self.here(), "shape", None)
 
@@ -17001,7 +17003,9 @@ class Engine:
 
         dest = ship.bound_for
         dest_name = self._settlement_name(dest)
-        if want and want != dest and want.lower() not in dest_name.lower() \
+        # The exits row names the ship by id, which `intents.normalise_ref` cuts to its hex.
+        if want and want not in (dest, ship.id) and not ship.id.endswith("-" + want) \
+                and want.lower() not in dest_name.lower() \
                 and want.lower() != ship.name.lower():
             return self._refuse(
                 intent, f"{ship.name} is bound for {dest_name}, nowhere else. Sail on with "
