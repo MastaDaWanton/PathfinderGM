@@ -220,13 +220,30 @@ def derive(grid: Grid | None, place_id: str, terrain: str = "", authored=None) -
             plan = old
     row = _profile(place_id, terrain, authored)
     out: list[dict] = []
-    for slot, squares in (("solid", plan.blocked & grid.blocked),
-                          ("rough", plan.difficult & grid.difficult)):
+    # A ship's room or a quay names its own pieces (`floorplan.parts`): the mast, the
+    # hatch, the rail. Each is named only where the grid still agrees with it.
+    named: set = set()
+    for part in floorplan.parts(place_id, terrain, authored):
+        sq = {tuple(p) for p in part["squares"]}
+        lay = part["lay"]
+        if not (sq <= grid.blocked if lay == "blocked" else sq <= grid.difficult
+                if lay == "difficult" else all(grid.floor.get(p) == part["level"] for p in sq)
+                if lay == "raised" else sq.isdisjoint(grid.blocked)):
+            continue
+        f = _fixture(part["kind"], sorted(sq),
+                     part["level"] if lay == "raised" else grid.ground(min(sq)), row)
+        f["name"] = part["name"] or f["name"]
+        out.append(f)
+        named |= sq
+    if shape.layout == "ship":
+        return out                   # all of a hull is its parts; its sides are nobody's
+    for slot, squares in (("solid", (plan.blocked & grid.blocked) - named),
+                          ("rough", (plan.difficult & grid.difficult) - named)):
         kinds_here = row.get(slot) or ()
         for i, clump in enumerate(_components(squares) if kinds_here else ()):
             out.append(_fixture(kinds_here[i % len(kinds_here)], clump,
                                 grid.ground(clump[0]), row))
-    raised = {p: v for p, v in plan.floor.items() if grid.floor.get(p) == v}
+    raised = {p: v for p, v in plan.floor.items() if grid.floor.get(p) == v and p not in named}
     kinds_up, n = row.get("raised") or (), 0
     for level in sorted(set(raised.values())):
         for clump in _components({p for p, v in raised.items() if v == level}):
@@ -281,6 +298,11 @@ def type_the_ground(scene, place_id: str, terrain: str = "", authored=None) -> N
     grid.fixtures = derive(grid, place_id, terrain, authored) + [dict(f) for f in named]
     grid.low = {tuple(p): grid.ground(tuple(p)) + 1 for f in grid.fixtures
                 if kinds()[f["kind"]].get("low") for p in f["squares"]}
+    # Water you cannot walk on but can see and shoot across (the sea past a rail): its
+    # top is the surface, a level under the floor, so it blocks no line and covers nobody.
+    grid.low.update({tuple(p): grid.ground(tuple(p)) - 1 for f in grid.fixtures
+                     if kinds()[f["kind"]].get("see_through") and not kinds()[f["kind"]].get("low")
+                     and "blocked" in kinds()[f["kind"]]["occupies"] for p in f["squares"]})
     # The rail opens where the stair arrives. The floorplan's rail stands on the squares in
     # front of a gallery (`floorplan._raise`'s lip), and the stair's foot is one of those
     # squares: left there, the board drew a rail through the stair and anyone on it, and a
@@ -335,7 +357,10 @@ def said(grid: Grid | None) -> list[str]:
         if kind == "stair" and "gallery" in by:
             continue                     # said with the gallery it climbs to
         first = fs[0]["name"]
-        phrase = first if len(fs) == 1 or first.startswith("the ") else kinds()[kind]["plural"]
+        # Three masts named fore, main and mizzen are "masts", not "the foremast" alone.
+        same = all(f["name"] == first for f in fs)
+        phrase = first if len(fs) == 1 or same and first.startswith("the ") \
+            else kinds()[kind]["plural"]
         if kind == "gallery" and any(f.get("stair") for f in fs):
             phrase += " reached by a stair"
         out.append(phrase)

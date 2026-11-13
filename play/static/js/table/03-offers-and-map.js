@@ -77,7 +77,10 @@ const FX_SYMBOL = { barrel: "barrel", crate: "crate", table: "table", counter: "
   stall: "stall",
   bookshelf: "shelf", rack: "rack", hearth: "hearth", cart: "cart", stair: "stair",
   gallery: "planks", water: "water", rubble: "rubble", chandelier: "chandelier",
-  door: "door", window: "window", crane: "crane" };
+  door: "door", window: "window", crane: "crane",
+  mast: "mast", rigging: "rigging", rope: "rope", hatch: "hatch", helm: "helm",
+  capstan: "capstan", anchor: "anchor", bench: "bench", boat: "boat", rail: "gunwale",
+  sea: "sea", bollard: "bollard" };
 const FX_DEFS = `
   <symbol id="fx-barrel" viewBox="0 0 18 18">
     <circle cx="9" cy="9" r="7.3" fill="#6b4a3a" stroke="#2e261e" stroke-width="1.5"/>
@@ -184,6 +187,71 @@ const FX_DEFS = `
     <rect x="2" y="2" width="14" height="14" fill="none" stroke="#6b4a3a" stroke-width="2"/>
     <path d="M2 16L16 2" stroke="#7d6845" stroke-width="1.6"/>
     <circle cx="16" cy="2" r="1.4" fill="#2e261e" stroke="#7d6845" stroke-width=".6"/></symbol>
+  <symbol id="fx-mast" viewBox="0 0 18 18">
+    <rect x="0" y="7.6" width="18" height="2.8" rx="1.2" fill="#4a3326" stroke="#241d15"
+          stroke-width=".6"/>
+    <path d="M1 9h16" stroke="#7d6845" stroke-width=".5"/>
+    <circle cx="9" cy="9" r="4.4" fill="#6b4a3a" stroke="#241d15" stroke-width="1"/>
+    <circle cx="9" cy="9" r="2.6" fill="none" stroke="#4a3326" stroke-width=".7"/>
+    <circle cx="9" cy="9" r=".9" fill="#2e261e"/></symbol>
+  <symbol id="fx-rigging" viewBox="0 0 18 18">
+    <path d="M2 17L7 1M9 17V1M16 17L11 1" stroke="#9a8458" stroke-width=".9"
+          fill="none"/>
+    <path d="M2.6 14h12.8M3.6 11h10.8M4.5 8h9M5.4 5h7.2M6.3 2.4h5.4" stroke="#7d6845"
+          stroke-width=".6"/></symbol>
+  <symbol id="fx-rope" viewBox="0 0 18 18">
+    <circle cx="9" cy="9" r="6.4" fill="#5c4a35" stroke="#241d15" stroke-width=".6"/>
+    <circle cx="9" cy="9" r="5.4" fill="none" stroke="#9a8458" stroke-width="1.3"/>
+    <circle cx="9" cy="9" r="3.6" fill="none" stroke="#9a8458" stroke-width="1.3"/>
+    <circle cx="9" cy="9" r="1.8" fill="#2e261e" stroke="#9a8458" stroke-width="1"/>
+    <path d="M14.4 9.5q2 2.5 3.4 3" stroke="#9a8458" stroke-width="1.2" fill="none"/></symbol>
+  <symbol id="fx-hatch" viewBox="0 0 18 18">
+    <rect x="1.5" y="1.5" width="15" height="15" fill="#241d15" stroke="#4a3326"
+          stroke-width="2.2"/>
+    <path d="M5 2.6v12.8M9 2.6v12.8M13 2.6v12.8M2.6 5h12.8M2.6 9h12.8M2.6 13h12.8"
+          stroke="#6b4a3a" stroke-width="1.1"/></symbol>
+  <symbol id="fx-helm" viewBox="0 0 18 18">
+    <rect x="7" y="11" width="4" height="6" fill="#4a3326" stroke="#241d15" stroke-width=".6"/>
+    <circle cx="9" cy="8" r="5.6" fill="none" stroke="#6b4a3a" stroke-width="1.6"/>
+    <path d="M9 .6v14.8M1.6 8h14.8M3.8 2.8l10.4 10.4M14.2 2.8L3.8 13.2" stroke="#7d6845"
+          stroke-width=".8"/>
+    <circle cx="9" cy="8" r="1.5" fill="#2e261e" stroke="#7d6845" stroke-width=".6"/></symbol>
+  <symbol id="fx-capstan" viewBox="0 0 18 18">
+    <path d="M1 9h16M9 1v16" stroke="#4a3326" stroke-width="1.8"/>
+    <circle cx="9" cy="9" r="4.6" fill="#6b4a3a" stroke="#241d15" stroke-width=".9"/>
+    <circle cx="9" cy="9" r="3" fill="#7d6845" stroke="#4a3326" stroke-width=".6"/>
+    <path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="#4a3326" stroke-width=".5"/></symbol>
+  <symbol id="fx-anchor" viewBox="0 0 18 18">
+    <path d="M9 3.5v11.5M3.5 10.5q1 4.5 5.5 4.5t5.5-4.5" fill="none" stroke="#6a6f76"
+          stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M5 5.2h8" stroke="#6b4a3a" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="9" cy="2.2" r="1.3" fill="none" stroke="#6a6f76" stroke-width=".9"/>
+    <path d="M2.6 11.6l.9-1.6 1.2 1.4M15.4 11.6l-.9-1.6-1.2 1.4" fill="none"
+          stroke="#6a6f76" stroke-width=".9"/></symbol>
+  <symbol id="fx-bench" viewBox="0 0 18 18">
+    <rect x="0" y="6" width="18" height="6" fill="#7d6845" stroke="#4a3326" stroke-width=".8"/>
+    <path d="M0 9h18" stroke="#5c4a35" stroke-width=".45"/>
+    <path d="M13 12l4 5.5" stroke="#9a8458" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="fx-boat" viewBox="0 0 18 18">
+    <path d="M0 3h18v12H0z" fill="#6b4a3a" stroke="#241d15" stroke-width=".8"/>
+    <path d="M0 4.5h18M0 13.5h18" stroke="#4a3326" stroke-width=".9"/>
+    <rect x="7.7" y="4.5" width="2.6" height="9" fill="#7d6845" stroke="#4a3326"
+          stroke-width=".5"/></symbol>
+  <symbol id="fx-sea" viewBox="0 0 18 18">
+    <rect width="18" height="18" fill="#2e3c46"/>
+    <path d="M2 5q2-1.6 4 0t4 0t4 0M4 10.5q2-1.6 4 0t4 0t4 0M1 15.5q2-1.4 4 0t4 0"
+          fill="none" stroke="#6a7a86" stroke-width=".7" opacity=".85"/></symbol>
+  <symbol id="fx-gunwale" viewBox="0 0 18 18">
+    <rect width="18" height="18" fill="#2e3c46"/>
+    <path d="M2 4q2-1.6 4 0t4 0t4 0M3 9q2-1.6 4 0t4 0" fill="none" stroke="#6a7a86"
+          stroke-width=".7" opacity=".85"/>
+    <rect x="0" y="12.4" width="18" height="5.6" fill="#4a3326" stroke="#241d15"
+          stroke-width=".6"/>
+    <rect x="0" y="12.4" width="18" height="2.2" fill="#7d6845"/></symbol>
+  <symbol id="fx-bollard" viewBox="0 0 18 18">
+    <circle cx="9" cy="9" r="4.6" fill="#4a3326" stroke="#241d15" stroke-width=".9"/>
+    <circle cx="9" cy="9" r="3.2" fill="#6b4a3a" stroke="#2e261e" stroke-width=".6"/>
+    <path d="M4 12.5q5 3 10 0" fill="none" stroke="#9a8458" stroke-width="1"/></symbol>
   <symbol id="fx-window" viewBox="0 0 18 18">
     <rect x="3" y="0" width="12" height="2.4" fill="#6a7a86" opacity=".7" stroke="#6b4a3a"
           stroke-width=".9"/></symbol>`;
@@ -274,6 +342,8 @@ function renderMap(s) {
   const fxRot = { "0,1": 0, "-1,0": 90, "0,-1": 180, "1,0": 270 };
   const openAt = (c, r) => c >= 0 && r >= 0 && c < g.width && r < g.height
     && !solidSq.has(`${c},${r}`);
+  const wetSq = new Set(fixtures.filter(f => f.kind === "sea" || f.kind === "rail")
+    .flatMap(f => f.squares.map(([c, r]) => `${c},${r}`)));
   for (const f of fixtures) {
     const sq = f.squares || [];
     if (!sq.length) continue;
@@ -297,8 +367,16 @@ function renderMap(s) {
         const sides = runX ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
         const front = sides.find(([dx, dy]) => openAt(c + dx, r + dy)) || sides[0];
         turn = fxRot[`${front[0]},${front[1]}`] || 0;
-      } else if (["cart", "table", "gallery"].includes(f.kind)) {
+      } else if (["cart", "table", "gallery", "bench", "boat"].includes(f.kind)) {
         turn = runX ? 0 : 90;
+      } else if (f.kind === "rail") {
+        // The planking faces the deck it closes, whichever side of the hull it is on and
+        // whatever stands there (a barrel at the rail is still deck): the side that is
+        // not more water. The rail round the bow runs every way at once.
+        const front = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) =>
+          c + dx >= 0 && r + dy >= 0 && c + dx < g.width && r + dy < g.height
+          && !wetSq.has(`${c + dx},${r + dy}`)) || [0, 1];
+        turn = fxRot[`${front[0]},${front[1]}`] || 0;
       }
       const sym = FX_SYMBOL[f.kind];
       if (!sym) continue;

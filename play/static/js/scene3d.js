@@ -554,8 +554,24 @@
     face(out, pts, UP, mat, cls + " fxd", NOPOINT);
   }
 
+  // A thin rope from p to q, `w` wide, lit as the face it is: the shrouds and their rungs.
+  function strip(out, p, q, w, mat, cls) {
+    var d = [q[0] - p[0], q[1] - p[1], q[2] - p[2]];
+    var side = Math.abs(d[1]) > Math.abs(d[0]) ? [w, 0, 0] : [0, w, 0];
+    var n = norm([d[1] * side[2] - d[2] * side[1], d[2] * side[0] - d[0] * side[2],
+                  d[0] * side[1] - d[1] * side[0]]);
+    if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
+    face(out, [[p[0] - side[0], p[1] - side[1], p[2]], [p[0] + side[0], p[1] + side[1], p[2]],
+               [q[0] + side[0], q[1] + side[1], q[2]], [q[0] - side[0], q[1] - side[1], q[2]]],
+         n, mat, cls + " fxd", NOPOINT);
+  }
+
   var NOPOINT = ' pointer-events="none"';
   var SIDES = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  // Water the board does not walk on (rules/fixtures.py: the sea, and the rail laid on
+  // it), and how far under the floor its surface lies, in levels.
+  var WATERY = { sea: true, rail: true }, SEA = -0.32;
+  var ROOF = null;   // the board's ceiling in levels while one render runs, or null
   var SPINES = ["spine0", "spine1", "spine2", "spine3", "spine4"];
 
   /* One fixture square, drawn as its kind. `front` is the side facing the open floor
@@ -717,6 +733,83 @@
       });
       return bed1;
     }
+    // --- aboard ship and on the quay (2026-11-13) ---
+    if (k === "mast") {
+      // A tall pole, its top and its yard across the ship, the yard's ends a little past
+      // the rail. Below decks only the pole, to the deckhead (`ROOF`): the yard is above.
+      var mt = ROOF ? z + ROOF : z + 4.6;
+      prism(out, x + 0.5, y + 0.5, 0.2, z, mt, "wood", cls, false, "wooddark");
+      prism(out, x + 0.5, y + 0.5, 0.215, z + 0.5, z + 0.62, "hoop", cls + " fxd", true);
+      if (!ROOF) {
+        slab(out, x - 1.1, y + 0.44, x + 2.1, y + 0.56, z + 3.7, z + 3.82, "wooddark", cls,
+             NOPOINT);
+        slab(out, x - 0.25, y + 0.25, x + 1.25, y + 0.75, z + 3.1, z + 3.2, "plank", cls,
+             NOPOINT);
+      }
+      return mt;
+    }
+    if (k === "helm") {
+      // A post, and a spoked wheel on it facing down the ship.
+      slab(out, x + 0.42, y + 0.42, x + 0.58, y + 0.58, z, z + 0.7, "wooddark", cls, NOPOINT);
+      var wr = 0.34, wz = z + 0.86, rim = [];
+      for (i = 0; i < 10; i++) {
+        var wa = i / 10 * 2 * Math.PI;
+        rim.push([x + 0.5 + wr * Math.cos(wa), y + 0.4, wz + wr * Math.sin(wa)]);
+      }
+      face(out, rim, NORTH, "wood", cls, NOPOINT);
+      face(out, rim.map(function (q) { return [q[0], q[1] + 0.06, q[2]]; }), SOUTH, "wood",
+           cls, NOPOINT);
+      [[1, 0], [0, 1], [0.7, 0.7], [0.7, -0.7]].forEach(function (d) {
+        slab(out, x + 0.5 - d[0] * 0.42 - 0.02, y + 0.36, x + 0.5 + d[0] * 0.42 + 0.02,
+             y + 0.37, wz - d[1] * 0.42 - 0.02, wz + d[1] * 0.42 + 0.02, "plank", cls, NOPOINT);
+      });
+      return z + 1.2;
+    }
+    if (k === "capstan") {
+      frustum(out, x + 0.5, y + 0.5, 0.3, 0.24, z, z + 0.62, 8, "wood", cls,
+              { cls: cls });
+      slab(out, x + 0.04, y + 0.46, x + 0.96, y + 0.54, z + 0.62, z + 0.68, "wooddark", cls,
+           NOPOINT);
+      slab(out, x + 0.46, y + 0.04, x + 0.54, y + 0.96, z + 0.68, z + 0.74, "wooddark", cls,
+           NOPOINT);
+      return z + 0.74;
+    }
+    if (k === "anchor") {
+      // Lying on the deck: an iron shank, its stock across it, the arms at the crown.
+      slab(out, x + 0.46, y + 0.12, x + 0.54, y + 0.86, z, z + 0.08, "iron", cls, NOPOINT);
+      slab(out, x + 0.2, y + 0.2, x + 0.8, y + 0.27, z, z + 0.1, "wooddark", cls, NOPOINT);
+      slab(out, x + 0.18, y + 0.78, x + 0.82, y + 0.86, z, z + 0.08, "iron", cls, NOPOINT);
+      slab(out, x + 0.14, y + 0.62, x + 0.22, y + 0.84, z, z + 0.08, "iron", cls, NOPOINT);
+      slab(out, x + 0.78, y + 0.62, x + 0.86, y + 0.84, z, z + 0.08, "iron", cls, NOPOINT);
+      return z + 0.1;
+    }
+    if (k === "bench") {
+      // Athwartships, at the side where the rower sits to his oar.
+      slab2(out, x + 0.04, y + 0.32, x + 0.96, y + 0.68, z + 0.4, z + 0.48, "plank", "wood",
+            cls, NOPOINT);
+      slab(out, x + 0.1, y + 0.4, x + 0.18, y + 0.6, z, z + 0.4, "wooddark", cls, NOPOINT);
+      slab(out, x + 0.82, y + 0.4, x + 0.9, y + 0.6, z, z + 0.4, "wooddark", cls, NOPOINT);
+      return z + 0.48;
+    }
+    if (k === "boat") {
+      var bb = runX ? [x, y + 0.14, x + 1, y + 0.86] : [x + 0.14, y, x + 0.86, y + 1];
+      slab(out, bb[0], bb[1], bb[2], bb[3], z, z + 0.12, "wooddark", cls, NOPOINT);
+      (runX ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]]).forEach(function (d) {
+        var sx0 = d[0] ? (d[0] < 0 ? bb[0] : bb[2] - 0.07) : bb[0];
+        var sy0 = d[1] ? (d[1] < 0 ? bb[1] : bb[3] - 0.07) : bb[1];
+        slab2(out, sx0, sy0, d[0] ? sx0 + 0.07 : bb[2], d[1] ? sy0 + 0.07 : bb[3], z,
+              z + 0.5, "plank", "wood", cls, NOPOINT);
+      });
+      slab(out, runX ? x + 0.44 : bb[0], runX ? bb[1] : y + 0.44, runX ? x + 0.56 : bb[2],
+           runX ? bb[3] : y + 0.56, z + 0.3, z + 0.36, "plank", cls, NOPOINT);
+      return z + 0.5;
+    }
+    if (k === "bollard") {
+      frustum(out, x + 0.5, y + 0.5, 0.17, 0.15, z, z + 0.5, 8, "wooddark", cls);
+      frustum(out, x + 0.5, y + 0.5, 0.21, 0.21, z + 0.5, z + 0.58, 8, "wood", cls,
+              { cls: cls });
+      return z + 0.58;
+    }
     return -1;
   }
 
@@ -735,6 +828,7 @@
     var turn = (opts.turn || 0) & 3;
     var level = opts.level || 0;
     var W = g.width, H = g.height;
+    ROOF = g.ceiling || null;
     DUSK = null;
     if (g.light && NIGHT[g.light.level] || (g.light && (g.light.lit || []).length)) {
       DUSK = { level: g.light.level, at: {} };
@@ -799,6 +893,38 @@
         });
         seam(out, x, y, x + 1, y + 1, t, y + 0.37, true, "wooddark", cls);
         seam(out, x, y, x + 1, y + 1, t, y + 0.63, true, "wooddark", cls);
+      } else if (f.kind === "rope") {
+        // A coil flaked down on the planking: three low turns, one inside the next.
+        [0.34, 0.25, 0.16].forEach(function (rr, i) {
+          prism(out, x + 0.5, y + 0.5, rr, t, t + 0.09 + i * 0.02, "tread",
+                cls + " fxd", i < 2, "wooddark");
+        });
+      } else if (f.kind === "hatch") {
+        // A coaming round a grating: the frame a hand high, the bars inside it.
+        slab(out, x + 0.08, y + 0.08, x + 0.92, y + 0.16, t, t + 0.12, "wooddark", cls, NOPOINT);
+        slab(out, x + 0.08, y + 0.84, x + 0.92, y + 0.92, t, t + 0.12, "wooddark", cls, NOPOINT);
+        slab(out, x + 0.08, y + 0.16, x + 0.16, y + 0.84, t, t + 0.12, "wooddark", cls, NOPOINT);
+        slab(out, x + 0.84, y + 0.16, x + 0.92, y + 0.84, t, t + 0.12, "wooddark", cls, NOPOINT);
+        face(out, [[x + 0.16, y + 0.16, t + 0.01], [x + 0.84, y + 0.16, t + 0.01],
+                   [x + 0.84, y + 0.84, t + 0.01], [x + 0.16, y + 0.84, t + 0.01]],
+             UP, "hoop", cls + " fxd", NOPOINT);
+        [0.33, 0.5, 0.67].forEach(function (a) {
+          seam(out, x + 0.16, y + 0.16, x + 0.84, y + 0.84, t + 0.06, y + a, true, "wood", cls);
+          seam(out, x + 0.16, y + 0.16, x + 0.84, y + 0.84, t + 0.06, x + a, false, "wood", cls);
+        });
+      } else if (f.kind === "rigging") {
+        // The shrouds at the rail: three lines leaning in toward the mast, ratlines across
+        // them, up past where somebody standing in them is (the square's own level).
+        var out0 = x < W / 2 ? x + 0.08 : x + 0.92, lean = x < W / 2 ? 0.55 : -0.55;
+        var top = (f.level || 2) + 0.9;
+        [0.2, 0.5, 0.8].forEach(function (a) {
+          strip(out, [out0, y + a, t + 0.45], [out0 + lean, y + a, top], 0.025, "tread", cls);
+        });
+        for (var rz = t + 0.75; rz < top - 0.1; rz += 0.36) {
+          var u = (rz - t - 0.45) / (top - t - 0.45);
+          strip(out, [out0 + lean * u, y + 0.2, rz], [out0 + lean * u, y + 0.8, rz], 0.012,
+                "plank", cls);
+        }
       } else if (f.kind === "rubble") {
         var h = (x * 7 + y * 13) % 5;
         [[0.15, 0.2, 0.18], [0.55, 0.15, 0.12], [0.35, 0.6, 0.2], [0.68, 0.62, 0.14]]
@@ -808,6 +934,30 @@
                  "stone", cls + " fxd", NOPOINT);
           });
       }
+    }
+
+    /* The sea past a ship's rail or a quay's edge (2026-11-13): water a little under the
+       planking, and on every edge it shares with dry ground the side that stands out of
+       it: a ship's hull and its gunwale where the square is the rail, the quay's stone
+       face where it is open water. */
+    function seaAt(out, f, x, y, z, cls) {
+      var s = z + SEA;
+      cap(out, x, y, s, "water", cls, "", "<title>" + esc(f.name) + "</title>", 0, false);
+      surface(out, { kind: "water" }, x, y, s, cls);
+      SIDES.forEach(function (d) {
+        var nx = x + d[0], ny = y + d[1];
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) return;
+        var n = fx[key(nx, ny)];
+        if (n && WATERY[n.kind]) return;
+        var e = 0.08;
+        var x0 = d[0] > 0 ? x + 1 - e : x, x1 = d[0] < 0 ? x + e : x + 1;
+        var y0 = d[1] > 0 ? y + 1 - e : y, y1 = d[1] < 0 ? y + e : y + 1;
+        if (f.kind === "rail") {
+          slab2(out, x0, y0, x1, y1, s, z + 0.45, "plank", "wood", cls, NOPOINT);
+        } else {
+          slab(out, x0, y0, x1, y1, s, z, "stonedark", cls, NOPOINT);
+        }
+      });
     }
 
     var reach = {};
@@ -841,6 +991,9 @@
     function topAt(x, y) {
       if (x < 0 || y < 0 || x >= W || y >= H) return 0;
       var k = key(x, y), z = ground[k] || 0;
+      // The shrouds are rope over the deck, not a block of ground; the sea and the rail
+      // lie under the planking (seaAt), so the deck beside them draws no wall.
+      if (fx[k] && (fx[k].kind === "rigging" || WATERY[fx[k].kind])) return 0;
       if (!solid[k]) return z;
       return fx[k] && fx[k].height === 1 ? z + 1 : Math.max(z + 2, 2);
     }
@@ -877,10 +1030,16 @@
         // A crate or cart you can climb onto (a raised square, not a solid one) is built of
         // wood, not of the room's raised floor.
         if (f3 && !solid[k] && (f3.kind === "crate" || f3.kind === "cart")) mat = "wood";
-        if (solid[k] && f3) {
+        if (f3 && !solid[k] && (f3.kind === "rigging" || f3.kind === "rope" ||
+                                f3.kind === "hatch")) { mat = "tile"; cls = cls.replace("raised", ""); }
+        var wet = solid[k] && f3 && WATERY[f3.kind];
+        if (solid[k] && f3 && !wet) {
           drawn = fixtureAt(faces, f3, x, y, z, frontOf(f3, x, y), runsX(f3), cls);
         }
-        if (drawn >= 0) {
+        if (drawn > tallest) tallest = drawn;
+        if (wet) {
+          seaAt(faces, f3, x, y, z, cls);
+        } else if (drawn >= 0) {
           // The floor under it, holding the name for the pointer (the drawing is deaf).
           cap(faces, x, y, z, z ? "raised" : "tile", "tile", "",
               "<title>" + esc(f3.name) + "</title>", 0, false);
