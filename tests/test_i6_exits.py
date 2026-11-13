@@ -23,7 +23,7 @@ import pytest
 from django.test import Client, override_settings
 
 from play import exits as exits_mod
-from rules import outskirts, places, states
+from rules import outskirts, places, ships, states
 from rules.activeeffect import ActiveEffect
 from rules.bestiary import instantiate
 from rules.dice import Dice
@@ -311,6 +311,10 @@ def test_a_journey_asks_before_it_spends_days(worlds, table):
     loc, spot = _journey_spot(worlds)
     assert loc is not None, "every export has a way out that is a journey"
     c = table["stand"](loc, spot)
+    # The first way out may be a passage, a paid crossing since 2026-11-13 (1 sp a mile
+    # a head): the coin is the ticket, and this test is about the confirmation.
+    c.scene.pc().purse = {"pp": 10}
+    c.save()
     x = next(v for v in _state()["scene"]["exits"] if v["journey"])
     assert x["group"] == "road"
     was_clock, was_at = c.scene.clock_minutes, c.scene.at
@@ -325,6 +329,14 @@ def test_a_journey_asks_before_it_spends_days(worlds, table):
     turn = [e for e in c.turn_log if e.get("kind") == "turn"][-1]
     assert [(i["op"], i["params"].get("to")) for i in turn["intents"]] == \
         [("journey", x["id"])]
+    if ships.vessel_of(c.scene.at):
+        # A passage: the confirmed click buys the berth and goes aboard; the days are
+        # the sailing's, which the deck's own row confirms the same way.
+        assert c.scene.pc().purse != {"pp": 10}, "the fare was not paid"
+        sail = next(v for v in _state()["scene"]["exits"] if v["journey"])
+        r = _say({"text": f"We sail for {sail['name']}.",
+                  "attachments": [{"kind": "place", "id": sail["id"], "confirmed": True}]})
+        assert r.status_code == 200, r.content[:300]
     assert c.scene.clock_minutes > was_clock + 60, "a journey costs hours at least"
 
 

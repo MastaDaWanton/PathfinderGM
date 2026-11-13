@@ -63,7 +63,11 @@ function exitNorm(text) {
 
 // The chip a way makes: its kind word and the line held under it.
 function exitChip(e, fighting) {
-  const days = e.journey ? `${upFirst(e.time_words)}; the days pass on the road.` : "";
+  // A passage's words are the engine's own (play/exits.py `_days_aboard`): its days pass
+  // aboard, never "on the road" (measured live 2026-11-13 on a sea crossing's chip).
+  const aboard = /\b(?:at sea|on the river)\b/.test(String(e.time_words || ""));
+  const days = e.journey
+    ? `${upFirst(e.time_words)}; the days pass ${aboard ? "aboard" : "on the road"}.` : "";
   if (fighting) {
     return { id: e.id, name: e.name, journey: !!e.journey, label: "Withdraw",
              note: days ? `${WITHDRAW_LINE} ${days}` : WITHDRAW_LINE };

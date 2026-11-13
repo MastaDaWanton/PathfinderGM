@@ -14100,18 +14100,18 @@ class Engine:
         speed = pc.speed_feet if pc is not None else 30
         hours, measured, how = journey_mod.hours_for(leg, speed)
         on_foot = hours
-        # From a port, a sea crossing is a passage bought and a deck stood on
-        # (2026-11-13). A river stays the boat-shaped road it was, and a crossing that
-        # starts inland is still "the road to the coast, and then days at sea".
-        if how == "sea" and leg.from_port and leg.by != "river":
+        # Every crossing by water is a passage bought and a deck stood on (2026-11-13):
+        # from a port, from an inland town by the road to the coast, by sea or river. Until
+        # the integrator's run the same day, a crossing that started inland was still the
+        # old free one — no ship, no fare, no weather — while its way back was paid: Vormoor
+        # to Ledgerwarren cost nothing and Ledgerwarren to Vormoor a platinum piece.
+        if how == "sea":
             return self._book_passage(intent, leg)
 
         # On foot, riding, or at a gallop (the owner's ruling Q13; `journey.mounted_hours`
         # carries the sourced rules). Checked before anything moves: a refusal here must
         # leave the conversation and the company exactly as they were.
         pace = journey_mod.pace_of(intent.params.get("pace")) or "walk"
-        if how == "sea":
-            pace = "walk"             # a horse does not make a ship go faster
         mount_refs: list[str] = []
         if pace != "walk":
             party = [str(w) for w in (intent.params.get("with") or [])
@@ -14213,10 +14213,7 @@ class Engine:
         # 20% — over the ground the world says this route crosses. Rolled BEFORE the
         # march so the march only charges the body for the hours actually walked: a
         # party stopped at noon on day one has not paid for day three.
-        #
-        # Not at sea. A passage is not a march and this table is a road's; a ship's own
-        # trouble is `rules/ships.py`, which has its own.
-        met = None
+        # (A crossing by water never gets here: it is a passage, `_book_passage`.)
         # Two different hours. `remaining` is the road still ahead when they set out;
         # `progress` is how much of it gets walked today; `hours` is what the day
         # costs. Weather adds to the cost and never to the progress — and until
@@ -14224,14 +14221,13 @@ class Engine:
         # after the storm's hours had gone into it: a ten-hour road held up by weather
         # on its second watch recorded twelve hours walked.
         progress = remaining = hours
-        if how != "sea":
-            met = ontheway.road(
-                self.dice, hours,
-                (leg.crosses[0] if leg.crosses else places_mod.terrain_of(self.scene.at)),
-                int(getattr(pc, "level", 1) or 1) if pc is not None else 1,
-                apl=encounter_budget.party_apl(self.scene),
-                # The road is as dangerous as its worse end (`volatility.scale`).
-                danger=volatility.scale(self.world, self.scene.at, leg.to_id))
+        met = ontheway.road(
+            self.dice, hours,
+            (leg.crosses[0] if leg.crosses else places_mod.terrain_of(self.scene.at)),
+            int(getattr(pc, "level", 1) or 1) if pc is not None else 1,
+            apl=encounter_budget.party_apl(self.scene),
+            # The road is as dangerous as its worse end (`volatility.scale`).
+            danger=volatility.scale(self.world, self.scene.at, leg.to_id))
         if met is not None:
             progress = ontheway.hours_walked(met, hours)
             hours = progress
@@ -14255,17 +14251,7 @@ class Engine:
         stopped_short = met is not None and progress < remaining
 
         toll_note = ""
-        if how == "sea":
-            # A passage is not a march. Nobody aboard is walking eight hours and camping
-            # at dusk — they are fed, watered and slept by the ship, which is exactly what
-            # `_march`'s camp does for a traveller and with none of the walking. So the
-            # clock moves and the body is not charged, and a crossing always completes:
-            # a ship does not turn back because a passenger is tired.
-            arrived, walked = True, ""
-            self.scene.advance(hours * survival.MINUTES_PER_HOUR, charge_body=False)
-        else:
-            arrived, walked = self._march(pc, hours,
-                                          places_mod.terrain_of(self.scene.at))
+        arrived, walked = self._march(pc, hours, places_mod.terrain_of(self.scene.at))
         if walked:
             toll_note = f" The road cost them: {walked}"
 
@@ -16888,13 +16874,32 @@ class Engine:
         found = self.world.get(entity_id) if self.world is not None and entity_id else None
         return str(getattr(found, "name", "") or "port")
 
+    def passage_quote(self, leg, heads: int = 1):
+        """(ship, days, fare in copper) for a berth on this leg from here: the port's
+        passenger ship (a keelboat on a river), the days by her speed over the world's
+        miles or the tree's days, and 1 sp a mile a head (CRB Table 6-9). One rule for the
+        booking and the exits row's price."""
+        from . import places as places_mod, ships as ships_mod
+
+        here = self.scene.location_id
+        town = self.world.get(here) if self.world is not None else None
+        offered = ships_mod.passenger_ship(
+            here, places_mod.scale_of(town) if town is not None else "town",
+            river=leg.by == "river")
+        ship = self.vessel(offered.id) or offered
+        days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
+                                  ship.kind, leg.days_apart)
+        miles = leg.miles if leg.source == "exact" and leg.miles \
+            else days * ships_mod.miles_a_day(ship.kind)
+        return ship, days, ships_mod.fare_cp(miles, heads)
+
     def _book_passage(self, intent: Intent, leg) -> Outcome:
         """Buy a berth to `leg`'s port and go aboard. She lies at the quay until the party
         sails (`_sail`), so the deck is somewhere to stand, talk and sleep first.
 
         The fare is the book's: 1 sp a mile a passenger (CRB Table 6-9), the miles the
         world's when it stated them, else the ship's own day's run times the days."""
-        from . import places as places_mod, ships as ships_mod
+        from . import ships as ships_mod
 
         pc = self.scene.pc()
         if pc is None:
@@ -16902,7 +16907,6 @@ class Engine:
         if self.scene.initiative:
             return self._refuse(intent, "Nobody sells a berth in the middle of a fight.")
         here = self.scene.location_id
-        town = self.world.get(here) if self.world is not None else None
         escorts = [str(w) for w in (intent.params.get("with") or [])
                    if str(w) in self.scene.actors]
         escorts += [r for r, a in self.scene.actors.items()
@@ -16916,15 +16920,8 @@ class Engine:
         if ship is not None:
             paid = f"Your berth on {ship.name} is still yours."
         else:
-            offered = ships_mod.passenger_ship(
-                here, places_mod.scale_of(town) if town is not None else "town")
-            ship = self.vessel(offered.id) or offered
-            days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
-                                      ship.kind, leg.days_apart)
-            miles = leg.miles if leg.source == "exact" and leg.miles \
-                else days * ships_mod.miles_a_day(ship.kind)
             heads = 1 + len(escorts)
-            cost = ships_mod.fare_cp(miles, heads)
+            ship, days, cost = self.passage_quote(leg, heads)
             coins = self._coins_here()
             purse, enough = goods.spend(pc.purse, cost)
             if not enough:
@@ -16937,15 +16934,30 @@ class Engine:
             ship.at, ship.bound_for, ship.came_from = here, leg.to_id, here
             ship.days_left = ship.days_total = days
             ship.sailed_at = None
+            ship.river = leg.by == "river"
             effects.append({"kind": "give", "ref": pc.ref, "item": "coin", "count": cost,
                             "how": "fare", "from": pc.ref, "to": ship.id,
                             "purse": dict(pc.purse), "goods": dict(pc.goods)})
             paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
                     f"passage to {leg.to_name} on {ship.name}, {english.a(ship.kind)}: "
-                    f"{days} day{'s' if days != 1 else ''} at sea.")
+                    f"{days} day{'s' if days != 1 else ''} "
+                    f"{'on the river' if ship.river else 'at sea'}.")
+            if not leg.from_port and not ship.river:
+                # No docks here: the passage is from where the road meets the coast, as
+                # the old free crossing said too, and costs no time of its own (as before).
+                paid = f"By the road to the coast: {paid}"
         ship.passengers = [pc.ref, *escorts]
         self._keep_vessel(ship)
         parted = self.end_talk("walked away")
+        # Whoever does not come aboard is left as `_op_journey` leaves them: kept in the
+        # world when they are somebody (`_stays_in_the_world`), gone when they are not —
+        # the road's rule, which the old free crossing applied and the passage must too.
+        rooms = {p.id for p in ships_mod.places_of(ship)}
+        for ref in list(self.scene.actors):
+            a = self.scene.actors[ref]
+            if ref not in ship.passengers and not a.is_pc and a.at not in rooms \
+                    and not self._stays_in_the_world(a):
+                self.scene.depart(ref)
         deck = ships_mod.deck_of(ship)
         self.place_party(deck)
         for ref in escorts:
@@ -17040,7 +17052,8 @@ class Engine:
                 if a.is_pc:
                     told.extend(survival.night(a, self.dice))
             ship.sailed_at, ship.days_left, sailed = due, ship.days_left - 1, sailed + 1
-            weather = ships_mod.day_at_sea(self.dice, level)
+            # The storm table is open water's (ships.py): a river passage is not rolled.
+            weather = "calm" if ship.river else ships_mod.day_at_sea(self.dice, level)
             if weather != "calm":
                 break
         self._journeyed = ship.name
@@ -17051,7 +17064,8 @@ class Engine:
                                 "volatility": volatility.word(level)}]
         days_said = f"{sailed} day{'s' if sailed != 1 else ''}"
         bits = [f"{ship.name[:1].upper()}{ship.name[1:]} "
-                f"{'casts off and ' if cast_off else ''}makes way: {days_said} at sea."]
+                f"{'casts off and ' if cast_off else ''}makes way: {days_said} "
+                f"{'on the river' if ship.river else 'at sea'}."]
         if weather == "storm":
             for a in aboard:
                 a.apply_effect(ActiveEffect(

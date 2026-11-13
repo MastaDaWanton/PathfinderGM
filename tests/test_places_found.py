@@ -30,7 +30,7 @@ from django.test import Client, override_settings
 from play import campaign as cm
 from play import exits as exits_mod
 from play import places_found
-from rules import places, states
+from rules import places, ships, states
 from rules.activeeffect import ActiveEffect
 from rules.bestiary import instantiate
 from rules.dice import Dice
@@ -172,10 +172,14 @@ def test_a_journey_adds_the_place_it_arrives_at(worlds):
             if road is None:
                 continue
             before = list(s.been)
+            # The way out may be a passage, a paid crossing since 2026-11-13: the coin is
+            # the ticket. It is booked, then sailed, and at sea the location is the ship.
+            pc.purse = {"pp": 10}
             for _ in range(20):
+                e._journeyed = ""
                 e.run(e.validate([{"op": "journey", "actor": pc.ref, "because": "t",
                                    "params": {"to": road["id"]}}], origin="author:test"))
-                if s.location_id != loc.id:
+                if s.location_id != loc.id and not ships.vessel_of(s.location_id):
                     break
             assert s.location_id == road["id"], "the journey reached the far end"
             assert s.been[:len(before)] == before

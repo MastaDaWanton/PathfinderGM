@@ -87,6 +87,24 @@ def _road_words(road, leg, hours: int, ride: bool) -> str:
     return words.replace(" on foot", " riding") if ride else words
 
 
+def _days_aboard(days: int, river: bool = False) -> str:
+    return f"{'a day' if days == 1 else f'{days} days'} " \
+           f"{'on the river' if river else 'at sea'}"
+
+
+def _passage_words(engine, leg, scene) -> str:
+    """A passage row's days and fare, from the same quote the booking charges
+    (`Engine.passage_quote`) — never "how far, nobody has written down", which is a
+    road's words: a passage's days are the ship's and its price is the book's."""
+    from rules import goods, states
+
+    heads = 1 + sum(1 for a in scene.actors.values()
+                    if not a.is_pc and a.has_state(states.TRAVELS_WITH_YOU))
+    _ship, days, cost = engine.passage_quote(leg, heads)
+    fare = goods.purse_line(goods.coins_for(cost), engine._coins_here())
+    return f"{_days_aboard(days, leg.by == 'river')}, {fare} passage"
+
+
 def exits(engine, world) -> list[dict]:
     """`[{"id", "name", "group", "time_words", "blocked", "journey"}]` for where the party
     stands. [] when they stand nowhere yet."""
@@ -155,7 +173,7 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
         days = ship.days_left
         row = {"id": ship.id, "name": str(getattr(dest, "name", "") or "port"),
                "group": "road", "blocked": "", "journey": True, "minutes": 0,
-               "time_words": f"{'a day' if days == 1 else f'{days} days'} at sea"}
+               "time_words": _days_aboard(days, ship.river)}
         for place_id, rows in out.items():
             if ships.vessel_of(place_id) == ship.id:
                 rows.append(dict(row))
@@ -239,9 +257,11 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
                     hours = max(1, hours - int(left.get("walked") or 0))
                 if ride and not sea:
                     hours = journey_mod.mounted_hours(hours, "ride")[0]
+            voyage = leg is not None and leg.by_sea
             roads.append((hours, {
                 "id": road.to_id, "name": road.to_name, "group": "road",
-                "time_words": _road_words(road, leg, hours, ride and not sea),
+                "time_words": (_passage_words(engine, leg, scene) if voyage else
+                               _road_words(road, leg, hours, ride and not sea)),
                 "blocked": watched, "journey": True, "minutes": 0}))
         out.extend(entry for _h, entry in sorted(roads, key=lambda t: t[0]))
     return out

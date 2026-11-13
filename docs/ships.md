@@ -165,6 +165,13 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
    `origin: rule:shipwreck` and the narrator is told the tell.
 5. **Arrival**: the ship ties up at the far docks and the party goes ashore.
 
+**Every crossing by water is this one path** (integrator's run, 2026-11-13: Vormoor to
+Ledgerwarren was still the old free crossing while the way back was paid). From a town
+with no docks the passage is "by the road to the coast", which costs no time of its own,
+as the old crossing did not either. A river is a passage on a keelboat, and no storm is
+rolled on it. Whoever does not come aboard is left as the road leaves them. The exits
+row prices the passage from the same quote the booking charges (`Engine.passage_quote`).
+
 **Boarding crews are budgeted** (`Engine._defenders`): the rail's count (up to four, by
 the hull's crew) is trimmed by `encounter_budget.most_of` on the **guarded** mix — a crew
 on her own deck is defending it, the owner's "guards and lairs may be challenging or hard",
@@ -179,8 +186,8 @@ Stormwrack's storm and shipwreck rules could not be read; nothing here claims th
   comes over the horizon on a voyage; the engagement above is still reached by a scheme,
   the narrator or a test. When one is written, its counts go through
   `encounter_budget` (wandering) and its chance through `volatility.factor`.
-- **A crossing that starts inland** is still "the road to the coast, and then days at
-  sea": the clock passes, nobody stands on a deck and no weather is rolled. Rivers too.
+- **The road to the coast** from an inland town takes no time, as before; the export
+  would need to say how far the coast is (for-world-bible 8).
 - **The storm's ranged half** ("ranged weapon attacks impossible") is not read by the
   attack op.
 - **Siege engines.** `arms` is on every row of the table and nothing reads it. A ballista

@@ -148,13 +148,16 @@ class Vessel:
     sailed_at: int | None = None
     # Who paid for a berth: the refs that come ashore with the party, wherever ashore is.
     passengers: list = field(default_factory=list)
+    # A river passage: no storm is rolled on it (the weather table is open water's).
+    river: bool = False
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
                 "sinking": self.sinking, "crew": self.crew, "at": self.at,
                 "bound_for": self.bound_for, "days_left": self.days_left,
                 "came_from": self.came_from, "days_total": self.days_total,
-                "sailed_at": self.sailed_at, "passengers": list(self.passengers)}
+                "sailed_at": self.sailed_at, "passengers": list(self.passengers),
+                "river": self.river}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -173,7 +176,8 @@ class Vessel:
                    days_total=int(d.get("days_total", 0) or 0),
                    sailed_at=(int(d["sailed_at"]) if d.get("sailed_at") is not None
                               else None),
-                   passengers=[str(r) for r in (d.get("passengers") or [])])
+                   passengers=[str(r) for r in (d.get("passengers") or [])],
+                   river=bool(d.get("river")))
 
     @property
     def row(self) -> dict:
@@ -451,12 +455,18 @@ def fare_cp(miles: int, heads: int = 1) -> int:
     return max(1, int(miles)) * PASSAGE_CP_PER_MILE * max(1, int(heads))
 
 
-def passenger_ship(port_id: str, scale: str) -> "Vessel":
+def passenger_ship(port_id: str, scale: str, river: bool = False) -> "Vessel":
     """The ship a harbourmaster puts a passenger aboard: a sailing ship when one lies here
     (Table 7-49's trader, "a crew who want no trouble"), else the port's first regular
     built for open water. A keelboat is a river boat ("shallow draught and no
-    pretensions"), so it carries a passenger to sea only where it is all the port keeps.
+    pretensions"), so it carries a passenger to sea only where it is all the port keeps —
+    and on a river it is the boat, whatever else lies at the quay.
     """
+    if river:
+        vid = vessel_id(port_id, "keelboat", 0)
+        row = VESSELS["keelboat"]
+        return Vessel(id=vid, name=name_for(vid), kind="keelboat", hp=int(row["hp"]),
+                      crew=int(row["crew"][0]), at=str(port_id))
     lying = offered_at(port_id, scale, n=3)
     return next((v for v in lying if v.kind == "sailing ship"),
                 next((v for v in lying if v.kind != "keelboat"), lying[0]))

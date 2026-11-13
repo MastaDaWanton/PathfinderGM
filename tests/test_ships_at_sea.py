@@ -96,8 +96,15 @@ def test_the_exits_row_offers_the_passage_and_then_the_voyage():
     rows = exits.exits(engine, PANGRELLA)
     passage = next(r for r in rows if r["id"] == ZHILVARNIA)
     assert passage["journey"] and not passage["blocked"]
+    # Days at sea and the fare the booking will charge, never a road's "how far, nobody
+    # has written down" (what the row said until 2026-11-13).
+    assert passage["time_words"] == "2 days at sea, 2 Kaldrimia platinum pieces, " \
+        "8 Kaldrimia gold pieces, 8 Kaldrimia silver pieces passage", passage
     _journey(engine, to=passage["id"])
     rows = exits.exits(engine, PANGRELLA)
+    # A ship's rooms are next door to each other, not "Outside" an hour away.
+    assert {r["group"] for r in rows if r["name"] in ("below decks", "the hold")} \
+        == {"next_door"}, rows
     # Keyed by the ship: live, a row sharing the port's id made the page keep the
     # booking chip with "The move did not happen".
     assert all(r["id"] != ZHILVARNIA for r in rows)
@@ -219,3 +226,35 @@ def test_a_save_mid_voyage_loads_and_sails_on(tmp_path, settings, monkeypatch):
     assert ship is not None and ship.sailed_at is not None and ship.passengers
     out = _journey(again)
     assert back.scene.location_id == ZHILVARNIA, out.tell
+
+
+def test_a_crossing_from_inland_is_a_passage_too():
+    """Integrator's run, 2026-11-13: Vormoor to Ledgerwarren went the old free crossing
+    (no ship, no fare, no weather) while Ledgerwarren to Vormoor was a paid passage. Every
+    crossing by water is now the one path: Zhilgoroth has no docks and its sea route to
+    Khalmorin still books, boards and sails."""
+    zhilgoroth, khalmorin = "58b90a214ada", "b36e9f16214d"
+    scene = Scene(location_id=zhilgoroth)
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    engine = Engine(scene, Dice(seed=4), world=PANGRELLA)
+    engine.place_party()
+    pc.purse = {"gp": 500}
+    out = _journey(engine, to="Khalmorin")
+    assert engine.aboard() is not None and pc.purse != {"gp": 500}, out.tell
+    assert out.tell.startswith("By the road to the coast"), out.tell
+    _journey(engine, to="Khalmorin")
+    assert scene.location_id == khalmorin
+
+
+def test_a_river_passage_is_a_keelboat_and_rolls_no_storm(monkeypatch):
+    """Mirabalos to Elyrielle is by river: a passage like any other, on a keelboat, and
+    the storm table is open water's — so a forced wreck never reaches it."""
+    elyrielle = "d677be869434"
+    scene, engine, pc = _at_port()
+    _journey(engine, to="Elyrielle")
+    ship = engine.aboard()
+    assert ship.kind == "keelboat" and ship.river
+    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "wreck")
+    out = _journey(engine, to="Elyrielle")
+    assert scene.location_id == elyrielle and "on the river" in out.tell, out.tell

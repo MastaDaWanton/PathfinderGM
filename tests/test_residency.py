@@ -36,7 +36,11 @@ DAY = 24 * HOUR
 
 def _engine(clock=10 * HOUR):
     s = Scene(location_id=VORMOOR)
-    s.add(load_pc("fixtures/pc-kesst.json"))
+    pc = s.add(load_pc("fixtures/pc-kesst.json"))
+    # Vormoor and Ledgerwarren are a sea crossing apart, and since 2026-11-13 every
+    # crossing is a paid passage (1 sp a mile a head) both ways. These tests are about who
+    # is still there when the party comes back, not about fares: the coin is the ticket.
+    pc.purse = {"pp": 10}
     s.clock_minutes = clock
     e = Engine(s, Dice(seed=3), world=WORLD)
     e.place_party()
@@ -59,7 +63,8 @@ def _journey(e, to):
     for _ in range(10):
         e._journeyed = ""
         e.run(e.validate([{"op": "journey", "params": {"to": to}}], origin="author:test"))
-        if WORLD.get(e.scene.location_id).name == to:
+        # At sea the location is the ship, which the world does not hold.
+        if getattr(WORLD.get(e.scene.location_id), "name", "") == to:
             return
     raise AssertionError(f"never reached {to}")
 
