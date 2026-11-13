@@ -39,6 +39,7 @@ from rules import crafting, effectspec, formulae, knowledge, survival, worldclas
 
 from . import bench_clock
 from . import campaign as campaign_mod
+from . import manual_reader
 from .apiutil import read_body
 
 TRACK_ID = al.TRACK_ID
@@ -446,6 +447,11 @@ def _state_body(c, pc) -> dict:
                                  for f in formulae.known(pc)) if r],
         "recipes": _recipes(c),
         "conversions": _conversions(pc),
+        # The alchemy manuals and formularies carried, for the footer's Manuals button (POST
+        # api/alchemy/manual reads one: the reagents a book `teaches`). A formulary's
+        # `formulae` are still written into the formula book through the Formulae
+        # dialog's own route (`alchemy_learn`, source "formulary"), with its check.
+        "manuals": manual_reader.carried(pc, knowledge.ALCHEMIST),
     }
 
 
@@ -1649,3 +1655,36 @@ def alchemy_material(request, material_id: str):
     if progress.level >= al.method_level("transmute"):
         card["transmutes"] = al.transmute_candidates(doc["id"], progress.level)
     return JsonResponse(card)
+
+
+# --- manuals -----------------------------------------------------------------------------
+
+@require_POST
+def alchemy_manual(request):
+    """Read an alchemy manual or formulary the character has with them (content/rules/
+    alchemy-manuals.json): the reagents it teaches are learned, its hours pass, and a first
+    reading pays its mastery on the Alchemist track (play/manual_reader.py). A formulary's
+    formulae are still copied through `alchemy_learn` (source "formulary"), with its check.
+    Measured 2026-10-08: before it, nothing read an alchemy book's `teaches` or paid it."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    body = read_body(request)
+    said = str(body.get("item") or body.get("manual") or "")
+    return manual_reader.read(c, pc, knowledge.ALCHEMIST, said, track_id=TRACK_ID,
+                              clock=_clock, note=_formulary_note)
+
+
+def _formulary_note(pc, manual: dict) -> str:
+    """What a formulary holds that the formula book does not, in words: six of the nine
+    alchemy books teach no reagent at all, only formulae, and those are copied one by one
+    from the Formulary (`alchemy_learn`, source "formulary"), so reading one must not say
+    it held nothing new."""
+    fids = [f for f in manual.get("formulae") or () if formulae.get(f) is not None]
+    if not fids:
+        return ""
+    new = [f for f in fids if not formulae.knows(pc, f)]
+    if not new:
+        return "Every formula it writes down is already in your formula book."
+    return (f"It writes down {len(new)} formula{'e' if len(new) != 1 else ''} not yet in "
+            f"your formula book: copy {'them' if len(new) != 1 else 'it'} from the Formulary.")

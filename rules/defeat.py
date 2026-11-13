@@ -252,7 +252,7 @@ def stock_worth(s) -> float:
 
 
 def _stock_weight(s) -> float | None:
-    from .gear import _forged_weight
+    from .gear import _forged_weight, manual_weight
 
     got = _forged_weight(s)
     if got is not None:
@@ -260,6 +260,9 @@ def _stock_weight(s) -> float | None:
     kind, base = _stock_parts(s)
     if kind and base:
         return _row_weight(goods.known_item(base))
+    book = manual_weight(str(getattr(s, "base", "") or ""))
+    if book is not None:
+        return book                 # a manual is a book, weighed as `gear.load` weighs it
     return None                     # a jar, a draught, a charm: carried in a hand
 
 

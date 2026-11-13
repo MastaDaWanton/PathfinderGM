@@ -555,6 +555,103 @@
       });
     };
 
+    // --- the manuals carried (play/manual_reader.py) ---------------------------------------
+    // One dialog for every bench whose craft sells books: the server's `state.manuals`, each
+    // read by one press of its Read through the bench's POST route. Measured 2026-10-08: a
+    // bought smithing, enchanting or alchemy manual had no door anywhere on the page, so it
+    // could never be opened. What the reading taught is listed in the server's words, and
+    // the dialog stays up so a second book can be read; `after(response)` is the bench's
+    // own (its clock, its state, its ledger's cache).
+    //   m = { list, route, word ("smithing"), about ("metals and the smith's stores"),
+    //         from (the opener, focus goes back to it), after(response) }
+    h.manuals = function (m) {
+      var pops = $id(o.pops);
+      if (!pops) return null;
+      var list = (m.list || []).slice();
+      var id = o.layer + "-manuals-" + Date.now();
+      var wrap = document.createElement("div");
+      wrap.className = "bench-modal bench-manuals";
+      wrap.setAttribute("role", "dialog");
+      wrap.setAttribute("aria-modal", "true");
+      wrap.setAttribute("aria-labelledby", id + "-t");
+      wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog bench-books-d v2-framed v2-card-leather">' +
+        '<i class="v2-rim" aria-hidden="true"></i><h3 id="' + id + '-t">Manuals</h3>' +
+        '<div class="bench-books-body"><ul class="bench-books"></ul>' +
+        '<div class="bench-books-said" role="status" aria-live="polite"></div></div>' +
+        '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-books-close>Close</button></div></div>';
+      pops.appendChild(wrap);
+      var ul = wrap.querySelector(".bench-books"), said = wrap.querySelector(".bench-books-said");
+      var draw = function () {
+        ul.innerHTML = list.length ? list.map(function (b) {
+          var hrs = C.minutes((Number(b.hours) || 1) * 60);
+          return '<li><b>' + esc(b.name) + '</b>' + (b.about ? '<i>' + esc(b.about) + '</i>' : "") +
+            '<span>' + esc(b.read ? "Read before. " + hrs + " to read again." : hrs + " to read.") + '</span>' +
+            '<button type="button" class="v2-btn is-small" data-read="' + esc(b.id) + '">Read</button></li>';
+        }).join("") : '<li><span>You carry no ' + esc(m.word || "") + ' manual.</span></li>';
+      };
+      draw();
+      C.sound("ui.open");
+      var close = function () {
+        h.dropEsc(close);
+        wrap.remove();
+        C.sound("ui.close");
+        if (m.from && document.contains(m.from) && m.from.focus) m.from.focus();
+        else h.focusFirst();
+      };
+      h.pushEsc(close);
+      wrap.querySelector("[data-books-close]").addEventListener("click", close);
+      wrap.querySelector(".bench-scrim").addEventListener("click", close);
+      ul.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-read]");
+        if (!b || b.disabled) return;
+        Array.prototype.forEach.call(ul.querySelectorAll("[data-read]"), function (x) { x.disabled = true; });
+        said.textContent = "Reading…";
+        C.api(m.route, { item: b.dataset.read }).then(function (got) {
+          var learned = got.revealed || [];
+          // One line per material, essence or recipe, its facts under the server's own
+          // words for where each acts ("In a weapon: +2 Damage rolls, -2 Attack rolls").
+          // Seen live 2026-10-08: one row per fact was 53 rows for one smithing book, each
+          // headed "Iron", and "+2 hardness" twice with nothing to say which was the armour's.
+          var order = [], by = {};
+          learned.forEach(function (r) {
+            var g = by[r.id];
+            if (!g) { g = by[r.id] = { name: r.name, heads: [], parts: {} }; order.push(g); }
+            var w = r.where || "";
+            if (!g.parts[w]) { g.parts[w] = []; g.heads.push(w); }
+            if (r.text) g.parts[w].push(r.text);
+          });
+          var lines = order.map(function (g) {
+            var said = g.heads.map(function (w) {
+              var txt = g.parts[w].join(", ");
+              return w ? w + ": " + txt : txt;
+            }).filter(Boolean).join("; ");
+            return '<li><b>' + esc(g.name) + '</b><span>' + esc(said) + '</span></li>';
+          });
+          // `worldclass.award_bonus`'s reasons: {why, mp}, "+5 mastery: read The Bench Primer".
+          var paid = ((got.mastery && got.mastery.lines) || []).map(function (l) {
+            return l && l.mp ? "+" + l.mp + " mastery: " + (l.why || "") : "";
+          }).filter(Boolean).join(". ");
+          said.innerHTML = '<p>You read ' + esc(got.name || "it") + ' for ' + esc(C.minutes(got.minutes)) + '. ' +
+            (learned.length ? "You learn " + learned.length + (learned.length === 1 ? " thing" : " things") +
+              " about " + esc(m.about || "the craft") + ":" : (got.note ? "" : "There is nothing new in it for you.")) + '</p>' +
+            (got.note ? '<p>' + esc(got.note) + '</p>' : "") +
+            (lines.length ? '<ul class="bench-books bench-books-learned">' + lines.join("") + '</ul>' : "") +
+            (paid ? '<p class="bench-books-paid">' + esc(paid) + '</p>' : "");
+          if (Array.isArray(got.manuals)) list = got.manuals;
+          draw();
+          if (typeof m.after === "function") { try { m.after(got); } catch (err) { console.error(err); } }
+          var again = ul.querySelector('[data-read="' + (window.CSS && CSS.escape ? CSS.escape(b.dataset.read) : b.dataset.read) + '"]');
+          if (again) again.focus();
+        }).catch(function (err) {
+          said.textContent = err.message || String(err);
+          Array.prototype.forEach.call(ul.querySelectorAll("[data-read]"), function (x) { x.disabled = false; });
+        });
+      });
+      var first = ul.querySelector("[data-read]") || wrap.querySelector("[data-books-close]");
+      if (first) first.focus();
+      return { wrap: wrap, close: close };
+    };
+
     // Esc or Close during a game: "Stop and keep what you have?" (herb UI plan §4.1).
     // Stopping scores the run so far, through BenchGames.stop(), which resolves the game's
     // promise; the bench's own finish then runs as for any ending. Materials are never lost

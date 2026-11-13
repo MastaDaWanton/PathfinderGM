@@ -117,6 +117,7 @@ urlpatterns = [
     path("api/forge/perks", forge_views.forge_perks, name="forge_perks"),
     path("api/forge/ledger", forge_views.forge_ledger, name="forge_ledger"),
     path("api/forge/ask", forge_views.forge_ask, name="forge_ask"),
+    path("api/forge/manual", forge_views.forge_manual, name="forge_manual"),
     path("api/forge/material/<str:material_id>", forge_views.forge_material,
          name="forge_material"),
     # In progress, every craft's unfinished work (docs/enchanting-contracts.md §8.2). Lane
@@ -138,6 +139,7 @@ urlpatterns = [
     path("api/enchant/perks", enchant_views.enchant_perks, name="enchant_perks"),
     path("api/enchant/ledger", enchant_views.enchant_ledger, name="enchant_ledger"),
     path("api/enchant/recipes", enchant_views.enchant_recipes, name="enchant_recipes"),
+    path("api/enchant/manual", enchant_views.enchant_manual, name="enchant_manual"),
     # The magic items carried with their cards, read only (lane U1 for lane U5's ledger).
     path("api/enchant/items", enchant_views.enchant_items, name="enchant_items"),
     # Old enchanted items converted onto the layer (lane H): answer a question, mark seen.
@@ -163,6 +165,7 @@ urlpatterns = [
     path("api/alchemy/recipe", alchemy_views.alchemy_recipe, name="alchemy_recipe"),
     path("api/alchemy/formulary", alchemy_views.alchemy_formulary, name="alchemy_formulary"),
     path("api/alchemy/codex", alchemy_views.alchemy_codex, name="alchemy_codex"),
+    path("api/alchemy/manual", alchemy_views.alchemy_manual, name="alchemy_manual"),
     path("api/alchemy/material/<str:material_id>", alchemy_views.alchemy_material,
          name="alchemy_material"),
     # The leather bench (docs/leatherworking-contracts.md §7). Lane E's block: every fixed

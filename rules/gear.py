@@ -354,6 +354,31 @@ def _good_weight(name: str, count: int) -> float | None:
     return None
 
 
+# A craft's manual weighs what a small written book does. The Core Rulebook's only book is
+# the blank wizard's spellbook, 3 lb for 100 pages (Table 6-9); Ultimate Equipment's
+# journal, the lightweight 50-page book a traveller carries, is 1 lb (UE p. 57), as most of
+# the written books after it are (d20pfsrd's "Books, Paper, & Writing Supplies", checked
+# 2026-10-08). A manual is read in an afternoon, so it is the journal's size, not the
+# spellbook's; a manual row may say otherwise with its own `lb`.
+MANUAL_LB = 1.0
+
+
+def manual_weight(name: str, count: int = 1) -> float | None:
+    """`count` of a craft's manual, by its name or id, in pounds; None for anything that is
+    not a manual. Measured 2026-10-08 (the leatherworking knowledge lane): the Equipment tab
+    said "Not weighed, the rules have no weight for: The Ironmonger's Daybook" of every
+    bought manual of every craft, since no table `load` reads held a book."""
+    from . import knowledge
+
+    try:
+        manual = knowledge.manual_named(str(name or ""))
+    except Exception:      # noqa: BLE001 - no manual files in this build: not a manual
+        return None
+    if manual is None:
+        return None
+    return float(manual.get("lb", MANUAL_LB)) * int(count)
+
+
 def _forged_weight(item) -> tuple[float, str] | None:
     """(pounds each, record id) for a forged weapon, suit or shield on the shelf, from its
     build — or None for anything not forged. The shelf entry's `base` is the record's
@@ -389,8 +414,9 @@ def _forged_weight(item) -> tuple[float, str] | None:
 def load(actor) -> dict:
     """What this character carries, in pounds, against what they can.
 
-    Counted: weapons, ammunition, armour and shields (their tables' weights) and the general
-    store's goods (`goods.GEAR` carries the CRB weights). Clothes are worn and not counted.
+    Counted: weapons, ammunition, armour and shields (their tables' weights), the general
+    store's goods (`goods.GEAR` carries the CRB weights) and the crafts' manuals
+    (`manual_weight`). Clothes are worn and not counted.
     Anything else is listed in `unknown` rather than guessed at."""
     from . import weapons as weapons_mod
     from .tables import ARMOUR, SHIELDS
@@ -433,6 +459,8 @@ def load(actor) -> dict:
             continue
         got = _good_weight(name, n)
         if got is None:
+            got = manual_weight(name, n)
+        if got is None:
             unknown.append(str(name))
         else:
             lb += got
@@ -453,6 +481,8 @@ def load(actor) -> dict:
             lb += lb_each * max(0, n)
             continue
         got = _good_weight(base, n)
+        if got is None:
+            got = manual_weight(base, n)
         if got is None:
             unknown.append(str(s.name))
         else:

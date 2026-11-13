@@ -32,11 +32,12 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import crafting, effectspec, sky, survival, worldclass
+from rules import crafting, effectspec, knowledge, sky, survival, worldclass
 from rules import enchanter as en
 
 from . import bench_clock
 from . import campaign as campaign_mod
+from . import manual_reader
 from .apiutil import read_body
 
 TRACK_ID = en.TRACK_ID
@@ -231,6 +232,9 @@ def _state_body(c, pc) -> dict:
         "seats": {g: en.seats_for(g) for g in (en.bench_rules().get("seats") or {})},
         "clock": _clock(c),
         "hour": _hour(c),
+        # The enchanting manuals carried, for the footer's Manuals button (POST
+        # api/enchant/manual reads one).
+        "manuals": manual_reader.carried(pc, knowledge.ENCHANTER),
     }
 
 
@@ -918,3 +922,20 @@ def enchant_recipes(request):
     if refused:
         return refused
     return JsonResponse({"recipes": _recipes(pc)})
+
+
+# --- manuals -----------------------------------------------------------------------------
+
+@require_POST
+def enchant_manual(request):
+    """Read an enchanting manual the character has with them (content/rules/enchanting-
+    manuals.json): the essences, recipes and property types it teaches are learned, its
+    hours pass, and a first reading pays its mastery on the Enchanter track
+    (play/manual_reader.py). Measured 2026-10-08: before it, a bought enchanting manual
+    could never be opened; the only reader in play/ was the herb bench's."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    body = read_body(request)
+    said = str(body.get("item") or body.get("manual") or "")
+    return manual_reader.read(c, pc, knowledge.ENCHANTER, said, track_id=TRACK_ID, clock=_clock)

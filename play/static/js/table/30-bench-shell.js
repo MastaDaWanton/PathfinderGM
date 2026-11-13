@@ -875,7 +875,10 @@
       track: t ? { title: "Herbalist", level: t.level, mp: t.mp,
                    need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
       picks: t && t.picks_banked,
-      buttons: '<button type="button" class="bf-btn" data-bench-recipes aria-haspopup="dialog">Recipes</button>' +
+      // Manuals when a herbal manual is carried (the server's `state.manuals`).
+      buttons: ((s && s.manuals && s.manuals.length)
+        ? '<button type="button" class="bf-btn" data-bench-manuals aria-haspopup="dialog">Manuals</button>' : "") +
+        '<button type="button" class="bf-btn" data-bench-recipes aria-haspopup="dialog">Recipes</button>' +
         '<button type="button" class="bf-btn" data-bench-herbarium>Herbarium</button>',
     };
   }
@@ -884,6 +887,8 @@
   var footEl = $id("bench-foot");
   if (footEl) {
     footEl.addEventListener("click", function (e) {
+      var mb = e.target.closest("[data-bench-manuals]");
+      if (mb) { B.openManuals(mb); return; }
       if (e.target.closest("[data-bench-herbarium]")) {
         // The Journal's herbarium (Lane C, 21-tab-journal.js), in place of the bench: the
         // bench closes and the Journal opens; `bench:herbarium` tells it which section.
@@ -895,6 +900,20 @@
     });
   }
   renderFoot();
+
+  // The herbal manuals carried, read through POST api/herb/manual (the core's dialog, as
+  // the forge, circle and alchemy bench do). Measured 2026-11-13: the route existed but no
+  // button reached it. A reading passes hours: the clock turns and the state is read again.
+  B.openManuals = function (from) {
+    core.manuals({
+      list: (B.state && B.state.manuals) || [], route: "/api/herb/manual", word: "herbal",
+      about: "herbs", from: from,
+      after: function (got) {
+        if (got.clock) tickClock(0, got.clock);
+        B.refresh();
+      },
+    });
+  };
 
   // Forage here (the satchel's empty state): the table's own Craft action, opened.
   B.forage = function () {
