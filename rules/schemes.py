@@ -512,6 +512,34 @@ def _place_for(engine, kind: str, spec: dict) -> dict | None:
     return None
 
 
+# The sides a scheme's `bring_in` writes for people who come to fight the party. Anybody
+# else it brings — a witness, a mourner, a side of "" — is not a fight and is not priced:
+# the budget is what a fight may cost, and a witness costs nothing.
+HOSTILE_SIDES = frozenset({"them", "foe"})
+
+
+def _hostile_count(engine, act: dict, template: str, role: str) -> int:
+    """How many of a `bring_in` arrive: the document's count, or, when they come to fight,
+    as many as the encounter budget buys (`encounter_budget.most_of`), never fewer than
+    one. Guards price as guards ("guarded"), anybody else as a document's staged fight
+    ("opening").
+
+    Measured 2026-11-13: a-small-favour's accusation brings "guard" x2 against the player
+    and the wild's hunters x2 then x3; at a lone level-1 PC (APL -1, 135 XP average) two
+    CR 1 guards are 800 XP, a CR 3 encounter, the fight the budget was written to end."""
+    wanted = max(1, int(act.get("count", 1) or 1))
+    if str(act.get("side") or "") not in HOSTILE_SIDES or wanted == 1:
+        return wanted
+    from . import bestiary
+    from . import encounter_budget as eb
+
+    each = eb.xp_of(bestiary.lookup(template) or {})
+    hard = engine.dice.roll("1d100", label="how hard they come",
+                            visibility="hidden").total
+    kind = "guarded" if ("guard" in role or "watch" in role) else "opening"
+    return eb.most_of(each, wanted, eb.party_apl(engine.scene), hard, kind=kind)
+
+
 def _template_for(engine, role: str) -> str:
     """The stat block `bring_in` should put on the board for a role word.
 
@@ -1152,7 +1180,9 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
     elif what == "bring_in":
         role = str(act.get("role") or "watchman")
         template = _template_for(engine, role)
-        born = engine._bring_in(template, count=int(act.get("count", 1) or 1), side=str(act.get("side") or ""))
+        side = str(act.get("side") or "")
+        born = engine._bring_in(template, count=_hostile_count(engine, act, template, role),
+                                side=side)
         inst.setdefault("brought", []).extend(b["ref"] for b in born)
         if "guard" in role or "watch" in role:
             for b in born:

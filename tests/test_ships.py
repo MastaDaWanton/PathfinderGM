@@ -72,7 +72,9 @@ def test_a_deck_is_not_the_sea():
     deck = ships.deck_of(vessel)
     assert places.terrain_of(deck) == ships.DECK
     shape = floorplan.shape_for(deck, ships.DECK)
-    assert shape.ceiling is None and shape.vertical == "ledge", shape
+    # Open to the sky; its height is the rigging's (tests/test_deck_fixtures.py), not a
+    # gallery down one side, which was this test's word for a deck until 2026-11-13.
+    assert shape.ceiling is None and shape.layout == "ship", shape
     assert "rail" in shape.about
 
 

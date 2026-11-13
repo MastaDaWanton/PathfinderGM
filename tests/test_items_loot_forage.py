@@ -319,7 +319,7 @@ def test_the_engine_forages_at_the_lower_of_trade_and_body(monkeypatch):
     the party's APL with the PC at min(trade, body). A level-3 body with a trade of 18 is a
     lone level 3 (APL 1); a trade of 1 on the same body is a lone level 1 (APL -1)."""
     seen = []
-    monkeypatch.setattr(gathering, "roll", lambda biome, level, dice, apl=None:
+    monkeypatch.setattr(gathering, "roll", lambda biome, level, dice, apl=None, danger=1.0:
                         seen.append(apl) or gathering.Encounter("quiet", 1))
     s = _scene()
     s.pc().level = 3

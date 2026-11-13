@@ -89,6 +89,8 @@ class Shape:
     # list: content/rules/fixtures.json). Empty for every derived shape; `rules/fixtures`
     # reads it in place of the spot's own row.
     fixtures: tuple = ()
+    # The vessel a `ship` layout is the hull of (a `ships.VESSELS` key), "" otherwise.
+    vessel: str = ""
 
 
 # Two squares of headroom is a house: ten feet, enough for a Medium creature to stand with
@@ -147,7 +149,8 @@ BY_SPOT: dict[str, Shape] = {
     "the-keep": Shape(16, 14, HALL, clumps=5, clump_max=2,
                       about="a hall, and the walk above it"),
     "the-docks": Shape(18, 14, None, clumps=6, clump_max=3, rough=6,
-                       about="a quay above the water, and what is stacked on it"),
+                       about="a quay above the water, and what is stacked on it",
+                       layout="quay"),
     "the-bridge": Shape(20, 8, None, clumps=2, clump_max=2,
                         about="a span, and a long drop either side"),
     "the-mine-head": Shape(14, 12, None, clumps=6, clump_max=2, rough=6,
@@ -514,6 +517,8 @@ def shape_for(place_id: str, terrain: str = "", authored: "Shape | None" = None)
     bare = str(place_id or "").rsplit(STOREY, 1)[0]
     spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
     spot = next((p for p in _SPOT_PREFIXES if spot.startswith(p + "-")), spot)
+    if authored is None and str(terrain or "").strip().lower() == "deck":
+        return ship_shape("", place_id)   # the vessel unknown here: its room's usual hull
     found = authored or BY_SPOT.get(spot) or BY_TERRAIN.get(
         str(terrain or "").strip().lower(), OPEN)
     level = _storey(place_id)
@@ -570,6 +575,9 @@ def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None,
         return (1 + r.next(max(1, shape.width - 2)),
                 1 + r.next(max(1, shape.height - 2)))
 
+    if shape.layout == "ship":
+        _lay_parts(grid, shape, place_id)
+        return grid
     if shape.layout == "rows" and not scatter:
         _rows(grid, shape, r)
     for _ in range(0 if shape.layout == "rows" and not scatter else shape.clumps):
@@ -587,6 +595,8 @@ def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None,
             grid.difficult.add(p)
 
     _raise(grid, shape, r)
+    if shape.layout == "quay":
+        _lay_parts(grid, shape, place_id)
     return grid
 
 
@@ -618,6 +628,237 @@ def _rows(grid: Grid, shape: Shape, r: "_Rolls") -> None:
             left -= 1
             for a, b in stall:
                 grid.blocked.add((a, b) if across else (b, a))
+
+
+# --- a ship's rooms, and the quay she lies at (2026-11-13) ------------------------------
+#
+# The owner: "make sure we have some boat/ship specific 3D objects like coils of rope and
+# masts to populate the maps". A deck was the `deck` terrain's twelve-by-twenty scatter
+# with a gallery down one side: a room, not a ship. So a ship's rooms get a HULL, laid
+# like a ship and not like a room: long and narrow, the bow at the top of the board, a
+# mast or more on the centre line, the rail down both sides with the sea past it, a hatch,
+# the helm aft, coils of rope and cargo about the place.
+#
+# These are the one layout in this module that places NAMED things (`parts`): a scatter
+# of clumps cannot be a mast, a hatch and a capstan, and `rules/fixtures.py` typing clumps
+# in turn would make the mast a barrel as often as not. Every part is still only geometry
+# the engine reads — blocked, difficult, raised, or left open — and `fixtures.derive`
+# names exactly these squares, so the two can never disagree.
+#
+# Beam and length in feet, how many masts, and what she is steered by: Ultimate Combat
+# pp.184-185, the water vehicles (aonprd.com Vehicles: keelboat "Squares 40 (20 ft. by
+# 50 ft.)", rudder; longship 15 by 75, one mast, rudder, forty rowers; sailing ship
+# 20 by 75, two masts, steering wheel; warship 20 by 100, one mast, wheel, eighty
+# rowers; galley 20 by 130, three masts, wheel, 140 rowers). `ships.VESSELS` has the
+# GameMastery Guide's fast-play numbers, which give no dimensions at all; its rooms are
+# read from there, its hull from here. "The nine squares around the steering wheel,
+# typically located at the aft of the ship" (UC) is where the helm goes.
+HULLS = {
+    "keelboat": (20, 50, 1, "the tiller"),
+    "longship": (15, 75, 1, "the steerboard"),
+    "sailing ship": (20, 75, 2, "the wheel"),
+    "warship": (20, 100, 1, "the wheel"),
+    "galley": (20, 130, 3, "the wheel"),
+}
+_MASTS = {1: ("the mast",), 2: ("the foremast", "the mainmast"),
+          3: ("the foremast", "the mainmast", "the mizzen")}
+# A ship's rooms by their slug (`ships.places_of`). The castles are short decks aft; the
+# rigging is the masts and their shrouds over the same hull; the rest are under a deck.
+_AFT = ("the-steering-deck", "the-sterncastle")
+_BELOW = ("the-hold", "below-decks", "the-oar-deck")
+# The vessel a room implies when nothing says which (a caller holding only a place id):
+# only a galley has an oar deck, and so on; anything else is the trader.
+_HULL_OF_ROOM = {"the-oar-deck": "galley", "the-sterncastle": "warship",
+                 "the-steering-deck": "longship"}
+
+
+def _slug_of(place_id: str) -> str:
+    bare = str(place_id or "").rsplit(STOREY, 1)[0]
+    return bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
+
+
+def ship_shape(kind: str, place_id: str) -> Shape:
+    """The hull of this room of a ship of this kind (a `ships.VESSELS` key; "" when the
+    caller does not know, and the room's own name picks the likeliest)."""
+    from . import ships
+
+    slug = _slug_of(place_id)
+    kind = kind if kind in HULLS else _HULL_OF_ROOM.get(slug, "sailing ship")
+    beam, length, _masts, _helm = HULLS[kind]
+    wide, long_ = beam // FEET_PER_SQUARE, length // FEET_PER_SQUARE
+    if slug in _AFT:
+        long_ = max(4, long_ // 4)
+    about = next((a for label, a, _i in ships.VESSELS[kind]["places"]
+                  if label.replace(" ", "-") == slug),
+                 BY_TERRAIN["deck"].about)
+    return Shape(wide + 2, long_ + 2, LOW if slug in _BELOW else None,
+                 vertical="scatter", layout="ship", vessel=kind, about=about)
+
+
+def parts(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> list[dict]:
+    """The named pieces of a ship's room or a quay, the same every time: each
+    {"kind", "squares", "lay" (blocked / difficult / raised / open), "level", "name"}.
+    Empty for every other place (`rules/fixtures.py` types those by their clumps)."""
+    shape = shape_for(place_id, terrain, authored)
+    if shape.layout == "ship":
+        return _ship_parts(shape, place_id)
+    if shape.layout == "quay":
+        return _quay_parts(shape, place_id)
+    return []
+
+
+def _lay_parts(grid: Grid, shape: Shape, place_id: str) -> None:
+    """Put the parts' geometry down. Below decks, everything outside the hull is the
+    ship's side: solid, and nothing's name."""
+    got = _ship_parts(shape, place_id) if shape.layout == "ship" else _quay_parts(shape, place_id)
+    for part in got:
+        for p in part["squares"]:
+            grid.blocked.discard(p)
+            grid.difficult.discard(p)
+            grid.floor.pop(p, None)
+            grid.parapet.pop(p, None)
+            if part["lay"] == "blocked":
+                grid.blocked.add(p)
+            elif part["lay"] == "difficult":
+                grid.difficult.add(p)
+            elif part["lay"] == "raised":
+                grid.floor[p] = part["level"]
+    if shape.layout == "ship" and shape.ceiling is not None:
+        hull = _hull(shape, _slug_of(place_id))
+        grid.blocked |= {(x, y) for x in range(shape.width) for y in range(shape.height)
+                         if (x, y) not in hull}
+
+
+def _hull(shape: Shape, slug: str) -> set:
+    """The squares of planking: columns 1..beam, rows 1..length, the bow's corners cut
+    off (row 1) so she comes to a point. A castle aft is square at both ends."""
+    wide, long_ = shape.width - 2, shape.height - 2
+    return {(x, y) for y in range(1, long_ + 1) for x in range(1, wide + 1)
+            if not (y == 1 and slug not in _AFT and wide >= 3 and x in (1, wide))}
+
+
+def _ship_parts(shape: Shape, place_id: str) -> list[dict]:
+    from . import ships
+
+    slug = _slug_of(place_id)
+    # The vessel's own seed, not the room's, so the hatch below is under the hatch above.
+    r = _Rolls(_seed(str(place_id).split("~", 1)[0]))
+    wide, long_ = shape.width - 2, shape.height - 2
+    _b, _l, masts, helm = HULLS[shape.vessel]
+    hull = _hull(shape, slug)
+    aft, below, aloft = slug in _AFT, shape.ceiling is not None, slug == "the-rigging"
+    out: list[dict] = []
+    taken: set = set()
+
+    def put(kind, squares, lay, level=0, name=""):
+        squares = [tuple(p) for p in squares]
+        if not squares or any(p not in hull or p in taken for p in squares):
+            return False
+        taken.update(squares)
+        out.append({"kind": kind, "squares": squares, "lay": lay, "level": level,
+                    "name": name})
+        return True
+
+    mid = (wide + 1) // 2 if wide % 2 else wide // 2 + r.next(2)
+    mast_rows = [] if aft else [max(3, round(1 + (i + 1) * long_ / (masts + 1)))
+                                for i in range(masts)]
+    for row, name in zip(mast_rows, _MASTS[masts]):
+        put("mast", [(mid, row)], "blocked", name=name)
+        if not below:
+            # The shrouds, a step abaft the mast at either rail: a rope ladder up to the top.
+            for x in (1, wide):
+                put("rigging", [(x, row + 1)], "raised", 2, "the rigging")
+    if not below:
+        # The rail: every square of sea beside the hull. The sea beyond it is the sea.
+        side = {(x, y) for x in range(shape.width) for y in range(shape.height)
+                if (x, y) not in hull}
+        rail = sorted(p for p in side if any(
+            (p[0] + dx, p[1] + dy) in hull for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))))
+        out.append({"kind": "rail", "squares": rail, "lay": "blocked", "level": 0,
+                    "name": "the rail"})
+        sea = sorted(side - set(rail))
+        if sea:
+            out.append({"kind": "sea", "squares": sea, "lay": "blocked", "level": 0,
+                        "name": "the sea"})
+    if aloft:
+        return out
+    hatch = (round((mast_rows[0] + mast_rows[1]) / 2) if len(mast_rows) > 1
+             else min(long_ - 2, mast_rows[0] + 3) if mast_rows else 2)
+    put("hatch", [(mid, hatch)], "open", name="the hatch")
+    has_castle = any(label.replace(" ", "-") in _AFT
+                     for label, _a, _i in ships.VESSELS[shape.vessel]["places"])
+    if aft or (not below and not has_castle):
+        put("helm", [(mid, long_ - 1)], "blocked", name=helm)
+        put("rope", [(1 if mid > 1 else wide, long_ - 1)], "difficult", name="a coil of rope")
+    for row in mast_rows:
+        # Lines coiled down at the foot of every mast.
+        put("rope", [(mid - 1, row)], "difficult", name="a coil of rope") or \
+            put("rope", [(mid + 1, row)], "difficult", name="a coil of rope")
+    if not below and not aft:
+        if shape.vessel in ("sailing ship", "warship", "galley"):
+            put("capstan", [(mid, 3)], "blocked", name="the capstan") or \
+                put("capstan", [(mid, 4)], "blocked", name="the capstan")
+        put("anchor", [(wide, 2)], "blocked", name="the anchor")
+        put("rope", [(1, 2)], "difficult", name="a coil of rope")
+        if shape.vessel in ("sailing ship", "warship"):
+            col = wide + 1 - mid
+            for y in range(hatch + 2, long_ - 2):
+                if put("boat", [(col, y), (col, y + 1)], "blocked", name="the ship's boat"):
+                    break
+    # Nothing beside a mast's rows but what is laid above: a bench or a crate there would
+    # close the deck across and leave the shrouds with no square to step up from.
+    keep_clear = {y for m in mast_rows for y in (m - 1, m, m + 1, m + 2)} | {hatch}
+    rowers = (slug == "the-deck" and shape.vessel == "longship") or slug == "the-oar-deck"
+    if rowers:
+        for y in range(3, long_ - 1, 2):
+            if y not in keep_clear:
+                for x in (1, wide):
+                    put("bench", [(x, y)], "blocked", name="a rowing bench")
+        return out
+    if aft:
+        return out
+    # Cargo along the ship's sides, the middle kept for walking: the hold stowed full,
+    # below decks every other row (sea chests and stores), on deck a few lashed down.
+    rows = [y for y in range(2, long_) if y not in keep_clear]
+    if slug == "the-hold":
+        stow = [(x, y) for y in rows for x in (1, wide)]
+    elif below:
+        stow = [(x, y) for y in rows[::2] for x in (1, wide)]
+    else:
+        spots = [(x, y) for y in rows if 2 < y < long_ - 1 for x in (1, wide)]
+        stow = [spots.pop(r.next(len(spots))) for _ in range(min(len(spots), 2 + r.next(3)))]
+    for i, p in enumerate(sorted(stow)):
+        kind = ("crate", "barrel")[(i + r.next(2)) % 2]
+        put(kind, [p], "blocked", name="")
+    return out
+
+
+def _quay_parts(shape: Shape, place_id: str) -> list[dict]:
+    """The docks' water side: the harbour along one long edge, bollards along the quay's
+    lip with rope coiled by them, and a ship's boat tied up in the water."""
+    r = _Rolls(_seed(place_id) ^ 0x5EA)
+    across = shape.width >= shape.height
+    long_, short = (shape.width, shape.height) if across else (shape.height, shape.width)
+
+    def at(a, b):            # (along the quay, out from the land) as a board square
+        return (a, b) if across else (b, a)
+
+    deep = 2 if short >= 8 else 1
+    water = [at(a, b) for a in range(long_) for b in range(short - deep, short)]
+    lip = short - deep - 1
+    boat_at = 2 + r.next(max(1, long_ - 7))
+    boat = [at(a, short - deep) for a in range(boat_at, boat_at + 3)]
+    out = [{"kind": "sea", "squares": sorted(set(water) - set(boat)), "lay": "blocked",
+            "level": 0, "name": ""},
+           {"kind": "boat", "squares": boat, "lay": "blocked", "level": 0,
+            "name": "a ship's boat"}]
+    for a in range(2 + r.next(2), long_ - 1, 4):
+        out.append({"kind": "bollard", "squares": [at(a, lip)], "lay": "blocked",
+                    "level": 0, "name": "a bollard"})
+        if a + 1 < long_ - 1 and r.next(2):
+            out.append({"kind": "rope", "squares": [at(a + 1, lip)], "lay": "difficult",
+                        "level": 0, "name": "a coil of rope"})
+    return out
 
 
 # How high a ledge stands and how high its rail comes. Two squares is ten feet — a storey

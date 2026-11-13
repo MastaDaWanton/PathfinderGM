@@ -207,7 +207,7 @@ def test_the_engines_own_seam_creature_is_a_kind(town, world):
     effects: list = []
     wyvern = bestiary.imported()["wyvern"]
     monkey = gathering.roll
-    gathering.roll = lambda biome, level, dice, apl=None: gathering.Encounter(
+    gathering.roll = lambda biome, level, dice, apl=None, danger=1.0: gathering.Encounter(
         "creature", 80, creature=wyvern, aggressive=False)
     try:
         clause = engine._gathering_encounter(pc, "hills", 5, "ore", found={"iron-ore": 2},

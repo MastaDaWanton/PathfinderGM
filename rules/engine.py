@@ -22,6 +22,7 @@ from . import goods
 from . import holding
 from . import ontheway
 from . import encounter_budget
+from . import volatility
 from . import casting
 from . import compulsion
 from . import consumables
@@ -4413,6 +4414,8 @@ class Engine:
         resolution.outcomes.extend(self._works_settles())
         # And what the clock ended, the same way (`_ended_settles`).
         resolution.outcomes.extend(self._ended_settles())
+        # The guards a fight this batch could not hold (`_law_room`), said.
+        resolution.outcomes.extend(self._law_held_settle())
         # Who the clock brought to the party's place or took from it (`settle_on_clock`).
         resolution.outcomes.extend(self._comings_settles())
         # An ability's effect that a state ends: a rage when its barbarian falls, a smite
@@ -11217,7 +11220,7 @@ class Engine:
             return word[:-1] if word.endswith("s") and len(word) > 3 else word
 
         kind = foe.from_template if foe.from_template in self.FIGHTING_KINDS else ""
-        joined = []
+        kin = []
         for other, b in list(self.scene.actors.items()):
             if other == ref or b.is_pc or b.is_down:
                 continue
@@ -11225,9 +11228,15 @@ class Engine:
                 continue
             same_name = head(b.name) == head(foe.name) and head(foe.name)
             same_kind = kind and b.from_template == kind
-            if (same_name or same_kind) and self.join_fight(other, side):
-                joined.append(other)
-        return joined
+            if same_name or same_kind:
+                kin.append(other)
+        # A guard rallying to a struck guard is the law coming in, and is priced as
+        # `_law_joins` prices it: the square of four guards came in whole through here
+        # whenever the first blow fell on one of them.
+        law = [r for r in kin if self.scene.actors[r].has_state(states.GUARD)]
+        coming, _held = self._law_room(side, law)
+        return [r for r in kin if (r in coming or r not in law)
+                and self.join_fight(r, side)]
 
     def _companions_join(self, sides: dict | None = None) -> list[str]:
         """Everyone travelling with the player comes into the fight on the player's side.
@@ -11280,6 +11289,9 @@ class Engine:
         Called from `_ensure_encounter`, the door a first swing opens the fight by. A
         fight the GM declares through `begin_encounter` names its own sides and is not
         second-guessed here — noted as open in docs/wanted.md.
+
+        Not every guard standing: as many as the encounter budget's guarded tier buys
+        (`_law_room`). The rest hang back and are said to (`_law_held_settle`).
         """
         from . import places as places_mod
 
@@ -11293,14 +11305,72 @@ class Engine:
         pc_side = next((s for s, refs in self.scene.sides.items()
                         if any(r in refs for r in hunted)), None)
         against = next((s for s in self.scene.sides if s != pc_side), "them")
-        joined = []
-        for ref, b in list(self.scene.actors.items()):
-            if b.is_pc or b.is_down:
-                continue
-            is_law = b.has_state(states.GUARD)
-            if is_law and self.join_fight(ref, against):
-                joined.append(ref)
-        return joined
+        law = [ref for ref, b in self.scene.actors.items()
+               if not b.is_pc and not b.is_down and b.has_state(states.GUARD)
+               and not any(ref in refs for refs in self.scene.sides.values())]
+        coming, _held = self._law_room(against, law)
+        return [ref for ref in coming if self.join_fight(ref, against)]
+
+    def _law_room(self, side: str, law: list[str]) -> tuple[list[str], list[str]]:
+        """Of the law `law` about to come into a fight on `side`, who comes and who hangs
+        back: the guards on that side, these and the ones already there, are an
+        encounter, priced by the guarded tier (`encounter_budget.most_of`).
+
+        Measured, the owner's report of 2026-11-13 ("cover the stuff that isnt covered
+        like the guards"): a wanted lone level-1 PC who swung in a square of four guards
+        met all four, 1,600 XP of CR 1s against an APL of -1, when the budget the road and
+        the street spend would have sent one. Never fewer than one on the side — the
+        warrant, or the guard the words struck, is the floor, as the street patrol's is —
+        and never a guard silently gone: the held are kept for `_law_held_settle` to say.
+        A side the player is on is not a fight against the party and is not priced."""
+        if not law or any(self.scene.actors[r].is_pc
+                          for r in self.scene.sides.get(side, ()) if r in self.scene.actors):
+            return list(law), []
+        from . import xp as xp_mod
+
+        on = [r for r in self.scene.sides.get(side, ())
+              if r in self.scene.actors and not self.scene.actors[r].is_down
+              and self.scene.actors[r].has_state(states.GUARD)]
+        # The dearest of them, so a sergeant among constables is not priced as one.
+        each = max(xp_mod.worth(self.scene.actors[r]) for r in on + list(law))
+        party = encounter_budget.party_apl(self.scene)
+        lowest = encounter_budget.MIX["guarded"][0][0]
+        if (len(on) + len(law)) * each <= encounter_budget.budget(
+                party + encounter_budget.TIERS[lowest]):
+            # Inside the guarded tier's least budget whatever the d100 says: not rolled.
+            return list(law), []
+        hard = self.dice.roll("1d100", label="how hard the watch is",
+                              visibility="hidden").total
+        n = encounter_budget.most_of(each, len(on) + len(law), party, hard,
+                                     kind="guarded")
+        room = max(0, n - len(on))
+        held = list(law[room:])
+        if held:
+            self._law_held = list(getattr(self, "_law_held", None) or []) + held
+        return list(law[:room]), held
+
+    def _law_held_settle(self) -> list[Outcome]:
+        """The guards `_law_room` kept out of a fight, said: standing in the scene, off
+        the initiative, raising the alarm. Their own outcome at the batch's end because
+        the fight's doors are several (a swing, `begin_encounter`, a rally), and a guard
+        who neither fights nor is mentioned is the silent vanishing the request ruled
+        out."""
+        held = [self.scene.actors[r] for r in (getattr(self, "_law_held", None) or ())
+                if r in self.scene.actors and not self.scene.actors[r].is_down
+                and not any(r in refs for refs in self.scene.sides.values())]
+        self._law_held = []
+        if not held:
+            return []
+        from .arrest import _names
+
+        one = len(held) == 1
+        return [self._articled(Outcome(
+            intent_id="", op="law_holds_back",
+            effects=[{"kind": "law_holds_back", "refs": [a.ref for a in held]}],
+            tell=(f"{_names(held)} {'does' if one else 'do'} not come in, but "
+                  f"{'hangs' if one else 'hang'} back from the fight, shouting the "
+                  f"alarm."),
+            because="the watch that came is all the fight could hold"))]
 
     def _has_acted(self, ref: str) -> bool:
         """Whether this combatant has taken a turn in the current encounter."""
@@ -13862,7 +13932,7 @@ class Engine:
             return False
         from . import floorplan, places as places_mod
 
-        authored = getattr(self.here(), "shape", None)
+        authored = self._ground_shape()
         self.scene.grid = floorplan.for_place(
             self.scene.at, places_mod.terrain_of(self.scene.at), authored)
         self._type_the_ground()
@@ -13893,7 +13963,21 @@ class Engine:
 
         fixtures.type_the_ground(self.scene, self.scene.at or "",
                                  places_mod.terrain_of(self.scene.at or ""),
-                                 getattr(self.here(), "shape", None))
+                                 self._ground_shape())
+
+    def _ground_shape(self):
+        """The shape the ground here was laid from: the world's authored one, or on a ship
+        the hull of the vessel the room belongs to (`floorplan.ship_shape`), which only the
+        scene knows — a ship room's id carries its vessel's id, never its kind."""
+        from . import floorplan, places as places_mod
+
+        at = self.scene.at or ""
+        if places_mod.terrain_of(at) == "deck":
+            ship = at.split("~", 1)[0]
+            kind = next((str(v.get("kind") or "") for v in self.scene.vessels
+                         if isinstance(v, dict) and str(v.get("id")) == ship), "")
+            return floorplan.ship_shape(kind, at)
+        return getattr(self.here(), "shape", None)
 
     def staff_the_place(self):
         """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
@@ -14143,7 +14227,9 @@ class Engine:
                 self.dice, hours,
                 (leg.crosses[0] if leg.crosses else places_mod.terrain_of(self.scene.at)),
                 int(getattr(pc, "level", 1) or 1) if pc is not None else 1,
-                apl=encounter_budget.party_apl(self.scene))
+                apl=encounter_budget.party_apl(self.scene),
+                # The road is as dangerous as its worse end (`volatility.scale`).
+                danger=volatility.scale(self.world, self.scene.at, leg.to_id))
         if met is not None:
             progress = ontheway.hours_walked(met, hours)
             hours = progress
@@ -14913,12 +14999,16 @@ class Engine:
                     ridden_minutes += step
                 if places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level,
-                                          apl=encounter_budget.party_apl(self.scene))
+                                          apl=encounter_budget.party_apl(self.scene),
+                                          danger=volatility.scale(
+                                              self.world, hop.id,
+                                              base=volatility.SETTLED_DEFAULT))
                 else:
                     # Outside is the road's table, the chance pro rata by the time the
                     # step takes (the published 20% a six-hour watch).
                     met = ontheway.road(self.dice, step_hours or 1, hop.terrain, level,
                                         apl=encounter_budget.party_apl(self.scene),
+                                        danger=volatility.scale(self.world, hop.id),
                                         **({} if step_hours else {"minutes": step}))
                 minutes += step
                 if met is not None and pc is not None:
@@ -16178,7 +16268,8 @@ class Engine:
         body = max(1, int(getattr(pc if pc is not None else actor, "level", 1) or 1))
         enc = gathering.roll(biome, max(1, int(level)), self.dice,
                              apl=encounter_budget.party_apl(
-                                 self.scene, pc_level=min(body, max(1, int(level)))))
+                                 self.scene, pc_level=min(body, max(1, int(level)))),
+                             danger=volatility.scale(self.world, self.scene.at))
         if enc.kind == "quiet":
             return ""
         clause = " " + gathering.describe(enc, what, biome, spot=spot, dug=dug)
@@ -17683,7 +17774,12 @@ class Engine:
         # Something may live here. Half the time, by the ground, from the bestiary.
         pc = self.scene.pc()
         level = getattr(pc, "level", 1) if pc is not None else 1
-        if self.dice.roll("1d2", label="is it inhabited", visibility="hidden").total == 2:
+        # Half the time where nothing rates the ground; a place's stated danger moves it
+        # (`volatility.scale`: a third as often on calm ground, twice on lawless). A d100
+        # against 50 where a d2 stood: the same half, with room to move.
+        inhabited = 50 * volatility.scale(self.world, head.id, parent.id)
+        if self.dice.roll("1d100", label="is it inhabited",
+                          visibility="hidden").total <= inhabited:
             row = gathering.creature_for(head.terrain, max(1, int(level)), self.dice,
                                          apl=encounter_budget.party_apl(self.scene))
             if row is not None:
@@ -24740,7 +24836,7 @@ class Engine:
         # whatever this app's table said a room of that NAME looks like. `here()` carries
         # the authored shape; a generated or founded place carries None and derives, as
         # every place did before.
-        authored = getattr(self.here(), "shape", None)
+        authored = self._ground_shape()
         mid = self.scene.grid.height // 2
         # A quarter of the way in, and never off the board. The literal 4 was safe while
         # every room was at least twelve squares wide; it stopped being safe the day a
@@ -28399,7 +28495,8 @@ class Engine:
             scale, by = gear_mod.night_scale(actor)
             night = ontheway.night(self.dice, hours, ground or "grassland",
                                    int(getattr(actor, "level", 1) or 1), scale=scale,
-                                   apl=encounter_budget.party_apl(self.scene))
+                                   apl=encounter_budget.party_apl(self.scene),
+                                   danger=volatility.scale(self.world, self.scene.at))
         return {"hours": hours, "minutes": minutes, "setting": setting, "ground": ground,
                 "night": night, "scale": scale, "scaled_by": by, "before": before,
                 "short": short, "until": until if wake is not None else ""}

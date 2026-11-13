@@ -1130,7 +1130,11 @@ nation until the export has sea regions of its own (see ask 2's ports and vessel
 
 **Rule 1 still holds.** The rating is a word on a five-step scale, not a probability:
 what each step does to each table (road meetings, night camps, storms at sea) is this
-app's, in `rules/volatility.py` and the tables that read it.
+app's, in `rules/volatility.py` and the tables that read it. On land, since 2026-11-13:
+calm a third of the published rate, settled a half, dangerous one and a half times,
+lawless twice, on the road's creatures and weather, the street's thieves and trouble,
+the night camp, a forage's creatures and a ventured place's inhabitant
+(docs/encounter-budget.md, "Danger and how often"). Only a stated value moves anything.
 
 ### Done when
 
