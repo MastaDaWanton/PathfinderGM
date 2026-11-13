@@ -13862,7 +13862,7 @@ class Engine:
             return False
         from . import floorplan, places as places_mod
 
-        authored = getattr(self.here(), "shape", None)
+        authored = self._ground_shape()
         self.scene.grid = floorplan.for_place(
             self.scene.at, places_mod.terrain_of(self.scene.at), authored)
         self._type_the_ground()
@@ -13893,7 +13893,21 @@ class Engine:
 
         fixtures.type_the_ground(self.scene, self.scene.at or "",
                                  places_mod.terrain_of(self.scene.at or ""),
-                                 getattr(self.here(), "shape", None))
+                                 self._ground_shape())
+
+    def _ground_shape(self):
+        """The shape the ground here was laid from: the world's authored one, or on a ship
+        the hull of the vessel the room belongs to (`floorplan.ship_shape`), which only the
+        scene knows — a ship room's id carries its vessel's id, never its kind."""
+        from . import floorplan, places as places_mod
+
+        at = self.scene.at or ""
+        if places_mod.terrain_of(at) == "deck":
+            ship = at.split("~", 1)[0]
+            kind = next((str(v.get("kind") or "") for v in self.scene.vessels
+                         if isinstance(v, dict) and str(v.get("id")) == ship), "")
+            return floorplan.ship_shape(kind, at)
+        return getattr(self.here(), "shape", None)
 
     def staff_the_place(self):
         """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
@@ -24406,7 +24420,7 @@ class Engine:
         # whatever this app's table said a room of that NAME looks like. `here()` carries
         # the authored shape; a generated or founded place carries None and derives, as
         # every place did before.
-        authored = getattr(self.here(), "shape", None)
+        authored = self._ground_shape()
         mid = self.scene.grid.height // 2
         # A quarter of the way in, and never off the board. The literal 4 was safe while
         # every room was at least twelve squares wide; it stopped being safe the day a
