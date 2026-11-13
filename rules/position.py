@@ -168,8 +168,9 @@ def engaged_with_friend(scene, actor, defender) -> str:
         if spot is None or _level(spot) != _level(there):
             continue
         mine = footprint((spot[0], spot[1]), other.size or "medium")
-        if any(reactions.threatens(scene, ref, sq) for sq in theirs) \
-                or any(reactions.threatens(scene, defender.ref, sq) for sq in mine):
+        if any(reactions.threatens(scene, ref, sq, defender.size) for sq in theirs) \
+                or any(reactions.threatens(scene, defender.ref, sq, other.size)
+                       for sq in mine):
             return other.name
     return ""
 

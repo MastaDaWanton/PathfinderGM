@@ -240,6 +240,18 @@ def locates(scene, observer, subject) -> bool:
     return sees(scene, observer, subject) or knows_where(scene, observer, subject)
 
 
+def player_locates(scene, subject) -> bool:
+    """Whether the player may be shown `subject` at all: the PC `locates` it. The one
+    question every view of the board asks — the map's tokens, the turn order, the lit
+    squares and the throw menu — so no list shows what another hides. The turn order
+    printed the hidden goblin's name and score while the map left it out (2026-11-11,
+    tests/test_hidden_leaks.py). With no PC, the plain hiding answers."""
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return not subject.has_state(HIDDEN)
+    return locates(scene, pc, subject)
+
+
 def unseen_by(scene, subject) -> list:
     """The conscious creatures here, not the subject's own side, who cannot see it."""
     out = []
@@ -584,7 +596,8 @@ def guess_fix(ref: str) -> str:
 
 __all__ = ["HIDDEN", "INVISIBLE", "SNEAKING", "SNEAKING_KEY", "KNOWS_WHERE", "KNOWS_NEAR",
            "STEALTH_ORIGIN", "PERCEPTION_ORIGIN", "ENDS_ON_ATTACK", "SNIPING_PENALTY",
-           "SNIPE_FROM_FT", "where_tag", "near_tag", "sees", "locates", "knows_where",
+           "SNIPE_FROM_FT", "where_tag", "near_tag", "sees", "locates", "player_locates",
+           "knows_where",
            "has_hunch", "sneaking", "stealth_result", "sees_invisible", "can_perceive",
            "note_motion", "note_loud", "motion", "loud", "invisible_stealth",
            "notice_dcs", "pinpoint", "hunch", "forget_one", "check", "judge", "moved_away",

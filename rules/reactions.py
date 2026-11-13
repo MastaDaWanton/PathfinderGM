@@ -165,17 +165,17 @@ def reacts_flat_footed(actor, name: str = "attack_of_opportunity") -> bool:
     return False
 
 
-def threatens(scene, watcher_ref: str, square) -> bool:
+def threatens(scene, watcher_ref: str, square, body: str = "medium") -> bool:
     """Does this creature threaten that square?
 
     False for anything the scene cannot place, which is every creature on a scene with no
     map. A reaction that fired on an unmeasurable battlefield would be the engine inventing
     geometry, and the GM's zones do not carry enough to tell whether a square was left.
     """
-    return tuple(square) in threatened_by(scene, watcher_ref)
+    return tuple(square) in threatened_by(scene, watcher_ref, body)
 
 
-def threatened_by(scene, watcher_ref: str) -> set:
+def threatened_by(scene, watcher_ref: str, body: str = "medium") -> set:
     """Every square this creature threatens right now — `threatens`, as the whole set.
 
     Split out so a question asked of many squares (the way out of a fight,
@@ -194,12 +194,38 @@ def threatened_by(scene, watcher_ref: str) -> set:
     reach = _reach_of(watcher)
     if reach <= 0:
         return set()
-    threatened = gridmod.threatened_squares(anchor, watcher.size, reach=reach)
-    if reach_gap(watcher):
+    flat = gridmod.threatened_squares(anchor, watcher.size, reach=reach)
+    threatened = set(flat)
+    gap = reach_gap(watcher)
+    if gap:
         # A reach weapon cannot strike what is right beside you. Subtracting the adjacent
         # ring here rather than in `grid` keeps geometry ignorant of inventory.
         threatened -= gridmod.threatened_squares(anchor, watcher.size,
                                                  reach=gridmod.SQUARE_FT)
+    # A square on another level is measured with `grid.distance_between`'s third axis.
+    # Flat, a goblin on a wall-walk 15 ft up still threatened the ground beneath it
+    # (2026-11-11, tests/test_hidden_leaks.py). The flat set is a superset, since height
+    # only adds distance.
+    # `body` is the size of whoever stands there, because height is size here: a Medium
+    # body is two squares tall (`grid.height_squares`), so its head is 5 ft from that
+    # goblin's feet and it IS threatened; a Small one is 10 ft off and is not.
+    # shortcut: the body stands on the floor of its square; a flier's altitude is not
+    # read — upgrade when the questions carry the level.
+    # A two-tuple is the floor THERE (`Engine._cannot_leave_the_ground`), not level 0: a
+    # goblin placed on a cart without its level would otherwise threaten as if below it.
+    grid = scene.grid
+    level = anchor[2] if len(anchor) > 2 else grid.ground(anchor)
+    at = (anchor[0], anchor[1], level)
+    for sq in flat:
+        floor = grid.ground(sq)
+        if floor == level:
+            continue
+        d = gridmod.distance_between(at, watcher.size, (sq[0], sq[1], floor),
+                                     body or "medium")
+        if (gridmod.SQUARE_FT if gap else 0) < d <= reach:
+            threatened.add(sq)
+        else:
+            threatened.discard(sq)
     return threatened
 
 
@@ -328,7 +354,7 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
         # against the squares it *left* rather than the ones it crossed is deliberate: the
         # engine does not know the route the mover took, and inventing one would hand out
         # attacks of opportunity nobody at a table would have allowed.
-        vacated = {sq for sq in left - arrived if threatens(scene, ref, sq)}
+        vacated = {sq for sq in left - arrived if threatens(scene, ref, sq, mover.size)}
         if not vacated:
             continue
         for reaction in reactions_for(watcher):
@@ -401,7 +427,7 @@ def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
         if ref == actor_ref or _allied(scene, ref, actor_ref) \
                 or _cannot_see(scene, ref, actor_ref):
             continue
-        if not any(threatens(scene, ref, sq) for sq in filled):
+        if not any(threatens(scene, ref, sq, actor.size) for sq in filled):
             continue
         for reaction in reactions_for(watcher):
             if reaction.fires_on("provoking_action"):
@@ -446,7 +472,7 @@ def provoked_by_maneuver(scene, actor_ref: str, target_ref: str,
         return []
     if _allied(scene, target_ref, actor_ref) or _cannot_see(scene, target_ref, actor_ref):
         return []
-    zone = threatened_by(scene, target_ref)
+    zone = threatened_by(scene, target_ref, actor.size)
     if not any(sq in zone for sq in gridmod.footprint((anchor[0], anchor[1]), actor.size)):
         return []
     return [(target_ref, r) for r in reactions_for(target) if r.fires_on("maneuver")]
@@ -517,7 +543,7 @@ def provoked_by_withdraw(scene, mover_ref: str,
         if watcher.has_state(states.BYSTANDER) or _cannot_see(scene, ref, mover_ref):
             continue
         owed =[r for r in reactions_for(watcher) if r.fires_on("leaves_threatened_square")]
-        zone = threatened_by(scene, ref) if owed else set()
+        zone = threatened_by(scene, ref, mover.size) if owed else set()
         if zone:
             watchers[ref] = (owed, zone)
     if not watchers:

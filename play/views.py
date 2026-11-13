@@ -19,7 +19,7 @@ from gm import (client, intimate as intimate_mod, judgement, ledger as ledger_mo
                 narration as narration_mod, prompts, speech as speech_mod, watcher)
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
-from rules import biomes, grid, ingredients as ing_mod
+from rules import awareness, biomes, grid, ingredients as ing_mod
 from rules import places as places_mod
 from rules.intents import IntentError
 
@@ -545,7 +545,7 @@ def _grid_state(scene) -> dict | None:
     pc = scene.pc()
     if pc is not None and pc.ref in scene.positions and pc.can_act():
         routes = g.reachable(scene.positions[pc.ref], pc.speed_feet, size=pc.size,
-                             occupied=scene.occupied(ignore=pc.ref))
+                             occupied=scene.occupied(ignore=pc.ref, seen_by=pc.ref))
         # The level each destination stands at, carried alongside the cost, because a
         # square is only half of where somebody would end up — walking onto a dais is
         # walking up onto it, and the map has to be able to say which squares those are.
@@ -750,7 +750,10 @@ def _reach_from(pc) -> dict:
     out: dict[str, list] = {}
     for ref in sorted(foes):
         foe = scene.actors.get(ref)
-        if foe is None or foe.is_down or ref not in scene.positions:
+        # A foe the PC has not found has no squares to strike it from: keyed by ref, the
+        # map read the hidden goblin's whereabouts off them (tests/test_hidden_leaks.py).
+        if foe is None or foe.is_down or ref not in scene.positions \
+                or not awareness.player_locates(scene, foe):
             continue
         squares = []
         for dx in range(-steps, steps + 1):
@@ -849,7 +852,7 @@ def _state(c) -> dict:
     coins = goods_mod.coins_here(c.world, c.scene)
     # Over the tokens the player sees only: a hidden "Tobin" must not turn Tam into "Ta".
     shown = {r: a for r, a in c.scene.actors.items()
-             if a.is_pc or not a.has_state("state.hidden")}
+             if a.is_pc or awareness.player_locates(c.scene, a)}
     marks = _marks({r: a.name for r, a in shown.items()})
 
     def with_areas(grid):
@@ -911,6 +914,8 @@ def _state(c) -> dict:
                  "up": c.scene.current_ref() == r,
                  "out": not c.scene.conscious(r)}
                 for r, v in c.scene.initiative
+                if r not in c.scene.actors
+                or awareness.player_locates(c.scene, c.scene.actors[r])
             ],
             "clock_minutes": c.scene.clock_minutes,
             "actors": [
@@ -1750,7 +1755,7 @@ def _throw_menu(pc, stock, item_id: str) -> list[dict]:
     out = []
     for ref, a in scene.actors.items():
         if a is pc or getattr(a, "is_pc", False) or a.has_state("state.down.dead") \
-                or a.has_state("state.hidden"):
+                or not awareness.player_locates(scene, a):
             continue
         why = ""
         if engine is not None:
