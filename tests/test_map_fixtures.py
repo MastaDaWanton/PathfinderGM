@@ -203,7 +203,8 @@ def test_anyone_may_climb_onto_a_crate_and_a_failed_climb_stays_put():
         if roll.total >= 10:
             made += 1
             assert tuple(s.positions[man.ref][:2]) == (3, 3) and s.positions[man.ref][2] == 1
-            assert "climbs up onto a crate" in out.tell
+            assert "up onto a crate" in out.tell and "DC 10" in out.tell
+            assert out.tell.count("a crate") == 1, out.tell     # named once, live 11-13
         else:
             missed += 1
             assert out.status == "prevented"

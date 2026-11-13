@@ -22468,8 +22468,14 @@ class Engine:
                 tell = " ".join([tell, *apart_said])
             if climbed is not None:
                 effect["climb"] = {"onto": climb[0], "dc": climb[1], "made": True}
-                tell += (f" {actor.name} climbs up onto {climb[0]} (Climb {climbed.total} "
-                         f"against DC {climb[1]}).")
+                # Said once: "moves 10 ft, up onto a cart (Climb 14 against DC 10)". Live,
+                # the walk's own "up onto a cart" and a second "climbs up onto a cart"
+                # named the cart twice in one tell.
+                rolled = f" (Climb {climbed.total} against DC {climb[1]})"
+                head = f"{went}, {onto}."
+                tell = (tell.replace(head, f"{went}, {onto}{rolled}.", 1)
+                        if onto and head in tell else
+                        f"{tell} {actor.name} climbs up onto {climb[0]}{rolled}.")
             return Outcome(
                 intent_id=intent.id, op="move",
                 effects=[effect, *apart_fx],
