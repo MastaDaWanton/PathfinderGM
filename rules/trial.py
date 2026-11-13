@@ -1230,15 +1230,15 @@ def _sentence(engine, pc, held, town: str):
             wage = int(labour["wage_cp"])
             days = min(int(labour["most_days"]), int(math.ceil(left / wage)))
             # The gaol feeds its labour: the weeks are not charged to the body.
-            ended = scene.advance(days * DAY, charge_body=False).get("ended") or []
+            # What the days ended is told behind the batch by `Engine._ended_settles`, as a
+            # sentence, not the fragment "Ended: ..." this once added here.
+            scene.advance(days * DAY, charge_body=False)
             worked = days * wage
             bits.append(f"The rest is worked off at the gaol, a labourer's wage a day: "
                         f"{days} day{'s' if days != 1 else ''}"
                         + (" — the most the watch will hold anybody for a fine, and what "
                            "is still owed is written off" if worked < left else "")
                         + ".")
-            if ended:
-                bits.append("Ended: " + ", ".join(ended) + ".")
             effects.append({"kind": "labour", "days": days, "origin": SOURCE})
         effects.append({"kind": "fine", "cp": owed, "paid_cp": paid, "origin": SOURCE})
     returned = _confiscate(engine, pc)
@@ -1310,7 +1310,9 @@ def _dawn(engine, pc, held, town: str):
     scene = engine.scene
     pay = held.payload or {}
     left = max(0, int(pay.get("dawn") or scene.clock_minutes) - int(scene.clock_minutes))
-    ended = scene.advance(left).get("ended") or [] if left else []
+    # What the night ended is told behind the batch by `Engine._ended_settles`.
+    if left:
+        scene.advance(left)
     engine.end_talk("led out")
     escort = _escort(engine, pay)
     _set(pc, held, stage="walk", by=[g.ref for g in escort])
@@ -1321,8 +1323,6 @@ def _dawn(engine, pc, held, town: str):
             + choices(pc.name, ["slip their hold (Escape Artist) and run",
                                 "wrench free of it (a combat manoeuvre) and run",
                                 "fight", "go along"]))
-    if ended:
-        tell += " Ended: " + ", ".join(ended) + "."
     return Outcome(intent_id="", op="trial",
                    effects=[{"kind": "custody", "stage": "walk", "origin": SOURCE}],
                    tell=tell)

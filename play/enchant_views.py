@@ -717,7 +717,12 @@ def enchant_wait(request):
         # carrying food and water). The engine lent first, so the people here go about
         # their day through it (`Engine.settle_on_clock`), told on this page.
         engine = c.engine()
+        queued = len(c.scene._ended_said)
         ended = c.scene.wait(minutes) or {}
+        # This page says what the wait ended (`ended` below); left queued, the next batch
+        # would tell the narrator the same expiries again (`Engine._ended_settles`).
+        # Records queued before this wait stay, for that batch to tell.
+        del c.scene._ended_said[queued:]
         minutes = int(ended.get("minutes", minutes))
         lived = survival.told_on_page(c.scene, ended, pc.ref) + engine.comings_on_page()
         c.transcript.append({"who": "gm", "kind": "consequence", "text": " ".join(
