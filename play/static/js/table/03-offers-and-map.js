@@ -358,6 +358,20 @@ function renderMap(s) {
   for (let r = 0; r < g.height; r++)
     parts.push(`<text class="coord row" x="${-7}" y="${(r + .5) * CELL + 3}">${r + 1}</text>`);
 
+  // Night (mock, plan item 10): the light the PC sees (views._light_state), as a wash
+  // over the ground and under the tokens, so people stay readable; a square a carried
+  // light raises is left out of it. One path a level, never a rect a square.
+  if (g.light) {
+    const lit = {}, wash = { dim: "", dark: "" };
+    for (const p of g.light.lit || []) lit[`${p[0]},${p[1]}`] = p[2];
+    for (let c = 0; c < g.width; c++) for (let r = 0; r < g.height; r++) {
+      const lv = lit[`${c},${r}`] || g.light.level;
+      if (lv in wash) wash[lv] += `M${c * CELL} ${r * CELL}h${CELL}v${CELL}h${-CELL}z`;
+    }
+    for (const lv in wash) if (wash[lv])
+      parts.push(`<path class="night ${lv}" pointer-events="none" d="${wash[lv]}"/>`);
+  }
+
   // Blood before bodies, so a token stands in its own pool rather than under it.
   for (const b of (s.scene.pools || [])) {
     if (!b.at) continue;
@@ -410,6 +424,10 @@ function renderMap(s) {
       : form ? `<ellipse cx="${cx}" cy="${cy + .4 * k}" rx="${6 * k}" ry="${3 * k}"/>
          <circle class="head" cx="${cx}" cy="${cy}" r="${3.4 * k}"/>` : "";
     if (glyph) parts.push(`<g class="tokbody${down ? " down" : ""}${ghost}">${glyph}</g>`);
+    // A keeper's brass coin (mock, plan item 4), the 3D base's own: not a ring, which
+    // already means whose turn it is.
+    if (a.keeps && !down) parts.push(`<circle class="keepcoin${ghost}" cx="${cx + 5.6 * k}" cy="${
+      cy + 5.6 * k}" r="${2 * k}"><title>${esc(a.name)} keeps a counter here</title></circle>`);
     parts.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
       form === "beast" ? cx - 1.2 * k : cx}" y="${
       unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : (mark.length > 1 ? 4.4 : 6) * k
