@@ -400,6 +400,11 @@ def open_escort(engine, spec: dict, employer: str, *, rng: random.Random,
     meet = meeting_minute(scene.clock_minutes)
     from . import openings
 
+    # The caravan is the party's side, never the encounter budget's: a teamster is not a
+    # fight, and nothing here is ever hostile (no ambush is spawned for a job, Battle
+    # Brothers' abandoned lesson above). The only trouble on the way is the road's own
+    # roll, which the budget already prices (`ontheway.road`). Not counted in the APL
+    # either (`encounter_budget.party_levels`: a `job:` bond is the job, not the party).
     people, master, roles = [], "", {}
     for row in spec.get("caravan") or ():
         for _ in range(openings.count_of(row)):

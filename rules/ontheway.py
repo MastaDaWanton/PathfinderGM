@@ -180,7 +180,33 @@ def _band(table, roll: int) -> str:
     return table[-1][0]
 
 
-def street(dice, level: int = 1, *, apl: int | None = None) -> Meeting | None:
+# The bands a place's danger moves (`rules/volatility.py`, owner 2026-11-13: "monsters/
+# bandits/catastrophe"). The street's thieves and its trouble are the bandits; the road's
+# creature is the monster and its weather the catastrophe. The rest — the press, the
+# hawker, the watch, travellers, a toll — are how busy a place is, not how dangerous.
+STREET_DANGER = frozenset({"cutpurse", "trouble"})
+ROAD_DANGER = frozenset({"creature", "weather"})
+
+
+def _weighed(table, danger: float, hostile) -> tuple[list, float]:
+    """The table with its hostile bands' widths multiplied by `danger`, and its new total
+    out of the old hundred. The check's chance is multiplied by the same total, so each
+    hostile band's own chance moves by exactly `danger` and every other band's stays as
+    it was. At 1.0 it is the table unchanged, to the roll."""
+    out, lo, top = [], 0, 0.0
+    for key, hi, *_ in table:
+        top += (hi - lo) * (float(danger) if key in hostile else 1.0)
+        lo = hi
+        out.append((key, top))
+    return out, top
+
+
+def _weighed_band(table, top: float, roll: int) -> str:
+    return _band(table, roll * top / 100)
+
+
+def street(dice, level: int = 1, *, apl: int | None = None,
+           danger: float = 1.0) -> Meeting | None:
     """One hop of a town. None most of the time, which is the point.
 
     Two rolls and not one: the check decides *whether*, the table decides *what*. Kept
@@ -188,11 +214,16 @@ def street(dice, level: int = 1, *, apl: int | None = None) -> Meeting | None:
     published rate and a measurement, and the table is authored — and a single d100 with
     the quiet band at the bottom would have tangled them into one number nobody could
     argue with separately.
+
+    `danger` is the place's (`volatility.scale`, against a town's settled default): it
+    moves the cutpurse and the trouble, nobody else (`_weighed`).
     """
-    if dice.roll("1d100", label="the street", visibility="hidden").total > STREET_PERCENT:
+    table, top = _weighed(STREET, danger, STREET_DANGER)
+    if dice.roll("1d100", label="the street",
+                 visibility="hidden").total > STREET_PERCENT * top / 100:
         return None
     r = dice.roll("1d100", label="who is in the way", visibility="hidden").total
-    kind = _band(STREET, r)
+    kind = _weighed_band(table, top, r)
     row = next(x for x in STREET if x[0] == kind)
     got = npcs.choose(list(row[2]), max(1, int(level or 1))) or {}
     count = row[3]
@@ -214,7 +245,8 @@ def street(dice, level: int = 1, *, apl: int | None = None) -> Meeting | None:
 
 
 def road(dice, hours: int, biome: str, level: int = 1, *,
-         minutes: int | None = None, apl: int | None = None) -> Meeting | None:
+         minutes: int | None = None, apl: int | None = None,
+         danger: float = 1.0) -> Meeting | None:
     """The march, checked once a watch until something happens or the road runs out.
 
     Stops rolling at the first hit, as asked, which is also what the published procedure
@@ -223,7 +255,11 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
     `minutes` is a step shorter than an hour — a half-mile hop between the outskirts and
     the fields (`rules/outskirts.py`) — checked at its share of a watch, never less than
     one in a hundred.
+
+    `danger` is the ground's (`volatility.scale`): it moves the creature and the weather,
+    never the travellers or a toll (`_weighed`).
     """
+    table, top = _weighed(ROAD, danger, ROAD_DANGER)
     # A part-watch gets a part-share of the check, pro rata. The alternative — rounding
     # every stub of a walk up to a whole watch — makes stepping outside the walls for an
     # hour as dangerous as a dawn-to-noon march, and that step is the most common move
@@ -237,10 +273,11 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
         if rest or not full:
             shares.append(max(1, round(ROAD_PERCENT * (rest or int(hours)) / WATCH_HOURS)))
     for w, chance in enumerate(shares, start=1):
-        if dice.roll("1d100", label="the road", visibility="hidden").total > chance:
+        if dice.roll("1d100", label="the road",
+                     visibility="hidden").total > chance * top / 100:
             continue
         r = dice.roll("1d100", label="what is on the road", visibility="hidden").total
-        kind = _band(ROAD, r)
+        kind = _weighed_band(table, top, r)
         if kind == "creature":
             got = _the_land(dice, biome, level, apl)
             if got is not None:
@@ -271,7 +308,8 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
 
 
 def night(dice, hours: int, biome: str, level: int = 1, *,
-          scale: float = 1.0, apl: int | None = None) -> Meeting | None:
+          scale: float = 1.0, apl: int | None = None,
+          danger: float = 1.0) -> Meeting | None:
     """The camp's check, watch by watch over the hours slept: the road's own procedure
     ("four times per day ... with a 20% chance of an encounter each time"), because a
     night in the open is the sixteen hours this module's road check leaves to the camp.
@@ -280,7 +318,9 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     sleep" — and until then there was nothing to decrease: `rest` rolled no check at all,
     so a night on the open ground was as safe as one in the inn. `scale` is what the
     camp's gear multiplies each watch's chance by (a tent's row in content/rules/
-    gear.json: one half), never below one in a hundred.
+    gear.json: one half), never below one in a hundred; `danger` is the ground's
+    (`volatility.scale`), on top of it — a tent halves a lawless night, it does not
+    make it a calm one.
 
     Only the creature band is drawn at night. Travellers, a toll and the weather are the
     road's: nobody collects a toll at a sleeping camp, and what the weather does to a
@@ -290,7 +330,7 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     shares = [ROAD_PERCENT] * full
     if rest or not full:
         shares.append(max(1, round(ROAD_PERCENT * (rest or int(hours)) / WATCH_HOURS)))
-    shares = [max(1, round(s * float(scale))) for s in shares]
+    shares = [max(1, round(s * float(scale) * float(danger))) for s in shares]
     for w, chance in enumerate(shares, start=1):
         if dice.roll("1d100", label="the night", visibility="hidden").total > chance:
             continue

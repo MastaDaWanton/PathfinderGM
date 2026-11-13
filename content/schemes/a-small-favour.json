@@ -282,7 +282,7 @@
             }
           ],
           "tell": {
-            "perceptible": "$captain comes up from $gate into $market with a guard at either side and asks for you by the errand you were sent on: $victim is dead at $lodging, and $giver has given your description."
+            "perceptible": "$captain comes up from $gate into $market with the watch behind and asks for you by the errand you were sent on: $victim is dead at $lodging, and $giver has given your description."
           }
         },
         {
@@ -1398,7 +1398,7 @@
             }
           ],
           "tell": {
-            "perceptible": "Two who have followed your trail from $gate down $road step out with $patron's coin in their purses."
+            "perceptible": "Whoever $patron paid has followed your trail from $gate down $road, and steps out now with the coin to show for it."
           }
         },
         {

@@ -123,12 +123,31 @@ def pick_index(dice, n: int, label: str) -> int:
     return dice.roll(f"1d{n}", label=label, visibility="hidden").total - 1
 
 
-def roll(biome: str, level: int, dice, apl: int | None = None) -> Encounter:
+def bands(danger: float = 1.0) -> tuple:
+    """`BANDS` with the creature and the guarded find widened (or narrowed) by a place's
+    danger (`volatility.scale`) and the quiet band taking up the difference, so a rich
+    find stays as likely as it was. At 1.0 it is `BANDS`, to the roll."""
+    width = {k: hi - lo + 1 for lo, hi, k in BANDS}
+    for k in ("creature", "guarded"):
+        width[k] = round(width[k] * float(danger))
+    width["quiet"] = max(0, 100 - sum(w for k, w in width.items() if k != "quiet"))
+    out, lo = [], 1
+    for _lo, _hi, k in BANDS:
+        out.append((lo, lo + width[k] - 1, k))
+        lo += width[k]
+    return tuple(out)
+
+
+def roll(biome: str, level: int, dice, apl: int | None = None,
+         danger: float = 1.0) -> Encounter:
     """Once per expedition. The d100 is the engine's, hidden, like every other roll a
     player could not have known the number of. `apl` is the party's
-    (`encounter_budget.party_apl`), the budget the creature is priced against."""
+    (`encounter_budget.party_apl`), the budget the creature is priced against; `danger`
+    the place's (`bands`)."""
     r = dice.roll("1d100", label="the ground's own answer", visibility="hidden").total
-    kind = next(k for lo, hi, k in BANDS if lo <= r <= hi)
+    # Past the last band (a lawless ground's widened creature bands overflowing a hundred)
+    # is the last band's.
+    kind = next((k for lo, hi, k in bands(danger) if lo <= r <= hi), BANDS[-1][2])
     if kind == "quiet":
         return Encounter("quiet", r)
     if kind == "rich":
