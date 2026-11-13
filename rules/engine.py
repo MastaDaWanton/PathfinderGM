@@ -22377,9 +22377,38 @@ class Engine:
                                         f"check, or 15 slashing to the goo).")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
-            refusal = self._cannot_leave_the_ground(actor, from_square, tuple(square))
+            climb = self._climb_to_make(actor, from_square, tuple(square))
+            refusal = "" if climb else self._cannot_leave_the_ground(actor, from_square,
+                                                                      tuple(square))
             if refusal:
                 return self._refuse(intent, refusal)
+            climbed = None
+            if climb:
+                # Anyone may try (the owner, 2026-11-13: "climb checks should be possible
+                # for anyone"); Climb is usable untrained (CRB p.90). Failing leaves the
+                # body where it stood: "fail by 4 or less, you make no progress", and from
+                # the ground there is nowhere to fall. shortcut: the climb is not priced at
+                # quarter speed against a round's movement; price it when a fight shows a
+                # climb plus a full walk in one move.
+                climbed = self.dice.d20(actor.skill_modifiers("climb"),
+                                        label=f"{actor.name} Climb",
+                                        visibility="player" if actor.is_pc else "hidden")
+                if climbed.total < climb[1]:
+                    # The walk to it happened; the climb did not. Left at its foot (the
+                    # cheapest open square beside it on the walker's own footing), not
+                    # back where the walk began three squares off.
+                    foot = self._foot_of(ref, from_square, tuple(square))
+                    if foot is not None:
+                        self.scene.positions[ref] = foot
+                        self.scene.settle_levels()
+                        self.scene.resync_zones()
+                    return Outcome(
+                        intent_id=intent.id, op="move", status="prevented",
+                        effects=[{"ref": ref, "kind": "climb", "onto": climb[0],
+                                  "dc": climb[1], "made": False, "to": foot}],
+                        tell=f"{actor.name} tries to climb onto {climb[0]} and does not "
+                             f"get up (Climb {climbed.total} against DC {climb[1]}).",
+                        rolls=[climbed], because=intent.because)
             self.scene.positions[ref] = tuple(square)
             self.scene.settle_levels()
             # The zone is now measured rather than taken on trust. The GM may still have
@@ -22437,9 +22466,14 @@ class Engine:
             apart_fx, apart_said = self._group_apart(actor)
             if apart_said:
                 tell = " ".join([tell, *apart_said])
+            if climbed is not None:
+                effect["climb"] = {"onto": climb[0], "dc": climb[1], "made": True}
+                tell += (f" {actor.name} climbs up onto {climb[0]} (Climb {climbed.total} "
+                         f"against DC {climb[1]}).")
             return Outcome(
                 intent_id=intent.id, op="move",
                 effects=[effect, *apart_fx],
+                rolls=[climbed] if climbed is not None else [],
                 tell=tell,
                 because=intent.because,
             )
@@ -22583,6 +22617,41 @@ class Engine:
                         return p
         return wanted
 
+    def _foot_of(self, ref, start, end) -> tuple | None:
+        """The cheapest open square beside `end` at the walker's own footing, or None."""
+        if max(abs(start[0] - end[0]), abs(start[1] - end[1])) <= 1:
+            return None                         # already at its foot
+        grid, actor = self.scene.grid, self.scene.actors[ref]
+        was = start[2] if len(start) > 2 else grid.ground(tuple(start[:2]))
+        routes = grid.reachable(tuple(start[:2]), 10_000, size=actor.size,
+                                occupied=self.scene.occupied(ignore=ref))
+        # Ties go square-on, as `position.square_in_reach` breaks them.
+        near = [(cost, (sq[0] - end[0]) ** 2 + (sq[1] - end[1]) ** 2, tuple(sq[:2]))
+                for sq, cost in routes.items()
+                if max(abs(sq[0] - end[0]), abs(sq[1] - end[1])) == 1
+                and grid.ground(tuple(sq[:2])) == was]
+        return min(near)[2] if near else None
+
+    def _climb_to_make(self, actor, start, end) -> tuple[str, int] | None:
+        """(what, Climb DC) when this move is a body going up onto a climbable fixture
+        (a cart, a crate stack) without a climb or fly speed of its own; else None, and
+        `_cannot_leave_the_ground` answers as before. Under a ceiling too low, None."""
+        from . import fixtures
+
+        grid = self.scene.grid
+        if grid is None or start is None or actor.can_move_vertically():
+            return None
+        onto = fixtures.climb_onto(grid, end[:2])
+        level = end[2] if len(end) > 2 else grid.ground(end[:2])
+        was = start[2] if len(start) > 2 else grid.ground(tuple(start[:2]))
+        roof = grid.headroom(end[:2])
+        if onto is None or level <= was or (roof is not None and level > roof):
+            return None
+        # A gallery a stair reaches is walked up, as `_cannot_leave_the_ground` lets it.
+        if level == grid.ground(end[:2]) and fixtures.stair_to(grid, end[:2]) is not None:
+            return None
+        return onto
+
     def _cannot_leave_the_ground(self, actor, start, end) -> str:
         """Why this creature may not move to that level, or "".
 
@@ -22628,10 +22697,10 @@ class Engine:
             return ""
         onto = fixtures.climb_onto(grid, end)
         if onto is not None:
-            # Phase 2 rolls this; until then the refusal names the check it would be.
+            # The move op rolls this (`_climb_to_make`) before it asks here; reached only
+            # when the climb was ruled out (a ceiling too low), so it names the check.
             return (f"{actor.name} cannot simply walk up onto {onto[0]}: getting up is a "
-                    f"Climb check (DC {onto[1]}), and the table does not roll that "
-                    f"for a move yet.")
+                    f"Climb check (DC {onto[1]}).")
         return (f"{actor.name} has no way up: no fly speed and no climb speed, and "
                 f"nothing here to climb.")
 

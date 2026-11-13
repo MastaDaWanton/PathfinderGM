@@ -450,15 +450,15 @@ def square_in_reach(scene, actor, defender, reach: int,
     best = None
     for square, cost in routes.items():
         flat = tuple(square[:2])
-        # Higher ground with no stair is a Climb the move op refuses (`_vertical_refusal`).
-        # Measured 2026-11-13: the market's rows put a cart beside the Spy, the approach
-        # named it, and the walk was refused with the PC left where she stood.
-        if grid.ground(flat) > was and not climbs and fixtures.stair_to(grid, flat) is None:
-            continue
+        # Higher ground with no stair is a Climb roll (`Engine._climb_to_make`), which can
+        # fail and leave the walker where they stood: it goes last, after every square on
+        # the walker's own footing. Measured 2026-11-13: the market's rows put a cart
+        # beside the Spy, the approach named it, and the PC never got there.
+        up = grid.ground(flat) > was and not climbs and fixtures.stair_to(grid, flat) is None
         feet = distance_between(flat + level, actor.size, there, defender.size)
         if feet > reach or (gap and feet <= SQUARE_FT):
             continue
-        rank = (cost, (flat[0] - there[0]) ** 2 + (flat[1] - there[1]) ** 2,
+        rank = (up, cost, (flat[0] - there[0]) ** 2 + (flat[1] - there[1]) ** 2,
                 flat[1], flat[0])
         if best is None or rank < best[0]:
             best = (rank, flat, cost)

@@ -179,9 +179,7 @@ def test_without_a_stair_the_gallery_still_needs_a_climb_however_the_square_is_w
     assert "no way up" in " ".join(o.tell for o in res.outcomes).lower()
 
 
-def test_climbing_onto_a_crate_names_the_check():
-    """A crate stack is a Climb check (CRB p.90, DC 10). Phase 1 does not roll it from a
-    move; the refusal says so, with the DC, instead of "nothing here to climb"."""
+def _crate_scene(seed):
     g = Grid(width=6, height=6)
     g.floor[(3, 3)] = 1
     g.fixtures = [fixtures._fixture("crate", [(3, 3)], 1, {})]
@@ -189,9 +187,42 @@ def test_climbing_onto_a_crate_names_the_check():
     man = instantiate("guildhand", scene=s, name="the man")
     s.add(man, at=(2, 3))
     s.grid = g
-    e = Engine(s, Dice(seed=2), world=None)
-    said = e._cannot_leave_the_ground(man, (2, 3), (3, 3, 1))
-    assert "Climb check (DC 10)" in said and "a crate" in said, said
+    return s, Engine(s, Dice(seed=seed), world=None), man
+
+
+def test_anyone_may_climb_onto_a_crate_and_a_failed_climb_stays_put():
+    """A crate stack is a Climb check (CRB p.90, DC 10). Until 2026-11-13 the move was
+    refused outright ("the table does not roll that for a move yet"); the owner: "climb
+    checks should be possible for anyone so they can climb onto stuff". It rolls now."""
+    made = missed = 0
+    for seed in range(40):
+        s, e, man = _crate_scene(seed)
+        out = _move(e, man.ref, (3, 3)).outcomes[-1]
+        roll = out.rolls[0]
+        assert roll.label == "the man Climb"
+        if roll.total >= 10:
+            made += 1
+            assert tuple(s.positions[man.ref][:2]) == (3, 3) and s.positions[man.ref][2] == 1
+            assert "climbs up onto a crate" in out.tell
+        else:
+            missed += 1
+            assert out.status == "prevented"
+            assert tuple(s.positions[man.ref][:2]) == (2, 3)
+            assert "does not get up" in out.tell and "DC 10" in out.tell
+    assert made and missed, (made, missed)
+
+
+def test_a_failed_climb_from_across_the_room_is_left_at_its_foot():
+    """Probed 2026-11-13: "I climb onto the cart" from three squares off failed its roll
+    and left the PC where the walk began, as if they had never crossed to it."""
+    for seed in range(40):
+        s, e, man = _crate_scene(seed)
+        s.positions[man.ref] = (0, 3)
+        out = _move(e, man.ref, (3, 3)).outcomes[-1]
+        if out.status == "prevented":
+            assert tuple(s.positions[man.ref][:2]) == (2, 3), s.positions[man.ref]
+            return
+    raise AssertionError("no failed climb in 40 seeds")
 
 
 def test_a_table_gives_cover_and_not_a_wall():
