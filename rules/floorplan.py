@@ -82,6 +82,9 @@ class Shape:
     #   none     flat, and meant to be
     vertical: str = "ledge"
     about: str = ""
+    # How the clumps are laid: `scatter` (anywhere, any way round) or `rows` (straight
+    # stall rows with aisles between, a market's; `_rows`).
+    layout: str = "scatter"
     # The fixture kinds a WORLD wrote for this place (`fixtures` in the export, a closed
     # list: content/rules/fixtures.json). Empty for every derived shape; `rules/fixtures`
     # reads it in place of the spot's own row.
@@ -96,7 +99,8 @@ LOW, HALL = 2, 4
 # tables it mirrors are closed and short.
 BY_SPOT: dict[str, Shape] = {
     "the-market": Shape(16, 16, None, clumps=7, clump_max=2, rise=2,
-                        vertical="scatter", about="stalls and awnings, and a cart to climb on"),
+                        vertical="scatter", about="stalls and awnings, and a cart to climb on",
+                        layout="rows"),
     "the-tavern": Shape(12, 10, LOW, clumps=6, clump_max=2,
                         about="tables, benches and a hearth"),
     "the-temple": Shape(14, 12, HALL, clumps=6, clump_max=1, rise=3, rise_to=1,
@@ -472,7 +476,7 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
                  rough=max(0, rough),
                  rise=max(3, inner // 60) if kind == "scatter" else 0,
                  rise_to=2 if kind == "slope" else 1,
-                 vertical=kind, about=base.about, fixtures=named)
+                 vertical=kind, about=base.about, fixtures=named, layout=base.layout)
 
 
 def _squares(feet, fallback: int, cap: int | None = MAX_SQUARES) -> int:
@@ -549,11 +553,14 @@ def _upstairs(ground: Shape, level: int) -> Shape:
                  about="partitioned, and lower than the room below")
 
 
-def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> Grid:
+def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None,
+              *, scatter: bool = False) -> Grid:
     """The ground at this place, the same every time it is asked for.
 
     Nothing is placed in the outermost ring, so a plan can never wall a scene in or strand
     a combatant in a corner they cannot leave. Everything in the middle is fair game.
+    `scatter` lays a `rows` place the way it was laid before rows (`fixtures.derive`
+    names a market saved then by its own old stalls).
     """
     shape = shape_for(place_id, terrain, authored)
     r = _Rolls(_seed(place_id))
@@ -563,7 +570,9 @@ def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None)
         return (1 + r.next(max(1, shape.width - 2)),
                 1 + r.next(max(1, shape.height - 2)))
 
-    for _ in range(shape.clumps):
+    if shape.layout == "rows" and not scatter:
+        _rows(grid, shape, r)
+    for _ in range(0 if shape.layout == "rows" and not scatter else shape.clumps):
         x, y = somewhere()
         run = 1 + r.next(shape.clump_max)
         down = r.next(2)
@@ -579,6 +588,36 @@ def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None)
 
     _raise(grid, shape, r)
     return grid
+
+
+def _rows(grid: Grid, shape: Shape, r: "_Rolls") -> None:
+    """A market's stalls in straight rows (plan item 6, 2026-11-13).
+
+    Scattered, two runs that happened to touch were typed as one stall bent round a corner
+    (the owner's market picture showed three L-shaped stalls). In rows they cannot touch:
+    a row, then a two-square aisle (10 ft, the FAO's and street-market guides' main aisle),
+    and a gap of one or two squares between stalls in a row to walk through. Rows run the
+    long way; a square market rolls for it. Whole rows are filled, in rolled order, until
+    `clumps` stalls stand: seven picked from every slot read as scattered again."""
+    w, h = shape.width, shape.height
+    across = w > h or (w == h and r.next(2) == 0)
+    long_, short = (w, h) if across else (h, w)
+    lanes = []
+    for lane in range(2, short - 2, 3):
+        at, row = 1 + r.next(2), []            # rows start staggered, not in a column
+        while True:
+            run = 1 + r.next(shape.clump_max)
+            if at + run > long_ - 1:
+                break
+            row.append([(at + k, lane) for k in range(run)])
+            at += run + 1 + r.next(2)
+        lanes.append(row)
+    left = shape.clumps
+    while lanes and left > 0:
+        for stall in lanes.pop(r.next(len(lanes)))[:left]:
+            left -= 1
+            for a, b in stall:
+                grid.blocked.add((a, b) if across else (b, a))
 
 
 # How high a ledge stands and how high its rail comes. Two squares is ten feet — a storey

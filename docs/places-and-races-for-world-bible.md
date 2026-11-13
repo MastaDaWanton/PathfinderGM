@@ -423,7 +423,7 @@ words:
 | Field | Meaning |
 |---|---|
 | `size_ft` | `{width, depth, height}` in **feet**. `height` is the ceiling, or `null` for open sky |
-| `clutter` | `bare`, `some`, `cluttered`, `dense` — how much solid stuff is in the way |
+| `clutter` | `bare`, `some`, `cluttered`, `dense` — how much solid stuff is in the way. In a market the app lays this as straight stall rows with 10 ft aisles (since 2026-11-13), not a scatter; nothing more is needed in the export for it |
 | `footing` | `firm`, `broken`, `bad` — rubble, undergrowth, standing water, spoil |
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — **how the place is shaped upward**, below |
 | `storeys` | `{"up": n, "down": n}` — how many floors above and below this one. Omit for outdoors |

@@ -211,6 +211,13 @@ def derive(grid: Grid | None, place_id: str, terrain: str = "", authored=None) -
     if (plan.width, plan.height) != (grid.width, grid.height):
         return []                    # a saved room of another shape: type nothing
     shape = floorplan.shape_for(place_id, terrain, authored)
+    if shape.layout == "rows" and not plan.blocked <= grid.blocked:
+        # Saved rooms are left alone (plan item 6): a market laid before its stalls stood
+        # in rows keeps the stalls it was saved with, named by the old scatter. Never
+        # moved, so nobody saved standing beside one is now inside it.
+        old = floorplan.for_place(place_id, terrain, authored, scatter=True)
+        if len(old.blocked & grid.blocked) > len(plan.blocked & grid.blocked):
+            plan = old
     row = _profile(place_id, terrain, authored)
     out: list[dict] = []
     for slot, squares in (("solid", plan.blocked & grid.blocked),
