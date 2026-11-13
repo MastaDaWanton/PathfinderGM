@@ -448,5 +448,12 @@ def herb_manual(request):
             {"ref": pc.ref, "kind": "manual_read", "manual": manual["name"],
              "learned": len(revealed)}]}]}))
     c.save()
+    from rules import knowledge
+
+    from . import manual_reader
+
+    # `name` and `manuals` are what the benches' shared Manuals dialog (29-bench-core.js)
+    # reads to say what was read and redraw the list.
     return JsonResponse({"revealed": revealed, "mastery": mastery, "minutes": minutes,
-                         "clock": clock(c)})
+                         "clock": clock(c), "name": manual["name"],
+                         "manuals": manual_reader.carried(pc, knowledge.HERBALIST)})

@@ -270,3 +270,27 @@ def test_a_handed_over_manual_survives_a_reload():
     pc.goods["brunt of the weight"] = 1
     _heal_minted_goods(s)
     assert pc.goods == names, set(names) - set(pc.goods)
+
+
+def test_the_herb_bench_lists_and_reads_its_manuals_through_the_same_dialog(client):
+    """Measured 2026-11-13: `api/herb/manual` had existed since 0.2.4, the 2026-10-08 port
+    gave the forge, circle and alchemy bench a Manuals button, and the herb bench still had
+    none, so a bought herbal manual could never be opened from the page. Its state now lists
+    the herbal books carried, its reading answers with what the core's dialog redraws from,
+    and its footer opens that dialog on the herb route."""
+    manual = next(iter(sorted(knowledge.manuals(knowledge.HERBALIST))))
+    assert client.get("/api/bench/state").json()["manuals"] == []
+    _buy("herbal-manuals", manual)
+    listed = client.get("/api/bench/state").json()["manuals"]
+    assert [m["id"] for m in listed] == [manual] and not listed[0]["read"]
+    got = post(client, "/api/herb/manual", {"item": manual})
+    assert got.status_code == 200, got.content
+    body = got.json()
+    # A herbalist's homeland seeding may already know what the book says; the first
+    # reading still pays.
+    assert body["name"] and body["mastery"]["lines"], body
+    assert [m["read"] for m in body["manuals"]] == [True]
+    src = (ROOT / "play" / "static" / "js" / "table" / "30-bench-shell.js").read_text(
+        encoding="utf-8")
+    assert "data-bench-manuals" in src and '"/api/herb/manual"' in src
+    assert "core.manuals(" in src and "s.manuals.length" in src

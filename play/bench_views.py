@@ -28,10 +28,11 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import crafting, herbknowledge, ingredients, worldclass
+from rules import crafting, herbknowledge, ingredients, knowledge, worldclass
 
 from . import bench_clock
 from . import campaign as campaign_mod
+from . import manual_reader
 from .apiutil import read_body, read_int
 
 TRACK_ID = "herbalist"
@@ -224,6 +225,10 @@ def _state_body(c, pc) -> dict:
         "ground": _ground(c),
         "recipes": _recipes(c),
         "clock": _clock(c),
+        # The herbal manuals carried, for the footer's Manuals button (POST api/herb/manual
+        # reads one). Measured 2026-11-13: herb_manual had a route but no button, so a
+        # bought herbal manual could not be opened from the page.
+        "manuals": manual_reader.carried(pc, knowledge.HERBALIST),
     }
 
 
