@@ -105,6 +105,9 @@ def test_a_foes_own_kind_come_in_with_them_and_civilians_stay_out():
     g1 = s.add(instantiate("watchman", scene=s, name="guards"), zone="near")
     g2 = s.add(instantiate("watchman", scene=s, name="guard"), zone="far")
     merchant = s.add(instantiate("guildhand", scene=s, name="the merchant"), zone="near")
+    # Level 3 (APL 1): the pair is an average fight, inside the encounter budget the
+    # watch is priced by since 2026-11-13 (tests/test_encounter_coverage.py).
+    pc.level = 3
     engine = Engine(s, Dice(seed=3))
     assert engine._ensure_encounter(pc.ref, target=g1.ref)
     assert set(s.sides["them"]) == {g1.ref, g2.ref}

@@ -158,6 +158,10 @@ def test_the_fight_opens_on_the_real_person_and_their_own_kind_answers():
                   at=(9, 9))
     other.add_condition("bystander", source="introduced by the scene")
     guard = _ref(s, "by the stall")
+    # Level 3 (APL 1): two watchmen are an average fight, so the rally is not cut by the
+    # encounter budget (2026-11-13, `Engine._law_room`); a lone level 1 meets a budgeted
+    # watch, pinned in tests/test_encounter_coverage.py.
+    s.pc().level = 3
     before = set(s.actors)
     out, _ = through_the_reading([], "I attack the closest person.", s, ask=everyone)
     assert [i["target"] for i in out] == [guard]
