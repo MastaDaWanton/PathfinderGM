@@ -439,12 +439,22 @@ def square_in_reach(scene, actor, defender, reach: int,
     there = scene.positions.get(defender.ref)
     if grid is None or start is None or there is None:
         return None
+    from . import fixtures
+
     level = tuple(start[2:3])
+    was = start[2] if len(start) > 2 else grid.ground(tuple(start[:2]))
+    climbs = bool(actor.can_move_vertically()) if hasattr(actor, "can_move_vertically") \
+        else False
     routes = grid.reachable(tuple(start[:2]), 10_000, size=actor.size,
                             occupied=occupancy_toward(scene, actor, defender))
     best = None
     for square, cost in routes.items():
         flat = tuple(square[:2])
+        # Higher ground with no stair is a Climb the move op refuses (`_vertical_refusal`).
+        # Measured 2026-11-13: the market's rows put a cart beside the Spy, the approach
+        # named it, and the walk was refused with the PC left where she stood.
+        if grid.ground(flat) > was and not climbs and fixtures.stair_to(grid, flat) is None:
+            continue
         feet = distance_between(flat + level, actor.size, there, defender.size)
         if feet > reach or (gap and feet <= SQUARE_FT):
             continue

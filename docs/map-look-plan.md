@@ -84,3 +84,28 @@ without the owner's word.
   - "You draw your rapier" was narrated with no draw op;
   - a hidden PC's foe "swings blind" with a sap from about 40 ft without moving.
 - **Judgement call for the owner:** a fight walk prefers cover from more foes over the nearest fixture. "The nearest stall" went to a stall 30 ft off that hid the PC from both thugs.
+
+## Done, 2026-11-13 (steps 3 and 4)
+
+- **Step 3, the mock round** (items 4, 5, 8, 10), on branch `mock/map-look` (fa6a23aa), built
+  on this one, with the comparison page at `docs/mock/map-look/index.html`. The proposed
+  looks are real game code on that branch, shot from the running game beside this branch's:
+  - 4: a brass coin on a keeper's base (3D) and token rim (flat). A coin, not a ring,
+    because a gold ring already means "whose turn".
+  - 5: goods on a stall, read from the keeper standing at it (`keeps`, the counter id, now
+    in the actor state); a stall with nobody at it is bare.
+  - 8: a lower, longer beast with a raised head, snout, ears and a low tail.
+  - 10: night from `Scene.light_at` as the PC sees it (`grid.light`), never the hour; dim
+    is blue and darker, a carried torch lights its ring warm, a roofed room stays lit.
+  - Item 1 was already fixed in step 2, so it was not in the round.
+  - Waiting on the owner's pick. Nothing from it is on this branch.
+- **Found during the round, fixed here** (c27d1833): four stallholders all read "SS";
+  clashes left after the letter rules now number (S1..S4). Cinzel's "1" can read as "I".
+- **Found, owner's call:** out of a fight a bystander is a brown disc on the flat board and
+  a white figure in 3D, though the 3D code says the boards share colours.
+- **Step 4, straight stall rows** (805ac18b): `floorplan._rows` lays a market's clumps in
+  rows with 10 ft aisles and a gap between stalls, so no two can merge into a bent stall.
+  A market saved before this keeps its stalls (`fixtures.derive` names it by the old
+  scatter when that matches the saved grid better); nothing saved is moved. Live: the save
+  loaded with its old stalls whole, then a walk out and back laid the rows, nobody inside
+  anything. The merchants' row still scatters (not in the plan item).
