@@ -108,6 +108,15 @@ def _marks(names: dict) -> dict:
             if not any(o != r and rule(words(on)) == m for o, on in names.items()):
                 break
         out[r] = m
+    # Still clashing after all three (live 2026-11-13: four "the stallholder at the ...
+    # stall" in one market all read "SS"): number them, initial first, in ref order.
+    seen: dict = {}
+    for r in names:
+        seen.setdefault(out[r], []).append(r)
+    for m, refs in seen.items():
+        if len(refs) > 1:
+            for i, r in enumerate(refs, 1):
+                out[r] = f"{m[:1]}{i}"
     return out
 
 
@@ -118,7 +127,8 @@ def _sits(scene, ref, a) -> list | None:
     posts put tavern patrons at tables and the board stood them up there (plan item 11)."""
     g = getattr(scene, "grid", None)
     sq = scene.positions.get(ref)
-    if g is None or not sq or a.is_pc or scene.in_encounter or a.hp <= 0             or (len(sq) > 2 and sq[2]):
+    if g is None or not sq or a.is_pc or scene.in_encounter or a.hp <= 0 \
+            or (len(sq) > 2 and sq[2]):
         return None
     tables = {tuple(t[:2]) for f in (g.fixtures or ())     # None on an untyped grid
               if f["kind"] == "table" and f["level"] == 0 for t in f["squares"]}

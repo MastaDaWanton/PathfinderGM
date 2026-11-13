@@ -464,6 +464,18 @@ def test_clashing_initials_get_a_second_letter():
     assert {m["e"], m["f"]} == {"VA", "VB"}
 
 
+def test_names_alike_to_the_last_word_are_numbered():
+    """Live 2026-11-13: four "the stallholder at the ... stall" in one market all read
+    "SS" after the three letter rules, so the plates told nobody apart. They number."""
+    from play.views import _marks
+
+    m = _marks({"a": "the stallholder at the provisions stall",
+                "b": "the stallholder at the cord and canvas stall",
+                "c": "the stallholder at the curio stall", "d": "Kesst"})
+    assert [m["a"], m["b"], m["c"]] == ["S1", "S2", "S3"]
+    assert m["d"] == "K"
+
+
 def test_tavern_patrons_sit_facing_their_table_and_stand_in_a_fight():
     """Plan item 11: the posts put tavern patrons beside tables and the board stood them
     up there, so a tavern read as a queue. Someone posted at a table is drawn seated,
