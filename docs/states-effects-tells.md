@@ -250,3 +250,31 @@ book does not put it there — a lie is an opposed check against Sense Motive �
 `mind_ungated` refusal still lists `check skill=bluff` beside the other two. And an
 intimidated creature does not turn unfriendly when its friendliness lapses, because the
 engine has no "when this effect ends" trigger; `docs/attitude.md` carries both.
+
+## The clock's expiries were told by two doors (2026-10-08, ported 2026-11-13)
+
+`Scene.advance` is the one ticker for a stretch of time, and it always expired what the
+stretch ended. Telling it was left to whoever called it, and of the two dozen doors that
+move the clock only `advance_time`, `rest` and the trial's gaol days did: a journey, a
+forage, a repair, taking armour off, the benches' hours all expired effects in silence.
+Where it was told, it was a fragment — "1 day pass. Ended: Kesst Vayr: Prohibited metal."
+— and measured live on scratch data with the real local model, the prose answered it with
+"your presence here is now marked by the restriction of your steel": the fragment read as
+a state imposed, not lifted.
+
+Now `advance` queues what each stretch ended or did as `_ward_tell` records — the round
+tick's own vocabulary (`effect_ended`, `pool_ready`, `ward_ended`, a day's periodic work,
+a curse's day, somebody coming round) — on `Scene._ended_said`, and
+`Engine._ended_settles` tells them behind the op whose hours they were and at every
+batch's end, the way the body's tolls (`_body_settles`) and finished work
+(`_works_settles`) already were. `advance_time`, `rest` (and its short night) and
+`rules/trial.py` no longer say it themselves, so there is one telling path as there is one
+ticker. Two pages say a wait's expiries on their own — the knockout path
+(`play/downed.py`) and the enchanting bench's Wait for it — and take what they said off
+the queue, so the next batch does not tell it twice. Only people in the room are told
+about: the clock runs for everyone the campaign holds, and a narrator told a buff wore off
+somebody two streets away has been handed somebody to put in the scene. The same turn
+after the change: "Prohibited metal wears off Kesst Vayr.", and the prose had the weight
+"finally, and noticeably, evaporated" (one run each way, on the 2026-10-08 code; not
+re-measured live on the port). Also "1 day passes", not "1 day pass", in the hour-of-day
+form master added since. Ratchet: `tests/test_clock_tells_what_it_ended.py`.

@@ -574,6 +574,16 @@ class Scene:
     # two-week steep finishes on the road more often than in a wait. Not saved: a ready row
     # whose line a restart lost is still READY in the section, where the player sees it.
     _works_said: list = field(default_factory=list)
+    # What a stretch of the clock ended or did (`advance` writes, `take_ended_said`
+    # empties), as `_ward_tell` records — the same vocabulary the round tick's `hazards`
+    # use — waiting to be told behind the op that moved the clock (`Engine._ended_settles`).
+    # For `_body_said`'s reason: of the two dozen doors that move the clock only
+    # `advance_time` and `rest` told `advance`'s `ended` list, so an expiry inside a
+    # journey, a forage, a repair or a bench's hours happened in silence. Measured
+    # 2026-10-08 by the leatherworking lane: a druid's day-long metal prohibition ran out
+    # inside a skipped day and the narration said its weight "has not lifted". Not saved,
+    # for `_body_said`'s reason; inside `snapshot`, so a refused turn takes these back too.
+    _ended_said: list = field(default_factory=list)
 
     def snapshot(self) -> dict:
         """Everything the scene is, deep-copied, so a refused turn can be undone.
@@ -1489,6 +1499,9 @@ class Scene:
         water = self._water_at_hand(minutes) if charge_body else ""
         self.clock_minutes += minutes
         ended: list[str] = []
+        # The same events as records, queued to be told (`_ended_said`). `ended` stays the
+        # return because pages read it (a bench's wait, the knockout path).
+        told: list[dict] = []
         body: list[dict] = []
         # Everyone the campaign holds: an eight-hour rest expires the buff on the
         # merchant in the next room and advances his hunger, exactly as it does here.
@@ -1547,9 +1560,17 @@ class Scene:
                 mended += a.run_periodic("round", rounds, self._dice, elapsed=True)
             if mended:
                 self._mended_said(a, mended, body)
-            ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
-            ended.extend(f"{a.name}: {pid} is ready"
-                         for pid in a.tick_pools(rounds))
+            had = list(a.effects)
+            names = a.tick_effects(rounds)
+            ended.extend(f"{a.name}: {name}" for name in names)
+            if names:
+                # Which effects went, by identity, so each record carries its origin.
+                told.extend({"kind": "effect_ended", "ref": a.ref, "what": e.ended_label,
+                             "origin": e.origin}
+                            for e in had if not any(e is x for x in a.effects))
+            pools = a.tick_pools(rounds)
+            ended.extend(f"{a.name}: {pid} is ready" for pid in pools)
+            told.extend({"kind": "pool_ready", "ref": a.ref, "pool": pid} for pid in pools)
             # A grudge the player earned by provoking them comes back with time, faster
             # the longer nothing new happens (rules/provocation.py, `recover`).
             if minutes and not a.is_pc:
@@ -1572,6 +1593,8 @@ class Scene:
                 a.apply_nonlethal_state()
                 if out_cold and not a.has_state("state.down.unconscious"):
                     ended.append(f"{a.name} comes round")
+                    told.append({"kind": "said", "ref": a.ref,
+                                 "said": f"{a.name} comes round."})
                 # What thirst or hunger holds does not mend with the hours (CRB p.444).
                 # Said as a body record, the way the checks are, so it is told once behind
                 # the op that spent the hours — a night's `rest`, a day's foraging — and
@@ -1600,17 +1623,19 @@ class Scene:
                 # A requirement curse's day, gathered before the day's tolls are paid:
                 # met, its magic works tomorrow; unmet, it sleeps until a day it is met
                 # (`curses.settle_day`, lane F; `_settle_curse_days` gathers the facts).
-                if days:
-                    ended.extend(self._settle_curse_days(a, days))
+                curse_said = self._settle_curse_days(a, days) if days else []
                 said = a.run_periodic("day", days, self._dice) if days else []
                 if days:
-                    ended.extend(self._curse_tolls_found(a))
+                    curse_said += self._curse_tolls_found(a)
             # What the pack grants, granted; what left it, taken back and left to linger
             # (`Actor.sync_carried`). Time passing is when a bench step or a sale away
             # from the engine's ops is first noticed.
             said += a.sync_carried(self._dice)
+            curse_said += self._curse_strikes(a, started)
+            ended.extend(curse_said)
             ended.extend(t for t in (_ward_tell(self, r) for r in said) if t)
-            ended.extend(self._curse_strikes(a, started))
+            told.extend({"kind": "said", "ref": a.ref, "said": line} for line in curse_said)
+            told.extend(r for r in said if _ward_tell(self, r))
         # The scene's own standing things expire on the same clock. `tick_standing` fires
         # `each_round` wards as well, which is exactly the work this must not repeat — so
         # it is called once, for expiry, and the firing stays where the rounds are real.
@@ -1618,6 +1643,9 @@ class Scene:
             what = record.get("what") or record.get("kind")
             if what:
                 ended.append(str(what))
+            if _ward_tell(self, record):
+                told.append(record)
+        self._ended_said.extend(told)
         # Work In progress whose minute this stretch passed turns ready, here and only here
         # (docs/enchanting-contracts.md §8; rules/inprogress.py): the section has no ticker
         # of its own, so the countdowns move exactly when this door moves the clock. Told
@@ -1888,6 +1916,16 @@ class Scene:
                 name = str(holders[0].get("name") or "item").lower()
                 out.append(f"{a.name}: " + curses_mod.tell(curses_mod.curse_of(holders[0]),
                                                            name, known=True))
+        return out
+
+    def take_ended_said(self) -> list[dict]:
+        """What the clock's stretches ended or did since last told, emptied as handed over.
+
+        Read by `Engine._ended_settles` behind every op and at every batch's end, and by
+        the knockout path (play/downed.py), which runs no batch and says them itself. A
+        bench or a forge view that moves the clock outside a batch leaves its records
+        here for the next batch to tell, late rather than never — `take_body_said`'s rule."""
+        out, self._ended_said = list(self._ended_said), []
         return out
 
     def take_works_said(self) -> list[dict]:
@@ -4353,6 +4391,8 @@ class Engine:
         resolution.outcomes.extend(self._body_settles())
         # Work In progress the clock turned ready, the same way (`_works_settles`).
         resolution.outcomes.extend(self._works_settles())
+        # And what the clock ended, the same way (`_ended_settles`).
+        resolution.outcomes.extend(self._ended_settles())
         # Who the clock brought to the party's place or took from it (`settle_on_clock`).
         resolution.outcomes.extend(self._comings_settles())
         # An ability's effect that a state ends: a rage when its barbarian falls, a smite
@@ -5097,6 +5137,40 @@ class Engine:
                 tell=" ".join(str(r.get("said") or "") for r in rows), because="")))
         return out
 
+    def _ended_settles(self) -> list:
+        """What the clock's stretches ended or did, told (law 3): the effects that ran out,
+        the pools that came back, the standing things that thinned away, a day's periodic
+        work, a curse's day.
+
+        Beside `_works_settles` and for its reason. `Scene.advance` is the one ticker and
+        always expired these; what it could not do was make anybody SAY them, and of the
+        two dozen doors that move the clock only `advance_time` and `rest` told its
+        `ended` list, as the fragment "Ended: Kesst Vayr: Prohibited metal." — so those
+        now leave the telling here too, and every door tells the same way in the same
+        words (`_ward_tell`, the round tick's sentences).
+
+        Only about people here. The clock runs for everyone the campaign holds, and a
+        narrator told that a buff wore off the merchant two streets away has been handed
+        somebody to put in the room."""
+        here = self.scene.actors
+        said: list[tuple[dict, str]] = []
+        for r in self.scene.take_ended_said():
+            ref = str(r.get("ref") or "")
+            if ref and ref not in here:
+                continue
+            line = (str(r.get("said") or "") if r.get("kind") == "said"
+                    else _ward_tell(self.scene, r))
+            if line:
+                said.append((r, line))
+        if not said:
+            return []
+        fx = [dict({k: v for k, v in r.items() if k != "said"},
+                   origin=r.get("origin") or "rule:the-clock") for r, _ in said]
+        return [self._articled(Outcome(
+            intent_id="", op="ended", effects=fx,
+            tell=" ".join(line if line.endswith((".", "!", "?")) else line + "."
+                          for _, line in said), because=""))]
+
     def _body_settles(self) -> list:
         """The body's tolls the clock's door rolled, as outcomes the narrator is fed.
 
@@ -5357,6 +5431,8 @@ class Engine:
             # asleep where they stand" (measured live on the owner's save, 2026-10-05).
             outcomes.extend(self._body_settles())
             outcomes.extend(self._works_settles())
+            # And what the same hours ended, behind the op whose hours they were.
+            outcomes.extend(self._ended_settles())
             # A single-roll check, save or manoeuvre decided on the player's own d20:
             # its outcome's verdict IS that roll's answer. Anything that judged the roll
             # at its own stage already has (`_judge` keeps the first).
@@ -22800,7 +22876,7 @@ class Engine:
         was = int(self.scene.clock_minutes or 0)
         passed = self.scene.wait(minutes, rounds=rounds)
         ended: list[str] = list(passed["ended"])
-        tell = f"{amount} {unit}{'s' if amount != 1 else ''} pass."
+        tell = f"{amount} {unit}{'s pass' if amount != 1 else ' passes'}."
         now = int(self.scene.clock_minutes or 0)
         if unit != "round" and now > was:
             # The hour it ends at, off the clock (`_hour_now`). Measured on the narration
@@ -22808,7 +22884,8 @@ class Engine:
             # wait — was told "until the sun hangs in the afternoon sky"; a count of
             # minutes says nothing of the hour, and the narrator guessed one.
             span = sky.span_words(now - was)
-            tell = (f"{span} pass{'es' if span in ('1 hour', '1 minute') else ''}: "
+            # "1 day passes", not "1 day pass" (2026-10-08); "1 day 3 hours" stays plural.
+            tell = (f"{span} pass{'es' if span in ('1 hour', '1 minute', '1 day') else ''}: "
                     f"{_hour_now(was, now)}.")
         if passed.get("stopped"):
             minutes = int(passed["minutes"])
@@ -22818,8 +22895,8 @@ class Engine:
                     f"{_hour_now(was, now)}." if minutes
                     else f"The wait of {asked} does not begin.")
         tell += _also(self._stayed_awake(passed, now - was))
-        if ended:
-            tell += " Ended: " + ", ".join(ended) + "."
+        # What the wait ended is told right behind this by `_ended_settles`, the way every
+        # other door that moves the clock is told; it is kept in the record for audit.
         return Outcome(
             intent_id=intent.id, op="advance_time",
             effects=[{"kind": "time", "rounds": rounds, "minutes": minutes,
@@ -27332,9 +27409,8 @@ class Engine:
         # chose — the body charged for them, the people here going about their day — and
         # the night's eight are slept at the end of them.
         kept_awake: list[str] = []
-        before_ended: list[str] = []
         if camp["before"] and actor.is_pc:
-            before_ended = self.scene.wait(camp["before"])["ended"]
+            self.scene.wait(camp["before"])
             kept_awake.append(
                 f"{actor.name} keeps the camp awake for {sky.span_words(camp['before'])} "
                 f"first: it is {sky.span_words(camp['before'] + camp['minutes'])} "
@@ -27392,8 +27468,7 @@ class Engine:
         # rest so the night's check could be rolled over the same hours.
         minutes, hours = (camp["minutes"], camp["hours"]) if result["hours"] else (0, 0)
         # A night slept is a wait the player chose: the people with them go about their day.
-        ended = before_ended + self.scene.advance(minutes, charge_body=False,
-                                                  waited=True)["ended"]
+        self.scene.advance(minutes, charge_body=False, waited=True)
         if result["hours"]:
             self._slept_a_night(actor)
 
@@ -27439,8 +27514,8 @@ class Engine:
             bits.append(f"{actor.name} is on their feet again.")
         if refilled:
             bits.append("Recovered: " + ", ".join(refilled) + ".")
-        if ended:
-            bits.append("Ended: " + ", ".join(ended) + ".")
+        # What the night ended is told behind this by `_ended_settles`, like every door
+        # that moves the clock.
         if prep_said:
             bits.append(prep_said)
         # The mounts' keep for the day rested (G3, 2026-09-29): a day's feed, and a night
@@ -27739,7 +27814,8 @@ class Engine:
         # The minutes actually slept, never the rounded hours: Ansel's 5 h 34 min (owner
         # report 2026-11-01) rounded to 6, and six hours is what resets the awake clock.
         survival.sleep(actor, minutes=camp["minutes"])
-        ended = self.scene.advance(camp["minutes"], charge_body=False, waited=True)["ended"]
+        # What the sleep ended is told behind this by `_ended_settles`.
+        self.scene.advance(camp["minutes"], charge_body=False, waited=True)
         fx, rolls, said = self._camp_morning(actor, camp, hours)
         bits = [f"{actor.name} sleeps {sky.span_words(camp['minutes'])}"
                 + (f", {camp['until']}" if camp["until"] else "") + ". " + why
@@ -27757,8 +27833,6 @@ class Engine:
                            "met_refs": [m["ref"] for m in made],
                            "origin": "rule:night-check"})
             bits.append(self._night_said(met, made, at_dawn=True))
-        if ended:
-            bits.append("Ended: " + ", ".join(ended) + ".")
         return Outcome(
             intent_id=intent.id, op="rest", rolls=rolls,
             effects=[{"ref": actor.ref, "kind": "rest", "healed": 0, "hours": hours,

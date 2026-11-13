@@ -386,7 +386,11 @@ def test_time_passing_expires_timed_conditions(engine, scene):
     assert scene.get("c1").has_condition("shaken")
     res = run(engine, [{"op": "advance_time", "params": {"amount": 1, "unit": "minute"}}])
     assert not scene.get("c1").has_condition("shaken")
-    assert "Shaken" in res.outcomes[0].tell
+    # Told right behind the wait by `_ended_settles`, the door every clock move shares —
+    # not inside the wait's own tell, where it was the fragment "Ended: c1: Shaken."
+    # (tests/test_clock_tells_what_it_ended.py has the measurement).
+    told = [o.tell for o in res.outcomes if "Shaken" in (o.tell or "")]
+    assert len(told) == 1 and "wears off" in told[0], [o.tell for o in res.outcomes]
 
 
 def test_initiative_orders_everyone_on_the_board(engine, scene):

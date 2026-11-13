@@ -308,6 +308,9 @@ def _wait_it_out(campaign, pc) -> Outcome:
     # dropped because the last line says it in words the player is already reading.
     lines.extend(line for line in (ended.get("ended") or [])
                  if what not in line.lower())
+    # Said here, so taken: left queued, the next batch would tell the narrator the same
+    # expiries again (`Scene.take_ended_said`, the rule `take_body_said` follows here).
+    scene.take_ended_said()
     still = pc.blocking_condition()
     lines.append("You have yourself back." if not still
                  else f"You are still {still.lower()}.")
