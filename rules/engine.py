@@ -766,7 +766,8 @@ class Scene:
             self.positions[ref] = ((spot[0], spot[1]) if not now
                                    else (spot[0], spot[1], now))
 
-    def occupied(self, ignore: str = "", level: int | None = None) -> set[tuple[int, int]]:
+    def occupied(self, ignore: str = "", level: int | None = None,
+                 seen_by: str = "") -> set[tuple[int, int]]:
         """Every square something is standing on, for movement to route around.
 
         `level` filters to the creatures whose own body reaches that level, because a
@@ -776,8 +777,15 @@ class Scene:
 
         Overlap rather than equality, so a Large creature standing on the floor still
         blocks the level above its feet, which is where its chest is.
+
+        `seen_by` leaves out every body that creature cannot locate (`awareness.locates`):
+        the board as it believes it to be. The map lit every square but the hidden
+        goblin's, and the gap was where it stood (2026-11-11, tests/test_hidden_leaks.py).
         """
+        from . import awareness
         from .grid import footprint, height_squares
+
+        looker = self.actors.get(seen_by) if seen_by else None
 
         out: set[tuple[int, int]] = set()
         for ref, anchor in self.positions.items():
@@ -785,6 +793,8 @@ class Scene:
                 continue
             actor = self.actors[ref]
             if actor.has_condition("dead"):
+                continue
+            if looker is not None and not awareness.locates(self, looker, actor):
                 continue
             if level is not None:
                 lo = anchor[2] if len(anchor) > 2 else 0
@@ -12388,7 +12398,10 @@ class Engine:
         grid = self.scene.grid
         # The bodies on the level it is going to, as `_move_cost` asks: somebody on the
         # floor below a gallery does not hold the gallery's squares.
-        occupied = self.scene.occupied(ignore=ref, level=target[2] if len(target) > 2 else 0)
+        # As the mover believes the board: a body it has not found is no refusal here (that
+        # was a free probe naming the hidden square); `_op_move` bumps into it instead.
+        occupied = self.scene.occupied(ignore=ref, level=target[2] if len(target) > 2 else 0,
+                                       seen_by=ref)
         # A Fine, Diminutive or Tiny body "can move into ... an occupied square"
         # (aonprd.com/Rules.aspx?ID=176) — and with a reach of 0 it must, to strike
         # (ID=179). So the squares it is going TO are not taken for it; the squares on
@@ -22396,6 +22409,9 @@ class Engine:
                                         f"check, or 15 slashing to the goo).")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
+            bumped = self._unseen_in_the_way(actor, from_square, tuple(square))
+            if bumped is not None:
+                square = bumped[1]
             climb = self._climb_to_make(actor, from_square, tuple(square))
             refusal = "" if climb else self._cannot_leave_the_ground(actor, from_square,
                                                                       tuple(square))
@@ -22481,8 +22497,23 @@ class Engine:
                     tell += (f" {' and '.join(lost)} no longer "
                              f"{'knows' if len(lost) == 1 else 'know'} where "
                              f"{actor.name} is.")
+            if bumped is not None:
+                blocker, _stop, hit = bumped
+                awareness.pinpoint(self.scene, actor, blocker, "walked into it")
+                self.scene.move_spent[ref] = self.scene.round
+                effect["bumped"] = True
+                # No feet in the sentence: "stops (15 ft)" was narrated live as "a halt
+                # fifteen feet from your goal" when the walk ended right beside it.
+                tell = (f"{actor.name} walks straight into something unseen in the next "
+                        f"square and stops beside it.")
+                effect["bumped_at"] = list(hit)
+                apart_fx = [{"kind": "knows_where", "ref": actor.ref, "of": blocker.ref,
+                             "origin": awareness.PERCEPTION_ORIGIN}]
+            else:
+                apart_fx = []
             # A shared invisibility stretched too far by this walk (`_group_apart`).
-            apart_fx, apart_said = self._group_apart(actor)
+            more_fx, apart_said = self._group_apart(actor)
+            apart_fx = apart_fx + list(more_fx)
             if apart_said:
                 tell = " ".join([tell, *apart_said])
             if climbed is not None:
@@ -22524,6 +22555,54 @@ class Engine:
             tell=tell,
             because=intent.because,
         )
+
+    def _unseen_in_the_way(self, actor: Actor, start, target):
+        """(blocker, the square the walk stops on, the square it bumped) when `target` is
+        held by a creature the mover cannot locate, or no route reaches it once those
+        bodies are counted; otherwise None.
+
+        No rulebook sentence covers walking into an unseen creature (AoN's Invisibility
+        and Stealth pages, checked 2026-11-11). The Paizo and EN World threads agree the
+        mover is blocked and learns that something is there, so the walk stops beside it
+        and `_op_move` pinpoints it. `_check_move` used to refuse "(7, 5) is taken",
+        which spent nothing and named the hidden square (tests/test_hidden_leaks.py).
+
+        shortcut: the engine holds no route, so the blocker is the unseen body nearest
+        the straight line and the stop is the reachable square beside it nearest the
+        target; attacks of opportunity were already judged on the intended square.
+        """
+        if start is None:
+            return None
+        grid, size = self.scene.grid, actor.size
+        level = target[2] if len(target) > 2 else 0
+        true = self.scene.occupied(ignore=actor.ref, level=level)
+        unseen = true - self.scene.occupied(ignore=actor.ref, level=level, seen_by=actor.ref)
+        if not unseen:
+            return None
+        flat, origin = tuple(target[:2]), tuple(start[:2])
+        landing = set(gridmod.footprint(flat, size))
+        if gridmod.enters_occupied(size):
+            true -= landing
+        budget = actor.speed_feet if self.scene.in_encounter else 10_000
+        routes = grid.reachable(origin, budget, size=size, occupied=true)
+        if flat == origin or (flat in routes and not landing & true):
+            return None
+        bodies = [(a, tuple(self.scene.positions[r])) for r, a in self.scene.actors.items()
+                  if r in self.scene.positions
+                  and set(gridmod.footprint(tuple(self.scene.positions[r][:2]), a.size))
+                  & unseen]
+        blocker, at = min(bodies, key=lambda b: gridmod.distance(origin, b[1][:2])
+                          + gridmod.distance(b[1][:2], flat))
+        routes[origin] = 0
+        beside = [sq for sq in routes
+                  if gridmod.is_adjacent(sq, size, tuple(at[:2]), blocker.size)]
+        # Squares on the walker's own footing first, as `position.square_in_reach` ranks
+        # them: higher ground is a Climb roll (`_climb_to_make`) the bump never asked for.
+        was = start[2] if len(start) > 2 else grid.ground(origin)
+        stop = min(beside, key=lambda sq: (grid.ground(sq) > was, gridmod.distance(sq, flat),
+                                           routes[sq], sq),
+                   default=origin)
+        return blocker, tuple(stop), tuple(at[:2])
 
     def _toward_tell(self, actor: Actor, foe: Actor, cost: int | None,
                      effect: dict) -> str:
