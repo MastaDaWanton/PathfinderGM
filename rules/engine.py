@@ -9611,7 +9611,34 @@ class Engine:
                 # the save (23 against DC 27)" read as bad arithmetic in the first run.
                 nat = natural_said(save, coup_dc)
                 why = f"{nat}, " if nat else ""
-                if d20_succeeds(save, coup_dc):
+                said = f"({why}{save.total} against DC {coup_dc})"
+                if lethality == "nonlethal":
+                    # Never a death save (owner ruling 2026-11-13): a failure is a longer
+                    # knockout on its own clock (`coup_de_grace.KNOCKED_OUT`), a success
+                    # only the non-lethal damage already dealt.
+                    if d20_succeeds(save, coup_dc):
+                        state["tells"].append(
+                            f"{defender.name} makes the Fortitude save {said}: only the "
+                            f"non-lethal damage counts.")
+                    else:
+                        hours = self.dice.roll(coup_mod.KNOCKOUT_DICE,
+                                               label="Hours knocked out by the coup de "
+                                                     "grâce", visibility="hidden")
+                        state["rolls"].append(hours.as_dict())
+                        defender.add_condition(
+                            coup_mod.KNOCKED_OUT,
+                            rounds=hours.total * coup_mod.ROUNDS_PER_HOUR,
+                            source="a non-lethal coup de grâce",
+                            origin=intent.origin or "")
+                        state["effects"].append({
+                            "ref": defender.ref, "kind": "condition",
+                            "condition": coup_mod.KNOCKED_OUT, "hours": hours.total,
+                            "from": "coup de grâce"})
+                        state["tells"].append(
+                            f"{defender.name} fails the Fortitude save {said} and is "
+                            f"knocked out cold for {hours.total} "
+                            f"hour{'s' if hours.total != 1 else ''}.")
+                elif d20_succeeds(save, coup_dc):
                     state["tells"].append(
                         f"{defender.name} makes the Fortitude save ({why}{save.total} "
                         f"against DC {coup_dc}) and clings to life.")

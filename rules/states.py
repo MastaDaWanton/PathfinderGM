@@ -318,6 +318,12 @@ TAGS: dict[str, tuple[str, ...]] = {
                     "state.helpless", "recovery.hit-points", "state.exposed"),
     "unconscious": ("state.down.unconscious", "state.down.fallen", "state.unable",
                     "state.helpless", "recovery.hit-points", "state.exposed"),
+    # A failed save against a non-lethal coup de grâce (rules/coup_de_grace.py,
+    # owner ruling 2026-11-13): unconscious for 1d4 hours on a timer. Unconscious's tags
+    # without `recovery.hit-points`, so the non-lethal healing and cures that lift the
+    # ordinary knockout do not lift this one; only its clock does.
+    "knocked out": ("state.down.unconscious", "state.down.fallen", "state.unable",
+                    "state.helpless", "state.exposed"),
     "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
     "petrified":   ("state.down.petrified", "state.unable", "state.helpless"),
