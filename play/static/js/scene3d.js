@@ -183,11 +183,27 @@
   // A spell's area: the flat map's `.spellarea` fill, character for character.
   var AREA = "#e0701e";
 
-  function paint(name, lit, wash) {
+  /* NIGHT (mock, 2026-11-13, plan item 10). The light the PC sees (`grid.light`,
+     views._light_state from `Scene.light_at`), never the hour: a roofed tavern at
+     midnight is "normal" by its own lamps and draws as it does by day. Dim is the book's
+     moonlit night, darker and blue; dark is darker still. A square a carried light
+     raises is drawn at its own level, so a torch lights its ring. Foundry VTT's scene
+     darkness works the same way (one level for the scene, light sources cutting it). */
+  var NIGHT = { dim: [0.5, 0.58, 0.86], dark: [0.24, 0.27, 0.4] };
+  var WARM = [1.08, 0.97, 0.8];
+  var DUSK = null;   // the board's light while one render runs: {level, at{"x,y": level}}
+  function duskAt(at) {
+    if (!DUSK || !at) return null;
+    var lv = DUSK.at[key(Math.floor(at[0]), Math.floor(at[1]))] || DUSK.level;
+    // A square a carried light raises out of the night is lit warm, a torch's colour.
+    return NIGHT[lv] || (lv !== DUSK.level && NIGHT[DUSK.level] ? WARM : null);
+  }
+
+  function paint(name, lit, wash, night) {
     var c = MATERIAL[name] || MATERIAL.tile, out = "#";
     for (var i = 0; i < 3; i++) {
       var base = wash ? c[i] + (GOLD[i] - c[i]) * WASH : c[i];
-      var v = Math.round(Math.max(0, Math.min(255, base * lit)));
+      var v = Math.round(Math.max(0, Math.min(255, base * lit * (night ? night[i] : 1))));
       out += (v < 16 ? "0" : "") + v.toString(16);
     }
     return out;
@@ -318,22 +334,31 @@
            b + 0.17 * s, mat, cls);
       top = b + 0.2 * s;
     } else if (form === "beast") {
-      [[-0.24, -0.13], [0.15, -0.13], [-0.24, 0.06], [0.15, 0.06]].forEach(function (l) {
-        slab(out, cx + l[0] * s, cy + l[1] * s, cx + (l[0] + 0.07) * s,
-             cy + (l[1] + 0.07) * s, b, b + 0.34 * s, mat, cls);
+      /* A beast (mock, plan item 8): four thin legs under a long low body, a deeper
+         chest, the head carried forward and higher than the back, a snout, ears, and a
+         tail hung low behind. The first cut was one box on four posts with a box on
+         the front, which read as a table. Faces +x, as it always has. */
+      [[-0.27, -0.1], [-0.18, 0.05], [0.12, -0.1], [0.2, 0.05]].forEach(function (l) {
+        slab(out, cx + l[0] * s, cy + l[1] * s, cx + (l[0] + 0.05) * s,
+             cy + (l[1] + 0.05) * s, b, b + 0.31 * s, mat, cls);
       });
-      slab(out, cx - 0.3 * s, cy - 0.16 * s, cx + 0.24 * s, cy + 0.16 * s, b + 0.3 * s,
-           b + 0.58 * s, mat, cls);
-      slab(out, cx + 0.2 * s, cy - 0.11 * s, cx + 0.44 * s, cy + 0.11 * s, b + 0.44 * s,
-           b + 0.7 * s, mat, cls);
-      slab(out, cx - 0.42 * s, cy - 0.03 * s, cx - 0.3 * s, cy + 0.03 * s, b + 0.46 * s,
+      slab(out, cx - 0.32 * s, cy - 0.11 * s, cx + 0.16 * s, cy + 0.11 * s, b + 0.29 * s,
+           b + 0.47 * s, mat, cls);
+      slab(out, cx + 0.06 * s, cy - 0.13 * s, cx + 0.27 * s, cy + 0.13 * s, b + 0.27 * s,
            b + 0.53 * s, mat, cls);
-      // Ears, so the head reads as a head and the block as an animal, not a table.
+      slab(out, cx + 0.24 * s, cy - 0.09 * s, cx + 0.42 * s, cy + 0.09 * s, b + 0.47 * s,
+           b + 0.65 * s, mat, cls);
+      slab(out, cx + 0.42 * s, cy - 0.045 * s, cx + 0.55 * s, cy + 0.045 * s, b + 0.49 * s,
+           b + 0.57 * s, mat, cls);
       [-1, 1].forEach(function (k) {
-        slab(out, cx + 0.24 * s, cy + k * 0.1 * s - 0.03 * s, cx + 0.3 * s,
-             cy + k * 0.1 * s + 0.03 * s, b + 0.7 * s, b + 0.8 * s, mat, cls);
+        slab(out, cx + 0.27 * s, cy + k * 0.06 * s - 0.025 * s, cx + 0.32 * s,
+             cy + k * 0.06 * s + 0.025 * s, b + 0.65 * s, b + 0.75 * s, mat, cls);
       });
-      top = b + 0.8 * s;
+      slab(out, cx - 0.42 * s, cy - 0.03 * s, cx - 0.32 * s, cy + 0.03 * s, b + 0.38 * s,
+           b + 0.45 * s, mat, cls);
+      slab(out, cx - 0.52 * s, cy - 0.03 * s, cx - 0.42 * s, cy + 0.03 * s, b + 0.3 * s,
+           b + 0.38 * s, mat, cls);
+      top = b + 0.75 * s;
     } else if (form === "ooze") {
       frustum(out, cx, cy, 0.38 * s, 0.32 * s, b, b + 0.14 * s, 10, mat, cls);
       frustum(out, cx, cy, 0.32 * s, 0.19 * s, b + 0.14 * s, b + 0.3 * s, 10, mat, cls);
@@ -533,6 +558,41 @@
      (where a shelf's spines and a hearth's fire are), `runX` whether the fixture runs
      along x (a counter's length, a cart's axle across it). Returns the height it reaches,
      or -1 when the kind has no drawing of its own and the plain block should stand. */
+  var GOODS = {};
+  /* What a line looks like laid on a counter: a few closed solids each, from the
+     palette already here. Two generic shapes a line, never a model per item. */
+  function wares(out, line, x, y, t, cls) {
+    if (!line) return;
+    var S = function (x0, y0, x1, y1, h, m) {
+      slab(out, x + x0, y + y0, x + x1, y + y1, t, t + h, m, cls, NOPOINT); };
+    var J = function (u, v, r, h, m) {
+      frustum(out, x + u, y + v, r, r * 0.8, t, t + h, 6, m, cls); };
+    if (line === "cloth") {
+      S(0.18, 0.2, 0.82, 0.34, 0.12, "spine0"); S(0.18, 0.4, 0.82, 0.54, 0.12, "spine1");
+      S(0.18, 0.6, 0.82, 0.74, 0.12, "spine2");
+    } else if (line === "provisions" || line === "general") {
+      J(0.32, 0.4, 0.14, 0.26, "plank"); J(0.64, 0.46, 0.13, 0.22, "plank");
+      if (line === "general") S(0.4, 0.62, 0.7, 0.86, 0.18, "wood");
+    } else if (line === "cookshop") {
+      J(0.38, 0.48, 0.17, 0.2, "iron"); J(0.7, 0.5, 0.09, 0.12, "wooddark");
+      J(0.38, 0.48, 0.1, 0.24, "ember");
+    } else if (line === "cord") {
+      J(0.32, 0.38, 0.15, 0.07, "plank"); J(0.64, 0.6, 0.15, 0.07, "plank");
+      J(0.64, 0.6, 0.12, 0.13, "plank");
+    } else if (line === "curios") {
+      S(0.2, 0.3, 0.38, 0.48, 0.14, "spine3"); J(0.6, 0.38, 0.07, 0.18, "rail");
+      S(0.44, 0.58, 0.66, 0.74, 0.08, "spine4");
+    } else if (line === "alchemist") {
+      J(0.28, 0.4, 0.07, 0.2, "spine1"); J(0.48, 0.5, 0.07, 0.24, "waterhi");
+      J(0.68, 0.42, 0.07, 0.18, "spine0");
+    } else if (line === "armorer" || line === "weaponsmith") {
+      S(0.16, 0.34, 0.84, 0.4, 0.04, "iron"); S(0.16, 0.52, 0.8, 0.58, 0.04, "iron");
+      if (line === "armorer") J(0.5, 0.7, 0.13, 0.12, "iron");
+    } else if (line === "leatherworker") {
+      S(0.2, 0.26, 0.8, 0.74, 0.03, "wood"); S(0.28, 0.34, 0.7, 0.66, 0.06, "wooddark");
+    }
+  }
+
   function fixtureAt(out, f, x, y, z, front, runX, cls) {
     var k = f.kind, i;
     if (k === "barrel") {
@@ -588,6 +648,7 @@
            NOPOINT);
       panel(out, x - 0.02, y - 0.02, x + 1.02, y + 1.02, front, 0, 1, z + 1.66, z + 1.75,
             "plank", cls);
+      wares(out, GOODS[key(x, y)], x, y, z + 0.86, cls);
       return z + 1.81;
     }
     if (k === "hearth") {
@@ -670,6 +731,11 @@
     var turn = (opts.turn || 0) & 3;
     var level = opts.level || 0;
     var W = g.width, H = g.height;
+    DUSK = null;
+    if (g.light && NIGHT[g.light.level] || (g.light && (g.light.lit || []).length)) {
+      DUSK = { level: g.light.level, at: {} };
+      g.light.lit.forEach(function (p) { DUSK.at[key(p[0], p[1])] = p[2]; });
+    }
 
     var ground = {}, rails = {}, solid = {}, rough = {}, murk = {};
     (g.floor || []).forEach(function (f) { ground[key(f[0], f[1])] = f[2]; });
@@ -742,6 +808,24 @@
 
     var reach = {};
     (g.reachable || []).forEach(function (e) { reach[key(e[0], e[1])] = e; });
+
+    /* GOODS ON A STALL (mock, plan item 5): the lines of the keeper standing at it
+       (`keeps`, the counter id "stall-cloth-curios" or a shop's id), one line a square
+       in turn. A stall with nobody behind it (shut, or the keeper gone home) is bare,
+       which is the truth of it. */
+    GOODS = {};
+    var keepers = (actors || []).filter(function (a) {
+      return a.keeps && a.keeps !== "here" && a.at && a.hp > 0; });
+    (g.fixtures || []).forEach(function (f) {
+      if (f.kind !== "stall") return;
+      var who = keepers.filter(function (a) {
+        return f.squares.some(function (p) {
+          return Math.max(Math.abs(a.at[0] - p[0]), Math.abs(a.at[1] - p[1])) <= 1; });
+      })[0];
+      if (!who) return;
+      var lines = who.keeps.indexOf("stall-") === 0 ? who.keeps.slice(6).split("-") : [who.keeps];
+      f.squares.forEach(function (p, i) { GOODS[key(p[0], p[1])] = lines[i % lines.length]; });
+    });
 
     // How high the ground stands in every square, worked out once: a wall is only a wall
     // where the square next door is lower, and answering that per neighbour per square
@@ -981,6 +1065,15 @@
         // A Large body stands on its whole footprint, and as much taller as it is wider.
         top = figure(faces, cx, cy, az, n, a.form, down, side, cls, baseCls, tip,
                      (a.form || "humanoid") === "humanoid" ? a.sits : null);
+        /* KEEPER'S COIN (mock, plan item 4): a brass coin on the base, so the people
+           behind the counters read apart from the shoppers without touching the side
+           colours. Not a ring: a gold ring on the base already means "whose turn". */
+        if (a.keeps && !down) {
+          var cs = faces.length;
+          frustum(faces, cx + 0.27 * n, cy + 0.27 * n, 0.12 * n, 0.12 * n, az + 0.07 * n,
+                  az + 0.11 * n, 8, "rail", cls, { cls: cls });
+          for (var ci = cs; ci < faces.length; ci++) faces[ci].cull = true;
+        }
       }
       /* The letter, on a small plate over the head: the flat token's initial, or a
          crowd's count. In the depth sort like a face, so a wall in front still covers it
@@ -1093,7 +1186,7 @@
       if (hid < 2) return;
       xray += '<g class="xray' + (g.offlevel ? " offlevel" : "") + '" pointer-events="none">' +
         g.faces.filter(function (f) { return f.sp; }).map(function (f) {
-          return f.plate ? plate(f, "plate") : '<polygon fill="' + paint(f.mat, shade(f.n, turn)) +
+          return f.plate ? plate(f, "plate") : '<polygon fill="' + paint(f.mat, shade(f.n, turn), false, duskAt(f.at)) +
             '" points="' + pts2(f.sp) + '"/>';
         }).join("") + "</g>";
     });
@@ -1159,7 +1252,7 @@
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
       var fill = f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
-        : paint(f.mat, shade(f.n, turn), f.wash);
+        : paint(f.mat, shade(f.n, turn), f.wash, duskAt(f.at));
       var tex = f.mat !== "area" && textureOf(f);
       if (tex) fill = textured(tex, f.n, fill, f.pts[0]);
       // A textured side carries no outline: the courses are the detail, and a stroke at

@@ -487,6 +487,13 @@ def cast_act(request):
                    player_text="")
 
 
+def _keeps(actor) -> str:
+    from rules import keepers
+
+    wid = str(getattr(actor, "world_entity_id", "") or "")
+    return (keepers.counter_of(wid) or "here") if keepers.is_keeper(wid) else ""
+
+
 def _grid_state(scene) -> dict | None:
     """The map, plus where the PC could actually go — or None when there is no map.
 
@@ -545,7 +552,24 @@ def _grid_state(scene) -> dict | None:
         out["reachable"] = [[c, r, cost, g.ground((c, r))]
                             for (c, r), cost in sorted(routes.items())]
         out["speed"] = pc.speed_feet
+    out["light"] = _light_state(scene, pc)
     return out
+
+
+def _light_state(scene, pc) -> dict:
+    """The light as the PC sees it: one level for the board (`Scene.light_at` with no
+    square) and every square a light changes. The board draws night from this and never
+    from the hour, so a tavern at midnight stays lit (its lamps, `ambient_light`) and a
+    torch carried into a dim market lights its own 20 ft, as the miss chance reads it."""
+    level = scene.light_at(None, viewer=pc)
+    lit = []
+    if scene.lights() and scene.grid is not None:
+        for x in range(scene.grid.width):
+            for y in range(scene.grid.height):
+                here = scene.light_at((x, y), viewer=pc)
+                if here != level:
+                    lit.append([x, y, here])
+    return {"level": level, "lit": lit}
 
 
 def _attack_slots(pc) -> dict:
@@ -905,6 +929,10 @@ def _state(c) -> dict:
                  # What shape the board stands them up as (`_body_form`).
                  "form": _body_form(a),
                  "mark": marks[r],
+                 # The counter a keeper keeps ("stall-cloth-curios", "general"), or
+                 # "here" for a place's one keeper: the board marks them as the people
+                 # behind the counters and lays their goods on the stall beside them.
+                 "keeps": _keeps(a),
                  "sits": _sits(c.scene, r, a),
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
