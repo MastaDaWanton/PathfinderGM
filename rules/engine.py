@@ -402,6 +402,9 @@ class Scene:
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
     # set by parent at read time. `Engine.found`/`Engine.venture` are the doors.
     founded: list[dict] = field(default_factory=list)
+    # Fixtures the reader named in a room that had none of that kind, by place id
+    # (`rules/fixtures.name_one`): the stored exception to derived fixtures, kept for good.
+    fixtures_named: dict[str, list[dict]] = field(default_factory=dict)
     # Places a person named that the settlement does not have yet (`rules/heard_places.py`):
     # heard of, not been to — Inform's *familiar*. Stored because a conversation made
     # them; each becomes a place through `found`, under the landmark the speaker gave,
@@ -804,37 +807,58 @@ class Scene:
             return None
         return gap(pa, self.actors[a].size, pb, self.actors[b].size)
 
-    def place_by_zone(self, refs: list[str], feet: int | None = None) -> None:
+    def place_by_zone(self, refs: list[str], feet: int | None = None,
+                      posts: bool = False) -> None:
         """Put these actors on the map at the distance their zone claims.
 
         Needed because a zone set *after* the board was laid — anything spawned
         mid-fight — had nowhere to be put, and `resync_zones` runs the other way: it
         reads distance off the map and names it, so on its own it simply renamed the
         zone back to whatever the stale position implied.
+
+        `posts`: these people were already in the room when the party came in, so out
+        of a fight they stand at their post (`fixtures.post_for`) — a trader behind
+        their stall, a drinker at a table — not in a ring round the player (the owner's
+        market picture, 2026-11-11). A keeper always does. Somebody the scene brings up
+        to the player mid-scene, a stated range, and anyone `engaged` or `far` keep the
+        ring: there the distance is what the words said.
         """
+        from . import fixtures, keepers
+        from .grid import footprint
         pc = self.pc()
         if self.grid is None or pc is None or pc.ref not in self.positions:
             return
-        px, py = self.positions[pc.ref]
-        taken = set(self.positions.values())
+        px, py = self.positions[pc.ref][:2]
+        # Every square a body stands on, flat: a Large creature's whole 2x2, and nobody
+        # missed for standing on a gallery (a 3-tuple never matched a 2-tuple here).
+        taken = self.occupied() | {tuple(p[:2]) for p in self.positions.values()}
         for ref in refs:
             if ref not in self.actors:
                 continue
             away = (max(1, int(feet) // FEET_PER_SQUARE) if feet
                     else SQUARES_BY_ZONE.get(self.zones.get(ref, "near"), 3))
+            keeper = keepers.is_keeper(getattr(self.actors[ref], "world_entity_id", ""))
+            if (not feet and not self.in_encounter and (posts or keeper)
+                    and self.zones.get(ref, "near") == "near"):
+                spot = fixtures.post_for(self, self.actors[ref], taken)
+                if spot is not None:
+                    self.positions[ref] = spot
+                    taken.add(spot)
+                    continue
             # The default board is a hundred feet square and a bowshot is not. Grown
             # rather than clamped: clamping put the archer's target at the edge of the
             # map and called it 100 feet, which is a different fight from the one the
             # player described.
             if self.grid is not None and px + away >= self.grid.width:
                 self.grid.width = px + away + 2
-            spot = self._free_spot_at(px, py, away, taken)
+            size = str(getattr(self.actors[ref], "size", "") or "medium")
+            spot = self._free_spot_at(px, py, away, taken, size)
             if spot is not None:
                 self.positions[ref] = spot
-                taken.add(spot)
+                taken.update(footprint(spot, size))
 
     def _free_spot_at(self, px: int, py: int, away: int,
-                      taken: set) -> tuple[int, int] | None:
+                      taken: set, size: str = "medium") -> tuple[int, int] | None:
         """A free square about `away` squares from (px, py), spread around it.
 
         Reported from the table 2026-09-17 with a picture of the board: seven creatures
@@ -848,8 +872,12 @@ class Scene:
         the zone asked for, so the first free square is the one that keeps the zone
         honest; ties break by a fixed rotation so the spread is deterministic and a
         seeded test can assert where everybody stood.
+
+        A Large body needs its whole footprint free and on one level. Only its corner was
+        checked, and a live fight in a tavern (2026-11-12) put an ogre at the room's edge
+        with half its 2x2 inside the gallery.
         """
-        from .grid import distance
+        from .grid import distance, footprint
 
         if self.grid is None:
             return None
@@ -864,7 +892,10 @@ class Scene:
                 x, y = px + dx, py + dy
                 if not (0 <= x < self.grid.width and 0 <= y < self.grid.height):
                     continue
-                if (x, y) in taken or (x, y) in self.grid.blocked:
+                fp = footprint((x, y), size)
+                if any(not (0 <= q[0] < self.grid.width and 0 <= q[1] < self.grid.height)
+                       or q in taken or q in self.grid.blocked
+                       or self.grid.ground(q) != self.grid.ground((x, y)) for q in fp):
                     continue
                 off = abs(distance(anchor, (x, y)) - want_ft)
                 # Second key spreads the ring: squares are tried in a rotation around
@@ -3159,7 +3190,7 @@ class Engine:
                     f"are, so cannot {what}. Search for them first (a Perception check)"
                     + (f", or {ways}" if ways and op != "use_ability" else "") + ".")
         guess = ""
-        if op == "attack":
+        if op == "attack" and awareness.has_hunch(actor, subject):   # `_guess_square`
             guess = (f", swing blind at where {actor.name} guesses they are "
                      f"({awareness.guess_fix(actor.ref)})")
         elif op == "cast" and need == "square":
@@ -3276,6 +3307,16 @@ class Engine:
         if not self.scene.has_grid or actor.ref not in self.scene.positions:
             return self._refuse(intent, f"{actor.name} has nothing to aim at: there is no "
                                         f"ground mapped to guess a square on.")
+        # A creature swings blind only on a hunch that somebody unseen is close by. The
+        # market, 2026-11-12: a lookout that had lost the player 40 ft off swung at the air
+        # beside itself instead of searching. Its own knowledge, so the refusal says nothing
+        # of where anyone is; the player's guesses are the player's to make.
+        if not actor.is_pc and not any(
+                awareness.has_hunch(actor, a) for a in self.scene.actors.values()
+                if a is not actor and a.has_state(awareness.HIDDEN)):
+            return self._refuse(intent, f"{actor.name} has no idea anybody unseen is close "
+                                        f"enough to swing at; it may search instead: "
+                                        f"{awareness.search_fix(actor.ref)}.")
         seen = set()
         for r, a in self.scene.actors.items():
             if r != actor.ref and r in self.scene.positions \
@@ -12393,9 +12434,22 @@ class Engine:
         # one wants a double move, the other wants a different route.
         anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied)
         if flat in anywhere:
+            # The square this round's movement gets them nearest it, named and carried as
+            # the fix: live 2026-11-12, told only the distance, the plan proposed a square
+            # 45-55 ft off seven times running and the turn fell to narration.
+            back = grid.reachable(flat, 10_000, size=actor.size, occupied=occupied)
+            toward = min((p for p in routes if p in back), default=None,
+                         key=lambda p: (back[p], -routes[p], p))
+            fix, said = None, ""
+            if toward is not None:
+                square = (*toward, grid.ground(toward)) if len(target) > 2 else tuple(toward)
+                fix = {"kind": "move", "square": list(square)}
+                said = (f" The nearest it can get this round is {square}, "
+                        f"{routes[toward]} ft.")
             raise IntentError(
                 f"move: {target} is {anywhere[flat]} ft away by the shortest open route "
-                f"and {actor.name} has {budget} ft of movement.", "legality", index,
+                f"and {actor.name} has {budget} ft of movement.{said}", "legality", index,
+                code="too_far", fix=fix,
             )
         raise IntentError(
             f"move: there is no route from {start} to {target} that {actor.name} fits "
@@ -13535,6 +13589,10 @@ class Engine:
         # but a brawl still has to happen on ground, and `floorplan.for_place("")` falls
         # through to open ground the way every fight used to get.
         if self.scene.grid is not None:
+            # A loaded grid carries no fixtures (they are derived, never saved): name it
+            # now, the one door `rules/fixtures.py` reaches a grid by.
+            if self.scene.grid.fixtures is None and self.scene.at:
+                self._type_the_ground()
             # The ground is down already; anybody still standing nowhere on it is put
             # at their zone now — a save from before arrivals were placed, a door that
             # added somebody before the player had a square. Nobody who HAS a square is
@@ -13544,7 +13602,7 @@ class Engine:
                 stragglers = [r for r in self.scene.actors
                               if r != pc.ref and r not in self.scene.positions]
                 if stragglers:
-                    self.scene.place_by_zone(stragglers)
+                    self.scene.place_by_zone(stragglers, posts=True)
             return False
         if not (self.scene.at or even_nowhere):
             return False
@@ -13553,6 +13611,7 @@ class Engine:
         authored = getattr(self.here(), "shape", None)
         self.scene.grid = floorplan.for_place(
             self.scene.at, places_mod.terrain_of(self.scene.at), authored)
+        self._type_the_ground()
         # The player first and everyone else around them, because `place_by_zone` measures
         # from the PC. A quarter of the way in, the same spot a fight would have put them,
         # and never off the board — a ten-foot alley is two squares wide.
@@ -13571,8 +13630,16 @@ class Engine:
         unplaced = [r for r in self.scene.actors
                     if r != pc.ref and r not in self.scene.positions]
         if unplaced:
-            self.scene.place_by_zone(unplaced)
+            self.scene.place_by_zone(unplaced, posts=True)
         return True
+
+    def _type_the_ground(self) -> None:
+        """Name the fixtures on the ground here (`rules/fixtures.type_the_ground`)."""
+        from . import fixtures, places as places_mod
+
+        fixtures.type_the_ground(self.scene, self.scene.at or "",
+                                 places_mod.terrain_of(self.scene.at or ""),
+                                 getattr(self.here(), "shape", None))
 
     def staff_the_place(self):
         """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
@@ -22329,9 +22396,38 @@ class Engine:
                                         f"check, or 15 slashing to the goo).")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
-            refusal = self._cannot_leave_the_ground(actor, from_square, tuple(square))
+            climb = self._climb_to_make(actor, from_square, tuple(square))
+            refusal = "" if climb else self._cannot_leave_the_ground(actor, from_square,
+                                                                      tuple(square))
             if refusal:
                 return self._refuse(intent, refusal)
+            climbed = None
+            if climb:
+                # Anyone may try (the owner, 2026-11-13: "climb checks should be possible
+                # for anyone"); Climb is usable untrained (CRB p.90). Failing leaves the
+                # body where it stood: "fail by 4 or less, you make no progress", and from
+                # the ground there is nowhere to fall. shortcut: the climb is not priced at
+                # quarter speed against a round's movement; price it when a fight shows a
+                # climb plus a full walk in one move.
+                climbed = self.dice.d20(actor.skill_modifiers("climb"),
+                                        label=f"{actor.name} Climb",
+                                        visibility="player" if actor.is_pc else "hidden")
+                if climbed.total < climb[1]:
+                    # The walk to it happened; the climb did not. Left at its foot (the
+                    # cheapest open square beside it on the walker's own footing), not
+                    # back where the walk began three squares off.
+                    foot = self._foot_of(ref, from_square, tuple(square))
+                    if foot is not None:
+                        self.scene.positions[ref] = foot
+                        self.scene.settle_levels()
+                        self.scene.resync_zones()
+                    return Outcome(
+                        intent_id=intent.id, op="move", status="prevented",
+                        effects=[{"ref": ref, "kind": "climb", "onto": climb[0],
+                                  "dc": climb[1], "made": False, "to": foot}],
+                        tell=f"{actor.name} tries to climb onto {climb[0]} and does not "
+                             f"get up (Climb {climbed.total} against DC {climb[1]}).",
+                        rolls=[climbed], because=intent.because)
             self.scene.positions[ref] = tuple(square)
             self.scene.settle_levels()
             # The zone is now measured rather than taken on trust. The GM may still have
@@ -22347,7 +22443,18 @@ class Engine:
                 self.scene.move_spent[ref] = self.scene.round
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
-            tell = f"{actor.name} moves to {zone}{crossed}."
+            # A zone is a distance from the player, so the player's own walk has none to
+            # name: "Pip moves to near (15 ft)" was read live as near somebody (2026-11-12).
+            went = (f"{actor.name} moves {cost} ft" if cost is not None else
+                    f"{actor.name} moves") if actor.is_pc else \
+                f"{actor.name} moves to {zone}{crossed}"
+            tell = f"{went}."
+            # Where in the place, when the square is a fixture's (`fixtures.where_said`).
+            from . import fixtures
+
+            onto = fixtures.where_said(self.scene.grid, from_square, tuple(square))
+            if onto:
+                tell = f"{went}, {onto}."
             # The step `_close_before` put in front of a blow: told as what it is, so the
             # narrator hears that the distance was closed before the swing it dresses.
             # `closing_on` is written by code only — the parser refuses it from a model.
@@ -22378,9 +22485,20 @@ class Engine:
             apart_fx, apart_said = self._group_apart(actor)
             if apart_said:
                 tell = " ".join([tell, *apart_said])
+            if climbed is not None:
+                effect["climb"] = {"onto": climb[0], "dc": climb[1], "made": True}
+                # Said once: "moves 10 ft, up onto a cart (Climb 14 against DC 10)". Live,
+                # the walk's own "up onto a cart" and a second "climbs up onto a cart"
+                # named the cart twice in one tell.
+                rolled = f" (Climb {climbed.total} against DC {climb[1]})"
+                head = f"{went}, {onto}."
+                tell = (tell.replace(head, f"{went}, {onto}{rolled}.", 1)
+                        if onto and head in tell else
+                        f"{tell} {actor.name} climbs up onto {climb[0]}{rolled}.")
             return Outcome(
                 intent_id=intent.id, op="move",
                 effects=[effect, *apart_fx],
+                rolls=[climbed] if climbed is not None else [],
                 tell=tell,
                 because=intent.because,
             )
@@ -22524,6 +22642,41 @@ class Engine:
                         return p
         return wanted
 
+    def _foot_of(self, ref, start, end) -> tuple | None:
+        """The cheapest open square beside `end` at the walker's own footing, or None."""
+        if max(abs(start[0] - end[0]), abs(start[1] - end[1])) <= 1:
+            return None                         # already at its foot
+        grid, actor = self.scene.grid, self.scene.actors[ref]
+        was = start[2] if len(start) > 2 else grid.ground(tuple(start[:2]))
+        routes = grid.reachable(tuple(start[:2]), 10_000, size=actor.size,
+                                occupied=self.scene.occupied(ignore=ref))
+        # Ties go square-on, as `position.square_in_reach` breaks them.
+        near = [(cost, (sq[0] - end[0]) ** 2 + (sq[1] - end[1]) ** 2, tuple(sq[:2]))
+                for sq, cost in routes.items()
+                if max(abs(sq[0] - end[0]), abs(sq[1] - end[1])) == 1
+                and grid.ground(tuple(sq[:2])) == was]
+        return min(near)[2] if near else None
+
+    def _climb_to_make(self, actor, start, end) -> tuple[str, int] | None:
+        """(what, Climb DC) when this move is a body going up onto a climbable fixture
+        (a cart, a crate stack) without a climb or fly speed of its own; else None, and
+        `_cannot_leave_the_ground` answers as before. Under a ceiling too low, None."""
+        from . import fixtures
+
+        grid = self.scene.grid
+        if grid is None or start is None or actor.can_move_vertically():
+            return None
+        onto = fixtures.climb_onto(grid, end[:2])
+        level = end[2] if len(end) > 2 else grid.ground(end[:2])
+        was = start[2] if len(start) > 2 else grid.ground(tuple(start[:2]))
+        roof = grid.headroom(end[:2])
+        if onto is None or level <= was or (roof is not None and level > roof):
+            return None
+        # A gallery a stair reaches is walked up, as `_cannot_leave_the_ground` lets it.
+        if level == grid.ground(end[:2]) and fixtures.stair_to(grid, end[:2]) is not None:
+            return None
+        return onto
+
     def _cannot_leave_the_ground(self, actor, start, end) -> str:
         """Why this creature may not move to that level, or "".
 
@@ -22536,13 +22689,20 @@ class Engine:
         cross a gap to reach its wall is a pathing question, and this is a permission
         question; `_move_cost` already answers "there is no route" with `None`.
         """
-        level = end[2] if len(end) > 2 else 0
-        was = start[2] if start is not None and len(start) > 2 else 0
+        grid = self.scene.grid
+        # A square written without a level is the floor THERE, which is where
+        # `settle_levels` puts a walker the moment they arrive. Reading it as level 0 let
+        # any move written as (x, y) walk a man straight up onto a ten-foot gallery that
+        # the same move written as (x, y, 2) was refused (found typing fixtures,
+        # 2026-11-11): the rule depended on how the square was spelled.
+        level = end[2] if len(end) > 2 else (grid.ground(end) if grid is not None else 0)
+        was = (start[2] if start is not None and len(start) > 2
+               else grid.ground(tuple(start[:2])) if grid is not None and start is not None
+               else 0)
         if level == was:
             return ""
         if level < 0:
             return f"{actor.name} cannot go below the floor."
-        grid = self.scene.grid
         roof = grid.headroom(end) if grid is not None else None
         if roof is not None and level > roof:
             return (f"There is not that much air above {actor.name}: the ceiling is "
@@ -22553,6 +22713,19 @@ class Engine:
         # Coming back down is always allowed — that is falling, and everybody can fall.
         if level < was:
             return ""
+        # Walking up a stair is walking (rules/fixtures.py): standing on the floor of a
+        # gallery that a stair reaches needs no climb speed.
+        from . import fixtures
+
+        if grid is not None and level == grid.ground(end) \
+                and fixtures.stair_to(grid, end) is not None:
+            return ""
+        onto = fixtures.climb_onto(grid, end)
+        if onto is not None:
+            # The move op rolls this (`_climb_to_make`) before it asks here; reached only
+            # when the climb was ruled out (a ceiling too low), so it names the check.
+            return (f"{actor.name} cannot simply walk up onto {onto[0]}: getting up is a "
+                    f"Climb check (DC {onto[1]}).")
         return (f"{actor.name} has no way up: no fly speed and no climb speed, and "
                 f"nothing here to climb.")
 
@@ -22575,8 +22748,12 @@ class Engine:
         from .grid import SQUARE_FT
 
         here, there = tuple(start[:2]), tuple(end[:2])
-        was = start[2] if len(start) > 2 else 0
-        now = end[2] if len(end) > 2 else 0
+        # A square written without a level is the floor there, as
+        # `_cannot_leave_the_ground` reads it: priced at 0, a move written (x, y) walked
+        # a gallery's height for free and skipped the stair (2026-11-11).
+        grid = self.scene.grid
+        was = start[2] if len(start) > 2 else grid.ground(here)
+        now = end[2] if len(end) > 2 else grid.ground(there)
         if there == here:
             # Straight up or straight down, without crossing the floor at all — which is
             # the commonest move a climber makes and the one `reachable` cannot answer:
@@ -22595,6 +22772,16 @@ class Engine:
             flat = reach.get(there)
             if flat is None:
                 return None
+            # Up a stair, the walk goes BY the stair: to its foot, then onto the gallery.
+            from . import fixtures
+
+            stair = fixtures.stair_to(self.scene.grid, there)
+            if stair is not None and now > was and here != stair \
+                    and not self.scene.actors[ref].can_move_vertically():
+                up = self.scene.grid.reachable(stair, 10_000, size=size,
+                                               occupied=occupied).get(there)
+                if reach.get(stair) is not None and up is not None:
+                    flat = reach[stair] + up
         return flat + abs(now - was) * SQUARE_FT
 
     def _op_advance_time(self, intent: Intent, partial: dict) -> Outcome:

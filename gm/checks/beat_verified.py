@@ -48,7 +48,8 @@ KINDS = frozenset({"beat-moves-player", "beat-hands-over", "beat-settles-trade",
                    "beat-harms", "beat-absent", "beat-presence", "beat-hour",
                    "beat-omits-outcome", "beat-condition", "beat-attempt", "beat-setting",
                    "beat-struck-with", "beat-swing-early", "beat-foe-struck-with",
-                   "beat-struck-at-early", "beat-aimed-wrong", "beat-makes-item"})
+                   "beat-struck-at-early", "beat-aimed-wrong", "beat-makes-item",
+                   "beat-height"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
 
 # Which finding kind each discrepancy category raises, and how heavy it is: a move the
@@ -104,7 +105,11 @@ _KIND = {"move": ("beat-moves-player", 4), "hands": ("beat-hands-over", 3),
          # A thing the page says the player made that no typed craft made: the "duller
          # blade of common steel" a refused mithral longsword left on the page (live,
          # 2026-10-28; docs/typed-crafting.md). Wrong for as long as the pack is read.
-         "made": ("beat-makes-item", 3)}
+         "made": ("beat-makes-item", 3),
+         # Where in the place the page leaves the player, against the square and level
+         # the engine holds (the gate, 2026-11-11: "you climb the stone stairs and step
+         # onto the wall-walk" with the token on the ground). As wrong as a move.
+         "height": ("beat-height", 4)}
 
 # The kinds repaired by the backstop alone, never a one-sentence rewrite. A rewrite is
 # checked by reading the rewritten sentence back ALONE (`beat_verify.read_beat` reads only
@@ -254,6 +259,8 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
         text = cut(text, [d.sentence])
         if d.category == "trade" and d.line and d.line not in text:
             text = f"{d.line} {text}".strip()
+        if d.category == "height" and d.line and d.line not in text:
+            text = narration_mod.put_before_the_hand_back(text, d.line)
         if d.category == "early" and d.line and d.line not in text:
             # The engine's own declaration stands where the landed blow was, once, as
             # `cut_premature_blows` puts it (the name becomes "you" later in the groom).

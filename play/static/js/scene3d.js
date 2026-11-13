@@ -161,8 +161,18 @@
     pc: [0xd9, 0xc0, 0x8a],
     ally: [0x6f, 0xc2, 0x76],
     foe: [0xe0, 0x26, 0x1e],
-    bystander: [0xf2, 0xec, 0xdd]
+    bystander: [0xf2, 0xec, 0xdd],
+    neutral: [0x6b, 0x4a, 0x3a],        // `#map .token`, the flat token with no side
+    // Fixtures (2026-11-11), from the table's own palette: wood from the leather and brass
+    // browns, stone from the board's greys, book spines from the side colours dimmed.
+    wood: [0x6b, 0x4a, 0x3a], wooddark: [0x4a, 0x33, 0x26], plank: [0x7d, 0x68, 0x45],
+    tread: [0x9a, 0x84, 0x58], hoop: [0x2e, 0x26, 0x1e], stone: [0x5c, 0x58, 0x52],
+    stonedark: [0x3a, 0x31, 0x28], iron: [0x6a, 0x6f, 0x76], water: [0x2e, 0x3c, 0x46],
+    waterhi: [0x6a, 0x7a, 0x86], spine0: [0x7d, 0x1a, 0x14], spine1: [0x1f, 0x4a, 0x26],
+    spine2: [0x7d, 0x68, 0x45], spine3: [0x3a, 0x40, 0x48], spine4: [0x7a, 0x6f, 0x5a]
   };
+  // A fire is its own light: the ember, never shaded by the lamp.
+  var EMBER = "#ffb054";
 
   // A square the party can reach is a WASH over whatever the ground already is, which is
   // what the flat map does with it — `#map .reach { fill: var(--gold); opacity: .12 }`.
@@ -174,11 +184,27 @@
   // A spell's area: the flat map's `.spellarea` fill, character for character.
   var AREA = "#e0701e";
 
-  function paint(name, lit, wash) {
+  /* NIGHT (mock, 2026-11-13, plan item 10). The light the PC sees (`grid.light`,
+     views._light_state from `Scene.light_at`), never the hour: a roofed tavern at
+     midnight is "normal" by its own lamps and draws as it does by day. Dim is the book's
+     moonlit night, darker and blue; dark is darker still. A square a carried light
+     raises is drawn at its own level, so a torch lights its ring. Foundry VTT's scene
+     darkness works the same way (one level for the scene, light sources cutting it). */
+  var NIGHT = { dim: [0.5, 0.58, 0.86], dark: [0.24, 0.27, 0.4] };
+  var WARM = [1.08, 0.97, 0.8];
+  var DUSK = null;   // the board's light while one render runs: {level, at{"x,y": level}}
+  function duskAt(at) {
+    if (!DUSK || !at) return null;
+    var lv = DUSK.at[key(Math.floor(at[0]), Math.floor(at[1]))] || DUSK.level;
+    // A square a carried light raises out of the night is lit warm, a torch's colour.
+    return NIGHT[lv] || (lv !== DUSK.level && NIGHT[DUSK.level] ? WARM : null);
+  }
+
+  function paint(name, lit, wash, night) {
     var c = MATERIAL[name] || MATERIAL.tile, out = "#";
     for (var i = 0; i < 3; i++) {
       var base = wash ? c[i] + (GOLD[i] - c[i]) * WASH : c[i];
-      var v = Math.round(Math.max(0, Math.min(255, base * lit)));
+      var v = Math.round(Math.max(0, Math.min(255, base * lit * (night ? night[i] : 1))));
       out += (v < 16 ? "0" : "") + v.toString(16);
     }
     return out;
@@ -252,13 +278,444 @@
     });
   }
 
-  // A freestanding box — a figure, a rail post. Nothing abuts it, so all four walls stand.
-  function box(out, x, y, z0, z1, mat, cls, attrs, inner, bevel) {
-    cap(out, x, y, z1, mat, cls, attrs, inner, bevel);
-    walls(out, x, y, z1, [z0, z0, z0, z0], mat, cls);
+  // A box of any footprint and height, all five visible faces: a rail on an edge, a step,
+  // a table top, a shelf. `attrs` (e.g. pointer-events) goes on every face.
+  function slab(out, x0, y0, x1, y1, z0, z1, mat, cls, attrs) {
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], UP, mat, cls, attrs);
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], NORTH, mat, cls, attrs);
+    face(out, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], SOUTH, mat, cls, attrs);
+    face(out, [[x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0]], WEST, mat, cls, attrs);
+    face(out, [[x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0]], EAST, mat, cls, attrs);
   }
 
   function key(c, r) { return c + "," + r; }
+
+  /* An upright frustum of `n` sides: radius r0 at z0 to r1 at z1, its normals tilted by
+     the taper so the lamp lights a narrowing body as it narrows. `cap` ({cls, inner})
+     puts a lid on top. */
+  function frustum(out, cx, cy, r0, r1, z0, z1, n, mat, cls, cap) {
+    var h = z1 - z0, ring = [], i;
+    for (i = 0; i < n; i++) {
+      var a = i / n * 2 * Math.PI, b = (i + 1) / n * 2 * Math.PI, m = (a + b) / 2;
+      face(out, [[cx + r1 * Math.cos(a), cy + r1 * Math.sin(a), z1],
+                 [cx + r1 * Math.cos(b), cy + r1 * Math.sin(b), z1],
+                 [cx + r0 * Math.cos(b), cy + r0 * Math.sin(b), z0],
+                 [cx + r0 * Math.cos(a), cy + r0 * Math.sin(a), z0]],
+           norm([Math.cos(m) * h, Math.sin(m) * h, r0 - r1]), mat, cls);
+      ring.push([cx + r1 * Math.cos(a), cy + r1 * Math.sin(a), z1]);
+    }
+    if (cap) face(out, ring, UP, mat, cap.cls, "", cap.inner);
+  }
+
+  /* --- figures (2026-11-11) ------------------------------------------------------------
+     The owner: "replace the square people with something that will indicate it is a
+     humanoid". A tabletop miniature, because that is the thing a player already reads
+     as "a person standing here": a round base in the side's colour, two legs, a body
+     that widens to the shoulders with the arms at its sides, a head. Built of a few lit frusta, like the rest
+     of the board — no image, no icon.
+
+     A body that is not a person must not be drawn as one (`form`, play/views.py
+     `_body_form`, from the `type.*` tags): an animal, a vermin, a magical beast stands
+     on all fours, low and long; an ooze is a mound. Two generic shapes, never one per
+     monster. Anyone at zero hit points lies on their base whatever they are: prone is
+     what should read across the room.
+
+     Every piece is a closed convex solid, so a face turned away from the camera is
+     hidden by its own front at every quarter-turn — marked `cull` and never drawn,
+     which halves what a figure costs the depth sort. Returns the figure's top. */
+  function figure(out, cx, cy, z, s, form, down, mat, cls, baseCls, tip, sits) {
+    var start = out.length;
+    frustum(out, cx, cy, 0.42 * s, 0.4 * s, z, z + 0.07 * s, 10, mat, cls,
+            { cls: cls + baseCls, inner: tip });
+    var b = z + 0.07 * s, top;
+    if (down) {
+      slab(out, cx - 0.36 * s, cy - 0.12 * s, cx + 0.16 * s, cy + 0.12 * s, b, b + 0.2 * s,
+           mat, cls);
+      slab(out, cx + 0.18 * s, cy - 0.09 * s, cx + 0.38 * s, cy + 0.09 * s, b,
+           b + 0.17 * s, mat, cls);
+      top = b + 0.2 * s;
+    } else if (form === "beast") {
+      /* A beast (mock, plan item 8): four thin legs under a long low body, a deeper
+         chest, the head carried forward and higher than the back, a snout, ears, and a
+         tail hung low behind. The first cut was one box on four posts with a box on
+         the front, which read as a table. Faces +x, as it always has. */
+      [[-0.27, -0.1], [-0.18, 0.05], [0.12, -0.1], [0.2, 0.05]].forEach(function (l) {
+        slab(out, cx + l[0] * s, cy + l[1] * s, cx + (l[0] + 0.05) * s,
+             cy + (l[1] + 0.05) * s, b, b + 0.31 * s, mat, cls);
+      });
+      slab(out, cx - 0.32 * s, cy - 0.11 * s, cx + 0.16 * s, cy + 0.11 * s, b + 0.29 * s,
+           b + 0.47 * s, mat, cls);
+      slab(out, cx + 0.06 * s, cy - 0.13 * s, cx + 0.27 * s, cy + 0.13 * s, b + 0.27 * s,
+           b + 0.53 * s, mat, cls);
+      slab(out, cx + 0.24 * s, cy - 0.09 * s, cx + 0.42 * s, cy + 0.09 * s, b + 0.47 * s,
+           b + 0.65 * s, mat, cls);
+      slab(out, cx + 0.42 * s, cy - 0.045 * s, cx + 0.55 * s, cy + 0.045 * s, b + 0.49 * s,
+           b + 0.57 * s, mat, cls);
+      [-1, 1].forEach(function (k) {
+        slab(out, cx + 0.27 * s, cy + k * 0.06 * s - 0.025 * s, cx + 0.32 * s,
+             cy + k * 0.06 * s + 0.025 * s, b + 0.65 * s, b + 0.75 * s, mat, cls);
+      });
+      slab(out, cx - 0.42 * s, cy - 0.03 * s, cx - 0.32 * s, cy + 0.03 * s, b + 0.38 * s,
+           b + 0.45 * s, mat, cls);
+      slab(out, cx - 0.52 * s, cy - 0.03 * s, cx - 0.42 * s, cy + 0.03 * s, b + 0.3 * s,
+           b + 0.38 * s, mat, cls);
+      top = b + 0.75 * s;
+    } else if (form === "ooze") {
+      frustum(out, cx, cy, 0.38 * s, 0.32 * s, b, b + 0.14 * s, 10, mat, cls);
+      frustum(out, cx, cy, 0.32 * s, 0.19 * s, b + 0.14 * s, b + 0.3 * s, 10, mat, cls);
+      frustum(out, cx, cy, 0.19 * s, 0.06 * s, b + 0.3 * s, b + 0.38 * s, 10, mat, cls,
+              { cls: cls });
+      top = b + 0.38 * s;
+    } else if (sits) {
+      /* Seated at a table (`sits` is the way to it, views._sits): a stool, thighs
+         level toward the table, shins down at its edge, the body on top 0.16 lower
+         than standing. The posts put patrons at tables; standing there, plan item 11,
+         a tavern read as a queue. */
+      var dx = sits[0], dy = sits[1], px = -dy, py = dx, h = 0.3 * s;
+      var bx = cx - dx * 0.1 * s, by = cy - dy * 0.1 * s;
+      var box = function (x0, y0, x1, y1, z0, z1, m) {
+        slab(out, Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1),
+             z0, z1, m, cls);
+      };
+      box(bx - 0.17 * s, by - 0.17 * s, bx + 0.17 * s, by + 0.17 * s, b, b + h, "wooddark");
+      [-1, 1].forEach(function (k) {
+        var ox = px * k * 0.08 * s, oy = py * k * 0.08 * s;
+        box(bx + ox - 0.05 * s, by + oy - 0.05 * s, bx + ox + dx * 0.36 * s + 0.05 * s,
+            by + oy + dy * 0.36 * s + 0.05 * s, b + h, b + h + 0.1 * s, mat);
+        var kx = bx + ox + dx * 0.33 * s, ky = by + oy + dy * 0.33 * s;
+        box(kx - 0.045 * s, ky - 0.045 * s, kx + 0.045 * s, ky + 0.045 * s, b, b + h, mat);
+        box(bx + px * k * 0.23 * s - 0.04 * s, by + py * k * 0.23 * s - 0.04 * s,
+            bx + px * k * 0.23 * s + 0.04 * s, by + py * k * 0.23 * s + 0.04 * s,
+            b + 0.34 * s, b + 0.8 * s, mat);
+      });
+      frustum(out, bx, by, 0.13 * s, 0.21 * s, b + 0.34 * s, b + 0.8 * s, 6, mat, cls);
+      frustum(out, bx, by, 0.21 * s, 0.07 * s, b + 0.8 * s, b + 0.88 * s, 6, mat, cls);
+      frustum(out, bx, by, 0.09 * s, 0.15 * s, b + 0.9 * s, b + 1.03 * s, 6, mat, cls);
+      frustum(out, bx, by, 0.15 * s, 0.08 * s, b + 1.03 * s, b + 1.19 * s, 6, mat, cls,
+              { cls: cls });
+      top = b + 1.19 * s;
+    } else {
+      // Two legs, a torso widening to the shoulders, arms at its sides, a head on a
+      // neck: the pawn-like first cut (one tapered column) read as a bottle.
+      [-1, 1].forEach(function (k) {
+        frustum(out, cx + k * 0.08 * s, cy, 0.06 * s, 0.075 * s, b, b + 0.52 * s, 6, mat,
+                cls);
+        slab(out, cx + k * 0.23 * s - 0.04 * s, cy - 0.045 * s, cx + k * 0.23 * s + 0.04 * s,
+             cy + 0.045 * s, b + 0.5 * s, b + 0.96 * s, mat, cls);
+      });
+      frustum(out, cx, cy, 0.13 * s, 0.21 * s, b + 0.5 * s, b + 0.96 * s, 6, mat, cls);
+      frustum(out, cx, cy, 0.21 * s, 0.07 * s, b + 0.96 * s, b + 1.04 * s, 6, mat, cls);
+      frustum(out, cx, cy, 0.09 * s, 0.15 * s, b + 1.06 * s, b + 1.19 * s, 6, mat, cls);
+      frustum(out, cx, cy, 0.15 * s, 0.08 * s, b + 1.19 * s, b + 1.35 * s, 6, mat, cls,
+              { cls: cls });
+      top = b + 1.35 * s;
+    }
+    for (var i = start; i < out.length; i++) out[i].cull = true;
+    return top;
+  }
+
+  /* --- textures (2026-11-11) -----------------------------------------------------------
+     The owner: "make the textures like stone apear in the 3D view as well". Stone courses
+     on walls and the sides of raised ground, planks on wall-walk tops and crates, a
+     subtle flagstone on the floor: the flat board's materials, as SVG patterns.
+
+     A pattern is laid in the FACE'S OWN PLANE. Its tile is drawn in squares and levels
+     (u along the face, v up it or across it) and `patternTransform` is the projection of
+     those two axes, so a course of stone runs level along a side face and a plank runs
+     along a top, and both turn with the board. Under an orthographic camera every face
+     of one orientation shares that map, so a board needs one pattern per material,
+     orientation and lit colour — about a dozen — never one per square.
+
+     The lamp stays on top of the texture: the pattern is painted in the face's lit
+     colour (stone mortar and plank seams are that colour darkened), so a wall turned
+     away from the lamp is dark stone and the lit one bright stone, as before.
+
+     Each pattern is anchored to its face's plane where it crosses the world origin, so
+     every wall's courses start at height 0. Anchored at the screen's origin, as first
+     built, parallel walls a row apart began their courses at different heights; the
+     owner's market picture showed it (plan item 9). */
+  function tint(hex, k) {
+    var out = "#";
+    for (var i = 1; i < 7; i += 2) {
+      var v = Math.round(Math.max(0, Math.min(255, parseInt(hex.substr(i, 2), 16) * k)));
+      out += (v < 16 ? "0" : "") + v.toString(16);
+    }
+    return out;
+  }
+  var TILES = {
+    // Coursed stone: courses a quarter-level high, stones half a square long, bonded.
+    stone: function (c) {
+      var m = tint(c, 0.6);
+      return [1, 0.5, '<rect width="1" height=".5" fill="' + c + '"/>' +
+        '<rect x=".5" width=".5" height=".25" fill="' + tint(c, 1.1) + '"/>' +
+        '<rect x=".25" y=".25" width=".5" height=".25" fill="' + tint(c, 0.9) + '"/>' +
+        '<path d="M0 0h1v.025H0zM0 .25h1v.025H0zM0 0h.02v.25H0zM.5 0h.02v.25h-.02z' +
+        'M.25 .25h.02v.25h-.02zM.75 .25h.02v.25h-.02z" fill="' + m + '"/>'];
+    },
+    // Boards a quarter-square wide, butt joints staggered.
+    plank: function (c) {
+      return [1, 0.75, '<rect width="1" height=".75" fill="' + c + '"/>' +
+        '<rect y=".25" width="1" height=".25" fill="' + tint(c, 1.07) + '"/>' +
+        '<path d="M0 0h1v.02H0zM0 .25h1v.02H0zM0 .5h1v.02H0zM.3 0h.02v.25h-.02z' +
+        'M.75 .25h.02v.25h-.02zM.12 .5h.02v.25h-.02z" fill="' + tint(c, 0.62) + '"/>'];
+    },
+    /* The floor, quietly: two rows of slabs to a square, joints only, laid once over
+       the whole ground as one polygon (see `ground` in render). Painted per tile it was
+       576 pattern fills on a 24x24 board and doubled the time a turn takes to show
+       (52 ms to 113, measured in Chrome); one overlay costs about nothing. */
+    flag: function () {
+      return [1, 1, '<path d="M0 .5h1v.018H0zM.5 0h.018v.5h-.018zM.25 .5h.018v.5h-.018z' +
+        'M.75 .5h.018v.5h-.018z" fill="#0a0806" fill-opacity=".3"/>' +
+        '<rect x=".5" width=".5" height=".5" fill="#0a0806" fill-opacity=".05"/>'];
+    }
+  };
+  // Which texture a face wears: axis-aligned faces only (a barrel's staves and a figure
+  // keep their flat lit colour), and never the thin detail panels laid over a face.
+  function textureOf(f) {
+    if (f.cls.indexOf("fxd") >= 0 || f.cls.lastIndexOf("fig", 0) === 0) return null;
+    var up = f.n[2] === 1, side = !f.n[2] && (Math.abs(f.n[0]) === 1 || Math.abs(f.n[1]) === 1);
+    if (!up && !side) return null;
+    if (f.mat === "solid" || f.mat === "stone") return "stone";
+    if (f.mat === "raised") return up ? "plank" : "stone";
+    if (f.mat === "wood" || (f.mat === "plank" && up)) return "plank";
+    return null;
+  }
+
+  // Whether screen point p lies inside polygon q (even-odd ray cast).
+  function inside(p, q) {
+    var hit = false;
+    for (var i = 0, j = q.length - 1; i < q.length; j = i++) {
+      if ((q[i][1] > p[1]) !== (q[j][1] > p[1]) &&
+          p[0] < (q[j][0] - q[i][0]) * (p[1] - q[i][1]) / (q[j][1] - q[i][1]) + q[i][0]) {
+        hit = !hit;
+      }
+    }
+    return hit;
+  }
+
+  // --- fixtures as the things they are (2026-11-11) ---------------------------------------
+  // The owner: "i want the fixtures to actually look like what the represent". Each kind
+  // in content/rules/fixtures.json is built from the same lit faces as everything else —
+  // prisms, slabs and thin panels laid on their faces — never an image or an icon, in the
+  // table's own browns, greys and ember. Detail panels carry `fxd` (no outline stroke, so a
+  // plank seam reads as a seam) and `pointer-events="none"`, so a click still lands on the
+  // square under them.
+
+  // A box whose top and sides are different stuff: a tread over its riser, a counter top.
+  function slab2(out, x0, y0, x1, y1, z0, z1, top, side, cls, attrs) {
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], UP, top, cls, attrs);
+    face(out, [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], NORTH, side, cls, attrs);
+    face(out, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], SOUTH, side, cls, attrs);
+    face(out, [[x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0]], WEST, side, cls, attrs);
+    face(out, [[x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0]], EAST, side, cls, attrs);
+  }
+
+  // An upright n-sided prism: a barrel's staves (or only a band of them, `sidesOnly`).
+  function prism(out, cx, cy, r, z0, z1, mat, cls, sidesOnly, top) {
+    var n = 8, ring = [];
+    for (var i = 0; i < n; i++) {
+      var a = (i + 0.5) / n * 2 * Math.PI;
+      ring.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    for (i = 0; i < n; i++) {
+      var p = ring[i], q = ring[(i + 1) % n], m = (i + 1) / n * 2 * Math.PI;
+      face(out, [[p[0], p[1], z1], [q[0], q[1], z1], [q[0], q[1], z0], [p[0], p[1], z0]],
+           [Math.cos(m), Math.sin(m), 0], mat, cls, NOPOINT);
+    }
+    if (!sidesOnly) {
+      face(out, ring.map(function (p) { return [p[0], p[1], z1]; }), UP, top || mat, cls,
+           NOPOINT);
+    }
+  }
+
+  // A thin panel lying on one face of the box [x0,x1]x[y0,y1], `d` the face's outward
+  // direction, from fraction a0 to a1 along it and z0 to z1 up it, a hair proud of it.
+  function panel(out, x0, y0, x1, y1, d, a0, a1, z0, z1, mat, cls) {
+    var e = 0.012, pts;
+    if (d[1]) {
+      var py = d[1] > 0 ? y1 + e : y0 - e, u0 = x0 + (x1 - x0) * a0, u1 = x0 + (x1 - x0) * a1;
+      pts = [[u0, py, z1], [u1, py, z1], [u1, py, z0], [u0, py, z0]];
+    } else {
+      var px = d[0] > 0 ? x1 + e : x0 - e, v0 = y0 + (y1 - y0) * a0, v1 = y0 + (y1 - y0) * a1;
+      pts = [[px, v0, z1], [px, v1, z1], [px, v1, z0], [px, v0, z0]];
+    }
+    face(out, pts, [d[0], d[1], 0], mat, cls + " fxd", NOPOINT);
+  }
+
+  // A thin strip on a top face at height z, across the square along x (`alongX`) or y.
+  function seam(out, x0, y0, x1, y1, z, at, alongX, mat, cls) {
+    var w = 0.025;
+    var pts = alongX
+      ? [[x0, at - w, z], [x1, at - w, z], [x1, at + w, z], [x0, at + w, z]]
+      : [[at - w, y0, z], [at + w, y0, z], [at + w, y1, z], [at - w, y1, z]];
+    face(out, pts, UP, mat, cls + " fxd", NOPOINT);
+  }
+
+  var NOPOINT = ' pointer-events="none"';
+  var SIDES = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  var SPINES = ["spine0", "spine1", "spine2", "spine3", "spine4"];
+
+  /* One fixture square, drawn as its kind. `front` is the side facing the open floor
+     (where a shelf's spines and a hearth's fire are), `runX` whether the fixture runs
+     along x (a counter's length, a cart's axle across it). Returns the height it reaches,
+     or -1 when the kind has no drawing of its own and the plain block should stand. */
+  var GOODS = {};
+  /* What a line looks like laid on a counter: a few closed solids each, from the
+     palette already here. Two generic shapes a line, never a model per item. */
+  function wares(out, line, x, y, t, cls) {
+    if (!line) return;
+    var S = function (x0, y0, x1, y1, h, m) {
+      slab(out, x + x0, y + y0, x + x1, y + y1, t, t + h, m, cls, NOPOINT); };
+    var J = function (u, v, r, h, m) {
+      frustum(out, x + u, y + v, r, r * 0.8, t, t + h, 6, m, cls); };
+    if (line === "cloth") {
+      S(0.18, 0.2, 0.82, 0.34, 0.12, "spine0"); S(0.18, 0.4, 0.82, 0.54, 0.12, "spine1");
+      S(0.18, 0.6, 0.82, 0.74, 0.12, "spine2");
+    } else if (line === "provisions" || line === "general") {
+      J(0.32, 0.4, 0.14, 0.26, "plank"); J(0.64, 0.46, 0.13, 0.22, "plank");
+      if (line === "general") S(0.4, 0.62, 0.7, 0.86, 0.18, "wood");
+    } else if (line === "cookshop") {
+      J(0.38, 0.48, 0.17, 0.2, "iron"); J(0.7, 0.5, 0.09, 0.12, "wooddark");
+      J(0.38, 0.48, 0.1, 0.24, "ember");
+    } else if (line === "cord") {
+      J(0.32, 0.38, 0.15, 0.07, "plank"); J(0.64, 0.6, 0.15, 0.07, "plank");
+      J(0.64, 0.6, 0.12, 0.13, "plank");
+    } else if (line === "curios") {
+      S(0.2, 0.3, 0.38, 0.48, 0.14, "spine3"); J(0.6, 0.38, 0.07, 0.18, "rail");
+      S(0.44, 0.58, 0.66, 0.74, 0.08, "spine4");
+    } else if (line === "alchemist") {
+      J(0.28, 0.4, 0.07, 0.2, "spine1"); J(0.48, 0.5, 0.07, 0.24, "waterhi");
+      J(0.68, 0.42, 0.07, 0.18, "spine0");
+    } else if (line === "armorer" || line === "weaponsmith") {
+      S(0.16, 0.34, 0.84, 0.4, 0.04, "iron"); S(0.16, 0.52, 0.8, 0.58, 0.04, "iron");
+      if (line === "armorer") J(0.5, 0.7, 0.13, 0.12, "iron");
+    } else if (line === "leatherworker") {
+      S(0.2, 0.26, 0.8, 0.74, 0.03, "wood"); S(0.28, 0.34, 0.7, 0.66, 0.06, "wooddark");
+    }
+  }
+
+  function fixtureAt(out, f, x, y, z, front, runX, cls) {
+    var k = f.kind, i;
+    if (k === "barrel") {
+      prism(out, x + 0.5, y + 0.5, 0.36, z, z + 0.9, "wood", cls, false, "plank");
+      prism(out, x + 0.5, y + 0.5, 0.372, z + 0.15, z + 0.24, "hoop", cls + " fxd", true);
+      prism(out, x + 0.5, y + 0.5, 0.372, z + 0.66, z + 0.75, "hoop", cls + " fxd", true);
+      return z + 0.9;
+    }
+    if (k === "crate") {
+      var b = [x + 0.1, y + 0.1, x + 0.9, y + 0.9], h = z + 0.82;
+      slab(out, b[0], b[1], b[2], b[3], z, h, "wood", cls, NOPOINT);
+      SIDES.forEach(function (d) {
+        panel(out, b[0], b[1], b[2], b[3], d, 0, 1, z + 0.27, z + 0.3, "wooddark", cls);
+        panel(out, b[0], b[1], b[2], b[3], d, 0, 1, z + 0.53, z + 0.56, "wooddark", cls);
+        panel(out, b[0], b[1], b[2], b[3], d, 0.04, 0.12, z + 0.04, h - 0.02, "plank", cls);
+        panel(out, b[0], b[1], b[2], b[3], d, 0.88, 0.96, z + 0.04, h - 0.02, "plank", cls);
+      });
+      seam(out, b[0], b[1], b[2], b[3], h + 0.002, y + 0.37, true, "wooddark", cls);
+      seam(out, b[0], b[1], b[2], b[3], h + 0.002, y + 0.63, true, "wooddark", cls);
+      return h;
+    }
+    if (k === "table") {
+      slab2(out, x + 0.02, y + 0.02, x + 0.98, y + 0.98, z + 0.68, z + 0.8, "plank", "wood",
+            cls, NOPOINT);
+      [[0.1, 0.1], [0.82, 0.1], [0.1, 0.82], [0.82, 0.82]].forEach(function (l) {
+        slab(out, x + l[0], y + l[1], x + l[0] + 0.08, y + l[1] + 0.08, z, z + 0.68,
+             "wooddark", cls, NOPOINT);
+      });
+      return z + 0.8;
+    }
+    if (k === "counter") {
+      slab(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, z, z + 0.95, "wooddark", cls,
+           NOPOINT);
+      slab2(out, x, y, x + 1, y + 1, z + 0.95, z + 1.05, "plank", "wood", cls, NOPOINT);
+      panel(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, front, 0.12, 0.88, z + 0.15,
+            z + 0.82, "wood", cls);
+      return z + 1.05;
+    }
+    if (k === "stall") {
+      // A trestle counter, two poles at its back and a cloth awning over the lot: the
+      // book-spine red, with a brass fringe along the front edge.
+      slab(out, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + 0.78, "wooddark", cls, NOPOINT);
+      slab2(out, x + 0.02, y + 0.02, x + 0.98, y + 0.98, z + 0.78, z + 0.86, "plank", "wood",
+            cls, NOPOINT);
+      var bx = front[0] ? (front[0] > 0 ? x + 0.06 : x + 0.86) : null;
+      var by = front[1] ? (front[1] > 0 ? y + 0.06 : y + 0.86) : null;
+      (bx !== null ? [[bx, y + 0.06], [bx, y + 0.86]] : [[x + 0.06, by], [x + 0.86, by]])
+        .forEach(function (p) {
+          slab(out, p[0], p[1], p[0] + 0.08, p[1] + 0.08, z + 0.86, z + 1.75, "wooddark", cls,
+               NOPOINT);
+        });
+      slab(out, x - 0.02, y - 0.02, x + 1.02, y + 1.02, z + 1.75, z + 1.81, "spine0", cls,
+           NOPOINT);
+      panel(out, x - 0.02, y - 0.02, x + 1.02, y + 1.02, front, 0, 1, z + 1.66, z + 1.75,
+            "plank", cls);
+      wares(out, GOODS[key(x, y)], x, y, z + 0.86, cls);
+      return z + 1.81;
+    }
+    if (k === "hearth") {
+      slab(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, z, z + 1, "stone", cls, NOPOINT);
+      SIDES.forEach(function (d) {
+        panel(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, d, 0, 1, z + 0.33, z + 0.36,
+              "stonedark", cls);
+        panel(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, d, 0, 1, z + 0.66, z + 0.69,
+              "stonedark", cls);
+      });
+      panel(out, x + 0.03, y + 0.03, x + 0.97, y + 0.97, front, 0.22, 0.78, z + 0.06,
+            z + 0.62, "ember", cls);
+      face(out, [[x + 0.28, y + 0.28, z + 1.003], [x + 0.72, y + 0.28, z + 1.003],
+                 [x + 0.72, y + 0.72, z + 1.003], [x + 0.28, y + 0.72, z + 1.003]],
+           UP, "ember", cls + " fxd", NOPOINT);
+      return z + 1;
+    }
+    if (k === "bookshelf" || k === "rack") {
+      // A case against the wall behind it, its open face to the room.
+      var c0 = [x, y, x + 1, y + 1], depth = 0.5, top = z + 1.9;
+      if (front[1] > 0) c0[1] = y + 1 - depth;
+      else if (front[1] < 0) c0[3] = y + depth;
+      else if (front[0] > 0) c0[0] = x + 1 - depth;
+      else c0[2] = x + depth;
+      slab(out, c0[0], c0[1], c0[2], c0[3], z, top, "wooddark", cls, NOPOINT);
+      var rows = [z + 0.06, z + 0.68, z + 1.3];
+      rows.forEach(function (r0, ri) {
+        panel(out, c0[0], c0[1], c0[2], c0[3], front, 0, 1, r0 - 0.05, r0, "plank", cls);
+        if (k === "bookshelf") {
+          var spots = [[0.05, 0.22], [0.24, 0.37], [0.39, 0.58], [0.6, 0.74], [0.76, 0.95]];
+          spots.forEach(function (s, si) {
+            var tall = 0.42 + ((si + ri) % 3) * 0.05;
+            panel(out, c0[0], c0[1], c0[2], c0[3], front, s[0], s[1], r0, r0 + tall,
+                  SPINES[(si * 2 + ri) % SPINES.length], cls);
+          });
+        } else {
+          [0.18, 0.5, 0.82].forEach(function (a) {
+            panel(out, c0[0], c0[1], c0[2], c0[3], front, a - 0.025, a + 0.025, r0,
+                  r0 + 0.52, "iron", cls);
+          });
+        }
+      });
+      panel(out, c0[0], c0[1], c0[2], c0[3], front, 0, 1, top - 0.05, top, "plank", cls);
+      return top;
+    }
+    if (k === "cart") {
+      var bed0 = z + 0.32, bed1 = z + 0.6;
+      slab(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, bed0, bed1, "wood", cls, NOPOINT);
+      seam(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, bed1 + 0.002, runX ? y + 0.37 : x + 0.37,
+           runX, "wooddark", cls);
+      seam(out, x + 0.06, y + 0.06, x + 0.94, y + 0.94, bed1 + 0.002, runX ? y + 0.63 : x + 0.63,
+           runX, "wooddark", cls);
+      // A wheel on each long side: an upright octagon, its hub at the axle.
+      (runX ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]]).forEach(function (d) {
+        var pts = [], r = 0.3, cz = z + 0.3;
+        for (i = 0; i < 8; i++) {
+          var a = (i + 0.5) / 8 * 2 * Math.PI, u = 0.5 + r * Math.cos(a), w = cz + r * Math.sin(a);
+          pts.push(d[1] ? [x + u, d[1] > 0 ? y + 0.97 : y + 0.03, w]
+                        : [d[0] > 0 ? x + 0.97 : x + 0.03, y + u, w]);
+        }
+        face(out, pts, [d[0], d[1], 0], "hoop", cls, NOPOINT);
+      });
+      return bed1;
+    }
+    return -1;
+  }
 
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -275,6 +732,11 @@
     var turn = (opts.turn || 0) & 3;
     var level = opts.level || 0;
     var W = g.width, H = g.height;
+    DUSK = null;
+    if (g.light && NIGHT[g.light.level] || (g.light && (g.light.lit || []).length)) {
+      DUSK = { level: g.light.level, at: {} };
+      g.light.lit.forEach(function (p) { DUSK.at[key(p[0], p[1])] = p[2]; });
+    }
 
     var ground = {}, rails = {}, solid = {}, rough = {}, murk = {};
     (g.floor || []).forEach(function (f) { ground[key(f[0], f[1])] = f[2]; });
@@ -282,9 +744,89 @@
     (g.blocked || []).forEach(function (p) { solid[key(p[0], p[1])] = true; });
     (g.difficult || []).forEach(function (p) { rough[key(p[0], p[1])] = true; });
     (g.obscuring || []).forEach(function (p) { murk[key(p[0], p[1])] = true; });
+    // The named fixtures (rules/fixtures.py). A low one (a table, the bar, a barrel) stands
+    // one level high rather than a wall's two, which is what the engine now reads it as —
+    // something you see and shoot over — and anything a person put there is brass, the
+    // palette's own word for it. Stairs are drawn after the floor, as steps.
+    var fx = {}, stairs = [];
+    (g.fixtures || []).forEach(function (f) {
+      (f.squares || []).forEach(function (p) { fx[key(p[0], p[1])] = f; });
+      if (f.form === "steps") stairs.push(f);
+    });
+
+    // Which way a fixture runs (a counter's length) and which side of a square faces the
+    // open floor (where a shelf shows its spines and a hearth its fire).
+    function runsX(f) {
+      var xs = f.squares.map(function (p) { return p[0]; });
+      var ys = f.squares.map(function (p) { return p[1]; });
+      return Math.max.apply(null, xs) - Math.min.apply(null, xs) >=
+             Math.max.apply(null, ys) - Math.min.apply(null, ys);
+    }
+    function frontOf(f, x, y) {
+      var sides = runsX(f) ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
+      for (var i = 0; i < sides.length; i++) {
+        var nx = x + sides[i][0], ny = y + sides[i][1];
+        if (nx >= 0 && ny >= 0 && nx < W && ny < H && !solid[key(nx, ny)]) return sides[i];
+      }
+      return sides[0];
+    }
+    // What lies ON a walkable square: a gallery's planks, water's ripples, rubble's stones.
+    function surface(out, f, x, y, z, cls) {
+      if (!f) return;
+      var t = z + 0.003;
+      if (f.kind === "gallery") {
+        var ax = runsX(f);
+        [0.33, 0.66].forEach(function (a) {
+          seam(out, x, y, x + 1, y + 1, t, (ax ? y : x) + a, ax, "wooddark", cls);
+        });
+      } else if (f.kind === "water") {
+        face(out, [[x + 0.15, y + 0.33, t], [x + 0.6, y + 0.33, t], [x + 0.6, y + 0.37, t],
+                   [x + 0.15, y + 0.37, t]], UP, "waterhi", cls + " fxd", NOPOINT);
+        face(out, [[x + 0.4, y + 0.68, t], [x + 0.85, y + 0.68, t], [x + 0.85, y + 0.72, t],
+                   [x + 0.4, y + 0.72, t]], UP, "waterhi", cls + " fxd", NOPOINT);
+      } else if ((f.kind === "crate" || f.kind === "cart") && z > 0) {
+        // Climbable: the raised square itself is the crate or the cart's bed.
+        SIDES.forEach(function (d) {
+          if (f.kind === "crate") {
+            panel(out, x, y, x + 1, y + 1, d, 0.04, 0.12, 0.04, z - 0.02, "plank", cls);
+            panel(out, x, y, x + 1, y + 1, d, 0.88, 0.96, 0.04, z - 0.02, "plank", cls);
+            panel(out, x, y, x + 1, y + 1, d, 0, 1, z * 0.5 - 0.015, z * 0.5 + 0.015,
+                  "wooddark", cls);
+          }
+        });
+        seam(out, x, y, x + 1, y + 1, t, y + 0.37, true, "wooddark", cls);
+        seam(out, x, y, x + 1, y + 1, t, y + 0.63, true, "wooddark", cls);
+      } else if (f.kind === "rubble") {
+        var h = (x * 7 + y * 13) % 5;
+        [[0.15, 0.2, 0.18], [0.55, 0.15, 0.12], [0.35, 0.6, 0.2], [0.68, 0.62, 0.14]]
+          .forEach(function (r, i) {
+            if ((h + i) % 5 === 4) return;
+            slab(out, x + r[0], y + r[1], x + r[0] + 0.2, y + r[1] + 0.17, z, z + r[2],
+                 "stone", cls + " fxd", NOPOINT);
+          });
+      }
+    }
 
     var reach = {};
     (g.reachable || []).forEach(function (e) { reach[key(e[0], e[1])] = e; });
+
+    /* GOODS ON A STALL (mock, plan item 5): the lines of the keeper standing at it
+       (`keeps`, the counter id "stall-cloth-curios" or a shop's id), one line a square
+       in turn. A stall with nobody behind it (shut, or the keeper gone home) is bare,
+       which is the truth of it. */
+    GOODS = {};
+    var keepers = (actors || []).filter(function (a) {
+      return a.keeps && a.keeps !== "here" && a.at && a.hp > 0; });
+    (g.fixtures || []).forEach(function (f) {
+      if (f.kind !== "stall") return;
+      var who = keepers.filter(function (a) {
+        return f.squares.some(function (p) {
+          return Math.max(Math.abs(a.at[0] - p[0]), Math.abs(a.at[1] - p[1])) <= 1; });
+      })[0];
+      if (!who) return;
+      var lines = who.keeps.indexOf("stall-") === 0 ? who.keeps.slice(6).split("-") : [who.keeps];
+      f.squares.forEach(function (p, i) { GOODS[key(p[0], p[1])] = lines[i % lines.length]; });
+    });
 
     // How high the ground stands in every square, worked out once: a wall is only a wall
     // where the square next door is lower, and answering that per neighbour per square
@@ -293,14 +835,15 @@
     function topAt(x, y) {
       if (x < 0 || y < 0 || x >= W || y >= H) return 0;
       var k = key(x, y), z = ground[k] || 0;
-      return solid[k] ? Math.max(z + 2, 2) : z;
+      if (!solid[k]) return z;
+      return fx[k] && fx[k].height === 1 ? z + 1 : Math.max(z + 2, 2);
     }
 
     var faces = [], tallest = 1;
     for (var x = 0; x < W; x++) {
       for (var y = 0; y < H; y++) {
         var k = key(x, y), z = ground[k] || 0, mat = "tile", cls = "tile";
-        if (solid[k]) { mat = "solid"; cls = "solid"; }
+        if (solid[k]) { mat = fx[k] && fx[k].height ? "rail" : "solid"; cls = "solid"; }
         else if (murk[k]) { mat = "murk"; cls = "murk"; }
         else if (rough[k]) { mat = "rough"; cls = "rough"; }
         else if (z) { mat = "raised"; cls = "tile raised"; }
@@ -319,23 +862,37 @@
         var topz = topAt(x, y);
         if (topz > tallest) tallest = topz;
 
-        /* A GALLERY YOU ARE NOT ON IS DRAWN THROUGH. Standing on the library floor at
-           turn 0, the player's own token sits behind ten feet of gallery and the camera
-           cannot see it — correct occlusion, and useless. XCOM answers this by cutting
-           away the walls between the camera and the floor being played on.
-           The level picker above the map is already that control, so it is given
-           something to do here rather than a second control being invented: a raised
-           FLOOR standing above the level being looked at is drawn through, and a wall is
-           not. That distinction is the point — a gallery is somebody else's floor and you
-           are entitled to see under it, where a wall is a wall from every level, and
-           making the stacks translucent would be telling the player they have a shot. */
-        if (!solid[k] && topz > level) cls += " above";
-
-        cap(faces, x, y, topz, mat, cls, hit, "", solid[k] ? 0.07 : 0, wash);
-        if (topz > 0) {
-          walls(faces, x, y, topz,
-                [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y), topAt(x + 1, y)],
-                mat, cls);
+        /* RAISED GROUND IS SOLID (2026-11-11). It used to be drawn at 45% whenever it
+           stood above the level being looked at, so a token under a gallery stayed in
+           view — and the owner saw the whole mass as glass: "fix the glass block". The
+           mass is opaque now, and only what it actually hides is shown through it (the
+           x-ray pass at the end of `render`). */
+        var f3 = fx[k], drawn = -1;
+        // A crate or cart you can climb onto (a raised square, not a solid one) is built of
+        // wood, not of the room's raised floor.
+        if (f3 && !solid[k] && (f3.kind === "crate" || f3.kind === "cart")) mat = "wood";
+        if (solid[k] && f3) {
+          drawn = fixtureAt(faces, f3, x, y, z, frontOf(f3, x, y), runsX(f3), cls);
+        }
+        if (drawn >= 0) {
+          // The floor under it, holding the name for the pointer (the drawing is deaf).
+          cap(faces, x, y, z, z ? "raised" : "tile", "tile", "",
+              "<title>" + esc(f3.name) + "</title>", 0, false);
+          if (z > 0) {
+            walls(faces, x, y, z, [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y),
+                                   topAt(x + 1, y)], "raised", "tile");
+          }
+        } else {
+          if (f3 && f3.kind === "water") mat = "water";
+          cap(faces, x, y, topz, mat, cls, hit,
+              f3 && solid[k] ? "<title>" + esc(f3.name) + "</title>" : "",
+              solid[k] ? (f3 && f3.form === "round" ? 0.18 : 0.07) : 0, wash);
+          if (topz > 0) {
+            walls(faces, x, y, topz,
+                  [topAt(x, y - 1), topAt(x, y + 1), topAt(x - 1, y), topAt(x + 1, y)],
+                  mat, cls);
+          }
+          surface(faces, f3, x, y, topz, cls);
         }
 
         if (rails[k] !== undefined) {
@@ -357,8 +914,30 @@
            * itself used to make. A hand's breadth of stone standing in the square says
            * "shoot over this" the way a wall does not. */
           var top = rails[k], foot = Math.max(0, topAt(x, y)), t = 0.14;
-          var rcls = "rail3" + (top > level ? " above" : "");
-          if (top > foot) {
+          var rcls = "rail3";
+          /* A GALLERY'S RAIL IS DRAWN ON THE GALLERY'S EDGE (2026-11-11). The floorplan
+             stores a gallery's rail on the ground square in front of it (`_raise`'s lip),
+             so the pane above stood in the middle of that square: at the gate it cut the
+             stair in half and ran through the player standing beside it. What the rule
+             asks of that square — lines at or under the walkway stopped — is the
+             gallery's own face, which `walls` already draws; what a player needs to see
+             is the railing on top of it. So where the square in front of the rail is
+             floor at the rail's height, the rail is a low bar on that shared edge, from
+             the walkway up, and the lip square stays clear. */
+          var edge = null;
+          [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (d) {
+            var n = key(x + d[0], y + d[1]);
+            if (!edge && !solid[n] && (ground[n] || 0) >= top) edge = d;
+          });
+          if (edge) {
+            var e = 0.09, rh = 0.42;
+            var ex0 = edge[0] > 0 ? x + 1 : edge[0] < 0 ? x - e : x;
+            var ex1 = edge[0] > 0 ? x + 1 + e : edge[0] < 0 ? x : x + 1;
+            var ey0 = edge[1] > 0 ? y + 1 : edge[1] < 0 ? y - e : y;
+            var ey1 = edge[1] > 0 ? y + 1 + e : edge[1] < 0 ? y : y + 1;
+            slab(faces, ex0, ey0, ex1, ey1, top, top + rh, "rail", rcls);
+            if (top + rh > tallest) tallest = top + rh;
+          } else if (top > foot) {
             // Which way the fence runs: along the row if the parapet continues that way,
             // along the column otherwise. A run of them should read as one balustrade
             // rather than as a line of unrelated posts.
@@ -381,6 +960,36 @@
         }
       }
     }
+
+    /* A stair as real steps (2026-11-11, the owner: "get the shape right"): four solid
+       steps climbing toward the higher ground beside it, each a lighter tread over a
+       darker riser, the last one meeting the gallery's floor. Deaf to the pointer, so the
+       floor under them still takes the click that queues a move onto the stair. */
+    stairs.forEach(function (f) {
+      (f.squares || []).forEach(function (p) {
+        var sx = p[0], sy = p[1], z0 = ground[key(sx, sy)] || 0;
+        var best = SIDES[0], hi = -1;
+        SIDES.forEach(function (d) {
+          var h = topAt(sx + d[0], sy + d[1]);
+          if (!solid[key(sx + d[0], sy + d[1])] && h > hi) { hi = h; best = d; }
+        });
+        var rise = Math.max(1, hi - z0), n = 4;
+        for (var i = 0; i < n; i++) {
+          // Step i covers the i-th quarter of the square counted from the far side, so
+          // the highest step is the one against the gallery.
+          var a0 = (n - 1 - i) / n, a1 = (n - i) / n, x0, x1, y0, y1;
+          if (best[0]) {
+            x0 = best[0] > 0 ? sx + a0 : sx + 1 - a1; x1 = x0 + 1 / n; y0 = sy; y1 = sy + 1;
+          } else {
+            y0 = best[1] > 0 ? sy + a0 : sy + 1 - a1; y1 = y0 + 1 / n; x0 = sx; x1 = sx + 1;
+          }
+          var zt = z0 + (n - i) * rise / n;
+          slab2(faces, x0, y0, x1, y1, z0, zt, "tread", "wooddark",
+                "fxstep", NOPOINT);
+        }
+        if (z0 + rise > tallest) tallest = z0 + rise;
+      });
+    });
 
     /* The latest turn's spell areas (`g.areas`, the engine's ruling on where a cone or
        burst fell). Until 2026-09-29 only the flat board drew them, so turning on 3D hid
@@ -427,47 +1036,236 @@
            "<title>" + name + (s.here ? "" : ", above or below this floor") + "</title>");
     });
 
+    var figs = [];
     (actors || []).forEach(function (a) {
       if (!a.at) return;
       var ax = a.at[0], ay = a.at[1], az = a.at.length > 2 ? a.at[2] : 0;
       var n = a.squares || 1;
       /* The server's `stance` (attitude.stance), the one answer the flat map and the
          panel read too; never worked out here from a fight's side name. */
-      var side = a.stance || "bystander";
-      var cls = "fig " + side + (a.hp <= 0 ? " down" : "");
+      // Out of a fight, someone with no stance is the flat token's plain brown, never
+      // the fight's white bystander: the owner's ruling, 2026-11-13 ("the townsfolk
+      // should stay brown"). The boards share colours, so this is the flat map's rule.
+      var side = a.stance || (opts.fight ? "bystander" : "neutral");
+      var down = a.hp <= 0;
+      var cls = "fig " + side + (down ? " down" : "");
       if (az !== level) cls += " offlevel";
-      /* Eight feet of a Medium creature is 1.6 levels — "their height contained within
-         2x5ft squares (8ft is max for medium)" — and a bigger body is as tall as it is
-         wide. A creature at zero hit points is drawn as a slab a third of a level high
-         rather than a standing figure at reduced opacity: prone is a thing you should be
-         able to read across the room, and a faded box is not it. */
-      var tall = a.hp <= 0 ? 0.3 : Math.min(1.6 * n, 2 * n);
       var tip = "<title>" + esc(a.name || "") + " — " + a.hp + "/" + a.hp_max +
+                (a.members != null ? " · " + a.members + " of " + a.members_max +
+                 " still standing" : "") +
                 (az ? " · " + az * 5 + " ft up" : "") + "</title>";
-      for (var dx = 0; dx < n; dx++) {
-        for (var dy = 0; dy < n; dy++) {
-          box(faces, ax + dx, ay + dy, az, az + tall, side, cls, "",
-              dx === 0 && dy === 0 ? tip : "", 0.12);
+      // Whose turn it is: a gold rim on the base (the flat token's ring, in 3D).
+      var baseCls = " base" + (opts.up && a.ref === opts.up ? " up" : "");
+      var start = faces.length, cx = ax + n / 2, cy = ay + n / 2, top;
+      if (a.members != null) {
+        /* A crowd held as one actor (item 33): three small people standing together on
+           its footprint, never one big body — a 3x3 block read as a giant. */
+        top = az;
+        [[0.28, 0.3], [0.72, 0.36], [0.46, 0.74]].forEach(function (o, i) {
+          top = Math.max(top, figure(faces, ax + n * o[0], ay + n * o[1], az, n * 0.42,
+                                     a.form, down, side, cls, baseCls, i ? "" : tip));
+        });
+      } else {
+        // A Large body stands on its whole footprint, and as much taller as it is wider.
+        top = figure(faces, cx, cy, az, n, a.form, down, side, cls, baseCls, tip,
+                     (a.form || "humanoid") === "humanoid" ? a.sits : null);
+        /* KEEPER'S COIN (mock, plan item 4): a brass coin on the base, so the people
+           behind the counters read apart from the shoppers without touching the side
+           colours. Not a ring: a gold ring on the base already means "whose turn". */
+        if (a.keeps && !down) {
+          var cs = faces.length;
+          frustum(faces, cx + 0.27 * n, cy + 0.27 * n, 0.12 * n, 0.12 * n, az + 0.07 * n,
+                  az + 0.11 * n, 8, "rail", cls, { cls: cls });
+          for (var ci = cs; ci < faces.length; ci++) faces[ci].cull = true;
         }
       }
-      if (az + tall > tallest) tallest = az + tall;
+      /* The letter, on a small plate over the head: the flat token's initial, or a
+         crowd's count. In the depth sort like a face, so a wall in front still covers it
+         (and the x-ray then shows it). */
+      var mark = a.members != null ? String(a.members)
+        : a.mark || String(a.name || "?").slice(0, 1).toUpperCase();  // views._marks
+      faces.push({ pts: [[cx, cy, top + 0.32]], n: UP, at: [cx, cy, top + 0.32], mat: side,
+                   cls: cls.replace("fig ", "fig plate "), attrs: "", inner: tip,
+                   plate: esc(mark) });
+      if (top + 0.6 > tallest) tallest = top + 0.6;
+      figs.push({ faces: faces.slice(start), x: cx, y: cy, z: az, top: top,
+                  own: [ax, ay, ax + n, ay + n], offlevel: az !== level });
     });
 
     // Back to front. One comparison on the real distance to the viewer, where the first
     // version summed a rotated row and column and added hand-picked offsets for the
-    // things that came out wrong.
-    faces.sort(function (a, b) { return depth(a.at, turn) - depth(b.at, turn); });
+    // things that came out wrong. A face marked `cull` (a closed solid's back) that faces
+    // away from the camera is hidden by its own front and is not drawn at all.
+    faces = faces.filter(function (f) {
+      return !f.cull || dot(turned(f.n, turn), TOWARD) > 0;
+    });
+    faces.forEach(function (f) {
+      f.d = depth(f.at, turn);
+      f.sp = f.pts.map(function (p) { return project(p, turn); });
+    });
+    /* Ground-level floor first, whatever its depth: nothing lies under it, so it can
+       never hide anything and is always safe to paint before the rest. That makes room
+       for the floor's texture to go down as ONE polygon right after it. */
+    faces.forEach(function (f) {
+      f.ground = f.n === UP && f.cls.lastIndexOf("tile", 0) === 0 &&
+        f.cls.indexOf("fxd") < 0 && f.pts.every(function (p) { return p[2] === 0; });
+    });
+    faces.sort(function (a, b) { return (b.ground - a.ground) || (a.d - b.d); });
 
+    /* WHAT A MASS HIDES IS SHOWN THROUGH IT, AND NOTHING ELSE IS (2026-11-11).
+     *
+     * The tactical games that put people behind walls agree on the shape of the answer
+     * and disagree only on the cut. Baldur's Gate 3 cuts a circular hole through the wall
+     * round the character (community recreations of its "occlusion cutout": 80.lv,
+     * Brendan Sullivan's ArtStation write-up); Divinity: Original Sin 2 and Torchlight 2
+     * draw the hidden character's silhouette over the wall (players asking BG3 for
+     * opaque walls cite Divinity's outline as what they want — Steam discussion
+     * 3811785047377002290). XCOM 2 fades whole walls and roofs, which players report as
+     * "translucent walls" they cannot read — the glass this replaced. A hole needs a
+     * depth buffer this painter's-sort SVG does not have; a silhouette needs only the
+     * figure's own faces drawn again, last. So: the mass stays solid, and a token the
+     * mass actually hides is drawn over it as a flat ghost in its side's colour.
+     *
+     * "Actually hides" is measured, not guessed: three points up the figure's axis, each
+     * tested against every face nearer the camera than it that rises above the floor the
+     * figure stands on (a floor tile in front cannot hide anybody). Two of three covered
+     * and the figure is hidden. The same test on five points of each square the player
+     * can reach, four of them covered: such a square is redrawn as an outline on top,
+     * carrying the same `data-sq`, so a move can still be queued onto the floor behind
+     * a gallery. Both are
+     * worked out from the projected faces after the sort, so they hold at every
+     * quarter-turn and agree with the painter's order by construction. */
+    var masses = faces.filter(function (f) {
+      // A figure hides a figure behind it too (plan item 2: only walls ghosted what they
+      // hid, so a goblin behind the ogre simply vanished). Its plate never hides anything.
+      if (f.mat === "area" || f.plate) return false;
+      f.fig = f.cls.lastIndexOf("fig", 0) === 0;
+      var top = -1e9, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      f.pts.forEach(function (p) { if (p[2] > top) top = p[2]; });
+      f.sp.forEach(function (p) {
+        if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+      });
+      f.top = top; f.box = [x0, y0, x1, y1];
+      return true;
+    });
+    // Binned by screen position, so a point is tested against the few faces over it
+    // rather than every face on the board (a 24x24 board: 31 ms of render to 10).
+    var BIN = 24, bins = {};
+    masses.forEach(function (m) {
+      for (var bx = Math.floor(m.box[0] / BIN); bx <= Math.floor(m.box[2] / BIN); bx++) {
+        for (var by = Math.floor(m.box[1] / BIN); by <= Math.floor(m.box[3] / BIN); by++) {
+          (bins[bx + "," + by] = bins[bx + "," + by] || []).push(m);
+        }
+      }
+    });
+    // `own` is the footprint the thing stands on: a stair's own steps, the crate it is
+    // climbing, are under it, not in front of it (measured at the gate: the player on
+    // the stair was ghosted at every turn by the steps beneath their feet).
+    // `figs` says whether people count as cover: they do for a person behind them, never
+    // for a square, or a move outline would be drawn over whoever stands in front of it.
+    function covered(p, floor, own, figs) {
+      var d = depth(p, turn), s = project(p, turn);
+      var near = bins[Math.floor(s[0] / BIN) + "," + Math.floor(s[1] / BIN)] || [];
+      for (var i = 0; i < near.length; i++) {
+        var m = near[i], b = m.box;
+        if ((m.fig && !figs) || m.d <= d || m.top <= floor + 0.05) continue;
+        if (m.at[0] > own[0] && m.at[0] < own[2] && m.at[1] > own[1] && m.at[1] < own[3]) {
+          continue;
+        }
+        if (s[0] < b[0] || s[0] > b[2] || s[1] < b[1] || s[1] > b[3]) continue;
+        if (inside(s, m.sp)) return true;
+      }
+      return false;
+    }
+    function pts2(sp) {
+      return sp.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    }
+    var xray = "";
+    figs.forEach(function (g) {
+      var h = g.top - g.z, hid = 0;
+      [0.3, 0.6, 0.9].forEach(function (k) {
+        if (covered([g.x, g.y, g.z + h * k], g.z, g.own, true)) hid++;
+      });
+      if (hid < 2) return;
+      xray += '<g class="xray' + (g.offlevel ? " offlevel" : "") + '" pointer-events="none">' +
+        g.faces.filter(function (f) { return f.sp; }).map(function (f) {
+          return f.plate ? plate(f, "plate") : '<polygon fill="' + paint(f.mat, shade(f.n, turn), false, duskAt(f.at)) +
+            '" points="' + pts2(f.sp) + '"/>';
+        }).join("") + "</g>";
+    });
+    faces.forEach(function (f) {
+      if (f.attrs.indexOf("data-sq") < 0) return;
+      var c = f.at, z = c[2], hid = 0, sq = [Math.floor(c[0]), Math.floor(c[1])];
+      sq.push(sq[0] + 1, sq[1] + 1);
+      var seen = 0;
+      [[0, 0], [-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]].forEach(function (o) {
+        if (seen > 1) return;          // two points in view: it can no longer be hidden
+        if (covered([c[0] + o[0], c[1] + o[1], z], z, sq)) hid++; else seen++;
+      });
+      if (hid < 4) return;           // mostly in view: the square itself takes the click
+      xray += '<polygon class="xsq lit face-top" points="' + pts2(f.sp) + '"' + f.attrs +
+        "><title>reachable, behind what stands in front of it</title></polygon>";
+    });
+
+    // The face's own plane, projected: its u and v axes in screen pixels (`TILES`).
+    var AXES = { z: [[1, 0, 0], [0, 1, 0]], y: [[1, 0, 0], [0, 0, 1]],
+                 x: [[0, 1, 0], [0, 0, 1]] };
+    var defs = {};
+    // `at` is a point on the face: the pattern is anchored to the world point where the
+    // face's own plane crosses u = v = 0, so every wall's courses start at world height 0
+    // and two parallel walls a row apart line up (plan item 9). Anchored at the screen's
+    // origin they started wherever that plane happened to cross it. One pattern per plane,
+    // not per face: a 24-square board has at most a few dozen.
+    function textured(tex, n, hex, at) {
+      var axis = n[2] ? "z" : n[1] ? "y" : "x", k = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+      var off = Math.round((at ? at[k] : 0) * 100) / 100;
+      var id = "s3" + tex + axis + hex.slice(1) + "_" + String(off).replace(/[.-]/g, "_");
+      if (!defs[id]) {
+        var u = project(AXES[axis][0], turn), v = project(AXES[axis][1], turn);
+        var o = [0, 0, 0]; o[k] = off;
+        var t = TILES[tex](hex), t0 = project(o, turn);
+        defs[id] = '<pattern id="' + id + '" patternUnits="userSpaceOnUse" width="' + t[0] +
+          '" height="' + t[1] + '" patternTransform="matrix(' + [u[0], u[1], v[0], v[1],
+          t0[0], t0[1]].map(function (k) { return k.toFixed(3); }).join(" ") + ')">' + t[2] +
+          "</pattern>";
+      }
+      return "url(#" + id + ")";
+    }
+
+    // A figure's letter plate: the side's colour, unshaded, as the flat token's is.
+    function plate(f, cls) {
+      var p = f.sp[0], w = f.plate.length > 1 ? 12 : 8.4;   // "Ty" needs the room
+      return '<g class="' + cls + '"><rect x="' + (p[0] - w / 2).toFixed(1) + '" y="' +
+        (p[1] - 4.6).toFixed(1) + '" width="' + w + '" height="8.4" rx="1.8" fill="' +
+        paint(f.mat, 1) + '"/><text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 2.3).toFixed(1) +
+        '">' + f.plate + "</text>" + (cls === "plate" ? "" : f.inner) + "</g>";
+    }
+
+    var laid = false;
+    function floorTex() {
+      laid = true;
+      return '<polygon class="floortex" pointer-events="none" fill="' +
+        textured("flag", UP, "#000000") + '" points="' +
+        pts2([[0, 0, 0], [W, 0, 0], [W, H, 0], [0, H, 0]].map(function (p) {
+          return project(p, turn); })) + '"/>';
+    }
     var body = faces.map(function (f) {
-      var pts = f.pts.map(function (p) { return project(p, turn); });
+      var lay = !f.ground && !laid ? floorTex() : "";
+      if (f.plate) return lay + plate(f, f.cls);
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
-      return '<polygon class="' + f.cls + '" fill="' +
-        (f.mat === "area" ? AREA : paint(f.mat, shade(f.n, turn), f.wash)) +
-        '" points="' +
-        pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") +
-        '"' + f.attrs + (f.inner ? ">" + f.inner + "</polygon>" : "/>");
-    }).join("");
+      var fill = f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
+        : paint(f.mat, shade(f.n, turn), f.wash, duskAt(f.at));
+      var tex = f.mat !== "area" && textureOf(f);
+      if (tex) fill = textured(tex, f.n, fill, f.pts[0]);
+      // A textured side carries no outline: the courses are the detail, and a stroke at
+      // every square's edge cut a twenty-square wall-walk into twenty boxes. Tops keep
+      // theirs, because the squares on them are where a player moves.
+      return lay + '<polygon class="' + f.cls + (tex && !f.n[2] ? " txs" : "") + '" fill="' + fill +
+        '" points="' + pts2(f.sp) + '"' + f.attrs +
+        (f.inner ? ">" + f.inner + "</polygon>" : "/>");
+    }).join("") + (laid ? "" : floorTex()) + xray;
 
     // The viewBox is measured from the projected corners rather than guessed, so a map of
     // any size at any rotation fills the frame without clipping. Measured to the board's
@@ -484,9 +1282,22 @@
     var x0 = Math.min.apply(null, xs) - pad, y0 = Math.min.apply(null, ys) - pad;
     var w = Math.max.apply(null, xs) - x0 + pad, h = Math.max.apply(null, ys) - y0 + pad;
     return '<svg id="view3d" viewBox="' + x0.toFixed(1) + " " + y0.toFixed(1) + " " +
-      w.toFixed(1) + " " + h.toFixed(1) + '" preserveAspectRatio="xMidYMid meet">' +
+      w.toFixed(1) + " " + h.toFixed(1) + '" preserveAspectRatio="xMidYMid meet"><defs>' +
+      Object.keys(defs).map(function (k) { return defs[k]; }).join("") + "</defs>" +
       body + "</svg>";
   }
 
-  window.Scene3D = { render: render, TURNS: 4 };
+  /* For js/table/24-map-zoom.js: a point on the board (squares, on the floor) to this
+     view's SVG units, and back. Zoom keeps its centre as a point on the board, so it holds
+     the same spot through a quarter-turn and across Flat and 3D. */
+  function toUser(bx, by, q) { return project([bx, by, 0], q & 3); }
+  function toBoard(u, v, q) {
+    // project() at z = 0 is linear in (x, y); invert its 2 x 2 matrix.
+    var o = project([0, 0, 0], q), ex = project([1, 0, 0], q), ey = project([0, 1, 0], q);
+    var a = ex[0] - o[0], b = ey[0] - o[0], c = ex[1] - o[1], d = ey[1] - o[1];
+    var det = a * d - b * c, du = u - o[0], dv = v - o[1];
+    return [(d * du - b * dv) / det, (a * dv - c * du) / det];
+  }
+
+  window.Scene3D = { render: render, TURNS: 4, toUser: toUser, toBoard: toBoard };
 })();

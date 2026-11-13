@@ -219,6 +219,7 @@ worse than none — somebody builds a thing that shipped a month ago.** Last rea
 | 9 | A vocabulary for versatile and lucky | **this side's**, listed so it is not lost |
 | 13 | Each nation's coin | **new, 2026-10-17.** Names only, no numbers. See below |
 | 14 | No Pathfinder setting terms in world prose | **new, 2026-10-30.** Aurvantis says "the First World" twice. See below |
+| 15 | `fixtures` on a place | **new, 2026-11-11.** Optional; the consumer reads it today. See below |
 
 ## 7. `play.names[]` — naming material (built; needs back-filling)
 
@@ -985,6 +986,53 @@ around them. None is urgent. All would be welcome.
   asks above — an invented name reaching a situation card is refused by the consumer's
   validator, so ungrounded rewrites turn directly into dropped cards.
 - **Years can be `null`** for undated events; the timeline sorts those last.
+
+## 15. `fixtures` on a place — the named things on its floor
+
+*Asked 2026-11-11, and the consumer reads it the day it appears (`rules/floorplan.from_world`
+→ `rules/fixtures.py`). Optional: a place without it is typed from this app's own table.*
+
+The tactical map now names what its solid, rough and raised squares ARE — the bar, the
+tables, the barrels, the stair up to the gallery — so the board, the narrator and the
+rules agree on one room. Today the choice is made from the place's kind (a library gets
+bookshelves, a storehouse crates and barrels, a tavern a bar, tables and a hearth); a world
+that wants its own smithy to be racks and barrels rather than a hearth says so with one list.
+
+**Shape.** One more optional field on each `play.places[]` entry, beside `clutter` and
+`vertical`:
+
+| Field | Meaning |
+|---|---|
+| `fixtures` | a list of kind words from the closed list below, most important first: `["counter", "table", "hearth"]` |
+
+The closed list (`content/rules/fixtures.json`, the one copy — read it rather than this
+table if they disagree): `stair`, `gallery`, `door`, `window`, `table`, `counter` (a bar
+or a shop counter), `barrel`, `crate`, `rack`, `bookshelf`, `hearth`, `chandelier`,
+`cart`, `crane`, `water`, `rubble`.
+
+```json
+{"id": "5bbd0c40345f~urban:the-tavern", "name": "the tavern",
+ "clutter": "some", "footing": "firm", "vertical": "ledge",
+ "size_ft": {"width": 60, "depth": 50, "height": 10},
+ "fixtures": ["counter", "table", "hearth", "barrel"]}
+```
+
+**Rules for it.**
+- **Words from the list, nothing else.** A word outside it is dropped, not guessed at, and
+  the place falls back to its kind's own row. No counts, no positions, no sizes: the
+  consumer places them on the room's own geometry, and `clutter` is still what says how
+  much solid stuff there is.
+- **Order matters**: the biggest solid clump becomes the first kind, the next the second,
+  and so on round the list. Put the one thing the room is known for first (a tavern's bar).
+- **Naming fixtures never reshapes a room.** A place that ships `fixtures` and none of the
+  shape fields keeps the shape the consumer would have derived.
+- `stair` and `gallery` need not be listed: a `ledge` place's raised band is always a
+  gallery, and the consumer puts a stair at its foot.
+- `door`, `window`, `chandelier` and `crane` are in the vocabulary now and are not yet
+  placed by the consumer (phase 2, which needs walls with sides and doors with state).
+
+**What Pathfinder GM does without it.** Types every place from its own table by kind and
+terrain. A place kind the table does not know gets nothing named but its gallery.
 
 ---
 

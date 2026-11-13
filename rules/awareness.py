@@ -557,14 +557,16 @@ def brief_line(scene, observer, subject) -> str:
         return (f"{observer.name} cannot see {name} ({how}), but knows the square they "
                 f"are in: it may attack them there, and invisibility still makes half its "
                 f"blows miss.")
-    sensed = (" It senses something unseen close by, and cannot tell where."
-              if has_hunch(observer, subject) else "")
+    hunch_ = has_hunch(observer, subject)
+    sensed = " It senses something unseen close by, and cannot tell where." if hunch_ else ""
+    # The blind swing only on a hunch, as the engine allows it (`_guess_square`).
+    swing = (f"swing blind at where it guesses they are ({guess_fix(observer.ref)}), "
+             if hunch_ else "")
     return (f"{observer.name} cannot see {name}: they are {how}, and {observer.name} does "
             f"not know where they are.{sensed} It cannot attack them, cast at them or use an "
             f"ability on them by name, and cannot describe them. It may search (a "
             f"Perception check: {search_fix(observer.ref)}), "
-            f"swing blind at where it guesses they are ({guess_fix(observer.ref)}), deal "
-            f"with somebody it can see, or wait.")
+            f"{swing}deal with somebody it can see, or wait.")
 
 
 # The two things a creature can do about somebody it cannot find, as the JSON its turn copies

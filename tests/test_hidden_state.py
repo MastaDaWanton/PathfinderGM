@@ -298,6 +298,7 @@ def test_a_creature_cannot_aim_at_a_player_it_has_not_found():
     s, e = _board()
     _drink(s, e)
     s.turn = 1
+    awareness.hunch(s, s.actors["c1"], s.actors["pc"])     # the blind swing needs one
     with pytest.raises(IntentError) as err:
         e.validate([{"op": "attack", "actor": "c1", "target": "pc", "because": "x"}])
     assert err.value.code == "unseen_target"
@@ -306,6 +307,7 @@ def test_a_creature_cannot_aim_at_a_player_it_has_not_found():
                         "params": {"skill": "perception", "search": True}},
                        {"op": "attack", "actor": "c1", "target": "pc", "because": "x"}])
     assert [i.op for i in plan] == ["check", "attack"]
+    s.actors["c1"].remove_effects(match=lambda x: awareness.near_tag("pc") in (x.tags or ()))
     assert judgement.default_npc_action(s, "c1")[0]["params"]["search"] is True
     s.positions["c1"] = (9, 5)
     assert position.closing_move(s, s.actors["c1"], s.actors["pc"], "sap") is None
@@ -319,6 +321,7 @@ def test_a_blind_swing_lands_only_on_the_square_the_player_is_in(monkeypatch):
     s, e = _board()
     _drink(s, e)
     s.turn = 1
+    awareness.hunch(s, s.actors["c1"], s.actors["pc"])
     monkeypatch.setattr(reactions, "threatened_by", lambda scene, ref: {(5, 5)})
     res = e.run(e.validate([{"op": "attack", "actor": "c1", "because": "blind swing",
                              "params": {"guess": True}}]))
@@ -332,6 +335,24 @@ def test_a_blind_swing_lands_only_on_the_square_the_player_is_in(monkeypatch):
                              "params": {"guess": True}}]))
     out = next(o for o in res.outcomes if o.op == "attack")
     assert out.verdict == "miss" and "swings blind" in out.tell and "Kesst" not in out.tell
+
+
+def test_no_blind_swing_without_a_hunch():
+    """The market, 2026-11-12: a lookout that had lost the hidden player ~40 ft off swung
+    blind at the air beside itself, a turn spent on nothing. A creature swings blind only
+    on a hunch somebody unseen is close by; without one it is refused with the search
+    named, and neither its brief nor the refusal offers the swing."""
+    s, e = _board()
+    _drink(s, e)
+    s.turn = 1
+    c1, pc = s.actors["c1"], s.actors["pc"]
+    assert "guess" not in awareness.brief_line(s, c1, pc)
+    res = e.run(e.validate([{"op": "attack", "actor": "c1", "because": "blind swing",
+                             "params": {"guess": True}}]))
+    out = next(o for o in res.outcomes if o.op == "attack")
+    assert "no idea" in out.tell and '"search": true' in out.tell, out.tell
+    awareness.hunch(s, c1, pc)
+    assert '"guess": true' in awareness.brief_line(s, c1, pc)
 
 
 def test_the_turn_prompt_says_it_cannot_see_the_player_and_its_refs_leave_her_out(

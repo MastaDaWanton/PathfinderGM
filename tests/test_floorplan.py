@@ -56,11 +56,15 @@ def test_nothing_is_saved_to_get_this():
     re-read from the export every time, and `Place.as_dict` deliberately leaves it out so
     that not one byte of a plan reaches a save file. The parameter list is checked by name
     rather than by count so that a fourth one has to be justified here.
+
+    The fourth, 2026-11-13: `scatter`, a flag, not state. A market laid before its stalls
+    stood in rows is still named by the old scatter (`fixtures.derive`), so a saved grid
+    keeps its stalls; it is a choice between two pure layouts, nothing read from a save.
     """
     import inspect
 
     sig = inspect.signature(floorplan.for_place)
-    assert list(sig.parameters) == ["place_id", "terrain", "authored"], sig
+    assert list(sig.parameters) == ["place_id", "terrain", "authored", "scatter"], sig
     assert "shape" not in places.Place(id=MARKET).as_dict(), (
         "a room's shape is being written into saves; it is derived, not stored")
     assert _plan(MARKET).blocked == floorplan.for_place(

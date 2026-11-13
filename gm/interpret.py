@@ -321,6 +321,14 @@ def said_to_nobody(frame: dict | None, scene=None) -> bool:
 # toward the hearth … You remain where you are". The old check read only the LAST word
 # ("room"); the part of the room is the word before "of" ("side"). No model is asked to
 # decide it and no sentence is parsed: a closed field, then a closed noun list.
+def fixture_kinds() -> tuple[str, ...]:
+    """The reader's closed fixture answer: "none" first, then content/rules/fixtures.json,
+    then `fixtures.FLOOR` — back down to the room's own floor ("I go back down")."""
+    from rules import fixtures
+
+    return ("none", *fixtures.names(), fixtures.FLOOR)
+
+
 _ROOM_EXTRA = frozenset({"fire", "fireside", "stair", "stairs", "staircase", "seat",
                          "nook", "alcove", "rear"})
 
@@ -336,7 +344,7 @@ def within_place(action: dict, places=(), here: str = "") -> bool:
 
     if not isinstance(action, dict) or action.get("act") != "go":
         return False
-    if action.get("within_place") is True:
+    if action.get("within_place") is True or action.get("fixture"):
         return True
     words = " ".join(str(action.get("place") or "").lower().replace("’", "'").split())
     words = [w.strip(".,;!?") for w in words.split()]
@@ -432,7 +440,10 @@ _WHAT_EACH_IS = """\
 go        walk somewhere within reach (a place in town, the crossroads, the fields, into
           the trees, back to the gate); walking OUT INTO somewhere named is go, not leave.
           `within_place` is true for a move inside the place you are in (across the
-          room, to the hearth, a corner, the bar, the window), false for anywhere else
+          room, to the hearth, a corner, the bar, the window), false for anywhere else;
+          `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
+          barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
+          floor for back down to the ground), or none
 journey   take the road or a ship to another town
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
@@ -680,7 +691,7 @@ _DEMOS = [
     ("I cross to the hearth and set a pot of stew on to simmer for supper.",
      {"question": False, "claims": [], "actions": [
          {"span": "cross to the hearth", "place": "the hearth", "within_place": True,
-          "act": "go"},
+          "fixture": "hearth", "act": "go"},
          {"span": "set a pot of stew on to simmer for supper", "object": "a pot of stew",
           "cost": "takes_time", "act": "other"}]}),
     # A move inside the place named by a part of the room rather than a thing in it
@@ -688,7 +699,20 @@ _DEMOS = [
     ("I shoulder through the crowd to the far end of the bar.",
      {"question": False, "claims": [], "actions": [
          {"span": "shoulder through the crowd to the far end of the bar",
-          "place": "the far end of the bar", "within_place": True, "act": "go"}]}),
+          "place": "the far end of the bar", "within_place": True, "fixture": "counter",
+          "act": "go"}]}),
+    # A raised part of the place by its own name, and the walk back down (the gate,
+    # 2026-11-11): "onto the wall-walk above the gate" was read as a walk to somewhere
+    # else, planned as travel to the gate the player stood in, and moved nobody.
+    ("I climb the steps up onto the wall-walk above the gate.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "climb the steps up onto the wall-walk above the gate",
+          "place": "the wall-walk", "within_place": True, "fixture": "gallery",
+          "act": "go"}]}),
+    ("I head back down to the ground.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "head back down to the ground", "place": "the ground",
+          "within_place": True, "fixture": "floor", "act": "go"}]}),
     ("I pick up the lantern, light it and peer down the stairwell.",
      {"question": False, "claims": [], "actions": [
          {"span": "pick up the lantern", "object": "the lantern", "act": "take"},
@@ -1135,6 +1159,11 @@ def per_act_schema() -> dict:
                  # place's own words, as `until` follows the time's: a closed answer the
                  # walk-to-nowhere refusal reads (`acts_to_ops._nowhere`), never English.
                  **({"within_place": {"type": "boolean"}} if act == "go" else {}),
+                 # Which fixture of the room the walk is to (`fixture_kinds`), a closed
+                 # enum after `within_place`: the map places one the room lacks
+                 # (rules/fixtures.name_one), never a word read out of the sentence.
+                 **({"fixture": {"type": "string", "enum": list(fixture_kinds())}}
+                    if act == "go" else {}),
                  # The means last, with the deed and its slots already written, and the
                  # same in every alternative, so it chooses no act (gm/means.py). The
                  # power's name before the verdict, so the verdict is written with its
@@ -1187,7 +1216,8 @@ def _demo_reply(frame: dict) -> str:
                         if a["act"] == "escape" else {}),
                      **({"blow": a.get("blow") or BLOWS[0]}
                         if a["act"] == "attack" else {}),
-                     **({"within_place": bool(a.get("within_place"))}
+                     **({"within_place": bool(a.get("within_place")),
+                         "fixture": a.get("fixture") or "none"}
                         if a["act"] == "go" else {}), **cost, **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
@@ -1331,6 +1361,14 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             # A walk inside the place (`within_place`): kept only when it says so, as
             # `blow` is. Only the boolean itself: a hosted provider's "yes" is not it.
             kept["within_place"] = True
+        if kept["act"] == "go":
+            # The fixture is the enum's or nothing; "none", or a word outside the closed
+            # list (a hosted provider does not enforce the schema), is no fixture.
+            fixture = str(a.get("fixture") or "").strip().lower()
+            if fixture != "none" and fixture in fixture_kinds():
+                kept["fixture"] = fixture
+            elif fixture and fixture != "none":
+                dropped.append(f"go.fixture={a.get('fixture')!r}")
         # By what means (`MEANS`). Absent or outside the enum — a reading from before
         # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
         # acted on. A power's name is held to the sentence like every slot; one that is
@@ -2110,6 +2148,18 @@ def _road_to(phrase, scene) -> bool:
     return any(leg.to_name.lower() == want or leg.to_id == phrase for leg in legs)
 
 
+def _board_square(a: dict, scene) -> bool:
+    """Marks a `go` whose words name a square of this room's board (`square`) — the
+    printed coordinate, read by code (`fixtures.square_said`)."""
+    from rules import fixtures
+
+    words = f"{a.get('place') or ''} {a.get('span') or ''}".upper()
+    sq = fixtures.square_said(getattr(scene, "grid", None), words)
+    if sq is not None:
+        a["square"] = fixtures.square_name(sq)
+    return sq is not None
+
+
 def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
     """The ops the reading commits the turn to, where the reading grounds.
 
@@ -2142,7 +2192,13 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             aim = cast_aim(frame, scene, a)
             if aim:
                 a["aim"] = aim
-        if act == "go" and a.get("place") and _road_to(a["place"], scene):
+        if act == "go" and _board_square(a, scene):
+            # "I walk over to L9": a square of this room's board, which the table walks
+            # (`acts_to_ops._to_the_square`). Marked so the brief says so and no travel
+            # is owed. Measured live 2026-11-12: read `go: L9`, the plan's first attempt
+            # was a travel to 'L9' and the schema refused it.
+            pass
+        elif act == "go" and a.get("place") and _road_to(a["place"], scene):
             # A town the roads from here reach, named whole: the journey, whatever verb the
             # reader filed it under. Asked before the town's own places, whose finder takes
             # "Kalixiri" for "the road to Kalixiri". Measured live 2026-10-27: "I give the
@@ -2500,9 +2556,9 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     actions = [a for a in (frame or {}).get("actions") or [] if acting(a)]
     acts = {a.get("act") for a in actions}
     # And a `go` whose place is a person here (`ops_for` marks that too): "I go back to
-    # the guild clerk" with the clerk at the table.
+    # the guild clerk" with the clerk at the table. Or a square of the board ("go to L9").
     elsewhere = {a.get("act") for a in actions
-                 if not (a.get("act") in ("seek", "go") and a.get("here"))}
+                 if not (a.get("act") in ("seek", "go") and (a.get("here") or a.get("square")))}
     kept, dropped = [], []
     # A body searched and nothing else (`acts_to_ops.body_search_only`): the check the
     # check detector reads off "search" is not the player's — the loot is the search, and
@@ -2633,7 +2689,13 @@ def brief_lines(frame: dict | None) -> str:
                 "something the character does. Answer it; the character does nothing.")
     rows = []
     for n, a in enumerate(frame.get("actions") or [], 1):
-        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim", "asks_for") if a.get(s))
+        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim", "asks_for") if a.get(s)
+                          and not (s == "place" and a.get("square")))
+        if a.get("square"):
+            # A board square is no place of the town: the engine walks it, the plan
+            # writes no travel and no found for it.
+            slots = ", ".join(filter(None, [slots, f"to square {a['square']} of this room's "
+                                            "board (the engine walks it: no travel, no found)"]))
         # How far it is done, said: a plan or a question is context for the plan, never
         # an op of its own (`COMMITS`).
         how = {"tried": " (TRIED now: the outcome is the dice's or the other person's)",

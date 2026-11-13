@@ -82,6 +82,73 @@ def _talk_state(c) -> list[dict]:
         return []
 
 
+# The bodies the board draws something other than a standing person for (scene3d.js
+# figures, the flat token's glyph). Asked of the type vocabulary (law 1), never of a name:
+# the world owns its own races, and an Orc in one world is a wolf-rider in the next.
+_ON_ALL_FOURS = ("type.animal", "type.vermin", "type.magical-beast", "type.dragon",
+                 "type.construct", "type.plant", "type.aberration")
+
+
+def _marks(names: dict) -> dict:
+    """ref -> the letters on a token's plate, one rule for both boards. One letter, the
+    name's own (a leading "the"/"a" skipped), unless another token shares it; then two
+    ("Ty", "Tr"), then first and last word's ("TB"). Live 2026-11-11 the market showed
+    two Ts and two Vs and nothing on the board told them apart."""
+    def words(n):
+        w = str(n or "?").split() or ["?"]
+        return w[1:] if len(w) > 1 and w[0].lower() in ("the", "a", "an") else w
+
+    rules = (lambda w: w[0][:1].upper(),
+             lambda w: w[0][:1].upper() + w[0][1:2].lower(),
+             lambda w: w[0][:1].upper() + w[-1][:1].upper())
+    out = {}
+    for r, n in names.items():
+        for rule in rules:
+            m = rule(words(n))
+            if not any(o != r and rule(words(on)) == m for o, on in names.items()):
+                break
+        out[r] = m
+    # Still clashing after all three (live 2026-11-13: four "the stallholder at the ...
+    # stall" in one market all read "SS"): number them, initial first, in ref order.
+    seen: dict = {}
+    for r in names:
+        seen.setdefault(out[r], []).append(r)
+    for m, refs in seen.items():
+        if len(refs) > 1:
+            for i, r in enumerate(refs, 1):
+                out[r] = f"{m[:1]}{i}"
+    return out
+
+
+def _sits(scene, ref, a) -> list | None:
+    """Which way a person seated at a table faces it ([dx, dy]), or None for standing.
+    Drawing only, like `form`: no rule reads it and it is no state (standing up is not
+    an action here). Out of a fight, not the player, beside a table on the floor: the
+    posts put tavern patrons at tables and the board stood them up there (plan item 11)."""
+    g = getattr(scene, "grid", None)
+    sq = scene.positions.get(ref)
+    if g is None or not sq or a.is_pc or scene.in_encounter or a.hp <= 0 \
+            or (len(sq) > 2 and sq[2]):
+        return None
+    tables = {tuple(t[:2]) for f in (g.fixtures or ())     # None on an untyped grid
+              if f["kind"] == "table" and f["level"] == 0 for t in f["squares"]}
+    for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)):
+        if (sq[0] + dx, sq[1] + dy) in tables:
+            return [dx, dy]
+    return None
+
+
+def _body_form(a) -> str:
+    """How the map draws this body: "ooze", "beast" or "humanoid". A creature's type is
+    in its stat block and visible at a glance, so it is the player's to see. Anything
+    with no type tag (the player, a world's own people) stands as a person."""
+    if a.has_state("type.ooze"):
+        return "ooze"
+    if any(a.has_state(t) for t in _ON_ALL_FOURS):
+        return "beast"
+    return "humanoid"
+
+
 def _shown_conditions(a) -> list[str]:
     """The words the panel prints after a person's hit points, and the book's head and the
     combat bar beside them: their conditions, with how they stand towards the player
@@ -420,6 +487,13 @@ def cast_act(request):
                    player_text="")
 
 
+def _keeps(actor) -> str:
+    from rules import keepers
+
+    wid = str(getattr(actor, "world_entity_id", "") or "")
+    return (keepers.counter_of(wid) or "here") if keepers.is_keeper(wid) else ""
+
+
 def _grid_state(scene) -> dict | None:
     """The map, plus where the PC could actually go — or None when there is no map.
 
@@ -431,6 +505,8 @@ def _grid_state(scene) -> dict | None:
     """
     if scene.grid is None:
         return None
+    from rules import fixtures as fixtures_mod
+
     g = scene.grid
     out = {
         "width": g.width, "height": g.height,
@@ -454,6 +530,10 @@ def _grid_state(scene) -> dict | None:
         "levels": sorted({0} | set(g.floor.values())
                          | {p[2] for p in scene.positions.values() if len(p) > 2}),
         "reachable": [],
+        # The named fixtures (rules/fixtures.py): the bar, the barrels, the stair. Only
+        # what the player could see — none wholly inside fog — and the terrain sets above
+        # stay exactly as they were, so nothing that reads them has to change.
+        "fixtures": fixtures_mod.seen(g),
     }
     # WHERE this ground is. The tray said "The ground" and nothing else, so a player
     # looking at a correct map of one place while the prose described another had no way
@@ -472,7 +552,24 @@ def _grid_state(scene) -> dict | None:
         out["reachable"] = [[c, r, cost, g.ground((c, r))]
                             for (c, r), cost in sorted(routes.items())]
         out["speed"] = pc.speed_feet
+    out["light"] = _light_state(scene, pc)
     return out
+
+
+def _light_state(scene, pc) -> dict:
+    """The light as the PC sees it: one level for the board (`Scene.light_at` with no
+    square) and every square a light changes. The board draws night from this and never
+    from the hour, so a tavern at midnight stays lit (its lamps, `ambient_light`) and a
+    torch carried into a dim market lights its own 20 ft, as the miss chance reads it."""
+    level = scene.light_at(None, viewer=pc)
+    lit = []
+    if scene.lights() and scene.grid is not None:
+        for x in range(scene.grid.width):
+            for y in range(scene.grid.height):
+                here = scene.light_at((x, y), viewer=pc)
+                if here != level:
+                    lit.append([x, y, here])
+    return {"level": level, "lit": lit}
 
 
 def _attack_slots(pc) -> dict:
@@ -750,6 +847,10 @@ def _state(c) -> dict:
     # same the engine's tells read: the room's tell said Saltmakers' while this said
     # Winged (2026-10-17).
     coins = goods_mod.coins_here(c.world, c.scene)
+    # Over the tokens the player sees only: a hidden "Tobin" must not turn Tam into "Ta".
+    shown = {r: a for r, a in c.scene.actors.items()
+             if a.is_pc or not a.has_state("state.hidden")}
+    marks = _marks({r: a.name for r, a in shown.items()})
 
     def with_areas(grid):
         # The latest turn's spell areas, for the map's overlay (§2.10): the cells each
@@ -825,6 +926,14 @@ def _state(c) -> dict:
                  # fight's end empties: an hour after the robbers won, neither was red.
                  "stance": attitude_mod.stance(c.scene, a),
                  "size": a.size, "squares": grid.size_squares(a.size),
+                 # What shape the board stands them up as (`_body_form`).
+                 "form": _body_form(a),
+                 "mark": marks[r],
+                 # The counter a keeper keeps ("stall-cloth-curios", "general"), or
+                 # "here" for a place's one keeper: the board marks them as the people
+                 # behind the counters and lays their goods on the stall beside them.
+                 "keeps": _keeps(a),
+                 "sits": _sits(c.scene, r, a),
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
                  # than one big creature (item 33). Absent for every ordinary creature.
@@ -846,8 +955,7 @@ def _state(c) -> dict:
                  # Held in a grapple, for the bar's Break free (`escape`, CRB p.200).
                  "grappled": bool(a.held_in_grapple),
                  "conditions": _shown_conditions(a)}
-                for r, a in c.scene.actors.items()
-                if a.is_pc or not a.has_state("state.hidden")
+                for r, a in shown.items()
             ],
             "grid": with_areas(_grid_state(c.scene)),
             # Blood on the ground. Sent whether or not there is a grid: without one

@@ -1,6 +1,6 @@
 # The turn budget and named fixtures: plan
 
-*2026-11-06. Owner rulings that day: multi-step plans are fine outside a fight, but "once a
+*2026-11-06; Part 2 phase 1 built 2026-11-11 (below). Owner rulings that day: multi-step plans are fine outside a fight, but "once a
 limit of actions has been hit the world doesnt stand still it moves as well". The map
 "needs a little upgrade". Not built yet.*
 
@@ -82,6 +82,61 @@ limit of actions has been hit the world doesnt stand still it moves as well". Th
    - a barrel rolled to block a stair becomes `blocked` or `difficult` squares (a Strength check);
    - a creative use of a named fixture gets its +2 from the judge **only if the fixture exists**.
 4. **The map shows them**, drawn on the existing table grid with the same look.
+
+### Phase 1, built 2026-11-11 (branch feat/map-fixtures)
+
+The owner, that day: "we had talked about adding crates and barrels bookshelfs stairs etc..
+lets do that now". Amended from the plan above where building it said otherwise:
+
+- **It types the geometry that exists; it lays none.** Campaigns have people on today's
+  derived maps, so a fixture is a name for squares the floorplan already made solid,
+  rough or raised (`rules/fixtures.py`, kinds and per-place rows in
+  `content/rules/fixtures.json`, validated on load). Derived from the pristine plan
+  intersected with the grid, so a spell's wall is never typed and nothing is saved. The
+  only addition is a stair at a gallery's foot, which is walkable and so can never put a
+  saved position inside anything (`tests/test_map_fixtures.py`, every place of all three
+  exports). Two kinds the plan lacked were needed: `gallery` (the ledge band a stair
+  reaches) and `rubble`; the owner's `crate` and `bookshelf` are their own kinds.
+- **The engine reads:** a low fixture (table, counter, barrel, crate, cart, hearth) is a
+  parapet one level up for sight and cover — cover, never total (CRB p.195); a gallery
+  with a stair is walked onto without a climb speed; a raised crate or cart names its
+  Climb DC in the refusal. Found on the way: a move written (x, y) without its level
+  walked anybody straight up a ten-foot gallery that (x, y, 2) refused — closed.
+- **The reader** gained a closed `fixture` on its `go` act (enum from the file); a
+  narratable kind the room lacks is put on a free square by the player and kept for good
+  (`Scene.fixtures_named`). `judgement._FIXTURES` is NOT retired: its regex caller
+  `judgement.movement_within` (dropping a travel/found the plan wrote for a walk across
+  the room) reads the player's words, not the reader's frame, and `interpret.within_place`
+  still falls back to its noun list when the reader says neither `within_place` nor
+  `fixture`. Retiring it needs `keep_movement_in_the_scene` to be handed the frame.
+- **World Bible** may author `fixtures` on a place (docs/for-world-bible.md ask 15).
+- **A walk to a fixture moves the token** (the owner at the gate, same day: "the
+  narration let him go up the stairs but the character never moved on the map"). A
+  `go` with a `fixture` builds a real `move` (`fixtures.walk_to`): to a gallery's free
+  square nearest its stair, a stair's square, the floor beside something solid, or —
+  the reader's `floor` — back down to the stair's foot. Free of time, never of the map.
+  A raised floor takes the place's own word (`names`: the gate's wall-walk, an inn's
+  landing, a granary's loft). The plan's travel cannot stand in for it
+  (`acts_to_ops.walk_in_place`), the move's tell says where it ended ("up onto the
+  wall-walk"), and the read-back asks where in the place the page leaves the player
+  (`beat_verify` `height`, finding `beat-height`).
+- **The rail opens where the stair arrives**, and both boards draw a gallery's rail on
+  its edge rather than through the square in front of it.
+
+### Phase 2 (not built)
+
+- The Climb check onto a crate or cart rolled from the move itself (phase 1 refuses with
+  the DC named).
+- Breaking, burning, pushing, rolling and toppling fixtures, reading the `breakable`,
+  `flammable`, `movable`, `hardness` and `hp` already in the file; a barrel rolled to
+  block a stair becoming `blocked` or `difficult` squares on a Strength check.
+- A chandelier swing.
+- Doors and windows: placed in walls, opening and closing as state.
+- The creative +2 from the judge, only for a fixture that exists.
+- Low-obstacle cover's 30-foot clause (CRB p.195: only within 30 ft of the obstacle, and
+  not when the attacker is nearer it than the target) — the grid's parapets lack it too.
+- Steep stairs as difficult terrain (CRB p.415), and "back to the stair" positioning.
+- Retiring `judgement._FIXTURES` (above).
 
 **Measured:** the ruling set's position lines (s4-08, s4-09, s4-10, s11-01, s11-07, s7-01, s7-09), re-scored with fixtures present, plus the existing fight benches, which must not move.
 

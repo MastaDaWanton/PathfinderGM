@@ -243,6 +243,14 @@ class Facts:
     # of the guardhouse toward the market" was flagged a move the engine never made, and
     # the repair wrote "seize your arms and hold you" over the engine's own sentence.
     led: bool = False
+    # Where in the place the player stands, when the place has a raised floor reached by a
+    # stair (rules/fixtures.py): the two answers ("up on the wall-walk", "down on the
+    # floor") and which one the engine holds. Empty asks nothing (`height`). The gate,
+    # 2026-11-11: "You climb the stone stairs and step onto the wall-walk" shipped with
+    # the token still on the ground - the player_ends_at question counts moving about
+    # inside a place as staying, so nothing asked where in it.
+    heights: tuple[str, ...] = ()
+    height: str = ""
     # The engine let the player go this turn (a custody that ended served, cleared, for
     # want of proof or cowed). Said in the move fact a repair is given, so the rewrite
     # keeps them free: on the bench of 2026-11-02 the fact "the player did not move" alone
@@ -467,7 +475,23 @@ def facts_from(ctx) -> Facts:
                  **_unseen_of(ctx, scene, pc),
                  was_clock=(None if getattr(ctx, "was_clock", None) is None
                             else int(ctx.was_clock)),
-                 led=led, let_go=let_go)
+                 led=led, let_go=let_go,
+                 **(_height_of(scene, pc) if start == end else {}))
+
+
+def _height_of(scene, pc) -> dict:
+    """The `heights` question's answers and the engine's own, or {} where the place has
+    no raised floor a stair reaches (`fixtures.stair_to`)."""
+    grid = getattr(scene, "grid", None)
+    if grid is None or not getattr(grid, "fixtures", None) or pc is None:
+        return {}
+    up = next((f for f in grid.fixtures if f.get("stair") and f.get("level", 0) > 0), None)
+    at = (getattr(scene, "positions", {}) or {}).get(pc.ref)
+    if up is None or at is None:
+        return {}
+    level = at[2] if len(at) > 2 else grid.ground(at)
+    heights = (f"up on {up['name']}", "down on the floor")
+    return {"heights": heights, "height": heights[0] if level > 0 else heights[1]}
 
 
 # How a custody ends when the watch lets the player go (rules/trial.py `_release`,
@@ -1408,6 +1432,51 @@ _UNSEEN_DEMO2_USER = (
 _UNSEEN_DEMO2_ANSWER = {"unseen_at_you": []}
 
 
+# Where in the place the page leaves the player, asked only where the place has a raised
+# floor reached by a stair (`Facts.heights`), in a call of its own as every side question
+# is (a model asked for N things answers in parallel). The answers are the engine's two.
+_HEIGHT_SYSTEM = (
+    "You read a passage of a story told to a player (\"you\") and report where in the "
+    "place the NARRATOR leaves the player: up on its raised floor, or down on the floor "
+    "below it. Report only a sentence that puts the player up there or down there - "
+    "climbing onto it, standing on it, coming down from it - and copy its words exactly "
+    "into \"quote\". Looking up at it, or somebody else being up there, is not the "
+    "player being there. Leave the list empty when the passage never says; most passages "
+    "never say.")
+_HEIGHT_DEMO_USER = (
+    "Answers: up on the loft, down on the floor\n\nPassage:\n"
+    "You glance up at the loft, where a cat watches from the rail. The miller waves you "
+    "over to the sacks and you cross to him.")
+_HEIGHT_DEMO_ANSWER = {"player_height": []}
+_HEIGHT_DEMO2_USER = (
+    "Answers: up on the landing, down on the floor\n\nPassage:\n"
+    "You take the creaking stairs two at a time and step out onto the landing, the "
+    "taproom's noise rising from below.")
+_HEIGHT_DEMO2_ANSWER = {"player_height": [
+    {"where": "up on the landing",
+     "quote": "step out onto the landing, the taproom's noise rising from below"}]}
+
+
+def height_schema(facts: Facts) -> dict:
+    s = {"type": "string"}
+    return {"type": "object", "properties": {"player_height": {
+        "type": "array", "maxItems": 3,
+        "items": {"type": "object", "properties": {
+            "where": {"type": "string", "enum": list(facts.heights)}, "quote": s},
+            "required": ["where", "quote"]}}},
+        "required": ["player_height"]}
+
+
+def height_messages(text: str, facts: Facts) -> list[dict]:
+    return [{"role": "system", "content": _HEIGHT_SYSTEM},
+            {"role": "user", "content": _HEIGHT_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_HEIGHT_DEMO_ANSWER)},
+            {"role": "user", "content": _HEIGHT_DEMO2_USER},
+            {"role": "assistant", "content": json.dumps(_HEIGHT_DEMO2_ANSWER)},
+            {"role": "user", "content": f"Answers: {', '.join(facts.heights)}\n\n"
+                                        f"Passage:\n{text}"}]
+
+
 def unseen_codes(facts: Facts) -> list[str]:
     return [*facts.unseen, NEW_PERSON]
 
@@ -2002,7 +2071,8 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
                             ("at_you", "at_you", ("who",)),
                             ("aimed_at", "aimed", ("striker", "target")),
                             ("unseen_at_you", "unseen", ("who",)),
-                            ("made", "made", ("item",))):
+                            ("made", "made", ("item",)),
+                            ("player_height", "height", ("where",))):
         for row in answer.get(key) or ():
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
@@ -2034,7 +2104,7 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "attempt": {a.code for a in attempts_of(facts)}, "shown": set(SHOWN),
                "kind": set(_settings()), "weapon": set(swing_codes(facts)),
                "striker": set(aimed_striker_codes(facts)),
-               "target": set(aimed_target_codes(facts))}
+               "target": set(aimed_target_codes(facts)), "where": set(facts.heights)}
     # A creature's weapons are its own codes, not the player's (`foe_swing_codes`).
     foe_codes = set(foe_swing_codes(facts)) if facts.foe_blows else set()
     seen: set[str] = set()
@@ -2179,6 +2249,9 @@ def read(text: str, facts: Facts, *, chat=None, model: str = "", host: str = "",
                       "unseen_at_you"))
     if crafted(facts):
         asked.append(("made", made_messages(text, facts), made_schema(facts), "made"))
+    if facts.heights:
+        asked.append(("height", height_messages(text, facts), height_schema(facts),
+                      "player_height"))
     for what, side_msgs, side_schema, key in asked:
         got = side(what, side_msgs, side_schema)
         if got is not None:
@@ -2666,6 +2739,13 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
         if refused is not None:
             out.append(refused)
             continue
+        if c.category == "height":
+            if facts.height and s["where"] != facts.height:
+                out.append(Discrepancy(
+                    "contradiction", "height",
+                    f"The player is {facts.height}, not {s['where']}.", c.sentence,
+                    f"You are {facts.height}.", c))
+            continue
         if c.category == "move":
             place = s["place"]
             if facts.led:
@@ -3032,6 +3112,8 @@ def question(d: Discrepancy, facts: Facts) -> str:
         # you?" is no question to ask of "you wrench it from the pile … and it flies".
         return ("Does this sentence say that you (the player) pick something up, take hold "
                 "of it, or throw it?")
+    if c.category == "height":
+        return f"Does this sentence say that you (the player) are now {s['where']}?"
     if c.category == "move":
         return (f"Does this sentence say that you (the player) have left {facts.start} and "
                 f"are now somewhere else — not just moving about inside {facts.start}?")

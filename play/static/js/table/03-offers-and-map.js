@@ -66,6 +66,136 @@ let MAP_LEVEL = 0;
 // the server is not responsible for where the player's attention is.
 let MAP_TURN = 0, MAP_3D = false;
 
+// Which symbol draws each fixture kind (content/rules/fixtures.json), and the symbols:
+// shapes and flat procedural texture that ARE the object, in the table's own palette —
+// wood from the leather and brass browns (#6b4a3a, #7d6845, #4a3326, #2e261e), stone from
+// the board's greys, the ember (rgb 255,176,84) for a fire. Each is an 18-unit square with
+// its front to the south (renderMap turns it). No image files, no icons, and no
+// gradient: url(#id) resolves to the first copy in the page, which may sit in a hidden
+// board, and Chrome then paints nothing.
+const FX_SYMBOL = { barrel: "barrel", crate: "crate", table: "table", counter: "counter",
+  stall: "stall",
+  bookshelf: "shelf", rack: "rack", hearth: "hearth", cart: "cart", stair: "stair",
+  gallery: "planks", water: "water", rubble: "rubble", chandelier: "chandelier",
+  door: "door", window: "window", crane: "crane" };
+const FX_DEFS = `
+  <symbol id="fx-barrel" viewBox="0 0 18 18">
+    <circle cx="9" cy="9" r="7.3" fill="#6b4a3a" stroke="#2e261e" stroke-width="1.5"/>
+    <circle cx="9" cy="9" r="6.1" fill="none" stroke="#4a3326" stroke-width="2.2"
+            stroke-dasharray=".55 2.6"/>
+    <circle cx="9" cy="9" r="4.7" fill="#7d6845" stroke="#2e261e" stroke-width=".9"/>
+    <path d="M6.6 5v8M9 4.3v9.4M11.4 5v8" stroke="#5c4a35" stroke-width=".5"/>
+    <circle cx="9" cy="9" r=".8" fill="#2e261e"/></symbol>
+  <symbol id="fx-crate" viewBox="0 0 18 18">
+    <rect x="2" y="2" width="14" height="14" fill="#6b4a3a" stroke="#241d15" stroke-width=".8"/>
+    <path d="M2 6.7h14M2 11.3h14" stroke="#4a3326" stroke-width=".6"/>
+    <path d="M3.2 3.2L14.8 14.8M14.8 3.2L3.2 14.8" stroke="#7d6845" stroke-width="1.2"/>
+    <rect x="2.7" y="2.7" width="12.6" height="12.6" fill="none" stroke="#7d6845"
+          stroke-width="1.1"/></symbol>
+  <symbol id="fx-table" viewBox="0 0 18 18">
+    <rect x="0" y="3.5" width="18" height="11" fill="#7d6845" stroke="#4a3326"
+          stroke-width="1"/>
+    <path d="M0 7.2h18M0 10.8h18" stroke="#5c4a35" stroke-width=".45"/></symbol>
+  <symbol id="fx-counter" viewBox="0 0 18 18">
+    <rect x="0" y="2" width="18" height="10" fill="#7d6845" stroke="#4a3326"
+          stroke-width=".8"/>
+    <path d="M0 5.3h18M0 8.6h18" stroke="#5c4a35" stroke-width=".45"/>
+    <rect x="0" y="12" width="18" height="4.6" fill="#4a3326" stroke="#241d15"
+          stroke-width=".6"/>
+    <path d="M6 12.6v3.4M12 12.6v3.4" stroke="#6b4a3a" stroke-width=".8"/></symbol>
+  <symbol id="fx-stall" viewBox="0 0 18 18">
+    <rect x="0" y="9" width="18" height="7.5" fill="#7d6845" stroke="#4a3326"
+          stroke-width=".8"/>
+    <path d="M0 12.6h18" stroke="#5c4a35" stroke-width=".45"/>
+    <rect x="0" y="1" width="18" height="7" fill="#7d1a14" stroke="#241d15"
+          stroke-width=".6"/>
+    <path d="M3 1v7M9 1v7M15 1v7" stroke="#7d6845" stroke-width="2.2"/></symbol>
+  <symbol id="fx-shelf" viewBox="0 0 18 18">
+    <rect x="0" y=".5" width="18" height="15.5" fill="#4a3326" stroke="#241d15"
+          stroke-width=".8"/>
+    <path d="M0 4h18M0 7.5h18" stroke="#2e261e" stroke-width=".5"/>
+    <rect x=".8" y="9.6" width="16.4" height="5.6" fill="#241d15"/>
+    <rect x="1.1" y="10" width="1.8" height="5" fill="#7d1a14"/>
+    <rect x="3.1" y="10.6" width="1.5" height="4.4" fill="#1f4a26"/>
+    <rect x="4.8" y="10" width="2" height="5" fill="#7d6845"/>
+    <rect x="7" y="10.8" width="1.4" height="4.2" fill="#3a4048"/>
+    <rect x="8.6" y="10.2" width="1.9" height="4.8" fill="#7a6f5a"/>
+    <rect x="10.7" y="10" width="1.6" height="5" fill="#5a0c08"/>
+    <rect x="12.5" y="10.5" width="2" height="4.5" fill="#1f4a26"/>
+    <rect x="14.7" y="10.1" width="1.4" height="4.9" fill="#7d6845"/>
+    <path d="M0 15.6h18" stroke="#7d6845" stroke-width="1"/></symbol>
+  <symbol id="fx-rack" viewBox="0 0 18 18">
+    <rect x="0" y=".5" width="18" height="15.5" fill="#4a3326" stroke="#241d15"
+          stroke-width=".8"/>
+    <rect x=".8" y="9.6" width="16.4" height="5.6" fill="#241d15"/>
+    <path d="M2.5 10v5.4M6 10v5.4M9.5 10v5.4M13 10v5.4M16 10v5.4" stroke="#6a6f76"
+          stroke-width=".9"/>
+    <path d="M1.5 11.4h2M5 11.4h2M8.5 11.4h2M12 11.4h2" stroke="#7d6845"
+          stroke-width=".7"/>
+    <path d="M0 15.6h18" stroke="#7d6845" stroke-width="1"/></symbol>
+  <symbol id="fx-hearth" viewBox="0 0 18 18">
+    <rect x="0" y="1" width="18" height="15.6" fill="#4d4a45" stroke="#241d15"
+          stroke-width=".8"/>
+    <path d="M0 5h18M0 9h18M0 13h18M5 1v4M12 1v4M8.5 5v4M15 5v4M2.5 9v4M15.5 9v4"
+          stroke="#3a3128" stroke-width=".6"/>
+    <rect x="4" y="9.4" width="10" height="7.2" rx="1" fill="#2e1a0e" stroke="#241d15"
+          stroke-width=".6"/>
+    <rect x="5.2" y="11.2" width="7.6" height="4.6" rx="1.4" fill="rgb(255,176,84)"
+          opacity=".8"/>
+    <rect x="7" y="12.8" width="4" height="2.6" rx="1" fill="#f0c070"/></symbol>
+  <symbol id="fx-cart" viewBox="0 0 18 18">
+    <rect x="0" y="3.6" width="18" height="10.8" fill="#6b4a3a" stroke="#241d15"
+          stroke-width=".8"/>
+    <path d="M0 7.2h18M0 10.8h18" stroke="#4a3326" stroke-width=".55"/>
+    <rect x="4.5" y=".6" width="9" height="2.7" rx="1.2" fill="#2e261e" stroke="#7d6845"
+          stroke-width=".55"/>
+    <rect x="4.5" y="14.7" width="9" height="2.7" rx="1.2" fill="#2e261e" stroke="#7d6845"
+          stroke-width=".55"/></symbol>
+  <symbol id="fx-stair" viewBox="0 0 18 18">
+    <rect x="1" y="13.4" width="16" height="4.2" fill="#4a3326"/>
+    <rect x="1" y="9.1" width="16" height="4.3" fill="#5c4a35"/>
+    <rect x="1" y="4.8" width="16" height="4.3" fill="#7d6845"/>
+    <rect x="1" y=".5" width="16" height="4.3" fill="#9a8458"/>
+    <path d="M1 13.4h16M1 9.1h16M1 4.8h16" stroke="#241d15" stroke-width="1"/>
+    <path d="M1 .5v17M17 .5v17" stroke="#241d15" stroke-width=".9"/></symbol>
+  <symbol id="fx-planks" viewBox="0 0 18 18">
+    <path d="M0 4.5h18M0 9h18M0 13.5h18M6 0v4.5M13 4.5v4.5M4 9v4.5M11 13.5v4.5"
+          stroke="#2e261e" stroke-width=".55" opacity=".75"/></symbol>
+  <symbol id="fx-water" viewBox="0 0 18 18">
+    <rect width="18" height="18" fill="#2e3c46" opacity=".6"/>
+    <path d="M2 5q2-1.6 4 0t4 0t4 0M4 10.5q2-1.6 4 0t4 0t4 0M1 15.5q2-1.4 4 0t4 0"
+          fill="none" stroke="#6a7a86" stroke-width=".7" opacity=".85"/></symbol>
+  <symbol id="fx-rubble" viewBox="0 0 18 18">
+    <g fill="#4d4a45" stroke="#241d15" stroke-width=".5">
+      <path d="M3 4l3-1 1.5 2.5-2 2-2.8-.8z"/><path d="M10 3.5l3.2.6.4 2.6-2.6 1-1.6-1.8z"/>
+      <path d="M6 10l2.6-.6 1.4 2.4-1.8 2-2.6-1.2z"/>
+      <path d="M12.5 11.5l2.8.2.6 2.8-2.4 1.2-1.8-2z"/></g>
+    <circle cx="15" cy="7.5" r=".9" fill="#5c574f"/>
+    <circle cx="3.5" cy="14" r="1" fill="#5c574f"/></symbol>
+  <symbol id="fx-chandelier" viewBox="0 0 18 18">
+    <circle cx="9" cy="9" r="6" fill="none" stroke="#7a6a44" stroke-width=".8"
+            stroke-dasharray="1.5 1.2" opacity=".45"/>
+    <circle cx="9" cy="9" r="1.2" fill="#7a6a44" opacity=".45"/></symbol>
+  <symbol id="fx-door" viewBox="0 0 18 18">
+    <rect x="2" y="0" width="14" height="3.4" fill="#6b4a3a" stroke="#241d15"
+          stroke-width=".7"/>
+    <path d="M2 0v5M16 0v5" stroke="#7d6845" stroke-width="1.3"/></symbol>
+  <symbol id="fx-crane" viewBox="0 0 18 18">
+    <rect x="2" y="2" width="14" height="14" fill="none" stroke="#6b4a3a" stroke-width="2"/>
+    <path d="M2 16L16 2" stroke="#7d6845" stroke-width="1.6"/>
+    <circle cx="16" cy="2" r="1.4" fill="#2e261e" stroke="#7d6845" stroke-width=".6"/></symbol>
+  <symbol id="fx-window" viewBox="0 0 18 18">
+    <rect x="3" y="0" width="12" height="2.4" fill="#6a7a86" opacity=".7" stroke="#6b4a3a"
+          stroke-width=".9"/></symbol>`;
+
+// A square's name on the board: column letters (A..Z, then AA..), rows from 1 at the top.
+// The engine reads the same names back (rules/fixtures.py `square_name`).
+function sqCol(c) {
+  return c < 26 ? String.fromCharCode(65 + c)
+    : String.fromCharCode(64 + Math.floor(c / 26)) + String.fromCharCode(65 + c % 26);
+}
+function sqName(c, r) { return `${sqCol(c)}${r + 1}`; }
+
 function renderMap(s) {
   const g = s.scene.grid;
   if (!g) {
@@ -81,7 +211,7 @@ function renderMap(s) {
     return;
   }
 
-  const CELL = 18;
+  const CELL = 18, MARGIN = 14;   // MARGIN: room for the coordinates, top and left
   const reach = new Map((g.reachable || []).map(([c, r, cost]) => [`${c},${r}`, cost]));
   const parts = [];
 
@@ -103,10 +233,66 @@ function renderMap(s) {
       `<title>${v * 5} ft above the floor</title>`));
   // Rails as edges, not fills. A parapet is a thing to shoot over; a filled square
   // would read as a wall, which is the very mistake the engine was making.
-  for (const [c, r, v] of (g.parapet || []))
-    parts.push(`<line class="rail" x1="${c * CELL + 2}" y1="${(r + .5) * CELL}" x2="${
-      (c + 1) * CELL - 2}" y2="${(r + .5) * CELL}"><title>a rail, ${
-      v * 5} ft up</title></line>`);
+  // A gallery's rail is stored on the ground square in front of it and drawn on the
+  // gallery's edge (the side meeting floor at the rail's height), as scene3d.js does:
+  // through the middle of that square it crossed the stair and whoever stood there.
+  const solidSq = new Set((g.blocked || []).map(([c, r]) => `${c},${r}`));
+  for (const [c, r, v] of (g.parapet || [])) {
+    const d = [[0, -1], [0, 1], [-1, 0], [1, 0]].find(([dx, dy]) =>
+      !solidSq.has(`${c + dx},${r + dy}`) && at(c + dx, r + dy) >= v);
+    const [x1, y1, x2, y2] = !d ? [c + .1, r + .5, c + .9, r + .5]
+      : d[0] ? [c + (d[0] > 0 ? 1 : 0), r + .1, c + (d[0] > 0 ? 1 : 0), r + .9]
+      : [c + .1, r + (d[1] > 0 ? 1 : 0), c + .9, r + (d[1] > 0 ? 1 : 0)];
+    parts.push(`<line class="rail" x1="${x1 * CELL}" y1="${y1 * CELL}" x2="${
+      x2 * CELL}" y2="${y2 * CELL}"><title>a rail, ${v * 5} ft up</title></line>`);
+  }
+  // The named fixtures (rules/fixtures.py), each drawn as the thing it is: one <symbol>
+  // per kind in <defs> (FX_DEFS) and one <use> per square, so a 24x24 board of barrels is
+  // 576 small elements at most, never a hand-drawn picture per square. Every symbol is
+  // drawn in an 18-unit square with its FRONT to the south; the square's own rotation
+  // turns that front to the open floor (a shelf's spines face the room, a stair climbs
+  // toward its gallery). Over the terrain fill and deaf to the pointer, so a lit square
+  // under a stair still queues the move onto it. The palette is the table's own: wood
+  // from the leather and brass browns, stone from the board's greys, the ember for a fire.
+  const fixtures = g.fixtures || [];
+  const fxRot = { "0,1": 0, "-1,0": 90, "0,-1": 180, "1,0": 270 };
+  const openAt = (c, r) => c >= 0 && r >= 0 && c < g.width && r < g.height
+    && !solidSq.has(`${c},${r}`);
+  for (const f of fixtures) {
+    const sq = f.squares || [];
+    if (!sq.length) continue;
+    // Faded when it stands on another floor; a stair, a gallery's planks and a crate you
+    // climb (a raised square, not a solid one) are all reached from this one.
+    const off = (f.level || 0) !== MAP_LEVEL && solidSq.has(`${sq[0][0]},${sq[0][1]}`)
+      ? " offlevel" : "";
+    const tip = `<title>${esc(f.name)}</title>`;
+    const xs = sq.map(p => p[0]), ys = sq.map(p => p[1]);
+    const runX = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+    for (const [c, r] of sq) {
+      let turn = 0;
+      if (f.kind === "stair") {
+        // Up is toward the highest open neighbour; the symbol climbs north.
+        const up = [[0, -1], [0, 1], [-1, 0], [1, 0]].reduce((best, d) =>
+          at(c + d[0], r + d[1]) > at(c + best[0], r + best[1]) ? d : best, [0, -1]);
+        turn = (fxRot[`${-up[0]},${-up[1]}`] || 0);
+      } else if (["bookshelf", "rack", "hearth", "counter", "stall", "door", "window"]
+                 .includes(f.kind)) {
+        // The front faces the open floor across the run: a shelf against a wall.
+        const sides = runX ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
+        const front = sides.find(([dx, dy]) => openAt(c + dx, r + dy)) || sides[0];
+        turn = fxRot[`${front[0]},${front[1]}`] || 0;
+      } else if (["cart", "table", "gallery"].includes(f.kind)) {
+        turn = runX ? 0 : 90;
+      }
+      const sym = FX_SYMBOL[f.kind];
+      if (!sym) continue;
+      parts.push(`<use href="#fx-${sym}" class="fx${off}" pointer-events="none" x="${
+        c * CELL}" y="${r * CELL}" width="${CELL}" height="${CELL}"${turn
+        ? ` transform="rotate(${turn} ${(c + .5) * CELL} ${(r + .5) * CELL})"` : ""}>${
+        tip}</use>`);
+    }
+  }
+
   for (const [key, cost] of reach) {
     const [c, r] = key.split(",").map(Number);
     // data-sq is what makes the square a *destination* — the combat builder queues a
@@ -117,7 +303,7 @@ function renderMap(s) {
     // A destination carries the level it lands you on, so the combat builder queues a
     // move to a CELL and not merely a square. Walking onto a dais is walking up onto it.
     const lvl = at(c, r);
-    parts.push(cell(c, r, "reach", `<title>${cost} ft${
+    parts.push(cell(c, r, "reach", `<title>${sqName(c, r)} · ${cost} ft${
         lvl ? ` · ${lvl * 5} ft up` : ""}</title>`)
       .replace('class="reach"', `class="reach" data-sq="${c},${r}${
         lvl ? "," + lvl : ""}"`));
@@ -163,6 +349,29 @@ function renderMap(s) {
     parts.push(`<line class="rule" x1="0" y1="${r * CELL}" x2="${
       g.width * CELL}" y2="${r * CELL}"/>`);
 
+  // Coordinates in the margin, letters across and numbers down, as play-by-post tables
+  // name squares ("move to H3"): the owner, 2026-11-12, "display coordinates on the map so
+  // that the user can be precise about where he wants to stand even outside of combat".
+  // A line naming one ("I go to C5") walks there (rules/fixtures.py `square_said`).
+  for (let c = 0; c < g.width; c++)
+    parts.push(`<text class="coord col" x="${(c + .5) * CELL}" y="${-4}">${sqCol(c)}</text>`);
+  for (let r = 0; r < g.height; r++)
+    parts.push(`<text class="coord row" x="${-7}" y="${(r + .5) * CELL + 3}">${r + 1}</text>`);
+
+  // Night (mock, plan item 10): the light the PC sees (views._light_state), as a wash
+  // over the ground and under the tokens, so people stay readable; a square a carried
+  // light raises is left out of it. One path a level, never a rect a square.
+  if (g.light) {
+    const lit = {}, wash = { dim: "", dark: "" };
+    for (const p of g.light.lit || []) lit[`${p[0]},${p[1]}`] = p[2];
+    for (let c = 0; c < g.width; c++) for (let r = 0; r < g.height; r++) {
+      const lv = lit[`${c},${r}`] || g.light.level;
+      if (lv in wash) wash[lv] += `M${c * CELL} ${r * CELL}h${CELL}v${CELL}h${-CELL}z`;
+    }
+    for (const lv in wash) if (wash[lv])
+      parts.push(`<path class="night ${lv}" pointer-events="none" d="${wash[lv]}"/>`);
+  }
+
   // Blood before bodies, so a token stands in its own pool rather than under it.
   for (const b of (s.scene.pools || [])) {
     if (!b.at) continue;
@@ -191,15 +400,38 @@ function renderMap(s) {
     // creature (item 33). The unit gets a hatched fill and its count on the glyph, so a
     // 3x3 of townsfolk cannot be mistaken for a giant.
     const unit = a.members != null;
-    parts.push(`<rect class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}"
-      x="${c * CELL + 2}" y="${r * CELL + 2}"
-      width="${n * CELL - 4}" height="${n * CELL - 4}" rx="3">
+    // Round, as a miniature's base is (2026-11-11, the owner: "replace the square people
+    // with something that will indicate it is a humanoid"). Seen from above: a person is
+    // shoulders and a head, a beast (`form`, from the `type.*` tags in play/views.py) a
+    // long body with its head to one side, an ooze a spreading ring. The initial sits on
+    // the head; a crowd keeps its hatching and its count.
+    const up = s.scene.in_encounter && a.ref && a.ref === s.scene.turn_ref ? " up" : "";
+    const cx = (c + n / 2) * CELL, cy = (r + n / 2) * CELL, k = n * CELL / 18;
+    parts.push(`<circle class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}${
+      up}" cx="${cx}" cy="${cy}" r="${n * CELL / 2 - 1.5}">
       <title>${esc(a.name)} — ${a.hp}/${a.hp_max}${
         unit ? ` · ${a.members} of ${a.members_max} still standing` : ""}${
-        a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></rect>`);
-    parts.push(`<text class="tok" x="${(c + n / 2) * CELL}" y="${
-      (r + n / 2) * CELL + 4}">${unit ? a.members
-        : esc(a.name.slice(0, 1).toUpperCase())}</text>`);
+        a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></circle>`);
+    const form = unit ? "" : a.form || "humanoid";
+    // The server's plate letters (views._marks): two when an initial clashes here.
+    const mark = a.mark || a.name.slice(0, 1).toUpperCase();
+    const glyph = form === "beast"
+      ? `<ellipse cx="${cx - 1.2 * k}" cy="${cy}" rx="${4.6 * k}" ry="${2.8 * k}"/>
+         <circle class="head" cx="${cx + 3.6 * k}" cy="${cy}" r="${2.2 * k}"/>`
+      : form === "ooze"
+      ? `<circle cx="${cx}" cy="${cy}" r="${5 * k}"/><circle class="head" cx="${cx}" cy="${
+          cy}" r="${2.6 * k}"/>`
+      : form ? `<ellipse cx="${cx}" cy="${cy + .4 * k}" rx="${6 * k}" ry="${3 * k}"/>
+         <circle class="head" cx="${cx}" cy="${cy}" r="${3.4 * k}"/>` : "";
+    if (glyph) parts.push(`<g class="tokbody${down ? " down" : ""}${ghost}">${glyph}</g>`);
+    // A keeper's brass coin (mock, plan item 4), the 3D base's own: not a ring, which
+    // already means whose turn it is.
+    if (a.keeps && !down) parts.push(`<circle class="keepcoin${ghost}" cx="${cx + 5.6 * k}" cy="${
+      cy + 5.6 * k}" r="${2 * k}"><title>${esc(a.name)} keeps a counter here</title></circle>`);
+    parts.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
+      form === "beast" ? cx - 1.2 * k : cx}" y="${
+      unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : (mark.length > 1 ? 4.4 : 6) * k
+        }px">${unit ? a.members : esc(mark)}</text>`);
   }
 
   // A flask being aimed at a square (04's Throw…, CRB "Throw Splash Weapon": a grid
@@ -219,8 +451,11 @@ function renderMap(s) {
   const svg = MAP_3D
     ? Scene3D.render(g, s.scene.actors || [],
                      { turn: MAP_TURN, level: MAP_LEVEL,
-                       reach: !!(STATE.scene && STATE.scene.in_encounter) })
-    : `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
+                       fight: !!s.scene.in_encounter,
+                       reach: !!(STATE.scene && STATE.scene.in_encounter),
+                       up: s.scene.in_encounter ? s.scene.turn_ref : null })
+    : `<svg id="map" viewBox="${-MARGIN} ${-MARGIN} ${g.width * CELL + MARGIN} ${
+         g.height * CELL + MARGIN}"
          preserveAspectRatio="xMidYMid meet"><defs>
          <pattern id="unithatch-foe" width="6" height="6" patternUnits="userSpaceOnUse"
                   patternTransform="rotate(45)">
@@ -231,7 +466,7 @@ function renderMap(s) {
                   patternTransform="rotate(45)">
            <rect width="6" height="6" fill="#d9d2c2"></rect>
            <line x1="0" y1="0" x2="0" y2="6" stroke="#f7f2e6" stroke-width="3"></line>
-         </pattern>
+         </pattern>${FX_DEFS}
        </defs>${parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
   // The controls sit in the board's head as the approved design lays them out (the mock's
@@ -257,7 +492,10 @@ function renderMap(s) {
           v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}</div>${
         g.ceiling ? `<span class="seglabel">ceiling ${g.ceiling * 5} ft</span>` : ""}`
     : "";
-  const legend = `${g.speed ? `<p class="sub maplegend">${
+  // What is on the board, in the words the narrator is given (gm/brief/fixtures_here.py).
+  const named = [...new Set(fixtures.map(f => f.name))];
+  const legend = `${named.length ? `<p class="sub maplegend">Here: ${
+      esc(named.join(", "))}</p>` : ""}${g.speed ? `<p class="sub maplegend">${
       reach.size} squares within ${g.speed} ft</p>` : ""}${
       pools ? `<p class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</p>` : ""}`;
@@ -273,6 +511,7 @@ function renderMap(s) {
     <div class="boardfoot">${g.about ? `<p class="sub maplegend">${esc(g.about)}</p>` : ""}${
       legend}</div>`;
   if (typeof mapPaint === "function") mapPaint();
+  if (typeof MapZoom !== "undefined") MapZoom.mount(g, s.scene);
 
   function cell(c, r, cls, inner = "") {
     return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${

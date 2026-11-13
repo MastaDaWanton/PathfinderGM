@@ -403,7 +403,7 @@ to the ceiling with a gallery round them.
 >
 > | Field | What it becomes |
 > |---|---|
-> | `size_ft.width` / `.depth` | the grid, at five feet to a square, clamped to 6–24 squares — a 15-foot closet is a room but not a scene, and past 24 is more map than anybody reads |
+> | `size_ft.width` / `.depth` | the grid, at five feet to a square, never below 2 squares (10 ft). **Since 2026-11-12** a place in a town with a roof (`height` not null) is held to 24 squares (120 ft); open ground (`height: null`) and anything outside a town is laid as big as written — the board zooms |
 > | `size_ft.height` | the ceiling in squares; `null` means no roof, and a place with no roof has no floors above it whatever `storeys` says |
 > | `clutter` | how much of the floor is solid stuff in the way: 2% of squares for `bare`, 11% for `dense` |
 > | `footing` | how much is difficult going: 2% for `firm`, 18% for `bad` |
@@ -423,10 +423,11 @@ words:
 | Field | Meaning |
 |---|---|
 | `size_ft` | `{width, depth, height}` in **feet**. `height` is the ceiling, or `null` for open sky |
-| `clutter` | `bare`, `some`, `cluttered`, `dense` — how much solid stuff is in the way |
+| `clutter` | `bare`, `some`, `cluttered`, `dense` — how much solid stuff is in the way. In a market the app lays this as straight stall rows with 10 ft aisles (since 2026-11-13), not a scatter; nothing more is needed in the export for it |
 | `footing` | `firm`, `broken`, `bad` — rubble, undergrowth, standing water, spoil |
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — **how the place is shaped upward**, below |
 | `storeys` | `{"up": n, "down": n}` — how many floors above and below this one. Omit for outdoors |
+| `fixtures` | *optional, read since 2026-11-11* — the named things on the floor, from a closed list (`counter`, `table`, `barrel`, `crate`, `bookshelf`, `hearth`, …), most important first. See `docs/for-world-bible.md` ask 15 |
 
 ```json
 {"id": "5bbd0c40345f~urban:the-library", "name": "the library",

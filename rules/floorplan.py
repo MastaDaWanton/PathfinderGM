@@ -30,6 +30,9 @@ already knows how to read:
 Nothing else. No doors, no furniture that is only scenery, no authored encounters — a
 feature the engine cannot act on is decoration, and decoration belongs in the prose the
 narrator writes, not in a data structure that has to be saved, drawn and reasoned about.
+(Since 2026-11-11 `rules/fixtures.py` NAMES these squares — this clump is the bar, that
+raised band a gallery reached by a stair — without changing any of them; every name it
+gives carries only properties the engine reads.)
 
 Keyed off the **spot** where the spot is one this app generates, and off the terrain
 otherwise. Both vocabularies are closed and small (`places._SETTLEMENT`, `places._WILD`,
@@ -79,6 +82,13 @@ class Shape:
     #   none     flat, and meant to be
     vertical: str = "ledge"
     about: str = ""
+    # How the clumps are laid: `scatter` (anywhere, any way round) or `rows` (straight
+    # stall rows with aisles between, a market's; `_rows`).
+    layout: str = "scatter"
+    # The fixture kinds a WORLD wrote for this place (`fixtures` in the export, a closed
+    # list: content/rules/fixtures.json). Empty for every derived shape; `rules/fixtures`
+    # reads it in place of the spot's own row.
+    fixtures: tuple = ()
 
 
 # Two squares of headroom is a house: ten feet, enough for a Medium creature to stand with
@@ -89,7 +99,8 @@ LOW, HALL = 2, 4
 # tables it mirrors are closed and short.
 BY_SPOT: dict[str, Shape] = {
     "the-market": Shape(16, 16, None, clumps=7, clump_max=2, rise=2,
-                        vertical="scatter", about="stalls and awnings, and a cart to climb on"),
+                        vertical="scatter", about="stalls and awnings, and a cart to climb on",
+                        layout="rows"),
     "the-tavern": Shape(12, 10, LOW, clumps=6, clump_max=2,
                         about="tables, benches and a hearth"),
     "the-temple": Shape(14, 12, HALL, clumps=6, clump_max=1, rise=3, rise_to=1,
@@ -386,8 +397,11 @@ FEET_PER_SQUARE = 5
 # narrowest thing that is still a fight rather than a queue. Nothing below that, because
 # a one-square room has no room to miss in.
 #
-# The ceiling stays twenty-four: the authored range runs to 125 feet and a grid much past
-# twenty-four is a map a player reads badly.
+# The ceiling of twenty-four holds for a building's interior in a town only (the owner,
+# 2026-11-12: "probably okay for building interiors inside of towns but anywhere else it
+# should be uncapped"). It was set when the board had no zoom, as "a grid much past
+# twenty-four is a map a player reads badly"; a street, a square or a yard is as big as
+# the world says.
 MIN_SQUARES, MAX_SQUARES = 2, 24
 
 # How much of the floor each clutter word puts something solid on, as a fraction of the
@@ -422,11 +436,29 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
     clutter = str(raw.get("clutter") or "").strip().lower()
     footing = str(raw.get("footing") or "").strip().lower()
     vertical = str(raw.get("vertical") or "").strip().lower()
-    if not (size or clutter or footing or vertical):
+    # The world's own fixture kinds, held to the closed list: a word outside it is
+    # dropped, never guessed at (models read, code validates — 2026-10-03). Imported only
+    # when the world wrote some: tools/check_places.py runs this module without Django.
+    named: tuple = ()
+    if isinstance(raw.get("fixtures"), list) and raw["fixtures"]:
+        from . import fixtures as fixtures_mod
+
+        named = tuple(dict.fromkeys(
+            w for w in (str(x or "").strip().lower() for x in raw["fixtures"])
+            if w in fixtures_mod.kinds()))
+    if not (size or clutter or footing or vertical or named):
         return None
     base = ground if ground is not None else OPEN
-    width = _squares(size.get("width"), base.width)
-    height = _squares(size.get("depth"), base.height)
+    if not (size or clutter or footing or vertical):
+        # Fixtures and nothing else: the room keeps the table's shape exactly.
+        from dataclasses import replace
+
+        return replace(base, fixtures=named)
+    # A roof in a town is a building's interior: capped. Anything else is not.
+    cap = MAX_SQUARES if size and size.get("height") is not None \
+        and "~urban:" in str(raw.get("id") or "") else None
+    width = _squares(size.get("width"), base.width, cap)
+    height = _squares(size.get("depth"), base.height, cap)
     # An authored height of null is a place with no roof, which is a fact and not a gap:
     # 241 of the 456 are written that way and they are the yards, the greens and the
     # streets. Only a place that wrote nothing at all about its size keeps the table's
@@ -444,15 +476,17 @@ def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
                  rough=max(0, rough),
                  rise=max(3, inner // 60) if kind == "scatter" else 0,
                  rise_to=2 if kind == "slope" else 1,
-                 vertical=kind, about=base.about)
+                 vertical=kind, about=base.about, fixtures=named, layout=base.layout)
 
 
-def _squares(feet, fallback: int) -> int:
+def _squares(feet, fallback: int, cap: int | None = MAX_SQUARES) -> int:
     try:
         n = round(float(feet) / FEET_PER_SQUARE)
     except (TypeError, ValueError):
         return fallback
-    return max(MIN_SQUARES, min(MAX_SQUARES, n)) if n else fallback
+    if not n:
+        return fallback
+    return max(MIN_SQUARES, min(cap, n) if cap else n)
 
 
 def _levels(feet) -> int | None:
@@ -519,11 +553,14 @@ def _upstairs(ground: Shape, level: int) -> Shape:
                  about="partitioned, and lower than the room below")
 
 
-def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> Grid:
+def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None,
+              *, scatter: bool = False) -> Grid:
     """The ground at this place, the same every time it is asked for.
 
     Nothing is placed in the outermost ring, so a plan can never wall a scene in or strand
     a combatant in a corner they cannot leave. Everything in the middle is fair game.
+    `scatter` lays a `rows` place the way it was laid before rows (`fixtures.derive`
+    names a market saved then by its own old stalls).
     """
     shape = shape_for(place_id, terrain, authored)
     r = _Rolls(_seed(place_id))
@@ -533,7 +570,9 @@ def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None)
         return (1 + r.next(max(1, shape.width - 2)),
                 1 + r.next(max(1, shape.height - 2)))
 
-    for _ in range(shape.clumps):
+    if shape.layout == "rows" and not scatter:
+        _rows(grid, shape, r)
+    for _ in range(0 if shape.layout == "rows" and not scatter else shape.clumps):
         x, y = somewhere()
         run = 1 + r.next(shape.clump_max)
         down = r.next(2)
@@ -549,6 +588,36 @@ def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None)
 
     _raise(grid, shape, r)
     return grid
+
+
+def _rows(grid: Grid, shape: Shape, r: "_Rolls") -> None:
+    """A market's stalls in straight rows (plan item 6, 2026-11-13).
+
+    Scattered, two runs that happened to touch were typed as one stall bent round a corner
+    (the owner's market picture showed three L-shaped stalls). In rows they cannot touch:
+    a row, then a two-square aisle (10 ft, the FAO's and street-market guides' main aisle),
+    and a gap of one or two squares between stalls in a row to walk through. Rows run the
+    long way; a square market rolls for it. Whole rows are filled, in rolled order, until
+    `clumps` stalls stand: seven picked from every slot read as scattered again."""
+    w, h = shape.width, shape.height
+    across = w > h or (w == h and r.next(2) == 0)
+    long_, short = (w, h) if across else (h, w)
+    lanes = []
+    for lane in range(2, short - 2, 3):
+        at, row = 1 + r.next(2), []            # rows start staggered, not in a column
+        while True:
+            run = 1 + r.next(shape.clump_max)
+            if at + run > long_ - 1:
+                break
+            row.append([(at + k, lane) for k in range(run)])
+            at += run + 1 + r.next(2)
+        lanes.append(row)
+    left = shape.clumps
+    while lanes and left > 0:
+        for stall in lanes.pop(r.next(len(lanes)))[:left]:
+            left -= 1
+            for a, b in stall:
+                grid.blocked.add((a, b) if across else (b, a))
 
 
 # How high a ledge stands and how high its rail comes. Two squares is ten feet — a storey

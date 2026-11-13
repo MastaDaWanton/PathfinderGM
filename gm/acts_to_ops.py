@@ -835,6 +835,9 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
             row.ops = interpret.ops_for({"actions": [a]}, scene, places)
+            if act == "go" and pc is not None and _to_the_square(row, a, scene, pc):
+                rows.append(row)              # "I go to C5": the board's own square
+                continue
             # A walk to a place somebody named and the town does not have yet owes the
             # found and the travel `judgement.go_to_heard_place` writes for it — owned by
             # this action, so `order` puts them where the words do. Measured live on the
@@ -864,6 +867,21 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 else:
                     _to_the_town(row, str(a["place"]), scene, places, pc)
                     _nowhere(row, a, scene, places)
+            if act == "go" and a.get("fixture"):
+                # The reader named a fixture of the room (its closed `fixture`): one the
+                # room lacks is put on the map, near the player, and keeps its square.
+                from rules import fixtures as fixtures_mod
+
+                # Held to the walker's own words against the room's fixtures ("the bar"
+                # is the counter here, never the barrel the reader chose, 2026-11-12).
+                a["fixture"] = fixtures_mod.held_to_words(
+                    getattr(scene, "grid", None), str(a["fixture"]),
+                    f"{a.get('place') or ''} {a.get('span') or ''}")
+                fixtures_mod.name_one(scene, str(a["fixture"]))
+                # And the walk happens: free of the turn's time, never of the map. Built
+                # whole, through the engine's own move (stair, reach and provoking rules).
+                if pc is not None:
+                    _to_the_fixture(row, str(a["fixture"]), scene, pc)
             if act == "call_on" and pc is not None:
                 # The reader's own call on a person who is standing here is the same walk
                 # home together; their door would refuse them ("is here, with you").
@@ -917,7 +935,19 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act == "harvest" and pc is not None:
                 _harvest(row, frame, i, scene, pc, rows)
             if act == "stealth" and pc is not None:
+                # Hiding behind something of this room moves you there first. Live
+                # 2026-11-12, twice: "duck behind the nearest stall" and "slip around
+                # behind the bar" were read as stealth (`place` the stall, the bar), and
+                # the player never left their square.
+                from rules import fixtures as fixtures_mod
+
+                kind = fixtures_mod.held_to_words(
+                    getattr(scene, "grid", None), "", str(a.get("place") or ""))
+                if kind:
+                    _to_the_fixture(row, kind, scene, pc)
                 _sneak(row, a, scene, pc)
+            if act == "use" and pc is not None and not row.ops:
+                _draw(row, a, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)
             if act == "escape" and pc is not None:
@@ -1103,6 +1133,26 @@ def _harvest(row: Row, frame, i, scene, pc, rows=()) -> None:
                         "because": "the player cuts parts off the carcass"})
     who = (getattr(scene, "actors", {}) or {}).get(ref)
     row.note = f"a harvest of {getattr(who, 'name', ref)}"
+
+
+def _draw(row: Row, a: dict, pc) -> None:
+    """A weapon the player carries and does not hold, used: drawn, through the `wear` door
+    every draw takes (`Engine._draw_before`), which prices it in a fight.
+
+    Live 2026-11-12, three fights running: "I draw my rapier and ..." was read `use: my
+    rapier`, the act owed no op, and the page said "You draw your rapier" while the rapier
+    stayed on the belt. shortcut: weapons the sheet lists only, not crafted ones; widen when
+    a crafted blade is drawn this way."""
+    from rules import weapons as weapons_mod
+
+    want = weapons_mod.key_for(str(a.get("object") or ""))
+    if not want or want == weapons_mod.key_for(str(pc.equipped or "")):
+        return
+    carried = next((w for w in pc.weapons if w and weapons_mod.key_for(str(w)) == want), None)
+    if carried is not None:
+        row.intents.append({"op": "wear", "actor": pc.ref,
+                            "params": {"item": str(carried), "actor": pc.ref},
+                            "because": f"the player draws the {carried}"})
 
 
 def _sneak(row: Row, a: dict, scene, pc) -> None:
@@ -1467,6 +1517,56 @@ def _home_together(row: Row, ref: str, scene, pc) -> None:
                         "because": f"the player goes home with {who.name}"})
     row.ops = []
     row.note = f"home with {who.name}, who is here"
+
+
+def _to_the_square(row: Row, a: dict, scene, pc) -> bool:
+    """A walk to a square the board names by its printed coordinate ("I stand at C5",
+    `fixtures.square_said`): the move to it, or the reason there is none. False when the
+    words name no square of this board. The owner, 2026-11-12: "display coordinates on the
+    map so that the user can be precise about where he wants to stand even outside of
+    combat"."""
+    from rules import fixtures
+
+    grid = getattr(scene, "grid", None)
+    words = f"{a.get('place') or ''} {a.get('span') or ''}".upper()
+    sq = fixtures.square_said(grid, words)
+    if sq is None:
+        return False
+    row.ops = []
+    name = fixtures.square_name(sq)
+    if sq in grid.blocked or not grid.passable(sq):
+        row.nowhere = f"{name} is solid: nobody can stand there."
+    elif sq in scene.occupied(ignore=pc.ref):
+        row.nowhere = f"Somebody already stands at {name}."
+    elif tuple(scene.positions.get(pc.ref) or ())[:2] != sq:
+        row.intents.append({"op": "move", "actor": pc.ref,
+                            "params": {"who": pc.ref, "square": [*sq, grid.ground(sq)]},
+                            "because": f"the player walks to {name}"})
+    return True
+
+
+def _to_the_fixture(row: Row, kind: str, scene, pc) -> None:
+    """The move a walk to a fixture of this room owes (`fixtures.walk_to`).
+
+    The gate, 2026-11-11: "I walk up the stair onto the wall-walk above the gate" read as
+    two walks within the place, `fixture: stair` and the wall-walk, and the table built
+    nothing for either ("a move inside the place: no travel"); the plan's travel to the
+    gate answered "You are already at the gate", the token stayed at (2, 3) on the ground,
+    and the page said "You climb the stone stairs and step onto the wall-walk". Moving
+    about the place is free of time (2026-11-06), not free of happening."""
+    from rules import fixtures
+
+    square, why = fixtures.walk_to(scene, kind, pc)
+    if square is not None:
+        here = getattr(getattr(scene, "grid", None), "fixtures", None) or []
+        name = next((f["name"] for f in here if f["kind"] == kind),
+                    "the floor" if kind == fixtures.FLOOR else kind)
+        row.intents.append({"op": "move", "actor": pc.ref,
+                            "params": {"who": pc.ref, "square": list(square)},
+                            "because": f"the player walks to {name}"})
+        row.note = ""
+    elif why:
+        row.nowhere = why
 
 
 def _nowhere(row: Row, a: dict, scene, places) -> None:
@@ -2761,6 +2861,72 @@ def _pays_for_the_room(r: dict, acts: set, scene, pc) -> bool:
 # The acts that choose where a walk goes: a move, a person sought or followed, a door
 # forced (`interpret._MOVING_ACTS`). A search stands behind a walk only to the places next
 # door (`interpret._sought_nearby`).
+def walk_in_place(raw, rows: list[Row], frame: dict | None, scene, places=(), *,
+                  notes: list | None = None) -> list:
+    """The plan, with no travel to the place the party already stands in when the reading
+    walks inside it, and no move of the player's own beside the move the table built.
+
+    The gate, 2026-11-11: "I walk up the stair onto the wall-walk above the gate" — the
+    reading's walks were inside the place, the table built nothing, and the plan wrote
+    `travel` to "the wall-walk above the gate", which the engine answered "You are already
+    at the gate." A travel cannot stand in for a walk across the room; the built move is
+    that walk (`_to_the_fixture`)."""
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
+        return raw
+    here = str(getattr(scene, "at", "") or "")
+    within = any(interpret.acting(a) and interpret.within_place(a, places, here)
+                 for a in frame.get("actions") or [])
+    built = [i for r in rows for i in r.intents if i.get("op") == "move"]
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if not within and not built:
+        return raw
+
+    inside = {" ".join(str(a.get("place") or "").lower().split())
+              for a in frame.get("actions") or []
+              if interpret.acting(a) and interpret.within_place(a, places, here)} - {""}
+
+    def is_here(name: str) -> bool:
+        if not name:
+            return True                     # a travel to nowhere, for a walk in the room
+        found = places_mod.find(places, name) if places else None
+        # The place stood in, or the very words the reading put inside it — never a
+        # place not founded yet ("…then head to the old tannery" keeps its walk).
+        return (found is not None and getattr(found, "id", "") == here)             or " ".join(name.lower().split()) in inside
+
+    # Every walk the words make stays inside the place: then no travel, journey or
+    # venture is the player's at all. Live on the fix, 2026-11-11: "I go back down"
+    # (fixture `floor`) was planned as a travel to the outskirts beside the built move;
+    # `unasked_travel` stands aside for any moving act, so it walked the party out of town.
+    moving = [a for a in frame.get("actions") or []
+              if interpret.acting(a) and a.get("act") in interpret._MOVING_ACTS]
+    inside_only = within and moving and all(
+        interpret.within_place(a, places, here) for a in moving)
+    out = []
+    for r in raw:
+        op = _op(r)
+        params = (r.get("params") or {}) if isinstance(r, dict) else {}
+        if inside_only and op in ("travel", "journey", "venture"):
+            if notes is not None:
+                notes.append(f"the plan's {op} dropped: every walk the words make is "
+                             f"inside the place")
+            continue
+        if within and op == "travel" and is_here(str(params.get("place") or "")):
+            if notes is not None:
+                notes.append(f"the plan's travel to {params.get('place')!r} dropped: the "
+                             f"words walk inside the place")
+            continue
+        if built and op == "move" and pc is not None and not any(r is b for b in built)                 and str(r.get("actor") or "") in (pc.ref, "pc")                 and str(params.get("who") or pc.ref) in (pc.ref, "pc"):
+            if notes is not None:
+                notes.append("the plan's move replaced by the reading's walk to a fixture")
+            continue
+        out.append(r)
+    return out
+
+
 def unasked_travel(raw, frame: dict | None, scene=None, places=(), *,
                    notes: list | None = None) -> list:
     """A walk no deed of the player's stands behind is the plan's, and is struck.

@@ -191,6 +191,11 @@
          border: 1px solid #241d15; border-radius: 3px;
          box-shadow: inset 0 0 24px rgba(0,0,0,.55); }
   #map .rule { stroke: #241d15; stroke-width: .5; }
+  /* Pinned to the view's edge while zoomed: a halo of the well's colour keeps a label
+     readable over the squares it now sits on. */
+  #map .coord.pinned { paint-order: stroke; stroke: #0f0c09; stroke-width: 2.5px; }
+  #map .coord { fill: var(--dim); font-size: 8.5px; text-anchor: middle;
+                pointer-events: none; user-select: none; }
   #map .blocked { fill: #3a3128; }
   #map .difficult { fill: #2a2416; }
   #map .obscuring { fill: #23262b; }
@@ -203,16 +208,19 @@
   #map .up2 { fill: #4a4130; }
   #map .up3 { fill: #585039; }
   #map .rail { stroke: #7a6a44; stroke-width: 2.5; stroke-linecap: round; }
+  /* Named fixtures (rules/fixtures.py): each kind is a <symbol> in the board's <defs>
+     (03-offers-and-map.js, FX_DEFS) carrying its own colours; only the level fade is
+     here. In 3D a fixture's detail panels (a seam, a spine, a hoop) carry no outline. */
+  #map .fx.offlevel { opacity: .32; }
+  #view3d .fxd { stroke: none; }
   /* Somebody on another floor of the same room: still there, still worth seeing, and
      plainly not who you are looking at. */
   #map .token.offlevel { opacity: .32; }
   #map .here { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .5; }
-  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point
-     is to be able to read the board at a glance, and shading exists only to tell one
-     face of a box from another. The two visible sides are stepped darker so a cube
-     reads as a cube without an outline round it. */
-  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point is
-     to read the board at a glance.
+  /* The three-dimensional view. The point is to read the board at a glance. Since
+     2026-11-11 stone, planks and flagstones are SVG patterns laid in each face's plane
+     and painted in its lit colour (scene3d.js, TILES), asked for by the owner: "make the
+     textures like stone apear in the 3D view as well".
 
      There are no `fill` rules here on purpose, and that is the whole of the rework. Every
      face's colour is its material multiplied by a light that belongs to the ROOM, worked
@@ -228,12 +236,29 @@
   #view3d .lit.face-top { cursor: pointer; }
   #view3d .lit.face-top:hover { fill: var(--gold); }
   /* Solid things read as solid: a seam between two faces of one box says "two faces". */
-  #view3d .fig, #view3d .rail3 { stroke: none; }
+  #view3d .fig, #view3d .rail3, #view3d .txs, #view3d .floortex { stroke: none; }
   #view3d .fig.offlevel { opacity: .38; }
-  /* A floor over your head — a gallery you are not standing on — and the rail along it.
-     Walls are never in here: a wall is a wall from every level, and drawing one through
-     would tell the player they have a shot they do not have. */
-  #view3d .above { opacity: .45; }
+  /* Every mass is solid (the half-clear gallery read as a glass block). What a mass hides
+     is drawn over it, last: a token as a ghost of itself in its side's colour, a square
+     you can reach as a dashed gold outline that still takes the click (scene3d.js, the
+     x-ray pass). Nothing transitions: it is there the moment the board turns. */
+  #view3d .xray { opacity: .6; }
+  #view3d .xray.offlevel { opacity: .22; }
+  #view3d .xray polygon { stroke: none; }
+  #view3d .xsq { fill: var(--gold); fill-opacity: .1; stroke: var(--gold);
+                 stroke-opacity: .55; stroke-width: .6; stroke-dasharray: 2 1.5; }
+  #view3d .xsq:hover { fill: var(--gold); fill-opacity: .45; }
+  /* Drawn over the mass that hides them, the outlines read as walkway squares on top of
+     a gallery (plan item 1, the owner's tavern). They show only while the pointer is on
+     the board, which is when a move is being chosen; still clickable either way. */
+  #view3d:not(:hover) .xsq { opacity: 0; }
+  /* A figure's letter plate over its head (the flat token's initial, or a crowd's
+     count), and the gold rim on the base of whoever's turn it is. */
+  #view3d .plate rect { stroke: #15120d; stroke-width: .45; }
+  #view3d .plate.neutral text { fill: #f2ecdd; }
+  #view3d .plate text { fill: #14120f; font: 700 6px var(--display); text-anchor: middle;
+                        pointer-events: none; }
+  #view3d .fig.base.up { stroke: #f0dcae; stroke-width: 1.3; }
   .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
   .levelpick button { padding: 1px 8px; font-size: 11px; }
   .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
@@ -246,6 +271,9 @@
   #map .token.ally { fill: #6fc276; stroke: #1f4a26; }
   #map .token.bystander { fill: #f2ecdd; stroke: #7a6f5a; }
   #map .token.down { opacity: .35; }
+  #map .night.dim { fill: #0b1530; opacity: .42; }
+  #map .night.dark { fill: #05080f; opacity: .7; }
+  #map .keepcoin { fill: #c9a45a; stroke: #4a3a1c; stroke-width: .8; }
   /* A crowd held as one actor (item 33). Hatched rather than solid, and dashed at the
      edge, because a filled 3x3 block reads as one big creature — the whole point is that
      it is many people standing together. The colour still says which side they are on. */
@@ -254,6 +282,14 @@
   #map .token.unit.bystander { fill: url(#unithatch-quiet); }
   #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
                   pointer-events: none; }
+  /* The figure seen from above on a round token (03-offers-and-map.js): shoulders or a
+     beast's body in the token's own colour shaded down, the head lit, the initial on it. */
+  #map .tokbody { fill: rgba(20, 18, 15, .24); pointer-events: none; }
+  #map .tokbody .head { fill: rgba(247, 242, 230, .32); stroke: rgba(20, 18, 15, .4);
+                        stroke-width: .5; }
+  #map .tokbody.down, #map text.tok.down { opacity: .35; }
+  #map .tokbody.offlevel, #map text.tok.offlevel { opacity: .32; }
+  #map .token.up { stroke: #f0dcae; stroke-width: 1.6; }
   .maplegend { margin-top: 4px; }
 
   .prepbtn { width: 22px; height: 22px; line-height: 1; border-radius: 3px;
@@ -2477,8 +2513,23 @@
   /* The board sits in a stone well sunk into the card. The old page's `#map` and `#view3d`
      rules sized each board to its width (`height: auto`), which in a well of fixed height
      let a tall room run off its foot: here they fill the well and keep their shape. */
-  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
+  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px; position: relative;
                border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken); overflow: hidden; }
+  /* Zoom (js/table/24-map-zoom.js): the board owns the touches and the middle button on
+     it; the buttons sit over its corner, so zooming never changes the board's size. */
+  #mapwrap .boardview, #mapwrap .boardview svg { touch-action: none; }
+  #mapwrap .boardview:focus { outline: none; }
+  #mapwrap .boardview:focus-visible { box-shadow: var(--sunken), 0 0 0 2px var(--candle); }
+  #mapwrap .boardview.is-zoomed svg { cursor: grab; }
+  #mapwrap .boardview.is-zoomed svg:active { cursor: grabbing; }
+  .mapzoom { position: absolute; right: 6px; bottom: 6px; z-index: 2; display: grid; gap: 2px;
+             padding: 2px; border-radius: 4px; background: var(--glass);
+             border: 1px solid var(--glass-edge); box-shadow: var(--sh-2); }
+  .mapzoom .v2-btn { width: 36px; height: 30px; min-height: 0; padding: 0; font-size: 13px;
+                     line-height: 1; letter-spacing: 0; touch-action: manipulation; user-select: none; }
+  .mapzoom .v2-btn[data-mapzoom="in"], .mapzoom .v2-btn[data-mapzoom="out"] { font-size: 17px; }
+  .mapzoom .v2-btn:disabled { opacity: .4; cursor: default; }
+  .mapzoom .v2-btn:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px; }
   .boardview svg, .boardview > #map, .boardview > #view3d {
     width: 100%; height: 100%; max-height: 100%; display: block; }
   .boardfoot { display: grid; gap: 2px; font-size: 14px; }
@@ -4262,6 +4313,9 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/01-core.js' %}"></script>
 <script src="{% asset 'js/table/02-state.js' %}"></script>
 <script src="{% asset 'js/table/03-offers-and-map.js' %}"></script>
+<!-- Zoom and pan on the ground board (2026-11-12), mounted by renderMap: before the first
+     board is drawn, which happens while the later scripts are still loading. -->
+<script src="{% asset 'js/table/24-map-zoom.js' %}"></script>
 <script src="{% asset 'js/table/04-combat-and-turns.js' %}"></script>
 <script src="{% asset 'js/table/05-sheet.js' %}"></script>
 <script src="{% asset 'js/table/06-trade-and-page.js' %}"></script>
