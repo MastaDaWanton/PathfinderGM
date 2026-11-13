@@ -277,6 +277,12 @@ class Scene:
     # square actually changed counts — a zone relabel moves no body (docs/fix-interfaces
     # §3.4) and must not cost the step that would.
     move_spent: dict[str, int] = field(default_factory=dict)
+    # The round each combatant spent its standard action on something that does not end
+    # the turn — a potion drunk or an oil applied (owner ruling 2026-11-13: CRB Table 8-2,
+    # a standard action that provokes). The Equipment tab's drink is its own request and
+    # leaves the turn open, so without a record a drink then a blow from the combat bar
+    # was two standard actions. `move_spent`'s shape, for its reason: no second ticker.
+    standard_spent: dict[str, int] = field(default_factory=dict)
     # What the player's character last struck with this encounter — the weapon and the
     # lethality their own words chose — and what was in hand then, by ref. A blow that
     # names no means carries on with these (`Engine._standing_means`), as a standing action
@@ -2228,6 +2234,7 @@ class Scene:
         # The next fight starts at round one again, and a walk from this one's round one
         # would read as already spent.
         self.move_spent = {}
+        self.standard_spent = {}
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -2404,6 +2411,7 @@ class Scene:
         self.positions.pop(ref, None)
         self.acted.discard(ref)
         self.move_spent.pop(ref, None)
+        self.standard_spent.pop(ref, None)
         self.spawn_feet.pop(ref, None)
         # Leaked by three of the four old depart doors and persisted, so a stale age was
         # waiting for whoever wore the ref next; with refs never reused it is merely
@@ -5629,6 +5637,8 @@ class Engine:
             return self._provoked_by_maneuver(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
+        if raw.get("op") == "use_item":
+            return self._provoked_by_drinking(raw)
         if raw.get("op") != "move":
             return []
 
@@ -5794,7 +5804,8 @@ class Engine:
     # built". Both halves arrive together, as the cast's provocation and its defensive
     # casting did: the cost is what makes the choice a trade.
 
-    def _coup_round_spent(self, actor) -> str:
+    def _coup_round_spent(self, actor, what: str = "a coup de grâce",
+                          end: str = "Nothing is rolled.") -> str:
         """Why this actor has no full round left for a coup de grâce in a fight, or "".
 
         A full-round action takes the whole turn: not after a move action this round
@@ -5802,17 +5813,99 @@ class Engine:
         that cost one), and not after a blow or a spell of this actor's already resolved in
         this batch (`_so_far`, the batch's outcomes; `Outcome.actor` names who). The engine
         keeps no record of a standard action across batches — a turn is one batch, spoken
-        or from the combat bar — so this asks the batch it can see."""
+        or from the combat bar — so this asks the batch it can see, and the one standard
+        action that does outlive a batch, a drink (`Scene.standard_spent`).
+
+        `what` names the full-round action: a potion fed to an unconscious creature asks
+        the same question (`_drink_refusal`)."""
         name = actor.name
         if self.scene.move_spent.get(actor.ref) == self.scene.round:
-            return (f"{name} has already moved this turn, and a coup de grâce takes the "
-                    f"whole round. Nothing is rolled.")
-        for o in getattr(self, "_so_far", None) or ():
-            if getattr(o, "actor", "") == actor.ref and o.op in ("attack", "cast") \
-                    and o.status == "resolved":
-                return (f"{name} has already acted this turn, and a coup de grâce takes "
-                        f"the whole round. Nothing is rolled.")
+            return (f"{name} has already moved this turn, and {what} takes the "
+                    f"whole round. {end}")
+        if self.scene.standard_spent.get(actor.ref) == self.scene.round or any(
+                self._acted_in_batch(actor)):
+            return (f"{name} has already acted this turn, and {what} takes "
+                    f"the whole round. {end}")
         return ""
+
+    def _acted_in_batch(self, actor, ops=("attack", "cast")):
+        """This actor's resolved blows and spells in the batch so far (`_so_far`)."""
+        for o in getattr(self, "_so_far", None) or ():
+            if getattr(o, "actor", "") == actor.ref and o.op in ops \
+                    and o.status == "resolved":
+                yield o
+
+    # --- a drink in a fight: a standard action that provokes ---------------------------
+    #
+    # Owner ruling 2026-11-13, the Core Rulebook strictly. Table 8-2: "Drink a potion or
+    # apply an oil — standard action, attack of opportunity: yes". Quick Draw changes
+    # nothing (the owner's reading: the feat speeds weapons, not potions). No separate
+    # fetch-from-pack move action is modelled.
+    # Magic Items, Potions: "a character can carefully administer a potion to an
+    # unconscious creature as a full-round action ... this action provokes attacks of
+    # opportunity". Until this, an Equipment drink in a fight cost nothing and drew no
+    # swing (playtest note 2026-10-08, "use door and action economy").
+    _DRINKS = frozenset({"drink", "apply"})
+
+    def _drink_refusal(self, actor, how: str, target: str) -> str:
+        """Why this drink cannot be taken now in a fight, or "". Asked by the op and by
+        `_provoked_by_drinking`, so a refused drink invents no opening."""
+        if not self.scene.in_encounter or how not in self._DRINKS:
+            return ""
+        other = self.scene.actors.get(str(target or ""))
+        if other is not None and other.ref != actor.ref \
+                and other.has_state("state.down.unconscious"):
+            return self._coup_round_spent(actor, f"giving a potion to {other.name}, who is "
+                                                 f"unconscious,", "Nothing is opened.")
+        spent = self.scene.standard_spent.get(actor.ref) == self.scene.round
+        done = next(self._acted_in_batch(actor), None)
+        if spent or done is not None:
+            return (f"{actor.name} has already used this turn's standard action, and "
+                    f"{'drinking a potion' if how == 'drink' else 'applying it'} is a "
+                    f"standard action. Nothing is opened.")
+        return ""
+
+    def _provoked_by_drinking(self, raw: dict) -> list[dict]:
+        """The attacks of opportunity a drink (or an oil applied, or a potion given) in a
+        threatened square is owed: Table 8-2's "yes", from every foe threatening the
+        drinker (`reactions.provoked_by_action`, the cast's and the pick-up's question).
+        Only a drink that will go down: no dose carried, or no action left, is refused by
+        the op with nothing provoked."""
+        params = raw.get("params") or {}
+        if params.get("power") or params.get("reaction"):
+            return []
+        how = str(params.get("how") or "drink").strip().lower()
+        actor = self.scene.actors.get(str(raw.get("actor") or ""))
+        if actor is None or how not in self._DRINKS:
+            return []
+        item_id, _ = consumables.resolve_stock(actor.stock,
+                                               str(params.get("item") or "").lower())
+        held = actor.stock.get(item_id) if item_id else None
+        target = params.get("to") or actor.ref
+        if held is None or held.count < 1 or target not in self.scene.actors \
+                or self._drink_refusal(actor, how, target):
+            return []
+        out: list[dict] = []
+        for watcher, reaction in reactions.provoked_by_action(self.scene, actor.ref):
+            if watcher == target or not self._spend_reaction(watcher, reaction.budget):
+                continue
+            out.append({
+                "op": reaction.op, "actor": watcher, "target": actor.ref,
+                "because": f"{actor.name} reached for {held.name} within reach",
+                "params": {"full_attack": False, "reaction": reaction.id},
+                "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+            })
+        return out
+
+    def _standard_spent_refusal(self, intent: Intent, actor) -> "Outcome | None":
+        """A blow or a spell after a drink this round, refused: the drink was the turn's
+        standard action (`Scene.standard_spent`). Never an attack of opportunity."""
+        if not self.scene.in_encounter or intent.params.get("reaction") \
+                or self.scene.standard_spent.get(actor.ref) != self.scene.round:
+            return None
+        return self._refuse(intent, f"{actor.name} has already used this turn's standard "
+                                    f"action on a drink. A move is still theirs to take.",
+                            code="standard_spent")
 
     def _coup_provokes(self, intent: Intent, actor, defender, weapon_key: str) -> None:
         """The attacks of opportunity a coup de grâce in a fight draws, raised as
@@ -8370,6 +8463,13 @@ class Engine:
                 effects=[{"ref": actor.ref, "kind": "attack_stopped", "why": why}],
                 tell=f"{actor.name} is {why} and never swings.",
                 because=intent.because)
+        # A drink this round was the standard action (owner ruling 2026-11-13). A thrown
+        # flask's attack was asked at the throw (`_op_use_item`), its dose already spent.
+        if partial.get("attack_state") is None and not dancing \
+                and intent.params.get("mode") != "splash":
+            spent = self._standard_spent_refusal(intent, actor)
+            if spent is not None:
+                return spent
         # A second blow behind a move this turn — the closing step or a declared one
         # (`_one_blow_left` marks it): a move action and a standard action leave ONE
         # attack — "the only movement you can take during a full attack is a 5-foot step"
@@ -9607,7 +9707,34 @@ class Engine:
                 # the save (23 against DC 27)" read as bad arithmetic in the first run.
                 nat = natural_said(save, coup_dc)
                 why = f"{nat}, " if nat else ""
-                if d20_succeeds(save, coup_dc):
+                said = f"({why}{save.total} against DC {coup_dc})"
+                if lethality == "nonlethal":
+                    # Never a death save (owner ruling 2026-11-13): a failure is a longer
+                    # knockout on its own clock (`coup_de_grace.KNOCKED_OUT`), a success
+                    # only the non-lethal damage already dealt.
+                    if d20_succeeds(save, coup_dc):
+                        state["tells"].append(
+                            f"{defender.name} makes the Fortitude save {said}: only the "
+                            f"non-lethal damage counts.")
+                    else:
+                        hours = self.dice.roll(coup_mod.KNOCKOUT_DICE,
+                                               label="Hours knocked out by the coup de "
+                                                     "grâce", visibility="hidden")
+                        state["rolls"].append(hours.as_dict())
+                        defender.add_condition(
+                            coup_mod.KNOCKED_OUT,
+                            rounds=hours.total * coup_mod.ROUNDS_PER_HOUR,
+                            source="a non-lethal coup de grâce",
+                            origin=intent.origin or "")
+                        state["effects"].append({
+                            "ref": defender.ref, "kind": "condition",
+                            "condition": coup_mod.KNOCKED_OUT, "hours": hours.total,
+                            "from": "coup de grâce"})
+                        state["tells"].append(
+                            f"{defender.name} fails the Fortitude save {said} and is "
+                            f"knocked out cold for {hours.total} "
+                            f"hour{'s' if hours.total != 1 else ''}.")
+                elif d20_succeeds(save, coup_dc):
                     state["tells"].append(
                         f"{defender.name} makes the Fortitude save ({why}{save.total} "
                         f"against DC {coup_dc}) and clings to life.")
@@ -10952,6 +11079,7 @@ class Engine:
         self.scene.initiative = rolls
         self.scene.round = 1
         self.scene.move_spent = {}
+        self.scene.standard_spent = {}
         self.end_talk("a fight starts")
         sides = {"pc": pc_side, "them": [r for r in them if r in standing]}
         self.scene.sides = sides
@@ -19610,6 +19738,29 @@ class Engine:
         if target not in self.scene.actors:
             away = self._elsewhere(target)
             return self._refuse(intent, away or f"There is no {target} here to use it on.")
+        # In a fight a drink is the turn's standard action, and it provokes
+        # (`_drink_refusal`, `_provoked_by_drinking`). A throw is a standard action too and
+        # asks only the drink's record: its own attack is the attack op's.
+        fed = self.scene.actors[target]
+        # Read before the drink: a cure that wakes them must not make it a standard action.
+        whole_round = (self.scene.in_encounter and how in self._DRINKS
+                       and target != actor.ref and fed.has_state("state.down.unconscious"))
+        if self.scene.in_encounter and not intent.params.get("reaction"):
+            why = self._drink_refusal(actor, how, target)
+            if how == "throw" and self.scene.standard_spent.get(actor.ref) == \
+                    self.scene.round:
+                why = (f"{actor.name} has already used this turn's standard action on a "
+                       f"drink. Nothing is thrown.")
+            if why:
+                return self._refuse(intent, why, code="standard_spent")
+            if how in self._DRINKS and (actor.is_down or actor.blocking_key("any")):
+                # The swings it drew dropped the drinker: the cork never comes out.
+                stopped = (actor.blocking_condition("any") or "down").lower()
+                return Outcome(intent_id=intent.id, op="use_item", status="prevented",
+                               effects=[{"ref": actor.ref, "kind": "use_stopped",
+                                         "why": stopped}],
+                               tell=f"{actor.name} is {stopped} and never drinks.",
+                               because=intent.because)
         # A jar still steeping is not a tincture yet (docs/herbalism-revamp-plan.md §6): the
         # bench refuses it, and so must the narrated door, or "I drink my tincture" on day 3
         # of a two-week steep would be the one way round the clock (Lane B2's note at merge).
@@ -19741,7 +19892,8 @@ class Engine:
         # looked up later.
         state = {"effects": effects, "item": use.item, "how": how, "target": target,
                  "route": route, "clouds": cloud_tells,
-                 "narrate": list(use.narrate or []), "delivers": bool(use.intents)}
+                 "narrate": list(use.narrate or []), "delivers": bool(use.intents),
+                 "whole_round": whole_round}
         validated = (self.validate(use.intents, origin=f"item:{item_id}",
                                    origin_name=use.item) if use.intents else [])
         return self._use_item_delivers(intent, partial, state, actor, validated)
@@ -19782,6 +19934,12 @@ class Engine:
             tell += " " + " ".join(state["clouds"])
         if state.get("narrate"):
             tell += f" ({'; '.join(state['narrate'])})"
+        if self.scene.in_encounter and how in self._DRINKS:
+            # The turn's standard action is spent (`Scene.standard_spent`); a potion given
+            # to the unconscious is the whole round, the move too.
+            self.scene.standard_spent[actor.ref] = self.scene.round
+            if state.get("whole_round"):
+                self.scene.move_spent[actor.ref] = self.scene.round
 
         return Outcome(
             intent_id=intent.id, op="use_item",
@@ -20188,6 +20346,12 @@ class Engine:
         # on the way in, and kept in the state, because on a resume the prepared copy is
         # already gone and the question can no longer be asked.
         state = partial.get("cast_state")
+        timing = str(getattr(spell, "casting_time", "") or "").lower()
+        if state is None and not any(w in timing for w in ("swift", "immediate", "free")):
+            # A drink this round was the standard action (owner ruling 2026-11-13).
+            spent = self._standard_spent_refusal(intent, actor)
+            if spent is not None:
+                return spent
         if state is None and not item:
             # A cursed item's drawback (CRB, Cursed Items: "character cannot cast arcane
             # spells" / "divine spells" / "any spells"), held or worn: asked of the
@@ -23244,6 +23408,7 @@ class Engine:
         self.scene.initiative = order
         self.scene.round = 1
         self.scene.move_spent = {}
+        self.scene.standard_spent = {}
         self.end_talk("a fight starts")
         # Nobody has acted at the top of round one, so everyone is flat-footed until
         # their first turn comes round.

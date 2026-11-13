@@ -102,6 +102,9 @@ def test_the_potion_of_invisibility_ends_the_moment_its_drinker_attacks():
     assert pc.has_state("state.hidden.invisible")
     eff = next(x for x in pc.effects if x.key == "invisible")
     assert eff.payload["ends_when"] == {"acts": ["attack", "cast_offensive"]}
+    # Her next turn: the drink was this round's standard action (owner ruling 2026-11-13,
+    # tests/test_drink_in_a_fight.py), so the blow comes a round later.
+    s.round += 1
     res = _finish(e, e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1",
                                         "because": "stab"}])))
     assert not pc.has_state("state.hidden.invisible")
@@ -159,6 +162,7 @@ def test_a_manoeuvre_is_an_attack_and_ends_it_too():
     s, e = _board()
     _drink(s, e)
     pc = s.actors["pc"]
+    s.round += 1                         # her next turn: the drink was this one's action
     res = _finish(e, e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1",
                                         "because": "trip",
                                         "params": {"manoeuvre": "trip"}}])), face=12)

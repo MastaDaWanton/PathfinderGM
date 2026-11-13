@@ -40,9 +40,10 @@ IN A FIGHT (the owner's ruling, 2026-11-04, "by the book"): the attacks of oppor
 it provokes, from every foe threatening the attacker, raised at the blow's point of
 commitment (`Engine._coup_provokes`), and the full round it costs — refused after a move
 or a blow this turn (`Engine._coup_round_spent`), and no later blow of the attacker's
-and no closing step after it (`Engine._coup_paid` marks the move spent). The engine
-keeps no standard-action record across batches, so "a blow this turn" is a blow in the
-same batch; a turn is one batch.
+and no closing step after it (`Engine._coup_paid` marks the move spent). "A blow this
+turn" is a blow in the same batch (a turn is one batch), or a drink from the Equipment
+tab this round — the one standard action recorded across batches
+(`Scene.standard_spent`, 2026-11-13).
 
 NOT BUILT, and said so rather than faked: the two-round version against total
 concealment, and a declared `move` after the coup in the same turn (a full-round action
@@ -56,6 +57,18 @@ import re
 # "DC 10 + damage dealt". The damage the defender actually lost, after DR and
 # resistance — the number the tell states — not what the die said.
 SAVE_BASE = 10
+
+# A NON-LETHAL coup de grâce (owner ruling 2026-11-13: a sap, an unarmed strike, or a
+# lethal weapon pulled at -4): the same automatic critical, dealing non-lethal damage, and
+# the same Fortitude save at DC 10 + damage dealt — but a failure is never death. It is a
+# longer knockout: 1d4 hours unconscious, engine-rolled, held by its own condition
+# (`KNOCKED_OUT`, the `knocked out` row in `states.TAGS`) so the hourly non-lethal healing
+# that lifts an ordinary knockout cannot lift it. When it ends they wake by the normal
+# rules, which keep them down if the non-lethal is still past their hit points. A success
+# is ordinary non-lethal damage and nothing more.
+KNOCKED_OUT = "knocked out"
+KNOCKOUT_DICE = "1d4"
+ROUNDS_PER_HOUR = 600
 
 # The two traits whose own text refuses every Fortitude save. Quoted in the header.
 _NO_FORT_TRAITS = frozenset({"undead traits", "construct traits"})

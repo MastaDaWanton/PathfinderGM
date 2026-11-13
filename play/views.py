@@ -443,8 +443,9 @@ def cast_act(request):
         return refusal
     if scene.awaiting:
         return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
-    if scene.in_encounter and scene.current_ref() != pc.ref:
-        return JsonResponse({"error": "It is not your turn."}, status=409)
+    off = _wait_your_turn(scene, pc)
+    if off:
+        return off
     spell = str(body.get("spell") or "").strip()
     if not spell:
         return JsonResponse({"error": "Which spell?"}, status=400)
@@ -3246,10 +3247,9 @@ def say(request):
     drawn = [dict(a) for a in attached if a.get("kind") != "place" or typed]
     beat = {"who": "player", "text": shown, **({"attachments": drawn} if drawn else {})}
     pc = c.scene.pc()
-    if place is not None and c.scene.in_encounter and pc is not None \
-            and c.scene.current_ref() != pc.ref:
+    if place is not None and _off_turn(c.scene, pc):
         # The combat bar's rule for a button that acts: not off-turn.
-        return JsonResponse({"error": "It is not your turn."}, status=409)
+        return _wait_your_turn(c.scene, pc)
     if downed.state_of(pc) not in ("fine", "disabled"):
         c.transcript.append(beat)
         outcome = downed.resolve(c)
@@ -3617,14 +3617,14 @@ def combat_act(request):
         if end_turn or any(str(a.get("op", "")).lower() != "use_ability"
                            for a in actions if isinstance(a, dict)) or not actions:
             return JsonResponse({"error": "No fight is on."}, status=409)
-    elif scene.current_ref() != pc.ref:
+    elif _off_turn(scene, pc):
         # The only reason somebody else holds the turn when the player posts is that
         # the NPC loop did not finish — so finish it, rather than refusing. Measured
         # live: a twelve-creature fight left a thug holding the turn and this branch
         # answered "It is not your turn" to every button, for ever. A refusal the
         # player cannot act on is not a refusal, it is a locked door.
         _run_npc_turns(c, GMAgent(c.world, c.engine()))
-        if scene.in_encounter and scene.current_ref() != pc.ref:
+        if _off_turn(scene, pc):
             _hand_the_turn_back(c, "The moment comes back to you.")
         # A fight that ended while they waited, or a die they now owe, is an answer
         # in itself — the declared action belongs to a turn that no longer exists.
@@ -6421,6 +6421,14 @@ def use_item(request):
     # started over the first would freeze its queue over the other's.
     if c.scene.awaiting:
         return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+    # In a fight, only on the player's own turn: drinking is a standard action and a throw
+    # a ranged attack (CRB Table 8-2), and neither is an immediate action that may be
+    # taken "even if it's not your turn". Measured by the alchemy finishing lane
+    # (2026-10-07): this door asked nothing, so a potion was drunk while a foe held the
+    # turn. Out of a fight there is no turn, and nothing here changes.
+    off = _wait_your_turn(c.scene, pc)
+    if off:
+        return off
     # One intent in, but a jar's authored effects fan out into several inside the
     # op, so a raise part-way can still leave the drink half-drunk: consumed off
     # the sheet, and no healing.
@@ -6490,6 +6498,40 @@ def _cannot_act(pc, doing: str):
         return JsonResponse(
             {"error": f"{pc.name} is in no condition to {doing}."}, status=409)
     return None
+
+
+def _off_turn(scene, pc) -> bool:
+    """Whether a fight is on and the turn is somebody else's. The one turn check.
+
+    It was written out inline at every door that asked it — the combat panel, the Spells
+    tab, the From-here row — and the Equipment tab's `/api/use` never asked at all, so a
+    potion could be drunk or a flask thrown while a foe held the turn (the alchemy
+    finishing lane, 2026-10-07). One predicate now, read by every door, so a fifth door
+    has something to call rather than a sixth copy to get wrong.
+    """
+    return bool(scene.in_encounter and pc is not None and scene.current_ref() != pc.ref)
+
+
+def _wait_your_turn(scene, pc):
+    """A refusal, naming who holds the turn, when `_off_turn`; else None.
+
+    A refusal and not the combat panel's recovery (which runs the NPC turns it finds
+    owed). The panel's case is a loop that gave up and left the turn parked; a button on
+    a sheet meets the other case, a turn that is being taken right now. `_LIVE` holds one
+    campaign shared by every request, and a commit's NPC turns run model calls for
+    minutes while the order sits on the foe — so a second door that "finished the loop"
+    would run it twice, concurrently, over the same scene.
+    """
+    if not _off_turn(scene, pc):
+        return None
+    from rules import names
+
+    holder = scene.actors.get(scene.current_ref())
+    # "thug" is a kind of person and takes its article; "Grix" does not (`definite`).
+    who = names.definite(holder.name) if holder is not None else "somebody else"
+    who = who[:1].upper() + who[1:]
+    return JsonResponse({"error": f"It is not your turn. {who} is acting; wait for "
+                                  f"the turn to come round to {pc.name}."}, status=409)
 
 
 @require_POST
