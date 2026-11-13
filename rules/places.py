@@ -852,7 +852,9 @@ def setting_of(place_id: str) -> str:
     `here`) is `in`: that is where every campaign started before places had ground.
     """
     ground = terrain_of(place_id)
-    if not ground or ground == URBAN:
+    # A ship's rooms are a building afloat: deck to hold is a step, not an hour's walk
+    # over open ground (measured live 2026-11-13: "the hold · about an hour").
+    if not ground or ground in (URBAN, "deck"):
         return "in"
     path = _spot_path(place_id)
     if not path:
@@ -1575,6 +1577,25 @@ def for_scene(location, at: str, terrain_hint: str = "",
     onto them would put "the heart of it" beside the fields), and its first reach is
     joined to the outskirts so the way back is walked, not jumped.
     """
+    from . import ships
+
+    aboard = ships.rooms_at(at)
+    if aboard:
+        # Aboard a ship (2026-11-13): her rooms, from the id alone. At sea the location IS
+        # the ship (`Engine._sail`), so her rooms are all there is; at the quay the town is
+        # still there, and the deck and the docks are a gangplank apart.
+        loc_id = str(getattr(location, "id", location) or "")
+        if ships.vessel_of(loc_id):
+            return with_founded(aboard, founded, at)
+        town = for_scene(location, "", terrain_hint, founded, ring)
+        quay = next((p for p in town
+                     if " ".join(str(p.name).split()).lower() in ships.PORT_PLACES), None)
+        if quay is None:
+            return town + aboard
+        deck = aboard[0]
+        town = tuple(_replace(p, exits=tuple(p.exits) + (deck.id,)) if p.id == quay.id
+                     else p for p in town)
+        return town + (_replace(deck, exits=tuple(deck.exits) + (quay.id,)),) + aboard[1:]
     home = home_set(location, terrain_hint)
     ground = terrain_of(at)
     ring = tuple(ring or ())

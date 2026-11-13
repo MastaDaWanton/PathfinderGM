@@ -121,13 +121,68 @@ four days at sea"*. The numbers behind that are an ask rather than a bug — see
 `docs/for-world-bible.md`. Aurvantis has 11 ports of 64, every one of them minted by this
 app's own cue table out of the settlement's prose; **Pangrella has none of 12**, because
 its places are authored, an authored list replaces the generated one by design, and so the
-cue that was the only way to spot a port never fires.
+cue that was the only way to spot a port never fires. (Stale by 2026-11-13: the fixture's
+places are generated again, and Pangrella has 4 ports of 12, two on each continent.)
+
+## Taking passage (2026-11-13)
+
+> Owner: "make ships boardable and have sea/ocean travel be accessible" — "I should be able
+> to get on a boat and travel" (ruling 2026-11-09) — and "over sea/ocean travel should be
+> rolled by the day with a small chance based on volatility to have storm wreck the ship".
+
+**The doors are the journey op's**, so every way a land journey is chosen reaches a ship:
+the exits row (from the docks a sea leg is a `road` row, and `views._take_the_exit` sends
+`journey to=<id>`), the reader (`journey` act, "book passage", "set sail"; or a `go` naming
+a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOARD line,
+`gm/brief/roads_out.py`, names where she is bound).
+
+1. **Book** (`Engine._book_passage`): at a port, a sea leg that is not a river buys a berth
+   on the port's sailing ship (`ships.passenger_ship`) for **1 sp a mile a head** (CRB
+   Table 6-9; Adventurer's Armory's Transport, Sea table agrees) out of the purse, the
+   miles the world's when stated, else the ship's day's run times the days. The party and
+   anybody travelling with them stand on her deck — a real place, `places.for_scene`
+   derives a ship's rooms from the place id (the kind rides in `ship-<kind>-<hex>`), the
+   deck and the docks a gangplank apart while she lies at the quay. The master and a hand
+   are aboard, from the NPC codex. A berth booked and not sailed is re-boarded free.
+2. **Sail** (`Engine._sail`): aboard a booked ship any journey is the voyage. She casts
+   off (the location becomes the ship: no town's rooms are a walk from her deck at sea)
+   and makes way a day at a time — the clock's day, the ship feeding, watering and
+   bedding her passengers as a camp's night does — until port, a storm, or `days`. A rest
+   aboard at sea is time she sails; the next sail does not charge it twice.
+3. **The weather**, once a day, hidden (`ships.day_at_sea`): a storm on 5% of days —
+   Ultimate Wilderness Table 4-28's windstorm band (96-100) — times the waters'
+   `volatility.factor` (the worse of the two ports'; calm 2.5%, lawless 10%), and one storm
+   in ten is the wrecking kind (CRB Table 13-9: 91-99 storm, 100 powerful storm). So 0.5%
+   a day at the published rate; a seven-day crossing is wrecked about one time in thirty.
+   A storm she rides out is an effect on everyone aboard (the CRB storm's -8 Perception,
+   for the day) and a tell, and stops the day's sailing.
+4. **The wreck** (`Engine._wreck`): the ship and her crew are lost. Passengers swim for
+   1d4 hours (the app's number) in stormy water — the Swim skill's DC 20 each hour or 1d6
+   nonlethal (CRB, Swim) — come ashore fatigued (the hustle precedent: lifts after 8 hours
+   of rest), lose their raw materials to the sea and each loose good on a coin toss (a
+   stated house rule; no 1e book prints one), and wash up on the shore of the port the
+   ship was nearer, or one time in four on another port's shore. Every number lands with
+   `origin: rule:shipwreck` and the narrator is told the tell.
+5. **Arrival**: the ship ties up at the far docks and the party goes ashore.
+
+**Boarding crews are budgeted** (`Engine._defenders`): the rail's count (up to four, by
+the hull's crew) is trimmed by `encounter_budget.most_of` on the **guarded** mix — a crew
+on her own deck is defending it, the owner's "guards and lairs may be challenging or hard",
+and the party chose to board.
+
+Researched and not used: Skull & Shackles' own weather table (Tempest Rising p.72) and
+Stormwrack's storm and shipwreck rules could not be read; nothing here claims them.
 
 ## Still open
 
-- **Nothing puts the party aboard on a sea journey yet.** A crossing passes the time; it
-  does not stand them on a deck for it. So the engagement above is reachable by a scheme,
-  by the narrator, or by a test — and not yet by simply taking passage.
+- **Sea encounters.** There is no sea table (ontheway's is the road's), so no pirate sail
+  comes over the horizon on a voyage; the engagement above is still reached by a scheme,
+  the narrator or a test. When one is written, its counts go through
+  `encounter_budget` (wandering) and its chance through `volatility.factor`.
+- **A crossing that starts inland** is still "the road to the coast, and then days at
+  sea": the clock passes, nobody stands on a deck and no weather is rolled. Rivers too.
+- **The storm's ranged half** ("ranged weapon attacks impossible") is not read by the
+  attack op.
 - **Siege engines.** `arms` is on every row of the table and nothing reads it. A ballista
   on a warship's deck is a weapon the engine has no notion of.
 - **The wind.** `days_for(with_the_wind=True)` halves a passage and nothing ever passes

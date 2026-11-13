@@ -329,7 +329,57 @@ def legs_from(world, here: str) -> list[Leg]:
             from_port=is_port(world, here),
             to_port=is_port(world, other),
         ))
+    # Passages the world did not write (owner, 2026-11-13: "continents are separated by
+    # water unless the world says otherwise", and a ship gets you across). A port sells
+    # passage to every port on another continent that no stated route already reaches;
+    # same-continent ports are left to the roads the world wrote. Days by the tree
+    # (`_depth_apart`), never a mileage the world did not state.
+    if here in ports(world):
+        mine = continent_of(world, here)
+        across = _sea_days(world)
+        for other in ports(world):
+            theirs = continent_of(world, other)
+            if other == here or other in seen or not mine or not theirs or mine == theirs:
+                continue
+            seen.add(other)
+            out.append(Leg(
+                to_id=other, to_name=str(getattr(world.get(other), "name", "") or "a port"),
+                days_apart=across or _depth_apart(world, here, other), source="derived",
+                by="sea",
+                by_sea=True, from_port=True, to_port=True))
     return sorted(out, key=lambda leg: leg.to_name.lower())
+
+
+def _sea_days(world) -> int:
+    """How wide the world's own sea is, in a sailing ship's days: the median of the
+    crossings it states (`by: sea` with `miles`), or 0 when it states none. Measured on
+    Pangrella the day passage shipped: the tree's depth put every unstated crossing at 7
+    days (100 gp a head at the book's fare) where the world's two stated crossings are
+    192 and 216 miles — about a day and a half."""
+    from . import ships as ships_mod
+
+    miles = sorted(int(t["miles"]) for t in (getattr(world, "play", None) or {}).get(
+        "travel") or () if str(t.get("by") or "").lower() == "sea"
+        and isinstance(t.get("miles"), int) and t["miles"] > 0)
+    return ships_mod.days_for(miles[len(miles) // 2], "sailing ship") if miles else 0
+
+
+_PORTS: dict[int, tuple] = {}
+
+
+def ports(world) -> tuple[str, ...]:
+    """Every settlement id that can put a ship to sea (`is_port`), once per world: asking
+    all of Aurvantis's 64 costs 0.2 s, and `legs_from` is asked several times a turn."""
+    if world is None:
+        return ()
+    got = _PORTS.get(id(world))
+    if got is None or got[0] is not world:
+        # The world is held in the value so a recycled id() can never answer for it.
+        got = (world, tuple(str(s.get("id")) for s in
+                            (getattr(world, "play", None) or {}).get("settlements") or ()
+                            if is_port(world, str(s.get("id")))))
+        _PORTS[id(world)] = got
+    return got[1]
 
 
 def find(legs: list[Leg], name: str) -> Leg | None:

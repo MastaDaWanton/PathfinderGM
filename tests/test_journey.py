@@ -94,9 +94,15 @@ def test_the_shipped_world_states_distances_now():
     in days at this app's own 24-a-day and banded so that no detour can beat a direct
     road. So the three-way answer is unchanged and the world has simply moved from the
     middle rung to the top one.
+
+    The routes the WORLD wrote, that is: since 2026-11-13 a port also offers the app's own
+    passages to ports across the water (`journey.legs_from`), and those state no miles by
+    design — they are priced by the tree until an export writes them (for-world-bible 8c).
     """
+    stated = {frozenset((t["from_id"], t["to_id"])) for t in WORLD.play["travel"]}
     legs = [leg for s in WORLD.play["settlements"]
-            for leg in journey.legs_from(WORLD, s["id"])]
+            for leg in journey.legs_from(WORLD, s["id"])
+            if frozenset((s["id"], leg.to_id)) in stated]
     assert legs and all(leg.miles and leg.source == "exact" for leg in legs)
     assert min(leg.miles for leg in legs) >= 24, "a road shorter than a day on foot"
 

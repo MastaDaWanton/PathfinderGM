@@ -32,6 +32,9 @@ SCAFFOLD = (
     "takes half the time on foot, and",
     "a third, though a mount pushed past its first hour of galloping in a day is hurt "
     "by it and tires.",
+    "ABOARD (fact):",
+    "bound for",
+    "a journey to it sails on; anything else is done aboard.",
 )
 # The SCAFFOLD strings printed only on some turns: a bearing asked for, a mount in the
 # party, a world that states bearings. Named so the scaffold's own test knows which
@@ -55,7 +58,36 @@ def asks_a_bearing(reading) -> bool:
     return False
 
 
+def _aboard(ctx) -> tuple[str, dict]:
+    """The ship the party stands on with a passage booked (2026-11-13). At sea there is
+    no settlement and so no roads: this line is the one way on, in the op's own words."""
+    from rules import ships, words
+
+    scene = ctx.scene
+    vid = ships.vessel_of(getattr(scene, "at", "") or "")
+    raw = next((v for v in getattr(scene, "vessels", None) or () if v.get("id") == vid),
+               None) if vid else None
+    ship = ships.Vessel.from_dict(raw) if raw else None
+    if ship is None or not ship.bound_for:
+        return "", {}
+    found = ctx.world.get(ship.bound_for) if ctx.world is not None else None
+    dest = str(getattr(found, "name", "") or "port")
+    where = "at the quay" if ship.sailed_at is None else "at sea"
+    days = f"{ship.days_left} day{'s' if ship.days_left != 1 else ''} on"
+    return (f"  ABOARD (fact): {ship.name}, {words.a(ship.kind)}, {where}, bound "
+            f"for {dest}, {days}; a journey to it sails on; anything else is done "
+            f"aboard."), {"aboard": ship.id, "bound_for": ship.bound_for, "where": where}
+
+
 def section(ctx) -> tuple[str, dict]:
+    # At sea the location is the ship, so `_roads` has nothing to say and ABOARD stands
+    # alone; at the quay both are true and both are said.
+    aboard, aboard_facts = _aboard(ctx)
+    text, facts = _roads(ctx)
+    return "\n".join(x for x in (aboard, text) if x), {**facts, **aboard_facts}
+
+
+def _roads(ctx) -> tuple[str, dict]:
     location, world = ctx.location, ctx.world
     if not location or world is None:
         return "", {}

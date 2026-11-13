@@ -68,7 +68,8 @@ VESSELS: dict[str, dict] = {
     "sailing ship": {
         "name": "sailing ship", "ac": 6, "hp": 125, "save": 6, "speed": 60, "arms": 2,
         "ram": "3d6+12", "squares": 3, "crew": (20, 20), "passengers": 50,
-        "about": "a trader: three masts, a deep hold, and a crew who want no trouble",
+        # Two masts, as Ultimate Combat's sailing ship has them (the deck layout follows UC).
+        "about": "a trader: two masts, a deep hold, and a crew who want no trouble",
         "places": (("the deck", "the mainmast, the hatches, and the rail", False),
                    ("below decks", "hammocks, lamplight, and everybody's belongings", True),
                    ("the hold", "the cargo, lashed down and in the way", True),
@@ -139,11 +140,21 @@ class Vessel:
     at: str = ""                        # the settlement it lies at, or "" for at sea
     bound_for: str = ""                 # where it is going, when it is going somewhere
     days_left: int = 0
+    # A passage (2026-11-13): the port she put out from, the crossing's length in days,
+    # and the clock minute her last sea day was reckoned to — None while she lies at the
+    # quay. The wreck's wash-up reads the first two (`wash_up_near`).
+    came_from: str = ""
+    days_total: int = 0
+    sailed_at: int | None = None
+    # Who paid for a berth: the refs that come ashore with the party, wherever ashore is.
+    passengers: list = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
                 "sinking": self.sinking, "crew": self.crew, "at": self.at,
-                "bound_for": self.bound_for, "days_left": self.days_left}
+                "bound_for": self.bound_for, "days_left": self.days_left,
+                "came_from": self.came_from, "days_total": self.days_total,
+                "sailed_at": self.sailed_at, "passengers": list(self.passengers)}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -157,7 +168,12 @@ class Vessel:
                    sinking=(int(d["sinking"]) if d.get("sinking") is not None else None),
                    crew=int(d.get("crew", 0) or 0), at=str(d.get("at") or ""),
                    bound_for=str(d.get("bound_for") or ""),
-                   days_left=int(d.get("days_left", 0) or 0))
+                   days_left=int(d.get("days_left", 0) or 0),
+                   came_from=str(d.get("came_from") or ""),
+                   days_total=int(d.get("days_total", 0) or 0),
+                   sailed_at=(int(d["sailed_at"]) if d.get("sailed_at") is not None
+                              else None),
+                   passengers=[str(r) for r in (d.get("passengers") or [])])
 
     @property
     def row(self) -> dict:
@@ -211,9 +227,39 @@ def vessel_id(port_id: str, kind: str, n: int = 0) -> str:
 
     `ship-` rather than `ship:` so it is still obvious at a glance that this is the app's
     own and not the world's, the way `keeper:` is on a person.
+
+    The kind rides in the id too (`ship-sailing-ship-<hex>`, 2026-11-13), so the rooms of
+    a ship are derivable from a place id alone (`rooms_at`) — every caller of
+    `places.for_scene` holds a place id and none holds the scene's vessel list.
     """
     digest = hashlib.sha256(f"{port_id}|{kind}|{n}".encode()).hexdigest()[:12]
-    return f"ship-{digest}"
+    return f"ship-{kind.replace(' ', '-')}-{digest}"
+
+
+def kind_of_id(vessel_id: str) -> str:
+    """The kind a vessel id carries, or "" for an id from before kinds were in it."""
+    head = str(vessel_id or "")
+    if not head.startswith("ship-"):
+        return ""
+    kind = head[len("ship-"):].rsplit("-", 1)[0].replace("-", " ")
+    return kind if kind in VESSELS else ""
+
+
+def vessel_of(place_id: str) -> str:
+    """The vessel id a place id stands on (`{vessel}~deck:{room}`), or ""."""
+    from . import places as places_mod
+
+    head = places_mod.location_of(str(place_id or ""))
+    return head if head.startswith("ship-") else ""
+
+
+def rooms_at(place_id: str):
+    """The rooms of the ship this place id is aboard, derived from the id; () ashore."""
+    vid = vessel_of(place_id)
+    kind = kind_of_id(vid)
+    if not kind:
+        return ()
+    return places_of(Vessel(id=vid, name=name_for(vid), kind=kind, hp=VESSELS[kind]["hp"]))
 
 
 def offered_at(port_id: str, scale: str, n: int = 2) -> list[Vessel]:
@@ -376,3 +422,111 @@ def crewed(vessel: Vessel) -> bool:
     wants one. A ship below her minimum does not move, which is the quiet reason you
     cannot simply steal a warship."""
     return vessel.crew >= int(vessel.row["crew"][0])
+
+
+# --- passage: paying for a berth, and the days at sea ------------------------------------------
+#
+# Owner, 2026-11-13: "make ships boardable and have sea/ocean travel be accessible." A
+# passage is bought at a port, the party stands on the deck from then until she makes
+# port, and the crossing is reckoned a day at a time so the sea can turn on her.
+
+# "Ship's passage: 1 sp per mile" — Core Rulebook, Table 6-9 Goods and Services, the same
+# row as Adventurer's Armory's Transport, Sea table (aonprd, fetched 2026-11-13). Per
+# passenger, as every row of that table is; food is the ship's, as a berth's always was.
+PASSAGE_CP_PER_MILE = 10
+
+# A day at sea is a whole one (HOURS_AT_SEA): a sailing ship at 60 ft makes 6 miles an
+# hour, so 144 miles a day.
+MINUTES_A_DAY = 24 * 60
+
+
+def miles_a_day(kind: str) -> int:
+    from . import journey as journey_mod
+
+    speed = int(VESSELS.get(kind, VESSELS["sailing ship"])["speed"])
+    return int(speed / journey_mod.FEET_PER_MPH * HOURS_AT_SEA)
+
+
+def fare_cp(miles: int, heads: int = 1) -> int:
+    return max(1, int(miles)) * PASSAGE_CP_PER_MILE * max(1, int(heads))
+
+
+def passenger_ship(port_id: str, scale: str) -> "Vessel":
+    """The ship a harbourmaster puts a passenger aboard: a sailing ship when one lies here
+    (Table 7-49's trader, "a crew who want no trouble"), else the port's first regular
+    built for open water. A keelboat is a river boat ("shallow draught and no
+    pretensions"), so it carries a passenger to sea only where it is all the port keeps.
+    """
+    lying = offered_at(port_id, scale, n=3)
+    return next((v for v in lying if v.kind == "sailing ship"),
+                next((v for v in lying if v.kind != "keelboat"), lying[0]))
+
+
+# --- the weather at sea ------------------------------------------------------------------------
+#
+# Rolled once per day at sea, by the engine, hidden. Researched 2026-11-13:
+#
+# - Ultimate Wilderness p.165ff, Table 4-28 (Wind), rolled "for the day's wind": 96–100
+#   is a windstorm. A 5% day is the storm a ship has to ride out.
+# - Core Rulebook Table 13-9 (Random Weather): 91–99 storm, 100 powerful storm (windstorm,
+#   hurricane). One storm in ten is the powerful kind, and that is the one that breaks a
+#   ship. So a wreck is 10% of storms, 0.5% of days at the published rate.
+# - Skull & Shackles' own Shackles weather table (Tempest Rising p.72) could not be
+#   read; its numbers are not used and not claimed. Stormwrack (3.5) likewise.
+#
+# The place's volatility scales the storm, as it scales every table's base chance
+# (`volatility.factor`, uneasy = 1.0 = the published rate): calm water 2.5% a day,
+# lawless water 10%.
+STORM_PCT = 5.0
+WRECK_PCT_OF_STORMS = 10
+
+
+def storm_pct(level: int) -> float:
+    from . import volatility
+
+    return STORM_PCT * volatility.factor(level)
+
+
+def day_at_sea(dice, level: int) -> str:
+    """'calm', 'storm' or 'wreck' for one day, on the engine's hidden dice."""
+    roll = dice.roll("1d100", label="the weather at sea", visibility="hidden").total
+    if roll > storm_pct(level):
+        return "calm"
+    worst = dice.roll("1d100", label="how bad the storm is", visibility="hidden").total
+    return "wreck" if worst <= WRECK_PCT_OF_STORMS else "storm"
+
+
+# The storm on deck, as the Core Rulebook's Storm entry writes it (Environment,
+# Weather): visibility cut by three quarters, "imposing a -8 penalty on Perception
+# checks", and ranged weapon attacks impossible. The penalty rides an effect that ends
+# with the day; the ranged half is not built (the attack op has no weather reader).
+STORM_PERCEPTION = -8
+STORM_ROUNDS = 24 * 60 * 10
+
+
+# --- the wreck -----------------------------------------------------------------------------------
+#
+# Into stormy water and swimming for it. The Swim skill (CRB): stormy water is DC 20, and
+# "each hour that you swim, you must make a DC 20 Swim check or take 1d6 points of
+# nonlethal damage from fatigue." How many hours to land is the app's (1d4: the wreck is
+# within sight of a coast, which is why anybody lives) — no source states it.
+WRECK_SWIM_HOURS = "1d4"
+WRECK_HOURLY_NONLETHAL = "1d6"
+# A wreck comes ashore near the end of the crossing she was nearer, most of the time; a
+# storm that carries a ship far off her course puts her people somewhere else. The
+# share is the app's, stated and not sourced.
+WASHED_FAR_PCT = 25
+# What the sea takes, a stated house rule (no 1e book prints one): raw materials carried
+# loose (herbs, hides, ore — `Actor.inventory`) are soaked through and lost; of the loose
+# things the fiction handed over (`Actor.goods`), each kind is lost on a hidden coin toss.
+# Coin, and the gear and arms that are worn or kept in the pack, come ashore with you.
+GOODS_LOST_PCT = 50
+
+
+def wash_up_near(vessel: "Vessel") -> str:
+    """The settlement nearer the wreck: where she came from in the first half of the
+    crossing, where she was going in the second."""
+    sailed = max(0, int(vessel.days_total) - int(vessel.days_left))
+    if vessel.came_from and sailed * 2 < max(1, int(vessel.days_total)):
+        return vessel.came_from
+    return vessel.bound_for or vessel.came_from
