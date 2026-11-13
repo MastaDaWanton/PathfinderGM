@@ -648,7 +648,7 @@ def test_a_move_the_engine_refused_comes_back_with_the_chip(worlds, desk, monkey
 def _quiet_ways(monkeypatch):
     from rules import ontheway
 
-    monkeypatch.setattr(ontheway, "street", lambda dice, level=1: None)
+    monkeypatch.setattr(ontheway, "street", lambda dice, level=1, apl=None: None)
     monkeypatch.setattr(ontheway, "road", lambda *a, **k: None)
 
 

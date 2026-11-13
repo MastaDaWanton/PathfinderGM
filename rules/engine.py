@@ -21,6 +21,7 @@ from . import biomes
 from . import goods
 from . import holding
 from . import ontheway
+from . import encounter_budget
 from . import casting
 from . import compulsion
 from . import consumables
@@ -14130,7 +14131,8 @@ class Engine:
             met = ontheway.road(
                 self.dice, hours,
                 (leg.crosses[0] if leg.crosses else places_mod.terrain_of(self.scene.at)),
-                int(getattr(pc, "level", 1) or 1) if pc is not None else 1)
+                int(getattr(pc, "level", 1) or 1) if pc is not None else 1,
+                apl=encounter_budget.party_apl(self.scene))
         if met is not None:
             progress = ontheway.hours_walked(met, hours)
             hours = progress
@@ -14899,11 +14901,13 @@ class Engine:
                     step = max(1, -(-step // journey_mod.PACES[pace]))
                     ridden_minutes += step
                 if places_mod.setting_of(hop.id) == "in":
-                    met = ontheway.street(self.dice, level)
+                    met = ontheway.street(self.dice, level,
+                                          apl=encounter_budget.party_apl(self.scene))
                 else:
                     # Outside is the road's table, the chance pro rata by the time the
                     # step takes (the published 20% a six-hour watch).
                     met = ontheway.road(self.dice, step_hours or 1, hop.terrain, level,
+                                        apl=encounter_budget.party_apl(self.scene),
                                         **({} if step_hours else {"minutes": step}))
                 minutes += step
                 if met is not None and pc is not None:
@@ -16157,9 +16161,13 @@ class Engine:
         from . import gathering
 
         pc = self.scene.pc()
-        # The party's level caps the creature as the trade's does (`gathering._cr_window`).
-        party = max(1, int(getattr(pc if pc is not None else actor, "level", 1) or 1))
-        enc = gathering.roll(biome, max(1, int(level)), self.dice, party=party)
+        # The party's APL, with the PC counted at the trade's level when the trade is the
+        # lower (a first-level herbalist on a fifth-level body forages as a first-level
+        # one): `encounter_budget`, the one budget.
+        body = max(1, int(getattr(pc if pc is not None else actor, "level", 1) or 1))
+        enc = gathering.roll(biome, max(1, int(level)), self.dice,
+                             apl=encounter_budget.party_apl(
+                                 self.scene, pc_level=min(body, max(1, int(level)))))
         if enc.kind == "quiet":
             return ""
         clause = " " + gathering.describe(enc, what, biome, spot=spot, dug=dug)
@@ -17342,7 +17350,7 @@ class Engine:
         level = getattr(pc, "level", 1) if pc is not None else 1
         if self.dice.roll("1d2", label="is it inhabited", visibility="hidden").total == 2:
             row = gathering.creature_for(head.terrain, max(1, int(level)), self.dice,
-                                         party=max(1, int(level)))
+                                         apl=encounter_budget.party_apl(self.scene))
             if row is not None:
                 born = self._bring_in(row["id"], count=1, name=row["name"])
                 ref = born[0]["ref"]
@@ -28055,7 +28063,8 @@ class Engine:
                 and not actor.has_state("state.down.dead"):
             scale, by = gear_mod.night_scale(actor)
             night = ontheway.night(self.dice, hours, ground or "grassland",
-                                   int(getattr(actor, "level", 1) or 1), scale=scale)
+                                   int(getattr(actor, "level", 1) or 1), scale=scale,
+                                   apl=encounter_budget.party_apl(self.scene))
         return {"hours": hours, "minutes": minutes, "setting": setting, "ground": ground,
                 "night": night, "scale": scale, "scaled_by": by, "before": before,
                 "short": short, "until": until if wake is not None else ""}
@@ -28064,8 +28073,12 @@ class Engine:
                     hours: int = 0) -> str:
         """The camp's check, in a sentence: who came, or what passed the camp by."""
         name = str((met.creature or {}).get("name") or "something")
-        article = "an" if name[:1].lower() in "aeiou" else "a"
         if not made:
+            if int(getattr(met, "count", 1) or 1) > 1:
+                # The budget may send a group; the sentence says how many.
+                who, _ = ontheway._creatures(met)
+                return f"In the night {who} come near the camp, and go on by."
+            article = "an" if name[:1].lower() in "aeiou" else "a"
             return (f"In the night {article} {name} comes near the camp, and goes on "
                     f"by.")
         who = ", ".join(self.scene.actors[m["ref"]].name for m in made

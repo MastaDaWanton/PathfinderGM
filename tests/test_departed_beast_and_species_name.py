@@ -62,12 +62,25 @@ class _Dice:
 
 # --- the land: only what the book puts there ------------------------------------------------
 
-def _window(biome: str, level: int, stated: bool) -> list[dict]:
-    low, high = gathering._cr_window(level, False)
-    return [r for r in bestiary.search(biome=biome, cr_min=low, cr_max=high, stated=stated,
-                                       limit=9999)
+def _window(biome: str, level: int, stated: bool, apl: int | None = None) -> list[dict]:
+    """Every creature the forage could be priced into for this party: nothing above the
+    largest single creature the wandering budget holds (`encounter_budget.highest_cr`)."""
+    from rules import encounter_budget as eb
+
+    party = eb.apl([level]) if apl is None else apl
+    return [r for r in bestiary.search(biome=biome, cr_max=eb.highest_cr(party),
+                                       stated=stated, limit=9999)
             if r.get("cr_value") is not None
             and r.get("creature_type") not in ("humanoid", "outsider", "undead")]
+
+
+class _Clamp(_Dice):
+    """`_Dice`, but never above the die: a pick of k from a pool of n < k is the last."""
+
+    def roll(self, notation, label="", visibility=""):
+        got = super().roll(notation, label, visibility).total
+        size = int(str(notation).split("d", 1)[1]) if "d" in str(notation) else got
+        return type("R", (), {"total": min(int(got), size)})()
 
 
 def test_the_forage_draws_only_what_the_book_puts_on_the_ground():
@@ -81,50 +94,59 @@ def test_the_forage_draws_only_what_the_book_puts_on_the_ground():
     The example moved to a shipped creature on 2026-10-29 under option D
     (docs/bestiary-licensing.md): the adventure rows are gone, Aelzeldra with them (her id
     now lands on the annis hag, a stated kind), and the shipped corpus carries no named
-    somebody with a guessed ground. The guessed pool in those hills is 70 against 66 stated
-    (measured 2026-10-29); among the four only guessed is the celestial dire lion, a
-    templated creature reached by name and never drawn out of the land."""
-    everything = _window("hills", 5, stated=False)
-    stated = _window("hills", 5, stated=True)
+    somebody with a guessed ground; among those only guessed is the celestial dire lion, a
+    templated creature reached by name and never drawn out of the land. Since 2026-11-13
+    the draw is priced by the party's budget (`encounter_budget`), so the pool is asked of
+    a party of four fifth-level characters (APL 5), every difficulty in turn."""
+    everything = _window("hills", 5, stated=False, apl=5)
+    stated = _window("hills", 5, stated=True, apl=5)
     guessed = {r["id"] for r in everything} - {r["id"] for r in stated}
     assert "celestial-dire-lion" in guessed, "the guessed pool holds a templated creature"
     assert 20 <= len(stated) < len(everything)
     drawn = set()
-    for k in range(1, len(stated) + 1):
-        row = gathering.creature_for("hills", 5, _Dice(what_lives_here=k))
-        assert bestiary.ground_stated(row), row["name"]
-        drawn.add(row["id"])
-    assert not (guessed & drawn) and len(drawn) == len(stated)
+    for hard in (1, 50, 95):
+        for k in range(1, len(stated) + 1):
+            row = gathering.creature_for("hills", 5, _Clamp(what_lives_here=k,
+                                                            how_hard_it_is=hard), apl=5)
+            assert row is not None and bestiary.ground_stated(row), row
+            drawn.add(row["id"])
+    assert drawn and not (guessed & drawn) and drawn <= {r["id"] for r in stated}
 
 
 @pytest.mark.parametrize("biome", ["forest", "hills", "mountain", "swamp", "desert",
                                    "grassland", "tundra", "coast", "underground", "urban"])
 @pytest.mark.parametrize("level", [1, 3, 5, 8, 12])
 def test_every_ground_still_has_something_living_on_it(biome, level):
-    """Narrowing the draw must not empty the land: measured from first to twelfth level the
-    stated windows hold 18 to 116 creatures on every biome but the planes (and water at
-    twelfth, 9)."""
+    """Narrowing the draw must not empty the land. Measured 2026-11-13 under the party's
+    budget for a lone PC (APL level-2): the stated pools hold 16 (coast, first level) to 293
+    creatures, and 100 of 100 seeded forages found a creature, guarded or not, on every one
+    of these grounds at every one of these levels."""
     assert len(_window(biome, level, stated=True)) >= 10
+    from rules.dice import Dice
+
+    assert all(gathering.creature_for(biome, level, Dice(seed=s)) is not None
+               for s in range(10))
 
 
 def test_the_road_and_the_night_draw_from_the_same_ground():
     """`ontheway.road` and `ontheway.night` drew from the same guessed pool as the forage;
     both ask `ground_stated` now (the caravan's `foes_from_the_land` too)."""
-    pool = bestiary.search(biome="hills", cr_min=max(1 / 3, 5 - ontheway.BELOW),
-                           cr_max=max(1, 5 + ontheway.ABOVE), stated=True, limit=400)
+    pool = _window("hills", 5, stated=True)
     for k in (1, len(pool) // 2, len(pool)):
-        met = ontheway.road(_Dice(the_road=1, what_is_on_the_road=10,
-                                  what_lives_out_here=k), 6, "hills", level=5)
+        met = ontheway.road(_Clamp(the_road=1, what_is_on_the_road=10, how_hard_it_is=50,
+                                   what_lives_out_here=k), 6, "hills", level=5)
         assert met is not None and met.kind == "creature"
         assert bestiary.ground_stated(met.creature)
-        slept = ontheway.night(_Dice(the_night=1, what_lives_out_here=k), 8, "hills", 5)
+        slept = ontheway.night(_Clamp(the_night=1, how_hard_it_is=50,
+                                      what_lives_out_here=k), 8, "hills", 5)
         assert slept is not None and bestiary.ground_stated(slept.creature)
 
 
 def test_one_creature_on_the_ground_is_not_a_crash(monkeypatch):
     """A stated window can hold exactly one creature, and "1d1" is refused notation
     (`gathering.pick_index`: 53 of 100 desert prospects crashed on it, 2026-10-06). The road
-    and the night pick through the same function now."""
+    and the night pick through the same function now. The wyvern (CR 6, 2,400 XP) is an
+    average fight for a lone eighth-level PC (APL 6)."""
     one = [bestiary.imported()["wyvern"]]
     monkeypatch.setattr(bestiary, "search", lambda **kw: list(one))
 
@@ -133,9 +155,11 @@ def test_one_creature_on_the_ground_is_not_a_crash(monkeypatch):
             assert notation != "1d1", "one of one is not rolled"
             return super().roll(notation, label, visibility)
 
-    met = ontheway.road(Strict(the_road=1, what_is_on_the_road=10), 6, "hills", level=5)
-    assert met.creature["id"] == "wyvern"
-    assert ontheway.night(Strict(the_night=1), 8, "hills", 5).creature["id"] == "wyvern"
+    met = ontheway.road(Strict(the_road=1, what_is_on_the_road=10, how_hard_it_is=50), 6,
+                        "hills", level=8)
+    assert met.creature["id"] == "wyvern" and met.count == 1
+    assert ontheway.night(Strict(the_night=1, how_hard_it_is=50), 8, "hills",
+                          8).creature["id"] == "wyvern"
 
 
 # --- a kind is called by its kind ------------------------------------------------------------
@@ -183,7 +207,7 @@ def test_the_engines_own_seam_creature_is_a_kind(town, world):
     effects: list = []
     wyvern = bestiary.imported()["wyvern"]
     monkey = gathering.roll
-    gathering.roll = lambda biome, level, dice, party=None: gathering.Encounter(
+    gathering.roll = lambda biome, level, dice, apl=None: gathering.Encounter(
         "creature", 80, creature=wyvern, aggressive=False)
     try:
         clause = engine._gathering_encounter(pc, "hills", 5, "ore", found={"iron-ore": 2},

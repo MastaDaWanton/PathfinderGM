@@ -80,8 +80,8 @@ ZONES = ("engaged", "near", "far")
 COUNTS = {"one": 1, "two": 2, "three": 3, "a few": 3}
 # Where a `fight` step's attackers come from. "" is the document's own words through the
 # codex (`npcs.choose`), which is where people are found; `land` is what the ground the
-# party stands on actually holds — the bestiary by that ground's biome and a CR window
-# around the party, `ontheway.road`'s and `gathering.creature_for`'s door exactly — with
+# party stands on actually holds — the bestiary by that ground's biome, priced against the
+# party's encounter budget (`encounter_budget`, the road's and the forage's too) — with
 # the words as the floor for ground the book stocks nothing for (design C §4.2: "or
 # `bestiary.search(biome, window)` on a road, as `ontheway.road` does").
 #
@@ -815,20 +815,6 @@ def wound_amount(actor, to: str) -> int:
     return max(1, hp // 2)
 
 
-def _xp_of(row: dict) -> int:
-    """What a bestiary row is worth: its own xp column, else its CR on the Core table."""
-    from . import xp as xp_mod
-
-    stated = int(row.get("xp") or 0)
-    if stated:
-        return stated
-    cr = row.get("cr_value")
-    if cr is None:
-        return 0
-    rung = min(xp_mod.CR_AWARD, key=lambda k: abs(float(k) - float(cr)))
-    return int(xp_mod.CR_AWARD[rung])
-
-
 def encounter_cr(total_xp: int) -> float:
     """The encounter's CR from its total XP, by the Core Rulebook's Table 12-1 reading:
     the highest CR whose award the total reaches (two CR 1/2 creatures, 400 XP, are a CR 1
@@ -839,73 +825,42 @@ def encounter_cr(total_xp: int) -> float:
     return float(max(reached)) if reached else 0.0
 
 
-def budget_for(level: int) -> int:
-    """The XP an opening fight is built to, for a party of this level.
-
-    The Core Rulebook ("Designing Encounters", Table 12-1) prices an AVERAGE encounter at
-    CR = APL, and its XP table turns that into a budget the creatures' own awards are
-    spent from. The CRB also takes one off the APL for a party of three or fewer; that
-    is NOT applied here, on purpose: the same road already meets a single creature up to
-    CR level+1 (`ontheway.ABOVE`), and a solo 1st-level budget of 200 XP inside the road's
-    window (CR 1/3 upward) buys exactly one CR 1/3–1/2 creature, every time — one viper
-    is not a caravan attack. At CR = level the opening fight is two CR 1/2s or one CR 1:
-    never harder than what the road it stands on already throws.
-    """
-    from . import xp as xp_mod
-
-    level = max(1, min(20, int(level or 1)))
-    return int(xp_mod.CR_AWARD[level])
-
-
-def _in_numbers(row: dict, n: int) -> bool:
-    """Whether the book lets this creature come in this number: an organization of
-    "solitary" and nothing else means one."""
-    org = " ".join(str(row.get("organization") or "").lower().split())
-    return n <= 1 or not org or not re.fullmatch(r"solitary\.?", org)
-
-
-def foes_from_the_land(biome: str, level: int, most: int,
+def foes_from_the_land(biome: str, party: int, most: int,
                        rng: random.Random) -> tuple[dict, int] | None:
     """(bestiary row, how many) for a fight the ground itself supplies, or None.
 
-    The bestiary by the ground's biome inside `ontheway`'s CR window (level-2 .. level+1,
-    the road's own), only the kinds that come at travellers (`RAIDER_TYPES`) and nothing
-    too small to stop a wagon, and only the creatures the book itself places on this
-    ground (`biomes_any` false: 4,636 of the 7,133 are "any", and a farmland that answers
-    with a homunculus is the book's floor, not the land). Then spent against the budget
-    (`budget_for`): the most of them the document allows whose awards fit the budget and
-    use more than half of it, so the fight is near the party's level whichever creature
-    the ground gives — fewer of a bigger one, never more than the document said.
+    The bestiary by the ground's biome, only the kinds that come at travellers
+    (`RAIDER_TYPES`) and nothing too small to stop a wagon, and only the creatures the
+    book itself places on this ground (`biomes_any` false: 4,636 of the 7,133 are "any",
+    and a farmland that answers with a homunculus is the book's floor, not the land). Then
+    spent against the party's encounter budget (`encounter_budget.choose`, kind
+    "opening": `party` is the party's APL): a creature and a count no more than the
+    document said whose total XP spends the rolled difficulty's budget. Until 2026-11-13
+    this priced a solo party as four of its level (the CRB's small-party step was "NOT
+    applied here, on purpose"); the owner's ruling counts a lone PC two down.
 
     Seeded from the story (`rng`), not the dice: which creature the start staged is part
     of the start, and the same story seed must open on the same road and the same wolves.
-    None when the ground stocks nothing that fits: the caller falls back to the words.
+    The rng is the engine's all the same — no model picks a number. None when the ground
+    stocks nothing that fits: the caller falls back to the words.
     """
     from . import bestiary
-    from . import ontheway
+    from . import encounter_budget as eb
 
     if not biome:
         return None
-    level = max(1, int(level or 1))
-    low = max(1 / 3, level - ontheway.BELOW)
-    high = max(1, level + ontheway.ABOVE)
+    party = int(party)
     # `stated` as well as not "any": a spreadsheet row's ground is a guess even when it is
     # one biome, and the guesses are where the adventures' named individuals live
     # (`bestiary.ground_stated`).
-    rows = [r for r in bestiary.search(biome=biome, cr_min=low, cr_max=high, stated=True,
-                                       limit=5000)
+    rows = [r for r in bestiary.search(biome=biome, cr_max=eb.highest_cr(party, "opening"),
+                                       stated=True, limit=5000)
             if r.get("cr_value") is not None and not r.get("biomes_any")
             and r.get("creature_type") in RAIDER_TYPES
-            and str(r.get("size") or "").lower() not in TOO_SMALL
-            and _xp_of(r) > 0]
-    budget = budget_for(level)
-    for n in range(max(1, int(most)), 0, -1):
-        each = budget / n
-        fit = sorted((r for r in rows if each / 2 < _xp_of(r) <= each and _in_numbers(r, n)),
-                     key=lambda r: str(r.get("id")))
-        if fit:
-            return fit[rng.randrange(len(fit))], n
-    return None
+            and str(r.get("size") or "").lower() not in TOO_SMALL]
+    got = eb.choose(rows, party, rng.randint(1, 100), rng.randrange, kind="opening",
+                    most=max(1, int(most)))
+    return (got.row, got.count) if got else None
 
 
 _OUTLAW_WORDS = re.compile(
@@ -934,19 +889,16 @@ def outlaw_people(world, rng: random.Random) -> str:
     return found[rng.randrange(len(found))] if found else ""
 
 
-def _within_budget(template: str, count: int, level: int) -> int:
+def _within_budget(template: str, count: int, party: int, rng: random.Random) -> int:
     """How many of a codex block the opening fight can hold: as many as the document
-    asks while the encounter stays within one CR of the party's own (`encounter_cr`)."""
+    asks while the total XP stays inside the rolled difficulty's budget for the party's
+    APL (`encounter_budget.most_of`, kind "opening"), never fewer than one."""
     from . import bestiary
+    from . import encounter_budget as eb
 
     row = bestiary.lookup(template) or {}
-    each = _xp_of({"xp": row.get("xp"), "cr_value": None})
-    if each <= 0:
-        return max(1, int(count))
-    n = max(1, int(count))
-    while n > 1 and encounter_cr(n * each) > max(1, int(level)) + 1:
-        n -= 1
-    return n
+    return eb.most_of(int(row.get("xp") or 0), count, party, rng.randint(1, 100),
+                      kind="opening")
 
 
 def creature_noun(name: str) -> str:
@@ -1210,7 +1162,10 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
         elif verb == "fight":
             from . import npcs
 
+            from . import encounter_budget
+
             level = int(getattr(pc, "level", 1) or 1)
+            party = encounter_budget.party_apl(scene)
             label, count, template = str(step.get("label")), count_of(step), ""
             got_land_row = None
             if str(step.get("from") or "") == "land":
@@ -1218,7 +1173,7 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                 # the owner's caravan under attack is attacked by the land it crosses.
                 ground = (str(getattr(spot, "terrain", "") or "")
                           or places_mod.terrain_of(scene.at or ""))
-                got_land = foes_from_the_land(ground, level, count,
+                got_land = foes_from_the_land(ground, party, count,
                                               rng_for(story_seed, f"foes:{slot}"))
                 if got_land is not None:
                     row, count = got_land
@@ -1230,10 +1185,10 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                 template = str(got.get("id") or "thug")
                 if str(step.get("from") or "") in ("land", "outlaws"):
                     # The same budget holds for people as for beasts: the codex answers
-                    # the words at CR level-1 (`npcs.target_cr`), so two of them are a
-                    # CR level+1 fight — one more than the road's own and within the
-                    # window; beyond the budget by more than that, fewer come.
-                    count = _within_budget(template, count, level)
+                    # the words near CR level-1 (`npcs.target_cr`), and as many come as
+                    # the party's budget holds (`encounter_budget`), one at the least.
+                    count = _within_budget(template, count, party,
+                                           rng_for(story_seed, f"budget:{slot}"))
             res = _run(engine, doc, [{
                 "op": "spawn", "because": f"the start: {doc['id']}",
                 "params": {"template": template,

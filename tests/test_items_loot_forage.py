@@ -299,15 +299,34 @@ def test_a_forage_with_company_is_a_refusal_not_resolved():
 def test_the_forage_creature_is_capped_by_the_characters_level():
     """Log 258: a CR 19 vishap (colossal, 362 hp) met a level-3 character's forage. The CR
     window was the trade level's alone; it is capped by the character's level too, and the
-    block the engine will spawn is checked against it after the pick."""
-    assert gathering._cr_window(18, False, party=3) == (1, 4)
-    assert gathering._cr_window(18, True, party=3)[1] == 5
-    assert gathering._cr_window(1, False, party=3) == (1 / 3, 2), "the trade still caps"
+    block the engine will spawn is checked against it after the pick.
+
+    Since 2026-11-13 the cap is the party's encounter budget (`encounter_budget`): the
+    engine counts the PC at the lower of trade and body, so Herbalist 18 on a lone
+    level-3 body is APL 1, whose wandering fights stop at challenging (CR 2, 600 XP) and
+    whose guard stops at hard (CR 3, 800 XP)."""
+    from rules import encounter_budget as eb, xp
+
     for seed in range(40):
-        row = gathering.creature_for("swamp", 18, Dice(seed=seed), party=3)
-        assert row is None or row["cr_value"] <= 4
-        row = gathering.creature_for("swamp", 18, Dice(seed=seed), guarding=True, party=3)
-        assert row is None or row["cr_value"] <= 5
+        row = gathering.creature_for("swamp", 18, Dice(seed=seed), apl=1)
+        assert row is not None and eb.xp_of(row) <= xp.CR_AWARD[2]
+        row = gathering.creature_for("swamp", 18, Dice(seed=seed), guarding=True, apl=1)
+        assert row is not None and eb.xp_of(row) <= xp.CR_AWARD[3]
+
+
+def test_the_engine_forages_at_the_lower_of_trade_and_body(monkeypatch):
+    """The engine's door, not the function: what `_gathering_encounter` hands the table is
+    the party's APL with the PC at min(trade, body). A level-3 body with a trade of 18 is a
+    lone level 3 (APL 1); a trade of 1 on the same body is a lone level 1 (APL -1)."""
+    seen = []
+    monkeypatch.setattr(gathering, "roll", lambda biome, level, dice, apl=None:
+                        seen.append(apl) or gathering.Encounter("quiet", 1))
+    s = _scene()
+    s.pc().level = 3
+    e = Engine(s, Dice(seed=1))
+    e._gathering_encounter(s.pc(), "swamp", 18, "herb", effects=[])
+    e._gathering_encounter(s.pc(), "swamp", 1, "herb", effects=[])
+    assert seen == [1, -1]
 
 
 # --- 6. a cure with nothing to cure ----------------------------------------------------------------

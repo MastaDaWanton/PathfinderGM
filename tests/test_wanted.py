@@ -241,7 +241,7 @@ def quiet_streets(monkeypatch):
     """Nothing met on the way, so the walk measured is the watch's and not a hawker's."""
     from rules import ontheway
 
-    monkeypatch.setattr(ontheway, "street", lambda dice, level=1: None)
+    monkeypatch.setattr(ontheway, "street", lambda dice, level=1, apl=None: None)
     monkeypatch.setattr(ontheway, "road", lambda *a, **k: None)
 
 

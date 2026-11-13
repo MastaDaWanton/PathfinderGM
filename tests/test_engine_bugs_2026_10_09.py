@@ -198,7 +198,13 @@ def test_sleeping_until_dawn_at_one_in_the_morning_is_short_of_a_night():
     assert pc.hp == pc.hp_max - 3 and "short of a full night's rest" in rest.tell
 
 
-def test_a_night_with_no_time_named_is_the_night_it_always_was():
+def test_a_night_with_no_time_named_is_the_night_it_always_was(monkeypatch):
+    # The clock is the subject, not the camp's check: seed 3's dice reached a creature
+    # breaking the first night an hour early (1740 min) once the encounter budget added
+    # its hidden difficulty roll (2026-11-13), so the night is kept quiet here.
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "night", lambda *a, **k: None)
     s, e = _grasslands(17 * HOUR)
     _run(e, [{"op": "rest", "actor": "pc", "because": "t", "params": {"kind": "night"}}])
     assert s.clock_minutes == 30 * HOUR

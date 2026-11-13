@@ -120,7 +120,7 @@ class TestTheWayIntoGroundIsWalkedOnce:
         s, e, pc = _party()
         calls = []
 
-        def road(dice, hours, biome, level=1):
+        def road(dice, hours, biome, level=1, **kw):
             calls.append((hours, biome))
             return None
 
@@ -134,7 +134,7 @@ class TestTheWayIntoGroundIsWalkedOnce:
         s, e, pc = _party()
         calls = []
         monkeypatch.setattr(ontheway, "road",
-                            lambda dice, hours, biome, level=1: calls.append(hours))
+                            lambda dice, hours, biome, level=1, **kw: calls.append(hours))
         monkeypatch.setattr(ontheway, "street", lambda *a, **k: None)
         self._venture(e, pc, kind="sewers")
         assert calls == [1]

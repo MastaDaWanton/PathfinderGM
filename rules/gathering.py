@@ -42,10 +42,11 @@ BANDS = (
 # an obstacle with a mind, and the player gets to decide what to do about them.
 AGGRESSIVE = frozenset({"animal", "vermin", "magical beast", "ooze", "plant"})
 
-# The CR window around the character's level, and how far it stretches for the thing
-# guarding the big find. A first-level character foraging should meet CR 1/3 to CR 2,
-# not a CR 8 — the table is a hazard of the work, not a way to die of botany.
-BELOW, ABOVE, GUARD_ABOVE = 2, 1, 2
+# What the creature may cost is `encounter_budget`'s: the guarded find's guard prices as a
+# guard ("guarded": challenging or hard sometimes), the hazard of the work as what the land
+# holds ("wandering": mostly average). The per-creature window that stood here (BELOW,
+# ABOVE, GUARD_ABOVE = 2, 1, 2 around the trade's level, capped by the party's) priced one
+# creature, not the encounter, and did not count a small party down (2026-11-13).
 
 # What multiplies the yield. A rich patch is twice the finding; a guarded find, three
 # times, and it waits.
@@ -63,55 +64,48 @@ class Encounter:
     extras: dict = field(default_factory=dict)
 
 
-def _cr_window(level: int, guarding: bool, party: int | None = None) -> tuple[float, float]:
-    """The CR window for the trade `level`, and never above what the party's own level
-    allows. Measured on the owner's 0.2.25 report (2026-11-01): a first-level herbalist on
-    a third-level character met a CR 19 vishap (362 hp) as the forage's creature. The window
-    was the trade's level alone, so a character whose trade outran their body — or a body
-    whose trade outran it, Herbalist 8 on a level-3 character — drew creatures by the
-    craft. 1e prices an encounter by the party's level: Table 12-1 runs from APL-1 (easy)
-    to APL+3 (epic), and stops there (CRB p.397). The ground's hazard of the work stays
-    inside challenging (character level +1), the guard's inside hard (+2): both windows are
-    capped by the character's level, whichever is lower. (The book also counts a party of
-    three or fewer one level lower, Step 1; not applied, so a solo forager's cap is the
-    book's challenging-to-hard band for a party of four of their level.)"""
-    above = GUARD_ABOVE if guarding else ABOVE
-    low = max(1 / 3, level - BELOW)
-    high = max(1, level + above)
-    if party is not None:
-        cap = max(1, int(party) + above)
-        high = min(high, cap)
-        low = min(low, max(1 / 3, int(party) - BELOW))
-    return low, high
-
-
 def creature_for(biome: str, level: int, dice, guarding: bool = False,
-                 party: int | None = None) -> dict | None:
+                 apl: int | None = None) -> dict | None:
     """A bestiary row that lives here and is a fair match, or None when the book has
-    nothing for this ground — a stone shelf where no creature is tagged is quiet.
+    nothing for this ground at the party's budget — a stone shelf where no creature is
+    tagged is quiet, and so is ground whose smallest creature is above the party.
+
+    One creature, always: the forage's tells, the guarded find's booking and the
+    excursion's scene call all speak of "it". The budget is the party's
+    (`encounter_budget.choose`, its `apl`; without one, the trade's `level` alone, a lone
+    PC — the cautious answer), so one creature means one whose own XP fits the rolled
+    difficulty. Measured before it (2026-11-01): a first-level herbalist on a third-level
+    character met a CR 19 vishap (362 hp).
 
     The row is checked again after it is picked: the creature the engine will bring in
-    is the block `bestiary.raw_block` resolves its id to, and that block's CR must be
-    inside the window too. A row and its block are the same thing in the shipped book;
-    a homebrew file or an alias that merged a different block under the id would not be,
-    and the vishap above could not be reproduced from the shipped book at trade levels
-    1-17 — so the spawned block is held to the window rather than trusted."""
-    low, high = _cr_window(level, guarding, party)
+    is the block `bestiary.raw_block` resolves its id to, and that block must fit the
+    same budget. A row and its block are the same thing in the shipped book; a homebrew
+    file or an alias that merged a different block under the id would not be, so the
+    spawned block is held to the budget rather than trusted."""
+    from . import encounter_budget as eb
+
+    party = eb.apl([level]) if apl is None else int(apl)
+    kind = "guarded" if guarding else "wandering"
     # Only creatures whose ground is the book's own words (`bestiary.ground_stated`): the
     # spreadsheet's guessed ground drew a named hag of an adventure, Aelzeldra, onto a
     # seam in the hills and the tell called her "an Aelzeldra" (the owner, 2026-10-09:
     # "it introduced itself as its species like it was a name").
-    rows = bestiary.search(biome=biome, cr_min=low, cr_max=high, stated=True, limit=400)
+    rows = bestiary.search(biome=biome, cr_max=eb.highest_cr(party, kind), stated=True,
+                           limit=5000)
     rows = [r for r in rows if r.get("cr_value") is not None
             and r.get("creature_type") not in ("humanoid", "outsider", "undead")]
     if not rows:
         return None
-    row = rows[pick_index(dice, len(rows), "what lives here")]
-    block = bestiary.raw_block(str(row.get("id") or "")) or row
-    cr = block.get("cr_value")
-    if cr is None or not (low <= float(cr) <= high):
+    hard = dice.roll("1d100", label="how hard it is", visibility="hidden").total
+    got = eb.choose(rows, party, hard, lambda n: pick_index(dice, n, "what lives here"),
+                    kind=kind, most=1)
+    if got is None:
         return None
-    return row
+    block = bestiary.raw_block(str(got.row.get("id") or "")) or got.row
+    landed = eb.budget(party + eb.TIERS[got.tier])
+    if block.get("cr_value") is None or eb.xp_of(block) > landed:
+        return None
+    return got.row
 
 
 def pick_index(dice, n: int, label: str) -> int:
@@ -129,17 +123,17 @@ def pick_index(dice, n: int, label: str) -> int:
     return dice.roll(f"1d{n}", label=label, visibility="hidden").total - 1
 
 
-def roll(biome: str, level: int, dice, party: int | None = None) -> Encounter:
+def roll(biome: str, level: int, dice, apl: int | None = None) -> Encounter:
     """Once per expedition. The d100 is the engine's, hidden, like every other roll a
-    player could not have known the number of. `party` is the party's level, which caps
-    the creature's CR as well as the trade's level does (`_cr_window`)."""
+    player could not have known the number of. `apl` is the party's
+    (`encounter_budget.party_apl`), the budget the creature is priced against."""
     r = dice.roll("1d100", label="the ground's own answer", visibility="hidden").total
     kind = next(k for lo, hi, k in BANDS if lo <= r <= hi)
     if kind == "quiet":
         return Encounter("quiet", r)
     if kind == "rich":
         return Encounter("rich", r, yield_times=RICH_YIELD)
-    row = creature_for(biome, level, dice, guarding=(kind == "guarded"), party=party)
+    row = creature_for(biome, level, dice, guarding=(kind == "guarded"), apl=apl)
     if row is None:
         # Nothing lives here that the book prices for this level; the ground is
         # quiet, and a rich find is what a guarded one becomes with nobody on it.

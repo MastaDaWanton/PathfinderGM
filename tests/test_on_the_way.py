@@ -170,7 +170,7 @@ class TestTheRoad:
         assert ontheway.hours_walked(None, hours=30) == 30
 
     def test_what_lives_out_there_comes_from_the_book(self):
-        got = ontheway.road(_Fixed(5, 10, 1), hours=6, biome="forest", level=1)
+        got = ontheway.road(_Fixed(5, 10, 50, 1), hours=6, biome="forest", level=1)
         assert got is not None and got.kind == "creature"
         assert got.creature and got.creature.get("name")
         assert got.creature.get("cr_value") is not None
@@ -359,7 +359,7 @@ def _meetings(monkeypatch, *script):
     """The street table answers the script hop by hop: None, or a meeting of that kind."""
     queue = list(script)
 
-    def street(dice, level=1):
+    def street(dice, level=1, apl=None):
         kind = queue.pop(0) if queue else None
         if kind is None:
             return None

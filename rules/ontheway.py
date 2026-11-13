@@ -44,8 +44,9 @@ request asked for and is not a number anybody would have arrived at by feel.
 
 Nobody in either table is invented. The street's people are grounded through `npcs.choose`
 against the 7,133 loaded stat blocks, the same door `rules/roster.py` uses; the road's are
-drawn from the bestiary by the ground's own biome and a CR window around the party, which
-is `gathering.creature_for` exactly. A model is never asked who is in the way.
+drawn from the bestiary by the ground's own biome, a creature and a count whose total XP
+spends the party's encounter budget (`rules/encounter_budget.py`, the one budget every
+picker spends). A model is never asked who is in the way.
 
 PASSING AND STOPPING (owner's ruling C1, 2026-09-30). "I should be able to go anywhere but
 if it would take me through a place the journey through that place should be described and
@@ -138,11 +139,12 @@ WEATHER_HOURS = "1d4+1"
 # not the sum.
 TOLL_DICE = "2d10+20"
 
-# Creature types that come at you on sight, and the CR window around the party. Both are
-# `gathering`'s, named here rather than imported so that changing the foraging table does
-# not silently change what walks up to you on a road.
+# Creature types that come at you on sight: `gathering`'s, named here rather than imported
+# so that changing the foraging table does not silently change what walks up to you on a
+# road. What they may cost is `encounter_budget`'s, the one budget every picker spends
+# (the per-creature window BELOW, ABOVE = 2, 1 that stood here let two CR 1s at a lone
+# first-level PC, 2026-11-13).
 AGGRESSIVE = frozenset({"animal", "vermin", "magical beast", "ooze", "plant"})
-BELOW, ABOVE = 2, 1
 
 # What the cutpurse is trying: "Sleight of Hand DC 20 to lift a small object from another
 # person", opposed by the mark's Perception (Core Rulebook, Sleight of Hand). The thief
@@ -177,7 +179,7 @@ def _band(table, roll: int) -> str:
     return table[-1][0]
 
 
-def street(dice, level: int = 1) -> Meeting | None:
+def street(dice, level: int = 1, *, apl: int | None = None) -> Meeting | None:
     """One hop of a town. None most of the time, which is the point.
 
     Two rolls and not one: the check decides *whether*, the table decides *what*. Kept
@@ -192,13 +194,26 @@ def street(dice, level: int = 1) -> Meeting | None:
     kind = _band(STREET, r)
     row = next(x for x in STREET if x[0] == kind)
     got = npcs.choose(list(row[2]), max(1, int(level or 1))) or {}
-    return Meeting(kind=kind, roll=r, words=row[2], count=row[3],
+    count = row[3]
+    if kind == "patrol":
+        # The watch is the one band that turns into a fight (a wanted name), and two of
+        # them were the measured death: two CR 1 guards at a lone first-level PC, an
+        # 800 XP encounter, CR 3 against an APL of -1 (2026-11-13). Priced as a guard's
+        # fight may be (`encounter_budget.MIX["guarded"]`), never fewer than one.
+        from . import bestiary
+        from . import encounter_budget as eb
+
+        party = eb.apl([level]) if apl is None else int(apl)
+        each = eb.xp_of(bestiary.lookup(str(got.get("id") or "")) or got)
+        hard = dice.roll("1d100", label="how hard the watch is", visibility="hidden").total
+        count = eb.most_of(each, count, party, hard, kind="guarded")
+    return Meeting(kind=kind, roll=r, words=row[2], count=count,
                    template=str(got.get("id") or "guildhand"),
                    aggressive=(kind == "trouble"))
 
 
 def road(dice, hours: int, biome: str, level: int = 1, *,
-         minutes: int | None = None) -> Meeting | None:
+         minutes: int | None = None, apl: int | None = None) -> Meeting | None:
     """The march, checked once a watch until something happens or the road runs out.
 
     Stops rolling at the first hit, as asked, which is also what the published procedure
@@ -208,8 +223,6 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
     the fields (`rules/outskirts.py`) — checked at its share of a watch, never less than
     one in a hundred.
     """
-    from . import bestiary
-
     # A part-watch gets a part-share of the check, pro rata. The alternative — rounding
     # every stub of a walk up to a whole watch — makes stepping outside the walls for an
     # hour as dangerous as a dawn-to-noon march, and that step is the most common move
@@ -228,22 +241,12 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
         r = dice.roll("1d100", label="what is on the road", visibility="hidden").total
         kind = _band(ROAD, r)
         if kind == "creature":
-            low = max(1 / 3, int(level or 1) - BELOW)
-            high = max(1, int(level or 1) + ABOVE)
-            # The ground's own creatures (`bestiary.ground_stated`), never an adventure's
-            # named somebody whose ground was guessed for them.
-            rows = [x for x in bestiary.search(biome=biome, cr_min=low, cr_max=high,
-                                               stated=True, limit=400)
-                    if x.get("cr_value") is not None]
-            if rows:
-                # `pick_index`: one of one is not rolled ("1d1" is refused notation),
-                # which a stated-ground window can now be.
-                from .gathering import pick_index
-
-                row = rows[pick_index(dice, len(rows), "what lives out here")]
+            got = _the_land(dice, biome, level, apl)
+            if got is not None:
+                row = got.row
                 return Meeting(kind="creature", roll=r, creature=row,
                                template=str(row.get("id") or ""),
-                               count=1, after=w,
+                               count=got.count, after=w,
                                aggressive=row.get("creature_type") in AGGRESSIVE)
             # Ground the book does not stock still has a road through it, and the
             # check HIT: what is met is other travellers, never a None that would
@@ -267,7 +270,7 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
 
 
 def night(dice, hours: int, biome: str, level: int = 1, *,
-          scale: float = 1.0) -> Meeting | None:
+          scale: float = 1.0, apl: int | None = None) -> Meeting | None:
     """The camp's check, watch by watch over the hours slept: the road's own procedure
     ("four times per day ... with a 20% chance of an encounter each time"), because a
     night in the open is the sixteen hours this module's road check leaves to the camp.
@@ -282,8 +285,6 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     road's: nobody collects a toll at a sleeping camp, and what the weather does to a
     sleeper is the cold rule's. A watch that hits on ground the bestiary does not stock
     meets nothing — a quiet night, not travellers in the dark."""
-    from . import bestiary
-
     full, rest = divmod(max(0, int(hours)), WATCH_HOURS)
     shares = [ROAD_PERCENT] * full
     if rest or not full:
@@ -292,20 +293,37 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     for w, chance in enumerate(shares, start=1):
         if dice.roll("1d100", label="the night", visibility="hidden").total > chance:
             continue
-        low = max(1 / 3, int(level or 1) - BELOW)
-        high = max(1, int(level or 1) + ABOVE)
-        rows = [x for x in bestiary.search(biome=biome, cr_min=low, cr_max=high,
-                                           stated=True, limit=400)
-                if x.get("cr_value") is not None]
-        if not rows:
+        got = _the_land(dice, biome, level, apl)
+        if got is None:
             return None
-        from .gathering import pick_index
-
-        row = rows[pick_index(dice, len(rows), "what lives out here")]
+        row = got.row
         return Meeting(kind="creature", roll=chance, creature=row,
-                       template=str(row.get("id") or ""), count=1, after=w,
+                       template=str(row.get("id") or ""), count=got.count, after=w,
                        aggressive=row.get("creature_type") in AGGRESSIVE)
     return None
+
+
+def _the_land(dice, biome: str, level: int, apl: int | None):
+    """What the ground holds, at the party's budget (`encounter_budget.choose`): a creature
+    and how many, or None for ground that stocks nothing the party could fairly meet.
+
+    `apl` is the party's (`encounter_budget.party_apl`); without it the walker is taken to
+    be alone at `level`, which is the cautious answer — a lone PC's APL is the lowest one.
+    Only the ground's own creatures (`bestiary.ground_stated`), never an adventure's named
+    somebody whose ground was guessed for them."""
+    from . import bestiary
+    from . import encounter_budget as eb
+    from .gathering import pick_index
+
+    party = eb.apl([level]) if apl is None else int(apl)
+    rows = [x for x in bestiary.search(biome=biome, cr_max=eb.highest_cr(party),
+                                       stated=True, limit=5000)
+            if x.get("cr_value") is not None]
+    if not rows:
+        return None
+    hard = dice.roll("1d100", label="how hard it is", visibility="hidden").total
+    # `pick_index`: one of one is not rolled ("1d1" is refused notation).
+    return eb.choose(rows, party, hard, lambda n: pick_index(dice, n, "what lives out here"))
 
 
 def walk_cut(scene, actor=None) -> dict | None:
@@ -382,6 +400,32 @@ def stops(meeting: Meeting, law: str = "") -> bool:
     return meeting.kind not in PASSING
 
 
+def _of_them(n: int) -> str:
+    """" two of them," — the watch's number as the sentence says it."""
+    from .openings import _NUMBER_WORDS
+
+    n = max(1, int(n or 1))
+    return " one of them alone," if n == 1 else f" {_NUMBER_WORDS.get(n, 'several')} of them,"
+
+
+def _looker(n: int) -> str:
+    return "One of them" if int(n or 1) > 1 else "The watchman"
+
+
+def _creatures(meeting: Meeting) -> tuple[str, bool]:
+    """"a wolf" or "two wolves", and whether it is more than one: the budget may send a
+    group (`encounter_budget.choose`), and a tell that said one would be a number the
+    narrator was told wrong."""
+    from . import bestiary
+    from .openings import group_phrase
+
+    name = bestiary.kind_word(meeting.creature) or "something"
+    n = max(1, int(meeting.count or 1))
+    if n == 1:
+        return f"{'an' if name[:1].lower() in 'aeiou' else 'a'} {name}", False
+    return group_phrase(name, n), True
+
+
 def passing(meeting: Meeting, where: str = "", law: str = "") -> str:
     """The sentence for a meeting the walk goes on through, said as part of that hop.
 
@@ -400,19 +444,16 @@ def passing(meeting: Meeting, where: str = "", law: str = "") -> str:
         lead = "a hand comes out, and the mouth above it knows your face is new"
         tail = "you are past it before the asking is done"
     elif meeting.kind == "patrol":
-        lead = "the watch comes by, two of them, looking at faces"
-        tail = ("one of them looks at yours twice, and lets you go on"
+        lead = f"the watch comes by,{_of_them(meeting.count)} looking at faces"
+        tail = (f"{_looker(meeting.count).lower()} looks at yours twice, and lets you go on"
                 if law == "suspected" else "they go on their way, and so do you")
     elif meeting.kind == "travellers":
         lead = "there are others on the road"
         tail = "you pass them, and walk on"
     elif meeting.kind == "creature" and meeting.creature:
-        from . import bestiary
-
-        name = bestiary.kind_word(meeting.creature) or "something"
-        article = "an" if name[:1].lower() in "aeiou" else "a"
-        lead = f"{article} {name} is near the way"
-        tail = "it lets you pass, and you walk on"
+        who, many = _creatures(meeting)
+        lead = f"{who} {'are' if many else 'is'} near the way"
+        tail = f"{'they let' if many else 'it lets'} you pass, and you walk on"
     else:
         return ""
     sentence = f"{at}{lead}; {tail}."
@@ -476,13 +517,15 @@ def _describe(meeting: Meeting, where: str = "", law: str = "") -> str:
         # faces, and nothing followed. The gate is still where a warrant is ENFORCED
         # (docs/wanted.md, reader one) — this is the second reader, and what it adds is
         # that the street stops being safe once your name is on the list.
+        # How many is the engine's (`street`'s budget), and the sentence says that many.
+        them = _of_them(meeting.count)
         if law == "wanted":
-            return (f"The watch comes down the road{at}, two of them, looking at faces "
+            return (f"The watch comes down the road{at},{them} looking at faces "
                     f"— and they have yours. They are coming straight for you.")
         if law == "suspected":
-            return (f"The watch comes down the road{at}, two of them, looking at faces. "
-                    f"One of them looks at yours twice. You get no further.")
-        return (f"The watch comes down the road{at}, two of them, looking at faces. "
+            return (f"The watch comes down the road{at},{them} looking at faces. "
+                    f"{_looker(meeting.count)} looks at yours twice. You get no further.")
+        return (f"The watch comes down the road{at},{them} looking at faces. "
                 f"You get no further.")
     if meeting.kind == "cutpurse":
         return f"Somebody comes in hard against your side{at}."
@@ -490,13 +533,10 @@ def _describe(meeting: Meeting, where: str = "", law: str = "") -> str:
         return (f"Somebody has been waiting for somebody, and you will do{at}. "
                 f"You get no further.")
     if meeting.kind == "creature" and meeting.creature:
-        from . import bestiary
-
-        name = bestiary.kind_word(meeting.creature) or "something"
-        article = "an" if name[:1].lower() in "aeiou" else "a"
-        return (f"The road is not empty: {article} {name} is on it, and it has seen you."
-                if meeting.aggressive else
-                f"The road is not empty: {article} {name} is on it, and it has not moved.")
+        who, many = _creatures(meeting)
+        on = f"{who} {'are' if many else 'is'} on it, and {'they have' if many else 'it has'}"
+        return (f"The road is not empty: {on} seen you." if meeting.aggressive else
+                f"The road is not empty: {on} not moved.")
     if meeting.kind == "travellers":
         return "There are others on this road, and they have stopped where you are."
     if meeting.kind == "weather":
