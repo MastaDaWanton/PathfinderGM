@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from rules import words as english
 
 # The acts whose ops are built here, whole.
 GOODS_ACTS = frozenset({"take", "drop", "give", "sell", "steal"})
@@ -2345,7 +2346,7 @@ def weapons(rows: list[Row], frame: dict | None, scene) -> list[str]:
 
 
 def _a_or_an(noun: str) -> str:
-    return ("an " if noun[:1] in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 def strike_with(raw, rows: list[Row], scene, *, notes: list | None = None) -> list:

@@ -78,6 +78,7 @@ from pathlib import Path
 
 from . import effectspec
 from . import worldclass as wc
+from . import words as english
 
 TRACK_ID = "enchanter"
 
@@ -2082,7 +2083,7 @@ def _a(name: str) -> str:
     n = str(name)
     if n[:1] in "+0123456789":
         return n
-    return ("an " if n[:1].lower() in "aeiou" else "a ") + n
+    return english.a(n)
 
 
 def _land_refined(actor, plan: StepPlan, tier: int) -> tuple[str, str, int]:

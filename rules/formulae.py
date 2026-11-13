@@ -53,6 +53,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from . import effectspec
+from . import words as english
 
 # The product families (plan §12.1). The family decides delivery; the VESSEL decides the
 # family (owner Q7.3), through its vessel working trait. A glass vial is drunk or poured on,
@@ -1097,7 +1098,7 @@ def findable_by_experiment(fid: str, level: int) -> list[str]:
 
 def _a(family: str) -> str:
     noun = {"splash": "splash flask"}.get(family, family)
-    return ("an " if noun[:1] in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 def could_become(actor, mix: dict, vessel_id: str | None = None) -> dict:

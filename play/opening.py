@@ -33,6 +33,7 @@ from dataclasses import dataclass, replace
 
 from rules import states
 from rules.dice import Dice
+from rules import words as english
 
 # Fact keys carry different names between exports, so everything is looked up through a
 # list of candidates and may legitimately find nothing.
@@ -663,7 +664,7 @@ def carrying(pc) -> str:
 
 
 def _article(word: str) -> str:
-    return "an" if word[:1].lower() in "aeiou" else "a"
+    return english.article(word)
 
 
 def compose(campaign, standing: str) -> str:

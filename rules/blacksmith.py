@@ -26,6 +26,7 @@ from pathlib import Path
 
 from . import worldclass as wc
 from pathfindergm import files
+from . import words as english
 
 TRACK_ID = "blacksmith"
 
@@ -1612,7 +1613,7 @@ def _alloy_ids() -> set[str]:
 
 
 def _a(noun: str) -> str:
-    return ("an " if noun[:1] in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 def _edged(shape: str) -> bool:

@@ -20,6 +20,7 @@ for.
 from __future__ import annotations
 
 import re
+from . import words as english
 
 # Slots per day for a full caster, by class level then spell level 0-9. The wizard's table
 # from Core Rulebook 7-2; the cleric's is the same shape, plus a domain slot per level.
@@ -736,7 +737,7 @@ def special_refusal(actor, kind: str, spell) -> str:
         if kind == "domain":
             return f"{spell.name} is not one of {name}'s domain spells."
         school = specialist_school(actor)
-        article = "an" if school[:1] in "aeiou" else "a"
+        article = english.article(school)
         return (f"{spell.name} is not {article} {school} spell in {name}'s book; only "
                 f"one goes in the school slot.")
     if lvl not in slots:

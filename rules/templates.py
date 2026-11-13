@@ -32,6 +32,7 @@ from pathlib import Path
 from pathfindergm import files
 
 from .tables import SIZE_ORDER, SIZES
+from . import words as english
 
 ABILITIES = ("str", "dex", "con", "int", "wis", "cha")
 _ALL: dict[str, dict] | None = None
@@ -475,7 +476,7 @@ def _finish(out: dict, base: dict, tpl: dict, unstepped=()) -> dict:
     # bench or a GM can show for a creature no printed block describes.
     if tpl.get("describe"):
         noun = str(base.get("name") or "creature").lower()
-        a_noun = ("an " if noun[:1] in "aeiou" else "a ") + noun
+        a_noun = english.a(noun)
         out["description"] = str(tpl["describe"]).format(
             base=noun, a_base=a_noun, A_base=a_noun[:1].upper() + a_noun[1:])
     if unstepped:

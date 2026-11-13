@@ -35,6 +35,7 @@ from . import bench_clock
 from . import campaign as campaign_mod
 from . import manual_reader
 from .apiutil import read_body, read_int
+from rules import words as english
 
 TRACK_ID = bs.TRACK_ID
 MAX_BATCH = 200
@@ -717,7 +718,7 @@ def _product_name(w) -> str:
 
 
 def _a(noun: str) -> str:
-    return ("an " if noun[:1] in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 def method_bulk(method: str) -> bool:

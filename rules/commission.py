@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import copy
 import math
+from . import words as english
 
 # A trained hireling's day (CRB Table 6-9 Services: "Hireling, trained: 3 sp per day"),
 # and the working day it buys.
@@ -374,7 +375,7 @@ def _cap(name: str) -> str:
 
 def _a(noun: str) -> str:
     noun = str(noun or "").strip()
-    return ("an " if noun[:1].lower() in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 def keeper_quality(margin: int) -> int | None:

@@ -36,6 +36,7 @@ from pathlib import Path
 from . import creature_effects
 from .sheet import Actor, from_dict
 from pathfindergm import files
+from . import words as english
 
 TEMPLATES: dict[str, dict] = {
     "guildhand": {
@@ -1571,7 +1572,7 @@ def body_said(words: str) -> str:
     if not words:
         return ""
     beside = SIZE_BESIDE_A_MAN.get(words.split()[0].lower(), "")
-    article = "an" if words[:1].lower() in "aeiou" else "a"
+    article = english.article(words)
     return f"{article} {words}" + (f", {beside}" if beside else "")
 
 

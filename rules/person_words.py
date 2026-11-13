@@ -23,6 +23,7 @@ The rulings it carries:
 from __future__ import annotations
 
 import re
+from . import words as english
 
 _FEMALE = frozenset({
     "woman", "women", "lady", "dame", "goodwife", "matron", "madam", "wife", "female",
@@ -382,10 +383,10 @@ def heal_ref_names(scene) -> list[tuple[str, str, str]]:
         if phrase and not _REF_SHAPED.fullmatch(phrase):
             new = phrase
         elif work:
-            new = ("an " if work[:1].lower() in "aeiou" else "a ") + work.lower()
+            new = english.a(work.lower())
         elif block and block not in _GENERIC_BLOCKS:
             noun = block.replace("-", " ")
-            new = ("an " if noun[:1] in "aeiou" else "a ") + noun
+            new = english.a(noun)
         else:
             new = "a stranger"
         actor.name = new
@@ -469,10 +470,10 @@ def heal_phrase_names(scene, world=None, transcript=()) -> list[tuple[str, str, 
                 and not names_mod.is_a_peoples_name(phrase, known=known):
             new = phrase
         elif work:
-            new = ("an " if work[:1].lower() in "aeiou" else "a ") + work.lower()
+            new = english.a(work.lower())
         elif block and block not in _GENERIC_BLOCKS:
             noun = block.replace("-", " ")
-            new = ("an " if noun[:1] in "aeiou" else "a ") + noun
+            new = english.a(noun)
         else:
             new = "a stranger"
         actor.name = new

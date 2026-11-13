@@ -46,6 +46,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from . import worldclass as wc
+from . import words as english
 
 # The five crafts, the closed choice the reader writes (`gm/interpret.CRAFTS` is the same
 # tuple) and the world-class track each one levels.
@@ -163,7 +164,7 @@ def _leftover_spans(toks: list[str]) -> list[str]:
 
 def _a(noun: str) -> str:
     noun = str(noun or "").strip()
-    return ("an " if noun[:1].lower() in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 def _one(name: str) -> str:

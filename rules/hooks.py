@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import re
+from . import words as english
 
 TIED = "tied"
 KNOWN = "known"
@@ -397,7 +398,7 @@ def _doing(scene, actor, hook: dict) -> str:
     rec = population.of_ref(scene, getattr(actor, "ref", "")) if actor is not None else None
     work = str(((rec or {}).get("life") or {}).get("work_name") or "").strip()
     if work:
-        return f"at their work as {'an' if work[:1] in 'aeiou' else 'a'} {work}"
+        return f"at their work as {english.article(work)} {work}"
     return ""
 
 
@@ -456,7 +457,7 @@ def demonstrations() -> dict:
 
 
 def _a(word: str) -> str:
-    return f"{'an' if word[:1].lower() in 'aeiou' else 'a'} {word}"
+    return f"{english.article(word)} {word}"
 
 
 def render(ing: dict, how: str, *, head: str = "", first: bool = False,

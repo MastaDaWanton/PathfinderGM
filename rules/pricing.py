@@ -27,6 +27,7 @@ detectable rather than a matter of taste, so it is detected: `specs` is empty or
 not.
 """
 from __future__ import annotations
+from . import words as english
 
 # What a potency-1 thing of each rarity is worth, in gold. The ladder is the engine's
 # five rungs — there is no epic or mythic — and the steps are roughly threefold, which is
@@ -340,7 +341,7 @@ def _exempt(row: dict) -> bool:
 
 
 def _a(word: str) -> str:
-    return ("an " if word[:1].lower() in "aeiou" else "a ") + word
+    return english.a(word)
 
 
 def _why_floor(row: dict) -> str:

@@ -90,6 +90,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import npcs
+from . import words as english
 
 # The published road check, unchanged: four a day, 20% each (AoN, Step 4: Create Random
 # Encounter Tables). Six hours is a watch, so an eight-hour walking day is one full check
@@ -422,7 +423,7 @@ def _creatures(meeting: Meeting) -> tuple[str, bool]:
     name = bestiary.kind_word(meeting.creature) or "something"
     n = max(1, int(meeting.count or 1))
     if n == 1:
-        return f"{'an' if name[:1].lower() in 'aeiou' else 'a'} {name}", False
+        return f"{english.article(name)} {name}", False
     return group_phrase(name, n), True
 
 

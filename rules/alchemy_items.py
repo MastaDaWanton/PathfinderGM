@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .crafting import Stock
+from . import words as english
 
 TRACK_ID = "alchemist"
 # The record's shape version (plan §12.2): 4 is the revamp's. Anything older is OLD WORK,
@@ -456,7 +457,7 @@ def scaled(spec: dict, mult: float, dmult: float, up: bool) -> dict:
 # --- choosing what goes in the bottle (plan §6.3) -----------------------------------------------
 
 def _a(noun: str) -> str:
-    return ("an " if noun[:1].lower() in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 FAMILY_WORDS = {"potion": "potion", "oil": "oil", "splash": "splash flask",

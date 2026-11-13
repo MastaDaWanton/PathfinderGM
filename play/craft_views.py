@@ -22,6 +22,7 @@ from rules.intents import IntentError
 
 from . import campaign as campaign_mod
 from .apiutil import read_body, read_int, script_json
+from rules import words as english
 
 # The disciplines the app knows about. Only Herbalism has rules behind it; the rest are
 # declared so the page is honest about what is coming instead of hiding it. `track` is
@@ -572,9 +573,9 @@ def floor_scene(f: dict) -> str:
     """The scene when the model is down or keeps getting it wrong: the same facts,
     plainly. Better than the line it replaces because it says WHERE the creature is and
     WHAT it is doing about you, which "has the ground you wanted" never did."""
-    a = "an" if f["name"][:1].lower() in "aeiou" else "a"
+    a = english.article(f["name"])
     looks = " ".join(x for x in (f["size"], f["kind"]) if x)
-    looks = (f" — {'an' if looks[:1].lower() in 'aeiou' else 'a'} {looks}"
+    looks = (f" — {english.article(looks)} {looks}"
              if looks else "")
     alone = " and alone" if f["organization"] == "solitary" else ""
     carried = (f"With the {', '.join(n.lower() for n in f['carried'][:2])} heavy in your "

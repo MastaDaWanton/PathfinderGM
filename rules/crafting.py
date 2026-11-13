@@ -20,6 +20,7 @@ from . import effectspec
 from . import inprogress
 from . import ingredients as ing_mod
 from . import worldclass as wc
+from . import words as english
 
 
 # --- concentration ------------------------------------------------------------------------
@@ -39,7 +40,7 @@ def _a(noun: str) -> str:
     """"an infusion", "a salve": the article a refusal reads with. Written as f"a {form}"
     the bench told players "A infusion can carry none of what this does"."""
     noun = str(noun or "")
-    return ("an " if noun[:1].lower() in "aeiou" else "a ") + noun
+    return english.a(noun)
 
 
 @dataclass

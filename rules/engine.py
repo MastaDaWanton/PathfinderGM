@@ -59,6 +59,7 @@ from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import (MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _mean_amount, _said_rounds,
                     _when_holds,
                     attacker_traits, current_moment, situated)
+from . import words as english
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
@@ -28078,7 +28079,7 @@ class Engine:
                 # The budget may send a group; the sentence says how many.
                 who, _ = ontheway._creatures(met)
                 return f"In the night {who} come near the camp, and go on by."
-            article = "an" if name[:1].lower() in "aeiou" else "a"
+            article = english.article(name)
             return (f"In the night {article} {name} comes near the camp, and goes on "
                     f"by.")
         who = ", ".join(self.scene.actors[m["ref"]].name for m in made

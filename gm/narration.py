@@ -26,6 +26,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from . import speech
+from rules import words as english
 
 # Six words is long enough that sharing one is copying rather than coincidence, and short
 # enough to catch a lifted clause rather than only a whole sentence.
@@ -5639,7 +5640,7 @@ def stands_elsewhere(text: str, here: str = "", places=(), here_is=(),
 # --- a face, said where the person is actually seen ----------------------------------
 
 def _an(word: str) -> str:
-    return "an" if str(word)[:1].lower() in "aeiou" else "a"
+    return english.article(word)
 
 
 def a_face_for(name: str, appearance: str) -> str:

@@ -40,6 +40,7 @@ narrator writes to, and the turn log carries a `people-granted` row.
 from __future__ import annotations
 
 import re
+from . import words as english
 
 # The player asked about presence. A people named in "I kill the elf" is not a question
 # the world answers; "any elves here?", "is there an elf in the back" are.
@@ -328,4 +329,4 @@ def claim(scene, place: str, *, gender: str = "", ref: str = "",
 def phrase_of(g: dict) -> str:
     """"a human woman" — how the brief says what was granted."""
     words = f"{str(g.get('kind') or '').lower()} {g.get('gender') or 'person'}".strip()
-    return ("an " if words[:1] in "aeiou" else "a ") + words
+    return english.a(words)

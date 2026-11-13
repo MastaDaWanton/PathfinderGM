@@ -41,6 +41,7 @@ import re
 from gm.narration import Finding
 
 from . import _space
+from rules import words as english
 
 ORDER = 65
 KINDS = frozenset({"size-words"})
@@ -181,7 +182,7 @@ def find(ctx) -> list[Finding]:
 
 def _article(det: str, word: str) -> str:
     if det.lower() in ("a", "an"):
-        a = "an" if word[:1].lower() in "aeiou" else "a"
+        a = english.article(word)
         return a.capitalize() if det[:1].isupper() else a
     return det
 

@@ -48,6 +48,7 @@ from pathlib import Path
 from django.conf import settings
 
 from pathfindergm import files
+from . import words as english
 
 # --- the vocabulary ---------------------------------------------------------------------------
 
@@ -916,30 +917,6 @@ def creature_noun(name: str) -> str:
     return name.lower()
 
 
-def _plural(noun: str) -> str:
-    """English plural of a creature noun's last word — enough for the bestiary's nouns
-    (wolf → wolves, lynx → lynxes, harpy → harpies, lizardfolk → lizardfolk)."""
-    words = noun.split()
-    if not words:
-        return noun
-    last = words[-1]
-    if last.endswith(("folk", "sheep", "deer", "fish", "people")):
-        pl = last
-    elif last.endswith("man"):
-        pl = last[:-3] + "men"
-    elif last.endswith("fe"):
-        pl = last[:-2] + "ves"
-    elif last.endswith("f") and not last.endswith("ff"):
-        pl = last[:-1] + "ves"
-    elif last.endswith(("s", "x", "z", "ch", "sh")):
-        pl = last + "es"
-    elif last.endswith("y") and last[-2:-1] not in "aeiou":
-        pl = last[:-1] + "ies"
-    else:
-        pl = last + "s"
-    return " ".join(words[:-1] + [pl])
-
-
 def group_phrase(noun: str, n: int) -> str:
     """"a wolf", "two wolves" — the incident's people as the opening says them."""
     noun = " ".join(str(noun or "").split()).lower()
@@ -947,8 +924,8 @@ def group_phrase(noun: str, n: int) -> str:
     if not noun:
         return ""
     if int(n) <= 1:
-        return f"{'an' if noun[:1] in 'aeiou' else 'a'} {noun}"
-    return f"{_NUMBER_WORDS.get(int(n), 'several')} {_plural(noun)}"
+        return f"{english.article(noun)} {noun}"
+    return f"{_NUMBER_WORDS.get(int(n), 'several')} {english.plural(noun)}"
 
 
 def crossed(text: str, start: dict) -> list[str]:
