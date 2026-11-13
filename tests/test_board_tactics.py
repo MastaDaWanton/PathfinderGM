@@ -165,3 +165,14 @@ def test_hover_only_paints_where_a_pointer_can_hover():
         before = page[:page.index(rule)]
         assert before.rstrip().endswith("{") and "(hover: hover) and (pointer: fine)" in \
             before[-80:], rule
+
+
+def test_a_hidden_creatures_turn_does_not_name_it():
+    """`scene.turn_ref` sent the hidden goblin's ref on its own turn: the one field the
+    0.3.0 hidden-leak pass missed (found by the variant D port, 2026-11-13)."""
+    s, _e, hidden, seen = _fight()
+    s.turn = next(i for i, (r, _v) in enumerate(s.initiative) if r == hidden.ref)
+    assert s.current_ref() == hidden.ref
+    assert views._state(_camp(s))["scene"]["turn_ref"] == ""
+    s.turn = next(i for i, (r, _v) in enumerate(s.initiative) if r == seen.ref)
+    assert views._state(_camp(s))["scene"]["turn_ref"] == seen.ref

@@ -1025,7 +1025,12 @@ def _state(c) -> dict:
             # Why the crafting hub is shut right now, or "": the engine's own sentence,
             # so the greyed button and the refusal behind it cannot disagree.
             "busy": _busy_state(c),
-            "turn_ref": c.scene.current_ref(),
+            # Blank while a creature the PC has not found takes its turn: the ref named
+            # it, the one field the hidden-leak pass of 0.3.0 missed.
+            "turn_ref": "" if (c.scene.current_ref() in c.scene.actors
+                               and not awareness.player_locates(
+                                   c.scene, c.scene.actors[c.scene.current_ref()]))
+                        else c.scene.current_ref(),
             "initiative": [
                 {"ref": r, "score": v,
                  "name": c.scene.actors[r].name if r in c.scene.actors else r,
