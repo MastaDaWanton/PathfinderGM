@@ -359,7 +359,7 @@ def _meetings(monkeypatch, *script):
     """The street table answers the script hop by hop: None, or a meeting of that kind."""
     queue = list(script)
 
-    def street(dice, level=1, apl=None):
+    def street(dice, level=1, apl=None, danger=1.0):
         kind = queue.pop(0) if queue else None
         if kind is None:
             return None

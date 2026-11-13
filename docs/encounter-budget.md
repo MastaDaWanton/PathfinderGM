@@ -188,14 +188,108 @@ Measured (2026-11-13, 300 seeds per cell, forest/hills/desert/grassland/swamp at
 no fallbacks and no empty draws. Counts were 1 to 3, mostly 1. A forage found a creature on
 100 of 100 seeds on all ten land biomes at levels 1, 3, 5, 8 and 12.
 
+## Covered since (2026-11-13, "cover the stuff that isnt covered like the guards")
+
+- **The law.** `Engine._law_joins` and `Engine.rally` (a guard rallying to a struck guard)
+  both go through `Engine._law_room`: the guards on the side against the party, the ones
+  already there plus the ones coming, are priced by `most_of(..., kind="guarded")` at the
+  dearest guard's XP. Never fewer than one (the warrant, or the guard the words struck, is
+  the floor); the rest stay in the scene, off the initiative, and are said to hang back
+  "shouting the alarm" (`Engine._law_held_settle`, its own outcome at the batch's end). A
+  watch already inside the tier's least (average) budget comes whole with no d100 rolled.
+  Measured: four watchmen (135 XP each) at a wanted lone level-1 PC joined 1 (15 of 20
+  seeds) or 2 (5 of 20); all four did before. Only the guards are priced: the person the
+  player struck is who the words named and is not counted against the watch.
+  Other law doors read, none brings guards into a fight: `rules/arrest.py` confronts and
+  hands a blow to `_law_joins`; `rules/trial.py` holds and judges; the street patrol was
+  already budgeted (`ontheway.street`). A fight the GM declares through `begin_encounter`
+  names its own sides, which are not second-guessed; only the extra law it draws is priced.
+- **Schemes.** A `bring_in` whose side is `them` or `foe` arrives at
+  `most_of(...)` of its count (`schemes._hostile_count`): guard and watch roles as
+  `guarded`, anybody else as `opening`. A witness, a mourner, or any other side is not a
+  fight and comes as written.
+- **The caravan.** Nothing hostile exists to budget: a job spawns no ambush (Battle
+  Brothers' abandoned lesson, `rules/jobs.py`), its people are the party's side, and the
+  only trouble on the way is the road's own roll, which is budgeted. Said in a comment at
+  the caravan's mint.
+
+## Danger and how often (volatility on land)
+
+`rules/volatility.py` rates a place 0 calm .. 4 lawless. `volatility.scale(world, *places,
+base=...)` multiplies a table's base chance by `FACTORS[rating] / FACTORS[base]`, where
+`base` is the rating the table's base was set for (the road, the night, a forage and a
+venture: uneasy; the street, measured in towns: settled). Only a rating the world STATES
+moves anything: no shipped export carries one yet, so every table rolls exactly as before,
+to the dice (`test_nothing_stated_is_the_published_rate_exactly`).
+
+### Research (2026-11-13)
+
+- **Pathfinder 1e has no danger scale.** Ultimate Wilderness p.127 (Archives of Nethys,
+  <https://www.aonprd.com/Rules.aspx?ID=2388>): "check for encounters four times per day
+  ... with a 20% chance of an encounter each time", and "Feel free to adjust the frequency
+  ... as best suits your game." Nothing by terrain or danger. A Paizo forum reply
+  (<https://paizo.com/threads/rzs2q1h6>) says the same: "I don't think there's any official
+  PF wandering encounter table by terrain". I did not find a GameMastery Guide table for
+  this and could not read the book itself.
+- **Kingmaker (PF1 AP #31, *Stolen Land*, p.13 as quoted by forum users, not read by me):**
+  5% a hex entered, 15% a day or night exploring or camping; *Rivers Running Red*: "These
+  chances decrease to 1% per hex or 5% per day ... in a claimed hex"
+  (<https://paizo.com/threads/rzs2q0wo>, <https://paizo.com/threads/rzs2ku76>). Tamed
+  land at **a third** of the wild's daily rate. Secondhand; unverified against the books.
+- **B/X / Old-School Essentials** (OSE SRD mirror,
+  <https://digital-gm.pages.dev/docs/ose-rules/adventures/wilderness-adventuring/>):
+  "City, clear, grasslands, settled lands: 1-in-6"; "Aerial, barren, desert, forest,
+  hills: 2-in-6"; "Jungle, mountains, swamp: 3-in-6", once a day. Settled is **half** the
+  ordinary wild, the worst ground **one and a half times** it. This is the cleanest
+  published danger ladder found. (The OSE SRD's own page returned an error; the mirror
+  quotes it.)
+- **AD&D 1e DMG** (forum summary of its population-density rule, not read by me): dense 1
+  in 20, patrolled 1 in 12, uninhabited 1 in 10 — densely settled **half** the wilderness
+  again. AD&D 2e's DMG instead *raises* the chance by one or two for patrolled and populated
+  areas (with prepared tables): more people, more meetings, the opposite axis, which is why
+  only the hostile bands move here and travellers do not.
+- **Pathfinder 2e** GM Core p.209 (<https://2e.aonprd.com/Rules.aspx?ID=3114>): a daily
+  flat check by terrain, plains DC 12 (45%) to desert/arctic/aquatic DC 17 (20%), "On a
+  road or river, decrease the DC by 2." A 2.25x spread, by terrain rather than danger, and
+  again roads mean *more* meetings, not fewer.
+- **What was abandoned:** nothing found. No source I reached moved from a danger ladder to
+  a flat rate or back. Ultimate Wilderness's flat 20% with "adjust as suits your game" is
+  the system leaving it to the GM, which this app has no GM to do.
+
+### The numbers chosen
+
+| Rating | Factor | Source |
+|---|---|---|
+| 0 calm | 1/3 | Kingmaker's claimed hex, 5% against 15% a day |
+| 1 settled | 1/2 | B/X settled 1-in-6 against 2-in-6; AD&D 1e dense 1/20 against 1/10 |
+| 2 uneasy | 1 | the published rate (UW's 20% a watch) |
+| 3 dangerous | 1.5 | B/X's worst ground, 3-in-6 against 2-in-6 |
+| 4 lawless | 2 | **extrapolated**: B/X's 1-in-6 step once more (4-in-6). No table goes past 3-in-6 |
+
+### What moves
+
+- **The road** (`ontheway.road`): the creature (monster) and weather (catastrophe) bands.
+  Travellers and a toll keep their own chance: `_weighed` widens the hostile bands and
+  multiplies the check by the new total, so each hostile band's chance moves by exactly
+  the factor. Rated by the worse end of a journey leg, or the hop. Measured over 600 seeds
+  of a six-hour forest watch: creature + weather 33 calm, 91 uneasy, 159 lawless;
+  travellers + toll 50, 45, 49.
+- **The street** (`ontheway.street`, base settled): the cutpurse and the trouble (the
+  bandits). Over 3,000 hops: 30 at the measured rate, 137 at four times it (a lawless
+  town); the press, hawkers, beggars and the watch unchanged.
+- **The night** (`ontheway.night`): the whole check, on top of the tent's scale.
+- **A forage** (`gathering.bands`): the creature and the guarded find widen, the quiet band
+  gives way, a rich find stays 20%. Lawless: creature 36, guarded 14, quiet 30.
+- **A venture's inhabitant**: half the time, now a d100 against 50 × the factor (the d2
+  that stood there could not move).
+
 ## Left open
 
-- `Engine._law_joins` still brings in **every** guard already standing in a town where the
-  PC is wanted. Those are residents, not a generated encounter, so this budget does not
-  limit them.
+- The struck person is not counted against the watch's budget: a merchant the player hit
+  plus the watch can cost more than the tier. The words named the merchant.
+- `rally` of non-law kin (thugs for a thug, bandits for a bandit) is still unpriced.
+
 - A ship's boarding crew (`Engine`, `min(4, 1 + crew // 25)` sailors) is not budgeted. The
   ship rulings of 2026-11-09 are not built yet.
-- Schemes' `bring_in` people and the caravan's own people are single people placed by a
-  document, not generated foes, and are not budgeted.
 - A companion who is a monster, not a classed NPC, counts at its `level`, not its CR.
 - Above CR 20 the budget is clamped to CR 20 (`rung`).
