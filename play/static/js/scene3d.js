@@ -162,6 +162,7 @@
     ally: [0x6f, 0xc2, 0x76],
     foe: [0xe0, 0x26, 0x1e],
     bystander: [0xf2, 0xec, 0xdd],
+    neutral: [0x6b, 0x4a, 0x3a],        // `#map .token`, the flat token with no side
     // Fixtures (2026-11-11), from the table's own palette: wood from the leather and brass
     // browns, stone from the board's greys, book spines from the side colours dimmed.
     wood: [0x6b, 0x4a, 0x3a], wooddark: [0x4a, 0x33, 0x26], plank: [0x7d, 0x68, 0x45],
@@ -1042,7 +1043,10 @@
       var n = a.squares || 1;
       /* The server's `stance` (attitude.stance), the one answer the flat map and the
          panel read too; never worked out here from a fight's side name. */
-      var side = a.stance || "bystander";
+      // Out of a fight, someone with no stance is the flat token's plain brown, never
+      // the fight's white bystander: the owner's ruling, 2026-11-13 ("the townsfolk
+      // should stay brown"). The boards share colours, so this is the flat map's rule.
+      var side = a.stance || (opts.fight ? "bystander" : "neutral");
       var down = a.hp <= 0;
       var cls = "fig " + side + (down ? " down" : "");
       if (az !== level) cls += " offlevel";

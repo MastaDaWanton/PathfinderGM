@@ -451,6 +451,7 @@ function renderMap(s) {
   const svg = MAP_3D
     ? Scene3D.render(g, s.scene.actors || [],
                      { turn: MAP_TURN, level: MAP_LEVEL,
+                       fight: !!s.scene.in_encounter,
                        reach: !!(STATE.scene && STATE.scene.in_encounter),
                        up: s.scene.in_encounter ? s.scene.turn_ref : null })
     : `<svg id="map" viewBox="${-MARGIN} ${-MARGIN} ${g.width * CELL + MARGIN} ${
