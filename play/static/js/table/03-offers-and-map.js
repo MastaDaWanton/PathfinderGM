@@ -231,6 +231,22 @@ function renderMap(s) {
   for (const [c, r, v] of (g.floor || []))
     parts.push(cell(c, r, `up${Math.min(3, v)}`,
       `<title>${v * 5} ft above the floor</title>`));
+  // Raised ground as relief (variant D, 2026-11-13): a lit lip on the edges that face the
+  // room's light (north, west) and a shadow on the two that do not, wherever the ground
+  // next door is lower. Four shades of brown alone said "different", not "higher".
+  const lip = [], shade = [];
+  for (const [c, r, v] of (g.floor || [])) {
+    if (at(c, r - 1) < v) lip.push([c, r, c + 1, r]);
+    if (at(c - 1, r) < v) lip.push([c, r, c, r + 1]);
+    if (at(c, r + 1) < v) shade.push([c, r + 1, c + 1, r + 1]);
+    if (at(c + 1, r) < v) shade.push([c + 1, r, c + 1, r + 1]);
+  }
+  parts.push(edgePath(lip, "lip"), edgePath(shade, "shade"));
+  // The fight's own answers for the PC (views._tactics), {} outside one: who threatens
+  // which square, which moves provoke and from whom, what the PC cannot see, a hunch's
+  // range. Read here, never worked out: one rule, in the engine.
+  const T = g.tactics || {};
+  const provokes = T.provokes || {};
   // Rails as edges, not fills. A parapet is a thing to shoot over; a filled square
   // would read as a wall, which is the very mistake the engine was making.
   // A gallery's rail is stored on the ground square in front of it and drawn on the
@@ -293,6 +309,7 @@ function renderMap(s) {
     }
   }
 
+  const safe = new Set();
   for (const [key, cost] of reach) {
     const [c, r] = key.split(",").map(Number);
     // data-sq is what makes the square a *destination* — the combat builder queues a
@@ -303,11 +320,21 @@ function renderMap(s) {
     // A destination carries the level it lands you on, so the combat builder queues a
     // move to a CELL and not merely a square. Walking onto a dais is walking up onto it.
     const lvl = at(c, r);
-    parts.push(cell(c, r, "reach", `<title>${sqName(c, r)} · ${cost} ft${
-        lvl ? ` · ${lvl * 5} ft up` : ""}</title>`)
-      .replace('class="reach"', `class="reach" data-sq="${c},${r}${
+    // In a fight the move is split by the engine's own "would this provoke"
+    // (`reactions.provoked_by_move`): the safe squares bright inside a candle outline, the
+    // provoking ones the old dim gold. Marking the exception is what reads: in the mock's
+    // fight 80 of 86 squares provoked, and a red wash on all of them (tried first) turned
+    // the whole board red, a notch on each (tried second) was confetti.
+    const how = !T.provokes ? "" : provokes[key] ? " risky" : " safe";
+    if (how === " safe") safe.add(key);
+    parts.push(cell(c, r, `reach${how}`, `<title>${sqName(c, r)} · ${cost} ft${
+        lvl ? ` · ${lvl * 5} ft up` : ""}${how === " risky" ? " · provokes" : ""}</title>`)
+      .replace(`class="reach${how}"`, `class="reach${how}" data-sq="${c},${r}${
         lvl ? "," + lvl : ""}"`));
   }
+  const reachEdges = boardEdges(g, (c, r) => reach.has(`${c},${r}`));
+  const safeEdges = safe.size && safe.size < reach.size
+    ? boardEdges(g, (c, r) => safe.has(`${c},${r}`)) : [];
 
   // The latest turn's spell areas (`scene.grid.areas`, §2.10): the engine's ruling on
   // where the cone or burst fell, drawn so the player can see it and dispute it the way a
@@ -341,6 +368,17 @@ function renderMap(s) {
     }
   }
 
+  // Threatened squares: a hatch in --alarm, not a fill, so the ground and the move wash
+  // read through it and it survives colour blindness where a red tint does not.
+  for (const k of Object.keys(T.threat || {})) {
+    const [c, r] = k.split(",").map(Number);
+    parts.push(`<rect class="threat" x="${c * CELL}" y="${r * CELL}" width="${CELL}" height="${CELL}"/>`);
+  }
+  // What the PC cannot see: fog, not a black-out, so remembered walls still read as walls
+  // (Foundry ships fog as an opacity for the same reason).
+  for (const [c, r] of (T.unseen || []))
+    parts.push(`<rect class="fog" x="${c * CELL}" y="${r * CELL}" width="${CELL}" height="${CELL}"/>`);
+
   // Grid lines last of the terrain, so they sit over the fills and under the tokens.
   for (let c = 0; c <= g.width; c++)
     parts.push(`<line class="rule" x1="${c * CELL}" y1="0" x2="${
@@ -372,6 +410,19 @@ function renderMap(s) {
       parts.push(`<path class="night ${lv}" pointer-events="none" d="${wash[lv]}"/>`);
   }
 
+  // The edge of the move, the edge of its safe steps, and the edge of each hunch: a hunch
+  // is a range round the PC (the squares views._tactics sends), never a square of the foe.
+  // In a fight only, as the 3D board lights the move only then: walking round town, a gold
+  // line round thirty feet of street says "this matters" when nothing does.
+  if (s.scene.in_encounter)
+    parts.push(edgePath(reachEdges, "reachedge"), edgePath(safeEdges, "safeedge"));
+  for (const h of (T.hunches || [])) {
+    const inside = new Set(h.squares.map(p => `${p[0]},${p[1]}`));
+    parts.push(`<path class="hunch" d="${pathOf(boardEdges(g, (c, r) => inside.has(`${c},${r}`)))
+      }"><title>you sense ${h.count === 1 ? "a foe" : h.count + " foes"} within ${
+      h.within_ft} ft</title></path>`);
+  }
+
   // Blood before bodies, so a token stands in its own pool rather than under it.
   for (const b of (s.scene.pools || [])) {
     if (!b.at) continue;
@@ -380,8 +431,13 @@ function renderMap(s) {
       <title>blood pool — ${esc(b.source || b.owner)}</title></circle>`);
   }
 
+  // Who the latest spell's area caught (the engine's own list, unseen creatures dropped).
+  const caught = new Set((g.areas || []).flatMap(a => a.caught || []));
   for (const a of s.scene.actors) {
     if (!a.at) continue;
+    // Each body is one group, focusable and named, so the readout answers a tap, a point
+    // or a Tab on it alike (variant D: a phone has no hover).
+    const tp = [];
     const [c, r] = a.at;
     const n = a.squares || 1;
     const down = a.hp <= 0;
@@ -407,7 +463,10 @@ function renderMap(s) {
     // the head; a crowd keeps its hatching and its count.
     const up = s.scene.in_encounter && a.ref && a.ref === s.scene.turn_ref ? " up" : "";
     const cx = (c + n / 2) * CELL, cy = (r + n / 2) * CELL, k = n * CELL / 18;
-    parts.push(`<circle class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}${
+    // Whose turn: a still candle ring round the token. A pulse was refused in the mock: it
+    // would be the one thing on the board that never stops moving.
+    if (up) tp.push(`<circle class="turnring" cx="${cx}" cy="${cy}" r="${n * CELL / 2 + .6}"/>`);
+    tp.push(`<circle class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}${
       up}" cx="${cx}" cy="${cy}" r="${n * CELL / 2 - 1.5}">
       <title>${esc(a.name)} — ${a.hp}/${a.hp_max}${
         unit ? ` · ${a.members} of ${a.members_max} still standing` : ""}${
@@ -423,15 +482,24 @@ function renderMap(s) {
           cy}" r="${2.6 * k}"/>`
       : form ? `<ellipse cx="${cx}" cy="${cy + .4 * k}" rx="${6 * k}" ry="${3 * k}"/>
          <circle class="head" cx="${cx}" cy="${cy}" r="${3.4 * k}"/>` : "";
-    if (glyph) parts.push(`<g class="tokbody${down ? " down" : ""}${ghost}">${glyph}</g>`);
+    if (glyph) tp.push(`<g class="tokbody${down ? " down" : ""}${ghost}">${glyph}</g>`);
     // A keeper's brass coin (mock, plan item 4), the 3D base's own: not a ring, which
     // already means whose turn it is.
-    if (a.keeps && !down) parts.push(`<circle class="keepcoin${ghost}" cx="${cx + 5.6 * k}" cy="${
+    if (a.keeps && !down) tp.push(`<circle class="keepcoin${ghost}" cx="${cx + 5.6 * k}" cy="${
       cy + 5.6 * k}" r="${2 * k}"><title>${esc(a.name)} keeps a counter here</title></circle>`);
-    parts.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
+    tp.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
       form === "beast" ? cx - 1.2 * k : cx}" y="${
       unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : (mark.length > 1 ? 4.4 : 6) * k
         }px">${unit ? a.members : esc(mark)}</text>`);
+    // The downed are struck through, so "down" reads without telling faded from far away.
+    if (down) {
+      const d = (n * CELL / 2 - 3) * .7071;
+      tp.push(`<path class="strike" d="M${cx - d} ${cy - d}L${cx + d} ${cy + d}M${cx + d} ${
+        cy - d}L${cx - d} ${cy + d}"/>`);
+    }
+    parts.push(`<g class="tokg${ghost}${caught.has(a.ref) ? " caught" : ""}" data-ref="${
+      esc(a.ref)}" tabindex="0" role="button" aria-label="${esc(`${a.name}, ${a.hp} of ${
+      a.hp_max}${down ? ", down" : ""}${up ? ", their turn" : ""}`)}">${tp.join("")}</g>`);
   }
 
   // A flask being aimed at a square (04's Throw…, CRB "Throw Splash Weapon": a grid
@@ -450,7 +518,11 @@ function renderMap(s) {
   // the flat one was built first.
   const svg = MAP_3D
     ? Scene3D.render(g, s.scene.actors || [],
-                     { turn: MAP_TURN, level: MAP_LEVEL,
+                     { turn: MAP_TURN, level: MAP_LEVEL, tactics: T, caught,
+                       hunches: (T.hunches || []).map(h => {
+                         const inside = new Set(h.squares.map(p => `${p[0]},${p[1]}`));
+                         return boardEdges(g, (c, r) => inside.has(`${c},${r}`));
+                       }),
                        fight: !!s.scene.in_encounter,
                        reach: !!(STATE.scene && STATE.scene.in_encounter),
                        up: s.scene.in_encounter ? s.scene.turn_ref : null })
@@ -466,7 +538,7 @@ function renderMap(s) {
                   patternTransform="rotate(45)">
            <rect width="6" height="6" fill="#d9d2c2"></rect>
            <line x1="0" y1="0" x2="0" y2="6" stroke="#f7f2e6" stroke-width="3"></line>
-         </pattern>${FX_DEFS}
+         </pattern>${FX_DEFS}${MAP_HATCH}
        </defs>${parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
   // The controls sit in the board's head as the approved design lays them out (the mock's
@@ -483,9 +555,9 @@ function renderMap(s) {
       <button type="button" data-mapview="3d" ${pressed(MAP_3D)}>3D</button></div>${MAP_3D
       ? `<div class="v2-recess" role="group" aria-label="Turn the board">
           <button type="button" class="v2-btn" data-mapturn="-1"
-                  aria-label="Turn the board left">Turn left</button>
+                  aria-label="Turn the board left"><span class="long">Turn </span>left</button>
           <button type="button" class="v2-btn" data-mapturn="1"
-                  aria-label="Turn the board right">Turn right</button></div>` : ""}`;
+                  aria-label="Turn the board right"><span class="long">Turn </span>right</button></div>` : ""}`;
   const picker = levels.length > 1
     ? `<div class="v2-recess" role="group" aria-label="Looking at"><span class="seglabel">Looking at</span>${
         levels.map(v => `<button type="button" data-maplevel="${v}" ${pressed(v === MAP_LEVEL)}>${
@@ -499,6 +571,16 @@ function renderMap(s) {
       reach.size} squares within ${g.speed} ft</p>` : ""}${
       pools ? `<p class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</p>` : ""}`;
+  // The key opens OVER the board, never under it (variant D): a key that pushed the foot
+  // taller shrank the board while somebody was looking at it. It stays as it was left.
+  const sw = (cls, label) => `<span class="mapk"><i class="sw ${cls}" aria-hidden="true"></i>${label}</span>`;
+  const key = `<details class="mapkey"${typeof MAPREAD !== "undefined" && MAPREAD.keyOpen ? " open" : ""}><summary>Key</summary>
+      <div class="mapkeyrow">${sw("k-pc", "You")}${sw("k-ally", "Ally")}${sw("k-foe", "Foe")}${
+      sw("k-by", "Bystander")}${s.scene.in_encounter ? sw("k-turn", "Whose turn") : ""}${
+      T.provokes ? sw("k-safe", "Move, safe") + sw("k-risky", "Move, provokes") : ""}${
+      T.threat ? sw("k-threat", "Threatened") : ""}${T.unseen ? sw("k-fog", "Out of sight") : ""}${
+      (T.hunches || []).length ? sw("k-hunch", "Sensed foe, somewhere inside") : ""}
+      ${g.about ? `<p class="sub maplegend">${esc(g.about)}</p>` : ""}${legend}</div></details>`;
   // The place is named, not just drawn. A correct map of the well, while the prose is
   // describing a gate, is indistinguishable from a broken map unless the board says which
   // place it is (reported 2026-09-21). `about` is the shape's own line about what that
@@ -507,9 +589,13 @@ function renderMap(s) {
   // the ground is shown and the town's name while Places is.
   $("#boardframe").dataset.ground = g.place ? `The ground · ${g.place}` : "The ground";
   $("#groundctl").innerHTML = view + picker;
+  // The readout (25-map-readout.js) is a box of fixed height under the board, so nothing
+  // tapped or pointed at changes the board's size.
   $("#mapwrap").innerHTML = `<div class="boardview">${svg}</div>
-    <div class="boardfoot">${g.about ? `<p class="sub maplegend">${esc(g.about)}</p>` : ""}${
-      legend}</div>`;
+    <div class="boardfoot"><div id="mapread" class="mapread" aria-live="polite"></div>
+      <div class="maprow">${key}${g.about ? `<span class="mapabout" title="${esc(g.about)}">${
+        esc(g.about)}</span>` : ""}</div></div>`;
+  if (typeof mapReadout === "function") mapReadout(s, T);
   if (typeof mapPaint === "function") mapPaint();
   if (typeof MapZoom !== "undefined") MapZoom.mount(g, s.scene);
 
@@ -517,6 +603,32 @@ function renderMap(s) {
     return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${
       CELL}" height="${CELL}">${inner}</rect>`;
   }
+  function pathOf(edges) {
+    return edges.map(([x1, y1, x2, y2]) => `M${x1 * CELL} ${y1 * CELL}L${x2 * CELL} ${y2 * CELL}`).join("");
+  }
+  function edgePath(edges, cls) {
+    return edges.length ? `<path class="${cls}" pointer-events="none" d="${pathOf(edges)}"/>` : "";
+  }
+}
+
+// The hatch both views lay over a threatened square: --alarm (#b0483c), thin, at 45°.
+const MAP_HATCH = `<pattern id="maphatch" width="4" height="4" patternUnits="userSpaceOnUse"
+  patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="#b0483c"
+  stroke-width="1.1" stroke-opacity=".7"></line></pattern>`;
+
+// The outline of a set of squares as unit edges [x1, y1, x2, y2] in squares: the edge of
+// the move, of its safe steps, of a hunch's range. Geometry only; the set is the engine's.
+function boardEdges(g, inside) {
+  const out = [];
+  const ok = (x, y) => x >= 0 && y >= 0 && x < g.width && y < g.height && inside(x, y);
+  for (let c = 0; c < g.width; c++) for (let r = 0; r < g.height; r++) {
+    if (!inside(c, r)) continue;
+    if (!ok(c, r - 1)) out.push([c, r, c + 1, r]);
+    if (!ok(c, r + 1)) out.push([c, r + 1, c + 1, r + 1]);
+    if (!ok(c - 1, r)) out.push([c, r, c, r + 1]);
+    if (!ok(c + 1, r)) out.push([c + 1, r, c + 1, r + 1]);
+  }
+  return out;
 }
 
 function renderRolls(log) {

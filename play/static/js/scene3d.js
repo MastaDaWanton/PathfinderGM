@@ -202,8 +202,11 @@
 
   function paint(name, lit, wash, night) {
     var c = MATERIAL[name] || MATERIAL.tile, out = "#";
+    // In a fight a safe move washes strongly toward gold and a provoking one faintly: the
+    // flat board's two move colours (views._tactics `provokes`, variant D).
+    var amt = wash === "risky" ? WASH * 0.7 : wash === "safe" ? WASH * 1.6 : WASH;
     for (var i = 0; i < 3; i++) {
-      var base = wash ? c[i] + (GOLD[i] - c[i]) * WASH : c[i];
+      var base = wash ? c[i] + (GOLD[i] - c[i]) * amt : c[i];
       var v = Math.round(Math.max(0, Math.min(255, base * lit * (night ? night[i] : 1))));
       out += (v < 16 ? "0" : "") + v.toString(16);
     }
@@ -223,7 +226,7 @@
       c[2] += pts[i][2] / pts.length;
     }
     out.push({ pts: pts, n: normal, at: c, mat: mat, cls: cls || "",
-               attrs: attrs || "", inner: inner || "", wash: !!wash });
+               attrs: attrs || "", inner: inner || "", wash: wash || false });
   }
 
   var UP = [0, 0, 1], NORTH = [0, -1, 0], SOUTH = [0, 1, 0],
@@ -809,6 +812,9 @@
 
     var reach = {};
     (g.reachable || []).forEach(function (e) { reach[key(e[0], e[1])] = e; });
+    // The fight's own answers for the PC (views._tactics), as the flat board reads them.
+    var T = opts.tactics || {}, unseen = {};
+    (T.unseen || []).forEach(function (p) { unseen[key(p[0], p[1])] = true; });
 
     /* GOODS ON A STALL (mock, plan item 5): the lines of the keeper standing at it
        (`keeps`, the counter id "stall-cloth-curios" or a shop's id), one line a square
@@ -848,9 +854,9 @@
         else if (rough[k]) { mat = "rough"; cls = "rough"; }
         else if (z) { mat = "raised"; cls = "tile raised"; }
 
-        var hit = "", wash = false;
+        var hit = "", wash = false, first = faces.length;
         if (!solid[k] && opts.reach && reach[k]) {
-          wash = true;
+          wash = !T.provokes ? true : (T.provokes[k] || []).length ? "risky" : "safe";
           cls += " lit";
           // The level a step onto this square actually lands on, straight from the
           // server's own answer. The flat map writes the same attribute.
@@ -958,6 +964,16 @@
             if (top > tallest) tallest = top;
           }
         }
+        // Out of the PC's sight: the square's own faces at half their light, the same
+        // fog the flat board lays (views._tactics `unseen`).
+        if (unseen[k]) for (var fi = first; fi < faces.length; fi++) faces[fi].fog = 0.5;
+        // Threatened: the flat board's hatch lying on the square's own floor, in the depth
+        // sort so a wall in front of it still hides it.
+        if (T.threat && T.threat[k] && !solid[k]) {
+          var tz = topz + 0.015;
+          face(faces, [[x, y, tz], [x + 1, y, tz], [x + 1, y + 1, tz], [x, y + 1, tz]],
+               UP, "threat", "threat3", NOPOINT);
+        }
       }
     }
 
@@ -1050,6 +1066,7 @@
       var down = a.hp <= 0;
       var cls = "fig " + side + (down ? " down" : "");
       if (az !== level) cls += " offlevel";
+      if (opts.caught && opts.caught.has(a.ref)) cls += " caught";
       var tip = "<title>" + esc(a.name || "") + " — " + a.hp + "/" + a.hp_max +
                 (a.members != null ? " · " + a.members + " of " + a.members_max +
                  " still standing" : "") +
@@ -1088,6 +1105,16 @@
                    cls: cls.replace("fig ", "fig plate "), attrs: "", inner: tip,
                    plate: esc(mark) });
       if (top + 0.6 > tallest) tallest = top + 0.6;
+      // Every face of the body names who it is, so the readout (25-map-readout.js) answers
+      // a tap or a point on it as on the flat token.
+      for (var fr = start; fr < faces.length; fr++) faces[fr].attrs += ' data-ref="' + esc(a.ref) + '"';
+      // Whose turn: a candle ring on the floor round the body, still, as on the flat board.
+      if (opts.up && a.ref === opts.up) {
+        var re = 0.06;
+        face(faces, [[ax - re, ay - re, az + 0.03], [ax + n + re, ay - re, az + 0.03],
+                     [ax + n + re, ay + n + re, az + 0.03], [ax - re, ay + n + re, az + 0.03]],
+             UP, "ring", "turnring3", NOPOINT);
+      }
       figs.push({ faces: faces.slice(start), x: cx, y: cy, z: az, top: top,
                   own: [ax, ay, ax + n, ay + n], offlevel: az !== level });
     });
@@ -1138,7 +1165,7 @@
     var masses = faces.filter(function (f) {
       // A figure hides a figure behind it too (plan item 2: only walls ghosted what they
       // hid, so a goblin behind the ogre simply vanished). Its plate never hides anything.
-      if (f.mat === "area" || f.plate) return false;
+      if (f.mat === "area" || f.mat === "threat" || f.mat === "ring" || f.plate) return false;
       f.fig = f.cls.lastIndexOf("fig", 0) === 0;
       var top = -1e9, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
       f.pts.forEach(function (p) { if (p[2] > top) top = p[2]; });
@@ -1255,8 +1282,10 @@
       if (f.plate) return lay + plate(f, f.cls);
       // A spell's area is a tint over the board, not a lit surface: the flat map's own
       // colour, unshaded, so the two views show the same orange.
+      // The threat hatch and the turn ring are marks on the board, not lit surfaces.
       var fill = f.mat === "area" ? AREA : f.mat === "ember" ? EMBER
-        : paint(f.mat, shade(f.n, turn), f.wash, duskAt(f.at));
+        : f.mat === "threat" ? "url(#maphatch)" : f.mat === "ring" ? "none"
+        : paint(f.mat, shade(f.n, turn) * (f.fog || 1), f.wash, duskAt(f.at));
       var tex = f.mat !== "area" && textureOf(f);
       if (tex) fill = textured(tex, f.n, fill, f.pts[0]);
       // A textured side carries no outline: the courses are the detail, and a stroke at
@@ -1266,6 +1295,14 @@
         '" points="' + pts2(f.sp) + '"' + f.attrs +
         (f.inner ? ">" + f.inner + "</polygon>" : "/>");
     }).join("") + (laid ? "" : floorTex()) + xray;
+    // The edge of each hunch on the floor, dashed: a range round the PC, never a square.
+    (opts.hunches || []).forEach(function (edges) {
+      body += '<path class="hunch" d="' + edges.map(function (e) {
+        var p0 = project([e[0], e[1], 0], turn), p1 = project([e[2], e[3], 0], turn);
+        return "M" + p0[0].toFixed(1) + " " + p0[1].toFixed(1) + "L" + p1[0].toFixed(1) + " " +
+          p1[1].toFixed(1);
+      }).join("") + '"/>';
+    });
 
     // The viewBox is measured from the projected corners rather than guessed, so a map of
     // any size at any rotation fills the frame without clipping. Measured to the board's
@@ -1283,7 +1320,8 @@
     var w = Math.max.apply(null, xs) - x0 + pad, h = Math.max.apply(null, ys) - y0 + pad;
     return '<svg id="view3d" viewBox="' + x0.toFixed(1) + " " + y0.toFixed(1) + " " +
       w.toFixed(1) + " " + h.toFixed(1) + '" preserveAspectRatio="xMidYMid meet"><defs>' +
-      Object.keys(defs).map(function (k) { return defs[k]; }).join("") + "</defs>" +
+      Object.keys(defs).map(function (k) { return defs[k]; }).join("") +
+      (typeof MAP_HATCH === "string" ? MAP_HATCH : "") + "</defs>" +
       body + "</svg>";
   }
 

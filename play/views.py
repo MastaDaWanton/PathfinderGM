@@ -256,7 +256,10 @@ def _latest_areas(c) -> list[dict]:
                 area = e.get("area") if e.get("kind") == "cast" else None
                 if isinstance(area, dict) and area.get("squares"):
                     out.append({"spell": e.get("spell", ""),
-                                "cells": [list(x) for x in area["squares"]]})
+                                "cells": [list(x) for x in area["squares"]],
+                                # Who the engine ruled was in it (`areas.caught`, the
+                                # cast's own list); `_state` drops whoever is unseen.
+                                "caught": list(e.get("caught") or [])})
         return out
     return []
 
@@ -573,6 +576,117 @@ def _light_state(scene, pc) -> dict:
     return {"level": level, "lit": lit}
 
 
+_SIGHT: dict = {}
+
+
+def _unseen_from(g, here) -> list:
+    """Every square `Grid.line_of_sight` says the PC at `here` cannot see, as [[x, y]].
+
+    Remembered per standing place and terrain: 400 squares were 209 ms on a 20x20 board,
+    and between two states of one fight only the PC's square usually changes. The key is
+    everything `line_of_sight` reads (`opaque`: blocked, low, obscuring; the ground, which
+    names each square's level), so a smoke cloud or a fallen wall asks again."""
+    key = (tuple(here), g.width, g.height, frozenset(g.blocked), frozenset(g.low),
+           frozenset(g.obscuring), frozenset(g.floor.items()))
+    if key not in _SIGHT:
+        if len(_SIGHT) > 32:
+            _SIGHT.clear()
+
+        def cell(x, y):
+            v = g.ground((x, y))
+            return (x, y, v) if v else (x, y)
+
+        _SIGHT[key] = [[x, y] for y in range(g.height) for x in range(g.width)
+                       if not g.line_of_sight(here, cell(x, y))]
+    return [list(p) for p in _SIGHT[key]]
+
+
+def _tactics(c, shown: dict, reachable: list) -> dict:
+    """What the board's readout and marks need in a fight, each the rules' own answer for
+    the PC (the polish mock's variant D, chosen 2026-11-13; docs/mock/polish/README.md on
+    mock/polish names the same functions), or {} outside one:
+
+      threat    {"x,y": [refs]}  squares each foe threatens (`reactions.threatened_by`)
+      provokes  {"x,y": [refs]}  reachable squares whose move would provoke, and from whom
+                                 (`reactions.provoked_by_move`, the move op's own call)
+      unseen    [[x, y]]         squares the PC has no line of sight to (`Grid.line_of_sight`)
+      cover     {ref: kind}      "cover", "soft" or "total" (`position.cover_of`), no number
+      attack    {ref: [...]}     the PC's own bonus per weapon, itemised (`Engine.attack_preview`,
+                                 the swing loop's sum) and whether it reaches; NEVER the AC
+      hunches   [{"within_ft", "count", "squares"}]  creatures the PC has a hunch of: how
+                                 many, and the squares within that range of the PC, nothing more
+
+    Only creatures in `shown` (`awareness.player_locates`) appear anywhere in it: a ref, a
+    threatened square or a provoker would each say where a hidden foe stands."""
+    from rules import position as position_mod
+    from rules import reactions
+
+    scene = c.scene
+    pc = scene.pc()
+    if pc is None or not scene.in_encounter or not scene.has_grid \
+            or pc.ref not in scene.positions:
+        return {}
+    g = scene.grid
+    here = tuple(scene.positions[pc.ref])
+    foes = sorted(r for refs in (scene.sides or {}).values() if pc.ref not in refs
+                  for r in refs if r in shown and r in scene.positions
+                  and not shown[r].is_down)
+    threat: dict[str, list] = {}
+    for r in foes:
+        for sq in sorted(reactions.threatened_by(scene, r)):
+            threat.setdefault(f"{sq[0]},{sq[1]}", []).append(r)
+    provokes, asked = {}, {}
+    left = set(grid.footprint(here, pc.size))
+    for x, y, _cost, lvl in reachable:
+        end = (x, y, lvl) if lvl else (x, y)
+        # shortcut: `provoked_by_move` reads the end square only through the 5-ft step and
+        # the squares the mover vacates, so one call per distinct pair answers all of them
+        # (112 calls were 111 ms on a 20x20 board); upgrade if it starts reading the route.
+        same = (grid.distance(here, end) <= grid.SQUARE_FT,
+                frozenset(left - set(grid.footprint(end, pc.size))))
+        if same not in asked:
+            asked[same] = sorted({r for r, _ in reactions.provoked_by_move(
+                scene, pc.ref, here, end) if r in shown})
+        if asked[same]:
+            provokes[f"{x},{y}"] = asked[same]
+    unseen = _unseen_from(g, here)
+    weapons = _attack_slots(pc)["weapons"]
+    # The engine lends itself to the scene (`Scene._engine`, `_dice`); a preview must not
+    # leave a fresh one behind in place of whatever the turn was using.
+    lent = (scene._dice, scene._engine)
+    try:
+        engine = c.engine()
+        attack = {}
+        for r in foes:
+            foe = shown[r]
+            rows = []
+            for key in weapons:
+                every, situational = engine.attack_preview(pc, foe, key)
+                rows.append({
+                    "weapon": key, "name": pc.weapon(key).get("name", key),
+                    "bonus": sum(m.value for m in every),
+                    "terms": [[m.source, m.value] for m in every if m.value],
+                    "situational": [[m.source, m.value] for m in situational if m.value],
+                    "in_reach": position_mod.out_of_reach(scene, pc, foe, key) is None})
+            attack[r] = rows
+    finally:
+        scene._dice, scene._engine = lent
+    cover = {r: kind for r in foes if (kind := position_mod.cover_of(scene, pc, shown[r]))}
+    # A hunch is a range from the PC and a count, never a ref or a square of the foe's:
+    # all `awareness.has_hunch` tells the player. The squares are the range's own (measured
+    # by `grid.distance_between`, the rule's), so the board draws its edge without a
+    # second copy of the diagonal rule in JavaScript.
+    sensed = sum(1 for r, a in scene.actors.items()
+                 if r not in shown and awareness.has_hunch(pc, a))
+    ft = awareness.NOTICE_RANGE_FT
+    hunches = [{"within_ft": ft, "count": sensed,
+                "squares": [[x, y] for y in range(g.height) for x in range(g.width)
+                            if grid.distance_between(here, pc.size, (x, y), "medium") <= ft]}
+               ] if sensed else []
+    return {"threat": threat, "provokes": provokes, "unseen": unseen, "cover": cover,
+            "attack": attack, "hunches": hunches}
+
+
 def _attack_slots(pc) -> dict:
     """The shape of this character's full attack, and whether abilities may stand in.
 
@@ -863,6 +977,9 @@ def _state(c) -> dict:
         # would (docs/design-e-magic.md §3.1).
         if grid is not None:
             grid["areas"] = _latest_areas(c)
+            for area in grid["areas"]:
+                area["caught"] = [r for r in area["caught"] if r in shown]
+            grid["tactics"] = _tactics(c, shown, grid["reachable"])
         return grid
 
     return {

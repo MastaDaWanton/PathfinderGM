@@ -9049,23 +9049,18 @@ class Engine:
                                     if iteration else [])
                                  + actor.weapon_own_mods("combat_mod", "attack", weapon_key,
                                                          defender=defender))
+                atk_mods = atk_mods + position_mod.attack_mods(
+                    self.scene, actor, defender, weapon)
+                if range_pen is not None:
+                    atk_mods = atk_mods + [range_pen]
             else:
                 # A throw is a ranged attack: Dex to hit (`attack_modifiers(thrown=)`).
                 atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
                                                   lethality=lethality, defender=defender,
                                                   thrown=thrown_any,
                                                   range_ft=self._gap_ft(actor, defender))
-                # Compulsions are charged here rather than in `attack_modifiers` because
-                # the penalty depends on *who is being attacked*, which the sheet does not
-                # know. It penalises and never prohibits: see rules/compulsion.py.
-                atk_mods = atk_mods + compulsion.penalty_against(actor, defender.ref)
-            # And the board, for the same reason one step further out: flanking and
-            # higher ground depend on where BOTH of them are standing, which the sheet
-            # knows even less about than it knows the target. `rules/position.py`.
-            atk_mods = atk_mods + position_mod.attack_mods(
-                self.scene, actor, defender, weapon)
-            if range_pen is not None:
-                atk_mods = atk_mods + [range_pen]
+                atk_mods = atk_mods + self._situational_attack_mods(
+                    actor, defender, weapon, range_pen)
 
             # A crowd makes no attack roll. Pathfinder's troop subtype: instead of attacks,
             # "they deal automatic damage to any creature within reach or whose space they
@@ -9817,6 +9812,36 @@ class Engine:
             because=intent.because,
             blows=list(state.get("blows") or []),
         )
+
+    def _situational_attack_mods(self, actor: Actor, defender: Actor, weapon: dict,
+                                 range_pen: Modifier | None) -> list[Modifier]:
+        """The attack terms that depend on who is attacked and where both stand.
+
+        Compulsions are charged here rather than in `attack_modifiers` because the penalty
+        depends on *who is being attacked*, which the sheet does not know; it penalises
+        and never prohibits (rules/compulsion.py). Then the board, for the same reason one
+        step further out: flanking and higher ground depend on where BOTH of them are
+        standing (`rules/position.py`). Then the range increment. The swing loop and the
+        board's preview (`attack_preview`) both add exactly these, so the number the
+        board shows is the number the roll uses."""
+        from . import position as position_mod
+
+        out = compulsion.penalty_against(actor, defender.ref) + position_mod.attack_mods(
+            self.scene, actor, defender, weapon)
+        return out + [range_pen] if range_pen is not None else out
+
+    def attack_preview(self, actor: Actor, defender: Actor,
+                       weapon_key: str) -> tuple[list[Modifier], list[Modifier]]:
+        """(every term of a first swing's attack roll at `defender`, the situational ones)
+        — the swing loop's own sum before the d20, with no Power Attack and no throw, for
+        the board's readout (play/views.py `_tactics`). Never the defender's AC."""
+        weapon = actor.weapon(weapon_key)
+        here = self._situational_attack_mods(
+            actor, defender, weapon,
+            self._range_increment(actor, defender, weapon, weapon_key, False)[0])
+        own = actor.attack_modifiers(weapon_key, 0, defender=defender,
+                                     range_ft=self._gap_ft(actor, defender))
+        return own + here, here
 
     def _range_increment(self, actor: Actor, defender: Actor, weapon: dict, weapon_key: str,
                          thrown: bool) -> tuple[Modifier | None, str]:

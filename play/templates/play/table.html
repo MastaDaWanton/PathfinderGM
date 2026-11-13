@@ -234,7 +234,10 @@
             border: 1px solid #241d15; border-radius: 3px; }
   #view3d polygon { stroke: #15120d; stroke-width: .35; stroke-linejoin: round; }
   #view3d .lit.face-top { cursor: pointer; }
-  #view3d .lit.face-top:hover { fill: var(--gold); }
+  /* Hover only where a pointer can hover (variant D): on a phone the first tap applies
+     :hover and leaves it stuck, so a tapped square stayed gold after the finger left. */
+  @media (hover: hover) and (pointer: fine) {
+    #view3d .lit.face-top:hover { fill: var(--gold); } }
   /* Solid things read as solid: a seam between two faces of one box says "two faces". */
   #view3d .fig, #view3d .rail3, #view3d .txs, #view3d .floortex { stroke: none; }
   #view3d .fig.offlevel { opacity: .38; }
@@ -247,11 +250,13 @@
   #view3d .xray polygon { stroke: none; }
   #view3d .xsq { fill: var(--gold); fill-opacity: .1; stroke: var(--gold);
                  stroke-opacity: .55; stroke-width: .6; stroke-dasharray: 2 1.5; }
-  #view3d .xsq:hover { fill: var(--gold); fill-opacity: .45; }
+  @media (hover: hover) and (pointer: fine) {
+    #view3d .xsq:hover { fill: var(--gold); fill-opacity: .45; } }
   /* Drawn over the mass that hides them, the outlines read as walkway squares on top of
      a gallery (plan item 1, the owner's tavern). They show only while the pointer is on
      the board, which is when a move is being chosen; still clickable either way. */
-  #view3d:not(:hover) .xsq { opacity: 0; }
+  /* A phone cannot hover, so there they always show. */
+  @media (hover: hover) and (pointer: fine) { #view3d:not(:hover) .xsq { opacity: 0; } }
   /* A figure's letter plate over its head (the flat token's initial, or a crowd's
      count), and the gold rim on the base of whoever's turn it is. */
   #view3d .plate rect { stroke: #15120d; stroke-width: .45; }
@@ -290,6 +295,33 @@
   #map .tokbody.down, #map text.tok.down { opacity: .35; }
   #map .tokbody.offlevel, #map text.tok.offlevel { opacity: .32; }
   #map .token.up { stroke: #f0dcae; stroke-width: 1.6; }
+  /* --- Variant D (the polish mocks, chosen 2026-11-13): marks that read the fight's own
+     answers (views._tactics). Every colour is an existing token or one the board used. */
+  #map .reach.safe { opacity: .3; }
+  #map .reach.is-sel, #map .reach.safe.is-sel { fill: var(--candle); opacity: .5; }
+  #map .reachedge { fill: none; stroke: var(--gold); stroke-opacity: .6; stroke-width: .9; }
+  #map .safeedge { fill: none; stroke: var(--candle); stroke-width: 1.2; }
+  #map .threat, #view3d .threat3 { fill: url(#maphatch); stroke: none; pointer-events: none; }
+  #map .fog { fill: var(--sunk); opacity: .62; pointer-events: none; }
+  #map .hunch, #view3d .hunch { fill: none; stroke: rgb(var(--ember)); stroke-opacity: .85;
+                                stroke-width: 1; stroke-dasharray: 3 2.5; pointer-events: none; }
+  /* Raised ground as relief: a lit lip toward the light, a shadow away from it. */
+  #map .lip { fill: none; stroke: rgba(255, 225, 170, .3); stroke-width: 1; }
+  #map .shade { fill: none; stroke: rgba(0, 0, 0, .6); stroke-width: 1.6; }
+  #map .tokg { cursor: pointer; }
+  #map .tokg:focus { outline: none; }
+  #map .turnring { fill: none; stroke: var(--candle); stroke-width: 1.4; pointer-events: none; }
+  #map .strike { stroke: #14120f; stroke-width: 1.4; stroke-linecap: round; pointer-events: none; }
+  #map .tokg.caught .token { stroke: #f0a050; stroke-width: 1.6; }
+  #map .tokg.is-sel .token, #map .tokg:focus-visible .token { stroke: var(--candle); stroke-width: 2; }
+  #map .tokg.is-warn .token { stroke: var(--ink); stroke-width: 1.8; stroke-dasharray: 2.5 1.5; }
+  #view3d .turnring3 { stroke: var(--candle); stroke-width: 1.4; }
+  #view3d .tile.raised.face-top { stroke: rgba(221, 196, 142, .32); }
+  #view3d .fig.caught { stroke: #f0a050; stroke-width: .8; }
+  #view3d .fig.is-sel { stroke: var(--candle); stroke-width: 1; }
+  #view3d .fig.is-warn { stroke: var(--ink); stroke-width: .9; stroke-dasharray: 2 1.5; }
+  #view3d .lit.face-top.is-sel { fill: var(--candle); }
+  #view3d .fig { cursor: pointer; }
   .maplegend { margin-top: 4px; }
 
   .prepbtn { width: 22px; height: 22px; line-height: 1; border-radius: 3px;
@@ -2532,7 +2564,59 @@
   .mapzoom .v2-btn:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px; }
   .boardview svg, .boardview > #map, .boardview > #view3d {
     width: 100%; height: 100%; max-height: 100%; display: block; }
-  .boardfoot { display: grid; gap: 2px; font-size: 14px; }
+  .boardfoot { display: grid; gap: 6px; font-size: 14px; grid-template-columns: minmax(0, 1fr); }
+  /* The readout (25-map-readout.js): a fixed box, so whatever is tapped never moves the
+     board above it. */
+  .mapread { height: calc(2 * 1.4em + 12px); overflow: hidden auto; overscroll-behavior: contain;
+             padding: 6px 10px; font-size: 14px; line-height: 1.4; border-radius: 3px;
+             background: var(--glass); border: 1px solid var(--glass-edge); overflow-wrap: anywhere; }
+  .mapread p { margin: 0; }
+  .mr-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; color: var(--gold);
+          font: 400 14px/1.4 var(--display); font-variant: small-caps; letter-spacing: .05em; }
+  .mr-h .mr-dim { font-family: var(--body); font-variant: normal; letter-spacing: 0; font-size: 13px; }
+  .mr-one { flex-wrap: nowrap; white-space: nowrap; }
+  .mr-one > span:first-child { flex: none; }
+  .mr-one > .mr-dim { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mr-who > .mr-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mr-who > .mr-dim, .mr-who > .mr-spell { flex: none; overflow: visible; }
+  .mr-bonus { color: var(--ink); font-variant-numeric: tabular-nums; min-width: 2ch; }
+  .mr-dim { color: var(--dim); font-style: italic; }
+  .mr-warn { color: color-mix(in srgb, var(--alarm) 62%, var(--ink)); font-style: normal; }
+  .mr-spell { color: #f0a050; }
+  .mr-hunch { color: rgb(var(--ember)); }
+  .mr-atk { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+  .mr-wpn { color: var(--ink); }
+  .mr-term { color: var(--dim); font-size: 13px; }
+  .mr-term.sit { color: var(--gold); }
+  .maprow { position: relative; display: flex; align-items: center; gap: 4px 14px; font-size: 13px; }
+  .mapkey { flex: none; }
+  /* Opens over the foot of the board, so opening it never shrinks the board. */
+  .mapkey[open] .mapkeyrow { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 3;
+    padding: 8px 10px; border-radius: 3px; background: rgba(16, 12, 9, .94);
+    border: 1px solid var(--glass-edge); box-shadow: var(--sh-2); }
+  .mapkey summary { cursor: pointer; color: var(--gold); font: 400 13px/1 var(--display);
+                    font-variant: small-caps; letter-spacing: .08em; padding: 6px 0; width: max-content;
+                    touch-action: manipulation; }
+  .mapkey summary:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+  .mapkeyrow { display: flex; flex-wrap: wrap; gap: 3px 14px; color: var(--ink); }
+  .mapkeyrow .maplegend { flex-basis: 100%; }
+  .mapk { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .mapabout { color: var(--dim); font-style: italic; min-width: 0; flex: 1 1 auto;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sw { display: inline-block; width: 11px; height: 11px; flex: none; background: #14110e;
+        border: 1px solid #241d15; }
+  .sw.k-pc { background: var(--gold); border-radius: 50%; }
+  .sw.k-ally { background: #6fc276; border-radius: 50%; }
+  .sw.k-foe { background: #e0261e; border-radius: 50%; }
+  .sw.k-by { background: #f2ecdd; border-radius: 50%; }
+  .sw.k-turn { border: 1.5px solid var(--candle); border-radius: 50%; }
+  .sw.k-safe { background: color-mix(in srgb, var(--gold) 30%, #14110e); border-color: var(--candle); }
+  .sw.k-risky { background: color-mix(in srgb, var(--gold) 12%, #14110e); }
+  .sw.k-threat { background: repeating-linear-gradient(45deg, rgba(176, 72, 60, .8) 0 1px, #14110e 1px 4px); }
+  .sw.k-fog { background: #0b0908; border-color: #3a2f22; }
+  .sw.k-hunch { border: 1px dashed rgb(var(--ember)); }
+  /* No grey flash on a tapped square or token (variant D, the phone pass). */
+  #mapwrap { -webkit-tap-highlight-color: transparent; }
   .boardfoot p { margin: 0; }
   .boardfoot .sub { margin: 0; color: var(--dim); font-style: italic; }
   .boardabout { color: var(--dim); font-style: italic; }
@@ -3320,7 +3404,20 @@
     .boardview { min-height: 200px; padding: 6px; }
     .boardhead { gap: 6px; }
     .boardhead h2 { font-size: 15px; }
-    .boardctl .v2-recess > .v2-btn { min-height: 30px; padding: 4px 9px; }
+    /* Variant D's phone pass: a long place name is clamped to two lines (a three-line
+       name cost the board 60px of a 520px screen; the whole name is its title), "Turn
+       left / right" become "Left / Right" (each button keeps its full aria-label), the
+       floor picker loses its caption and the ground's controls share Places's row, so
+       the head wraps as little as the buttons allow (at 375 wide: the name, then Places
+       with Flat/3D, then the floors). */
+    .boardhead h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+                    overflow: hidden; overflow-wrap: anywhere; }
+    .boardctl .long, .boardctl .seglabel { display: none; }
+    .boardctl { gap: 6px; }
+    .boardctl > .groundctl { display: contents; }
+    .mapread { height: calc(2 * 1.4em + 10px); padding: 4px 8px; font-size: 13px; }
+    .mr-h { font-size: 13px; }
+    .boardctl .v2-recess > .v2-btn { min-height: 30px; padding: 4px 8px; }
     .boardkey { font-size: 12.5px; line-height: 1.5; }
     /* The chart fills the well and the slip is under it, a scroll away (the mock: a fixed
        320px chart in a 200px well was cut off at its foot). */
@@ -4316,6 +4413,8 @@ window.PATHFINDER_BOOT = {
 <!-- Zoom and pan on the ground board (2026-11-12), mounted by renderMap: before the first
      board is drawn, which happens while the later scripts are still loading. -->
 <script src="{% asset 'js/table/24-map-zoom.js' %}"></script>
+<!-- The board's readout (2026-11-13, variant D), likewise called by renderMap. -->
+<script src="{% asset 'js/table/25-map-readout.js' %}"></script>
 <script src="{% asset 'js/table/04-combat-and-turns.js' %}"></script>
 <script src="{% asset 'js/table/05-sheet.js' %}"></script>
 <script src="{% asset 'js/table/06-trade-and-page.js' %}"></script>
