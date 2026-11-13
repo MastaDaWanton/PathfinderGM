@@ -465,7 +465,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # because they are different scales doing different work — one costs a move, the
     # other costs days — and because a model that says "we set out for Zhilgoroth" should
     # not be able to reach it by naming a biome.
-    "journey": (("to",), ("note", "with", "pace"), "hidden"),
+    # `days` (2026-11-13): aboard a booked ship, how many days to sail this turn before
+    # the deck is the player's again; absent, she sails until port or weather stops her.
+    "journey": (("to",), ("note", "with", "pace", "days"), "hidden"),
     # Doors two and three of rules/places.py. `found`: the player makes a place from
     # where they stand — a base at a friend's house, the alley behind the market —
     # with an owner the engine knows; the engine mints the id, the narrator never

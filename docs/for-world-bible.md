@@ -278,6 +278,30 @@ inference. One optional field settles it per route:
 and is read today: a world that writes a road between two landmasses has said there is an
 isthmus or a causeway, and a thing the world says beats a thing this app worked out.
 
+**8c. Ports and the ships in them (asked 2026-11-13, when passage became playable).**
+Passage is bought at a port and sailed to another (docs/ships.md, "Taking passage"). Until
+an export says which settlements are ports, this app decides it the way 8a describes: a
+settlement is a port when its places include the docks, the harbour, the quay or the
+wharf — authored, or minted by the cue table from the settlement's own words ("port",
+"harbour", "quay", "ships", "fishing"…). Measured on the shipped exports that day:
+**Pangrella has 4 ports of 12** (Mirabalos and Elyrielle on one continent, Zhilvarnia and
+Khalmorin on the other), Aurvantis 23 of 64. Between ports on different continents with no
+stated route, this app offers a passage of its own and prices its days by the tree; that
+is how Pangrella's two continents are reachable by ship from either side. The ask, in
+order of value:
+
+```json
+"settlements": [{"id": "...", "port": true, "on": "sea"}],
+"travel":      [{"from_id": "...", "to_id": "...", "by": "sea", "miles": 420}]
+```
+`port` (with 8a's `on`) beats the docks cue outright. A stated sea route with `miles`
+replaces the derived passage between those two ports, so its days and its fare (1 sp a
+mile a head, CRB Table 6-9) are the world's rather than the tree's. Optionally
+`"vessels": [{"kind": "sailing ship", "name": "..."}]` on a port — `kind` one of Table
+7-49's five — would name the regulars this app otherwise derives from the port's id.
+**Sea danger** is ask 16's `volatility`, read off the two ports' own ratings (the worse
+of the two) until a world has sea regions to put it on.
+
 **Not asked for:** coastlines as geometry, sea routes as waypoints, or anything with
 coordinates in it. The boundary holds — the world says which places touch water, and this
 app decides what crossing it costs.

@@ -444,7 +444,8 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
           barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
           floor for back down to the ground), or none
-journey   take the road or a ship to another town
+journey   take the road or a ship to another town; book or take passage, board a ship
+          bound somewhere, set sail, sail on
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
 look      look, watch, listen, read, examine

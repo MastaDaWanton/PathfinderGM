@@ -13989,6 +13989,11 @@ class Engine:
 
         pc = self.scene.pc()
         want = " ".join(str(intent.params.get("to") or "").split())
+        # Aboard a ship with a passage booked, the journey is the voyage: "set sail", the
+        # exits row's sail-on, and "on to X" all mean the ship makes way (`_sail`).
+        ship = self.aboard()
+        if ship is not None and ship.bound_for:
+            return self._sail(intent, ship, want)
         legs = journey_mod.legs_from(self.world, self.scene.location_id)
         if not legs:
             return self._refuse(
@@ -14009,6 +14014,11 @@ class Engine:
         speed = pc.speed_feet if pc is not None else 30
         hours, measured, how = journey_mod.hours_for(leg, speed)
         on_foot = hours
+        # From a port, a sea crossing is a passage bought and a deck stood on
+        # (2026-11-13). A river stays the boat-shaped road it was, and a crossing that
+        # starts inland is still "the road to the coast, and then days at sea".
+        if how == "sea" and leg.from_port and leg.by != "river":
+            return self._book_passage(intent, leg)
 
         # On foot, riding, or at a gallop (the owner's ruling Q13; `journey.mounted_hours`
         # carries the sourced rules). Checked before anything moves: a refusal here must
@@ -16766,6 +16776,322 @@ class Engine:
         rows.append(vessel.as_dict())
         self.scene.vessels = rows
 
+    # --- passage: a berth bought, a deck stood on, days at sea ---------------------------
+    #
+    # Owner, 2026-11-13: "make ships boardable and have sea/ocean travel be accessible",
+    # and "rolled by the day with a small chance based on volatility to have storm wreck
+    # the ship". The doors are the journey op's (the exits row, "I book passage to X",
+    # "set sail"): from a port a sea leg books and boards (`_book_passage`), and aboard a
+    # booked ship any journey is the voyage (`_sail`). docs/ships.md, "Taking passage".
+
+    def aboard(self):
+        """The vessel the party is standing on, or None ashore."""
+        from . import ships as ships_mod
+
+        vid = ships_mod.vessel_of(self.scene.at)
+        return self.vessel(vid) if vid else None
+
+    def _settlement_name(self, entity_id: str) -> str:
+        found = self.world.get(entity_id) if self.world is not None and entity_id else None
+        return str(getattr(found, "name", "") or "port")
+
+    def _book_passage(self, intent: Intent, leg) -> Outcome:
+        """Buy a berth to `leg`'s port and go aboard. She lies at the quay until the party
+        sails (`_sail`), so the deck is somewhere to stand, talk and sleep first.
+
+        The fare is the book's: 1 sp a mile a passenger (CRB Table 6-9), the miles the
+        world's when it stated them, else the ship's own day's run times the days."""
+        from . import places as places_mod, ships as ships_mod
+
+        pc = self.scene.pc()
+        if pc is None:
+            return self._refuse(intent, "Nobody is here to take passage.")
+        if self.scene.initiative:
+            return self._refuse(intent, "Nobody sells a berth in the middle of a fight.")
+        here = self.scene.location_id
+        town = self.world.get(here) if self.world is not None else None
+        escorts = [str(w) for w in (intent.params.get("with") or [])
+                   if str(w) in self.scene.actors]
+        escorts += [r for r, a in self.scene.actors.items()
+                    if r not in escorts and not a.is_pc
+                    and a.has_state(states.TRAVELS_WITH_YOU)]
+        # A berth booked here and not yet sailed is the same berth: aboard again, free.
+        ship = next((v for v in (ships_mod.Vessel.from_dict(r) for r in self.scene.vessels)
+                     if v is not None and v.at == here and v.bound_for == leg.to_id
+                     and v.sailed_at is None), None)
+        effects: list[dict] = []
+        if ship is not None:
+            paid = f"Your berth on {ship.name} is still yours."
+        else:
+            offered = ships_mod.passenger_ship(
+                here, places_mod.scale_of(town) if town is not None else "town")
+            ship = self.vessel(offered.id) or offered
+            days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
+                                      ship.kind, leg.days_apart)
+            miles = leg.miles if leg.source == "exact" and leg.miles \
+                else days * ships_mod.miles_a_day(ship.kind)
+            heads = 1 + len(escorts)
+            cost = ships_mod.fare_cp(miles, heads)
+            coins = self._coins_here()
+            purse, enough = goods.spend(pc.purse, cost)
+            if not enough:
+                return self._refuse(
+                    intent, f"Passage to {leg.to_name} on {ship.name} is "
+                            f"{goods.purse_line(goods.coins_for(cost), coins)} for "
+                            f"{heads} (a silver piece a mile a head), and "
+                            f"{pc.name} carries {goods.purse_line(pc.purse, coins)}.")
+            pc.purse = purse
+            ship.at, ship.bound_for, ship.came_from = here, leg.to_id, here
+            ship.days_left = ship.days_total = days
+            ship.sailed_at = None
+            effects.append({"kind": "give", "ref": pc.ref, "item": "coin", "count": cost,
+                            "how": "fare", "from": pc.ref, "to": ship.id,
+                            "purse": dict(pc.purse), "goods": dict(pc.goods)})
+            paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
+                    f"passage to {leg.to_name} on {ship.name}, {english.a(ship.kind)}: "
+                    f"{days} day{'s' if days != 1 else ''} at sea.")
+        ship.passengers = [pc.ref, *escorts]
+        self._keep_vessel(ship)
+        parted = self.end_talk("walked away")
+        deck = ships_mod.deck_of(ship)
+        self.place_party(deck)
+        for ref in escorts:
+            if ref in self.scene.people:
+                self.scene.move(ref, deck)
+        crew = self._ships_company(ship, deck)
+        bits = [b for b in (parted, paid, f"{pc.name} goes aboard; she lies at the quay "
+                            f"until you sail.") if b]
+        if crew:
+            # The crew are "the captain" and "a deckhand": "the ship's master" printed as
+            # "the ship's the master" live, in a port whose harbourmaster's man is called
+            # "master" (a name rewrite downstream of the tell, not traced here).
+            said = " and ".join(a.name for a in crew)
+            bits.append(f"{said[:1].upper()}{said[1:]} "
+                        f"{'is' if len(crew) == 1 else 'are'} on deck.")
+        effects.append({"kind": "passage", "vessel": ship.id, "to": leg.to_id,
+                        "to_name": leg.to_name, "days": ship.days_left, "place": deck,
+                        "who": list(ship.passengers)})
+        return Outcome(intent_id=intent.id, op="journey", effects=effects,
+                       tell=" ".join(bits), because=intent.because)
+
+    def _ships_company(self, ship, deck: str) -> list:
+        """The master and a hand, on deck, the first time the party boards her: people to
+        talk to, from the NPC codex like every keeper. The same ones every boarding after,
+        because they are stored where they stand."""
+        from . import npcs, ships as ships_mod
+        from .bestiary import instantiate
+
+        rooms = {p.id for p in ships_mod.places_of(ship)}
+        if any(a.at in rooms and not a.is_pc and r not in ship.passengers
+               for r, a in self.scene.people.items()):
+            return []
+        level = int(getattr(self.scene.pc(), "level", 1) or 1)
+        template = str((npcs.choose(["sailor"], level) or {}).get("id") or "thug")
+        out = []
+        for name in ("the captain", "a deckhand"):
+            try:
+                who = instantiate(template, scene=self.scene, name=name)
+            except Exception:       # noqa: BLE001 — a ship with no codex sailor sails empty
+                break
+            self.scene.add(who)
+            self.scene.move(who.ref, deck)
+            out.append(who)
+        return out
+
+    def _sail(self, intent: Intent, ship, want: str = "") -> Outcome:
+        """The ship makes way, a day at a time, until she makes port or the weather turns.
+
+        Each day is the clock's (the ship feeds, waters and beds her passengers, as a
+        camp's night does, `survival.night`) and the weather's, rolled hidden
+        (`ships.day_at_sea`, scaled by the waters' volatility). Days already spent aboard
+        at sea — a night's rest on deck — count: the clock is the voyage's measure. `days`
+        caps how many are sailed this turn."""
+        from . import ships as ships_mod, volatility
+
+        dest = ship.bound_for
+        dest_name = self._settlement_name(dest)
+        if want and want != dest and want.lower() not in dest_name.lower() \
+                and want.lower() != ship.name.lower():
+            return self._refuse(
+                intent, f"{ship.name} is bound for {dest_name}, nowhere else. Sail on with "
+                        f"her, or go ashore when she makes port.")
+        if self.scene.initiative:
+            return self._refuse(intent, "Not while there is fighting on deck.")
+        if self.scene.sea:
+            return self._refuse(intent, "Another ship is on the water with you: close "
+                                        "with her or sheer off first.")
+        pc = self.scene.pc()
+        cast_off = ship.sailed_at is None
+        if cast_off:
+            ship.at, ship.sailed_at = "", int(self.scene.clock_minutes)
+            # At sea the ship IS the location: no town's rooms are a walk from her deck.
+            self.scene.location_id = ship.id
+        level = max(volatility.of(self.world, ship.came_from),
+                    volatility.of(self.world, dest))
+        try:
+            cap = max(1, int(intent.params.get("days") or 0) or ship.days_left)
+        except (TypeError, ValueError):
+            cap = ship.days_left            # "a few" is not a number: sail until port
+        aboard = [self.scene.people[r] for r in ship.passengers if r in self.scene.people]
+        told: list[str] = []
+        weather, sailed = "calm", 0
+        while ship.days_left > 0 and sailed < cap:
+            due = int(ship.sailed_at) + ships_mod.MINUTES_A_DAY
+            if self.scene.clock_minutes < due:
+                self.scene.advance(due - self.scene.clock_minutes, charge_body=False)
+            for a in aboard:
+                survival.eat(a)
+                survival.drink(a)
+                if a.is_pc:
+                    told.extend(survival.night(a, self.dice))
+            ship.sailed_at, ship.days_left, sailed = due, ship.days_left - 1, sailed + 1
+            weather = ships_mod.day_at_sea(self.dice, level)
+            if weather != "calm":
+                break
+        self._journeyed = ship.name
+        if weather == "wreck":
+            return self._wreck(intent, ship, sailed)
+        effects: list[dict] = [{"kind": "voyage", "vessel": ship.id, "days": sailed,
+                                "left": ship.days_left, "weather": weather,
+                                "volatility": volatility.word(level)}]
+        days_said = f"{sailed} day{'s' if sailed != 1 else ''}"
+        bits = [f"{ship.name[:1].upper()}{ship.name[1:]} "
+                f"{'casts off and ' if cast_off else ''}makes way: {days_said} at sea."]
+        if weather == "storm":
+            for a in aboard:
+                a.apply_effect(ActiveEffect(
+                    name="a storm at sea", kind="situation", key="storm-at-sea",
+                    source="rule:storm-at-sea", origin="rule:storm-at-sea",
+                    duration="rounds", rounds_left=ships_mod.STORM_ROUNDS,
+                    modifiers=[{"kind": "skill_mod", "target": "perception",
+                                "amount": ships_mod.STORM_PERCEPTION,
+                                "note": "a storm at sea"}]))
+                effects.append({"kind": "condition", "ref": a.ref,
+                                "condition": "storm-at-sea", "origin": "rule:storm-at-sea"})
+            bits.append(f"A storm comes down on her: wind and black water over the rail, "
+                        f"nothing to see past the bow (-8 Perception), and she rides it out.")
+        if ship.days_left > 0:
+            self._keep_vessel(ship)
+            bits.append(f"{dest_name} is {ship.days_left} day"
+                        f"{'s' if ship.days_left != 1 else ''} on.")
+            return Outcome(intent_id=intent.id, op="journey", effects=effects,
+                           tell=" ".join(bits + told), because=intent.because)
+        # Making port: the ship ties up, and the party goes down the gangplank.
+        ship.at, ship.bound_for, ship.sailed_at = dest, "", None
+        self._keep_vessel(ship)
+        self.scene.location_id = dest
+        quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
+                     in ships_mod.PORT_PLACES), None)
+        self.place_party(quay.id if quay is not None else "")
+        for a in aboard:
+            if not a.is_pc:
+                self.scene.move(a.ref, self.scene.at)
+        effects.append({"kind": "journey", "to": dest, "to_name": dest_name,
+                        "arrived": True, "how": "sea", "place": self.scene.at})
+        bits.append(f"She makes {dest_name} and ties up; {pc.name if pc else 'the party'} "
+                    f"goes ashore at {self.here().name}.")
+        return Outcome(intent_id=intent.id, op="journey", effects=effects,
+                       tell=" ".join(bits + told), because=intent.because)
+
+    def _wreck(self, intent: Intent, ship, sailed: int) -> Outcome:
+        """A storm breaks her. The vessel is lost with her crew; her passengers swim for
+        it and come ashore on a real coast, paying the Swim skill's hourly price in
+        stormy water, and the sea keeps some of what they carried (ships.py, "the
+        wreck"). Every roll the engine's and hidden; the narrator gets the tell."""
+        from . import journey as journey_mod, outskirts, places as places_mod
+        from . import ships as ships_mod, water
+
+        pc = self.scene.pc()
+        swimmers = [self.scene.people[r] for r in ship.passengers if r in self.scene.people]
+        rooms = {p.id for p in ships_mod.places_of(ship)}
+        for ref in [r for r, a in self.scene.people.items()
+                    if a.at in rooms and r not in ship.passengers]:
+            self.scene.depart(ref)
+        self.scene.vessels = [v for v in self.scene.vessels if str(v.get("id")) != ship.id]
+
+        near = ships_mod.wash_up_near(ship)
+        where, far = near, False
+        others = [p for p in journey_mod.ports(self.world) if p != near]
+        if others and self.dice.roll("1d100", label="where the sea puts them",
+                                     visibility="hidden").total <= ships_mod.WASHED_FAR_PCT:
+            where, far = others[self.dice.roll(f"1d{len(others)}", label="which coast",
+                                               visibility="hidden").total - 1], True
+        hours = self.dice.roll(ships_mod.WRECK_SWIM_HOURS, label="hours in the water",
+                               visibility="hidden").total
+        dc = water.SWIM_DC["stormy"]
+        effects: list[dict] = [{"kind": "wreck", "vessel": ship.id, "days": sailed,
+                                "hours": hours, "origin": "rule:shipwreck"}]
+        hurt: list[str] = []
+        for a in swimmers:
+            taken = 0
+            for _ in range(hours):
+                roll = self.dice.d20(list(a.skill_modifiers("swim")),
+                                     label=f"{a.name} Swim, stormy water",
+                                     visibility="hidden")
+                if roll.total < dc:
+                    taken += self.dice.roll(ships_mod.WRECK_HOURLY_NONLETHAL,
+                                            label="the sea's toll",
+                                            visibility="hidden").total
+            if taken:
+                a.take_damage(taken, lethality="nonlethal")
+                effects.append({"kind": "damage", "ref": a.ref, "amount": taken,
+                                "lethality": "nonlethal", "origin": "rule:shipwreck"})
+            a.add_condition(journey_mod.MOUNT_FATIGUE, rounds=journey_mod.FATIGUE_ROUNDS,
+                            source="shipwreck", origin="rule:shipwreck")
+            effects.append({"kind": "condition", "ref": a.ref, "condition": "fatigued",
+                            "origin": "rule:shipwreck"})
+            hurt.append(a.name)
+        # What the sea keeps (`ships.GOODS_LOST_PCT`, a stated house rule).
+        lost: list[str] = []
+        for a in swimmers:
+            for key in list(a.inventory):
+                lost.append(key.replace("-", " "))
+                a.inventory.pop(key, None)
+            for name in list(a.goods):
+                if self.dice.roll("1d100", label="what the sea keeps",
+                                  visibility="hidden").total <= ships_mod.GOODS_LOST_PCT:
+                    lost.append(name)
+                    a.goods.pop(name, None)
+        if lost:
+            effects.append({"kind": "lost", "items": lost, "origin": "rule:shipwreck"})
+        self.scene.advance(hours * survival.MINUTES_PER_HOUR, charge_body=False)
+
+        # Ashore on a real coast: that settlement's shore, else its outskirts.
+        self.scene.location_id = where
+        found = self.world.get(where) if self.world is not None else None
+        ring = self._ring(found, "")
+        land = next((p for p in ring if p.name == outskirts.SHORE), None) or next(
+            (p for p in ring if p.name == outskirts.OUTSKIRTS), None)
+        self.place_party(land.id if land is not None else "")
+        for a in swimmers:
+            if not a.is_pc:
+                self.scene.move(a.ref, self.scene.at)
+        where_name = self._settlement_name(where)
+        effects.append({"kind": "journey", "to": where, "to_name": where_name,
+                        "arrived": False, "how": "wreck", "place": self.scene.at})
+        out_days = max(1, ship.days_total - ship.days_left)
+        bits = [f"A storm breaks {ship.name} on her {self._ordinal(out_days)} day out: the "
+                f"masts go, the sea comes in, and she goes down with her crew.",
+                f"{_and_list(hurt)} {'swims' if len(hurt) == 1 else 'swim'} for it, "
+                f"{hours} hour{'s' if hours != 1 else ''} in stormy water, and "
+                f"{'washes' if len(hurt) == 1 else 'wash'} up at {self.here().name} near "
+                f"{where_name}{', far off her course' if far else ''}, fatigued."]
+        for rec in effects:
+            if rec.get("kind") == "damage":
+                who = self.scene.people.get(rec["ref"])
+                bits.append(f"The swim costs {who.name if who else 'them'} "
+                            f"{rec['amount']} nonlethal damage.")
+        if lost:
+            bits.append(f"The sea keeps {_and_list(lost)}.")
+        return Outcome(intent_id=intent.id, op="journey", effects=effects,
+                       tell=" ".join(bits), because=intent.because)
+
+    @staticmethod
+    def _ordinal(n: int) -> str:
+        n = max(1, int(n))
+        return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth",
+                6: "sixth", 7: "seventh"}.get(n, f"{n}th")
+
     def _op_sea(self, intent: Intent, partial: dict) -> Outcome:
         """Two ships, and the distance between them.
 
@@ -16949,9 +17275,17 @@ class Engine:
             return []
         pc = self.scene.pc()
         level = int(getattr(pc, "level", 1) or 1)
-        how_many = max(1, min(4, 1 + vessel.crew // 25))
-        template = str((npcs.choose(["sailor", "pirate"], level) or {}).get("id")
-                       or "thug")
+        row = npcs.choose(["sailor", "pirate"], level) or {}
+        template = str(row.get("id") or "thug")
+        # Priced by the party's XP budget (rules/encounter_budget.py, owner 2026-11-13).
+        # The GUARDED mix: a crew on her own deck is defending it, the ruling's "guards
+        # and lairs may be challenging or hard" — and the party chose to board. The rail
+        # count is the ceiling, the budget trims it, one is always there.
+        roll = self.dice.roll("1d100", label="how hard the rail is held",
+                              visibility="hidden").total
+        how_many = encounter_budget.most_of(
+            encounter_budget.xp_of(row), max(1, min(4, 1 + vessel.crew // 25)),
+            encounter_budget.party_apl(self.scene), roll, kind="guarded")
         # Named apart, because the brief lists people by name beside their ref and three
         # actors all called "a hand" is a narrator writing about one person three times.
         called = ("a hand", "a second hand", "a third hand", "a fourth hand")
