@@ -102,7 +102,7 @@ as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its p
 de grâce** (CRB p.197) — the `coup_de_grace` attack param: no attack roll, an
 automatic critical the PC still rolls, sneak attack added, then Fortitude DC 10 +
 damage dealt or `Actor.die` (the one door `dead` is written through, shared with
-`apply_hp_state`); refused, with the reason printed, at anybody not helpless, at a
+`apply_hp_state`) — with a NONLETHAL weapon (sap, unarmed, a blade pulled to nonlethal) the crit is nonlethal damage and a failed save is the `knocked out` condition for 1d4 hours, never death (owner ruling 2026-11-13, `tests/test_nonlethal_coup.py`); refused, with the reason printed, at anybody not helpless, at a
 creature immune to critical hits (ooze, elemental, swarm, incorporeal, or the
 printed immunity — NOT undead or constructs, that was 3.5), and with any ranged
 weapon but a point-blank bow or crossbow; undead and constructs take the blow and
