@@ -1070,3 +1070,47 @@ A short list, because each of these would cost a rework rather than a fix.
 Asks 1 and 2 are the ones to do first, and not only because they are easiest: the consumer
 already reads both, so each one flips from derived to authored the day it appears in an
 export, with no coordinated release and nothing to change on the Pathfinder GM side.
+
+## 16. `volatility` — how dangerous a place is
+
+*Asked 2026-11-13 by the owner. The consumer reads it the day it appears
+(`world/loader.py` → `rules/volatility.py`). Optional: without it a town reads as
+settled (1) and everything else as uneasy (2), which is how every world played before.*
+
+The owner's ruling: a place's danger rating moves the chance of meeting monsters, bandits
+and catastrophe there: a road through a lawless march is ambushed more often than one
+between two quiet market towns, and a sea crossing in a stormy strait is likelier to end
+in a wreck than one across a calm gulf. The world knows which places are which; this app
+cannot guess it from prose without inventing it.
+
+**Shape.** One optional integer, `0`–`4`, on any entity (a `CONTINENT`, `NATION` or
+`CITY`), and on any `play.places[]` row:
+
+| value | word | what it means at the table |
+|---|---|---|
+| `0` | calm | patrolled, peaceful; trouble is rare |
+| `1` | settled | ordinary town life; the default for a settlement |
+| `2` | uneasy | the published wandering-encounter rates; the default for open ground and sea |
+| `3` | dangerous | bandit country, a monster's range, a strait known for storms |
+| `4` | lawless | war, a cursed waste, a sea nobody crosses twice |
+
+A place takes its own row's value first, then its settlement's, then the nation's and the
+continent's (`parent_id` up the tree), so one number on a nation covers every city in it
+that does not say otherwise. Sea between continents takes the value of the nearer coast's
+nation until the export has sea regions of its own (see ask 2's ports and vessels).
+
+```json
+{"id": "431bd046b7d5", "kind": "NATION", "name": "Kaldrimia", "volatility": 3}
+{"id": "5bbd0c40345f~urban:the-temple", "name": "the temple", "volatility": 0}
+```
+
+**Rule 1 still holds.** The rating is a word on a five-step scale, not a probability:
+what each step does to each table (road meetings, night camps, storms at sea) is this
+app's, in `rules/volatility.py` and the tables that read it.
+
+### Done when
+
+An export carries `volatility` on at least its nations, `tools/check_places.py` accepts
+0–4 and nothing else, and a city in a nation rated 4 is measured meeting more trouble on
+its roads than one rated 0.
+

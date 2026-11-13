@@ -85,6 +85,11 @@ Ids are unique within a world, not across worlds. Key your own storage on
 - `parent_id` is the containing entity (`null` for the world). It gives you the whole tree
   without parsing `path`.
 - `links` are cross-references this entry makes to other entities, already resolved to ids.
+- `volatility` (proposed 2026-11-13, optional, any entity and any `play.places[]` row): how
+  dangerous the ground is, `0` calm, `1` settled, `2` uneasy, `3` dangerous, `4` lawless.
+  Inherited down `parent_id`; missing means a town is `1` and anywhere else `2`. It moves
+  the chance of road meetings, night attacks and storms at sea (`rules/volatility.py`;
+  docs/for-world-bible.md ask 16).
 - `facts` are short tagged values; `sections` are the prose, already grouped under
   headings.
 - A `PEOPLE` is an ethnic group, not a place: it may span several nations or belong to

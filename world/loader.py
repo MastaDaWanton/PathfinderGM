@@ -44,6 +44,10 @@ class Entity:
     # id. Empty for a world that ships none, and for every export at 1.2 or below, which
     # is what keeps the generated set working unchanged.
     places: list[dict] = field(default_factory=list)
+    # How dangerous the ground is, 0 calm to 4 lawless (`rules/volatility.py`), or None
+    # when the export does not say: asked of World Bible 2026-11-13
+    # (docs/for-world-bible.md), read through the parent chain, defaulted by ground.
+    volatility: int | None = None
 
     @property
     def role(self) -> str:
@@ -210,6 +214,14 @@ class World:
         return any(u["name"].lower() == name.strip().lower() for u in self.unwritten)
 
 
+def _volatility(value) -> int | None:
+    """An export's `volatility`, 0..4, or None for missing or unreadable (never a guess)."""
+    try:
+        return max(0, min(4, int(value)))
+    except (TypeError, ValueError):
+        return None
+
+
 def _text(d: dict, key: str, default: str = "") -> str:
     """A text field of the export, null read as `default`.
 
@@ -292,6 +304,7 @@ def load(path: str | Path) -> World:
             links=e.get("links") or [],
             trade=e.get("trade") if isinstance(e.get("trade"), dict) else {},
             scale=None if e.get("scale") is None else str(e["scale"]),
+            volatility=_volatility(e.get("volatility")),
         )
 
     # `play.places[]` (schema 1.3), filed under the settlement each one names as its
