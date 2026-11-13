@@ -164,13 +164,16 @@ def test_a_potion_given_to_the_unconscious_takes_the_whole_round():
     assert s.move_spent["pc"] == s.round and s.standard_spent["pc"] == s.round
 
 
-def test_the_record_survives_a_save():
+def test_the_record_survives_a_save(tmp_path):
     """Saved for the reason `move_spent` is: a fight put down mid-turn would hand the
-    drink's standard action back."""
-    import inspect
+    drink's standard action back. Asserted by a real save and load (the first version
+    read the source text and broke the suite's getsource ceiling, 65 of 64)."""
+    from django.test import override_settings
 
-    from play import campaign
+    from play import campaign as cm
 
-    src = inspect.getsource(campaign)
-    assert '"standard_spent": (dict(self.scene.standard_spent), {})' in src
-    assert "standard_spent={k: int(v)" in src
+    with override_settings(CAMPAIGN_DIR=str(tmp_path / "campaigns")):
+        c = cm.new_campaign("drink-saved")
+        c.scene.standard_spent = {"pc": 3}
+        again = cm.Campaign.load(c.save())
+        assert again.scene.standard_spent == {"pc": 3}
