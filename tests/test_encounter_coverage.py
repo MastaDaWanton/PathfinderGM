@@ -279,3 +279,27 @@ def test_a_witness_is_not_a_fight_and_comes_as_written():
     e = _scheme_engine(0)
     assert schemes._hostile_count(e, {"count": 3, "side": ""}, "thug", "mourner") == 3
     assert schemes._hostile_count(e, {"count": 3, "side": "pc"}, "thug", "friend") == 3
+
+
+def test_a_priced_road_draw_is_not_priced_again_when_a_model_fight_wraps_it():
+    """Seed 176's forest watch draws two foxes (100 XP each, 200: the challenging budget
+    at a lone level-1's APL -1). A model's `begin_encounter` naming both foxes and the
+    merchant beside the road re-rolled the whole lot: on an average roll (135 XP) one fox
+    of the priced pair was held back. Now the road's pair is marked priced at the draw
+    (`states.PRICED`), comes whole, still counts its 200 XP, and the merchant the model
+    swept in is the one held."""
+    met = ontheway.road(Dice(seed=176), 6, "forest", 1, apl=-1)
+    assert met.kind == "creature" and met.count == 2
+    for seed in range(20):
+        s = Scene(location_id=TOWN)
+        s.add(load_pc("fixtures/pc-kesst.json"))
+        e = Engine(s, Dice(seed=seed), world=WORLD)
+        e.place_party(MARKET)
+        foxes = [m["ref"] for m in e._meet_on_the_way(met, zone="near")]
+        assert all(s.actors[r].has_state(states.PRICED) for r in foxes)
+        merchant = s.add(instantiate("merchant", scene=s, name="a merchant"), zone="near")
+        res = e.run(e.validate([{"op": "begin_encounter", "because": "t", "params": {
+            "sides": {"pc": ["pc"], "them": foxes + [merchant.ref]}}}]))
+        assert s.sides["them"] == foxes, (seed, s.sides)
+        tells = " ".join(o.tell or "" for o in res.outcomes)
+        assert merchant.name in tells and "hang" in tells, tells

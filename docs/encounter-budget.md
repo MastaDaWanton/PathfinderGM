@@ -305,6 +305,15 @@ to the dice (`test_nothing_stated_is_the_published_rate_exactly`).
   struck from the side and said to hang back. A staged fight — origin `start:` (openings),
   `scheme:`, `author:` (the cheat clerk, tests) — comes as written, priced at its source.
   Tests that stage a fight now say so with `origin="author:test"`.
+  Foes a budgeted source already priced are not priced again: each source marks who it
+  brings with `role.priced` (`states.PRICED`, an effect through the one applicator, origin
+  `budget:<source>`): a road/night creature or street patrol (`ontheway.PRICED`,
+  `Engine._meet_on_the_way`), a forage or venture creature, a scheme's hostile
+  `bring_in`, an opening's foes, a boarding crew, and anyone `_law_room` admits.
+  `_priced_sides` counts their XP as already on the side and prices only the rest.
+  Measured: two foxes drawn at challenging (200 XP) and wrapped by a model fight with a
+  merchant lost one fox on an average re-roll; now both fight and the merchant is held.
+  The mark lasts until dismissed: a priced survivor stays priced in a later fight.
 - **A monster companion counts at its CR** (`encounter_budget.companion_level`), by the
   Bestiary's Monsters as PCs, p.313 (<https://aonprd.com/Rules.aspx?ID=2476>): "Treat the
   monster's CR as class levels when determining the monster PC's overall levels." The CR

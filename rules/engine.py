@@ -11343,6 +11343,7 @@ class Engine:
         if encounter_budget.admit(already, each, encounter_budget.budget(
                 party + encounter_budget.TIERS[lowest])) == len(coming):
             # Inside the tier's least budget whatever the d100 says: not rolled.
+            self._mark_priced(coming, "joined")
             return coming, []
         label = ("how hard the watch is"
                  if any(self.scene.actors[r].has_state(states.GUARD) for r in coming)
@@ -11356,6 +11357,7 @@ class Engine:
         held = coming[room:]
         if held:
             self._law_held = list(getattr(self, "_law_held", None) or []) + held
+        self._mark_priced(coming[:room], "joined")
         return coming[:room], held
 
     def _law_held_settle(self) -> list[Outcome]:
@@ -15548,7 +15550,23 @@ class Engine:
             self.scene.positions.pop(m["ref"], None)
         if self.scene.grid is not None and self.scene.positions:
             self.scene.place_by_zone([m["ref"] for m in made])
+        if met.kind in ontheway.PRICED:
+            self._mark_priced([m["ref"] for m in made], f"meeting:{met.kind}")
         return made
+
+    def _mark_priced(self, refs, source: str) -> None:
+        """Mark people a budgeted source brought in (`states.PRICED`), through the one
+        applicator, the origin naming the source."""
+        from .activeeffect import ActiveEffect
+
+        for r in refs:
+            a = self.scene.actors.get(r)
+            if a is None or a.is_pc or a.has_state(states.PRICED):
+                continue
+            a.apply_effect(ActiveEffect(
+                name="priced into a fight", kind="situation", key=f"priced:{source}",
+                source=f"budget:{source}", origin=f"budget:{source}",
+                duration="until-dismissed", tags=(states.PRICED,)))
 
     def _cutpurse(self, pc, thief) -> str:
         """A hand in the purse, resolved by the book and not by a flat chance.
@@ -16289,6 +16307,7 @@ class Engine:
         made = self._bring_in(enc.creature["id"], count=1,
                                name=bestiary_mod.kind_word(enc.creature))
         ref = made[0]["ref"]
+        self._mark_priced([ref], "forage")
         self.scene.zones[ref] = "far"
         self.scene.positions.pop(ref, None)
         if self.scene.grid is not None and self.scene.positions:
@@ -17423,6 +17442,7 @@ class Engine:
             self.scene.add(who)
             self.scene.move(who.ref, deck)
             out.append(who)
+        self._mark_priced([w.ref for w in out], "boarding")
         return out
 
     # --- in conversation -----------------------------------------------------------------
@@ -17818,6 +17838,7 @@ class Engine:
             if row is not None:
                 born = self._bring_in(row["id"], count=1, name=row["name"])
                 ref = born[0]["ref"]
+                self._mark_priced([ref], "venture")
                 self.scene.zones[ref] = "far"
                 self.scene.positions.pop(ref, None)
                 aggressive = row.get("creature_type") in gathering.AGGRESSIVE
@@ -23901,19 +23922,27 @@ class Engine:
         The gap the budget lanes left (docs/encounter-budget.md): a `begin_encounter`
         from a turn's plan that listed the four watchmen in the square as "them" put all
         four in the initiative against a lone level-1 PC (540 XP against a hard cap of
-        400), because only the extra law it pulled in was priced. Every side the player is not on is the encounter; the people who
-        are not bystanders are listed first, so the one the words meant comes before the
-        crowd the model swept in; the first always comes. Those past the budget are struck
-        from the side and said to hang back (`_law_held_settle`). Wandering tier, the
-        street's own trouble — guarded when a guard is among them."""
+        400), because only the extra law it pulled in was priced. Every side the player
+        is not on is the encounter; the people who are not bystanders are listed first,
+        so the one the words meant comes before the crowd the model swept in; the first
+        always comes. Those past the budget are struck from the side and said to hang
+        back (`_law_held_settle`). Wandering tier, the street's own trouble — guarded when
+        a guard is among them.
+
+        Foes a budgeted source already priced (`states.PRICED`: a road draw, a scheme's
+        hunters, the admitted watch) are not priced again — a second roll would hold back
+        part of a fight the budget already rolled, three wolves rolled challenging coming
+        as two — but their XP still counts, so a model cannot pile extras on top."""
         actors = self.scene.actors
         foes = [r for side, refs in sides.items()
                 if not any(actors[x].is_pc for x in refs if x in actors)
                 for r in refs if r in actors and not actors[r].is_pc]
+        priced = [r for r in foes if actors[r].has_state(states.PRICED)]
+        foes = [r for r in foes if r not in priced]
         foes.sort(key=lambda r: actors[r].has_state(states.BYSTANDER))
         kind = ("guarded" if any(actors[r].has_state(states.GUARD) for r in foes)
                 else "wandering")
-        coming, held = self._law_room("", foes, on=[], kind=kind)
+        coming, held = self._law_room("", foes, on=priced, kind=kind)
         if not held:
             return sides
         return {s: [r for r in refs if r not in held] for s, refs in sides.items()}
