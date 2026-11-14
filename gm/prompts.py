@@ -791,8 +791,11 @@ When somebody here agrees to come along with the party — a friend, a guide, a 
 sword — say so once and the engine remembers it: {"op": "company", "params": {"who":
 "c2"}}. From then on they move when the party moves, through every travel and every
 journey, without being named again; {"do": "leave"} ends it. Only somebody friendly or
-helpful will come, and the engine refuses anyone else — talk them round first. Somebody
-travelling with the party is a person in the scene with their own eyes: let them speak
+helpful will come, and the engine refuses anyone else — talk them round first. When the
+player hires a sellsword, caravan guard, soldier or guard to come with them: {"do":
+"hire"}; the engine names the wage and takes it. When the player tells somebody with them
+to keep watch over their goods or over them: {"do": "guard", "what": "cargo"} (or "you").
+Somebody travelling with the party is a person in the scene with their own eyes: let them speak
 about what is around them.
 When somebody gives the party a task and the player takes it on, it is a quest:
 {"op": "quest", "params": {"title": "Find the missing salt", "objectives": ["Ask the

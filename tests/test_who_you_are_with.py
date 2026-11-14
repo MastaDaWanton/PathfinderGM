@@ -344,7 +344,7 @@ class TestSomebodyWhoComesAlong:
         res = _run(e, {"op": "company", "actor": pc.ref, "because": "t",
                        "params": {"who": who.ref, "do": "abandon"}})
         tell = " ".join(o.tell for o in res.outcomes)
-        assert "'join' or 'leave'" in tell
+        assert "'join', 'leave', 'hire' or 'guard'" in tell
         assert not who.has_state(states.TRAVELS_WITH_YOU)
 
     def test_talking_them_round_is_a_real_route_and_not_a_promise(self):

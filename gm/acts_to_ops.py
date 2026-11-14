@@ -3004,7 +3004,10 @@ def _company_who(scene, r) -> str:
 # question is not asked or its call fails: an `other` or a walk needs the question's yes.
 _COMPANY_ACTS = frozenset({"talk", "request", "other", "go", "journey"})
 _COMPANY_SPOKEN = frozenset({"talk", "request"})
-_COMPANY_DOES = {"join": "has them come along", "leave": "sends them away"}
+# Hiring is having them come along for pay (the demos say "hire the sellsword"); a guard
+# order is its own answer (rules/hirelings.py).
+_COMPANY_DOES = {"join": "has them come along", "hire": "has them come along",
+                 "leave": "sends them away", "guard": "sets them to guard"}
 
 
 def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
@@ -3076,6 +3079,56 @@ def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
             notes.append(f"the plan's company of {who} struck: the player's words did not "
                          f"ask for it")
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
+def hire_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
+                notes: list | None = None) -> list:
+    """A hire the player's words make and the plan left out, added: `company do: hire`
+    for a sword for hire the plan's own `say` speaks to.
+
+    Measured live 2026-11-14 (gemma-4-12B, Scrapden tavern): "I will hire you after all,
+    sellsword. Come with me." was planned as a `say` and a `greet`, no `company`; the
+    sellsword answered "Fine. Lead the way" and stayed where they stood, unpaid. One plan
+    in two wrote the hire. Detected in code (a say to somebody who `hires_out`, not yet in
+    the player's pay, and no company op for them), then the company question already
+    asked of a plan's own company (`interpret.confirm_company`), once per spoken act. With
+    no question (`ask` None: the suite, the reader off) nothing is added: coin is never
+    spent on a guess."""
+    from rules import hirelings
+
+    from . import interpret
+
+    if ask is None or not isinstance(raw, list) or not frame or frame.get("error") \
+            or scene is None:
+        return raw
+    actors = getattr(scene, "actors", {}) or {}
+    planned = {_company_who(scene, r) for r in raw if _op(r) == "company"}
+    spoken = [a for a in frame.get("actions") or [] if interpret.acting(a)
+              and str(a.get("act") or "") in _COMPANY_SPOKEN]
+    if not spoken:
+        return raw
+    memo = asked if asked is not None else {}
+    out = list(raw)
+    for r in raw:
+        if _op(r) != "say":
+            continue
+        ref = str(((r or {}).get("params") or {}).get("to") or "")
+        who = actors.get(ref)
+        if who is None or ref in planned or hirelings.wage(who) is not None \
+                or not hirelings.hires_out(scene, who):
+            continue
+        for a in spoken:
+            key = (str(a.get("span") or ""), who.name)
+            if key not in memo:
+                memo[key] = ask(key[0], who.name) or ""
+            if memo[key] == "has them come along":
+                out.append({"op": "company", "because": "the player hired them",
+                            "params": {"who": ref, "do": "hire"}})
+                planned.add(ref)
+                if notes is not None:
+                    notes.append(f"the hire of {who.name} the words made, added")
+                break
+    return out
 
 
 def address_the_named(raw, frame: dict | None, scene, *,

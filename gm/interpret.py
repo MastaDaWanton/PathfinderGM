@@ -1935,7 +1935,8 @@ def confirm_job(span: str, employer: str, jobs=(), *,
 # question, only when the plan wrote one (`acts_to_ops.company_asked`): do these words have
 # this person come along, send them away, or neither. Demonstrations written for this, in no
 # world's words; none is a probed line, and the owner's line is not among them.
-COMPANY_ANSWERS = ("has them come along", "sends them away", "something else")
+COMPANY_ANSWERS = ("has them come along", "sends them away", "sets them to guard",
+                   "something else")
 _COMPANY_DEMOS = [
     ("ask Tamsin to come with me to the ford", "Tamsin", "has them come along"),
     ("say \"Pack your things, you're coming with us\"", "the guide", "has them come along"),
@@ -1943,6 +1944,9 @@ _COMPANY_DEMOS = [
     ("hire the sellsword to watch my back on the road", "the sellsword",
      "has them come along"),
     ("tell her to go home, we part ways here", "the guide", "sends them away"),
+    ("tell Bren to keep an eye on the crates in the hold", "Bren", "sets them to guard"),
+    ("say \"Stand over my wagon and let nobody near it\"", "the sellsword",
+     "sets them to guard"),
     ("take the foreman's job guarding the warehouse", "the foreman", "something else"),
     ("agree to the reeve's terms for the week", "the reeve", "something else"),
     ("ask her what the road ahead is like", "the guide", "something else"),
@@ -1955,7 +1959,9 @@ def company_messages(span: str, who: str) -> list[dict]:
               "another person. Answer from the words alone: do they have that person come "
               "along with the character from now on (asked to come, invited, hired to go "
               "with them, or told yes when the person offered to come), send that person "
-              "away (part company, tell them to go), or something else? Taking work FROM "
+              "away (part company, tell them to go), set that person to guard something "
+              "(keep watch over the character or their goods), or something else? Taking "
+              "work FROM "
               "somebody, agreeing to their terms, or talking with them is something else.")
     out = [{"role": "system", "content": system}]
     for said, person_, answer in _COMPANY_DEMOS:
