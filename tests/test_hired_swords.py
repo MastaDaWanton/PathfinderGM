@@ -163,12 +163,71 @@ def test_a_hire_the_plan_left_out_is_added_from_the_words():
     frame = {"actions": [{"act": "talk", "target": "Hesk", "commit": "done",
                           "says": "I will hire you", "span": "I will hire you. Come with me."}]}
     plan = [{"op": "say", "params": {"to": sword.ref, "words": "I will hire you."}}]
-    assert acts_to_ops.hire_spoken(plan, frame, s, ask=None) == plan
-    got = acts_to_ops.hire_spoken(plan, frame, s, ask=lambda span, who: "something else")
+    assert acts_to_ops.orders_spoken(plan, frame, s, ask=None) == plan
+    got = acts_to_ops.orders_spoken(plan, frame, s, ask=lambda span, who: "something else")
     assert [r["op"] for r in got] == ["say"]
-    got = acts_to_ops.hire_spoken(plan, frame, s, ask=lambda span, who: "has them come along")
+    got = acts_to_ops.orders_spoken(plan, frame, s, ask=lambda span, who: "has them come along")
     assert got[-1]["params"] == {"who": sword.ref, "do": "hire"}
     _s, _e, _pc, baker = _party(work="baker")
     plan = [{"op": "say", "params": {"to": baker.ref, "words": "Come with me."}}]
-    got = acts_to_ops.hire_spoken(plan, frame, _s, ask=lambda span, who: "has them come along")
+    got = acts_to_ops.orders_spoken(plan, frame, _s, ask=lambda span, who: "has them come along")
     assert [r["op"] for r in got] == ["say"]
+
+
+def test_a_guard_order_the_plan_left_out_is_added_from_the_words():
+    """Measured live 2026-11-14: "Your first job: stand over my wares in the hold and let
+    nobody near them." was planned as a say alone; the sellsword promised to keep the wares
+    safe and held no guard. A say to a companion the company question reads as an order to
+    guard adds `company do: guard`, with what is guarded asked in one more closed
+    question; and the engine then grants `bond.guarding` over the cargo."""
+    from gm import acts_to_ops
+
+    s, e, pc, sword = _party()
+    _company(e, pc, sword, do="hire")
+    span = "stand over my wares in the hold and let nobody near them"
+    frame = {"actions": [{"act": "talk", "target": "Hesk", "commit": "done",
+                          "says": span, "span": span}]}
+    plan = [{"op": "say", "params": {"to": sword.ref, "words": span}}]
+    got = acts_to_ops.orders_spoken(plan, frame, s, ask=lambda *a: "something else",
+                                    ask_what=lambda *a: "cargo")
+    assert [r["op"] for r in got] == ["say"]
+    got = acts_to_ops.orders_spoken(plan, frame, s, ask=lambda *a: "sets them to guard",
+                                    ask_what=lambda *a: "cargo")
+    assert got[-1]["params"] == {"who": sword.ref, "do": "guard", "what": "cargo"}
+    # Live, the line had no addressee (a say with no `to`): with one companion along,
+    # it is theirs — for a guard order only.
+    unnamed = [{"op": "say", "params": {"words": span}}]
+    got = acts_to_ops.orders_spoken(unnamed, frame, s, ask=lambda *a: "sets them to guard",
+                                    ask_what=lambda *a: "cargo")
+    assert got[-1]["params"] == {"who": sword.ref, "do": "guard", "what": "cargo"}
+    e.run(e.validate([dict(got[-1], actor=pc.ref)], origin="author:test"))
+    assert hirelings.guarding(sword) == "cargo"
+    # Nobody with the party is set to guard by words to them: they must come along first.
+    _s, _e, _pc, stranger = _party(work="baker")
+    plan = [{"op": "say", "params": {"to": stranger.ref, "words": span}}]
+    got = acts_to_ops.orders_spoken(plan, frame, _s, ask=lambda *a: "sets them to guard")
+    assert [r["op"] for r in got] == ["say"]
+
+
+def test_a_coin_given_beside_a_hire_is_not_paid_twice():
+    """Measured live 2026-11-14: "Here is your coin, sellsword. You are hired; come with
+    me." was planned as `company do: hire` and `give gp 1 to c10`; the purse paid the
+    week's wage (4 gp 4 sp 1 cp) and a gold piece more. The engine's wage is the payment:
+    only the week leaves the purse."""
+    from gm import acts_to_ops
+
+    s, e, pc, sword = _party()
+    plan = [{"op": "say", "actor": pc.ref, "params": {"to": sword.ref, "words": "Here."}},
+            {"op": "company", "actor": pc.ref, "because": "t",
+             "params": {"who": sword.ref, "do": "hire"}},
+            {"op": "give", "actor": pc.ref, "because": "t",
+             "params": {"item": "gp", "count": 1, "from_": pc.ref, "to": sword.ref}}]
+    notes = []
+    got = acts_to_ops.wage_not_tipped(plan, s, notes=notes)
+    assert [r["op"] for r in got] == ["say", "company"] and notes
+    before = goods.in_copper(pc.purse)
+    e.run(e.validate([r for r in got if r["op"] == "company"], origin="author:test"))
+    assert before - goods.in_copper(pc.purse) == hirelings.wage(sword).payload["per_day_cp"] * 7
+    # A give with no hire beside it is the player's own and stands.
+    alone = [plan[2]]
+    assert acts_to_ops.wage_not_tipped(alone, s) == alone

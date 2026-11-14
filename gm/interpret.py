@@ -1974,6 +1974,11 @@ def company_messages(span: str, who: str) -> list[dict]:
 def confirm_company(span: str, who: str, *, model: str | None = None) -> str:
     """One of `COMPANY_ANSWERS`; "" when the call fails (the caller then judges the plan's
     company by the reading's acts alone, `acts_to_ops.company_asked`)."""
+    return _closed(company_messages(span, who), COMPANY_ANSWERS, model)
+
+
+def _closed(messages: list[dict], answers, model: str | None = None) -> str:
+    """One closed question to the interpreter: one of `answers`, or "" when it fails."""
     from . import client
     from play import modelcfg
 
@@ -1981,16 +1986,41 @@ def confirm_company(span: str, who: str, *, model: str | None = None) -> str:
     if not cfg.get("model"):
         cfg = modelcfg.for_role("narrator")
     schema = {"type": "object", "properties": {"answer": {
-        "type": "string", "enum": list(COMPANY_ANSWERS)}}, "required": ["answer"]}
+        "type": "string", "enum": list(answers)}}, "required": ["answer"]}
     try:
-        reply = client.chat(company_messages(span, who), model or cfg["model"],
+        reply = client.chat(messages, model or cfg["model"],
                             cfg["host"], as_json=True, think=False, temperature=0.0,
                             num_predict=20, provider=cfg.get("provider", "ollama"),
                             api_key=cfg.get("api_key", ""), schema=schema)
         got = str((reply.json() or {}).get("answer") or "")
     except Exception:  # noqa: BLE001
         return ""
-    return got if got in COMPANY_ANSWERS else ""
+    return got if got in answers else ""
+
+
+# What a guard order is over (`acts_to_ops.orders_spoken`), asked only once the company
+# question said the words set somebody to guard: the engine's closed `hirelings.GUARDS`.
+# Demonstrations written for this, in no world's words; none is a probed line.
+GUARDED_ANSWERS = {"their goods": "cargo", "the character": "you"}
+_GUARDED_DEMOS = [
+    ("tell Bren to keep an eye on the crates in the hold", "Bren", "their goods"),
+    ("say \"Stand over my wagon and let nobody near it\"", "the sellsword", "their goods"),
+    ("tell the guard to watch my back in the market", "the guard", "the character"),
+    ("say \"Keep close and keep me alive\"", "the sellsword", "the character"),
+]
+
+
+def confirm_guarded(span: str, who: str, *, model: str | None = None) -> str:
+    """"cargo" or "you" (`hirelings.GUARDS`) for a guard order's words; "" on failure."""
+    system = ("In a role-playing game the player's character tells another person to "
+              "guard something. Answer from the words alone: is it the character's goods "
+              "(wares, cargo, crates, a wagon, belongings) or the character themselves?")
+    messages = [{"role": "system", "content": system}]
+    for said, person_, answer in _GUARDED_DEMOS:
+        messages.append({"role": "user", "content": f"The person: {person_}\nThe words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The person: {who}\nThe words: {span}"})
+    return GUARDED_ANSWERS.get(_closed(messages, tuple(GUARDED_ANSWERS), model), "")
 
 
 # --- who a blow lands on, asked ---------------------------------------------------------
