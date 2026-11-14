@@ -1149,8 +1149,6 @@ def _state(c) -> dict:
             # The "From here" row (I6): every way on, from the engine's own graph, with
             # the ones the rules would refuse greyed in the rules' own words.
             "exits": (exits_now := _exits_state(c)),
-            # The harbourmaster's berths, offered while the player talks with them.
-            "passage_offer": _passage_offer(c, exits_now),
             # The Places chart (owner, 2026-09-29): every place the player has stood in
             # and every place one way from them, by name, with the ways between; the
             # rest of the town stays under the fog.
@@ -1167,6 +1165,9 @@ def _state(c) -> dict:
             # carries them on through the downed door (`say`). Appended last, as the
             # state's key order is a contract (tests/test_s3_aftermath_and_api.py).
             "pc_down": downed.state_of(pc) not in ("fine", "disabled") if pc else False,
+            # The harbourmaster's berths, offered while the player talks with them
+            # (2026-11-13). Appended after pc_down: the key order is a contract.
+            "passage_offer": _passage_offer(c, exits_now),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.

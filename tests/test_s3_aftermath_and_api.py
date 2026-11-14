@@ -61,7 +61,8 @@ NEW_SCENE = ["where_label", "where_detail", "setting", "conversation", "day_part
              "places_found",   # the fog-of-war place chart (2026-09-30)
              "writings",       # notes and maps written with ink and paper (2026-10-01)
              "confided",       # what companions have told the player (2026-10-01)
-             "pc_down"]        # the player cannot take a turn: no combat bar (2026-10-09)
+             "pc_down",        # the player cannot take a turn: no combat bar (2026-10-09)
+             "passage_offer"]  # the harbourmaster's berths while talking (2026-11-13)
 
 
 # --- helpers ------------------------------------------------------------------------------
