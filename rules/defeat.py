@@ -659,6 +659,19 @@ def settle(engine) -> list:
     if pc is None:
         return []
     out = []
+    # The party's cargo off a robber who is down, helpless or held, here with them
+    # (`trade.reclaim`): theirs again, by the same measure — who holds it now.
+    from . import trade
+
+    back = trade.reclaim(scene)
+    if back:
+        out.append(Outcome(
+            intent_id="", op="quest_step",
+            effects=[{"kind": "cargo", "how": "reclaimed", "lots": [w for w, _ in back],
+                      "from": [n for _, n in back], "origin": QUEST_ORIGIN}],
+            tell=" ".join(f"{_upper_first(who)} no longer has the party's {what}: it is "
+                          f"theirs again." for what, who in back),
+            because="what was taken is back"))
     for card in cards_mod.quests(scene):
         rec = card.recover
         if not rec or not card.live:

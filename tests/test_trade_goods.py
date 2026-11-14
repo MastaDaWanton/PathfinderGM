@@ -329,3 +329,51 @@ def test_a_plan_that_names_the_good_buys_and_sells_it_in_bulk():
     assert sum(x["units"] for x in trade.lots(scene)) == 10, out.tell
     out = _do(engine, "sell", "iron", 10)
     assert not trade.lots(scene), out.tell
+
+
+def test_a_stolen_lot_comes_back_when_its_holder_is_beaten_here():
+    """Coordinator, 2026-11-14: the robbed lot must come back when the robbers holding it
+    are beaten, killed or caught. Before it, `trade.robbed` marked the lot taken and
+    nothing ever read it again: 20 lb of iron gone for good the moment Kesst went down.
+    Measured on the holdings, as `defeat.settle` measures the coin: the robber is found
+    (here, on his feet: it stays his), then put down (it is the party's again, owned by
+    Kesst, no longer stolen)."""
+    import test_robbed_retrieval_quest as robbery
+    from rules import defeat
+
+    def with_cargo(s, e, pc, gang):
+        trade.add_lot(s, "iron", 20, pc.ref, 160, s.location_id)
+
+    s, e, pc, gang, _out, _quest = robbery._robbed(before=with_cargo)
+    holder = gang[0]
+    defeat.settle(e)                                            # gone off stage: kept
+    assert trade.lots(s)[0]["stowed"] == "taken"
+    s.move(holder.ref, s.at)                                    # the party finds him
+    assert holder.ref in s.actors
+    defeat.settle(e)
+    assert trade.lots(s)[0]["stowed"] == "taken", "a robber on his feet kept it"
+    holder.take_damage(holder.hp + 20)
+    outs = defeat.settle(e)
+    lot = trade.lots(s)[0]
+    assert lot["stowed"] == "party" and lot["owner"] == pc.ref
+    assert "held_by" not in lot and "stolen" not in lot and lot["stolen_by"] == holder.ref
+    assert trade.reachable(s, "iron")
+    assert any("20 lb of iron" in o.tell and "theirs again" in o.tell for o in outs), outs
+
+
+def test_a_robber_in_custody_gives_the_lot_up_too():
+    import test_robbed_retrieval_quest as robbery
+    from rules import defeat, states
+    from rules.activeeffect import ActiveEffect
+
+    def with_cargo(s, e, pc, gang):
+        trade.add_lot(s, "iron", 20, pc.ref, 160, s.location_id)
+
+    s, e, pc, gang, _out, _quest = robbery._robbed(before=with_cargo)
+    holder = gang[0]
+    s.move(holder.ref, s.at)
+    holder.apply_effect(ActiveEffect(name="held by the watch", kind="situation",
+                                     key="custody", source="test", origin="test",
+                                     tags=(states.CUSTODY,)))
+    defeat.settle(e)
+    assert trade.lots(s)[0]["stowed"] == "party"

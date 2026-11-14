@@ -682,16 +682,46 @@ def robbed(scene, robber_ref: str) -> list[str]:
     """The party is beaten where its cargo is: whatever of it is in reach (stowed with
     them, or in the hold of the ship they are on) goes with the robbers, still the
     party's by right (`owner`) and marked stolen — the props ledger's rule
-    (docs/items-have-owners.md). shortcut: nothing yet brings a taken lot back when the
-    robber is beaten; upgrade with the robbery quest (`defeat.settle`)."""
+    (docs/items-have-owners.md). `reclaim` brings it back when they are beaten."""
     here = str(getattr(scene, "location_id", "") or "")
     out = []
     for lot in lots(scene):
         if lot.get("stowed") in ("party", "hold") and where_now(scene, lot) == here:
             lot["stowed"], lot["held_by"], lot["stolen"] = "taken", robber_ref, True
+            lot["stolen_by"] = robber_ref
             lot["at"] = here
             lot.pop("vessel", None)
             out.append(said(lot))
+    return out
+
+
+def beaten(actor) -> bool:
+    """Whether a robber can no longer keep what they took from a party standing over
+    them: down (dying, out cold, dead), helpless, or in the watch's custody."""
+    from . import states
+
+    return bool(actor.is_down or actor.has_state("state.helpless")
+                or actor.has_state(states.CUSTODY))
+
+
+def reclaim(scene) -> list[tuple[str, str]]:
+    """Every taken lot whose holder is here with the party and beaten goes back to the
+    party: stowed with them, still the owner's, no longer stolen — the props ledger's
+    `_own_again` for cargo. A lot whose holder is elsewhere, or still on their feet,
+    waits. Returns [(the lot in words, the holder's name)]."""
+    out = []
+    for lot in lots(scene):
+        if lot.get("stowed") != "taken":
+            continue
+        holder = (getattr(scene, "actors", {}) or {}).get(str(lot.get("held_by") or ""))
+        if holder is None or not beaten(holder):
+            continue
+        lot["stowed"] = "party"
+        for k in ("held_by", "stolen", "at"):
+            lot.pop(k, None)
+        out.append((said(lot), str(holder.name)))
+    if out:
+        _merge(scene)
     return out
 
 

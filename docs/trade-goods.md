@@ -122,7 +122,9 @@ The hired-swords lane's guards defend a lot by these fields. Nothing here builds
 - **The wreck** takes the hold with the ship (`Engine._wreck`).
 - **Robbers** who beat the party down take the cargo in reach: with the party, or in the
   hold of the ship it is on. It stays the party's by right and is marked stolen
-  (`defeat.aftermath`).
+  (`defeat.aftermath`). It comes back when the robber holding it is here with the party
+  and down, dead, helpless or in the watch's custody (`trade.reclaim`, run by
+  `defeat.settle` every batch, the same holdings measure as the robbery quest's coin).
 - **A road toll-keeper** names a levy on the cargo, a fortieth of its book value. This is
   THIS APP'S number, the low end of medieval ad valorem tolls. It is paid, or gone round,
   like the toll itself.
@@ -139,8 +141,6 @@ The hired-swords lane's guards defend a lot by these fields. Nothing here builds
 
 ## What is not done
 
-- A stolen lot does not come back when its robber is beaten (`trade.robbed` says so).
-  The robbery quest could carry it.
 - Herding livestock costs nothing and needs no drover.
 - A pack animal needs no pack saddle.
 - Towns charge no customs at their gates.
