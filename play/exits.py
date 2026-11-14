@@ -105,6 +105,13 @@ def _passage_words(engine, leg, scene) -> str:
     _ship, days, cost = engine.passage_quote(leg, heads, port=harbour)
     fare = goods.purse_line(goods.coins_for(cost), engine._coins_here())
     aboard = f"{_days_aboard(days, leg.by == 'river')}, {fare} passage"
+    from rules import trade
+
+    shipped = trade.shipping(scene)
+    if shipped:
+        # The fare carries the party's cargo as freight (`trade.freight_cp`, in the quote).
+        lb = sum(trade.lb_of(x) for x in shipped)
+        aboard += f" and freight for {lb:g} lb of cargo"
     if coast is None:
         return aboard
     # Inland, the road to the harbour comes first and is walked (`_op_journey`): the row

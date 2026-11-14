@@ -1184,3 +1184,117 @@ Swim check does are this app's, in `rules/water.py`.
 An export carries `water` on at least one fast river or rapids place, `tools/check_places.py`
 accepts the three words and nothing else, and a character swimming there is measured
 rolling against DC 15 or 20 instead of 10.
+
+
+## 19. `good` on a trade route — what it carries, in words
+
+*Asked 2026-11-14 (feat/trade-goods). The consumer reads it the day it appears
+(`rules/trade.route_row` → `row_of_good`). Optional: without it the route's `commodity`
+prose is filed by this app's word table (`trade.WORDS`), which is how every world plays
+today.*
+
+A party can now buy a route's commodity in bulk at its origin and sell it dear at its
+destination. The price is the Pathfinder Trade Goods table's (Core Rulebook p.140), and the
+app has to choose the row. From prose it can only guess. "Tempered steel" becomes iron,
+"Turmoil-era tea blends" becomes coffee, and "river-borne trade goods" matches no row, so
+it is never offered. The world knows what each commodity is and roughly what it is worth.
+
+**Shape.** One optional object on each `trade_routes[]` entry:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `food`, `spice`, `cloth`, `hide`, `metal`, `stone`, `timber`, `fuel`, `livestock` or `other` |
+| `worth` | `cheap`, `common`, `dear` or `precious`: dear for its kind, not dear in coin |
+| `service` | `true` when the "commodity" is not a thing you can carry: mercenary contracts, river tolls, message relays, a black market |
+
+```json
+{"origin": "Ashwatch", "destination": "Steelline", "commodity": "tempered steel",
+ "sought_as": "tempered steel", "good": {"kind": "metal", "worth": "common"}}
+{"origin": "Harforge", "destination": "Harpost", "commodity": "mercenary contracts",
+ "good": {"service": true}}
+```
+
+**Rule 1 still holds.** Words, never prices. `kind` × `worth` picks a row of the book's
+table (`trade.GOOD_ROWS`: metal goes iron, copper, silver, gold; food goes wheat, tobacco,
+salt, saffron). The price, the unit and the weight are the row's. So a world never has to
+say how heavy a bale is, or in what it is counted. `other` has no row and is not offered.
+
+**What Pathfinder GM does without it.** Reads the commodity's words against
+`trade.WORDS`, first match by priority, and says so in the code where the match is a
+judgement (ore and steel are iron; gems, pearls and coral are gold by the pound).
+
+### Done when
+
+An Aurvantis export carries `good` on every route, and `river-borne trade goods` and
+`novelty trade goods` are measured offered at their origins. `mercenary contracts` stays
+unoffered.
+
+
+## 20. `volume` on a trade route — how much moves along it
+
+*Asked 2026-11-14 (feat/trade-goods). The consumer reads it the day it appears
+(`rules/trade.volume`). Optional: without it a market's stock and appetite are its
+settlement's base value's worth of the good, which is how every world plays today.*
+
+A market's price moves with every unit the party buys or sells. It refills over a week,
+and it cannot sell more than it holds. How much it holds is now the settlement's size,
+read from its scale. The world knows better: a salt road that feeds a whole kingdom
+moves more salt than one village's cellar.
+
+**Shape.** One optional word on each `trade_routes[]` entry: `"trickle"`, `"steady"` or
+`"heavy"`. Anything else reads as steady.
+
+| value | at the table |
+|---|---|
+| `trickle` | a pack train now and then: half the usual stock at both ends |
+| `steady` | the default |
+| `heavy` | a road or a sea lane that never empties: twice the stock at both ends |
+
+```json
+{"origin": "Saltmere", "destination": "Brackgate", "commodity": "salt", "volume": "heavy"}
+```
+
+**Rule 1 still holds.** The word is the world's. The halving and the doubling are this
+app's, in `trade.VOLUME_WORDS`.
+
+### Done when
+
+At least the heaviest routes of an export carry `volume`, and a heavy route's origin is
+measured selling twice the units before its price tops out.
+
+
+## 21. `goods` on a settlement — what it makes and wants, as goods
+
+*Asked 2026-11-14 (feat/trade-goods). The consumer reads it the day it appears
+(`rules/trade._settlement_goods`). Optional: without it the settlement's one `sells` and one
+`buys` line of prose are read by the word table, which is how every world plays today.*
+
+`play.settlements[].sells` and `buys` are one line of prose each, so a town that makes
+salt *and* smoked fish can only say one of them. A town that wants iron but has no route
+bringing it is only known to want it if that line happens to say so. This generalises the
+`trade.goods[]` row proposed in docs/from-world-bible.md, and supersedes it.
+
+**Shape.** One optional object on each `play.settlements[]` row, with two lists of goods
+in ask 19's words plus a name:
+
+```json
+{"id": "c0a1f5e20013", "name": "Marrowby", "sells": "salt", "buys": "wool",
+ "goods": {"sells": [{"name": "salt", "kind": "food", "worth": "dear"},
+                     {"name": "smoked fish", "kind": "food", "worth": "cheap"}],
+           "buys":  [{"name": "fleeces", "kind": "cloth", "worth": "common"},
+                     {"name": "iron tools", "kind": "metal", "worth": "cheap"}]}}
+```
+
+**Rules for it.**
+- `sells` is what the place makes or ships, sold cheap there. `buys` is what it is short
+  of, bought dear there. A place that both makes and wants a thing is not short of it.
+- Keep `sells` and `buys` as the one-line summaries: other readers use them.
+- `name` is the world's own word, shown to the player; `kind` and `worth` choose the row.
+
+**Rule 1 still holds.** Words only. The cheap and dear prices are the book's row times
+this app's factors (`trade.SUPPLY_FACTOR`, `DEMAND_FACTOR`).
+
+### Done when
+
+An export carries `goods` on its settlements, and a settlement that sells two goods is
+measured offering both at its market.

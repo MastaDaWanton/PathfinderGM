@@ -162,6 +162,8 @@
       {"key": "military saddle", "name": "military saddle", "cost_gp": 20},
       {"key": "pack saddle", "name": "pack saddle", "cost_gp": 5},
       {"key": "saddlebags", "name": "saddlebags", "cost_gp": 4},
+      {"key": "cart", "name": "cart", "cost_gp": 15},
+      {"key": "wagon", "name": "wagon", "cost_gp": 35},
       {"key": "animal feed", "name": "animal feed", "cost_gp": 0.05, "unit": "days", "per": 1}
     ]
   }

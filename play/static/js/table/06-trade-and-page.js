@@ -385,7 +385,76 @@ function drawTrade() {
   $("#tradetill").textContent = `${TRADE.till.text} in the till`;
   drawHaggle();
   tradeRedraw();
+  drawCargo();
 }
+
+// --- bulk trade goods (rules/trade.py) ----------------------------------------------
+// Not in the basket: every unit moves the market's price, so a line's total is the
+// engine's when it is made, and the row shows the next unit's price ("about"). One
+// button a line, one trade a press, and the counter redrawn from the server after it.
+function drawCargo() {
+  const box = $("#tradecargo");
+  if (!box) return;
+  const cg = (TRADE && TRADE.cargo) || { offers: [], lots: [] };
+  const offers = cg.offers || [], lots = cg.lots || [];
+  box.hidden = !offers.length && !lots.length;
+  if (box.hidden) return;
+  const haul = cg.haul || { lb: 0, how: [] };
+  $("#tradecargohaul").textContent = `carrying ${cg.carried_lb || 0} of ${haul.lb} lb`
+    + (haul.how && haul.how.length ? ` (${haul.how.join(", ")})` : "")
+    + (cg.terms ? ` · ${cg.terms}` : "");
+  const row = (side, x, max, words, label) => `
+    <div class="tr-cg" data-cargo="${side}" data-id="${esc(x.id)}">
+      <span class="nm">${esc(label)}<small>${esc(words)}</small></span>
+      <label>How many <input type="number" min="1" max="${Math.max(1, Math.min(500, max))}"
+        value="${Math.max(1, Math.min(10, max))}" inputmode="numeric"
+        aria-label="How many ${esc(x.name)}"></label>
+      <button type="button" class="v2-btn is-small"${max > 0 ? "" : " disabled"}>${
+        side === "buy" ? "Buy" : "Sell"}</button>
+    </div>`;
+  const parts = [];
+  if (offers.length) {
+    parts.push(`<h3>Made here, by the ${esc(offers[0].unit)}</h3>` + offers.map(o => row(
+      "buy", o, o.left,
+      `about ${o.each} a ${o.unit} · ${o.left} ${o.unit} to be had`
+        + (o.dear_in.length ? ` · sells dear in ${o.dear_in.join(", ")}` : ""),
+      `${o.name}`)).join(""));
+  }
+  if (lots.length) {
+    parts.push(`<h3>Your cargo</h3>` + lots.map(l => l.here ? row(
+      "sell", l, Math.min(l.units, l.takes),
+      `${l.where} · fetches about ${l.each} each here${l.wanted ? ", wanted here" : ""}`
+        + (l.paid ? ` · cost ${l.paid}` : ""), l.said)
+      : `<div class="tr-cg"><span class="nm">${esc(l.said)}<small>${esc(l.where)}</small></span></div>`
+    ).join(""));
+  }
+  $("#tradecargobody").innerHTML = parts.join("");
+}
+
+$("#tradecargo") && $("#tradecargo").addEventListener("click", async e => {
+  const btn = e.target.closest(".tr-cg button");
+  if (!btn || !TRADE) return;
+  const line = btn.closest(".tr-cg");
+  const n = parseInt(line.querySelector("input").value, 10);
+  if (!(n >= 1)) return;
+  btn.disabled = true;
+  const body = { op: line.dataset.cargo, item: line.dataset.id, count: Math.min(500, n) };
+  if (TRADE.line) body.line = TRADE.line;
+  let said = "";
+  try {
+    const r = await post("/api/trade/do", body);
+    said = r.tell || "";
+  } catch (err) {
+    said = err.message;
+  }
+  try {
+    TRADE = await post("/api/trade", TRADE.line ? { line: TRADE.line } : {});
+  } catch (err) {
+    said = [said, err.message].filter(Boolean).join(" ");
+  }
+  drawTrade();
+  $("#trademsg").textContent = said;
+});
 
 // The haggle (rules/tradecraft.py, the engine's `haggle` op): once a counter a day, and
 // what it won is said on the button, so a moved price is a price the player can see moved.

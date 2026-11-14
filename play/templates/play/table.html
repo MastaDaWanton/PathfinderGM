@@ -3106,9 +3106,13 @@
 
   /* --- Trade: I7's window in the design's framed card ---------------------------------- */
   .modepage > #tradepanel { position: relative; display: none; min-height: 0; flex: 1 1 0;
-                            grid-template-rows: auto auto auto minmax(0, 1fr);
+                            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
                             padding: 18px 22px 16px; }
   .modepage > #tradepanel.on { display: grid; }
+  /* Pinned to their rows: the message and the counters' tabs are often not displayed,
+     and auto-placement then put the body in an auto row and the trade goods in the 1fr. */
+  .modepage > #tradepanel > .tradebody { grid-row: 4; }
+  .modepage > #tradepanel > .tr-cargo { grid-row: 5; }
   #tradepanel > :not(.v2-rim) { position: relative; z-index: 1; }
   #tradepanel .sheethead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
                            padding: 4px 26px 12px; background: none; box-shadow: none;
@@ -3131,6 +3135,21 @@
   #tradelines { margin: 10px 26px 0; padding: 4px; overflow-x: auto; }
   #tradelines[hidden] { display: none; }
   .tradebody { padding: 16px 26px 10px; }
+  .tr-cargo { margin: 0 26px; padding: 10px 0 4px; border-top: 1px solid #221b13;
+              max-height: 30vh; overflow-y: auto; }
+  .tr-cargo[hidden] { display: none; }
+  .tr-cargo > h2 { font: 400 16px/1 var(--display); letter-spacing: .12em;
+                   font-variant: small-caps; color: var(--gold); margin: 0 0 8px; }
+  .tr-cargo > h2 span { float: right; color: var(--dim); font: 400 13.5px/1 var(--body);
+                        letter-spacing: 0; font-variant: normal; }
+  .tr-cargo h3 { margin: 8px 0 4px; color: var(--dim); font: 600 12.5px/1 var(--body);
+                 letter-spacing: .08em; text-transform: uppercase; }
+  .tr-cg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+           padding: 6px 0; border-bottom: 1px solid #1b150f; }
+  .tr-cg .nm { flex: 1 1 260px; min-width: 0; color: var(--ink); font: 15px/1.4 var(--body); }
+  .tr-cg .nm small { display: block; color: var(--dim); font: italic 13px/1.4 var(--body); }
+  .tr-cg input { width: 5.5em; min-height: 36px; }
+  .tr-cg button { min-height: 36px; }
   .tradecol > h2 { font: 400 16px/1 var(--display); letter-spacing: .12em; text-transform: none;
                    font-variant: small-caps; text-shadow: var(--engraved);
                    border-bottom: 1px solid #221b13; box-shadow: 0 1px 0 rgba(255, 225, 170, .08); }
@@ -4064,6 +4083,13 @@
         rel="noopener">Which icon is whose</a>.</p>
     </section>
   </div>
+  <!-- Bulk trade goods (rules/trade.py, 2026-11-14): what this town makes by the pound,
+       where it sells dear, and the party's cargo wherever it is. Bought and sold one
+       line at a time, since every unit moves the market's price. -->
+  <section class="tr-cargo" id="tradecargo" aria-labelledby="tr-cargo-h" hidden>
+    <h2 id="tr-cargo-h">Trade goods <span id="tradecargohaul"></span></h2>
+    <div id="tradecargobody"></div>
+  </section>
 </div>
 </section>
 

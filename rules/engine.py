@@ -37,6 +37,7 @@ from . import states
 from . import survival
 from . import object_numbers
 from . import tradecraft
+from . import trade as trade_mod
 from . import troops as troops_mod
 from . import water
 from . import worldclass
@@ -441,6 +442,15 @@ class Scene:
     # room does not move and a hull does not heal, so where a ship is and how much of it
     # is left are facts play made and nothing can recompute.
     vessels: list[dict] = field(default_factory=list)
+    # The party's bulk trade goods, lot by lot (`rules/trade.py`): what, how much, whose,
+    # and where — `stowed` with the party, in a ship's `hold`, `left` at a settlement, or
+    # `taken` by robbers. Stored, because where a cart of salt is is something that
+    # happened. A guard defends a lot by where it is (docs/trade-goods.md).
+    cargo: list[dict] = field(default_factory=list)
+    # How far each market's price for a trade good has been pushed, "place|row" ->
+    # {"net": units bought (+) or sold (-), "day"}; it ebbs back over a week
+    # (`trade.pressure`), so a route cannot be farmed for ever.
+    trade_pressure: dict[str, dict] = field(default_factory=dict)
     # The engagement at sea, when there is one: which two ships, how far apart, and
     # whether the grapnels are in. `{"ours", "theirs", "range", "grappled"}`.
     #
@@ -14318,6 +14328,13 @@ class Engine:
             return stopped
         # Setting out is walking away, whatever the road then does.
         parted = self.end_talk("walked away")
+        # The cargo goes with the party as far as its backs, beasts and wagon can take it
+        # (`trade.load_up`); the rest stays where it was left, said.
+        took_up, set_down = trade_mod.load_up(self.scene)
+        cargo_note = " ".join(x for x in (
+            f"Loaded: {_and_list(took_up)}." if took_up else "",
+            f"Too much to haul, left at {self._settlement_name(self.scene.location_id) or 'the start'}: "
+            f"{_and_list(set_down)}." if set_down else "") if x)
 
         # A road already half walked is half a road. `scene.road` is what an interrupted
         # journey left behind, and it is only good for the road it was left on: setting
@@ -14527,6 +14544,15 @@ class Engine:
             -(-max(1, int(hours)) // journey_mod.HOURS_PER_DAY))
         if keep_note:
             mount_note = (mount_note + " " + keep_note).strip()
+        if met is not None and met.kind == "toll" and trade_mod.toll_cp(self.scene):
+            # The toll-keeper's levy on the cargo, the engine's figure (`trade.toll_cp`):
+            # paid with a `pay`, like the toll itself, or gone round.
+            levy = trade_mod.toll_cp(self.scene)
+            cargo_note = (cargo_note + f" They want "
+                          f"{goods.purse_line(goods.coins_for(levy), self._coins_here())} "
+                          f"on the cargo, a fortieth of its worth.").strip()
+        if cargo_note:
+            mount_note = (mount_note + " " + cargo_note).strip()
 
         # The register's fields on every branch (docs/fix-interfaces.md §2.7).
         common = {"from_id": from_id, "setting": places_mod.setting_of(self.scene.at),
@@ -17130,6 +17156,10 @@ class Engine:
         miles = leg.miles if leg.source == "exact" and leg.miles \
             else days * ships_mod.miles_a_day(ship.kind)
         book = ships_mod.fare_cp(miles, heads)
+        # Freight for the party's cargo, by the berth rate for its weight
+        # (`trade.freight_cp`): one quote for the exits row and the booking.
+        book += trade_mod.freight_cp(
+            sum(trade_mod.lb_of(x) for x in trade_mod.shipping(self.scene)), miles)
         percent, _why, _seller = self.passage_terms()
         pc = self.scene.pc()
         # The shop's own machinery (`_op_buy`): the law's markup on the book's price, then
@@ -17255,6 +17285,13 @@ class Engine:
             effects.append({"kind": "give", "ref": pc.ref, "item": "coin", "count": cost,
                             "how": "fare", "from": pc.ref, "to": ship.id,
                             "purse": dict(pc.purse), "goods": dict(pc.goods)})
+            freight = trade_mod.into_hold(self.scene, ship.id)
+            if freight:
+                moved = (f"{moved}. " if moved else "") + (
+                    f"The fare carries {_and_list(freight)} in her hold as freight, at the "
+                    f"berth rate for its weight")
+                effects.append({"kind": "cargo", "how": "shipped", "vessel": ship.id,
+                                "lots": freight})
             paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
                     f"passage to {leg.to_name} on {ship.name}, {english.a(ship.kind)}: "
                     f"{days} day{'s' if days != 1 else ''} "
@@ -17431,6 +17468,11 @@ class Engine:
                         "arrived": True, "how": "sea", "place": self.scene.at})
         bits.append(f"She makes {dest_name} and ties up; {pc.name if pc else 'the party'} "
                     f"goes ashore at {self.here().name}.")
+        landed = trade_mod.unload(self.scene, ship.id, dest)
+        if landed:
+            bits.append(f"{_sentence(_and_list(landed))} {'is' if len(landed) == 1 else 'are'}"
+                        f" swung onto the quay.")
+            effects.append({"kind": "cargo", "how": "landed", "at": dest, "lots": landed})
         return Outcome(intent_id=intent.id, op="journey", effects=effects,
                        tell=" ".join(bits + told), because=intent.because)
 
@@ -17593,6 +17635,8 @@ class Engine:
                                   visibility="hidden").total <= ships_mod.GOODS_LOST_PCT:
                     lost.append(name)
                     a.goods.pop(name, None)
+        sunk = trade_mod.lost_with(self.scene, ship.id)
+        lost.extend(sunk)
         if lost:
             effects.append({"kind": "lost", "items": lost, "origin": "rule:shipwreck"})
         self.scene.advance(hours * survival.MINUTES_PER_HOUR, charge_body=False)
@@ -21034,9 +21078,16 @@ class Engine:
         actor = self.scene.actors[intent.actor]
         item_id = str(intent.params["item"]).strip().lower()
         count = max(1, int(intent.params.get("count") or 1))
+        if item_id.startswith(trade_mod.PREFIX):
+            return self._sell_cargo(intent, actor, item_id[len(trade_mod.PREFIX):], count)
 
         held = actor.stock.get(item_id)
         if held is None or held.count < 1:
+            # The party's cargo, named in words: a lot of it is here to sell.
+            bulk = trade_mod.row_for(item_id)
+            if bulk and trade_mod.reachable(self.scene, bulk) \
+                    and holding.key_in(actor.goods, intent.params["item"]) is None:
+                return self._sell_cargo(intent, actor, bulk, count)
             # Not a jar: a thing out of the pack (item 2 of 2026-10-03). The crate
             # Kesst carried to the counting house was haggled over for four turns and
             # never sold, because this op only knew the crafting shelf.
@@ -21273,6 +21324,10 @@ class Engine:
         place = str(self.scene.location_id or "nowhere")
         stall = self._stall_here(intent, seller, want=item_id)
         day = market_mod.day_of(self.scene.clock_minutes)
+        # Bulk trade goods (rules/trade.py): the panel names them `cargo:<row>`.
+        if item_id.startswith(trade_mod.PREFIX):
+            return self._buy_cargo(intent, actor, item_id[len(trade_mod.PREFIX):], count,
+                                   self._counter_keeper(seller, stall), who)
 
         # The stall names the counter when it is one of a market's (`market:armorer`, I2):
         # the armorer's shelf, not the whole market's.
@@ -21284,6 +21339,18 @@ class Engine:
         found = next((m for m in counter if str(getattr(m, "id", "")).lower() == item_id),
                      None)
         if found is None:
+            # A trade good this place makes, named by the plan in words ("iron", "salt"):
+            # sold by the unit before the shelf's matcher is asked, which answered "iron"
+            # with the one bar of cold iron on the counter (2026-11-14). By the world's
+            # table, never a guess (`trade.row_for`); a shelf row named exactly by its id
+            # was taken above. Only the good's own name or the world's word for it: "some
+            # tools" in a town that ships "iron tools" is a tool, not a pound of iron.
+            bulk = trade_mod.row_for(item_id)
+            made = trade_mod.supplied_at(self.world, place)
+            if bulk in made and item_id in (trade_mod.ROWS[bulk][0],
+                                             " ".join(made[bulk].lower().split())):
+                return self._buy_cargo(intent, actor, bulk, count,
+                                       self._counter_keeper(seller, stall), who)
             # Named the way a person names it ("rope", "a coil of rope") rather than by
             # id: the shelf's own matcher, which guesses nothing (`goods.match_want`).
             found, _ = goods.match_want(item_id, counter)
@@ -21355,6 +21422,136 @@ class Engine:
                  + arrived_tell,
             because=intent.because,
         )
+
+    def _cargo_terms(self, actor, keeper) -> tuple[int, str, float]:
+        """(percent, the reason in words, the law's markup) a bulk trade is moved by: the
+        keeper's own terms (`pricing.seller_percent`: attitude and thrift, inside the
+        haggle's floor) and the watch's markup — NOT the day's haggle, for "trade goods
+        are exempt from bargaining" (Ultimate Campaign p.139)."""
+        from . import pricing
+
+        percent, why = pricing.seller_percent(self.scene, keeper)
+        moved = tradecraft.terms_said(keeper, percent, why) if keeper is not None else ""
+        return percent, moved, pricing.markup_for(actor, str(self.scene.location_id or ""))
+
+    def _buy_cargo(self, intent: Intent, actor, key: str, count: int, keeper,
+                   who: str) -> Outcome:
+        """Buy a trade good by the unit where the world says it is made (rules/trade.py).
+
+        The book's price (CRB Table 6-3) times this market's standing, pushed up by every
+        unit the party buys and ebbing back over a week; never more than the market has.
+        What the party cannot haul waits here, `left`, for a ship's hold or a second
+        trip."""
+        from . import pricing
+
+        place = str(self.scene.location_id or "")
+        made = trade_mod.supplied_at(self.world, place)
+        if key not in trade_mod.ROWS or key not in made:
+            what = trade_mod.ROWS[key][0] if key in trade_mod.ROWS else key
+            from_ = sorted({trade_mod._name(self.world, str(r.get("origin_id") or ""))
+                            for r in getattr(self.world, "trade_routes", None) or ()
+                            if trade_mod.route_row(r) == key}
+                           - {""})
+            return self._refuse(
+                intent, f"Nobody here sells {what} in bulk."
+                        + (f" It comes from {_and_list(from_)}." if from_ else ""))
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        r = trade_mod.row(key)
+        left = trade_mod.can_buy(self.scene, self.world, place, key)
+        if left <= 0:
+            return self._refuse(
+                intent, f"{_sentence(who)} has no {r['name']} left to sell in bulk: the "
+                        f"party has bought this market out, and it fills again over "
+                        f"{trade_mod.RECOVER_DAYS} days.")
+        units = min(int(count), left)
+        percent, moved, markup = self._cargo_terms(actor, keeper)
+        book = trade_mod.book_cp(self.scene, self.world, place, key, units, buying=True)
+        cost = pricing.moved_cp(book * markup, percent)
+        coins = self._coins_here()
+        purse, paid = goods.spend(actor.purse, cost)
+        if not paid:
+            return Outcome(
+                intent_id=intent.id, op="buy", effects=[],
+                tell=f"{trade_mod.said({'key': key, 'name': r['name'], 'units': units})} "
+                     f"is {goods.purse_line(goods.coins_for(cost), coins)} and "
+                     f"{actor.name} has {goods.purse_line(actor.purse, coins)}. Nothing "
+                     f"changes hands.",
+                because=intent.because)
+        actor.purse = purse
+        trade_mod.record(self.scene, self.world, place, key, units, buying=True)
+        lot = trade_mod.add_lot(self.scene, key, units, actor.ref, cost, place,
+                                made.get(key, ""))
+        waits = ""
+        haul = trade_mod.haul_lb(self.scene)
+        if trade_mod.with_party_lb(self.scene) > haul["lb"]:
+            _up, behind = trade_mod.load_up(self.scene)
+            how = f" ({_and_list(haul['how'])})" if haul["how"] else ""
+            waits = (f" The party can haul {haul['lb']:g} lb{how}; {_and_list(behind)} "
+                     f"waits here until it can be carried or shipped.")
+        dear = trade_mod.sells_dear_in(self.world, key, place)
+        tell = (f"{actor.name} pays {who} {goods.purse_line(goods.coins_for(cost), coins)} "
+                f"for {trade_mod.said({'key': key, 'name': r['name'], 'units': units})}, "
+                f"the book's {r['name']} at {self._coin_text(r['cp'] / 100)} a {r['unit']}, "
+                f"cheaper where it is made" + (f" ({moved})" if moved else "") + "."
+                + (f" It sells dear in {_and_list(dear[:4])}." if dear else "")
+                + (" That is all the market had." if units < count else "")
+                + waits + f" ({goods.purse_line(actor.purse, coins)} left.)")
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "cargo", "how": "bought", "row": key,
+                      "units": units, "paid_cp": cost, "lot": lot["id"],
+                      "from": getattr(keeper, "ref", "") or ""}],
+            tell=tell, because=intent.because)
+
+    def _sell_cargo(self, intent: Intent, actor, key: str, count: int) -> Outcome:
+        """Sell the party's trade goods here, at full value (CRB p.140: the exception to
+        half-price selling) times this market's standing — dear where a route carries
+        them, pushed down by every unit sold. Never more than the market will take."""
+        place = str(self.scene.location_id or "")
+        name = trade_mod.ROWS[key][0] if key in trade_mod.ROWS else key
+        have = sum(int(x["units"]) for x in trade_mod.reachable(self.scene, key))
+        if key not in trade_mod.ROWS or have <= 0:
+            return self._refuse(intent, f"The party has no {name} here to sell.")
+        buyer_ref = intent.params.get("to")
+        if buyer_ref and buyer_ref not in self.scene.actors:
+            return self._refuse(intent, self._elsewhere(buyer_ref)
+                                or f"There is no {buyer_ref} here to sell to.")
+        keeper = self._counter_keeper(buyer_ref, self._stall_here(intent, buyer_ref))
+        who = keeper.name if keeper is not None else "the merchants"
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        room = trade_mod.can_sell(self.scene, self.world, place, key)
+        if room <= 0:
+            return self._refuse(
+                intent, f"Nobody here will take more {name}: the market is full of it, "
+                        f"and it clears over {trade_mod.RECOVER_DAYS} days.")
+        units = min(int(count), have, room)
+        percent, moved, markup = self._cargo_terms(actor, keeper)
+        book = trade_mod.book_cp(self.scene, self.world, place, key, units, buying=False)
+        got = int(tradecraft.sell_price(book / markup, percent))
+        taken, cost = trade_mod.take_units(self.scene, key, units)
+        trade_mod.record(self.scene, self.world, place, key, taken, buying=False)
+        actor.purse = goods.credit(actor.purse, got)
+        coins = self._coins_here()
+        why = {"demand": "wanted here", "supply": "made here, so cheap"}.get(
+            trade_mod.standing(self.world, place, key), "")
+        net = got - cost
+        tell = (f"{actor.name} sells {trade_mod.said({'key': key, 'name': name, 'units': taken})} "
+                f"to {who} for {goods.purse_line(goods.coins_for(got), coins)}"
+                + (f", {why}" if why else "") + (f" ({moved})" if moved else "")
+                + (f": {'a profit of' if net >= 0 else 'a loss of'} "
+                   f"{goods.purse_line(goods.coins_for(abs(net)), coins)} on what it cost"
+                   if cost else "")
+                + "." + (" That is all the market will take." if taken < min(count, have)
+                         else "")
+                + f" ({goods.purse_line(actor.purse, coins)} in hand.)")
+        return Outcome(
+            intent_id=intent.id, op="sell",
+            effects=[{"ref": actor.ref, "kind": "cargo", "how": "sold", "row": key,
+                      "units": taken, "paid_cp": got,
+                      "to": getattr(keeper, "ref", "") or ""}],
+            tell=tell, because=intent.because)
 
     def _op_cast(self, intent: Intent, partial: dict) -> Outcome:
         """Cast a spell: spend the slot, state the numbers, and roll what the spell says.

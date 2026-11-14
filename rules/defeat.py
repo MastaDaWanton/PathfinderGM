@@ -487,6 +487,19 @@ def aftermath(scene, pc, coins=None, *, here_name: str = "",
             _move(scene, pc, robber, thing)
             thing["pc_left"] = holds(pc, thing)
         share = coin_share(len(robbers))
+        # And the party's cargo where they fell: the cart, the pack beasts' loads, the
+        # ship's hold (`trade.robbed`) — still the party's by right, now stolen.
+        from . import trade
+
+        hauled = trade.robbed(scene, robber.ref)
+        cargo_line = ""
+        if hauled:
+            effects.append({"kind": "cargo", "how": "taken", "ref": robber.ref,
+                            "from": pc.ref, "lots": hauled, "why": "robbed while down"})
+            cargo_line = (f"{robber.name}"
+                          + (" and the rest drive" if len(robbers) > 1 else " drives")
+                          + " off the party's cargo: "
+                          f"{trade_and(hauled)}.")
         effects.append({"kind": "took", "ref": robber.ref, "from": pc.ref,
                         "items": ([f"{n} {coin}" for coin, n in took.items()]
                                   + ([thing["name"]] if thing else [])),
@@ -494,6 +507,8 @@ def aftermath(scene, pc, coins=None, *, here_name: str = "",
                         "of": dict(purse), "thing": dict(thing) if thing else {},
                         "why": "robbed while down"})
         lines.append(_robbed_line(robber, took, purse, thing, coins))
+        if cargo_line:
+            lines.append(cargo_line)
     where = _offstage(scene)
     landmark = str(getattr(scene, "at", "") or "")
     gone = []
@@ -510,6 +525,11 @@ def aftermath(scene, pc, coins=None, *, here_name: str = "",
                         "origin": QUEST_ORIGIN, "hideout": card.recover.get("hideout", "")})
         lines.append(f"You mean to get it back. It is in your journal: {card.title}.")
     return effects, [_upper_first(x) for x in lines]
+
+
+def trade_and(names) -> str:
+    names = list(names)
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
 
 
 def _robbed_line(robber, took: dict, purse: dict, thing, coins) -> str:

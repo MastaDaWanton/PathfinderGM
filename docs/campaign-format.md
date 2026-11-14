@@ -141,6 +141,12 @@ A route carries `origin`/`destination` with matching `origin_id`/`destination_id
 the buyer needs them), `conduct` (how the exchange is actually done) and `friction` (what
 it strains). Endpoint ids are `null` if the place has not been written up.
 
+*(proposed 2026-11-14, read today)* `good` (`{kind, worth, service}`, words) and `volume`
+(`trickle` / `steady` / `heavy`) say what the route carries and how much. The app trades
+each route's commodity in bulk from its origin to its destination at the Core Rulebook's
+Trade Goods prices (`rules/trade.py`; docs/for-world-bible.md asks 19–21). Absent, the
+commodity's own words choose the row.
+
 A faction carries `name`, `description`, `reach`, `aim`, `method`, `foothold` and
 `weakness`.
 
