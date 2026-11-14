@@ -383,6 +383,7 @@ def definite(name: str) -> str:
 
 _QUOTED = re.compile(r"\"[^\"]*\"|“[^”]*”")
 _WORD_BEFORE = re.compile(r"([A-Za-z'’]+)\s+$")
+_POSSESSIVE = re.compile(r"(?:['’]s|s['’])$", re.I)
 _SENTENCE_START = re.compile(r"(?:^|[.!?]\s+|\n\s*)$")
 
 
@@ -413,7 +414,10 @@ def with_articles(text: str, names) -> str:
         # The name as it is kept, and — for a descriptor — as a sentence opening
         # capitalises it ("Man comes round" from a `.capitalize()`d tell).
         forms = [re.escape(name)]
-        if is_descriptor(name):
+        if name[:1].islower():
+            # Any name that opens lower case, determiner or not: "The ship's master" at
+            # a sentence's start must claim its span, or "master" inside it is taken
+            # for another person (live 2026-11-13: "The ship's the master").
             forms.append(re.escape(name[:1].upper() + name[1:]))
         rx = re.compile(rf"(?<![\w'’-])(?:{'|'.join(forms)})(?![\w-])")
         for m in rx.finditer(text):
@@ -428,8 +432,9 @@ def with_articles(text: str, names) -> str:
             if not is_descriptor(name):
                 continue
             prev = _WORD_BEFORE.search(before)
-            if prev and prev.group(1).lower() in _DETERMINERS:
-                continue
+            if prev and (prev.group(1).lower() in _DETERMINERS
+                         or _POSSESSIVE.search(prev.group(1))):
+                continue                 # "the ship's master", "Kesst's man": definite
             edits.append((lo, hi, f"{'The' if opening else 'the'} {name}"))
     for lo, hi, new in sorted(edits, reverse=True):
         text = text[:lo] + new + text[hi:]
