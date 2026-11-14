@@ -14257,8 +14257,30 @@ class Engine:
         # the integrator's run the same day, a crossing that started inland was still the
         # old free one — no ship, no fare, no weather — while its way back was paid: Vormoor
         # to Ledgerwarren cost nothing and Ledgerwarren to Vormoor a platinum piece.
+        sea_leg, harbour = None, ""
         if how == "sea":
-            return self._book_passage(intent, leg)
+            coast = self.road_to_the_coast(leg)
+            if coast is None:
+                return self._book_passage(intent, leg)
+            # Inland: the road to the harbour is a journey like any other, walked by
+            # everything below, and the berth is bought on arrival (`road_to_the_coast`).
+            # The fare is checked first: four days' march to be told at the quay that the
+            # purse is short is the refusal the exits row's price was there to prevent.
+            sea_leg, leg = leg, coast
+            harbour = "" if leg.to_id == sea_leg.to_id else leg.to_id
+            if pc is not None:
+                heads = 1 + len(self._passage_party(intent))
+                ship, _days, cost = self.passage_quote(sea_leg, heads, port=harbour)
+                if goods.in_copper(pc.purse) < cost:
+                    coins = self._coins_here()
+                    return self._refuse(
+                        intent, f"Passage to {sea_leg.to_name} from "
+                                f"{harbour and leg.to_name or 'the coast'} is "
+                                f"{goods.purse_line(goods.coins_for(cost), coins)} for "
+                                f"{heads} (a silver piece a mile a head), and {pc.name} "
+                                f"carries {goods.purse_line(pc.purse, coins)}.")
+            hours, measured, how = journey_mod.hours_for(leg, speed)
+            on_foot = hours
 
         # On foot, riding, or at a gallop (the owner's ruling Q13; `journey.mounted_hours`
         # carries the sourced rules). Checked before anything moves: a refusal here must
@@ -14413,7 +14435,10 @@ class Engine:
             met, stopped_short = None, False
 
         if arrived and not stopped_short:
-            self.scene.location_id = leg.to_id
+            # The derived road to an unwritten coast ends where it began: the ship lies
+            # off this town's own shore (`road_to_the_coast`).
+            if sea_leg is None or harbour:
+                self.scene.location_id = leg.to_id
             # A march between settlements is this turn's journey too (item 35), and a
             # `travel` behind it would walk the party across the new town the moment it
             # arrived. A road turned back from cost hours but moved nobody, so it does
@@ -14438,6 +14463,10 @@ class Engine:
                                # nobody an inch nearer the far end. And they are hours
                                # ON FOOT, whatever the pace was.
                                "walked": resumed + walked_units}
+            if sea_leg is not None:
+                # The crossing this road is the start of: the exits row offers it
+                # from the stretch of road, and the next journey resumes it.
+                self.scene.road["then"] = sea_leg.to_id
             crosses = [c for c in (biomes.canonical(str(x)) for x in leg.crosses) if c]
             total = max(1, on_foot)
             if crosses:
@@ -14585,7 +14614,7 @@ class Engine:
         note = str(intent.params.get("note") or "").strip()
         if note:
             bits.append(note)
-        return Outcome(
+        done = Outcome(
             intent_id=intent.id, op="journey",
             effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                       "hours": hours, "measured": measured, "how": how,
@@ -14594,6 +14623,13 @@ class Engine:
             tell=" ".join(bits),
             because=intent.because,
         )
+        if sea_leg is not None:
+            # At the harbour: the berth bought and boarded, as from any port. A purse
+            # the quay's own terms find short leaves them ashore there, the road walked.
+            booked = self._book_passage(intent, sea_leg)
+            done.effects += booked.effects
+            done.tell = f"{done.tell} {booked.tell}".strip()
+        return done
 
     def watch_at_the_way_out(self, pc, was_place: str, going_to, known, *,
                              through: bool = False, crossing: bool = True
@@ -17043,14 +17079,47 @@ class Engine:
         found = self.world.get(entity_id) if self.world is not None and entity_id else None
         return str(getattr(found, "name", "") or "port")
 
-    def passage_quote(self, leg, heads: int = 1):
-        """(ship, days, fare in copper) for a berth on this leg from here: the port's
-        passenger ship (a keelboat on a river), the days by her speed over the world's
-        miles or the tree's days, and 1 sp a mile a head (CRB Table 6-9). One rule for the
-        booking and the exits row's price."""
+    def road_to_the_coast(self, sea_leg):
+        """The road an inland crossing walks before it boards, or None when it boards here.
+
+        Lane fix/overland-to-the-port, 2026-11-14: in 0.3.2 a crossing from an inland town
+        booked and boarded on the spot, with no time on the clock — "the road to the coast"
+        cost nothing. Measured on Aurvantis that day: 52 stated sea legs start inland, 36
+        of them END inland too (so "go to the port first" would strand them: no port sells
+        a berth to an inland town), and 39 have a road from the start to a port. So the
+        player books where they stand and is walked there, by the journey op itself.
+
+        The road is the quickest of the world's own roads to a port (CRB Table 7-8/7-9 by
+        `journey.hours_for`). With no road to any port (13 of the 52, and all 3 of
+        Pangrella's), the coast is somewhere the world never wrote down: a day's road
+        (`journey._depth_apart`'s smallest step), derived, and boarding from the town's
+        own shore as before — for-world-bible ask 8 is what would make it exact. The
+        derived leg carries the sea leg's `to_id`, so a road stopped short resumes."""
+        from . import journey as journey_mod
+
+        pc = self.scene.pc()
+        return journey_mod.coast_road(self.world, self.scene.location_id, sea_leg,
+                                      pc.speed_feet if pc is not None else 30)
+
+    def _passage_party(self, intent: Intent) -> list[str]:
+        """Who takes a berth with the PC: whoever the intent names and whoever travels
+        with them. One list for the fare checked before the road and the one charged."""
+        escorts = [str(w) for w in (intent.params.get("with") or [])
+                   if str(w) in self.scene.actors]
+        escorts += [r for r, a in self.scene.actors.items()
+                    if r not in escorts and not a.is_pc
+                    and a.has_state(states.TRAVELS_WITH_YOU)]
+        return escorts
+
+    def passage_quote(self, leg, heads: int = 1, port: str = ""):
+        """(ship, days, fare in copper) for a berth on this leg from here (or from `port`,
+        the harbour an inland crossing walks to): the port's passenger ship (a keelboat on
+        a river), the days by her speed over the world's miles or the tree's days, and
+        1 sp a mile a head (CRB Table 6-9). One rule for the booking and the exits row's
+        price."""
         from . import places as places_mod, pricing, ships as ships_mod
 
-        here = self.scene.location_id
+        here = port or self.scene.location_id
         town = self.world.get(here) if self.world is not None else None
         offered = ships_mod.passenger_ship(
             here, places_mod.scale_of(town) if town is not None else "town",
@@ -17157,11 +17226,7 @@ class Engine:
         if self.scene.initiative:
             return self._refuse(intent, "Nobody sells a berth in the middle of a fight.")
         here = self.scene.location_id
-        escorts = [str(w) for w in (intent.params.get("with") or [])
-                   if str(w) in self.scene.actors]
-        escorts += [r for r, a in self.scene.actors.items()
-                    if r not in escorts and not a.is_pc
-                    and a.has_state(states.TRAVELS_WITH_YOU)]
+        escorts = self._passage_party(intent)
         # A berth booked here and not yet sailed is the same berth: aboard again, free.
         ship = next((v for v in (ships_mod.Vessel.from_dict(r) for r in self.scene.vessels)
                      if v is not None and v.at == here and v.bound_for == leg.to_id
@@ -17195,10 +17260,6 @@ class Engine:
                     f"{days} day{'s' if days != 1 else ''} "
                     f"{'on the river' if ship.river else 'at sea'}."
                     + (f" {moved}." if moved else ""))
-            if not leg.from_port and not ship.river:
-                # No docks here: the passage is from where the road meets the coast, as
-                # the old free crossing said too, and costs no time of its own (as before).
-                paid = f"By the road to the coast: {paid}"
         ship.passengers = [pc.ref, *escorts]
         self._keep_vessel(ship)
         parted = self.end_talk("walked away")

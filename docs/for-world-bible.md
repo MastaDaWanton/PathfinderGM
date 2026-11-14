@@ -302,6 +302,13 @@ mile a head, CRB Table 6-9) are the world's rather than the tree's. Optionally
 **Sea danger** is ask 16's `volatility`, read off the two ports' own ratings (the worse
 of the two) until a world has sea regions to put it on.
 
+**8d. Where an inland crossing boards (2026-11-14).** A stated sea route from an inland
+town is now walked to a harbour first, by the quickest stated road to a port. Measured on
+Aurvantis: 13 of 52 inland sea legs (and all 3 of Pangrella's) have **no road to any
+port**, so this app walks a derived day to a coast it cannot name. Either fixes it, the
+first smaller: `"leaves_from_id": "<port settlement id>"` on the sea route, or a stated
+road from that town to a port.
+
 **Not asked for:** coastlines as geometry, sea routes as waypoints, or anything with
 coordinates in it. The boundary holds — the world says which places touch water, and this
 app decides what crossing it costs.

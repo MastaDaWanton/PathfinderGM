@@ -240,9 +240,13 @@ def test_a_crossing_from_inland_is_a_passage_too():
     engine = Engine(scene, Dice(seed=4), world=PANGRELLA)
     engine.place_party()
     pc.purse = {"gp": 500}
+    before = scene.clock_minutes
     out = _journey(engine, to="Khalmorin")
     assert engine.aboard() is not None and pc.purse != {"gp": 500}, out.tell
-    assert out.tell.startswith("By the road to the coast"), out.tell
+    # And the road to the coast is walked (fix/overland-to-the-port, 2026-11-14): 0.3.2
+    # boarded with 0 minutes on the clock. With no road to a port, a derived day's road.
+    assert scene.clock_minutes - before >= journey.HOURS_PER_DAY * 60, out.tell
+    assert out.tell.startswith("A day on the road, and the coast"), out.tell
     _journey(engine, to="Khalmorin")
     assert scene.location_id == khalmorin
 

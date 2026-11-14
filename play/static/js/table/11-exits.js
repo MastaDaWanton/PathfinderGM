@@ -65,9 +65,11 @@ function exitNorm(text) {
 function exitChip(e, fighting) {
   // A passage's words are the engine's own (play/exits.py `_days_aboard`): its days pass
   // aboard, never "on the road" (measured live 2026-11-13 on a sea crossing's chip).
+  // Inland, the road to the harbour comes first ("... on foot to Scrapden, then ...").
   const aboard = /\b(?:at sea|on the river)\b/.test(String(e.time_words || ""));
-  const days = e.journey
-    ? `${upFirst(e.time_words)}; the days pass ${aboard ? "aboard" : "on the road"}.` : "";
+  const road = /\b(?:on foot|riding) to\b/.test(String(e.time_words || ""));
+  const where = aboard && road ? "on the road, then aboard" : aboard ? "aboard" : "on the road";
+  const days = e.journey ? `${upFirst(e.time_words)}; the days pass ${where}.` : "";
   if (fighting) {
     return { id: e.id, name: e.name, journey: !!e.journey, label: "Withdraw",
              note: days ? `${WITHDRAW_LINE} ${days}` : WITHDRAW_LINE };
